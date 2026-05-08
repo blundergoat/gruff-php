@@ -1,0 +1,85 @@
+# CLAUDE.md - v1.5.1 (2026-05-09)
+gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app structure or commands until real source/config files exist.
+
+## Truth Order
+
+1. User's explicit instruction in the current session
+2. This instruction file
+3. `.goat-flow/architecture.md`
+4. `.goat-flow/code-map.md`
+5. Skills and `.goat-flow/skill-reference/` on demand
+
+## Autonomy Tiers
+
+**Always:** Read files, inspect git status, run goat-flow audits, and edit `CLAUDE.md`, `.claude/**`, and `.goat-flow/**` when asked to maintain Claude/goat-flow setup.
+
+**Ask First:** Before changing `README.md`, deleting files, changing peer agent surfaces (`AGENTS.md`, `.codex/**`, `.agents/**`), or adding application structure beyond the user's request, state the boundary, files read, learning-loop check, local instruction check, and rollback command.
+
+**Never:** Invent PHP app commands, frameworks, services, incidents, footguns, or lessons. Do not commit, push, edit secrets, or run destructive git commands unless explicitly requested.
+
+## Hard Rules
+
+- If a file exists, modify it in place; do not create backup or `_new` variants.
+- Keep app claims grounded in existing files. Today there is no `composer.json`, `src/`, `tests/`, or PHP runtime config.
+- Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
+- Preserve cross-agent consistency between `CLAUDE.md` and `AGENTS.md` for shared goat-flow rules.
+- Keep the controlling goat-flow workspace distinct from this selected target project when tools or prompts originate outside this checkout.
+
+## Key Resources
+
+- Learning loop: `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/`
+- Tool playbooks: `.goat-flow/skill-reference/browser-use.md`, `.goat-flow/skill-reference/page-capture.md`
+- Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
+
+## Essential Commands
+
+No application lint, typecheck, build, or test command is configured yet.
+
+```bash
+git status --short --untracked-files=all
+node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude
+node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude --harness
+```
+
+## Execution Loop: READ -> SCOPE -> ACT -> VERIFY
+
+When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
+
+### READ
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-reference/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
+
+### SCOPE
+Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
+
+### ACT
+State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly and prefer existing project patterns over new abstractions.
+
+### VERIFY
+Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
+
+## Definition of Done
+
+- Changed files are listed.
+- Relevant checks were run or explicitly skipped with reason.
+- No broken router paths or stale references were introduced.
+- Learning-loop updates were made only for real incidents or measured traps.
+- No unapproved peer-agent or application-surface changes were made.
+
+## Artifact Routing
+
+Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lessons/<category>.md`; decisions in `.goat-flow/decisions/ADR-NNN.md`; patterns in `.goat-flow/patterns/<category>.md`. Read the target directory README before adding artifacts.
+
+## Router Table
+
+| Resource | Path |
+|----------|------|
+| Claude instruction file | `CLAUDE.md` |
+| Codex peer instruction file | `AGENTS.md` |
+| Learning loop | `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/` |
+| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-* references) | `.goat-flow/skill-reference/` - read BEFORE declaring a tool unavailable |
+| Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
+| Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
+| Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |
+| Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/tasks/`, `.goat-flow/scratchpad/` |
+| Commit guidance | `.github/git-commit-instructions.md` |
+| Project entry docs | `README.md` |
