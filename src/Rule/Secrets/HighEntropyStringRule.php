@@ -48,7 +48,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            if ($this->skipKnownSecretPattern($value) || SecretScannerHelper::isLikelyDummyValue($value)) {
+            if ($this->skipKnownSecretPattern($value) || $this->isPathLikeLiteral($value) || SecretScannerHelper::isLikelyDummyValue($value)) {
                 continue;
             }
 
@@ -84,5 +84,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || str_starts_with($value, 'xox')
             || substr_count($value, '.') === 2
             || ctype_xdigit($value);
+    }
+
+    private function isPathLikeLiteral(string $value): bool
+    {
+        if (!str_contains($value, '/') && !str_contains($value, '\\')) {
+            return false;
+        }
+
+        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $value) === 1;
     }
 }

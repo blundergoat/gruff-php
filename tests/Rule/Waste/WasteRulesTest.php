@@ -66,12 +66,28 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('AbstractFixture::abstractMethod()', $symbols);
     }
 
+    public function testPromotedConstructorNotFlaggedAsEmpty(): void
+    {
+        $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('PromotedConstructorFixture::__construct()', $symbols);
+    }
+
     public function testEmptyClassDetected(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
 
         self::assertCount(1, $findings);
         self::assertSame('EmptyClassFixture', $findings[0]->symbol);
+    }
+
+    public function testEmptyExceptionMarkerNotFlaggedAsEmptyClass(): void
+    {
+        $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('EmptyExceptionFixture', $symbols);
     }
 
     public function testUnusedImportsDetected(): void

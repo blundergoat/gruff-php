@@ -50,6 +50,10 @@ final readonly class EmptyClassRule implements RuleInterface
                 continue;
             }
 
+            if ($this->isEmptyExceptionMarker($class)) {
+                continue;
+            }
+
             $symbol = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
             $findings[] = new Finding(
@@ -68,5 +72,21 @@ final readonly class EmptyClassRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function isEmptyExceptionMarker(Class_ $class): bool
+    {
+        if ($class->extends === null) {
+            return false;
+        }
+
+        $parent = $class->extends->toString();
+
+        return $parent === 'Exception'
+            || $parent === 'Throwable'
+            || str_ends_with($parent, 'Exception')
+            || str_ends_with($parent, 'Throwable')
+            || str_ends_with($parent, '\\Exception')
+            || str_ends_with($parent, '\\Throwable');
     }
 }

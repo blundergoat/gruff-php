@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node\Stmt\ClassMethod;
 
 final readonly class NoAssertionsRule implements RuleInterface
 {
@@ -35,7 +36,7 @@ final readonly class NoAssertionsRule implements RuleInterface
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
+            if ($this->hasObservableExpectation($scope)) {
                 continue;
             }
 
@@ -55,5 +56,36 @@ final readonly class NoAssertionsRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function hasObservableExpectation(TestQualityScope $scope): bool
+    {
+        if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
+            return true;
+        }
+
+        if ($scope->node instanceof ClassMethod && $this->hasExpectedExceptionAnnotation($scope->node)) {
+            return true;
+        }
+
+        foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            if (TestQualityNodeHelper::isMockVerificationCall($call)) {
+                return true;
+            }
+
+            $name = TestQualityNodeHelper::callName($call);
+            if (in_array($name, ['addtoassertioncount', 'marktestincomplete', 'marktestskipped'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasExpectedExceptionAnnotation(ClassMethod $method): bool
+    {
+        $docText = strtolower($method->getDocComment()?->getText() ?? '');
+
+        return str_contains($docText, '@expectedexception');
     }
 }

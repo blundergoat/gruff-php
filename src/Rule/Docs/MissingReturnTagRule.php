@@ -70,6 +70,10 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 continue;
             }
 
+            if (!str_contains($docText, '@param')) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(

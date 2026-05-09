@@ -57,12 +57,17 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
                     continue;
                 }
 
+                if ($definition['name'] === 'email' && $this->isAttributionEmail($unit->source, $offset)) {
+                    continue;
+                }
+
+                $line = SecretScannerHelper::lineNumberForOffset($unit->source, $offset);
                 $preview = SecretScannerHelper::redactedPreview($value);
                 $findings[] = SecretScannerHelper::finding(
                     unit: $unit,
                     ruleId: self::ID,
                     message: sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
-                    line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                    line: $line,
                     confidence: Confidence::Medium,
                     detector: $definition['name'],
                     preview: $preview,
@@ -84,5 +89,18 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             || str_contains($normalized, 'example')
             || str_contains($normalized, '555-010')
             || str_contains($normalized, '555 010');
+    }
+
+    private function isAttributionEmail(string $source, int $offset): bool
+    {
+        $lineStart = strrpos(substr($source, 0, $offset), "\n");
+        $lineStart = $lineStart === false ? 0 : $lineStart + 1;
+        $lineEnd = strpos($source, "\n", $offset);
+        $lineEnd = $lineEnd === false ? strlen($source) : $lineEnd;
+        $line = strtolower(substr($source, $lineStart, $lineEnd - $lineStart));
+
+        return str_contains($line, '@author')
+            || str_contains($line, 'copyright')
+            || str_contains($line, '@copyright');
     }
 }

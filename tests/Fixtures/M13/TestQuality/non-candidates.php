@@ -22,6 +22,14 @@ final class CleanQualityTest extends TestCase
         $this->markTestSkipped('External service sandbox is unavailable in CI.');
     }
 
+    /**
+     * @expectedException \RuntimeException
+     */
+    public function testLegacyExpectedExceptionAnnotation(): void
+    {
+        throw new \RuntimeException('expected');
+    }
+
     public function helperWithCondition(): void
     {
         if (true) {

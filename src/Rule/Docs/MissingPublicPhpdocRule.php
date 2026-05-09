@@ -15,7 +15,15 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\Match_;
 use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Do_;
+use PhpParser\Node\Stmt\For_;
+use PhpParser\Node\Stmt\Foreach_;
+use PhpParser\Node\Stmt\If_;
+use PhpParser\Node\Stmt\Switch_;
+use PhpParser\Node\Stmt\TryCatch;
+use PhpParser\Node\Stmt\While_;
 use PhpParser\NodeFinder;
 
 final readonly class MissingPublicPhpdocRule implements RuleInterface
@@ -39,12 +47,19 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::High,
+            defaultThresholds: [
+                'minBodyLines' => 8,
+                'minParameters' => 2,
+            ],
         );
     }
 
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
+        $settings = $context->settingsFor($definition);
+        $minBodyLines = (int) $settings->numericThreshold('minBodyLines');
+        $minParameters = (int) $settings->numericThreshold('minParameters');
         $finder = new NodeFinder();
         $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
 
@@ -68,6 +83,10 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             $docComment = $method->getDocComment();
 
             if ($docComment !== null) {
+                continue;
+            }
+
+            if (!$this->needsIntentDoc($method, $finder, $minBodyLines, $minParameters)) {
                 continue;
             }
 
@@ -99,5 +118,59 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         }
 
         return false;
+    }
+
+    private function needsIntentDoc(
+        ClassMethod $method,
+        NodeFinder $finder,
+        int $minBodyLines,
+        int $minParameters,
+    ): bool {
+        if (count($method->params) >= $minParameters) {
+            return true;
+        }
+
+        if ($this->bodyLineCount($method) >= $minBodyLines) {
+            return true;
+        }
+
+        return $finder->findFirst($method->stmts ?? [], static function (Node $node): bool {
+            return $node instanceof If_
+                || $node instanceof For_
+                || $node instanceof Foreach_
+                || $node instanceof While_
+                || $node instanceof Do_
+                || $node instanceof Switch_
+                || $node instanceof TryCatch
+                || $node instanceof Match_;
+        }) !== null;
+    }
+
+    private function bodyLineCount(ClassMethod $method): int
+    {
+        if ($method->stmts === null || $method->stmts === []) {
+            return 0;
+        }
+
+        $start = null;
+        $end = null;
+
+        foreach ($method->stmts as $statement) {
+            $statementStart = $statement->getStartLine();
+            $statementEnd = $statement->getEndLine();
+
+            if ($statementStart <= 0 || $statementEnd <= 0) {
+                continue;
+            }
+
+            $start = $start === null ? $statementStart : min($start, $statementStart);
+            $end = $end === null ? $statementEnd : max($end, $statementEnd);
+        }
+
+        if ($start === null || $end === null) {
+            return 0;
+        }
+
+        return $end - $start + 1;
     }
 }

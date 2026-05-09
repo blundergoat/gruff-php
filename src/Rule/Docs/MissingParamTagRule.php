@@ -56,6 +56,11 @@ final readonly class MissingParamTagRule implements RuleInterface
 
             $docText = $docComment->getText();
             $documentedParams = $this->extractParamNames($docText);
+
+            if ($documentedParams === []) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             foreach ($node->params as $param) {

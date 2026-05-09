@@ -8,6 +8,15 @@ class MissingPhpdocFixture
 {
     public function undocumented(int $x): int
     {
+        if ($x > 10) {
+            return $x * 2;
+        }
+
+        return $x + 1;
+    }
+
+    public function trivialUndocumented(int $x): int
+    {
         return $x * 2;
     }
 

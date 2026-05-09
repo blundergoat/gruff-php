@@ -30,6 +30,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::Low,
+            defaultThresholds: ['minPositionalArguments' => 5],
         );
     }
 
@@ -39,6 +40,8 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             return [];
         }
 
+        $definition = $this->definition();
+        $minPositionalArguments = (int) $context->settingsFor($definition)->numericThreshold('minPositionalArguments');
         $finder = new NodeFinder();
         $findings = [];
 
@@ -47,7 +50,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
                 continue;
             }
 
-            $reason = $this->reason($call->args);
+            $reason = $this->reason($call->args, $minPositionalArguments);
             if ($reason === null) {
                 continue;
             }
@@ -75,7 +78,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
      */
-    private function reason(array $args): ?string
+    private function reason(array $args, int $minPositionalArguments): ?string
     {
         $positionalCount = 0;
 
@@ -94,6 +97,6 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             }
         }
 
-        return $positionalCount >= 4 ? sprintf('%d positional arguments', $positionalCount) : null;
+        return $positionalCount >= $minPositionalArguments ? sprintf('%d positional arguments', $positionalCount) : null;
     }
 }

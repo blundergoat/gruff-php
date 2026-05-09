@@ -27,6 +27,17 @@ class NotEmptyClassFixture
     public int $x = 0;
 }
 
+class EmptyExceptionFixture extends \RuntimeException
+{
+}
+
+final class PromotedConstructorFixture
+{
+    public function __construct(private string $name)
+    {
+    }
+}
+
 interface EmptyInterfaceFixture
 {
     public function required(): void;

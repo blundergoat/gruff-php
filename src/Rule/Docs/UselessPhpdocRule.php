@@ -83,7 +83,7 @@ final readonly class UselessPhpdocRule implements RuleInterface
             $hasOnlyTypeRestatements = true;
 
             foreach ($lines as $line) {
-                if (str_starts_with($line, '@param') || str_starts_with($line, '@return')) {
+                if ($this->isBareSignatureRestatement($line)) {
                     continue;
                 }
 
@@ -113,5 +113,27 @@ final readonly class UselessPhpdocRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function isBareSignatureRestatement(string $line): bool
+    {
+        if (preg_match('/^@param\s+(\S+)\s+\$\w+\s*$/', $line, $matches) === 1) {
+            return $this->isSimpleDocType($matches[1]);
+        }
+
+        if (preg_match('/^@return\s+(\S+)\s*$/', $line, $matches) === 1) {
+            return $this->isSimpleDocType($matches[1]);
+        }
+
+        return false;
+    }
+
+    private function isSimpleDocType(string $type): bool
+    {
+        if (preg_match('/[<>{}\\[\\]|&]/', $type) === 1) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -32,8 +32,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             defaultSeverity: Severity::Warning,
             confidence: Confidence::Medium,
             defaultThresholds: [
-                'warning' => 65,
-                'error' => 40,
+                'warning' => 55,
+                'error' => 35,
             ],
         );
     }

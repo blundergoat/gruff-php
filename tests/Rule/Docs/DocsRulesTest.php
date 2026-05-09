@@ -61,6 +61,14 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('MissingPhpdocFixture::privateMethod()', $symbols);
     }
 
+    public function testTrivialTypedPublicMethodExemptFromPhpdoc(): void
+    {
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
+    }
+
     public function testMagicMethodExemptFromPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -74,7 +82,7 @@ final class DocsRulesTest extends TestCase
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
 
         $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $findings);
-        self::assertContains('x', $params);
+        self::assertContains('y', $params);
     }
 
     public function testCompleteParamTagNotFlagged(): void
@@ -91,6 +99,19 @@ final class DocsRulesTest extends TestCase
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::missingReturn()', $symbols);
+    }
+
+    public function testSemanticOnlyDocblockDoesNotRequireSignatureTags(): void
+    {
+        $paramFindings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
+        $returnFindings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
+
+        $symbols = array_merge(
+            array_map(static fn ($f) => $f->symbol, $paramFindings),
+            array_map(static fn ($f) => $f->symbol, $returnFindings),
+        );
+
+        self::assertNotContains('PhpdocTagsFixture::apiMarkerOnly()', $symbols);
     }
 
     public function testStaleParamTagDetected(): void
@@ -115,6 +136,15 @@ final class DocsRulesTest extends TestCase
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::uselessDoc()', $symbols);
+    }
+
+    public function testUsefulTagDetailsAreNotUselessPhpdoc(): void
+    {
+        $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
+        self::assertNotContains('PhpdocTagsFixture::describedTagDoc()', $symbols);
     }
 
     public function testTodoDensityDetected(): void

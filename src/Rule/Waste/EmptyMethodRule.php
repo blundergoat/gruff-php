@@ -55,6 +55,10 @@ final readonly class EmptyMethodRule implements RuleInterface
                 continue;
             }
 
+            if ($node instanceof ClassMethod && $this->isPromotedConstructor($node)) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
@@ -73,5 +77,20 @@ final readonly class EmptyMethodRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function isPromotedConstructor(ClassMethod $method): bool
+    {
+        if ($method->name->toString() !== '__construct') {
+            return false;
+        }
+
+        foreach ($method->params as $param) {
+            if ($param->isPromoted()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

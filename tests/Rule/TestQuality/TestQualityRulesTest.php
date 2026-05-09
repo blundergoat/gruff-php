@@ -89,6 +89,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(SkippedWithoutReasonRule::ID, 0, $findings);
         self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
         self::assertRuleCount(SleepInTestRule::ID, 0, $findings);
+        self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
     }
 
     public function testTestQualityRulesRespectConfigDisables(): void

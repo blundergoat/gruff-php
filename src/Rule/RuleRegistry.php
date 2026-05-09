@@ -264,6 +264,8 @@ final class RuleRegistry
             }
         }
 
+        $findings = $this->deduplicateFindings($findings);
+
         usort(
             $findings,
             static fn (Finding $left, Finding $right): int => [
@@ -280,5 +282,37 @@ final class RuleRegistry
         );
 
         return $findings;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function deduplicateFindings(array $findings): array
+    {
+        $seen = [];
+        $uniqueFindings = [];
+
+        foreach ($findings as $finding) {
+            $key = implode("\0", [
+                $finding->ruleId,
+                $finding->filePath,
+                (string) ($finding->line ?? ''),
+                (string) ($finding->endLine ?? ''),
+                (string) ($finding->column ?? ''),
+                $finding->symbol ?? '',
+                $finding->message,
+                json_encode($finding->metadata) ?: '',
+            ]);
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $uniqueFindings[] = $finding;
+        }
+
+        return $uniqueFindings;
     }
 }

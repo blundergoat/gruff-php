@@ -204,6 +204,24 @@ final class RuleRegistryTest extends TestCase
         self::assertSame([], array_values($fileLengthFindings));
     }
 
+    public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
+    {
+        $registry = new RuleRegistry([$this->duplicateProjectRule()]);
+        $config = AnalysisConfig::fromRegistry($registry);
+
+        $findings = $registry->analyse(
+            [
+                $this->parseFixture('tests/Fixtures/M02/mixed/alpha.php'),
+                $this->parseFixture('tests/Fixtures/M02/mixed/nested/beta.php'),
+            ],
+            new RuleContext(__DIR__ . '/../..', $config),
+        );
+
+        self::assertCount(1, $findings);
+        self::assertSame('test.project-level', $findings[0]->ruleId);
+        self::assertSame('README.md', $findings[0]->filePath);
+    }
+
     public function testRejectsDuplicateRuleIds(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -253,6 +271,39 @@ final class RuleRegistryTest extends TestCase
                         pillar: Pillar::Maintainability,
                         tier: RuleTier::V01,
                         confidence: Confidence::Low,
+                    ),
+                ];
+            }
+        };
+    }
+
+    private function duplicateProjectRule(): RuleInterface
+    {
+        return new readonly class implements RuleInterface {
+            public function definition(): RuleDefinition
+            {
+                return new RuleDefinition(
+                    id: 'test.project-level',
+                    name: 'Project-level fixture',
+                    pillar: Pillar::Documentation,
+                    tier: RuleTier::V01,
+                    defaultSeverity: Severity::Warning,
+                    confidence: Confidence::High,
+                );
+            }
+
+            public function analyse(AnalysisUnit $unit, RuleContext $context): array
+            {
+                return [
+                    new Finding(
+                        ruleId: 'test.project-level',
+                        message: 'Project has no README.md.',
+                        filePath: 'README.md',
+                        line: null,
+                        severity: Severity::Warning,
+                        pillar: Pillar::Documentation,
+                        tier: RuleTier::V01,
+                        confidence: Confidence::High,
                     ),
                 ];
             }

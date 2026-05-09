@@ -18,13 +18,14 @@ class PhpdocTagsFixture
     }
 
     /**
-     * Missing @param tag.
+     * Missing one @param tag.
      *
+     * @param int $x The first value.
      * @return int
      */
-    public function missingParam(int $x): int
+    public function missingParam(int $x, int $y): int
     {
-        return $x;
+        return $x + $y;
     }
 
     /**
@@ -33,6 +34,14 @@ class PhpdocTagsFixture
      * @param int $x The value.
      */
     public function missingReturn(int $x): int
+    {
+        return $x;
+    }
+
+    /**
+     * @api
+     */
+    public function apiMarkerOnly(int $x): int
     {
         return $x;
     }
@@ -47,6 +56,22 @@ class PhpdocTagsFixture
     public function staleParam(int $x): int
     {
         return $x;
+    }
+
+    /**
+     * @param class-string[] $types
+     */
+    public function genericParamDoc(array $types): array
+    {
+        return $types;
+    }
+
+    /**
+     * @param int $x The value being doubled.
+     */
+    public function describedTagDoc(int $x): int
+    {
+        return $x * 2;
     }
 
     /**
