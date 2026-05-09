@@ -233,7 +233,12 @@ final class RuleRegistry
     {
         return array_values(array_filter(
             $this->rules,
-            static fn (RuleInterface $rule): bool => $config->ruleSettings($rule->definition()->id)->enabled,
+            static function (RuleInterface $rule) use ($config): bool {
+                $definition = $rule->definition();
+
+                return $config->ruleSettings($definition->id)->enabled
+                    && $config->ruleSelection()->allows($definition);
+            },
         ));
     }
 

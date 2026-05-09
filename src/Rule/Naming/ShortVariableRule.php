@@ -74,6 +74,10 @@ final readonly class ShortVariableRule implements RuleInterface
                     continue;
                 }
 
+                if (in_array($name, $context->config->acceptedAbbreviations(), true)) {
+                    continue;
+                }
+
                 if (in_array($name, self::LOOP_COUNTER_ALLOWLIST, true) && isset($loopVars[$name])) {
                     continue;
                 }

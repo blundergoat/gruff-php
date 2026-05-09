@@ -41,6 +41,25 @@ final class SourceDiscoveryTest extends TestCase
         ], array_map(static fn ($file): string => $file->displayPath, $result->files));
     }
 
+    public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
+    {
+        $root = $this->fixtureRoot('mixed');
+        $result = (new SourceDiscovery($root))->discover(
+            ['.'],
+            includeIgnored: true,
+            configuredIgnorePatterns: ['nested/**', 'build'],
+        );
+
+        self::assertSame([
+            'alpha.php',
+            'cache/ignored.php',
+            'generated/ignored.php',
+            'vendor/ignored.php',
+        ], array_map(static fn ($file): string => $file->displayPath, $result->files));
+        self::assertContains('nested/beta.php', $result->ignoredPaths);
+        self::assertContains('build', $result->ignoredPaths);
+    }
+
     public function testReportsMissingPaths(): void
     {
         $root = $this->fixtureRoot('mixed');

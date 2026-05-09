@@ -45,14 +45,22 @@ scripts/
 
 src/
 |-- Analysis/
-|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/trend
-|   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/history errors)
+|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/trend/baseline
+|   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/baseline/history errors)
+|-- Baseline/
+|   |-- BaselineData.php                      = loaded/generated baseline entries indexed by fingerprint
+|   |-- BaselineEntry.php                     = fingerprint/rule/file/line/symbol/message row
+|   |-- BaselineException.php                 = baseline read/write/validation failure exception
+|   |-- BaselineFilter.php                    = suppresses findings matching baseline fingerprint + rule + file
+|   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
+|   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
 |-- Command/
-|   `-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs, scores, renders, and resolves exit code
+|   `-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, scores, renders, and resolves exit code
 |-- Config/
-|   |-- AnalysisConfig.php                    = resolved per-rule settings; immutable, `withRuleSettings()` for per-rule edits
+|   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
-|   |-- ConfigLoader.php                      = `.gruff.json` / `--config` JSON loader; strict unknown-key, type, and threshold validation
+|   |-- ConfigLoader.php                      = `.gruff.json` / `--config` JSON loader; strict unknown-key, path, allowlist, selection, type, and threshold validation
+|   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
 |   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`
@@ -90,12 +98,12 @@ src/
 |   |-- JsonReporter.php                      = pretty-printed JSON renderer of `AnalysisReport::toArray()`
 |   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer
 |   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` enum
-|   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, findings, summary)
+|   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, baseline, findings, summary)
 |-- Rule/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
 |   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
-|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` skips parse-errored units, runs PHP rules on PHP files only, runs source-text rules on text files too, then sorts findings by file/line/ruleId/message
+|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs PHP rules on PHP files only, runs source-text rules on text files too, then sorts findings by file/line/ruleId/message
 |   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
 |   |-- Complexity/
 |   |   |-- CognitiveComplexityRule.php       = `complexity.cognitive`
@@ -203,7 +211,7 @@ src/
 |   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, and mutation scoring
 |   `-- ScoreReport.php                       = serialisable score payload for reports
 |-- Source/
-|   |-- SourceDiscovery.php                   = recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/neon/xml/yaml/yml + `.env*`); deterministic ksort + path canonicalisation
+|   |-- SourceDiscovery.php                   = recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/neon/xml/yaml/yml + `.env*`); deterministic ksort + path canonicalisation; default and configured ignore patterns
 |   |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
 |   `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
 `-- Trend/
@@ -218,9 +226,9 @@ Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.git`, `.
 ```text
 tests/
 |-- Config/
-|   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, unknown-key/threshold validation
+|   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config, fail-on, JSON/schema score data, Infection ingestion, HTML/Markdown/GitHub/hotspot/history/diff paths
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, HTML/Markdown/GitHub/hotspot/history/diff paths
 |-- Diff/
 |   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
 |-- Finding/
@@ -232,7 +240,7 @@ tests/
 |-- Reporting/
 |   `-- HtmlReporterTest.php                  = dashboard section rendering and malicious string escaping
 |-- Source/
-|   `-- SourceDiscoveryTest.php               = discovery, ignore semantics, missing-path reporting
+|   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
 |   |-- RuleRegistryTest.php                  = registry sorting, enable/disable, duplicate-id rejection, parse-error skipping
 |   |-- Complexity/
@@ -275,7 +283,8 @@ tests/
     |-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
     |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
     |-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
-    `-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
+    |-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
+    `-- M16/                                  = config selection, path ignore, allowlist, and invalid-selection fixtures
 ```
 
 ## goat-flow harness
@@ -347,3 +356,4 @@ tests/
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

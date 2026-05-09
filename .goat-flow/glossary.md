@@ -32,19 +32,19 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `analyse` command
 
-`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, and `--history-file`.
+`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, and `--generate-baseline`.
 
 ### Exit codes
 
 - `0` (`Command::SUCCESS`): clean run, or findings below the `--fail-on` threshold.
 - `1` (`Command::FAILURE`): at least one finding meets `--fail-on`.
-- `2` (`Command::INVALID`): any `RunDiagnostic` was recorded (usage, config, missing-path, parse, mutation, diff, or history).
+- `2` (`Command::INVALID`): any `RunDiagnostic` was recorded (usage, config, missing-path, parse, mutation, diff, baseline, or history).
 
 ## Source pipeline
 
 ### `SourceDiscovery`
 
-`src/Source/SourceDiscovery.php`. Resolves user-supplied paths into `SourceFile` values. Defaults to `.` when no paths are passed, canonicalises with `realpath`, deterministically sorts results, and consults two constants: `IGNORED_DIRECTORIES` and `TEXT_EXTENSIONS`. The `--include-ignored` flag opts back into ignored paths.
+`src/Source/SourceDiscovery.php`. Resolves user-supplied paths into `SourceFile` values. Defaults to `.` when no paths are passed, canonicalises with `realpath`, deterministically sorts results, and consults two constants: `IGNORED_DIRECTORIES` and `TEXT_EXTENSIONS`. Configured `paths.ignore` patterns are project-relative and always apply. The `--include-ignored` flag opts back into default ignored directories only.
 
 ### Default ignored directories
 
@@ -84,7 +84,7 @@ Project-relative path used in findings and reports. Computed in `SourceDiscovery
 
 ### `.gruff.json`
 
-Optional project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.json`; `--config <path>` overrides it. Recognised root keys are `minimumPhpVersion` and `rules`; everything else throws `ConfigException`.
+Optional project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.json`; `--config <path>` overrides it. Recognised root keys are `minimumPhpVersion`, `paths`, `selection`, `allowlists`, and `rules`; everything else throws `ConfigException`.
 
 ### Minimum PHP Version
 
@@ -92,7 +92,19 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### `AnalysisConfig`
 
-`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id plus the configured minimum PHP version. Constructed from the registry defaults via `fromRegistry()` and then overlayed by JSON config. Immutable; use `withRuleSettings()` or `withMinimumPhpVersion()` to derive a new instance.
+`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id plus the configured minimum PHP version, rule selection, path ignore patterns, accepted abbreviations, and allowed secret previews. Constructed from the registry defaults via `fromRegistry()` and then overlayed by JSON config.
+
+### Path Ignores
+
+`paths.ignore` in `.gruff.json`. A list of project-relative exact or glob-like patterns (`*`, `?`, `**`) applied by `SourceDiscovery`. Absolute paths and parent traversal are rejected so config cannot silently point outside the project.
+
+### Rule Selection
+
+`src/Config/RuleSelection.php` and `selection` in `.gruff.json`. Includes can target `tiers`, `pillars`, and explicit `rules`; exclusions can target `excludePillars` and `excludeRules`. If any include list is non-empty, a rule must match at least one include before exclusions apply. Per-rule `enabled: false` still disables a selected rule.
+
+### Allowlists
+
+`allowlists` in `.gruff.json`. `acceptedAbbreviations` feeds naming rules such as `naming.short-variable`; `secretPreviews` suppresses exact redacted secret previews already emitted by gruff findings. This avoids putting raw secret values in normal config for known synthetic fixtures.
 
 ### `RuleSettings`
 
@@ -100,7 +112,7 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### `ConfigLoader`
 
-`src/Config/ConfigLoader.php`. Loads and validates JSON config. Strict on unknown root keys, invalid `minimumPhpVersion`, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
+`src/Config/ConfigLoader.php`. Loads and validates JSON config. Strict on unknown root keys, invalid `minimumPhpVersion`, path ignore values, allowlist values, selection tiers/pillars/rules, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
 
 ### `ConfigException`
 
@@ -164,6 +176,10 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 `src/Trend/TrendRecorder.php`. Optional score-history writer enabled only by `--history-file <path>`. It appends a bounded JSON entry with timestamp, composite score, letter grade, and finding count, then reports current-vs-previous score delta.
 
+### Static Baseline
+
+`src/Baseline/BaselineStore.php`, `src/Baseline/BaselineFilter.php`, and the CLI options `--baseline` / `--generate-baseline`. Baselines are explicit `gruff.baseline.v1` JSON files containing stable finding fingerprints plus rule/file/line/symbol/message context. Applying a baseline suppresses only exact fingerprint + rule id + file path matches. Full-project runs report stale baseline entries; diff-mode runs skip stale evaluation because the scan is intentionally partial.
+
 ### Test Quality Scope
 
 `src/Rule/TestQuality/TestQualityScope.php`. Value object representing a detected PHPUnit method or Pest `it()` / `test()` closure. Test-quality rules only inspect these scopes so production code is not flagged for test-only smells.
@@ -204,7 +220,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `TextReporter`
 
-`src/Reporting/TextReporter.php`. Grouped human report: header, file counts, optional ignored/missing/diagnostic sections, score summary, optional mutation summary, findings list, summary block ending with the exit code.
+`src/Reporting/TextReporter.php`. Grouped human report: header, file counts, optional ignored/missing/diagnostic sections, score summary, optional baseline summary, optional mutation summary, findings list, summary block ending with the exit code.
 
 ### `JsonReporter`
 
@@ -228,11 +244,11 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `AnalysisReport` / `gruff.analysis.v1`
 
-`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, optional score data, optional diff metadata, and optional trend data.
+`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, optional score data, optional diff metadata, optional trend data, and optional baseline metadata.
 
 ### `RunDiagnostic`
 
-`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`, `mutation-tool-error`, `mutation-run-error`, `mutation-report-error`, `diff-mode-error`, and `history-error`. Any diagnostic in the report forces exit code `2`.
+`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`, `mutation-tool-error`, `mutation-run-error`, `mutation-report-error`, `diff-mode-error`, `baseline-error`, and `history-error`. Any diagnostic in the report forces exit code `2`.
 
 ## Verification
 

@@ -6,6 +6,7 @@ namespace GruffPhp\Analysis;
 
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Baseline\BaselineReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Scoring\ScoreReport;
@@ -39,6 +40,7 @@ final readonly class AnalysisReport
         public ?ScoreReport $score = null,
         public ?DiffResult $diff = null,
         public ?TrendReport $trend = null,
+        public ?BaselineReport $baseline = null,
     ) {
     }
 
@@ -121,6 +123,10 @@ final readonly class AnalysisReport
 
         if ($this->trend instanceof TrendReport) {
             $report['trend'] = $this->trend->toArray();
+        }
+
+        if ($this->baseline instanceof BaselineReport) {
+            $report['baseline'] = $this->baseline->toArray();
         }
 
         return $report;

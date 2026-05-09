@@ -47,8 +47,9 @@ final readonly class SourceDiscovery
 
     /**
      * @param list<string> $paths
+     * @param list<string> $configuredIgnorePatterns
      */
-    public function discover(array $paths, bool $includeIgnored = false): SourceDiscoveryResult
+    public function discover(array $paths, bool $includeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
     {
         $requestedPaths = $paths === [] ? ['.'] : $paths;
         $files = [];
@@ -63,7 +64,12 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            if (!$includeIgnored && $this->isIgnoredPath($absolutePath)) {
+            if ($this->isConfiguredIgnoredPath($absolutePath, $configuredIgnorePatterns)) {
+                $ignoredPaths[] = $this->displayPath($absolutePath);
+                continue;
+            }
+
+            if (!$includeIgnored && $this->isDefaultIgnoredPath($absolutePath)) {
                 $ignoredPaths[] = $this->displayPath($absolutePath);
                 continue;
             }
@@ -82,7 +88,7 @@ final readonly class SourceDiscovery
             }
 
             if (is_dir($absolutePath)) {
-                foreach ($this->walkDirectory($absolutePath, $includeIgnored, $ignoredPaths) as $file) {
+                foreach ($this->walkDirectory($absolutePath, $includeIgnored, $configuredIgnorePatterns, $ignoredPaths) as $file) {
                     $canonicalPath = $this->canonicalPath($file->getPathname());
                     $type = $this->sourceType($canonicalPath);
 
@@ -102,9 +108,15 @@ final readonly class SourceDiscovery
 
     /**
      * @param list<string> $ignoredPaths
+     * @param list<string> $configuredIgnorePatterns
      * @return iterable<SplFileInfo>
      */
-    private function walkDirectory(string $directory, bool $includeIgnored, array &$ignoredPaths): iterable
+    private function walkDirectory(
+        string $directory,
+        bool $includeIgnored,
+        array $configuredIgnorePatterns,
+        array &$ignoredPaths,
+    ): iterable
     {
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
@@ -118,7 +130,12 @@ final readonly class SourceDiscovery
 
             $path = $file->getPathname();
 
-            if (!$includeIgnored && $this->isIgnoredPath($path)) {
+            if ($this->isConfiguredIgnoredPath($path, $configuredIgnorePatterns)) {
+                $ignoredPaths[] = $this->displayPath($path);
+                continue;
+            }
+
+            if (!$includeIgnored && $this->isDefaultIgnoredPath($path)) {
                 if ($file->isDir()) {
                     $ignoredPaths[] = $this->displayPath($path);
                 }
@@ -190,7 +207,7 @@ final readonly class SourceDiscovery
         return $basename === '.env' || str_starts_with($basename, '.env.');
     }
 
-    private function isIgnoredPath(string $path): bool
+    private function isDefaultIgnoredPath(string $path): bool
     {
         $displayPath = str_replace('\\', '/', $this->displayPath($path));
         $segments = explode('/', trim($displayPath, '/'));
@@ -207,5 +224,43 @@ final readonly class SourceDiscovery
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $patterns
+     */
+    private function isConfiguredIgnoredPath(string $path, array $patterns): bool
+    {
+        if ($patterns === []) {
+            return false;
+        }
+
+        $displayPath = str_replace('\\', '/', $this->displayPath($path));
+
+        foreach ($patterns as $pattern) {
+            if ($this->matchesPathPattern($displayPath, $pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function matchesPathPattern(string $displayPath, string $pattern): bool
+    {
+        $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
+        $normalizedPath = trim($displayPath, '/');
+
+        if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
+            return true;
+        }
+
+        $regex = '#^' . strtr(preg_quote($normalizedPattern, '#'), [
+            '\\*\\*' => '.*',
+            '\\*' => '[^/]*',
+            '\\?' => '[^/]',
+        ]) . '$#';
+
+        return preg_match($regex, $normalizedPath) === 1;
     }
 }

@@ -200,6 +200,102 @@ final class GruffCliTest extends TestCase
     /**
      * @throws JsonException
      */
+    public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--config',
+            'tests/Fixtures/M16/Config/only-size-rules.json',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        $summary = $report['summary'] ?? null;
+        self::assertIsArray($summary);
+        $findingCounts = $summary['findings'] ?? null;
+        self::assertIsArray($findingCounts);
+        self::assertSame(0, $findingCounts['total'] ?? null);
+    }
+
+    public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M02/mixed',
+            '--config',
+            'tests/Fixtures/M16/Config/ignore-alpha.json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Discovered: 1', $process->getOutput());
+        self::assertStringContainsString('tests/Fixtures/M02/mixed/alpha.php', $process->getOutput());
+    }
+
+    public function testAnalyseCommandReportsInvalidSelectionConfig(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            '--config',
+            'tests/Fixtures/M16/Config/invalid-selection-rule.json',
+            'tests/Fixtures/M14/Source',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString('[CONFIG-ERROR] Unknown rule id "size.nope" in "selection.rules".', $process->getOutput());
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M11/Secrets/synthetic-secrets.php',
+            '--config',
+            'tests/Fixtures/M16/Config/allow-aws-preview.json',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $report = $this->decodeJsonOutput($process);
+        $findings = $report['findings'] ?? null;
+        self::assertIsArray($findings);
+        $ruleIds = array_map(
+            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+            $findings,
+        );
+
+        self::assertNotContains('secrets.aws-access-key', $ruleIds);
+        self::assertContains('secrets.api-key-pattern', $ruleIds);
+    }
+
+    /**
+     * @throws JsonException
+     */
     public function testAnalyseCommandIngestsInfectionReportInJson(): void
     {
         $process = new Process([
@@ -470,6 +566,95 @@ final class GruffCliTest extends TestCase
 
             self::assertIsArray($decodedHistory);
             self::assertCount(1, $decodedHistory);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
+    {
+        $tempDir = $this->tempDir();
+        $baselinePath = $tempDir . '/gruff-baseline.json';
+
+        try {
+            $generate = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'tests/Fixtures/M14/Source',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--generate-baseline',
+                $baselinePath,
+            ], __DIR__ . '/../..');
+            $generate->run();
+
+            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            self::assertFileExists($baselinePath);
+
+            $generatedReport = $this->decodeJsonOutput($generate);
+            $generatedBaseline = $generatedReport['baseline'] ?? null;
+            self::assertIsArray($generatedBaseline);
+            self::assertSame(true, $generatedBaseline['generated'] ?? null);
+            self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
+
+            $apply = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'tests/Fixtures/M14/Source',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--baseline',
+                $baselinePath,
+            ], __DIR__ . '/../..');
+            $apply->run();
+
+            self::assertSame(0, $apply->getExitCode(), $apply->getErrorOutput());
+            $appliedReport = $this->decodeJsonOutput($apply);
+            $appliedBaseline = $appliedReport['baseline'] ?? null;
+            $summary = $appliedReport['summary'] ?? null;
+            self::assertIsArray($appliedBaseline);
+            self::assertIsArray($summary);
+            self::assertSame(1, $appliedBaseline['suppressedFindings'] ?? null);
+            $findingCounts = $summary['findings'] ?? null;
+            self::assertIsArray($findingCounts);
+            self::assertSame(0, $findingCounts['total'] ?? null);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    public function testAnalyseCommandRejectsInvalidBaselineJson(): void
+    {
+        $tempDir = $this->tempDir();
+        $baselinePath = $tempDir . '/broken-baseline.json';
+
+        try {
+            file_put_contents($baselinePath, '{"schemaVersion":"wrong","findings":[]}');
+
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'tests/Fixtures/M14/Source',
+                '--fail-on',
+                'none',
+                '--baseline',
+                $baselinePath,
+            ], __DIR__ . '/../..');
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('[BASELINE-ERROR]', $process->getOutput());
+            self::assertStringContainsString('Baseline schemaVersion must be "gruff.baseline.v1".', $process->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }

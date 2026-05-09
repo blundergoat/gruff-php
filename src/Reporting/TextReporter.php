@@ -31,6 +31,7 @@ final readonly class TextReporter
         $this->appendPathSection($lines, 'Missing paths', $report->missingPaths);
         $this->appendDiagnostics($lines, $report->diagnostics);
         $this->appendScore($lines, $report);
+        $this->appendBaseline($lines, $report);
         $this->appendMutation($lines, $report->mutation);
         $this->appendFindings($lines, $report->findings);
 
@@ -86,6 +87,25 @@ final readonly class TextReporter
                 $pillar->findings,
             );
         }
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private function appendBaseline(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->baseline === null) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Baseline';
+        $lines[] = sprintf('  Path: %s', $report->baseline->path);
+        $lines[] = sprintf('  Entries: %d', $report->baseline->totalEntries);
+        $lines[] = sprintf('  Generated: %s', $report->baseline->generated ? 'yes' : 'no');
+        $lines[] = sprintf('  Suppressed findings: %d', $report->baseline->suppressedFindings);
+        $lines[] = sprintf('  Stale evaluation: %s', $report->baseline->staleEvaluation);
+        $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
     }
 
     /**

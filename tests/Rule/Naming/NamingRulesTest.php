@@ -68,6 +68,22 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('j', $vars);
     }
 
+    public function testAcceptedAbbreviationsCanSuppressShortVariableFindings(): void
+    {
+        $unit = $this->parseFixture('short-variable.php');
+        $registry = RuleRegistry::defaults();
+        $config = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations(['a']);
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $shortVariableFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === ShortVariableRule::ID,
+        ));
+
+        $vars = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $shortVariableFindings);
+        self::assertContains('x', $vars);
+        self::assertNotContains('a', $vars);
+    }
+
     public function testCatchVariableExcluded(): void
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);

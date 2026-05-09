@@ -6,9 +6,16 @@ namespace GruffPhp\Command;
 
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Analysis\RunDiagnostic;
+use GruffPhp\Baseline\BaselineException;
+use GruffPhp\Baseline\BaselineFilter;
+use GruffPhp\Baseline\BaselineReport;
+use GruffPhp\Baseline\BaselineStore;
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Console\Application;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
 use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
 use GruffPhp\Diff\DiffResult;
@@ -60,7 +67,9 @@ final class AnalyseCommand extends Command
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
-            ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.');
+            ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.')
+            ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Suppress current findings that match this gruff baseline JSON file.')
+            ->addOption('generate-baseline', null, InputOption::VALUE_REQUIRED, 'Write current findings to this gruff baseline JSON file.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -85,6 +94,8 @@ final class AnalyseCommand extends Command
         $mutationBaselinePath = $this->optionalStringOption($input, 'mutation-baseline');
         $diffMode = $this->diffMode($input);
         $historyFile = $this->optionalStringOption($input, 'history-file');
+        $baselinePath = $this->optionalStringOption($input, 'baseline');
+        $generateBaselinePath = $this->optionalStringOption($input, 'generate-baseline');
         $format = $this->parseFormat($input->getOption('format'), $output);
 
         if (!$format instanceof OutputFormat) {
@@ -107,6 +118,32 @@ final class AnalyseCommand extends Command
         );
 
         if ($mutationBudget === false) {
+            return Command::INVALID;
+        }
+
+        if ($baselinePath !== null && $generateBaselinePath !== null) {
+            $this->renderReport(
+                new AnalysisReport(
+                    toolVersion: Application::VERSION,
+                    requestedPaths: $paths,
+                    format: $format->value,
+                    failOn: $failThreshold->value,
+                    filesDiscovered: 0,
+                    filesParsed: 0,
+                    ignoredPaths: [],
+                    missingPaths: [],
+                    diagnostics: [new RunDiagnostic(
+                        'usage-error',
+                        '--baseline and --generate-baseline are mutually exclusive.',
+                    )],
+                    findings: [],
+                    exitCode: Command::INVALID,
+                    configPath: $configPath,
+                ),
+                $format,
+                $output,
+            );
+
             return Command::INVALID;
         }
 
@@ -138,7 +175,7 @@ final class AnalyseCommand extends Command
         }
 
         $discovery = new SourceDiscovery($projectRoot);
-        $discoveryResult = $discovery->discover($paths, $includeIgnored);
+        $discoveryResult = $discovery->discover($paths, $includeIgnored, $config->ignoredPathPatterns());
         $parser = new PhpFileParser();
         $diagnostics = [];
         $analysisUnits = [];
@@ -189,6 +226,16 @@ final class AnalyseCommand extends Command
             $findings = (new DiffFindingFilter())->filter($findings, $diff);
         }
 
+        $findings = $this->filterAllowedSecretPreviews($findings, $config);
+        $baselineReport = $this->applyBaseline(
+            projectRoot: $projectRoot,
+            baselinePath: $baselinePath,
+            generateBaselinePath: $generateBaselinePath,
+            findings: $findings,
+            diff: $diff,
+            diagnostics: $diagnostics,
+        );
+
         $score = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
         $trend = null;
 
@@ -222,11 +269,35 @@ final class AnalyseCommand extends Command
             score: $score,
             diff: $diff,
             trend: $trend,
+            baseline: $baselineReport,
         );
 
         $this->renderReport($report, $format, $output);
 
         return $exitCode;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
+    {
+        $allowedPreviews = $config->allowedSecretPreviews();
+        if ($allowedPreviews === []) {
+            return $findings;
+        }
+
+        return array_values(array_filter(
+            $findings,
+            static function (Finding $finding) use ($allowedPreviews): bool {
+                $preview = $finding->metadata['preview'] ?? null;
+
+                return $finding->pillar !== Pillar::Secrets
+                    || !is_string($preview)
+                    || !in_array($preview, $allowedPreviews, true);
+            },
+        ));
     }
 
     private function parseFormat(mixed $value, OutputInterface $output): ?OutputFormat
@@ -340,6 +411,64 @@ final class AnalyseCommand extends Command
         }
 
         return (int) $value;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @param list<RunDiagnostic> $diagnostics
+     */
+    private function applyBaseline(
+        string $projectRoot,
+        ?string $baselinePath,
+        ?string $generateBaselinePath,
+        array &$findings,
+        ?DiffResult $diff,
+        array &$diagnostics,
+    ): ?BaselineReport {
+        $store = new BaselineStore($projectRoot);
+
+        if ($generateBaselinePath !== null) {
+            try {
+                $baseline = $store->write($generateBaselinePath, $findings);
+            } catch (BaselineException $exception) {
+                $diagnostics[] = new RunDiagnostic(
+                    type: 'baseline-error',
+                    message: $exception->getMessage(),
+                    path: $generateBaselinePath,
+                );
+
+                return null;
+            }
+
+            return new BaselineReport(
+                path: $baseline->path,
+                generated: true,
+                totalEntries: count($baseline->entries),
+                suppressedFindings: 0,
+                staleEvaluation: 'generated',
+            );
+        }
+
+        if ($baselinePath === null) {
+            return null;
+        }
+
+        try {
+            $baseline = $store->read($baselinePath);
+            $application = (new BaselineFilter())->apply($baseline, $findings, $diff instanceof DiffResult && $diff->active);
+        } catch (BaselineException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type: 'baseline-error',
+                message: $exception->getMessage(),
+                path: $baselinePath,
+            );
+
+            return null;
+        }
+
+        $findings = $application['findings'];
+
+        return $application['report'];
     }
 
     /**

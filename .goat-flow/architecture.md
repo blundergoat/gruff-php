@@ -16,10 +16,11 @@ The agent harness is intentionally separate from the app. `.goat-flow/` holds du
 | Command | Parse CLI flags, orchestrate the run, render | `src/Command/AnalyseCommand.php`, `src/Reporting/*` |
 | Discovery | Resolve user paths to source files | `src/Source/SourceDiscovery.php`, `src/Source/SourceFile.php`, `src/Source/SourceDiscoveryResult.php` |
 | Parsing | Produce AST + tokens or per-file diagnostics | `src/Parser/PhpFileParser.php`, `src/Parser/AnalysisUnit.php`, `src/Parser/ParseDiagnostic.php` |
-| Configuration | Resolve per-rule enable/threshold settings | `src/Config/ConfigLoader.php`, `src/Config/AnalysisConfig.php`, `src/Config/RuleSettings.php` |
+| Configuration | Resolve thresholds, rule selection, path ignores, and allowlists | `src/Config/ConfigLoader.php`, `src/Config/AnalysisConfig.php`, `src/Config/RuleSelection.php`, `src/Config/RuleSettings.php` |
 | Rules | Emit findings from `AnalysisUnit` + `RuleContext` | `src/Rule/RuleRegistry.php`, `src/Rule/{Size,Complexity,DeadCode,Waste,Naming,Docs,Modernisation,Security,Secrets,TestQuality}/*` |
 | Mutation | Parse optional Infection output and emit mutation findings | `src/Mutation/*` |
 | Diff | Resolve Git changed files/line ranges and filter findings | `src/Diff/*` |
+| Baseline | Generate/read fingerprint baselines and suppress matching findings | `src/Baseline/*` |
 | Scoring | Compute A-F composite, pillar, file, and composite-design findings | `src/Scoring/*` |
 | Trend | Append optional score-history JSON entries | `src/Trend/*` |
 | Findings & Report | Stable typed payload + summary aggregation | `src/Finding/*`, `src/Analysis/AnalysisReport.php`, `src/Analysis/RunDiagnostic.php` |
@@ -31,20 +32,22 @@ The current request flow is CLI-only.
 
 1. `bin/gruff` runs `(new \GruffPhp\Console\Application())->run()` after loading `vendor/autoload.php`.
 2. `Application` (Symfony Console subclass) registers the single `analyse` command with version constant `0.1.0-dev`.
-3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--format`, `--fail-on`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, and `--history-file` options, validating `--format`, `--fail-on`, and mutation budget input up front.
+3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--format`, `--fail-on`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, and `--generate-baseline` options, validating `--format`, `--fail-on`, mutually exclusive baseline modes, and mutation budget input up front.
 4. `RuleRegistry::defaults()` constructs the v0.1 catalogue (sorted by id via `ksort`).
-5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
-6. `SourceDiscovery::discover()` expands the input paths (defaulting to `.`), records missing inputs, applies the default ignored-directory list, and yields `SourceFile` values typed `php` or `text`.
+5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist values, selection values, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
+6. `SourceDiscovery::discover()` expands the input paths (defaulting to `.`), records missing inputs, applies configured path ignores plus the default ignored-directory list, and yields `SourceFile` values typed `php` or `text`.
 7. For each discovered file, `PhpFileParser::parse()` reads the source. PHP files are parsed by `nikic/php-parser` and decorated with a `ParentConnectingVisitor`; non-PHP text/config files short-circuit to an `AnalysisUnit` with raw source but no AST or tokens. Parse failures produce one `ParseDiagnostic` per error and are surfaced as `parse-error` `RunDiagnostic` entries.
-8. `RuleRegistry::analyse()` skips units with parse errors, then iterates the enabled rules. PHP-only rules run only against `SourceFile::isPhp()` units; rules implementing `SourceTextRuleInterface` also run against text/config units, so secret/PII scanners cover JSON, YAML, env, and similar files. Findings from all units are sorted by `(filePath, line, ruleId, message)` for deterministic output.
+8. `RuleRegistry::analyse()` skips units with parse errors, then iterates rules allowed by `RuleSelection` and per-rule `enabled` settings. PHP-only rules run only against `SourceFile::isPhp()` units; rules implementing `SourceTextRuleInterface` also run against text/config units, so secret/PII scanners cover JSON, YAML, env, and similar files. Findings from all units are sorted by `(filePath, line, ruleId, message)` for deterministic output.
 9. If `--infection-report` is supplied, `InfectionReportParser` ingests the full Infection JSON report, calculates per-file mutation summaries, and `MutationFindingFactory` appends `mutation.survived-mutant`, `mutation.budget-exceeded`, and `mutation.msi-regression` findings where applicable. `--infection-run` is explicit opt-in and only shells out through `InfectionRunner`; it requires a report path because Infection controls full JSON log output through its config.
 10. `CompositeFindingFactory` appends `design.god-method` findings when size and complexity findings overlap on the same symbol.
 11. If `--diff` is supplied, `GitDiffProvider` reads changed files and new-line ranges from Git (`working-tree`, `staged`, `unstaged`, or a base ref), and `DiffFindingFilter` keeps only findings touching changed lines or changed files.
-12. `ScoreCalculator` computes per-pillar scores, top-offender file scores, complexity distribution buckets, optional mutation scoring, and the composite A-F grade. If `--history-file` is supplied, `TrendRecorder` appends a bounded JSON history entry.
-13. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, and optional trend data, then renders it via the selected reporter.
+12. Configured secret preview allowlists remove matching `Secrets` findings by redacted preview, after rules run and before scoring.
+13. If `--generate-baseline` is supplied, `BaselineStore` writes the current scoped findings to a `gruff.baseline.v1` JSON file. If `--baseline` is supplied, `BaselineStore` reads the file and `BaselineFilter` suppresses matching findings by fingerprint, rule id, and file path. Stale entries are evaluated only in full-project scope; diff scope reports that stale evaluation is skipped.
+14. `ScoreCalculator` computes per-pillar scores, top-offender file scores, complexity distribution buckets, optional mutation scoring, and the composite A-F grade. If `--history-file` is supplied, `TrendRecorder` appends a bounded JSON history entry.
+15. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, optional trend data, and optional baseline metadata, then renders it via the selected reporter.
 14. `resolveExitCode()` returns `Command::INVALID` (`2`) if any `RunDiagnostic` was recorded, `Command::FAILURE` (`1`) when at least one finding satisfies `--fail-on`, and `Command::SUCCESS` (`0`) otherwise.
 
-General baselines remain owned by a later v0.1 milestone. Mutation-specific baseline MSI comparison exists through `--mutation-baseline`.
+Static finding baselines use `--baseline` / `--generate-baseline`; mutation-specific baseline MSI comparison remains separate through `--mutation-baseline`.
 
 ## Rule Catalogue
 
@@ -71,8 +74,9 @@ The default registry-backed static rule set covers ten pillars (`Size`, `Complex
 
 There is no runtime authentication or authorisation surface. The analyser only reads local files supplied by the user. Trust boundaries that exist:
 
-- **Source discovery** treats any path provided on the CLI as user-trusted and applies the default ignored-directory list (overridable with `--include-ignored`).
-- **Config loading** treats `.gruff.json` and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, rule ids, rule sub-keys, and non-numeric thresholds all raise `ConfigException`.
+- **Source discovery** treats any path provided on the CLI as user-trusted and applies configured path ignores plus the default ignored-directory list (default ignores are overridable with `--include-ignored`; configured ignores still apply).
+- **Config loading** treats `.gruff.json` and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist entries, rule selection entries, rule ids, rule sub-keys, and non-numeric thresholds all raise `ConfigException`.
+- **Baselines** are explicit JSON files supplied by the user. They suppress only exact fingerprint/rule/file matches and report suppression counts plus stale-entry status; inline suppression comments are not supported in v0.1.
 - **Agent tooling** is gated independently by `.claude/hooks/deny-dangerous.sh` and `.codex/hooks/deny-dangerous.sh`, which reject dangerous shell commands before agent execution.
 
 ## Data Flow
@@ -86,7 +90,7 @@ There is no runtime authentication or authorisation surface. The analyser only r
 - Trend history: `TrendRecorder` appends bounded JSON history entries only when `--history-file` is supplied; no history file is read or written by default.
 - Aggregation: `AnalysisReport` exposes summary counts (advisory/warning/error/total), `parseErrorCount()` derived from diagnostics, optional mutation, score, diff, and trend payloads; `JsonReporter` returns `AnalysisReport::toArray()` matching the `gruff.analysis.v1` schema.
 - Exit semantics: `--fail-on` accepts `none`, `advisory`, `warning`, or `error` (default `error`). `none` never fails the run; `advisory` fails on any finding; `warning` fails on warning or error; `error` fails only on error.
-- Diagnostics surface (string `type` field): `usage-error` for unsupported flag values, `config-error` for `ConfigException`, `missing-path` for input paths that do not exist, `parse-error` for per-file parser errors, `mutation-tool-error` for missing Infection executables, `mutation-run-error` for execution failures before a report exists, `mutation-report-error` for unreadable or malformed Infection JSON, `diff-mode-error` for invalid or unavailable Git diff context, and `history-error` for score-history write failures. Every diagnostic forces an exit code of `2`.
+- Diagnostics surface (string `type` field): `usage-error` for unsupported flag values, `config-error` for `ConfigException`, `missing-path` for input paths that do not exist, `parse-error` for per-file parser errors, `mutation-tool-error` for missing Infection executables, `mutation-run-error` for execution failures before a report exists, `mutation-report-error` for unreadable or malformed Infection JSON, `diff-mode-error` for invalid or unavailable Git diff context, `baseline-error` for invalid/unreadable/unwritable gruff baselines, and `history-error` for score-history write failures. Every diagnostic forces an exit code of `2`.
 
 ## Configuration
 
@@ -95,6 +99,20 @@ There is no runtime authentication or authorisation surface. The analyser only r
 ```json
 {
   "minimumPhpVersion": 8.3,
+  "paths": {
+    "ignore": ["legacy/**", "generated"]
+  },
+  "selection": {
+    "tiers": ["v0.1"],
+    "pillars": ["security", "secrets"],
+    "rules": ["size.file-length"],
+    "excludePillars": ["documentation"],
+    "excludeRules": ["security.weak-crypto"]
+  },
+  "allowlists": {
+    "acceptedAbbreviations": ["id", "db"],
+    "secretPreviews": ["AKIA...T3R2 (redacted, 20 chars)"]
+  },
   "rules": {
     "<rule.id>": {
       "enabled": true,
@@ -104,12 +122,14 @@ There is no runtime authentication or authorisation surface. The analyser only r
 }
 ```
 
-`minimumPhpVersion` is optional, defaults to `8.3`, and must be numeric and at least `7.4`; PHP syntax opportunity rules use it to suppress suggestions unsupported by the configured target. Unknown top-level keys, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`.
+`minimumPhpVersion` is optional, defaults to `8.3`, and must be numeric and at least `7.4`; PHP syntax opportunity rules use it to suppress suggestions unsupported by the configured target. `paths.ignore` contains project-relative exact or glob-like patterns (`*`, `?`, `**`) and cannot escape the project with absolute or parent paths. `selection` is explicit: if any of `tiers`, `pillars`, or `rules` is present, a rule must match at least one include; `excludePillars` and `excludeRules` subtract from that set. Per-rule `enabled: false` still disables a rule; `enabled: true` does not force a rule back into an excluded selection. `allowlists.acceptedAbbreviations` feeds naming rules, while `allowlists.secretPreviews` suppresses exact redacted secret previews already printed by gruff.
+
+Unknown top-level keys, unknown path/allowlist/selection keys, unknown rule ids, unknown pillars, unknown tiers, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`.
 
 ## Reporting
 
-- Text output (`TextReporter`): header (`gruff <version>`, format, fail threshold), file counts, optional ignored/missing/diagnostics sections, score summary, optional mutation summary, findings section grouped by file/line, and a final summary line with severity counts and exit code.
-- JSON output (`JsonReporter`): `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR`, schema rooted at `gruff.analysis.v1` (`AnalysisReport::SCHEMA_VERSION`) with optional `mutation`, `score`, `diff`, and `trend` objects.
+- Text output (`TextReporter`): header (`gruff <version>`, format, fail threshold), file counts, optional ignored/missing/diagnostics sections, score summary, optional baseline summary, optional mutation summary, findings section grouped by file/line, and a final summary line with severity counts and exit code.
+- JSON output (`JsonReporter`): `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR`, schema rooted at `gruff.analysis.v1` (`AnalysisReport::SCHEMA_VERSION`) with optional `mutation`, `score`, `diff`, `trend`, and `baseline` objects.
 - HTML output (`HtmlReporter`): a self-contained dashboard with inline CSS, escaped run data, masthead, verdict, stats, pillar grades, top offenders, complexity distribution, mutation state, and findings list.
 - Markdown output (`MarkdownReporter`): PR-comment style summary with score, counts, top offenders, and findings.
 - GitHub annotations output (`GithubAnnotationsReporter`): GitHub Actions workflow commands for findings, with annotation properties escaped.
