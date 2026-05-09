@@ -68,19 +68,12 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $reads = [];
             $writes = [];
             $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+            $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
 
             foreach ($allNodes as $node) {
-                if (!$node instanceof Expr\PropertyFetch
-                    || !$node->var instanceof Expr\Variable
-                    || $node->var->name !== 'this'
-                    || !$node->name instanceof Node\Identifier
-                ) {
-                    continue;
-                }
+                $name = $this->propertyAccessName($node, $ownClassName);
 
-                $name = $node->name->toString();
-
-                if (!isset($privateProps[$name])) {
+                if ($name === null || !isset($privateProps[$name])) {
                     continue;
                 }
 
@@ -145,5 +138,40 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         }
 
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
+    }
+
+    private function propertyAccessName(Node $node, ?string $ownClassName): ?string
+    {
+        if ($node instanceof Expr\PropertyFetch
+            && $node->var instanceof Expr\Variable
+            && $node->var->name === 'this'
+            && $node->name instanceof Node\Identifier
+        ) {
+            return $node->name->toString();
+        }
+
+        if ($node instanceof Expr\StaticPropertyFetch
+            && $node->name instanceof Node\VarLikeIdentifier
+            && $this->refersToOwnClass($node->class, $ownClassName)
+        ) {
+            return $node->name->toString();
+        }
+
+        return null;
+    }
+
+    private function refersToOwnClass(Node $class, ?string $ownClassName): bool
+    {
+        if (!$class instanceof Node\Name) {
+            return false;
+        }
+
+        $reference = strtolower($class->toString());
+
+        if ($reference === 'self' || $reference === 'static') {
+            return true;
+        }
+
+        return $ownClassName !== null && strtolower($class->getLast()) === strtolower($ownClassName);
     }
 }

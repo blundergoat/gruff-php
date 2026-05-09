@@ -57,6 +57,7 @@ final class AnalyseCommand extends Command
             ->setDescription('Run gruff analysis.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
+            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for this run.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, or hotspot.', OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', FailThreshold::Error->value)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.')
@@ -104,6 +105,12 @@ final class AnalyseCommand extends Command
         $includeIgnored = (bool) $input->getOption('include-ignored');
         $configPath = $input->getOption('config');
         $configPath = is_string($configPath) ? $configPath : null;
+        $noConfig = (bool) $input->getOption('no-config');
+
+        if ($noConfig && $configPath !== null) {
+            $output->writeln('<error>--no-config cannot be combined with --config.</error>');
+            return Command::INVALID;
+        }
         $infectionReportPath = $this->optionalStringOption($input, 'infection-report');
         $infectionRun = (bool) $input->getOption('infection-run');
         $infectionBin = $this->optionalStringOption($input, 'infection-bin') ?? 'infection';
@@ -188,7 +195,9 @@ final class AnalyseCommand extends Command
         $registry = RuleRegistry::defaults();
 
         try {
-            $config = (new ConfigLoader($projectRoot))->load($configPath, $registry);
+            $config = $noConfig
+                ? AnalysisConfig::fromRegistry($registry)
+                : (new ConfigLoader($projectRoot))->load($configPath, $registry);
         } catch (ConfigException $exception) {
             $this->renderReport(
                 new AnalysisReport(
@@ -332,7 +341,7 @@ final class AnalyseCommand extends Command
             static function (Finding $finding) use ($allowedPreviews): bool {
                 $preview = $finding->metadata['preview'] ?? null;
 
-                return $finding->pillar !== Pillar::Secrets
+                return $finding->pillar !== Pillar::SensitiveData
                     || !is_string($preview)
                     || !in_array($preview, $allowedPreviews, true);
             },

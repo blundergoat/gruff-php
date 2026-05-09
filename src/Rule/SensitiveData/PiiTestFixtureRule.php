@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
@@ -15,7 +15,7 @@ use GruffPhp\Rule\SourceTextRuleInterface;
 
 final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 {
-    public const ID = 'secrets.pii-test-fixture';
+    public const ID = 'sensitive-data.pii-test-fixture';
 
     /**
      * @return list<array{name: string, pattern: string}>
@@ -34,7 +34,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         return new RuleDefinition(
             id: self::ID,
             name: 'PII in test fixture',
-            pillar: Pillar::Secrets,
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence: Confidence::Medium,

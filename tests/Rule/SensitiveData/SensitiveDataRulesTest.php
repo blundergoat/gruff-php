@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Tests\Rule\Secrets;
+namespace GruffPhp\Tests\Rule\SensitiveData;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
@@ -11,22 +11,22 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Secrets\ApiKeyPatternRule;
-use GruffPhp\Rule\Secrets\AwsAccessKeyRule;
-use GruffPhp\Rule\Secrets\DatabaseUrlPasswordRule;
-use GruffPhp\Rule\Secrets\HardcodedEnvValueRule;
-use GruffPhp\Rule\Secrets\HighEntropyStringRule;
-use GruffPhp\Rule\Secrets\JwtTokenRule;
-use GruffPhp\Rule\Secrets\PhiPatternRule;
-use GruffPhp\Rule\Secrets\PiiTestFixtureRule;
-use GruffPhp\Rule\Secrets\PrivateKeyRule;
+use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
+use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
+use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
+use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
+use GruffPhp\Rule\SensitiveData\JwtTokenRule;
+use GruffPhp\Rule\SensitiveData\PhiPatternRule;
+use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
+use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
 use GruffPhp\Source\SourceDiscovery;
 use GruffPhp\Source\SourceFile;
 use JsonException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
-final class SecretsRulesTest extends TestCase
+final class SensitiveDataRulesTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
@@ -82,7 +82,7 @@ final class SecretsRulesTest extends TestCase
     {
         $findings = array_values(array_filter(
             $this->analysePath('tests/Fixtures/M11/Secrets/safe-dummy-values.php'),
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'secrets.'),
+            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
         ));
 
         self::assertSame([], $findings);
@@ -115,6 +115,7 @@ final class SecretsRulesTest extends TestCase
             'tests/Fixtures/M11/Secrets/config-secrets.json',
             '--fail-on',
             'none',
+            '--no-config',
         ]);
         $json = $this->runGruff([
             'analyse',
@@ -124,6 +125,7 @@ final class SecretsRulesTest extends TestCase
             'json',
             '--fail-on',
             'none',
+            '--no-config',
         ]);
 
         json_decode($json, true, 512, JSON_THROW_ON_ERROR);

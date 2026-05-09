@@ -13,7 +13,7 @@ enum Pillar: string
     case Naming = 'naming';
     case Documentation = 'documentation';
     case Security = 'security';
-    case Secrets = 'secrets';
+    case SensitiveData = 'sensitive-data';
     case Design = 'design';
     case Modernisation = 'modernisation';
     case TestQuality = 'test-quality';

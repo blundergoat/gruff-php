@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
@@ -13,25 +13,25 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
-final readonly class JwtTokenRule implements SourceTextRuleInterface
+final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
-    public const ID = 'secrets.jwt-token';
+    public const ID = 'sensitive-data.aws-access-key';
 
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
             id: self::ID,
-            name: 'JWT token literal',
-            pillar: Pillar::Secrets,
+            name: 'AWS access key',
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence: Confidence::High,
         );
     }
 
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        preg_match_all('/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
         foreach ($matches[0] as $match) {
@@ -40,16 +40,15 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview = SecretScannerHelper::redactedPreview($value);
             $findings[] = SecretScannerHelper::finding(
                 unit: $unit,
                 ruleId: self::ID,
-                message: sprintf('JWT-like token literal detected: %s.', $preview),
+                message: sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($value)),
                 line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::Medium,
-                detector: 'jwt-token',
-                preview: $preview,
-                remediation: 'Move tokens out of source fixtures/config and generate them at runtime.',
+                confidence: Confidence::High,
+                detector: 'aws-access-key',
+                preview: SecretScannerHelper::redactedPreview($value),
+                remediation: 'Remove the key from source and rotate it if it was real.',
             );
         }
 

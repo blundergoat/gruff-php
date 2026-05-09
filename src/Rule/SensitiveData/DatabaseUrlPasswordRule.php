@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
@@ -15,14 +15,14 @@ use GruffPhp\Rule\SourceTextRuleInterface;
 
 final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 {
-    public const ID = 'secrets.database-url-password';
+    public const ID = 'sensitive-data.database-url-password';
 
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
             id: self::ID,
             name: 'Database URL password',
-            pillar: Pillar::Secrets,
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence: Confidence::High,

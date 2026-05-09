@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -121,7 +121,7 @@ final class SecretScannerHelper
             filePath: $unit->file->displayPath,
             line: $line,
             severity: Severity::Warning,
-            pillar: Pillar::Secrets,
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             confidence: $confidence,
             remediation: $remediation,

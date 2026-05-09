@@ -29,6 +29,7 @@ final class DashboardCommand extends Command
             ->addOption('scan-timeout', null, InputOption::VALUE_REQUIRED, 'Seconds to allow each refresh scan. Use 0 to disable.', '120')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', 'none')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Initial gruff JSON config path.')
+            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for dashboard scans.')
             ->addOption(
                 'baseline',
                 null,
@@ -256,7 +257,7 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, includeIgnored: string} $state
+     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string} $state
      * @param list<string> $paths
      * @return list<string>
      */
@@ -264,7 +265,9 @@ final class DashboardCommand extends Command
     {
         $command = [PHP_BINARY, $this->gruffBinary(), 'analyse', ...$paths, '--format', 'html', '--fail-on', $state['failOn']];
 
-        if ($state['config'] !== '') {
+        if ($state['noConfig'] === '1') {
+            $command[] = '--no-config';
+        } elseif ($state['config'] !== '') {
             $command[] = '--config';
             $command[] = $state['config'];
         }
@@ -285,7 +288,7 @@ final class DashboardCommand extends Command
 
     /**
      * @param array<string, string> $query
-     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, includeIgnored: string}
+     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string}
      */
     private function dashboardState(InputInterface $input, string $projectRoot, array $query): array
     {
@@ -298,12 +301,13 @@ final class DashboardCommand extends Command
             'config' => $query['config'] ?? $defaults['config'],
             'baseline' => $query['baseline'] ?? $defaults['baseline'],
             'noBaseline' => ($query['noBaseline'] ?? $defaults['noBaseline']) === '1' ? '1' : '0',
+            'noConfig' => ($query['noConfig'] ?? $defaults['noConfig']) === '1' ? '1' : '0',
             'includeIgnored' => ($query['includeIgnored'] ?? $defaults['includeIgnored']) === '1' ? '1' : '0',
         ];
     }
 
     /**
-     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, includeIgnored: string}
+     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string}
      */
     private function defaultQuery(InputInterface $input, string $projectRoot): array
     {
@@ -320,6 +324,7 @@ final class DashboardCommand extends Command
             'config' => $this->optionalStringOption($input, 'config') ?? '',
             'baseline' => $baseline,
             'noBaseline' => (bool) $input->getOption('no-baseline') ? '1' : '0',
+            'noConfig' => (bool) $input->getOption('no-config') ? '1' : '0',
             'includeIgnored' => (bool) $input->getOption('include-ignored') ? '1' : '0',
         ];
     }

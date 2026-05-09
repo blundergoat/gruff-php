@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Source;
 
+use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
+use RecursiveIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
@@ -27,16 +29,23 @@ final readonly class SourceDiscovery
 
     /** @var list<string> */
     private const IGNORED_DIRECTORIES = [
+        '.fleet',
         '.git',
+        '.goat-flow/logs',
+        '.goat-flow/scratchpad',
+        '.goat-flow/tasks',
         '.hg',
-        '.svn',
+        '.idea',
         '.phpunit.cache',
+        '.svn',
+        '.vscode',
         'build',
         'cache',
         'coverage',
         'dist',
         'generated',
         'node_modules',
+        'tmp',
         'var/cache',
         'vendor',
     ];
@@ -118,32 +127,37 @@ final readonly class SourceDiscovery
         array &$ignoredPaths,
     ): iterable
     {
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST,
+        $inner = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
+        $filter = new RecursiveCallbackFilterIterator(
+            $inner,
+            function (SplFileInfo $file, mixed $key, RecursiveIterator $iterator) use ($includeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
+                $path = $file->getPathname();
+                $isDir = $file->isDir();
+
+                if ($this->isConfiguredIgnoredPath($path, $configuredIgnorePatterns)) {
+                    $ignoredPaths[] = $this->displayPath($path);
+                    return false;
+                }
+
+                if (!$includeIgnored && $this->isDefaultIgnoredPath($path)) {
+                    if ($isDir) {
+                        $ignoredPaths[] = $this->displayPath($path);
+                    }
+                    return false;
+                }
+
+                return true;
+            },
         );
+
+        $iterator = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::SELF_FIRST);
 
         foreach ($iterator as $file) {
             if (!$file instanceof SplFileInfo) {
                 continue;
             }
 
-            $path = $file->getPathname();
-
-            if ($this->isConfiguredIgnoredPath($path, $configuredIgnorePatterns)) {
-                $ignoredPaths[] = $this->displayPath($path);
-                continue;
-            }
-
-            if (!$includeIgnored && $this->isDefaultIgnoredPath($path)) {
-                if ($file->isDir()) {
-                    $ignoredPaths[] = $this->displayPath($path);
-                }
-
-                continue;
-            }
-
-            if ($file->isFile() && $this->sourceType($path) !== null) {
+            if ($file->isFile() && $this->sourceType($file->getPathname()) !== null) {
                 yield $file;
             }
         }

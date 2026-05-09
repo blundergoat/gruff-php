@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
@@ -15,7 +15,7 @@ use GruffPhp\Rule\SourceTextRuleInterface;
 
 final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 {
-    public const ID = 'secrets.api-key-pattern';
+    public const ID = 'sensitive-data.api-key-pattern';
 
     /**
      * @return list<array{name: string, pattern: string}>
@@ -36,7 +36,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         return new RuleDefinition(
             id: self::ID,
             name: 'Common API key pattern',
-            pillar: Pillar::Secrets,
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence: Confidence::High,

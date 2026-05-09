@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GruffPhp\Rule\Secrets;
+namespace GruffPhp\Rule\SensitiveData;
 
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
@@ -15,14 +15,14 @@ use GruffPhp\Rule\SourceTextRuleInterface;
 
 final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 {
-    public const ID = 'secrets.high-entropy-string';
+    public const ID = 'sensitive-data.high-entropy-string';
 
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
             id: self::ID,
             name: 'High entropy string',
-            pillar: Pillar::Secrets,
+            pillar: Pillar::SensitiveData,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence: Confidence::Medium,
@@ -83,7 +83,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || str_starts_with($value, 'ghp_')
             || str_starts_with($value, 'xox')
             || substr_count($value, '.') === 2
-            || ctype_xdigit($value);
+            || ctype_xdigit($value)
+            || ctype_alpha($value);
     }
 
     private function isPathLikeLiteral(string $value): bool

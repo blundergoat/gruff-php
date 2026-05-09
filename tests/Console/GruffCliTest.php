@@ -77,6 +77,7 @@ final class GruffCliTest extends TestCase
             self::PROJECT_ROOT . '/bin/gruff',
             'analyse',
             'tests/Fixtures/M02/mixed',
+            '--no-config',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -95,6 +96,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/M02/mixed/alpha.php',
             'tests/Fixtures/M02/syntax-error/broken.php',
+            '--no-config',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -212,6 +214,7 @@ final class GruffCliTest extends TestCase
             'tests/Fixtures/M02/syntax-error',
             '--format',
             'json',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -339,8 +342,8 @@ final class GruffCliTest extends TestCase
             $findings,
         );
 
-        self::assertNotContains('secrets.aws-access-key', $ruleIds);
-        self::assertContains('secrets.api-key-pattern', $ruleIds);
+        self::assertNotContains('sensitive-data.aws-access-key', $ruleIds);
+        self::assertContains('sensitive-data.api-key-pattern', $ruleIds);
     }
 
     /**
@@ -689,6 +692,7 @@ final class GruffCliTest extends TestCase
             'github',
             '--fail-on',
             'none',
+            '--no-config',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -781,6 +785,7 @@ final class GruffCliTest extends TestCase
                 'none',
                 '--generate-baseline',
                 $baselinePath,
+                '--no-config',
             ], __DIR__ . '/../..');
             $generate->run();
 
@@ -804,6 +809,7 @@ final class GruffCliTest extends TestCase
                 'none',
                 '--baseline',
                 $baselinePath,
+                '--no-config',
             ], __DIR__ . '/../..');
             $apply->run();
 

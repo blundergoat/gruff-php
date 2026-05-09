@@ -23,7 +23,7 @@ final readonly class ScoreCalculator
         'documentation',
         'modernisation',
         'security',
-        'secrets',
+        'sensitive-data',
         'test-quality',
     ];
 

@@ -21,7 +21,7 @@ Score
     documentation: A (96.00) findings=1
     modernisation: A (100.00) findings=0
     security: A (100.00) findings=0
-    secrets: A (100.00) findings=0
+    sensitive-data: A (100.00) findings=0
     test-quality: A (100.00) findings=0
 
 Findings

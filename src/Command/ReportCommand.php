@@ -23,6 +23,7 @@ final class ReportCommand extends Command
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Report format: html or json.', 'html')
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Write the report to this file.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
+            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for this run.')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', 'none')
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.')
             ->addOption('infection-report', null, InputOption::VALUE_REQUIRED, 'Path to a full Infection JSON report to ingest.')
@@ -116,6 +117,10 @@ final class ReportCommand extends Command
 
         if ((bool) $input->getOption('no-baseline')) {
             $command[] = '--no-baseline';
+        }
+
+        if ((bool) $input->getOption('no-config')) {
+            $command[] = '--no-config';
         }
 
         if ((bool) $input->getOption('include-ignored')) {

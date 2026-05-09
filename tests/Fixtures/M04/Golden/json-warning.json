@@ -181,7 +181,7 @@
                 "penalty": 0
             },
             {
-                "pillar": "secrets",
+                "pillar": "sensitive-data",
                 "applicable": true,
                 "score": 100,
                 "grade": "A",

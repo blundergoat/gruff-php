@@ -76,7 +76,7 @@ src/
 |-- Finding/
 |   |-- Confidence.php                        = `low` / `medium` / `high` enum
 |   |-- Finding.php                           = readonly finding value with stable `fingerprint()` (sha256 of identity fields, truncated)
-|   |-- Pillar.php                            = quality pillar enum (size, complexity, coupling, dead-code, naming, documentation, security, secrets, design, modernisation, test-quality, architecture, maintainability, mutation)
+|   |-- Pillar.php                            = quality pillar enum (size, complexity, coupling, dead-code, naming, documentation, security, sensitive-data, design, modernisation, test-quality, architecture, maintainability, mutation)
 |   |-- RuleTier.php                          = release-tier enum (currently only `v0.1`)
 |   `-- Severity.php                          = `advisory` / `warning` / `error` enum
 |-- Mutation/
@@ -146,17 +146,17 @@ src/
 |   |   |-- NamedArgumentOpportunityRule.php   = `modernisation.named-argument-opportunity`
 |   |   |-- PublicPropertyRule.php             = `modernisation.public-property`
 |   |   `-- ReadonlyPropertyCandidateRule.php = `modernisation.readonly-property-candidate`
-|   |-- Secrets/                              = SourceTextRuleInterface rules; scan PHP plus config/text/env files
-|   |   |-- ApiKeyPatternRule.php             = `secrets.api-key-pattern`
-|   |   |-- AwsAccessKeyRule.php              = `secrets.aws-access-key`
-|   |   |-- DatabaseUrlPasswordRule.php       = `secrets.database-url-password`
-|   |   |-- HardcodedEnvValueRule.php         = `secrets.hardcoded-env-value`
-|   |   |-- HighEntropyStringRule.php         = `secrets.high-entropy-string`
-|   |   |-- JwtTokenRule.php                  = `secrets.jwt-token`
-|   |   |-- PhiPatternRule.php                = `secrets.phi-pattern`
-|   |   |-- PiiTestFixtureRule.php            = `secrets.pii-test-fixture`
-|   |   |-- PrivateKeyRule.php                = `secrets.private-key`
-|   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the secrets pack
+|   |-- SensitiveData/                        = SensitiveData-pillar SourceTextRuleInterface rules; scan PHP plus config/text/env files
+|   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern`
+|   |   |-- AwsAccessKeyRule.php              = `sensitive-data.aws-access-key`
+|   |   |-- DatabaseUrlPasswordRule.php       = `sensitive-data.database-url-password`
+|   |   |-- HardcodedEnvValueRule.php         = `sensitive-data.hardcoded-env-value`
+|   |   |-- HighEntropyStringRule.php         = `sensitive-data.high-entropy-string`
+|   |   |-- JwtTokenRule.php                  = `sensitive-data.jwt-token`
+|   |   |-- PhiPatternRule.php                = `sensitive-data.phi-pattern`
+|   |   |-- PiiTestFixtureRule.php            = `sensitive-data.pii-test-fixture`
+|   |   |-- PrivateKeyRule.php                = `sensitive-data.private-key`
+|   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the sensitive-data pack
 |   |-- Security/                             = AST-driven heuristic rules
 |   |   |-- DangerousFunctionCallRule.php     = `security.dangerous-function-call`
 |   |   |-- DisabledSslVerificationRule.php   = `security.disabled-ssl-verification`
@@ -222,7 +222,7 @@ src/
     `-- TrendReport.php                       = current-vs-previous score delta payload
 ```
 
-Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.git`, `.hg`, `.svn`, `.phpunit.cache`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `var/cache`, `vendor`. The `--include-ignored` flag opts back in.
+Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.fleet`, `.git`, `.goat-flow/logs`, `.goat-flow/scratchpad`, `.goat-flow/tasks`, `.hg`, `.idea`, `.phpunit.cache`, `.svn`, `.vscode`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `tmp`, `var/cache`, `vendor`. Discovery uses a `RecursiveCallbackFilterIterator` to prune subtrees instead of descending into them, so each ignored root is reported once. The `--include-ignored` flag opts back in.
 
 ## Test surface
 
@@ -257,8 +257,8 @@ tests/
 |   |   `-- DocsRulesTest.php
 |   |-- Naming/
 |   |   `-- NamingRulesTest.php
-|   |-- Secrets/
-|   |   `-- SecretsRulesTest.php
+|   |-- SensitiveData/
+|   |   `-- SensitiveDataRulesTest.php
 |   |-- Security/
 |   |   `-- SecurityRulesTest.php
 |   |-- Size/
@@ -283,7 +283,7 @@ tests/
     |-- M08/Naming/                           = naming rule fixtures
     |-- M09/Docs/                             = documentation rule fixtures
     |-- M10/                                  = security rules: Security/ source + Config/disable scenarios
-    |-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
+    |-- M11/                                  = sensitive-data rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
     |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
     |-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
     |-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
@@ -359,5 +359,5 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.
