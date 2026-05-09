@@ -7,6 +7,9 @@ namespace GruffPhp\Analysis;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\MutationAnalysisResult;
+use GruffPhp\Diff\DiffResult;
+use GruffPhp\Scoring\ScoreReport;
+use GruffPhp\Trend\TrendReport;
 
 final readonly class AnalysisReport
 {
@@ -33,6 +36,9 @@ final readonly class AnalysisReport
         public int $exitCode,
         public ?string $configPath = null,
         public ?MutationAnalysisResult $mutation = null,
+        public ?ScoreReport $score = null,
+        public ?DiffResult $diff = null,
+        public ?TrendReport $trend = null,
     ) {
     }
 
@@ -103,6 +109,18 @@ final readonly class AnalysisReport
 
         if ($this->mutation instanceof MutationAnalysisResult) {
             $report['mutation'] = $this->mutation->toArray();
+        }
+
+        if ($this->score instanceof ScoreReport) {
+            $report['score'] = $this->score->toArray();
+        }
+
+        if ($this->diff instanceof DiffResult) {
+            $report['diff'] = $this->diff->toArray();
+        }
+
+        if ($this->trend instanceof TrendReport) {
+            $report['trend'] = $this->trend->toArray();
         }
 
         return $report;

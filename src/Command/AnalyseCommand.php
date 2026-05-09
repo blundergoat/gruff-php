@@ -9,6 +9,10 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Console\Application;
+use GruffPhp\Diff\DiffException;
+use GruffPhp\Diff\DiffFindingFilter;
+use GruffPhp\Diff\DiffResult;
+use GruffPhp\Diff\GitDiffProvider;
 use GruffPhp\Mutation\InfectionReportParser;
 use GruffPhp\Mutation\InfectionRunner;
 use GruffPhp\Mutation\MutationAnalysisResult;
@@ -16,12 +20,21 @@ use GruffPhp\Mutation\MutationFindingFactory;
 use GruffPhp\Mutation\MutationReportException;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\GithubAnnotationsReporter;
+use GruffPhp\Reporting\HotspotReporter;
+use GruffPhp\Reporting\HtmlReporter;
 use GruffPhp\Reporting\JsonReporter;
+use GruffPhp\Reporting\MarkdownReporter;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Reporting\TextReporter;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Scoring\CompositeFindingFactory;
+use GruffPhp\Scoring\ScoreCalculator;
 use GruffPhp\Source\SourceDiscovery;
+use GruffPhp\Trend\TrendRecorder;
+use JsonException;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -37,7 +50,7 @@ final class AnalyseCommand extends Command
             ->setDescription('Run gruff analysis.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text or json.', OutputFormat::Text->value)
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, or hotspot.', OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', FailThreshold::Error->value)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.')
             ->addOption('infection-report', null, InputOption::VALUE_REQUIRED, 'Path to a full Infection JSON report to ingest.')
@@ -45,7 +58,9 @@ final class AnalyseCommand extends Command
             ->addOption('infection-bin', null, InputOption::VALUE_REQUIRED, 'Infection executable for --infection-run.', 'infection')
             ->addOption('infection-config', null, InputOption::VALUE_REQUIRED, 'Path to infection.json5 for --infection-run.')
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
-            ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.');
+            ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
+            ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
+            ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -68,6 +83,8 @@ final class AnalyseCommand extends Command
         $infectionBin = $this->optionalStringOption($input, 'infection-bin') ?? 'infection';
         $infectionConfigPath = $this->optionalStringOption($input, 'infection-config');
         $mutationBaselinePath = $this->optionalStringOption($input, 'mutation-baseline');
+        $diffMode = $this->diffMode($input);
+        $historyFile = $this->optionalStringOption($input, 'history-file');
         $format = $this->parseFormat($input->getOption('format'), $output);
 
         if (!$format instanceof OutputFormat) {
@@ -166,6 +183,27 @@ final class AnalyseCommand extends Command
             $findings = array_merge($findings, (new MutationFindingFactory())->findingsFor($mutationAnalysis));
         }
 
+        $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
+        $diff = $this->buildDiffResult($projectRoot, $diffMode, $diagnostics);
+        if ($diff instanceof DiffResult && $diff->active) {
+            $findings = (new DiffFindingFilter())->filter($findings, $diff);
+        }
+
+        $score = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $trend = null;
+
+        if ($historyFile !== null) {
+            try {
+                $trend = (new TrendRecorder())->record($projectRoot, $historyFile, $score, count($findings));
+            } catch (JsonException | RuntimeException $exception) {
+                $diagnostics[] = new RunDiagnostic(
+                    type: 'history-error',
+                    message: $exception->getMessage(),
+                    path: $historyFile,
+                );
+            }
+        }
+
         $exitCode = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
         $report = new AnalysisReport(
             toolVersion: Application::VERSION,
@@ -181,6 +219,9 @@ final class AnalyseCommand extends Command
             exitCode: $exitCode,
             configPath: $configPath,
             mutation: $mutationAnalysis,
+            score: $score,
+            diff: $diff,
+            trend: $trend,
         );
 
         $this->renderReport($report, $format, $output);
@@ -194,7 +235,7 @@ final class AnalyseCommand extends Command
         $format = OutputFormat::fromInput($rawValue);
 
         if (!$format instanceof OutputFormat) {
-            $output->writeln(sprintf('<error>USAGE-ERROR Unsupported output format "%s". Use text or json.</error>', $rawValue));
+            $output->writeln(sprintf('<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, or hotspot.</error>', $rawValue));
         }
 
         return $format;
@@ -244,6 +285,17 @@ final class AnalyseCommand extends Command
         $value = $input->getOption($name);
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function diffMode(InputInterface $input): ?string
+    {
+        if (!$input->hasParameterOption('--diff')) {
+            return null;
+        }
+
+        $value = $input->getOption('diff');
+
+        return is_string($value) && $value !== '' ? $value : 'working-tree';
     }
 
     /**
@@ -402,6 +454,27 @@ final class AnalyseCommand extends Command
 
     /**
      * @param list<RunDiagnostic> $diagnostics
+     */
+    private function buildDiffResult(string $projectRoot, ?string $diffMode, array &$diagnostics): ?DiffResult
+    {
+        if ($diffMode === null) {
+            return DiffResult::inactive();
+        }
+
+        try {
+            return (new GitDiffProvider())->changedLines($projectRoot, $diffMode);
+        } catch (DiffException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type: 'diff-mode-error',
+                message: $exception->getMessage(),
+            );
+
+            return null;
+        }
+    }
+
+    /**
+     * @param list<RunDiagnostic> $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
      */
     private function resolveExitCode(array $diagnostics, array $findings, FailThreshold $failThreshold): int
@@ -421,7 +494,14 @@ final class AnalyseCommand extends Command
 
     private function renderReport(AnalysisReport $report, OutputFormat $format, OutputInterface $output): void
     {
-        $renderer = $format === OutputFormat::Json ? new JsonReporter() : new TextReporter();
+        $renderer = match ($format) {
+            OutputFormat::Json => new JsonReporter(),
+            OutputFormat::Html => new HtmlReporter(),
+            OutputFormat::Markdown => new MarkdownReporter(),
+            OutputFormat::Github => new GithubAnnotationsReporter(),
+            OutputFormat::Hotspot => new HotspotReporter(),
+            OutputFormat::Text => new TextReporter(),
+        };
         $output->write($renderer->render($report));
     }
 }

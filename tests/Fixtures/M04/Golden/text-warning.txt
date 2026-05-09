@@ -9,6 +9,21 @@ Files
   Missing: 0
   Parse errors: 0
 
+Score
+  Composite: A (96.40/100)
+  Scope: full-project
+  Pillars:
+    size: B (84.00) findings=1
+    complexity: A (100.00) findings=0
+    maintainability: A (100.00) findings=0
+    dead-code: A (100.00) findings=0
+    naming: B (84.00) findings=1
+    documentation: A (96.00) findings=1
+    modernisation: A (100.00) findings=0
+    security: A (100.00) findings=0
+    secrets: A (100.00) findings=0
+    test-quality: A (100.00) findings=0
+
 Findings
   [warning] size.file-length
     tests/Fixtures/M02/mixed/alpha.php:1

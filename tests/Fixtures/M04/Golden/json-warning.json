@@ -85,5 +85,156 @@
             "fingerprint": "5660f4fb68273be3",
             "metadata": []
         }
-    ]
+    ],
+    "score": {
+        "composite": {
+            "score": 96.4,
+            "grade": "A"
+        },
+        "pillars": [
+            {
+                "pillar": "size",
+                "applicable": true,
+                "score": 84,
+                "grade": "B",
+                "findings": 1,
+                "advisories": 0,
+                "warnings": 1,
+                "errors": 0,
+                "penalty": 16
+            },
+            {
+                "pillar": "complexity",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "maintainability",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "dead-code",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "naming",
+                "applicable": true,
+                "score": 84,
+                "grade": "B",
+                "findings": 1,
+                "advisories": 0,
+                "warnings": 1,
+                "errors": 0,
+                "penalty": 16
+            },
+            {
+                "pillar": "documentation",
+                "applicable": true,
+                "score": 96,
+                "grade": "A",
+                "findings": 1,
+                "advisories": 1,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 4
+            },
+            {
+                "pillar": "modernisation",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "security",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "secrets",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "test-quality",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            }
+        ],
+        "topOffenders": [
+            {
+                "file": "tests/Fixtures/M02/mixed/alpha.php",
+                "score": 55,
+                "grade": "F",
+                "findings": 3,
+                "advisories": 1,
+                "warnings": 2,
+                "errors": 0,
+                "penalty": 45,
+                "maxCyclomatic": null,
+                "maxCognitive": null,
+                "maxLines": 14,
+                "mutationScore": null
+            }
+        ],
+        "complexityDistribution": {
+            "1-5": 0,
+            "6-10": 0,
+            "11-15": 0,
+            "16-20": 0,
+            "21+": 0
+        },
+        "scope": "full-project",
+        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
+    },
+    "diff": {
+        "active": false,
+        "mode": "full-project",
+        "base": null,
+        "changedFiles": 0,
+        "message": "Diff mode is disabled.",
+        "files": []
+    }
 }

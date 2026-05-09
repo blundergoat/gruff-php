@@ -45,10 +45,10 @@ scripts/
 
 src/
 |-- Analysis/
-|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings
-|   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error)
+|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/trend
+|   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/history errors)
 |-- Command/
-|   `-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules, renders, and resolves exit code
+|   `-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs, scores, renders, and resolves exit code
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings; immutable, `withRuleSettings()` for per-rule edits
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
@@ -56,6 +56,12 @@ src/
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
 |   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`
+|-- Diff/
+|   |-- ChangedLineRange.php                  = inclusive changed-line range value object
+|   |-- DiffException.php                     = diff-mode failure exception
+|   |-- DiffFindingFilter.php                 = keeps findings touching changed ranges or changed files
+|   |-- DiffResult.php                        = diff-mode metadata exposed in reports
+|   `-- GitDiffProvider.php                   = zero-context `git diff` parser for working-tree, staged, unstaged, or base-ref modes
 |-- Finding/
 |   |-- Confidence.php                        = `low` / `medium` / `high` enum
 |   |-- Finding.php                           = readonly finding value with stable `fingerprint()` (sha256 of identity fields, truncated)
@@ -78,9 +84,13 @@ src/
 |   `-- PhpFileParser.php                     = nikic/php-parser wrapper; attaches `ParentConnectingVisitor`; non-PHP files return empty AST/tokens
 |-- Reporting/
 |   |-- FailThreshold.php                     = `none` / `advisory` / `warning` / `error` enum + `isTriggeredBy(Severity)` predicate
+|   |-- GithubAnnotationsReporter.php         = GitHub Actions annotation renderer with escaped annotation properties
+|   |-- HotspotReporter.php                   = hotspot-map JSON renderer based on file scores
+|   |-- HtmlReporter.php                      = self-contained escaped dashboard renderer
 |   |-- JsonReporter.php                      = pretty-printed JSON renderer of `AnalysisReport::toArray()`
-|   |-- OutputFormat.php                      = `text` / `json` enum
-|   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, findings, summary)
+|   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer
+|   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` enum
+|   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, findings, summary)
 |-- Rule/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
 |   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars
@@ -185,10 +195,20 @@ src/
 |       |-- UnreachableCodeRule.php           = `waste.unreachable-code`
 |       |-- UnusedImportRule.php              = `waste.unused-import`
 |       `-- UnusedParameterRule.php           = `waste.unused-parameter`
-`-- Source/
-    |-- SourceDiscovery.php                   = recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/neon/xml/yaml/yml + `.env*`); deterministic ksort + path canonicalisation
-    |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
-    `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
+|-- Scoring/
+|   |-- CompositeFindingFactory.php           = emits `design.god-method` from overlapping size + complexity findings
+|   |-- FileScore.php                         = per-file top-offender score value
+|   |-- Grade.php                             = A-F grade helper around 0-100 scores
+|   |-- PillarScore.php                       = per-pillar score/count/penalty value
+|   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, and mutation scoring
+|   `-- ScoreReport.php                       = serialisable score payload for reports
+|-- Source/
+|   |-- SourceDiscovery.php                   = recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/neon/xml/yaml/yml + `.env*`); deterministic ksort + path canonicalisation
+|   |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
+|   `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
+`-- Trend/
+    |-- TrendRecorder.php                     = optional bounded JSON score-history writer for `--history-file`
+    `-- TrendReport.php                       = current-vs-previous score delta payload
 ```
 
 Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.git`, `.hg`, `.svn`, `.phpunit.cache`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `var/cache`, `vendor`. The `--include-ignored` flag opts back in.
@@ -200,13 +220,17 @@ tests/
 |-- Config/
 |   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config, fail-on, JSON schema, Infection ingestion
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config, fail-on, JSON/schema score data, Infection ingestion, HTML/Markdown/GitHub/hotspot/history/diff paths
+|-- Diff/
+|   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
 |-- Finding/
 |   `-- FindingTest.php                       = `Finding::toArray()` shape and `fingerprint()` stability
 |-- Mutation/
 |   `-- InfectionReportParserTest.php         = full Infection JSON parser, path normalisation, MSI/per-file summaries, malformed report handling
 |-- Parser/
 |   `-- PhpFileParserTest.php                 = valid parse, syntax-error diagnostics, parent-connecting visitor
+|-- Reporting/
+|   `-- HtmlReporterTest.php                  = dashboard section rendering and malicious string escaping
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, ignore semantics, missing-path reporting
 |-- Rule/
@@ -236,6 +260,8 @@ tests/
 |   |   `-- SizeIntegrationTest.php
 |   `-- Waste/
 |       `-- WasteRulesTest.php
+|-- Scoring/
+|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, design composite findings
 `-- Fixtures/
     |-- M02/                                  = parser/discovery: mixed/, empty/, syntax-error/
     |-- M03/Config/                           = JSON config: defaults, threshold override, disabled rule, unknown-rule
@@ -320,4 +346,4 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Design, Architecture) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.

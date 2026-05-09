@@ -340,6 +340,142 @@ final class GruffCliTest extends TestCase
     }
 
     /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        $score = $report['score'] ?? null;
+        $diff = $report['diff'] ?? null;
+
+        self::assertIsArray($score);
+        self::assertIsArray($diff);
+        $composite = $score['composite'] ?? null;
+        self::assertIsArray($composite);
+        self::assertSame('A', $composite['grade'] ?? null);
+        self::assertSame('full-project', $score['scope'] ?? null);
+        self::assertSame(false, $diff['active'] ?? null);
+    }
+
+    public function testAnalyseCommandOutputsHtmlDashboard(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('<section class="verdict">', $process->getOutput());
+        self::assertStringContainsString('pillar grades', $process->getOutput());
+        self::assertStringContainsString('Mutation data unavailable', $process->getOutput());
+        self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
+    }
+
+    public function testAnalyseCommandOutputsGithubAnnotations(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--format',
+            'github',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('::notice file=tests/Fixtures/M14/Source/OrderCalculator.php', $process->getOutput());
+    }
+
+    public function testAnalyseCommandReportsNonGitDiffModeClearly(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                '.',
+                '--diff',
+                'unstaged',
+                '--fail-on',
+                'none',
+            ], $tempDir);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('[DIFF-MODE-ERROR]', $process->getOutput());
+            self::assertStringContainsString('Diff mode requires a git working tree.', $process->getOutput());
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandWritesTrendHistoryFile(): void
+    {
+        $tempDir = $this->tempDir();
+        $historyPath = $tempDir . '/history/gruff-history.json';
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'tests/Fixtures/M14/Source',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--history-file',
+                $historyPath,
+            ], __DIR__ . '/../..');
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertFileExists($historyPath);
+
+            $report = $this->decodeJsonOutput($process);
+            self::assertIsArray($report['trend'] ?? null);
+
+            $decodedHistory = json_decode((string) file_get_contents($historyPath), true, 512, JSON_THROW_ON_ERROR);
+
+            self::assertIsArray($decodedHistory);
+            self::assertCount(1, $decodedHistory);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      * @throws JsonException
      */
@@ -357,5 +493,40 @@ final class GruffCliTest extends TestCase
         }
 
         return $report;
+    }
+
+    private function tempDir(): string
+    {
+        $path = sys_get_temp_dir() . '/gruff-cli-' . bin2hex(random_bytes(6));
+
+        self::assertTrue(mkdir($path));
+
+        return $path;
+    }
+
+    private function removeDir(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $items = scandir($path);
+        self::assertIsArray($items);
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $child = $path . '/' . $item;
+            if (is_dir($child) && !is_link($child)) {
+                $this->removeDir($child);
+                continue;
+            }
+
+            unlink($child);
+        }
+
+        rmdir($path);
     }
 }

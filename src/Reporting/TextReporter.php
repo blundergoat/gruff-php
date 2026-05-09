@@ -30,6 +30,7 @@ final readonly class TextReporter
         $this->appendPathSection($lines, 'Ignored paths', $report->ignoredPaths);
         $this->appendPathSection($lines, 'Missing paths', $report->missingPaths);
         $this->appendDiagnostics($lines, $report->diagnostics);
+        $this->appendScore($lines, $report);
         $this->appendMutation($lines, $report->mutation);
         $this->appendFindings($lines, $report->findings);
 
@@ -45,6 +46,46 @@ final readonly class TextReporter
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private function appendScore(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->score === null) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Score';
+        $lines[] = sprintf(
+            '  Composite: %s (%.2f/100)',
+            $report->score->composite->letter,
+            $report->score->composite->score,
+        );
+        $lines[] = sprintf('  Scope: %s', $report->score->scope);
+
+        if ($report->diff !== null && $report->diff->active) {
+            $lines[] = sprintf(
+                '  Diff: %s, %d changed files',
+                $report->diff->mode,
+                count($report->diff->changedFiles),
+            );
+        }
+
+        $lines[] = '  Pillars:';
+        foreach ($report->score->pillars as $pillar) {
+            $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            $score = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
+            $lines[] = sprintf(
+                '    %s: %s (%s) findings=%d',
+                $pillar->pillar,
+                $grade,
+                $score,
+                $pillar->findings,
+            );
+        }
     }
 
     /**

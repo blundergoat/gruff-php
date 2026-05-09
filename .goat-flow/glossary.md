@@ -32,13 +32,13 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `analyse` command
 
-`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, and `--mutation-budget`.
+`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, and `--history-file`.
 
 ### Exit codes
 
 - `0` (`Command::SUCCESS`): clean run, or findings below the `--fail-on` threshold.
 - `1` (`Command::FAILURE`): at least one finding meets `--fail-on`.
-- `2` (`Command::INVALID`): any `RunDiagnostic` was recorded (usage, config, missing-path, parse).
+- `2` (`Command::INVALID`): any `RunDiagnostic` was recorded (usage, config, missing-path, parse, mutation, diff, or history).
 
 ## Source pipeline
 
@@ -130,7 +130,7 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### Pillar
 
-`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted by static rules: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Optional Infection ingestion emits `mutation`. Reserved (no rules yet): `coupling`, `design`, `architecture`.
+`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted by static rules: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Optional Infection ingestion emits `mutation`, and `CompositeFindingFactory` can emit `design`. Reserved (no rules yet): `coupling`, `architecture`.
 
 ### Infection Report
 
@@ -143,6 +143,26 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 ### Mutation Findings
 
 `src/Mutation/MutationFindingFactory.php`. External-result findings emitted from Infection data rather than `RuleRegistry`: `mutation.survived-mutant` for escaped or timed-out mutants, `mutation.budget-exceeded` when survived mutants exceed `--mutation-budget`, and `mutation.msi-regression` when current MSI is lower than the baseline.
+
+### God Method Composite
+
+`src/Scoring/CompositeFindingFactory.php`. External-result finding emitted as `design.god-method` when size findings (`size.method-length`, `size.parameter-count`) and complexity findings (`complexity.cognitive`, `complexity.cyclomatic`, `complexity.nesting-depth`, `complexity.npath`) overlap on the same method/function symbol.
+
+### Grade
+
+`src/Scoring/Grade.php`. A-F grade helper over a 0-100 score: A is 90+, B is 80+, C is 70+, D is 60+, and F is below 60.
+
+### Score Report
+
+`src/Scoring/ScoreReport.php` and `src/Scoring/ScoreCalculator.php`. Per-pillar scores start at 100 and subtract severity/confidence-weighted penalties. The composite score averages applicable pillar scores. Mutation uses Infection MSI when supplied and is omitted when no Infection report exists. The score payload also carries top-offender files, complexity distribution buckets, scope (`full-project` or `diff`), and a plain-language explanation.
+
+### Diff Mode
+
+`src/Diff/GitDiffProvider.php` and `src/Diff/DiffFindingFilter.php`. Enabled by `--diff` with an optional mode. Supported modes are `working-tree` (default when the flag has no value), `staged`, `unstaged`, or a base ref. Diff mode requires a Git worktree, parses zero-context `git diff`, keeps findings on changed line ranges, and falls back to changed-file filtering for line-less findings.
+
+### Trend History
+
+`src/Trend/TrendRecorder.php`. Optional score-history writer enabled only by `--history-file <path>`. It appends a bounded JSON entry with timestamp, composite score, letter grade, and finding count, then reports current-vs-previous score delta.
 
 ### Test Quality Scope
 
@@ -176,7 +196,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `OutputFormat`
 
-`src/Reporting/OutputFormat.php`. `text` (default) or `json`. `fromInput()` returns `null` for unknown values so the command can emit a `usage-error`.
+`src/Reporting/OutputFormat.php`. `text` (default), `json`, `html`, `markdown`, `github`, or `hotspot`. `fromInput()` returns `null` for unknown values so the command can emit a `usage-error`.
 
 ### `FailThreshold`
 
@@ -184,19 +204,35 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `TextReporter`
 
-`src/Reporting/TextReporter.php`. Grouped human report: header, file counts, optional ignored/missing/diagnostic sections, findings list, summary block ending with the exit code.
+`src/Reporting/TextReporter.php`. Grouped human report: header, file counts, optional ignored/missing/diagnostic sections, score summary, optional mutation summary, findings list, summary block ending with the exit code.
 
 ### `JsonReporter`
 
 `src/Reporting/JsonReporter.php`. Wraps `AnalysisReport::toArray()` with `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR`.
 
+### `HtmlReporter`
+
+`src/Reporting/HtmlReporter.php`. Self-contained dashboard renderer with inline CSS, escaped run data, masthead, verdict, stats, pillar grades, top offenders, complexity distribution, mutation state, and findings list.
+
+### `MarkdownReporter`
+
+`src/Reporting/MarkdownReporter.php`. PR-comment style Markdown renderer for score, counts, top offenders, and findings.
+
+### `GithubAnnotationsReporter`
+
+`src/Reporting/GithubAnnotationsReporter.php`. GitHub Actions annotation renderer. It escapes annotation properties so file paths, messages, and rule values cannot break annotation syntax.
+
+### `HotspotReporter`
+
+`src/Reporting/HotspotReporter.php`. JSON hotspot-map renderer based on file scores. It declares its current limitation that Git churn is not available yet.
+
 ### `AnalysisReport` / `gruff.analysis.v1`
 
-`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, and optional mutation data.
+`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, optional score data, optional diff metadata, and optional trend data.
 
 ### `RunDiagnostic`
 
-`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`, `mutation-tool-error`, `mutation-run-error`, and `mutation-report-error`. Any diagnostic in the report forces exit code `2`.
+`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`, `mutation-tool-error`, `mutation-run-error`, `mutation-report-error`, `diff-mode-error`, and `history-error`. Any diagnostic in the report forces exit code `2`.
 
 ## Verification
 
