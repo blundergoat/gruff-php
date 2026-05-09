@@ -1,5 +1,5 @@
 # CLAUDE.md - v1.5.1 (2026-05-09)
-gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app structure or commands until real source/config files exist.
+gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
 
@@ -20,7 +20,7 @@ gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app 
 ## Hard Rules
 
 - If a file exists, modify it in place; do not create backup or `_new` variants.
-- Keep app claims grounded in existing files. Today there is no `composer.json`, `src/`, `tests/`, or PHP runtime config.
+- Keep app claims grounded in existing files. Current app surface: `composer.json`, `composer.lock`, `bin/gruff`, `src/`, `tests/`, and `phpunit.xml.dist`.
 - Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
 - Preserve cross-agent consistency between `CLAUDE.md` and `AGENTS.md` for shared goat-flow rules.
 - Keep the controlling goat-flow workspace distinct from this selected target project when tools or prompts originate outside this checkout.
@@ -33,10 +33,14 @@ gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app 
 
 ## Essential Commands
 
-No application lint, typecheck, build, or test command is configured yet.
+Application commands configured by `composer.json`:
 
 ```bash
 git status --short --untracked-files=all
+composer check
+composer test
+php bin/gruff --help
+php bin/gruff analyse
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude --harness
 ```

@@ -1,0 +1,53 @@
+{
+    "name": "devgoat/gruff-php",
+    "description": "Opinionated PHP code quality analyzer.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5.6",
+        "symfony/console": "^6.4 || ^7.0 || ^8.0",
+        "symfony/finder": "^6.4 || ^7.0 || ^8.0",
+        "symfony/process": "^6.4 || ^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "GruffPhp\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "GruffPhp\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/gruff"
+    ],
+    "scripts": {
+        "check": [
+            "composer validate --strict",
+            "@php -l bin/gruff",
+            "@php -l src/Command/AnalyseCommand.php",
+            "@php -l src/Console/Application.php",
+            "@php -l src/Parser/AnalysisUnit.php",
+            "@php -l src/Parser/ParseDiagnostic.php",
+            "@php -l src/Parser/PhpFileParser.php",
+            "@php -l src/Source/SourceDiscovery.php",
+            "@php -l src/Source/SourceDiscoveryResult.php",
+            "@php -l src/Source/SourceFile.php",
+            "@php -l tests/Console/GruffCliTest.php",
+            "@php -l tests/Parser/PhpFileParserTest.php",
+            "@php -l tests/Source/SourceDiscoveryTest.php"
+        ],
+        "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {},
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
