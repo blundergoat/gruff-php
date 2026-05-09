@@ -9,3 +9,4 @@ parameters:
         - tests/Fixtures/M06
         - tests/Fixtures/M07
         - tests/Fixtures/M08
+        - tests/Fixtures/M09

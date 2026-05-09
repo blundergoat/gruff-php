@@ -1,0 +1,103 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Docs;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\NodeFinder;
+
+final readonly class MissingPublicPhpdocRule implements RuleInterface
+{
+    public const ID = 'docs.missing-public-phpdoc';
+
+    private const EXEMPT_PREFIXES = ['get', 'set', 'is', 'has'];
+    private const MAGIC_METHODS = [
+        '__construct', '__destruct', '__clone', '__toString', '__debugInfo',
+        '__get', '__set', '__isset', '__unset', '__call', '__callStatic',
+        '__invoke', '__sleep', '__wakeup', '__serialize', '__unserialize',
+        '__set_state',
+    ];
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Missing public method PHPDoc',
+            pillar: Pillar::Documentation,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::High,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $definition = $this->definition();
+        $finder = new NodeFinder();
+        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+
+        $findings = [];
+
+        foreach ($methods as $method) {
+            if (!$method->isPublic() || $method->isAbstract()) {
+                continue;
+            }
+
+            $name = $method->name->toString();
+
+            if (in_array($name, self::MAGIC_METHODS, true)) {
+                continue;
+            }
+
+            if ($this->isTrivialAccessor($name)) {
+                continue;
+            }
+
+            $docComment = $method->getDocComment();
+
+            if ($docComment !== null) {
+                continue;
+            }
+
+            $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+
+            $findings[] = new Finding(
+                ruleId: $definition->id,
+                message: sprintf('Public method %s has no PHPDoc.', $symbol),
+                filePath: $unit->file->displayPath,
+                line: $method->getStartLine(),
+                severity: $definition->defaultSeverity,
+                pillar: $definition->pillar,
+                tier: $definition->tier,
+                confidence: $definition->confidence,
+                symbol: $symbol,
+                remediation: 'Add a docblock describing the method\'s purpose.',
+            );
+        }
+
+        return $findings;
+    }
+
+    private function isTrivialAccessor(string $name): bool
+    {
+        foreach (self::EXEMPT_PREFIXES as $prefix) {
+            if (str_starts_with($name, $prefix) && strlen($name) > strlen($prefix) && ctype_upper($name[strlen($prefix)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

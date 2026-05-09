@@ -142,7 +142,7 @@ final class GruffCliTest extends TestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(2, $findings);
+        self::assertCount(3, $findings);
         $firstFinding = $findings[0] ?? null;
 
         self::assertIsArray($firstFinding);

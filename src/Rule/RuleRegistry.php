@@ -9,6 +9,14 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rule\Docs\MissingParamTagRule;
+use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
+use GruffPhp\Rule\Docs\MissingReadmeRule;
+use GruffPhp\Rule\Docs\MissingReturnTagRule;
+use GruffPhp\Rule\Docs\MissingThrowsTagRule;
+use GruffPhp\Rule\Docs\StaleParamTagRule;
+use GruffPhp\Rule\Docs\TodoDensityRule;
+use GruffPhp\Rule\Docs\UselessPhpdocRule;
 use GruffPhp\Rule\Naming\BooleanPrefixRule;
 use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
@@ -87,6 +95,14 @@ final class RuleRegistry
             new HungarianNotationRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
+            new MissingParamTagRule(),
+            new MissingPublicPhpdocRule(),
+            new MissingReadmeRule(),
+            new MissingReturnTagRule(),
+            new MissingThrowsTagRule(),
+            new StaleParamTagRule(),
+            new TodoDensityRule(),
+            new UselessPhpdocRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),
             new FileLengthRule(),
