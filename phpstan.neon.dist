@@ -1,0 +1,7 @@
+parameters:
+    level: 10
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - tests/Fixtures/M02/syntax-error

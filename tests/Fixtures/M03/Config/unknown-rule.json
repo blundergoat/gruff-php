@@ -1,0 +1,7 @@
+{
+    "rules": {
+        "size.nope": {
+            "enabled": true
+        }
+    }
+}

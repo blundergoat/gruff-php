@@ -1,0 +1,11 @@
+{
+    "rules": {
+        "size.file-length": {
+            "enabled": false,
+            "thresholds": {
+                "warning": 3,
+                "error": 999
+            }
+        }
+    }
+}

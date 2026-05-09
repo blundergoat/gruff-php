@@ -11,6 +11,7 @@
         "symfony/process": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
+        "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.5"
     },
     "autoload": {
@@ -31,17 +32,36 @@
             "composer validate --strict",
             "@php -l bin/gruff",
             "@php -l src/Command/AnalyseCommand.php",
+            "@php -l src/Config/AnalysisConfig.php",
+            "@php -l src/Config/ConfigException.php",
+            "@php -l src/Config/ConfigLoader.php",
+            "@php -l src/Config/RuleSettings.php",
             "@php -l src/Console/Application.php",
+            "@php -l src/Finding/Confidence.php",
+            "@php -l src/Finding/Finding.php",
+            "@php -l src/Finding/Pillar.php",
+            "@php -l src/Finding/RuleTier.php",
+            "@php -l src/Finding/Severity.php",
             "@php -l src/Parser/AnalysisUnit.php",
             "@php -l src/Parser/ParseDiagnostic.php",
             "@php -l src/Parser/PhpFileParser.php",
+            "@php -l src/Rule/RuleContext.php",
+            "@php -l src/Rule/RuleDefinition.php",
+            "@php -l src/Rule/RuleInterface.php",
+            "@php -l src/Rule/RuleRegistry.php",
+            "@php -l src/Rule/Size/FileLengthRule.php",
             "@php -l src/Source/SourceDiscovery.php",
             "@php -l src/Source/SourceDiscoveryResult.php",
             "@php -l src/Source/SourceFile.php",
+            "@php -l tests/Config/ConfigLoaderTest.php",
             "@php -l tests/Console/GruffCliTest.php",
+            "@php -l tests/Finding/FindingTest.php",
             "@php -l tests/Parser/PhpFileParserTest.php",
-            "@php -l tests/Source/SourceDiscoveryTest.php"
+            "@php -l tests/Rule/RuleRegistryTest.php",
+            "@php -l tests/Source/SourceDiscoveryTest.php",
+            "@phpstan"
         ],
+        "phpstan": "phpstan analyse --configuration=phpstan.neon.dist",
         "test": "phpunit"
     },
     "config": {

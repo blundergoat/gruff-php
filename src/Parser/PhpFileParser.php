@@ -34,15 +34,15 @@ final readonly class PhpFileParser
         }
 
         try {
-            $statements = $this->parser->parse($source) ?? [];
+            $statements = array_values($this->parser->parse($source) ?? []);
 
-            return new AnalysisUnit($file, $source, $statements, $this->parser->getTokens(), []);
+            return new AnalysisUnit($file, $source, $statements, array_values($this->parser->getTokens()), []);
         } catch (Error $error) {
             return new AnalysisUnit(
                 $file,
                 $source,
                 [],
-                $this->parser->getTokens(),
+                array_values($this->parser->getTokens()),
                 [new ParseDiagnostic($error->getRawMessage(), max(1, $error->getStartLine()))],
             );
         } catch (Throwable $throwable) {

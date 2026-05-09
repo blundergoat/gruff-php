@@ -2,30 +2,57 @@
 
 ```text
 .
+|-- CHANGELOG.md = human-readable release notes
 |-- composer.json = Composer package metadata, dependencies, bin registration, autoloading, and scripts
 |-- composer.lock = resolved Composer dependency versions for the current scaffold
+|-- phpstan.neon.dist = PHPStan 2 level 10 config for `src/` and `tests/`
 |-- bin/
 |   `-- gruff = PHP CLI entrypoint loading Composer autoload and running the Symfony Console app
 |-- src/ = gruff-php application source
 |   |-- Command/
-|       `-- AnalyseCommand.php = `analyse` command; expands paths, parses PHP files, and prints parser-stage output
+|       `-- AnalyseCommand.php = `analyse` command; loads config, expands paths, parses PHP files, runs rules, and prints findings
+|   |-- Config/
+|   |   |-- AnalysisConfig.php = resolved project rule settings
+|   |   |-- ConfigException.php = invalid config exception type
+|   |   |-- ConfigLoader.php = `.gruff.json` / `--config` JSON loader with loud validation
+|   |   `-- RuleSettings.php = enabled flag and threshold values for one rule
 |   |-- Console/
 |   |   `-- Application.php = Symfony Console application named `gruff`
+|   |-- Finding/
+|   |   |-- Finding.php = serialized finding shape and stable fingerprint
+|   |   |-- Severity.php = advisory/warning/error enum
+|   |   |-- Pillar.php = v0.1 quality pillar enum
+|   |   |-- RuleTier.php = rule release tier enum
+|   |   `-- Confidence.php = heuristic confidence enum
 |   |-- Parser/
 |       |-- PhpFileParser.php = nikic/php-parser wrapper that returns per-file diagnostics
 |       |-- AnalysisUnit.php = parsed source, AST statements, tokens, and diagnostics
 |       `-- ParseDiagnostic.php = parse error message and line value object
+|   |-- Rule/
+|   |   |-- RuleDefinition.php = stable rule id, pillar, tier, severity, confidence, and default thresholds
+|   |   |-- RuleInterface.php = parsed-file rule contract returning findings
+|   |   |-- RuleContext.php = project root and resolved config passed to rules
+|   |   |-- RuleRegistry.php = deterministic rule lookup, enablement, and execution
+|   |   `-- Size/
+|   |       `-- FileLengthRule.php = initial threshold-backed file length rule
 |   `-- Source/
 |       |-- SourceDiscovery.php = deterministic PHP file discovery with default ignored directories
 |       |-- SourceDiscoveryResult.php = discovered files, missing paths, and ignored paths
 |       `-- SourceFile.php = absolute/display path value object
 |-- tests/ = PHPUnit tests
+|   |-- Config/
+|   |   `-- ConfigLoaderTest.php = default config, overrides, disabled rules, and invalid config tests
 |   |-- Console/
-|   |   `-- GruffCliTest.php = CLI smoke tests for `bin/gruff`
+|   |   `-- GruffCliTest.php = CLI smoke tests for `bin/gruff`, parser output, config, and findings
+|   |-- Finding/
+|   |   `-- FindingTest.php = finding serialization and fingerprint tests
 |   |-- Fixtures/
-|   |   `-- M02/ = parser/discovery fixtures for valid, ignored, empty, and syntax-error inputs
+|   |   |-- M02/ = parser/discovery fixtures for valid, ignored, empty, and syntax-error inputs
+|   |   `-- M03/ = config fixtures for rule threshold and invalid-config behavior
 |   |-- Parser/
 |   |   `-- PhpFileParserTest.php = valid parse and syntax-error tests
+|   |-- Rule/
+|   |   `-- RuleRegistryTest.php = registry, rule execution, disabled-rule, and duplicate-id tests
 |   `-- Source/
 |       `-- SourceDiscoveryTest.php = discovery, ignore, and missing-path tests
 |-- phpunit.xml.dist = PHPUnit test suite config
