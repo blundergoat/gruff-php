@@ -2,65 +2,15 @@
 
 ## Unreleased
 
-### Added
+Initial analyser foundation, rule catalogue, reporting contracts, and local quality gates.
 
-- Composer-based analyser CLI with source discovery, parser diagnostics, and rule execution.
-- Finding schema, rule registry, validated JSON config loading, and per-rule threshold overrides.
-- Text and JSON analysis reports with schema versioning, diagnostics, summary counts, and documented exit codes (0 clean, 1 findings, 2 errors).
-- `--format`, `--fail-on`, `--config`, and `--include-ignored` CLI options.
-- ParentConnectingVisitor in the parser for enclosing class name resolution.
-- PHPUnit and PHPStan level 10 quality gates for local verification.
-
-#### Size rules (7)
-
-- `size.file-length` — files over 400/800 lines.
-- `size.class-length` — classes, traits, or enums over 300/500 lines (interfaces skipped).
-- `size.method-length` — methods, functions, or closures over 30/60 lines.
-- `size.parameter-count` — more than 5/8 parameters (includes promoted properties).
-- `size.public-method-count` — classes with more than 15/25 public methods.
-- `size.property-count` — classes with more than 15/25 properties (includes promoted).
-- `size.average-method-length` — classes with average method length over 20/40 lines.
-
-#### Complexity rules (6)
-
-- `complexity.cyclomatic` — cyclomatic complexity over 10/20.
-- `complexity.cognitive` — Sonar-style cognitive complexity over 15/30 with boolean chain collapsing and nesting penalties.
-- `complexity.nesting-depth` — max nesting deeper than 4/6.
-- `complexity.npath` — NPath complexity over 200/500 (clamped at 100k).
-- `complexity.halstead-volume` — Halstead volume over 1000/2000.
-- `complexity.maintainability-index` — MI below 65/40 (inverse threshold).
-
-#### Dead code rules (2)
-
-- `dead-code.unused-private-method` — private methods never called within the class (magic methods excluded).
-- `dead-code.unused-private-property` — private properties never read, never written, or never used.
-
-#### Waste rules (6)
-
-- `waste.unreachable-code` — statements after return, throw, or exit.
-- `waste.empty-method` — methods with empty bodies (abstract excluded).
-- `waste.empty-class` — non-abstract classes with no members.
-- `waste.unused-import` — use statements with no reference in the file.
-- `waste.unused-parameter` — unused parameters in private methods and standalone functions.
-- `waste.commented-out-code` — semicolon-density heuristic on comments (advisory).
-
-#### Naming rules (7)
-
-- `naming.generic-method` — generic names like `process()`, `handle()`, `execute()` without qualifiers.
-- `naming.short-variable` — single-character variables (loop counters and catch variables excluded).
-- `naming.boolean-prefix` — bool-returning methods without `is`/`has`/`can`/`should`/`will` prefix.
-- `naming.hungarian-notation` — type-prefix variables like `$strName`, `$arrItems`.
-- `naming.confusing-name` — standalone class names like `Helper`, `Util`, `Manager`.
-- `naming.test-naming-consistency` — mixed camelCase and snake_case test methods in the same class.
-- `naming.class-file-mismatch` — class name does not match filename (PSR-4).
-
-#### Documentation rules (8)
-
-- `docs.missing-public-phpdoc` — public methods without docblocks (getters, setters, magic methods exempt).
-- `docs.missing-param-tag` — documented method missing `@param` for a parameter.
-- `docs.missing-return-tag` — documented method missing `@return` for non-void return.
-- `docs.missing-throws-tag` — method throws but has no `@throws` tag.
-- `docs.stale-param-tag` — `@param` for parameter that no longer exists.
-- `docs.useless-phpdoc` — docblock that only restates the type signature.
-- `docs.todo-density` — files with more than 5/10 TODO/FIXME markers.
-- `docs.missing-readme` — project root has no README.md.
+- **Package scaffold and verification gates** - Bootstrapped `gruff-php` as a Composer CLI package with the `bin/gruff` entry point, Symfony Console wiring, PHPUnit coverage, PHPStan level 10, and a readable preflight runner for static analysis plus tests. (`composer.json`, `composer.lock`, `bin/gruff`, `src/Console/Application.php`, `phpunit.xml.dist`, `phpstan.neon.dist`, `scripts/preflight-checks.sh`)
+- **Source discovery and parser pipeline** - Added deterministic PHP file discovery with default ignored directories, missing/ignored path reporting, per-file parser diagnostics, token and AST capture, and parent-node attributes for rules that need enclosing class context. Parse errors are reported without aborting the whole run. (`src/Source/`, `src/Parser/`, `tests/Source/SourceDiscoveryTest.php`, `tests/Parser/PhpFileParserTest.php`, `tests/Fixtures/M02/`)
+- **Rule engine, finding schema, and config** - Rules now share a `RuleInterface`, stable `RuleDefinition` metadata, default thresholds, enable/disable support, and deterministic registry execution. Findings carry rule ID, message, file, location, severity, pillar, tier, confidence, remediation, fingerprint, and metadata. JSON config supports per-rule threshold overrides and strict unknown-key validation. (`src/Rule/`, `src/Finding/`, `src/Config/`, `tests/Rule/RuleRegistryTest.php`, `tests/Finding/FindingTest.php`, `tests/Config/ConfigLoaderTest.php`)
+- **CLI reporting and exit codes** - `analyse` now emits grouped text reports or schema-versioned JSON (`gruff.analysis.v1`) with tool metadata, run config, summary counts, diagnostics, ignored/missing paths, and findings. Exit codes are `0` for clean or below-threshold runs, `1` for findings meeting `--fail-on`, and `2` for expected config, parse, or input errors. (`src/Command/AnalyseCommand.php`, `src/Analysis/`, `src/Reporting/`, `tests/Console/GruffCliTest.php`, `tests/Fixtures/M04/`)
+- **Size metrics** - Added seven threshold-backed size checks for file length, class/trait/enum length, method/function/closure length, parameter count, public method count, property count, and average method length per class. Counts use PhpParser source spans and dual warn/error thresholds. (`src/Rule/Size/`, `tests/Fixtures/M05/`)
+- **Complexity metrics** - Added six structural complexity checks: cyclomatic complexity, cognitive complexity, maximum nesting depth, NPath complexity, Halstead volume, and maintainability index. Algorithms cover boolean operators, ternaries, nesting penalties, path multiplication, and inverse thresholds where lower scores are worse. (`src/Rule/Complexity/`, `tests/Fixtures/M06/`)
+- **Dead code and waste rules** - Added class-local unused private method/property detection plus waste checks for unreachable statements, empty methods/classes, unused imports, unused parameters, and commented-out code. The scope stays conservative to avoid framework and inheritance false positives. (`src/Rule/DeadCode/`, `src/Rule/Waste/`, `tests/Fixtures/M07/`)
+- **Naming rules** - Added naming checks for generic method names, single-character variables, boolean prefix conventions, Hungarian notation, vague standalone class names, mixed test naming conventions, and class/file mismatches. (`src/Rule/Naming/`, `tests/Fixtures/M08/`)
+- **Documentation rules** - Added documentation quality checks for missing public PHPDoc, missing `@param` / `@return` / `@throws` tags, stale `@param` tags, useless docblocks, TODO/FIXME density, and missing project README files. (`src/Rule/Docs/`, `tests/Rule/Docs/DocsRulesTest.php`, `tests/Fixtures/M09/Docs/`)
+- **Security dangerous-pattern rules** - Added heuristic AST rules for dangerous execution calls, unsafe `unserialize()`, weak crypto, variable include/require paths, SQL string concatenation, request-controlled `header()` calls, error suppression, silent catches, `extract()`/`compact()` on request data, insecure random sources, and disabled cURL SSL verification. Findings are labelled as pattern or heuristic checks and covered by safe-wrapper, config-disable, cumulative, and CLI fixtures. (`src/Rule/Security/`, `tests/Rule/Security/SecurityRulesTest.php`, `tests/Fixtures/M10/Security/`)

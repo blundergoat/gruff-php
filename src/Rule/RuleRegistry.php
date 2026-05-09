@@ -25,6 +25,17 @@ use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rule\Security\DangerousFunctionCallRule;
+use GruffPhp\Rule\Security\DisabledSslVerificationRule;
+use GruffPhp\Rule\Security\ErrorSuppressionRule;
+use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
+use GruffPhp\Rule\Security\HeaderInjectionRule;
+use GruffPhp\Rule\Security\InsecureRandomRule;
+use GruffPhp\Rule\Security\SilentCatchRule;
+use GruffPhp\Rule\Security\SqlConcatenationRule;
+use GruffPhp\Rule\Security\UnsafeUnserializeRule;
+use GruffPhp\Rule\Security\VariableIncludeRule;
+use GruffPhp\Rule\Security\WeakCryptoRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
@@ -95,6 +106,17 @@ final class RuleRegistry
             new HungarianNotationRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
+            new DangerousFunctionCallRule(),
+            new DisabledSslVerificationRule(),
+            new ErrorSuppressionRule(),
+            new ExtractCompactUserInputRule(),
+            new HeaderInjectionRule(),
+            new InsecureRandomRule(),
+            new SilentCatchRule(),
+            new SqlConcatenationRule(),
+            new UnsafeUnserializeRule(),
+            new VariableIncludeRule(),
+            new WeakCryptoRule(),
             new MissingParamTagRule(),
             new MissingPublicPhpdocRule(),
             new MissingReadmeRule(),

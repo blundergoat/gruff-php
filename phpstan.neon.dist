@@ -10,3 +10,4 @@ parameters:
         - tests/Fixtures/M07
         - tests/Fixtures/M08
         - tests/Fixtures/M09
+        - tests/Fixtures/M10

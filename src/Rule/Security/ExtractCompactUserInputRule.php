@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Security;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node\Expr;
+use PhpParser\NodeFinder;
+
+final class ExtractCompactUserInputRule implements RuleInterface
+{
+    public const ID = 'security.extract-compact-user-input';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'extract or compact on request data',
+            pillar: Pillar::Security,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Warning,
+            confidence: Confidence::Medium,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $finder = new NodeFinder();
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+            $name = SecurityNodeHelper::globalFunctionName($call);
+            if ($name === null || !in_array($name, ['compact', 'extract'], true)) {
+                continue;
+            }
+
+            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
+            if ($firstArg === null || !SecurityNodeHelper::containsUserInput($firstArg)) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId: self::ID,
+                message: sprintf('Heuristic %s() call on request-controlled data detected.', $name),
+                filePath: $unit->file->displayPath,
+                line: $call->getStartLine(),
+                severity: Severity::Warning,
+                pillar: Pillar::Security,
+                tier: RuleTier::V01,
+                confidence: Confidence::Medium,
+                remediation: 'Map request fields explicitly instead of mass-importing user input into local variables.',
+                metadata: [
+                    'function' => $name,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+}
