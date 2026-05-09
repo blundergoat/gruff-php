@@ -8,6 +8,14 @@ use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rule\Waste\CommentedOutCodeRule;
+use GruffPhp\Rule\Waste\EmptyClassRule;
+use GruffPhp\Rule\Waste\EmptyMethodRule;
+use GruffPhp\Rule\Waste\UnreachableCodeRule;
+use GruffPhp\Rule\Waste\UnusedImportRule;
+use GruffPhp\Rule\Waste\UnusedParameterRule;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
@@ -57,6 +65,14 @@ final class RuleRegistry
             new MaintainabilityIndexRule(),
             new NestingDepthRule(),
             new NpathComplexityRule(),
+            new UnusedPrivateMethodRule(),
+            new UnusedPrivatePropertyRule(),
+            new CommentedOutCodeRule(),
+            new EmptyClassRule(),
+            new EmptyMethodRule(),
+            new UnreachableCodeRule(),
+            new UnusedImportRule(),
+            new UnusedParameterRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),
             new FileLengthRule(),

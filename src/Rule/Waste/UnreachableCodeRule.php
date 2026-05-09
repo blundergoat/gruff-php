@@ -1,0 +1,156 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Waste;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Stmt;
+use PhpParser\NodeFinder;
+
+final readonly class UnreachableCodeRule implements RuleInterface
+{
+    public const ID = 'waste.unreachable-code';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Unreachable code',
+            pillar: Pillar::DeadCode,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Warning,
+            confidence: Confidence::High,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $finder = new NodeFinder();
+        $functions = $finder->find($unit->statements, static function (Node $node): bool {
+            return $node instanceof Stmt\ClassMethod
+                || $node instanceof Stmt\Function_
+                || $node instanceof Expr\Closure;
+        });
+
+        $findings = [];
+
+        foreach ($functions as $fn) {
+            /** @var Stmt\ClassMethod|Stmt\Function_|Expr\Closure $fn */
+            $this->checkBlock($fn->stmts ?? [], $unit, $findings);
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @param array<Node\Stmt> $stmts
+     * @param list<Finding> &$findings
+     */
+    private function checkBlock(array $stmts, AnalysisUnit $unit, array &$findings): void
+    {
+        $definition = $this->definition();
+        $terminated = false;
+
+        foreach ($stmts as $stmt) {
+            if ($terminated && $stmt->getStartLine() > 0) {
+                $findings[] = new Finding(
+                    ruleId: $definition->id,
+                    message: 'Unreachable code after terminating statement.',
+                    filePath: $unit->file->displayPath,
+                    line: $stmt->getStartLine(),
+                    severity: $definition->defaultSeverity,
+                    pillar: $definition->pillar,
+                    tier: $definition->tier,
+                    confidence: $definition->confidence,
+                    endLine: $stmt->getEndLine() > 0 ? $stmt->getEndLine() : null,
+                    remediation: 'Remove dead code or fix the control flow.',
+                );
+
+                return;
+            }
+
+            if ($this->isTerminating($stmt)) {
+                $terminated = true;
+            }
+
+            $this->walkChildren($stmt, $unit, $findings);
+        }
+    }
+
+    /**
+     * @param list<Finding> &$findings
+     */
+    private function walkChildren(Node\Stmt $node, AnalysisUnit $unit, array &$findings): void
+    {
+        if ($node instanceof Stmt\If_) {
+            $this->checkBlock($node->stmts, $unit, $findings);
+
+            foreach ($node->elseifs as $elseif) {
+                $this->checkBlock($elseif->stmts, $unit, $findings);
+            }
+
+            if ($node->else !== null) {
+                $this->checkBlock($node->else->stmts, $unit, $findings);
+            }
+
+            return;
+        }
+
+        if ($node instanceof Stmt\For_
+            || $node instanceof Stmt\Foreach_
+            || $node instanceof Stmt\While_
+            || $node instanceof Stmt\Do_
+        ) {
+            $this->checkBlock($node->stmts, $unit, $findings);
+
+            return;
+        }
+
+        if ($node instanceof Stmt\Switch_) {
+            foreach ($node->cases as $case) {
+                $this->checkBlock($case->stmts, $unit, $findings);
+            }
+
+            return;
+        }
+
+        if ($node instanceof Stmt\TryCatch) {
+            $this->checkBlock($node->stmts, $unit, $findings);
+
+            foreach ($node->catches as $catch) {
+                $this->checkBlock($catch->stmts, $unit, $findings);
+            }
+
+            if ($node->finally !== null) {
+                $this->checkBlock($node->finally->stmts, $unit, $findings);
+            }
+        }
+    }
+
+    private function isTerminating(Node $stmt): bool
+    {
+        if ($stmt instanceof Stmt\Return_) {
+            return true;
+        }
+
+        if ($stmt instanceof Stmt\Expression) {
+            $expr = $stmt->expr;
+
+            return $expr instanceof Expr\Exit_
+                || $expr instanceof Expr\Throw_;
+        }
+
+        return false;
+    }
+}

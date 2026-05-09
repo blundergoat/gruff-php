@@ -1,0 +1,126 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Waste;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Token;
+
+final readonly class CommentedOutCodeRule implements RuleInterface
+{
+    public const ID = 'waste.commented-out-code';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Commented-out code',
+            pillar: Pillar::DeadCode,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::Medium,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $definition = $this->definition();
+        $findings = [];
+
+        foreach ($unit->tokens as $token) {
+            if (!$this->isCommentToken($token)) {
+                continue;
+            }
+
+            $text = $token->text;
+            $line = $token->line;
+
+            if ($this->isDocblock($text)) {
+                continue;
+            }
+
+            $content = $this->stripCommentMarkers($text);
+
+            if ($this->looksLikeCode($content)) {
+                $findings[] = new Finding(
+                    ruleId: $definition->id,
+                    message: 'Comment appears to contain commented-out code.',
+                    filePath: $unit->file->displayPath,
+                    line: $line,
+                    severity: $definition->defaultSeverity,
+                    pillar: $definition->pillar,
+                    tier: $definition->tier,
+                    confidence: $definition->confidence,
+                    remediation: 'Remove commented-out code or restore it if still needed.',
+                );
+            }
+        }
+
+        return $findings;
+    }
+
+    private function isCommentToken(Token $token): bool
+    {
+        return $token->id === T_COMMENT;
+    }
+
+    private function isDocblock(string $text): bool
+    {
+        return str_starts_with(trim($text), '/**');
+    }
+
+    private function stripCommentMarkers(string $text): string
+    {
+        $text = preg_replace('/^\/\*+\s*|\s*\*+\/$/', '', $text) ?? $text;
+        $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
+        $text = preg_replace('/^\/\/\s?/m', '', $text) ?? $text;
+
+        return trim($text);
+    }
+
+    private function looksLikeCode(string $content): bool
+    {
+        if (strlen($content) < 5) {
+            return false;
+        }
+
+        $lines = array_filter(explode("\n", $content), static fn (string $l): bool => trim($l) !== '');
+
+        if ($lines === []) {
+            return false;
+        }
+
+        $codeIndicators = 0;
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            if (str_contains($trimmed, ';') && preg_match('/\$\w/', $trimmed) === 1) {
+                $codeIndicators++;
+            }
+
+            if (preg_match('/^(if|for|foreach|while|return|throw|echo)\s*\(/', $trimmed) === 1) {
+                $codeIndicators++;
+            }
+
+            if (preg_match('/\$\w+\s*->\s*\w+\s*\(/', $trimmed) === 1) {
+                $codeIndicators++;
+            }
+
+            if (preg_match('/\$\w+\s*=\s*/', $trimmed) === 1) {
+                $codeIndicators++;
+            }
+        }
+
+        return $codeIndicators >= 2;
+    }
+}
