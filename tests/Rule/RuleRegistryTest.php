@@ -17,7 +17,13 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Size\AverageMethodLengthRule;
+use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\Size\MethodLengthRule;
+use GruffPhp\Rule\Size\ParameterCountRule;
+use GruffPhp\Rule\Size\PropertyCountRule;
+use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Source\SourceFile;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -28,8 +34,13 @@ final class RuleRegistryTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
 
+        self::assertTrue($registry->has(AverageMethodLengthRule::ID));
+        self::assertTrue($registry->has(ClassLengthRule::ID));
         self::assertTrue($registry->has(FileLengthRule::ID));
-        self::assertSame(FileLengthRule::ID, $registry->get(FileLengthRule::ID)->definition()->id);
+        self::assertTrue($registry->has(MethodLengthRule::ID));
+        self::assertTrue($registry->has(ParameterCountRule::ID));
+        self::assertTrue($registry->has(PropertyCountRule::ID));
+        self::assertTrue($registry->has(PublicMethodCountRule::ID));
     }
 
     public function testRunsEnabledRulesOverParsedFiles(): void

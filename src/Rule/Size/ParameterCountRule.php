@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Size;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
+use PhpParser\NodeFinder;
+
+final readonly class ParameterCountRule implements RuleInterface
+{
+    public const ID = 'size.parameter-count';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Parameter count',
+            pillar: Pillar::Size,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Warning,
+            confidence: Confidence::High,
+            defaultThresholds: [
+                'warning' => 5,
+                'error' => 8,
+            ],
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $definition = $this->definition();
+        $settings = $context->settingsFor($definition);
+        $warningThreshold = $settings->numericThreshold('warning');
+        $errorThreshold = $settings->numericThreshold('error');
+
+        $finder = new NodeFinder();
+        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+            return $node instanceof ClassMethod
+                || $node instanceof Function_
+                || $node instanceof Closure
+                || $node instanceof ArrowFunction;
+        });
+
+        $findings = [];
+
+        foreach ($nodes as $node) {
+            /** @var ClassMethod|Function_|Closure|ArrowFunction $node */
+            $paramCount = count($node->params);
+
+            if ($paramCount <= $warningThreshold) {
+                continue;
+            }
+
+            $severity = $paramCount > $errorThreshold ? Severity::Error : Severity::Warning;
+            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
+            $symbol = $this->resolveSymbol($node);
+
+            $findings[] = new Finding(
+                ruleId: $definition->id,
+                message: sprintf(
+                    '%s has %d parameters, above the %s threshold of %s.',
+                    $symbol,
+                    $paramCount,
+                    $severity->value,
+                    $this->formatNumber($threshold),
+                ),
+                filePath: $unit->file->displayPath,
+                line: $node->getStartLine(),
+                severity: $severity,
+                pillar: $definition->pillar,
+                tier: $definition->tier,
+                confidence: $definition->confidence,
+                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol: $symbol,
+                remediation: 'Group related parameters into a value object or configuration class.',
+                secondaryPillars: $definition->secondaryPillars,
+                metadata: [
+                    'parameters' => $paramCount,
+                    'threshold' => $threshold,
+                    'thresholdType' => $severity->value,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+
+    private function resolveSymbol(Node $node): string
+    {
+        if ($node instanceof ClassMethod) {
+            $parent = $node->getAttribute('parent');
+            $className = $parent instanceof Node\Stmt\Class_
+                || $parent instanceof Node\Stmt\Trait_
+                || $parent instanceof Node\Stmt\Enum_
+                ? ($parent->name?->toString() ?? 'class@anonymous')
+                : null;
+
+            return $className !== null
+                ? sprintf('%s::%s()', $className, $node->name->toString())
+                : $node->name->toString() . '()';
+        }
+
+        if ($node instanceof Function_) {
+            return $node->name->toString() . '()';
+        }
+
+        return sprintf('Closure@%d', $node->getStartLine());
+    }
+
+    private function formatNumber(int|float $value): string
+    {
+        if (is_float($value) && floor($value) !== $value) {
+            return (string) $value;
+        }
+
+        return (string) (int) $value;
+    }
+}

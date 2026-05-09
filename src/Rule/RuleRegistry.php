@@ -7,7 +7,13 @@ namespace GruffPhp\Rule;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\Size\AverageMethodLengthRule;
+use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\Size\MethodLengthRule;
+use GruffPhp\Rule\Size\ParameterCountRule;
+use GruffPhp\Rule\Size\PropertyCountRule;
+use GruffPhp\Rule\Size\PublicMethodCountRule;
 use InvalidArgumentException;
 
 final class RuleRegistry
@@ -39,7 +45,13 @@ final class RuleRegistry
     public static function defaults(): self
     {
         return new self([
+            new AverageMethodLengthRule(),
+            new ClassLengthRule(),
             new FileLengthRule(),
+            new MethodLengthRule(),
+            new ParameterCountRule(),
+            new PropertyCountRule(),
+            new PublicMethodCountRule(),
         ]);
     }
 

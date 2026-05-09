@@ -5,3 +5,4 @@ parameters:
         - tests
     excludePaths:
         - tests/Fixtures/M02/syntax-error
+        - tests/Fixtures/M05

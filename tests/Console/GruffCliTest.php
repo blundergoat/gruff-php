@@ -129,6 +129,11 @@ final class GruffCliTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
+        $expected = file_get_contents(__DIR__ . '/../Fixtures/M04/Golden/json-warning.json');
+
+        self::assertIsString($expected);
+        self::assertSame($expected, $process->getOutput());
+
         $report = $this->decodeJsonOutput($process);
         $summary = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
