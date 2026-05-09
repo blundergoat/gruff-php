@@ -6,6 +6,7 @@ namespace GruffPhp\Analysis;
 
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Mutation\MutationAnalysisResult;
 
 final readonly class AnalysisReport
 {
@@ -31,6 +32,7 @@ final readonly class AnalysisReport
         public array $findings,
         public int $exitCode,
         public ?string $configPath = null,
+        public ?MutationAnalysisResult $mutation = null,
     ) {
     }
 
@@ -62,44 +64,11 @@ final readonly class AnalysisReport
     }
 
     /**
-     * @return array{
-     *     schemaVersion: string,
-     *     tool: array{name: string, version: string},
-     *     run: array{format: string, failOn: string, config: string|null, paths: list<string>},
-     *     summary: array{
-     *         filesDiscovered: int,
-     *         filesParsed: int,
-     *         ignoredPaths: int,
-     *         missingPaths: int,
-     *         parseErrors: int,
-     *         findings: array{advisory: int, warning: int, error: int, total: int},
-     *         exitCode: int
-     *     },
-     *     ignoredPaths: list<string>,
-     *     missingPaths: list<string>,
-     *     diagnostics: list<array{type: string, message: string, file: string|null, line: int|null, path: string|null}>,
-     *     findings: list<array{
-     *         ruleId: string,
-     *         message: string,
-     *         file: string,
-     *         line: int|null,
-     *         endLine: int|null,
-     *         column: int|null,
-     *         symbol: string|null,
-     *         severity: string,
-     *         pillar: string,
-     *         secondaryPillars: list<string>,
-     *         tier: string,
-     *         confidence: string,
-     *         remediation: string|null,
-     *         fingerprint: string,
-     *         metadata: array<string, mixed>
-     *     }>
-     * }
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
-        return [
+        $report = [
             'schemaVersion' => self::SCHEMA_VERSION,
             'tool' => [
                 'name' => 'gruff',
@@ -131,6 +100,12 @@ final readonly class AnalysisReport
                 $this->findings,
             ),
         ];
+
+        if ($this->mutation instanceof MutationAnalysisResult) {
+            $report['mutation'] = $this->mutation->toArray();
+        }
+
+        return $report;
     }
 
     public function hasFindingsAtSeverity(Severity $severity): bool

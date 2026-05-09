@@ -32,7 +32,7 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `analyse` command
 
-`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), and `--include-ignored`.
+`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, and `--mutation-budget`.
 
 ### Exit codes
 
@@ -130,7 +130,19 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### Pillar
 
-`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Reserved (no rules yet): `coupling`, `design`, `architecture`, `mutation`.
+`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted by static rules: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Optional Infection ingestion emits `mutation`. Reserved (no rules yet): `coupling`, `design`, `architecture`.
+
+### Infection Report
+
+`src/Mutation/InfectionReportParser.php` and `src/Mutation/InfectionReport.php`. The full JSON output produced by Infection's JSON reporter. gruff-php validates top-level stats and mutant sections (`escaped`, `timeouted`, `killed`, `killedByStaticAnalysis`, `errored`, `syntaxErrors`, `uncovered`, `ignored`), normalises mutant paths, and exposes MSI, covered MSI, mutation coverage, survived mutants, and per-file summaries.
+
+### Mutation Analysis Result
+
+`src/Mutation/MutationAnalysisResult.php`. Optional aggregate attached to `AnalysisReport` when `--infection-report` is supplied. Contains the current Infection report, optional baseline report from `--mutation-baseline`, optional survived-mutant limit from `--mutation-budget`, and the serialised `mutation` JSON object.
+
+### Mutation Findings
+
+`src/Mutation/MutationFindingFactory.php`. External-result findings emitted from Infection data rather than `RuleRegistry`: `mutation.survived-mutant` for escaped or timed-out mutants, `mutation.budget-exceeded` when survived mutants exceed `--mutation-budget`, and `mutation.msi-regression` when current MSI is lower than the baseline.
 
 ### Test Quality Scope
 
@@ -180,11 +192,11 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `AnalysisReport` / `gruff.analysis.v1`
 
-`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, and findings.
+`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, and optional mutation data.
 
 ### `RunDiagnostic`
 
-`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`. Any diagnostic in the report forces exit code `2`.
+`src/Analysis/RunDiagnostic.php`. Run-level diagnostic with a string `type`. Known types today: `usage-error`, `config-error`, `missing-path`, `parse-error`, `mutation-tool-error`, `mutation-run-error`, and `mutation-report-error`. Any diagnostic in the report forces exit code `2`.
 
 ## Verification
 

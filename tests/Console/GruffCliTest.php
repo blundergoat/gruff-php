@@ -198,6 +198,148 @@ final class GruffCliTest extends TestCase
     }
 
     /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandIngestsInfectionReportInJson(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--infection-report',
+            'tests/Fixtures/M14/Infection/infection-valid.json',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        $mutation = $report['mutation'] ?? null;
+        $findings = $report['findings'] ?? null;
+
+        self::assertIsArray($mutation);
+        $totals = $mutation['totals'] ?? null;
+        self::assertIsArray($totals);
+        self::assertEquals(50.0, $totals['msi'] ?? null);
+        self::assertSame(2, $totals['survivedMutants'] ?? null);
+        self::assertIsArray($findings);
+        self::assertContains(
+            'mutation.survived-mutant',
+            array_map(
+                static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+                $findings,
+            ),
+        );
+
+        $mutationFindings = array_values(array_filter(
+            $findings,
+            static fn (mixed $finding): bool => is_array($finding)
+                && ($finding['ruleId'] ?? null) === 'mutation.survived-mutant',
+        ));
+        $firstMutationFinding = $mutationFindings[0] ?? null;
+
+        self::assertIsArray($firstMutationFinding);
+        $metadata = $firstMutationFinding['metadata'] ?? null;
+        self::assertIsArray($metadata);
+        self::assertEquals(50.0, $metadata['msi'] ?? null);
+        self::assertEquals(50.0, $metadata['coveredMsi'] ?? null);
+    }
+
+    public function testAnalyseCommandRendersMutationSummaryInText(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--infection-report',
+            'tests/Fixtures/M14/Infection/infection-valid.json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Mutation', $process->getOutput());
+        self::assertStringContainsString('MSI: 50.00%', $process->getOutput());
+        self::assertStringContainsString('mutation.survived-mutant', $process->getOutput());
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testAnalyseCommandReportsMutationBudgetAndMsiRegression(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--infection-report',
+            'tests/Fixtures/M14/Infection/infection-valid.json',
+            '--mutation-baseline',
+            'tests/Fixtures/M14/Infection/infection-baseline.json',
+            '--mutation-budget',
+            '1',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        $mutation = $report['mutation'] ?? null;
+        $findings = $report['findings'] ?? null;
+
+        self::assertIsArray($mutation);
+        $baseline = $mutation['baseline'] ?? null;
+        $budget = $mutation['budget'] ?? null;
+        self::assertIsArray($baseline);
+        self::assertIsArray($budget);
+        self::assertEquals(-30.0, $baseline['delta'] ?? null);
+        self::assertSame(true, $budget['exceeded'] ?? null);
+        self::assertIsArray($findings);
+
+        $ruleIds = array_map(
+            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+            $findings,
+        );
+
+        self::assertContains('mutation.budget-exceeded', $ruleIds);
+        self::assertContains('mutation.msi-regression', $ruleIds);
+    }
+
+    public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/M14/Source',
+            '--infection-run',
+            '--infection-bin',
+            'tests/Fixtures/M14/missing-infection',
+            '--infection-report',
+            'tests/Fixtures/M14/Infection/infection-clean.json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString('[MUTATION-TOOL-ERROR]', $process->getOutput());
+        self::assertStringContainsString('Infection executable not found', $process->getOutput());
+    }
+
+    /**
      * @return array<string, mixed>
      * @throws JsonException
      */

@@ -62,6 +62,16 @@ src/
 |   |-- Pillar.php                            = quality pillar enum (size, complexity, coupling, dead-code, naming, documentation, security, secrets, design, modernisation, test-quality, architecture, maintainability, mutation)
 |   |-- RuleTier.php                          = release-tier enum (currently only `v0.1`)
 |   `-- Severity.php                          = `advisory` / `warning` / `error` enum
+|-- Mutation/
+|   |-- InfectionMutant.php                   = parsed Infection mutant row with status, file, line, mutator, diff, and process output
+|   |-- InfectionReport.php                   = parsed Infection report plus MSI, covered MSI, survived-mutant, and per-file summary helpers
+|   |-- InfectionReportParser.php             = full Infection JSON parser; validates stats/sections and normalises paths
+|   |-- InfectionRunResult.php                = result value for optional Infection process execution
+|   |-- InfectionRunner.php                   = explicit opt-in Infection `run` wrapper using Symfony Process and executable lookup
+|   |-- MutationAnalysisResult.php            = report + optional baseline/budget aggregate exposed as optional JSON `mutation`
+|   |-- MutationFileSummary.php               = per-file mutation totals and MSI values
+|   |-- MutationFindingFactory.php             = emits `mutation.survived-mutant`, `mutation.budget-exceeded`, `mutation.msi-regression`
+|   `-- MutationReportException.php           = invalid/malformed Infection report exception type
 |-- Parser/
 |   |-- AnalysisUnit.php                      = parsed unit: SourceFile, source text, AST statements, token list, diagnostics; `lineCount()` helper
 |   |-- ParseDiagnostic.php                   = per-file parse error message + 1-based line
@@ -190,9 +200,11 @@ tests/
 |-- Config/
 |   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config, fail-on, JSON schema
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config, fail-on, JSON schema, Infection ingestion
 |-- Finding/
 |   `-- FindingTest.php                       = `Finding::toArray()` shape and `fingerprint()` stability
+|-- Mutation/
+|   `-- InfectionReportParserTest.php         = full Infection JSON parser, path normalisation, MSI/per-file summaries, malformed report handling
 |-- Parser/
 |   `-- PhpFileParserTest.php                 = valid parse, syntax-error diagnostics, parent-connecting visitor
 |-- Source/
@@ -236,7 +248,8 @@ tests/
     |-- M10/                                  = security rules: Security/ source + Config/disable scenarios
     |-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
     |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
-    `-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
+    |-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
+    `-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
 ```
 
 ## goat-flow harness
@@ -307,4 +320,4 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Other `Pillar::*` cases (Coupling, Design, Architecture, Mutation) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Design, Architecture) are reserved for later tiers.

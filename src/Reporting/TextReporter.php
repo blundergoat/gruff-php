@@ -7,6 +7,7 @@ namespace GruffPhp\Reporting;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Finding\Finding;
+use GruffPhp\Mutation\MutationAnalysisResult;
 
 final readonly class TextReporter
 {
@@ -29,6 +30,7 @@ final readonly class TextReporter
         $this->appendPathSection($lines, 'Ignored paths', $report->ignoredPaths);
         $this->appendPathSection($lines, 'Missing paths', $report->missingPaths);
         $this->appendDiagnostics($lines, $report->diagnostics);
+        $this->appendMutation($lines, $report->mutation);
         $this->appendFindings($lines, $report->findings);
 
         $lines[] = '';
@@ -43,6 +45,62 @@ final readonly class TextReporter
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private function appendMutation(array &$lines, ?MutationAnalysisResult $mutation): void
+    {
+        if (!$mutation instanceof MutationAnalysisResult) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Mutation';
+        $lines[] = sprintf('  Source: %s', $mutation->report->reportPath);
+        $lines[] = sprintf(
+            '  MSI: %.2f%% | Covered MSI: %.2f%% | Mutation coverage: %.2f%%',
+            $mutation->report->msi(),
+            $mutation->report->coveredMsi(),
+            $mutation->report->coverageRate(),
+        );
+        $lines[] = sprintf(
+            '  Mutants: %d total, %d survived',
+            $mutation->report->totalMutants(),
+            $mutation->survivedCount(),
+        );
+
+        $baselineDelta = $mutation->msiDelta();
+        if ($mutation->baselineReport !== null && $baselineDelta !== null) {
+            $lines[] = sprintf(
+                '  Baseline: %.2f%% (%+.2f points)',
+                $mutation->baselineReport->msi(),
+                $baselineDelta,
+            );
+        }
+
+        if ($mutation->mutationBudget !== null) {
+            $status = $mutation->budgetExceeded() ? 'exceeded' : 'within budget';
+            $lines[] = sprintf('  Budget: %d survived mutants allowed (%s)', $mutation->mutationBudget, $status);
+        }
+
+        $fileSummaries = $mutation->report->fileSummaries();
+        if ($fileSummaries === []) {
+            return;
+        }
+
+        $lines[] = '  Files:';
+        foreach ($fileSummaries as $summary) {
+            $lines[] = sprintf(
+                '    %s: MSI %.2f%%, Covered MSI %.2f%%, survived %d/%d',
+                $summary->filePath,
+                $summary->msi,
+                $summary->coveredMsi,
+                $summary->survivedMutants,
+                $summary->totalMutants,
+            );
+        }
     }
 
     /**
