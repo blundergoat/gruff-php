@@ -8,9 +8,14 @@
 |-- phpstan.neon.dist = PHPStan 2 level 10 config for `src/` and `tests/`
 |-- bin/
 |   `-- gruff = PHP CLI entrypoint loading Composer autoload and running the Symfony Console app
+|-- scripts/
+|   `-- preflight-checks.sh = local PHPStan + PHPUnit preflight runner with readable summary output
 |-- src/ = gruff-php application source
+|   |-- Analysis/
+|   |   |-- AnalysisReport.php = schema-versioned report payload with summary, diagnostics, paths, and findings
+|   |   `-- RunDiagnostic.php = expected run diagnostic value object for config, path, and parse errors
 |   |-- Command/
-|       `-- AnalyseCommand.php = `analyse` command; loads config, expands paths, parses PHP files, runs rules, and prints findings
+|       `-- AnalyseCommand.php = `analyse` command; loads config, expands paths, parses PHP files, runs rules, renders reports, and returns documented exit codes
 |   |-- Config/
 |   |   |-- AnalysisConfig.php = resolved project rule settings
 |   |   |-- ConfigException.php = invalid config exception type
@@ -28,6 +33,11 @@
 |       |-- PhpFileParser.php = nikic/php-parser wrapper that returns per-file diagnostics
 |       |-- AnalysisUnit.php = parsed source, AST statements, tokens, and diagnostics
 |       `-- ParseDiagnostic.php = parse error message and line value object
+|   |-- Reporting/
+|   |   |-- OutputFormat.php = `text` / `json` output option enum
+|   |   |-- FailThreshold.php = `--fail-on` severity threshold enum
+|   |   |-- TextReporter.php = grouped terminal report renderer
+|   |   `-- JsonReporter.php = pretty JSON renderer for `gruff.analysis.v1`
 |   |-- Rule/
 |   |   |-- RuleDefinition.php = stable rule id, pillar, tier, severity, confidence, and default thresholds
 |   |   |-- RuleInterface.php = parsed-file rule contract returning findings
@@ -48,7 +58,8 @@
 |   |   `-- FindingTest.php = finding serialization and fingerprint tests
 |   |-- Fixtures/
 |   |   |-- M02/ = parser/discovery fixtures for valid, ignored, empty, and syntax-error inputs
-|   |   `-- M03/ = config fixtures for rule threshold and invalid-config behavior
+|   |   |-- M03/ = config fixtures for rule threshold and invalid-config behavior
+|   |   `-- M04/ = CLI reporting fixtures for fail findings and golden text output
 |   |-- Parser/
 |   |   `-- PhpFileParserTest.php = valid parse and syntax-error tests
 |   |-- Rule/

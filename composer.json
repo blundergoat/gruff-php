@@ -30,7 +30,10 @@
     "scripts": {
         "check": [
             "composer validate --strict",
+            "bash -n scripts/preflight-checks.sh",
             "@php -l bin/gruff",
+            "@php -l src/Analysis/AnalysisReport.php",
+            "@php -l src/Analysis/RunDiagnostic.php",
             "@php -l src/Command/AnalyseCommand.php",
             "@php -l src/Config/AnalysisConfig.php",
             "@php -l src/Config/ConfigException.php",
@@ -45,6 +48,10 @@
             "@php -l src/Parser/AnalysisUnit.php",
             "@php -l src/Parser/ParseDiagnostic.php",
             "@php -l src/Parser/PhpFileParser.php",
+            "@php -l src/Reporting/FailThreshold.php",
+            "@php -l src/Reporting/JsonReporter.php",
+            "@php -l src/Reporting/OutputFormat.php",
+            "@php -l src/Reporting/TextReporter.php",
             "@php -l src/Rule/RuleContext.php",
             "@php -l src/Rule/RuleDefinition.php",
             "@php -l src/Rule/RuleInterface.php",

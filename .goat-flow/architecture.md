@@ -19,9 +19,11 @@ The current request flow is CLI-only:
 7. Each parsed file becomes a `GruffPhp\Parser\AnalysisUnit` containing source text, AST statements, tokens, and parse diagnostics.
 8. `GruffPhp\Config\ConfigLoader` loads default rule settings and optional project JSON config from `.gruff.json` or `--config`.
 9. `GruffPhp\Rule\RuleRegistry` runs enabled rules over successfully parsed `AnalysisUnit` values and returns `GruffPhp\Finding\Finding` values.
-10. The current command prints discovery, parse, and finding results. It returns exit code 0 for clean/parser-success runs, exit code 1 when paths are missing or parse errors are present, and exit code 2 for invalid config.
+10. `GruffPhp\Analysis\AnalysisReport` combines run metadata, summary counts, diagnostics, ignored/missing paths, and findings.
+11. `GruffPhp\Reporting\TextReporter` or `GruffPhp\Reporting\JsonReporter` renders the report according to `--format`.
+12. The command returns exit code 0 for clean or below-threshold finding runs, 1 when findings meet `--fail-on`, and 2 for expected input/config/parse errors.
 
-Formal JSON reporting, scoring, dashboard, baselines, and diff-mode flow are owned by subsequent v0.1 milestones.
+Scoring, dashboard, baselines, and diff-mode flow are owned by subsequent v0.1 milestones.
 
 ## Auth / Trust Boundaries
 
@@ -43,6 +45,8 @@ Source and analysis flow:
 - `RuleDefinition` owns stable rule metadata and default thresholds.
 - `ConfigLoader` currently supports one JSON config shape with root `rules`; unknown root keys, rule ids, rule keys, and threshold keys fail loudly.
 - `RuleRegistry::defaults()` currently registers `size.file-length` as the contract smoke rule for threshold and finding behavior.
+- `AnalysisReport` uses schema version `gruff.analysis.v1` for JSON output and includes tool metadata, run metadata, summary counts, diagnostics, ignored/missing paths, and finding arrays.
+- `--fail-on` accepts `advisory`, `warning`, `error`, or `none`; the default is `error`.
 
 Durable project documentation lives in `README.md` and committed `.goat-flow/` files. Local continuity and generated working notes stay under `.goat-flow/logs/`, `.goat-flow/tasks/`, and `.goat-flow/scratchpad/` according to their nested `.gitignore` files.
 
@@ -50,8 +54,9 @@ Durable project documentation lives in `README.md` and committed `.goat-flow/` f
 
 Composer is now the package manager. Local verification commands are defined by `composer.json` scripts:
 
-- `composer check` runs package validation and PHP syntax checks.
+- `composer check` runs package validation, shell syntax checks, PHP syntax checks, and PHPStan.
 - `composer phpstan` runs PHPStan 2 at level 10.
 - `composer test` runs PHPUnit.
+- `scripts/preflight-checks.sh` runs PHPStan and PHPUnit with a human-readable summary.
 
 No CI, deployment, Packagist release, signed release, or runtime service operation flow is configured yet. Before adding those claims or commands, read the actual files that introduce them.

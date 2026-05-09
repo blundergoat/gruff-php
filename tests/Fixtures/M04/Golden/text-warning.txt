@@ -1,0 +1,19 @@
+gruff 0.1.0-dev
+Format: text
+Fail threshold: error
+
+Files
+  Discovered: 1
+  Parsed: 1
+  Ignored: 0
+  Missing: 0
+  Parse errors: 0
+
+Findings
+  [warning] size.file-length
+    tests/Fixtures/M02/mixed/alpha.php:1
+    File has 14 lines, above the warning threshold of 3.
+
+Summary
+  Findings: 1 (advisory: 0, warning: 1, error: 0)
+  Exit code: 0

@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use GruffPhp\Analysis\AnalysisReport;
+use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Console\Application;
 use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\JsonReporter;
+use GruffPhp\Reporting\OutputFormat;
+use GruffPhp\Reporting\TextReporter;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceDiscovery;
@@ -26,6 +32,8 @@ final class AnalyseCommand extends Command
             ->setDescription('Run gruff analysis.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text or json.', OutputFormat::Text->value)
+            ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', FailThreshold::Error->value)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.');
     }
 
@@ -44,12 +52,41 @@ final class AnalyseCommand extends Command
         $includeIgnored = (bool) $input->getOption('include-ignored');
         $configPath = $input->getOption('config');
         $configPath = is_string($configPath) ? $configPath : null;
+        $format = $this->parseFormat($input->getOption('format'), $output);
+
+        if (!$format instanceof OutputFormat) {
+            return Command::INVALID;
+        }
+
+        $failThreshold = $this->parseFailThreshold($input->getOption('fail-on'), $format, $paths, $configPath, $output);
+
+        if (!$failThreshold instanceof FailThreshold) {
+            return Command::INVALID;
+        }
+
         $registry = RuleRegistry::defaults();
 
         try {
             $config = (new ConfigLoader($projectRoot))->load($configPath, $registry);
         } catch (ConfigException $exception) {
-            $output->writeln(sprintf('<error>CONFIG-ERROR %s</error>', $exception->getMessage()));
+            $this->renderReport(
+                new AnalysisReport(
+                    toolVersion: Application::VERSION,
+                    requestedPaths: $paths,
+                    format: $format->value,
+                    failOn: $failThreshold->value,
+                    filesDiscovered: 0,
+                    filesParsed: 0,
+                    ignoredPaths: [],
+                    missingPaths: [],
+                    diagnostics: [new RunDiagnostic('config-error', $exception->getMessage())],
+                    findings: [],
+                    exitCode: Command::INVALID,
+                    configPath: $configPath,
+                ),
+                $format,
+                $output,
+            );
 
             return Command::INVALID;
         }
@@ -57,83 +94,128 @@ final class AnalyseCommand extends Command
         $discovery = new SourceDiscovery($projectRoot);
         $discoveryResult = $discovery->discover($paths, $includeIgnored);
         $parser = new PhpFileParser();
-        $parseErrorCount = 0;
+        $diagnostics = [];
         $analysisUnits = [];
 
-        $output->writeln(sprintf('gruff %s', Application::VERSION));
-        $output->writeln(sprintf('Discovered %d PHP file(s).', count($discoveryResult->files)));
-
-        foreach ($discoveryResult->ignoredPaths as $ignoredPath) {
-            $output->writeln(sprintf('IGNORED %s', $ignoredPath));
-        }
-
         foreach ($discoveryResult->missingPaths as $missingPath) {
-            $output->writeln(sprintf('MISSING %s', $missingPath));
+            $diagnostics[] = new RunDiagnostic(
+                type: 'missing-path',
+                message: 'Input path does not exist.',
+                path: $missingPath,
+            );
         }
 
         foreach ($discoveryResult->files as $file) {
             $unit = $parser->parse($file);
-
-            if ($unit->hasParseErrors()) {
-                $parseErrorCount += count($unit->diagnostics);
-                $analysisUnits[] = $unit;
-
-                foreach ($unit->diagnostics as $diagnostic) {
-                    $output->writeln(sprintf(
-                        'PARSE-ERROR %s:%d %s',
-                        $file->displayPath,
-                        $diagnostic->line,
-                        $diagnostic->message,
-                    ));
-                }
-
-                continue;
-            }
-
             $analysisUnits[] = $unit;
 
-            $output->writeln(sprintf(
-                'OK %s (%d line(s), %d statement(s), %d token(s))',
-                $file->displayPath,
-                $unit->lineCount(),
-                count($unit->statements),
-                count($unit->tokens),
-            ));
+            if ($unit->hasParseErrors()) {
+                foreach ($unit->diagnostics as $diagnostic) {
+                    $diagnostics[] = new RunDiagnostic(
+                        type: 'parse-error',
+                        message: $diagnostic->message,
+                        filePath: $file->displayPath,
+                        line: $diagnostic->line,
+                    );
+                }
+            }
         }
 
         $findings = $registry->analyse($analysisUnits, new RuleContext($projectRoot, $config));
+        $exitCode = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
+        $report = new AnalysisReport(
+            toolVersion: Application::VERSION,
+            requestedPaths: $paths,
+            format: $format->value,
+            failOn: $failThreshold->value,
+            filesDiscovered: count($discoveryResult->files),
+            filesParsed: count(array_filter($analysisUnits, static fn ($unit): bool => !$unit->hasParseErrors())),
+            ignoredPaths: $discoveryResult->ignoredPaths,
+            missingPaths: $discoveryResult->missingPaths,
+            diagnostics: $diagnostics,
+            findings: $findings,
+            exitCode: $exitCode,
+            configPath: $configPath,
+        );
+
+        $this->renderReport($report, $format, $output);
+
+        return $exitCode;
+    }
+
+    private function parseFormat(mixed $value, OutputInterface $output): ?OutputFormat
+    {
+        $rawValue = is_string($value) ? $value : OutputFormat::Text->value;
+        $format = OutputFormat::fromInput($rawValue);
+
+        if (!$format instanceof OutputFormat) {
+            $output->writeln(sprintf('<error>USAGE-ERROR Unsupported output format "%s". Use text or json.</error>', $rawValue));
+        }
+
+        return $format;
+    }
+
+    /**
+     * @param list<string> $paths
+     */
+    private function parseFailThreshold(
+        mixed $value,
+        OutputFormat $format,
+        array $paths,
+        ?string $configPath,
+        OutputInterface $output,
+    ): ?FailThreshold {
+        $rawValue = is_string($value) ? $value : FailThreshold::Error->value;
+        $failThreshold = FailThreshold::fromInput($rawValue);
+
+        if ($failThreshold instanceof FailThreshold) {
+            return $failThreshold;
+        }
+
+        $report = new AnalysisReport(
+            toolVersion: Application::VERSION,
+            requestedPaths: $paths,
+            format: $format->value,
+            failOn: $rawValue,
+            filesDiscovered: 0,
+            filesParsed: 0,
+            ignoredPaths: [],
+            missingPaths: [],
+            diagnostics: [new RunDiagnostic(
+                'usage-error',
+                sprintf('Unsupported fail threshold "%s". Use advisory, warning, error, or none.', $rawValue),
+            )],
+            findings: [],
+            exitCode: Command::INVALID,
+            configPath: $configPath,
+        );
+        $this->renderReport($report, $format, $output);
+
+        return null;
+    }
+
+    /**
+     * @param list<RunDiagnostic> $diagnostics
+     * @param list<\GruffPhp\Finding\Finding> $findings
+     */
+    private function resolveExitCode(array $diagnostics, array $findings, FailThreshold $failThreshold): int
+    {
+        if ($diagnostics !== []) {
+            return Command::INVALID;
+        }
 
         foreach ($findings as $finding) {
-            $line = $finding->line === null ? '' : sprintf(':%d', $finding->line);
-            $output->writeln(sprintf(
-                'FINDING %s %s %s%s %s',
-                $finding->severity->value,
-                $finding->ruleId,
-                $finding->filePath,
-                $line,
-                $finding->message,
-            ));
+            if ($failThreshold->isTriggeredBy($finding->severity)) {
+                return Command::FAILURE;
+            }
         }
-
-        if ($parseErrorCount > 0 || $discoveryResult->hasInputErrors()) {
-            $output->writeln(sprintf(
-                'Completed with %d finding(s), %d parse error(s), and %d missing path(s).',
-                count($findings),
-                $parseErrorCount,
-                count($discoveryResult->missingPaths),
-            ));
-
-            return Command::FAILURE;
-        }
-
-        if ($findings !== []) {
-            $output->writeln(sprintf('Completed with %d finding(s).', count($findings)));
-
-            return Command::SUCCESS;
-        }
-
-        $output->writeln('Completed without parse errors or findings.');
 
         return Command::SUCCESS;
+    }
+
+    private function renderReport(AnalysisReport $report, OutputFormat $format, OutputInterface $output): void
+    {
+        $renderer = $format === OutputFormat::Json ? new JsonReporter() : new TextReporter();
+        $output->write($renderer->render($report));
     }
 }
