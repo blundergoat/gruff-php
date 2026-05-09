@@ -90,9 +90,6 @@ final readonly class InfectionReportParser
         return $stats;
     }
 
-    /**
-     * @param mixed $row
-     */
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
         if (!is_array($row) || array_is_list($row)) {

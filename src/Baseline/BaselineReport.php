@@ -6,6 +6,9 @@ namespace GruffPhp\Baseline;
 
 final readonly class BaselineReport
 {
+    public const SOURCE_EXPLICIT = 'explicit';
+    public const SOURCE_DEFAULT = 'default';
+
     /**
      * @param list<BaselineEntry> $staleEntries
      */
@@ -16,6 +19,7 @@ final readonly class BaselineReport
         public int $suppressedFindings,
         public string $staleEvaluation,
         public array $staleEntries = [],
+        public string $source = self::SOURCE_EXPLICIT,
     ) {
     }
 
@@ -27,6 +31,7 @@ final readonly class BaselineReport
      *     suppressedFindings: int,
      *     staleEvaluation: string,
      *     staleEntries: int,
+     *     source: string,
      *     stale: list<array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string}>
      * }
      */
@@ -39,6 +44,7 @@ final readonly class BaselineReport
             'suppressedFindings' => $this->suppressedFindings,
             'staleEvaluation' => $this->staleEvaluation,
             'staleEntries' => count($this->staleEntries),
+            'source' => $this->source,
             'stale' => array_map(
                 static fn (BaselineEntry $entry): array => $entry->toArray(),
                 $this->staleEntries,

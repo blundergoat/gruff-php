@@ -14,9 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
-final readonly class MissingReadmeRule implements RuleInterface
+final class MissingReadmeRule implements RuleInterface
 {
     public const ID = 'docs.missing-readme';
+
+    /** @var array<string, bool> */
+    private array $readmePresenceByRoot = [];
+
+    private bool $emitted = false;
 
     public function definition(): RuleDefinition
     {
@@ -32,12 +37,19 @@ final readonly class MissingReadmeRule implements RuleInterface
 
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $readmePath = $context->projectRoot . '/README.md';
-
-        if (file_exists($readmePath)) {
+        if ($this->emitted) {
             return [];
         }
 
+        $root = $context->projectRoot;
+        $readmePresent = $this->readmePresenceByRoot[$root]
+            ??= file_exists($root . '/README.md');
+
+        if ($readmePresent) {
+            return [];
+        }
+
+        $this->emitted = true;
         $definition = $this->definition();
 
         return [

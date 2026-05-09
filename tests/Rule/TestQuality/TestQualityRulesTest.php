@@ -109,6 +109,18 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
     }
 
+    public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/M19/TestQuality/non-test-class.php');
+
+        $testQualityFindings = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
+        ));
+
+        self::assertSame([], $testQualityFindings, 'Library code with test* method names must not trigger test-quality rules.');
+    }
+
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
         $findings = array_values(array_filter(

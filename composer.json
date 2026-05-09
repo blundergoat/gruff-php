@@ -41,6 +41,8 @@
             "@php -l src/Baseline/BaselineReport.php",
             "@php -l src/Baseline/BaselineStore.php",
             "@php -l src/Command/AnalyseCommand.php",
+            "@php -l src/Command/DashboardCommand.php",
+            "@php -l src/Command/ReportCommand.php",
             "@php -l src/Config/AnalysisConfig.php",
             "@php -l src/Config/ConfigException.php",
             "@php -l src/Config/ConfigLoader.php",
@@ -160,6 +162,7 @@
             "@php -l tests/Rule/TestQuality/TestQualityRulesTest.php",
             "@php -l tests/Scoring/ScoreCalculatorTest.php",
             "@php -l tests/Source/SourceDiscoveryTest.php",
+            "bash -n scripts/start-dev.sh",
             "@phpstan"
         ],
         "phpstan": "phpstan analyse --configuration=phpstan.neon.dist",

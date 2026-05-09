@@ -94,4 +94,12 @@ class PhpdocTagsFixture
     {
         return $x;
     }
+
+    /**
+     * @param resource $stream
+     */
+    public function resourceParamDoc($stream): int
+    {
+        return is_resource($stream) ? 1 : 0;
+    }
 }

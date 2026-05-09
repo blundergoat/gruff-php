@@ -10,6 +10,7 @@ use JsonException;
 final readonly class BaselineStore
 {
     public const SCHEMA_VERSION = 'gruff.baseline.v1';
+    public const DEFAULT_FILENAME = 'gruff-baseline.json';
 
     public function __construct(private string $projectRoot)
     {

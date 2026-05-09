@@ -68,8 +68,25 @@ final class AnalyseCommand extends Command
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
             ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.')
-            ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Suppress current findings that match this gruff baseline JSON file.')
-            ->addOption('generate-baseline', null, InputOption::VALUE_REQUIRED, 'Write current findings to this gruff baseline JSON file.');
+            ->addOption(
+                'baseline',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                sprintf(
+                    'Suppress findings that match a gruff baseline JSON file. Defaults to "%s" at the project root when present.',
+                    BaselineStore::DEFAULT_FILENAME,
+                ),
+            )
+            ->addOption(
+                'generate-baseline',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                sprintf(
+                    'Write current findings to a gruff baseline JSON file. Defaults to "%s" when no path is given; overwrites silently.',
+                    BaselineStore::DEFAULT_FILENAME,
+                ),
+            )
+            ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -94,8 +111,16 @@ final class AnalyseCommand extends Command
         $mutationBaselinePath = $this->optionalStringOption($input, 'mutation-baseline');
         $diffMode = $this->diffMode($input);
         $historyFile = $this->optionalStringOption($input, 'history-file');
-        $baselinePath = $this->optionalStringOption($input, 'baseline');
-        $generateBaselinePath = $this->optionalStringOption($input, 'generate-baseline');
+        $noBaseline = (bool) $input->getOption('no-baseline');
+        $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
+        $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
+        $baselinePath = $baselineFlagPresent
+            ? ($this->optionalStringOption($input, 'baseline') ?? BaselineStore::DEFAULT_FILENAME)
+            : null;
+        $generateBaselinePath = $generateFlagPresent
+            ? ($this->optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
+            : null;
+        $baselineExplicit = $baselineFlagPresent;
         $format = $this->parseFormat($input->getOption('format'), $output);
 
         if (!$format instanceof OutputFormat) {
@@ -121,7 +146,13 @@ final class AnalyseCommand extends Command
             return Command::INVALID;
         }
 
-        if ($baselinePath !== null && $generateBaselinePath !== null) {
+        $usageError = $this->validateBaselineOptions(
+            baselinePath: $baselinePath,
+            generateBaselinePath: $generateBaselinePath,
+            noBaseline: $noBaseline,
+        );
+
+        if ($usageError !== null) {
             $this->renderReport(
                 new AnalysisReport(
                     toolVersion: Application::VERSION,
@@ -132,10 +163,7 @@ final class AnalyseCommand extends Command
                     filesParsed: 0,
                     ignoredPaths: [],
                     missingPaths: [],
-                    diagnostics: [new RunDiagnostic(
-                        'usage-error',
-                        '--baseline and --generate-baseline are mutually exclusive.',
-                    )],
+                    diagnostics: [new RunDiagnostic('usage-error', $usageError)],
                     findings: [],
                     exitCode: Command::INVALID,
                     configPath: $configPath,
@@ -145,6 +173,16 @@ final class AnalyseCommand extends Command
             );
 
             return Command::INVALID;
+        }
+
+        if (
+            $baselinePath === null
+            && $generateBaselinePath === null
+            && !$noBaseline
+            && is_file($projectRoot . '/' . BaselineStore::DEFAULT_FILENAME)
+        ) {
+            $baselinePath = BaselineStore::DEFAULT_FILENAME;
+            $baselineExplicit = false;
         }
 
         $registry = RuleRegistry::defaults();
@@ -230,6 +268,7 @@ final class AnalyseCommand extends Command
         $baselineReport = $this->applyBaseline(
             projectRoot: $projectRoot,
             baselinePath: $baselinePath,
+            baselineExplicit: $baselineExplicit,
             generateBaselinePath: $generateBaselinePath,
             findings: $findings,
             diff: $diff,
@@ -420,6 +459,7 @@ final class AnalyseCommand extends Command
     private function applyBaseline(
         string $projectRoot,
         ?string $baselinePath,
+        bool $baselineExplicit,
         ?string $generateBaselinePath,
         array &$findings,
         ?DiffResult $diff,
@@ -446,6 +486,9 @@ final class AnalyseCommand extends Command
                 totalEntries: count($baseline->entries),
                 suppressedFindings: 0,
                 staleEvaluation: 'generated',
+                source: $generateBaselinePath === BaselineStore::DEFAULT_FILENAME
+                    ? BaselineReport::SOURCE_DEFAULT
+                    : BaselineReport::SOURCE_EXPLICIT,
             );
         }
 
@@ -467,8 +510,33 @@ final class AnalyseCommand extends Command
         }
 
         $findings = $application['findings'];
+        $report = $application['report'];
 
-        return $application['report'];
+        return new BaselineReport(
+            path: $report->path,
+            generated: $report->generated,
+            totalEntries: $report->totalEntries,
+            suppressedFindings: $report->suppressedFindings,
+            staleEvaluation: $report->staleEvaluation,
+            staleEntries: $report->staleEntries,
+            source: $baselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
+        );
+    }
+
+    private function validateBaselineOptions(
+        ?string $baselinePath,
+        ?string $generateBaselinePath,
+        bool $noBaseline,
+    ): ?string {
+        if ($baselinePath !== null && $generateBaselinePath !== null) {
+            return '--baseline and --generate-baseline are mutually exclusive.';
+        }
+
+        if ($noBaseline && $baselinePath !== null) {
+            return '--no-baseline cannot be combined with --baseline.';
+        }
+
+        return null;
     }
 
     /**
@@ -631,6 +699,8 @@ final class AnalyseCommand extends Command
             OutputFormat::Hotspot => new HotspotReporter(),
             OutputFormat::Text => new TextReporter(),
         };
-        $output->write($renderer->render($report));
+        // OUTPUT_RAW skips Symfony's OutputFormatter tag scan, which would otherwise
+        // parse every <...> in HTML/JSON/Markdown output as a console style tag.
+        $output->write($renderer->render($report), false, OutputInterface::OUTPUT_RAW);
     }
 }

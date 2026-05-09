@@ -17,11 +17,24 @@ use PhpParser\NodeFinder;
 
 final class TestQualityNodeHelper
 {
+    /** @var \WeakMap<AnalysisUnit, list<TestQualityScope>>|null */
+    private static ?\WeakMap $scopeCache = null;
+
     /**
      * @return list<TestQualityScope>
      */
     public static function testScopes(AnalysisUnit $unit): array
     {
+        // 18 test-quality rules each call this for every PHP unit; cache so the AST walks once per unit.
+        $cache = self::$scopeCache ??= new \WeakMap();
+
+        if ($cache->offsetExists($unit)) {
+            /** @var list<TestQualityScope> $scopes */
+            $scopes = $cache->offsetGet($unit);
+
+            return $scopes;
+        }
+
         $finder = new NodeFinder();
         $scopes = [];
 
@@ -73,16 +86,42 @@ final class TestQualityNodeHelper
             );
         }
 
+        $cache->offsetSet($unit, $scopes);
+
         return $scopes;
     }
 
     public static function isTestMethod(Stmt\ClassMethod $method): bool
     {
+        if (self::hasAttribute($method, 'Test')) {
+            return true;
+        }
+
+        if (str_contains($method->getDocComment()?->getText() ?? '', '@test')) {
+            return true;
+        }
+
         $name = $method->name->toString();
 
-        return str_starts_with($name, 'test')
-            || self::hasAttribute($method, 'Test')
-            || str_contains($method->getDocComment()?->getText() ?? '', '@test');
+        if (!str_starts_with($name, 'test')) {
+            return false;
+        }
+
+        // The bare `test*` prefix only counts as a PHPUnit test method when the enclosing
+        // class extends a *TestCase base. This stops library code with method names like
+        // testScopes()/testCandidate() being analysed as test bodies.
+        return self::extendsTestCase(self::parentClass($method));
+    }
+
+    public static function extendsTestCase(?Stmt\Class_ $class): bool
+    {
+        if ($class === null || $class->extends === null) {
+            return false;
+        }
+
+        $parent = strtolower($class->extends->getLast());
+
+        return str_ends_with($parent, 'testcase');
     }
 
     /**

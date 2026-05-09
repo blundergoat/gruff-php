@@ -249,14 +249,17 @@ final class RuleRegistry
     public function analyse(array $units, RuleContext $context): array
     {
         $findings = [];
+        $enabledRules = $this->enabledRules($context->config);
 
         foreach ($units as $unit) {
             if ($unit->hasParseErrors()) {
                 continue;
             }
 
-            foreach ($this->enabledRules($context->config) as $rule) {
-                if (!$unit->file->isPhp() && !$rule instanceof SourceTextRuleInterface) {
+            $isPhp = $unit->file->isPhp();
+
+            foreach ($enabledRules as $rule) {
+                if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                     continue;
                 }
 

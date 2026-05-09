@@ -101,11 +101,30 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = 'Baseline';
         $lines[] = sprintf('  Path: %s', $report->baseline->path);
+        $lines[] = sprintf('  Source: %s', $report->baseline->source);
         $lines[] = sprintf('  Entries: %d', $report->baseline->totalEntries);
         $lines[] = sprintf('  Generated: %s', $report->baseline->generated ? 'yes' : 'no');
         $lines[] = sprintf('  Suppressed findings: %d', $report->baseline->suppressedFindings);
         $lines[] = sprintf('  Stale evaluation: %s', $report->baseline->staleEvaluation);
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
+
+        if ($report->baseline->generated) {
+            $lines[] = sprintf(
+                '  Tip: commit %s and rerun `gruff analyse` to apply it; pass --baseline %s for explicit application.',
+                $report->baseline->path,
+                $report->baseline->path,
+            );
+
+            return;
+        }
+
+        if ($report->baseline->staleEntries !== []) {
+            $lines[] = sprintf(
+                '  Tip: %d stale baseline entries no longer match a finding. Regenerate with `gruff analyse --generate-baseline %s` after reviewing the diff.',
+                count($report->baseline->staleEntries),
+                $report->baseline->path,
+            );
+        }
     }
 
     /**

@@ -134,6 +134,12 @@ final readonly class UselessPhpdocRule implements RuleInterface
             return false;
         }
 
+        // `resource` is not a valid PHP signature type, so a `@param resource` docblock is the only
+        // place this type can live - it is never a redundant restatement of the signature.
+        if (strtolower($type) === 'resource') {
+            return false;
+        }
+
         return true;
     }
 }

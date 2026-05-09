@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 final class HtmlReporterTest extends TestCase
 {
-    public function testHtmlReporterEscapesRunDataAndRendersDashboardSections(): void
+    public function testHtmlReporterEscapesRunDataAndRendersReportSections(): void
     {
         $findings = [
             new Finding(

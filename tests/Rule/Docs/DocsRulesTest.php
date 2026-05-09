@@ -145,6 +145,11 @@ final class DocsRulesTest extends TestCase
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
         self::assertNotContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::describedTagDoc()', $symbols);
+        self::assertNotContains(
+            'PhpdocTagsFixture::resourceParamDoc()',
+            $symbols,
+            '`@param resource` adds type info that PHP cannot express in the signature.',
+        );
     }
 
     public function testTodoDensityDetected(): void

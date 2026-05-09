@@ -25,7 +25,7 @@ Last reviewed 2026-05-09. Captures the v0.1 surface as wired in `composer.json`,
 |-- .editorconfig             = editor settings
 |-- .gitattributes            = git export/diff rules
 |-- .gitignore                = root ignore rules
-|-- .github/                  = repository-facing guidance (commit instructions)
+|-- .github/                  = repository-facing guidance and CI workflow
 |-- .idea/                    = JetBrains IDE settings (developer-local)
 |-- .goat-flow/               = goat-flow project memory and reference docs
 |-- .claude/                  = Claude Code config, hooks, and installed skills
@@ -41,6 +41,7 @@ bin/
 
 scripts/
 |-- preflight-checks.sh                       = local PHPStan + PHPUnit runner with coloured pass/fail summary
+|-- start-dev.sh                              = starts `bin/gruff dashboard` with environment-overridable host/port/project/scan timeout
 `-- maintenance/                              = ad-hoc maintenance scripts (developer-local)
 
 src/
@@ -55,7 +56,9 @@ src/
 |   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
 |   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
 |-- Command/
-|   `-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, scores, renders, and resolves exit code
+|   |-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, scores, renders, and resolves exit code
+|   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
+|   `-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
@@ -94,7 +97,7 @@ src/
 |   |-- FailThreshold.php                     = `none` / `advisory` / `warning` / `error` enum + `isTriggeredBy(Severity)` predicate
 |   |-- GithubAnnotationsReporter.php         = GitHub Actions annotation renderer with escaped annotation properties
 |   |-- HotspotReporter.php                   = hotspot-map JSON renderer based on file scores
-|   |-- HtmlReporter.php                      = self-contained escaped dashboard renderer
+|   |-- HtmlReporter.php                      = self-contained escaped HTML report renderer
 |   |-- JsonReporter.php                      = pretty-printed JSON renderer of `AnalysisReport::toArray()`
 |   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer
 |   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` enum
@@ -228,7 +231,7 @@ tests/
 |-- Config/
 |   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, HTML/Markdown/GitHub/hotspot/history/diff paths
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
 |-- Diff/
 |   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
 |-- Finding/
@@ -238,7 +241,7 @@ tests/
 |-- Parser/
 |   `-- PhpFileParserTest.php                 = valid parse, syntax-error diagnostics, parent-connecting visitor
 |-- Reporting/
-|   `-- HtmlReporterTest.php                  = dashboard section rendering and malicious string escaping
+|   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
@@ -284,7 +287,8 @@ tests/
     |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
     |-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
     |-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
-    `-- M16/                                  = config selection, path ignore, allowlist, and invalid-selection fixtures
+    |-- M16/                                  = config selection, path ignore, allowlist, and invalid-selection fixtures
+    `-- M19/TestQuality/                      = non-test class with `test*` method names; regression fixture for tightened test detection
 ```
 
 ## goat-flow harness

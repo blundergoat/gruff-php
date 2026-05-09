@@ -4,7 +4,7 @@ Last reviewed 2026-05-09. All claims map to a real file in `src/`, `tests/`, or 
 
 ## System Overview
 
-`gruff-php` is a Composer-distributed PHP CLI for opinionated code-quality analysis. The package boundary is `composer.json`: it declares dependencies (`nikic/php-parser`, `symfony/console`, `symfony/finder`, `symfony/process`), the `bin/gruff` entrypoint, the `GruffPhp\` PSR-4 root, and the `check`, `phpstan`, and `test` Composer scripts. The runtime is a single `analyse` Symfony Console command that discovers source files, parses PHP through `nikic/php-parser`, runs a deterministic registry of rules, optionally ingests Infection mutation JSON, scores the result, optionally filters to Git diff ranges, and emits a schema-versioned report (`gruff.analysis.v1`) as text, JSON, HTML, Markdown, GitHub annotations, or hotspot JSON.
+`gruff-php` is a Composer-distributed PHP CLI for opinionated code-quality analysis. The package boundary is `composer.json`: it declares dependencies (`nikic/php-parser`, `symfony/console`, `symfony/finder`, `symfony/process`), the `bin/gruff` entrypoint, the `GruffPhp\` PSR-4 root, and the `check`, `phpstan`, and `test` Composer scripts. The runtime exposes `analyse`, `report`, and `dashboard` Symfony Console commands. `analyse` discovers source files, parses PHP through `nikic/php-parser`, runs a deterministic registry of rules, optionally ingests Infection mutation JSON, scores the result, optionally filters to Git diff ranges, and emits a schema-versioned report (`gruff.analysis.v1`) as text, JSON, HTML, Markdown, GitHub annotations, or hotspot JSON. `report` is the static report convenience command: it delegates to `analyse` and can emit HTML or JSON to stdout or `--output`. `dashboard` is the local interactive server for refreshing scans and pointing gruff at other local project roots.
 
 The agent harness is intentionally separate from the app. `.goat-flow/` holds durable project knowledge and tool playbooks; `.claude/`, `.codex/`, and `.agents/skills/` hold the per-agent skill, hook, and settings surfaces. Harness changes do not touch the analyser binary or the Composer package.
 
@@ -13,7 +13,7 @@ The agent harness is intentionally separate from the app. `.goat-flow/` holds du
 | Layer | Purpose | Key files |
 | --- | --- | --- |
 | Entry | Boot autoloader and the Symfony Console app | `bin/gruff`, `src/Console/Application.php` |
-| Command | Parse CLI flags, orchestrate the run, render | `src/Command/AnalyseCommand.php`, `src/Reporting/*` |
+| Command | Parse CLI flags, orchestrate the run, render | `src/Command/AnalyseCommand.php`, `src/Command/ReportCommand.php`, `src/Command/DashboardCommand.php`, `src/Reporting/*` |
 | Discovery | Resolve user paths to source files | `src/Source/SourceDiscovery.php`, `src/Source/SourceFile.php`, `src/Source/SourceDiscoveryResult.php` |
 | Parsing | Produce AST + tokens or per-file diagnostics | `src/Parser/PhpFileParser.php`, `src/Parser/AnalysisUnit.php`, `src/Parser/ParseDiagnostic.php` |
 | Configuration | Resolve thresholds, rule selection, path ignores, and allowlists | `src/Config/ConfigLoader.php`, `src/Config/AnalysisConfig.php`, `src/Config/RuleSelection.php`, `src/Config/RuleSettings.php` |
@@ -28,11 +28,11 @@ The agent harness is intentionally separate from the app. `.goat-flow/` holds du
 
 ## Request Flow
 
-The current request flow is CLI-only.
+The current request flow is CLI-first; `dashboard` additionally starts a local HTTP server for manual refreshes and cross-project scans.
 
 1. `bin/gruff` runs `(new \GruffPhp\Console\Application())->run()` after loading `vendor/autoload.php`.
-2. `Application` (Symfony Console subclass) registers the single `analyse` command with version constant `0.1.0-dev`.
-3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--format`, `--fail-on`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, and `--generate-baseline` options, validating `--format`, `--fail-on`, mutually exclusive baseline modes, and mutation budget input up front.
+2. `Application` (Symfony Console subclass) registers the `analyse`, `report`, and `dashboard` commands with version constant `0.1.0-dev`.
+3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--format`, `--fail-on`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline` options, validating `--format`, `--fail-on`, mutually exclusive baseline modes, and mutation budget input up front. Both `--baseline` and `--generate-baseline` accept an optional path that defaults to `gruff-baseline.json` at the project root; bare `--baseline` resolves to that default file when present.
 4. `RuleRegistry::defaults()` constructs the v0.1 catalogue (sorted by id via `ksort`).
 5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist values, selection values, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
 6. `SourceDiscovery::discover()` expands the input paths (defaulting to `.`), records missing inputs, applies configured path ignores plus the default ignored-directory list, and yields `SourceFile` values typed `php` or `text`.
@@ -42,12 +42,14 @@ The current request flow is CLI-only.
 10. `CompositeFindingFactory` appends `design.god-method` findings when size and complexity findings overlap on the same symbol.
 11. If `--diff` is supplied, `GitDiffProvider` reads changed files and new-line ranges from Git (`working-tree`, `staged`, `unstaged`, or a base ref), and `DiffFindingFilter` keeps only findings touching changed lines or changed files.
 12. Configured secret preview allowlists remove matching `Secrets` findings by redacted preview, after rules run and before scoring.
-13. If `--generate-baseline` is supplied, `BaselineStore` writes the current scoped findings to a `gruff.baseline.v1` JSON file. If `--baseline` is supplied, `BaselineStore` reads the file and `BaselineFilter` suppresses matching findings by fingerprint, rule id, and file path. Stale entries are evaluated only in full-project scope; diff scope reports that stale evaluation is skipped.
+13. If `--generate-baseline` is supplied, `BaselineStore` writes the current scoped findings to a `gruff.baseline.v1` JSON file (defaulting to `gruff-baseline.json` at the project root, overwriting silently). If `--baseline` is supplied, `BaselineStore` reads that file and `BaselineFilter` suppresses matching findings by fingerprint, rule id, and file path. With no explicit baseline flag, `AnalyseCommand` auto-discovers `gruff-baseline.json` at the project root and applies it unless `--no-baseline` is set. The `BaselineReport` payload distinguishes `source: "explicit"` from `source: "default"` so reporters can communicate whether application was auto-discovered. Stale entries are evaluated only in full-project scope; diff scope reports that stale evaluation is skipped.
 14. `ScoreCalculator` computes per-pillar scores, top-offender file scores, complexity distribution buckets, optional mutation scoring, and the composite A-F grade. If `--history-file` is supplied, `TrendRecorder` appends a bounded JSON history entry.
-15. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, optional trend data, and optional baseline metadata, then renders it via the selected reporter.
-14. `resolveExitCode()` returns `Command::INVALID` (`2`) if any `RunDiagnostic` was recorded, `Command::FAILURE` (`1`) when at least one finding satisfies `--fail-on`, and `Command::SUCCESS` (`0`) otherwise.
+15. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, optional trend data, and optional baseline metadata, then renders it via the selected reporter. Reporter output is written using `OutputInterface::OUTPUT_RAW` so Symfony Console does not scan rendered HTML/JSON/Markdown payloads as console formatting tags.
+16. `resolveExitCode()` returns `Command::INVALID` (`2`) if any `RunDiagnostic` was recorded, `Command::FAILURE` (`1`) when at least one finding satisfies `--fail-on`, and `Command::SUCCESS` (`0`) otherwise.
+17. `ReportCommand` builds a safe Symfony Process argument vector for `bin/gruff analyse <paths> --format <html|json> --fail-on <threshold>`, preserving supported analysis options including `--baseline` and `--no-baseline`, then writes the static report to stdout (also via `OUTPUT_RAW`) or to `--output`.
+18. `DashboardCommand` binds a local socket (default `127.0.0.1:8765`), renders a control page at `GET /` (now including baseline path and skip-baseline form fields), re-runs analysis at `GET /scan` using query-supplied project root, paths, and baseline state, injects a no-store dashboard toolbar into the HTML report, and exposes `GET /health` for smoke tests. `scripts/start-dev.sh` starts this command with environment-overridable host, port, project root, and scan timeout.
 
-Static finding baselines use `--baseline` / `--generate-baseline`; mutation-specific baseline MSI comparison remains separate through `--mutation-baseline`.
+Static finding baselines default to `gruff-baseline.json` at the project root: `--generate-baseline` writes it (overwriting silently), bare `--baseline` or no flag at all picks it up automatically, `--baseline=<path>` forces an explicit file, and `--no-baseline` opts a single run out. Mutation-specific baseline MSI comparison remains separate through `--mutation-baseline`.
 
 ## Rule Catalogue
 
@@ -130,21 +132,23 @@ Unknown top-level keys, unknown path/allowlist/selection keys, unknown rule ids,
 
 - Text output (`TextReporter`): header (`gruff <version>`, format, fail threshold), file counts, optional ignored/missing/diagnostics sections, score summary, optional baseline summary, optional mutation summary, findings section grouped by file/line, and a final summary line with severity counts and exit code.
 - JSON output (`JsonReporter`): `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR`, schema rooted at `gruff.analysis.v1` (`AnalysisReport::SCHEMA_VERSION`) with optional `mutation`, `score`, `diff`, `trend`, and `baseline` objects.
-- HTML output (`HtmlReporter`): a self-contained dashboard with inline CSS, escaped run data, masthead, verdict, stats, pillar grades, top offenders, complexity distribution, mutation state, and findings list.
+- HTML output (`HtmlReporter`): a self-contained report with inline CSS, escaped run data, masthead, verdict, stats, pillar grades, top offenders, complexity distribution, mutation state, and findings list.
 - Markdown output (`MarkdownReporter`): PR-comment style summary with score, counts, top offenders, and findings.
 - GitHub annotations output (`GithubAnnotationsReporter`): GitHub Actions workflow commands for findings, with annotation properties escaped.
 - Hotspot output (`HotspotReporter`): JSON hotspot map focused on file scores and known limitations; Git churn is not available yet.
 
 ## Deployment / Operations
 
-Composer is the package manager. Local verification is defined entirely by `composer.json` scripts:
+Composer is the package manager. Local verification is defined by `composer.json` scripts:
 
 - `composer check` runs `composer validate --strict`, `bash -n scripts/preflight-checks.sh`, an explicit `php -l` over every committed PHP source/test file, and PHPStan.
 - `composer phpstan` runs PHPStan 2 at level 10 against `src/` and `tests/`.
 - `composer test` runs PHPUnit 11.
 - `scripts/preflight-checks.sh` runs `composer phpstan` then `composer test` with a coloured pass/fail summary.
 
-There is no CI configuration, deployment pipeline, Packagist release flow, or runtime service operation today. Do not list any of these as implemented until the corresponding files (e.g. a `.github/workflows/` directory or release script) exist.
+CI is `.github/workflows/ci.yml`. It runs on push to `main` and pull requests, installs dependencies on PHP 8.3, then runs `composer check` and `bash scripts/preflight-checks.sh`.
+
+There is no deployment pipeline, Packagist release flow, or persistent runtime service operation today. The `dashboard` command is a developer-local HTTP view only. Do not list deployment or release automation as implemented until the corresponding files (e.g. a release script or publishing workflow) exist.
 
 ## File-Level Conventions
 
