@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\TestQuality;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Name;
+use PhpParser\NodeFinder;
+
+final readonly class PrivateReflectionRule implements RuleInterface
+{
+    public const ID = 'test-quality.private-reflection';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Private method reflection',
+            pillar: Pillar::TestQuality,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Warning,
+            confidence: Confidence::High,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $finder = new NodeFinder();
+        $findings = [];
+
+        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+            $reflectionNode = null;
+            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_ || $node instanceof Expr\MethodCall) as $node) {
+                if ($this->isPrivateReflectionNode($node)) {
+                    $reflectionNode = $node;
+                    break;
+                }
+            }
+
+            if (!$reflectionNode instanceof Node) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId: self::ID,
+                message: sprintf('%s uses reflection to reach implementation details.', $scope->symbol),
+                filePath: $unit->file->displayPath,
+                line: $reflectionNode->getStartLine(),
+                severity: Severity::Warning,
+                pillar: Pillar::TestQuality,
+                tier: RuleTier::V01,
+                confidence: Confidence::High,
+                symbol: $scope->symbol,
+                remediation: 'Test behavior through public contracts instead of private methods.',
+            );
+        }
+
+        return $findings;
+    }
+
+    private function isPrivateReflectionNode(Node $node): bool
+    {
+        if ($node instanceof Expr\New_ && $node->class instanceof Name) {
+            return strtolower($node->class->toString()) === 'reflectionmethod';
+        }
+
+        if ($node instanceof Expr\MethodCall) {
+            $name = TestQualityNodeHelper::callName($node);
+
+            return $name === 'setaccessible'
+                && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true;
+        }
+
+        return false;
+    }
+}

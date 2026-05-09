@@ -130,7 +130,15 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### Pillar
 
-`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`. Reserved (no rules yet): `coupling`, `design`, `test-quality`, `architecture`, `mutation`.
+`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Reserved (no rules yet): `coupling`, `design`, `architecture`, `mutation`.
+
+### Test Quality Scope
+
+`src/Rule/TestQuality/TestQualityScope.php`. Value object representing a detected PHPUnit method or Pest `it()` / `test()` closure. Test-quality rules only inspect these scopes so production code is not flagged for test-only smells.
+
+### Test Quality Node Helper
+
+`src/Rule/TestQuality/TestQualityNodeHelper.php`. Shared AST helper for PHPUnit/Pest test detection, assertion detection, mock creation/verification detection, literal extraction, and SUT-call name normalization.
 
 ### Tier (`RuleTier`)
 

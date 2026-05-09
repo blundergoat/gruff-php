@@ -17,7 +17,7 @@ The agent harness is intentionally separate from the app. `.goat-flow/` holds du
 | Discovery | Resolve user paths to source files | `src/Source/SourceDiscovery.php`, `src/Source/SourceFile.php`, `src/Source/SourceDiscoveryResult.php` |
 | Parsing | Produce AST + tokens or per-file diagnostics | `src/Parser/PhpFileParser.php`, `src/Parser/AnalysisUnit.php`, `src/Parser/ParseDiagnostic.php` |
 | Configuration | Resolve per-rule enable/threshold settings | `src/Config/ConfigLoader.php`, `src/Config/AnalysisConfig.php`, `src/Config/RuleSettings.php` |
-| Rules | Emit findings from `AnalysisUnit` + `RuleContext` | `src/Rule/RuleRegistry.php`, `src/Rule/{Size,Complexity,DeadCode,Waste,Naming,Docs,Modernisation,Security,Secrets}/*` |
+| Rules | Emit findings from `AnalysisUnit` + `RuleContext` | `src/Rule/RuleRegistry.php`, `src/Rule/{Size,Complexity,DeadCode,Waste,Naming,Docs,Modernisation,Security,Secrets,TestQuality}/*` |
 | Findings & Report | Stable typed payload + summary aggregation | `src/Finding/*`, `src/Analysis/AnalysisReport.php`, `src/Analysis/RunDiagnostic.php` |
 | Reporting | Render the report for humans or machines | `src/Reporting/TextReporter.php`, `src/Reporting/JsonReporter.php`, `src/Reporting/OutputFormat.php`, `src/Reporting/FailThreshold.php` |
 
@@ -40,7 +40,7 @@ Scoring, dashboard, baselining, and diff-mode flow remain owned by later v0.1 mi
 
 ## Rule Catalogue
 
-The default rule set covers nine pillars (`Size`, `Complexity`, `Maintainability`, `DeadCode`, `Naming`, `Documentation`, `Modernisation`, `Security`, `Secrets`). All rules are tier `v0.1`. The `Pillar` enum reserves additional names (`Coupling`, `Design`, `TestQuality`, `Architecture`, `Mutation`); none have rules yet.
+The default rule set covers ten pillars (`Size`, `Complexity`, `Maintainability`, `DeadCode`, `Naming`, `Documentation`, `Modernisation`, `Security`, `Secrets`, `TestQuality`). All rules are tier `v0.1`. The `Pillar` enum reserves additional names (`Coupling`, `Design`, `Architecture`, `Mutation`); none have rules yet.
 
 | Pillar | Rule ids | Notes |
 | --- | --- | --- |
@@ -53,6 +53,7 @@ The default rule set covers nine pillars (`Size`, `Complexity`, `Maintainability
 | Modernisation | `modernisation.constructor-promotion-candidate`, `modernisation.enum-candidate`, `modernisation.first-class-callable-candidate`, `modernisation.forbidden-global-access`, `modernisation.match-expression-candidate`, `modernisation.mixed-type-overuse`, `modernisation.named-argument-opportunity`, `modernisation.public-property`, `modernisation.readonly-property-candidate` | PHP-version-gated opportunity checks where syntax support matters; no autofix behavior; `ModernisationNodeHelper` is shared infrastructure |
 | Security | `security.dangerous-function-call`, `security.disabled-ssl-verification`, `security.error-suppression`, `security.extract-compact-user-input`, `security.header-injection`, `security.insecure-random`, `security.silent-catch`, `security.sql-concatenation`, `security.unsafe-unserialize`, `security.variable-include`, `security.weak-crypto` | Heuristic AST checks; some carry secondary pillars (e.g. `Pillar::Complexity` or `Pillar::Modernisation`); `SecurityNodeHelper` is shared infrastructure |
 | Secrets | `secrets.api-key-pattern`, `secrets.aws-access-key`, `secrets.database-url-password`, `secrets.hardcoded-env-value`, `secrets.high-entropy-string`, `secrets.jwt-token`, `secrets.phi-pattern`, `secrets.pii-test-fixture`, `secrets.private-key` | All implement `SourceTextRuleInterface`, so they also scan JSON/YAML/INI/.env-style files; `SecretScannerHelper` is shared infrastructure |
+| TestQuality | `test-quality.no-assertions`, `test-quality.trivial-assertion`, `test-quality.conditional-logic`, `test-quality.loop-in-test`, `test-quality.test-longer-than-sut`, `test-quality.eager-test`, `test-quality.mystery-guest`, `test-quality.excessive-mocking`, `test-quality.mock-only-test`, `test-quality.sleep-in-test`, `test-quality.naming-consistency`, `test-quality.magic-number-assertion`, `test-quality.private-reflection`, `test-quality.data-provider-annotation`, `test-quality.trivial-snapshot`, `test-quality.sut-not-called`, `test-quality.setup-bloat`, `test-quality.skipped-without-reason` | PHPUnit/Pest AST heuristics scoped to detected test methods or closures; confidence labels identify noisier smells; `TestQualityNodeHelper` is shared infrastructure |
 
 `RuleDefinition` validates that ids match the slug pattern `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$` and that threshold names are non-empty; the registry rejects duplicate ids on construction.
 

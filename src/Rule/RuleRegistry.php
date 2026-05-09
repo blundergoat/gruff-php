@@ -54,6 +54,24 @@ use GruffPhp\Rule\Security\SqlConcatenationRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
+use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
+use GruffPhp\Rule\TestQuality\EagerTestRule;
+use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rule\TestQuality\LoopInTestRule;
+use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
+use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
+use GruffPhp\Rule\TestQuality\MysteryGuestRule;
+use GruffPhp\Rule\TestQuality\NoAssertionsRule;
+use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
+use GruffPhp\Rule\TestQuality\SetupBloatRule;
+use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
+use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\SutNotCalledRule;
+use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
+use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
+use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
@@ -153,6 +171,24 @@ final class RuleRegistry
             new UnsafeUnserializeRule(),
             new VariableIncludeRule(),
             new WeakCryptoRule(),
+            new ConditionalTestLogicRule(),
+            new DataProviderAnnotationRule(),
+            new EagerTestRule(),
+            new ExcessiveMockingRule(),
+            new LoopInTestRule(),
+            new MagicNumberAssertionRule(),
+            new MockOnlyTestRule(),
+            new MysteryGuestRule(),
+            new NoAssertionsRule(),
+            new PrivateReflectionRule(),
+            new SetupBloatRule(),
+            new SkippedWithoutReasonRule(),
+            new SleepInTestRule(),
+            new SutNotCalledRule(),
+            new TestLongerThanSutRule(),
+            new TestQualityNamingConsistencyRule(),
+            new TrivialAssertionRule(),
+            new TrivialSnapshotRule(),
             new MissingParamTagRule(),
             new MissingPublicPhpdocRule(),
             new MissingReadmeRule(),

@@ -139,6 +139,27 @@ src/
 |   |   |-- UnsafeUnserializeRule.php         = `security.unsafe-unserialize`
 |   |   |-- VariableIncludeRule.php           = `security.variable-include`
 |   |   `-- WeakCryptoRule.php                = `security.weak-crypto`
+|   |-- TestQuality/                          = PHPUnit/Pest AST rules scoped by `TestQualityNodeHelper`
+|   |   |-- ConditionalTestLogicRule.php      = `test-quality.conditional-logic`
+|   |   |-- DataProviderAnnotationRule.php    = `test-quality.data-provider-annotation`
+|   |   |-- EagerTestRule.php                 = `test-quality.eager-test`
+|   |   |-- ExcessiveMockingRule.php          = `test-quality.excessive-mocking`
+|   |   |-- LoopInTestRule.php                = `test-quality.loop-in-test`
+|   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion`
+|   |   |-- MockOnlyTestRule.php              = `test-quality.mock-only-test`
+|   |   |-- MysteryGuestRule.php              = `test-quality.mystery-guest`
+|   |   |-- NoAssertionsRule.php              = `test-quality.no-assertions`
+|   |   |-- PrivateReflectionRule.php         = `test-quality.private-reflection`
+|   |   |-- SetupBloatRule.php                = `test-quality.setup-bloat`
+|   |   |-- SkippedWithoutReasonRule.php      = `test-quality.skipped-without-reason`
+|   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test`
+|   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called`
+|   |   |-- TestLongerThanSutRule.php         = `test-quality.test-longer-than-sut`
+|   |   |-- TestNamingConsistencyRule.php     = `test-quality.naming-consistency`
+|   |   |-- TestQualityNodeHelper.php         = shared test-scope/assertion/mock/SUT-call helpers
+|   |   |-- TestQualityScope.php              = detected PHPUnit/Pest scope value
+|   |   |-- TrivialAssertionRule.php          = `test-quality.trivial-assertion`
+|   |   `-- TrivialSnapshotRule.php          = `test-quality.trivial-snapshot`
 |   |-- Size/
 |   |   |-- AverageMethodLengthRule.php       = `size.average-method-length`
 |   |   |-- ClassLengthRule.php               = `size.class-length`
@@ -214,7 +235,8 @@ tests/
     |-- M09/Docs/                             = documentation rule fixtures
     |-- M10/                                  = security rules: Security/ source + Config/disable scenarios
     |-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
-    `-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
+    |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
+    `-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
 ```
 
 ## goat-flow harness
@@ -285,4 +307,4 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets. Other `Pillar::*` cases (Coupling, Design, TestQuality, Architecture, Mutation) are reserved for later tiers.
+- Pillars currently emitted by registered rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets, TestQuality. Other `Pillar::*` cases (Coupling, Design, Architecture, Mutation) are reserved for later tiers.
