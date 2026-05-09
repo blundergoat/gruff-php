@@ -9,6 +9,13 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rule\Naming\BooleanPrefixRule;
+use GruffPhp\Rule\Naming\ClassFileMismatchRule;
+use GruffPhp\Rule\Naming\ConfusingNameRule;
+use GruffPhp\Rule\Naming\GenericMethodNameRule;
+use GruffPhp\Rule\Naming\HungarianNotationRule;
+use GruffPhp\Rule\Naming\ShortVariableRule;
+use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
@@ -73,6 +80,13 @@ final class RuleRegistry
             new UnreachableCodeRule(),
             new UnusedImportRule(),
             new UnusedParameterRule(),
+            new BooleanPrefixRule(),
+            new ClassFileMismatchRule(),
+            new ConfusingNameRule(),
+            new GenericMethodNameRule(),
+            new HungarianNotationRule(),
+            new ShortVariableRule(),
+            new TestNamingConsistencyRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),
             new FileLengthRule(),

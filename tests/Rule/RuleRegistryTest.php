@@ -79,10 +79,12 @@ final class RuleRegistryTest extends TestCase
             new RuleSettings(true, ['warning' => 3, 'error' => 999]),
         );
 
-        $findings = $registry->analyse(
+        $allFindings = $registry->analyse(
             [$this->parseFixture('tests/Fixtures/M02/mixed/alpha.php')],
             new RuleContext(__DIR__ . '/../..', $config),
         );
+
+        $findings = array_values(array_filter($allFindings, static fn ($f) => $f->ruleId === FileLengthRule::ID));
 
         self::assertCount(1, $findings);
         self::assertSame(FileLengthRule::ID, $findings[0]->ruleId);
@@ -99,12 +101,13 @@ final class RuleRegistryTest extends TestCase
             new RuleSettings(false, ['warning' => 3, 'error' => 999]),
         );
 
-        $findings = $registry->analyse(
+        $allFindings = $registry->analyse(
             [$this->parseFixture('tests/Fixtures/M02/mixed/alpha.php')],
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
-        self::assertSame([], $findings);
+        $fileLengthFindings = array_filter($allFindings, static fn ($f) => $f->ruleId === FileLengthRule::ID);
+        self::assertSame([], array_values($fileLengthFindings));
     }
 
     public function testRejectsDuplicateRuleIds(): void

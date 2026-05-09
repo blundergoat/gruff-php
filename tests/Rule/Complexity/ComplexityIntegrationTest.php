@@ -54,7 +54,7 @@ final class ComplexityIntegrationTest extends TestCase
         }
     }
 
-    public function testSimpleFixtureProducesNoFindings(): void
+    public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
         $parser = new PhpFileParser();
         $unit = $parser->parse(new SourceFile(
@@ -66,7 +66,8 @@ final class ComplexityIntegrationTest extends TestCase
         $config = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        self::assertSame([], $findings);
+        $complexityFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'complexity.'));
+        self::assertSame([], array_values($complexityFindings));
     }
 
     public function testConfigOverrideChangesComplexityFindings(): void

@@ -90,7 +90,7 @@ final class SizeIntegrationTest extends TestCase
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));
     }
 
-    public function testCleanFixtureProducesNoFindings(): void
+    public function testCleanFixtureProducesNoSizeFindings(): void
     {
         $parser = new PhpFileParser();
         $path = __DIR__ . '/../../Fixtures/M05/Size/short-method.php';
@@ -100,6 +100,7 @@ final class SizeIntegrationTest extends TestCase
         $config = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        self::assertSame([], $findings);
+        $sizeFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'size.'));
+        self::assertSame([], array_values($sizeFindings));
     }
 }

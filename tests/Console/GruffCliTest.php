@@ -34,7 +34,6 @@ final class GruffCliTest extends TestCase
         self::assertStringContainsString('gruff 0.1.0-dev', $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 4', $process->getOutput());
-        self::assertStringContainsString('Findings' . PHP_EOL . '  None', $process->getOutput());
         self::assertStringNotContainsString('ignored.php', $process->getOutput());
     }
 
@@ -143,7 +142,7 @@ final class GruffCliTest extends TestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(1, $findings);
+        self::assertCount(2, $findings);
         $firstFinding = $findings[0] ?? null;
 
         self::assertIsArray($firstFinding);

@@ -131,14 +131,15 @@ final class WasteRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $findings[0]->severity);
     }
 
-    public function testCleanFileHasNoFindings(): void
+    public function testCleanFileHasNoWasteFindings(): void
     {
         $unit = $this->parseFixture('clean.php');
         $registry = RuleRegistry::defaults();
         $config = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        self::assertSame([], $findings);
+        $wasteFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'waste.') || str_starts_with($f->ruleId, 'dead-code.'));
+        self::assertSame([], array_values($wasteFindings));
     }
 
     /**
