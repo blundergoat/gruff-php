@@ -84,11 +84,15 @@ Project-relative path used in findings and reports. Computed in `SourceDiscovery
 
 ### `.gruff.json`
 
-Optional project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.json`; `--config <path>` overrides it. Only the `rules` root key is recognised; everything else throws `ConfigException`.
+Optional project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.json`; `--config <path>` overrides it. Recognised root keys are `minimumPhpVersion` and `rules`; everything else throws `ConfigException`.
+
+### Minimum PHP Version
+
+`minimumPhpVersion` in `.gruff.json`, defaulting to `AnalysisConfig::DEFAULT_MINIMUM_PHP_VERSION` (`8.3`). Must be numeric and at least `7.4`. Modernisation rules that suggest PHP 8.0/8.1 syntax use it to suppress findings unsupported by the configured target.
 
 ### `AnalysisConfig`
 
-`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id. Constructed from the registry defaults via `fromRegistry()` and then overlayed by JSON config. Immutable; use `withRuleSettings()` to derive a new instance.
+`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id plus the configured minimum PHP version. Constructed from the registry defaults via `fromRegistry()` and then overlayed by JSON config. Immutable; use `withRuleSettings()` or `withMinimumPhpVersion()` to derive a new instance.
 
 ### `RuleSettings`
 
@@ -96,7 +100,7 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### `ConfigLoader`
 
-`src/Config/ConfigLoader.php`. Loads and validates JSON config. Strict on unknown root keys, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
+`src/Config/ConfigLoader.php`. Loads and validates JSON config. Strict on unknown root keys, invalid `minimumPhpVersion`, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
 
 ### `ConfigException`
 
@@ -126,7 +130,7 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### Pillar
 
-`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `security`, `secrets`. Reserved (no rules yet): `coupling`, `design`, `modernisation`, `test-quality`, `architecture`, `mutation`.
+`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`. Reserved (no rules yet): `coupling`, `design`, `test-quality`, `architecture`, `mutation`.
 
 ### Tier (`RuleTier`)
 

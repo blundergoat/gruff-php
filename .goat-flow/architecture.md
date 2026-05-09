@@ -17,7 +17,7 @@ The agent harness is intentionally separate from the app. `.goat-flow/` holds du
 | Discovery | Resolve user paths to source files | `src/Source/SourceDiscovery.php`, `src/Source/SourceFile.php`, `src/Source/SourceDiscoveryResult.php` |
 | Parsing | Produce AST + tokens or per-file diagnostics | `src/Parser/PhpFileParser.php`, `src/Parser/AnalysisUnit.php`, `src/Parser/ParseDiagnostic.php` |
 | Configuration | Resolve per-rule enable/threshold settings | `src/Config/ConfigLoader.php`, `src/Config/AnalysisConfig.php`, `src/Config/RuleSettings.php` |
-| Rules | Emit findings from `AnalysisUnit` + `RuleContext` | `src/Rule/RuleRegistry.php`, `src/Rule/{Size,Complexity,DeadCode,Waste,Naming,Docs,Security,Secrets}/*` |
+| Rules | Emit findings from `AnalysisUnit` + `RuleContext` | `src/Rule/RuleRegistry.php`, `src/Rule/{Size,Complexity,DeadCode,Waste,Naming,Docs,Modernisation,Security,Secrets}/*` |
 | Findings & Report | Stable typed payload + summary aggregation | `src/Finding/*`, `src/Analysis/AnalysisReport.php`, `src/Analysis/RunDiagnostic.php` |
 | Reporting | Render the report for humans or machines | `src/Reporting/TextReporter.php`, `src/Reporting/JsonReporter.php`, `src/Reporting/OutputFormat.php`, `src/Reporting/FailThreshold.php` |
 
@@ -29,7 +29,7 @@ The current request flow is CLI-only.
 2. `Application` (Symfony Console subclass) registers the single `analyse` command with version constant `0.1.0-dev`.
 3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--format`, `--fail-on`, `--include-ignored` options, validating `--format` and `--fail-on` against their enums up front.
 4. `RuleRegistry::defaults()` constructs the v0.1 catalogue (sorted by id via `ksort`).
-5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
+5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
 6. `SourceDiscovery::discover()` expands the input paths (defaulting to `.`), records missing inputs, applies the default ignored-directory list, and yields `SourceFile` values typed `php` or `text`.
 7. For each discovered file, `PhpFileParser::parse()` reads the source. PHP files are parsed by `nikic/php-parser` and decorated with a `ParentConnectingVisitor`; non-PHP text/config files short-circuit to an `AnalysisUnit` with raw source but no AST or tokens. Parse failures produce one `ParseDiagnostic` per error and are surfaced as `parse-error` `RunDiagnostic` entries.
 8. `RuleRegistry::analyse()` skips units with parse errors, then iterates the enabled rules. PHP-only rules run only against `SourceFile::isPhp()` units; rules implementing `SourceTextRuleInterface` also run against text/config units, so secret/PII scanners cover JSON, YAML, env, and similar files. Findings from all units are sorted by `(filePath, line, ruleId, message)` for deterministic output.
@@ -40,7 +40,7 @@ Scoring, dashboard, baselining, and diff-mode flow remain owned by later v0.1 mi
 
 ## Rule Catalogue
 
-The default rule set covers eight pillars (`Size`, `Complexity`, `Maintainability`, `DeadCode`, `Naming`, `Documentation`, `Security`, `Secrets`). All rules are tier `v0.1`. The `Pillar` enum reserves additional names (`Coupling`, `Design`, `Modernisation`, `TestQuality`, `Architecture`, `Mutation`); none have rules yet.
+The default rule set covers nine pillars (`Size`, `Complexity`, `Maintainability`, `DeadCode`, `Naming`, `Documentation`, `Modernisation`, `Security`, `Secrets`). All rules are tier `v0.1`. The `Pillar` enum reserves additional names (`Coupling`, `Design`, `TestQuality`, `Architecture`, `Mutation`); none have rules yet.
 
 | Pillar | Rule ids | Notes |
 | --- | --- | --- |
@@ -50,7 +50,8 @@ The default rule set covers eight pillars (`Size`, `Complexity`, `Maintainabilit
 | Waste | `waste.commented-out-code`, `waste.empty-class`, `waste.empty-method`, `waste.unreachable-code`, `waste.unused-import`, `waste.unused-parameter` | AST-driven |
 | Naming | `naming.boolean-prefix`, `naming.class-file-mismatch`, `naming.confusing-name`, `naming.generic-method`, `naming.hungarian-notation`, `naming.short-variable`, `naming.test-naming-consistency` | Mix of identifier conventions and class/file alignment |
 | Documentation | `docs.missing-public-phpdoc`, `docs.missing-param-tag`, `docs.missing-return-tag`, `docs.missing-throws-tag`, `docs.stale-param-tag`, `docs.useless-phpdoc`, `docs.todo-density`, `docs.missing-readme` | `docs.missing-readme` looks at `<projectRoot>/README.md` and is independent of the unit being analysed |
-| Security | `security.dangerous-function-call`, `security.disabled-ssl-verification`, `security.error-suppression`, `security.extract-compact-user-input`, `security.header-injection`, `security.insecure-random`, `security.silent-catch`, `security.sql-concatenation`, `security.unsafe-unserialize`, `security.variable-include`, `security.weak-crypto` | Heuristic AST checks; some carry secondary pillars (e.g. `Pillar::Complexity`); `SecurityNodeHelper` is shared infrastructure |
+| Modernisation | `modernisation.constructor-promotion-candidate`, `modernisation.enum-candidate`, `modernisation.first-class-callable-candidate`, `modernisation.forbidden-global-access`, `modernisation.match-expression-candidate`, `modernisation.mixed-type-overuse`, `modernisation.named-argument-opportunity`, `modernisation.public-property`, `modernisation.readonly-property-candidate` | PHP-version-gated opportunity checks where syntax support matters; no autofix behavior; `ModernisationNodeHelper` is shared infrastructure |
+| Security | `security.dangerous-function-call`, `security.disabled-ssl-verification`, `security.error-suppression`, `security.extract-compact-user-input`, `security.header-injection`, `security.insecure-random`, `security.silent-catch`, `security.sql-concatenation`, `security.unsafe-unserialize`, `security.variable-include`, `security.weak-crypto` | Heuristic AST checks; some carry secondary pillars (e.g. `Pillar::Complexity` or `Pillar::Modernisation`); `SecurityNodeHelper` is shared infrastructure |
 | Secrets | `secrets.api-key-pattern`, `secrets.aws-access-key`, `secrets.database-url-password`, `secrets.hardcoded-env-value`, `secrets.high-entropy-string`, `secrets.jwt-token`, `secrets.phi-pattern`, `secrets.pii-test-fixture`, `secrets.private-key` | All implement `SourceTextRuleInterface`, so they also scan JSON/YAML/INI/.env-style files; `SecretScannerHelper` is shared infrastructure |
 
 `RuleDefinition` validates that ids match the slug pattern `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$` and that threshold names are non-empty; the registry rejects duplicate ids on construction.
@@ -60,7 +61,7 @@ The default rule set covers eight pillars (`Size`, `Complexity`, `Maintainabilit
 There is no runtime authentication or authorisation surface. The analyser only reads local files supplied by the user. Trust boundaries that exist:
 
 - **Source discovery** treats any path provided on the CLI as user-trusted and applies the default ignored-directory list (overridable with `--include-ignored`).
-- **Config loading** treats `.gruff.json` and `--config` as user-trusted but validates strictly: unknown root keys, rule ids, rule sub-keys, and non-numeric thresholds all raise `ConfigException`.
+- **Config loading** treats `.gruff.json` and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, rule ids, rule sub-keys, and non-numeric thresholds all raise `ConfigException`.
 - **Agent tooling** is gated independently by `.claude/hooks/deny-dangerous.sh` and `.codex/hooks/deny-dangerous.sh`, which reject dangerous shell commands before agent execution.
 
 ## Data Flow
@@ -78,6 +79,7 @@ There is no runtime authentication or authorisation surface. The analyser only r
 
 ```json
 {
+  "minimumPhpVersion": 8.3,
   "rules": {
     "<rule.id>": {
       "enabled": true,
@@ -87,7 +89,7 @@ There is no runtime authentication or authorisation surface. The analyser only r
 }
 ```
 
-Unknown top-level keys, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`.
+`minimumPhpVersion` is optional, defaults to `8.3`, and must be numeric and at least `7.4`; PHP syntax opportunity rules use it to suppress suggestions unsupported by the configured target. Unknown top-level keys, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`.
 
 ## Reporting
 

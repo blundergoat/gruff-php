@@ -29,6 +29,7 @@ final class ErrorSuppressionRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
             confidence: Confidence::High,
+            secondaryPillars: [Pillar::Modernisation],
         );
     }
 
@@ -48,6 +49,7 @@ final class ErrorSuppressionRule implements RuleInterface
                 tier: RuleTier::V01,
                 confidence: Confidence::High,
                 remediation: 'Handle the specific failure mode explicitly instead of suppressing errors with @.',
+                secondaryPillars: [Pillar::Modernisation],
             );
         }
 

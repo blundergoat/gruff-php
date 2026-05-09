@@ -56,9 +56,22 @@ final readonly class ConfigLoader
         $rootConfig = $this->requireObject($decoded, 'Config root must be a JSON object.');
 
         foreach (array_keys($rootConfig) as $rootKey) {
-            if ($rootKey !== 'rules') {
+            if ($rootKey !== 'rules' && $rootKey !== 'minimumPhpVersion') {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
+        }
+
+        if (array_key_exists('minimumPhpVersion', $rootConfig)) {
+            $version = $rootConfig['minimumPhpVersion'];
+            if (!is_int($version) && !is_float($version)) {
+                throw new ConfigException('Config key "minimumPhpVersion" must be numeric.');
+            }
+
+            if ($version < 7.4) {
+                throw new ConfigException('Config key "minimumPhpVersion" must be at least 7.4.');
+            }
+
+            $config = $config->withMinimumPhpVersion((float) $version);
         }
 
         if (!isset($rootConfig['rules'])) {

@@ -1,0 +1,88 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Modernisation;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar;
+use PhpParser\Node\Stmt;
+use PhpParser\NodeFinder;
+
+final readonly class FirstClassCallableCandidateRule implements RuleInterface
+{
+    public const ID = 'modernisation.first-class-callable-candidate';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'First-class callable candidate',
+            pillar: Pillar::Modernisation,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::Medium,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
+            return [];
+        }
+
+        $finder = new NodeFinder();
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, Expr\Array_::class) as $array) {
+            if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId: self::ID,
+                message: 'Array callable syntax may be replaceable with PHP 8.1 first-class callable syntax.',
+                filePath: $unit->file->displayPath,
+                line: $array->getStartLine(),
+                severity: Severity::Advisory,
+                pillar: Pillar::Modernisation,
+                tier: RuleTier::V01,
+                confidence: Confidence::Medium,
+                remediation: 'Consider first-class callable syntax only when callable binding semantics remain equivalent; gruff-php reports only.',
+                metadata: [
+                    'requiresPhp' => 8.1,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+
+    private function isCallableArray(Expr\Array_ $array): bool
+    {
+        if (count($array->items) !== 2) {
+            return false;
+        }
+
+        return $array->items[1]->value instanceof Scalar\String_;
+    }
+
+    private function isCallableContext(Expr\Array_ $array): bool
+    {
+        $parent = ModernisationNodeHelper::parent($array);
+
+        return $parent instanceof Node\Arg
+            || $parent instanceof Expr\Assign
+            || $parent instanceof Stmt\Return_;
+    }
+}

@@ -25,6 +25,15 @@ use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
+use GruffPhp\Rule\Modernisation\EnumCandidateRule;
+use GruffPhp\Rule\Modernisation\FirstClassCallableCandidateRule;
+use GruffPhp\Rule\Modernisation\ForbiddenGlobalAccessRule;
+use GruffPhp\Rule\Modernisation\MatchExpressionCandidateRule;
+use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
+use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
+use GruffPhp\Rule\Modernisation\PublicPropertyRule;
+use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
 use GruffPhp\Rule\Secrets\ApiKeyPatternRule;
 use GruffPhp\Rule\Secrets\AwsAccessKeyRule;
 use GruffPhp\Rule\Secrets\DatabaseUrlPasswordRule;
@@ -115,6 +124,15 @@ final class RuleRegistry
             new HungarianNotationRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
+            new ConstructorPromotionCandidateRule(),
+            new EnumCandidateRule(),
+            new FirstClassCallableCandidateRule(),
+            new ForbiddenGlobalAccessRule(),
+            new MatchExpressionCandidateRule(),
+            new MixedTypeOveruseRule(),
+            new NamedArgumentOpportunityRule(),
+            new PublicPropertyRule(),
+            new ReadonlyPropertyCandidateRule(),
             new ApiKeyPatternRule(),
             new AwsAccessKeyRule(),
             new DatabaseUrlPasswordRule(),

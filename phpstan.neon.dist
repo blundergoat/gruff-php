@@ -12,3 +12,4 @@ parameters:
         - tests/Fixtures/M09
         - tests/Fixtures/M10
         - tests/Fixtures/M11
+        - tests/Fixtures/M12

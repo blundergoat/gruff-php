@@ -9,11 +9,19 @@ use InvalidArgumentException;
 
 final readonly class AnalysisConfig
 {
+    public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
+
     /**
      * @param array<string, RuleSettings> $rules
      */
-    public function __construct(private array $rules)
+    public function __construct(
+        private array $rules,
+        private float $minimumPhpVersion = self::DEFAULT_MINIMUM_PHP_VERSION,
+    )
     {
+        if ($this->minimumPhpVersion < 7.4) {
+            throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
+        }
     }
 
     public static function fromRegistry(RuleRegistry $registry): self
@@ -43,7 +51,17 @@ final readonly class AnalysisConfig
         $rules = $this->rules;
         $rules[$ruleId] = $settings;
 
-        return new self($rules);
+        return new self($rules, $this->minimumPhpVersion);
+    }
+
+    public function minimumPhpVersion(): float
+    {
+        return $this->minimumPhpVersion;
+    }
+
+    public function withMinimumPhpVersion(float $minimumPhpVersion): self
+    {
+        return new self($this->rules, $minimumPhpVersion);
     }
 
     /**

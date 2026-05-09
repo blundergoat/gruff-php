@@ -48,6 +48,25 @@ final class ConfigLoaderTest extends TestCase
         self::assertFalse($config->ruleSettings(FileLengthRule::ID)->enabled);
     }
 
+    public function testLoadsMinimumPhpVersion(): void
+    {
+        $path = $this->writeTempConfig('{"minimumPhpVersion": 7.4}');
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+
+        self::assertSame(7.4, $config->minimumPhpVersion());
+    }
+
+    public function testRejectsUnsupportedMinimumPhpVersion(): void
+    {
+        $path = $this->writeTempConfig('{"minimumPhpVersion": 7.3}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Config key "minimumPhpVersion" must be at least 7.4.');
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
     public function testRejectsUnknownRuleIds(): void
     {
         $this->expectException(ConfigException::class);

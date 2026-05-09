@@ -104,6 +104,17 @@ src/
 |   |   |-- HungarianNotationRule.php         = `naming.hungarian-notation`
 |   |   |-- ShortVariableRule.php             = `naming.short-variable`
 |   |   `-- TestNamingConsistencyRule.php     = `naming.test-naming-consistency`
+|   |-- Modernisation/                        = AST-driven PHP-modernisation opportunity rules; PHP syntax suggestions respect `minimumPhpVersion`
+|   |   |-- ConstructorPromotionCandidateRule.php = `modernisation.constructor-promotion-candidate`
+|   |   |-- EnumCandidateRule.php              = `modernisation.enum-candidate`
+|   |   |-- FirstClassCallableCandidateRule.php = `modernisation.first-class-callable-candidate`
+|   |   |-- ForbiddenGlobalAccessRule.php      = `modernisation.forbidden-global-access`
+|   |   |-- MatchExpressionCandidateRule.php   = `modernisation.match-expression-candidate`
+|   |   |-- MixedTypeOveruseRule.php           = `modernisation.mixed-type-overuse`
+|   |   |-- ModernisationNodeHelper.php        = shared PHP-version/type/parent-node helpers
+|   |   |-- NamedArgumentOpportunityRule.php   = `modernisation.named-argument-opportunity`
+|   |   |-- PublicPropertyRule.php             = `modernisation.public-property`
+|   |   `-- ReadonlyPropertyCandidateRule.php = `modernisation.readonly-property-candidate`
 |   |-- Secrets/                              = SourceTextRuleInterface rules; scan PHP plus config/text/env files
 |   |   |-- ApiKeyPatternRule.php             = `secrets.api-key-pattern`
 |   |   |-- AwsAccessKeyRule.php              = `secrets.aws-access-key`
@@ -202,7 +213,8 @@ tests/
     |-- M08/Naming/                           = naming rule fixtures
     |-- M09/Docs/                             = documentation rule fixtures
     |-- M10/                                  = security rules: Security/ source + Config/disable scenarios
-    `-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
+    |-- M11/                                  = secrets rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
+    `-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
 ```
 
 ## goat-flow harness
@@ -273,4 +285,4 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Security, Secrets. Other `Pillar::*` cases (Coupling, Design, Modernisation, TestQuality, Architecture, Mutation) are reserved for later tiers.
+- Pillars currently emitted by registered rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, Secrets. Other `Pillar::*` cases (Coupling, Design, TestQuality, Architecture, Mutation) are reserved for later tiers.
