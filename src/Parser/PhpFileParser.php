@@ -35,6 +35,10 @@ final readonly class PhpFileParser
             );
         }
 
+        if (!$file->isPhp()) {
+            return new AnalysisUnit($file, $source, [], [], []);
+        }
+
         try {
             $statements = array_values($this->parser->parse($source) ?? []);
 

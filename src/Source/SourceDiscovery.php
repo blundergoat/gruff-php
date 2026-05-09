@@ -13,6 +13,19 @@ final readonly class SourceDiscovery
     private const PHP_EXTENSION = 'php';
 
     /** @var list<string> */
+    private const TEXT_EXTENSIONS = [
+        'conf',
+        'config',
+        'env',
+        'ini',
+        'json',
+        'neon',
+        'xml',
+        'yaml',
+        'yml',
+    ];
+
+    /** @var list<string> */
     private const IGNORED_DIRECTORIES = [
         '.git',
         '.hg',
@@ -56,10 +69,12 @@ final readonly class SourceDiscovery
             }
 
             if (is_file($absolutePath)) {
-                if ($this->isPhpFile($absolutePath)) {
+                $type = $this->sourceType($absolutePath);
+                if ($type !== null) {
                     $files[$this->canonicalPath($absolutePath)] = new SourceFile(
                         $this->canonicalPath($absolutePath),
                         $this->displayPath($absolutePath),
+                        $type,
                     );
                 }
 
@@ -69,7 +84,11 @@ final readonly class SourceDiscovery
             if (is_dir($absolutePath)) {
                 foreach ($this->walkDirectory($absolutePath, $includeIgnored, $ignoredPaths) as $file) {
                     $canonicalPath = $this->canonicalPath($file->getPathname());
-                    $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath));
+                    $type = $this->sourceType($canonicalPath);
+
+                    if ($type !== null) {
+                        $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath), $type);
+                    }
                 }
             }
         }
@@ -107,7 +126,7 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            if ($file->isFile() && $this->isPhpFile($path)) {
+            if ($file->isFile() && $this->sourceType($path) !== null) {
                 yield $file;
             }
         }
@@ -149,9 +168,26 @@ final readonly class SourceDiscovery
         return $canonicalPath;
     }
 
-    private function isPhpFile(string $path): bool
+    private function sourceType(string $path): ?string
     {
-        return strtolower(pathinfo($path, PATHINFO_EXTENSION)) === self::PHP_EXTENSION;
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        if ($extension === self::PHP_EXTENSION) {
+            return SourceFile::TYPE_PHP;
+        }
+
+        if (in_array($extension, self::TEXT_EXTENSIONS, true) || $this->isEnvLikeFile($path)) {
+            return SourceFile::TYPE_TEXT;
+        }
+
+        return null;
+    }
+
+    private function isEnvLikeFile(string $path): bool
+    {
+        $basename = basename($path);
+
+        return $basename === '.env' || str_starts_with($basename, '.env.');
     }
 
     private function isIgnoredPath(string $path): bool

@@ -1,0 +1,7 @@
+{
+    "rules": {
+        "secrets.high-entropy-string": {
+            "enabled": false
+        }
+    }
+}

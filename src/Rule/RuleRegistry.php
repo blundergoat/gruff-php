@@ -25,6 +25,15 @@ use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
+use GruffPhp\Rule\Secrets\ApiKeyPatternRule;
+use GruffPhp\Rule\Secrets\AwsAccessKeyRule;
+use GruffPhp\Rule\Secrets\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\Secrets\HardcodedEnvValueRule;
+use GruffPhp\Rule\Secrets\HighEntropyStringRule;
+use GruffPhp\Rule\Secrets\JwtTokenRule;
+use GruffPhp\Rule\Secrets\PhiPatternRule;
+use GruffPhp\Rule\Secrets\PiiTestFixtureRule;
+use GruffPhp\Rule\Secrets\PrivateKeyRule;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
@@ -106,6 +115,15 @@ final class RuleRegistry
             new HungarianNotationRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
+            new ApiKeyPatternRule(),
+            new AwsAccessKeyRule(),
+            new DatabaseUrlPasswordRule(),
+            new HardcodedEnvValueRule(),
+            new HighEntropyStringRule(),
+            new JwtTokenRule(),
+            new PhiPatternRule(),
+            new PiiTestFixtureRule(),
+            new PrivateKeyRule(),
             new DangerousFunctionCallRule(),
             new DisabledSslVerificationRule(),
             new ErrorSuppressionRule(),
@@ -179,6 +197,10 @@ final class RuleRegistry
             }
 
             foreach ($this->enabledRules($context->config) as $rule) {
+                if (!$unit->file->isPhp() && !$rule instanceof SourceTextRuleInterface) {
+                    continue;
+                }
+
                 array_push($findings, ...$rule->analyse($unit, $context));
             }
         }
