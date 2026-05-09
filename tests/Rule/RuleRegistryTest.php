@@ -17,6 +17,12 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rule\Complexity\NestingDepthRule;
+use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\Size\AverageMethodLengthRule;
 use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
@@ -34,6 +40,12 @@ final class RuleRegistryTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
 
+        self::assertTrue($registry->has(CognitiveComplexityRule::ID));
+        self::assertTrue($registry->has(CyclomaticComplexityRule::ID));
+        self::assertTrue($registry->has(HalsteadVolumeRule::ID));
+        self::assertTrue($registry->has(MaintainabilityIndexRule::ID));
+        self::assertTrue($registry->has(NestingDepthRule::ID));
+        self::assertTrue($registry->has(NpathComplexityRule::ID));
         self::assertTrue($registry->has(AverageMethodLengthRule::ID));
         self::assertTrue($registry->has(ClassLengthRule::ID));
         self::assertTrue($registry->has(FileLengthRule::ID));

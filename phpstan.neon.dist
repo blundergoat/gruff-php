@@ -6,3 +6,4 @@ parameters:
     excludePaths:
         - tests/Fixtures/M02/syntax-error
         - tests/Fixtures/M05
+        - tests/Fixtures/M06

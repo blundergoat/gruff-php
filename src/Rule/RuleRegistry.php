@@ -7,6 +7,12 @@ namespace GruffPhp\Rule;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rule\Complexity\NestingDepthRule;
+use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\Size\AverageMethodLengthRule;
 use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
@@ -45,6 +51,12 @@ final class RuleRegistry
     public static function defaults(): self
     {
         return new self([
+            new CognitiveComplexityRule(),
+            new CyclomaticComplexityRule(),
+            new HalsteadVolumeRule(),
+            new MaintainabilityIndexRule(),
+            new NestingDepthRule(),
+            new NpathComplexityRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),
             new FileLengthRule(),
