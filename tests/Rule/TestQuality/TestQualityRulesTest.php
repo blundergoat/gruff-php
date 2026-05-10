@@ -28,6 +28,9 @@ use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
+use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
+use GruffPhp\Rule\TestQuality\PhpUnitDeprecationsNotFatalRule;
+use GruffPhp\Rule\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
@@ -119,6 +122,8 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $findings);
         self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $findings);
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $findings);
+        // The phpunit-* rules are project-level (they fire on .phpunit.xml.dist at the project root),
+        // not source-file rules, so they're intentionally excluded from this fixture-content assertion.
     }
 
     public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
@@ -259,6 +264,77 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockingDomainObjectRule::ID, 2, $optedInFindings);
     }
 
+    public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
+    {
+        self::assertCount(0, (new PhpUnitStrictFlagsMissingRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
+        ));
+
+        $laxFindings = (new PhpUnitStrictFlagsMissingRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
+        );
+
+        self::assertCount(1, $laxFindings);
+        self::assertSame(['failOnRisky', 'failOnWarning', 'beStrictAboutTestsThatDoNotTestAnything', 'beStrictAboutOutputDuringTests', 'beStrictAboutChangesToGlobalState'], $laxFindings[0]->metadata['missing']);
+    }
+
+    public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
+    {
+        self::assertCount(0, (new PhpUnitDeprecationsNotFatalRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
+        ));
+
+        self::assertCount(1, (new PhpUnitDeprecationsNotFatalRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
+        ));
+    }
+
+    public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
+    {
+        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
+        ));
+
+        self::assertCount(1, (new PhpUnitCoverageSourceMissingRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
+        ));
+
+        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse(
+            $this->phpUnitDummyUnit(),
+            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/legacy-whitelist'),
+        ));
+    }
+
+    public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
+    {
+        $context = $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/no-config');
+
+        self::assertCount(0, (new PhpUnitStrictFlagsMissingRule())->analyse($this->phpUnitDummyUnit(), $context));
+        self::assertCount(0, (new PhpUnitDeprecationsNotFatalRule())->analyse($this->phpUnitDummyUnit(), $context));
+        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse($this->phpUnitDummyUnit(), $context));
+    }
+
+    private function phpUnitDummyUnit(): AnalysisUnit
+    {
+        return $this->unitForPath('tests/Fixtures/TestQuality/non-candidates.php');
+    }
+
+    private function phpUnitContext(string $relativeRoot): RuleContext
+    {
+        $registry = RuleRegistry::defaults();
+
+        return new RuleContext(
+            self::PROJECT_ROOT . '/' . $relativeRoot,
+            AnalysisConfig::fromRegistry($registry),
+        );
+    }
+
     public function testTestQualityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();
@@ -282,7 +358,8 @@ final class TestQualityRulesTest extends TestCase
 
         $testQualityFindings = array_values(array_filter(
             $findings,
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
+            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.')
+                && str_contains($finding->filePath, 'non-test-class.php'),
         ));
 
         self::assertSame([], $testQualityFindings, 'Library code with test* method names must not trigger test-quality rules.');

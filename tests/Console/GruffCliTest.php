@@ -194,12 +194,18 @@ final class GruffCliTest extends TestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(3, $findings);
-        $firstFinding = $findings[0] ?? null;
+        // 3 findings on alpha.php + 2 project-config findings on gruff's phpunit.xml.dist (no strict flags, no failOnDeprecation).
+        self::assertCount(5, $findings);
 
-        self::assertIsArray($firstFinding);
-        self::assertSame('size.file-length', $firstFinding['ruleId'] ?? null);
-        self::assertSame('warning', $firstFinding['severity'] ?? null);
+        $sizeFinding = null;
+        foreach ($findings as $finding) {
+            if (is_array($finding) && ($finding['ruleId'] ?? null) === 'size.file-length') {
+                $sizeFinding = $finding;
+                break;
+            }
+        }
+        self::assertIsArray($sizeFinding);
+        self::assertSame('warning', $sizeFinding['severity'] ?? null);
     }
 
     /**
@@ -877,7 +883,8 @@ final class GruffCliTest extends TestCase
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame(true, $generatedBaseline['generated'] ?? null);
-            self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
+            // 1 finding from OrderCalculator.php + 2 from gruff's phpunit.xml.dist (no strict flags, no failOnDeprecation).
+            self::assertSame(3, $generatedBaseline['totalEntries'] ?? null);
 
             $apply = new Process([
                 PHP_BINARY,
@@ -900,7 +907,7 @@ final class GruffCliTest extends TestCase
             $summary = $appliedReport['summary'] ?? null;
             self::assertIsArray($appliedBaseline);
             self::assertIsArray($summary);
-            self::assertSame(1, $appliedBaseline['suppressedFindings'] ?? null);
+            self::assertSame(3, $appliedBaseline['suppressedFindings'] ?? null);
             $findingCounts = $summary['findings'] ?? null;
             self::assertIsArray($findingCounts);
             self::assertSame(0, $findingCounts['total'] ?? null);

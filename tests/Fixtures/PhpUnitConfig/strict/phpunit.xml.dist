@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="vendor/autoload.php"
+    failOnRisky="true"
+    failOnWarning="true"
+    failOnDeprecation="true"
+    beStrictAboutTestsThatDoNotTestAnything="true"
+    beStrictAboutOutputDuringTests="true"
+    beStrictAboutChangesToGlobalState="true">
+    <testsuites>
+        <testsuite name="unit">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+</phpunit>

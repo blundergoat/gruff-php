@@ -71,6 +71,9 @@ use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
+use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
+use GruffPhp\Rule\TestQuality\PhpUnitDeprecationsNotFatalRule;
+use GruffPhp\Rule\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
@@ -201,6 +204,9 @@ final class RuleRegistry
             new MultipleAaaCyclesRule(),
             new MysteryGuestRule(),
             new NoAssertionsRule(),
+            new PhpUnitCoverageSourceMissingRule(),
+            new PhpUnitDeprecationsNotFatalRule(),
+            new PhpUnitStrictFlagsMissingRule(),
             new PrivateReflectionRule(),
             new RepeatedStructureMissingDataProviderRule(),
             new SetupBloatRule(),

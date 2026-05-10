@@ -20,9 +20,9 @@
         "parseErrors": 0,
         "findings": {
             "advisory": 1,
-            "warning": 2,
+            "warning": 4,
             "error": 0,
-            "total": 3
+            "total": 5
         },
         "exitCode": 0
     },
@@ -30,6 +30,48 @@
     "missingPaths": [],
     "diagnostics": [],
     "findings": [
+        {
+            "ruleId": "test-quality.phpunit-deprecations-not-fatal",
+            "message": "phpunit.xml.dist does not enable failOnDeprecation, so deprecated calls will not fail the test run.",
+            "file": "phpunit.xml.dist",
+            "line": 1,
+            "endLine": null,
+            "column": null,
+            "symbol": "phpunit.xml.dist",
+            "severity": "warning",
+            "pillar": "test-quality",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Add failOnDeprecation=\"true\" to the <phpunit> root so deprecation notices fail the build instead of accumulating silently.",
+            "fingerprint": "3b5e339401bf7d5b",
+            "metadata": []
+        },
+        {
+            "ruleId": "test-quality.phpunit-strict-flags-missing",
+            "message": "phpunit.xml.dist is missing strict-mode attribute(s): failOnRisky, failOnWarning, beStrictAboutTestsThatDoNotTestAnything, beStrictAboutOutputDuringTests, beStrictAboutChangesToGlobalState.",
+            "file": "phpunit.xml.dist",
+            "line": 1,
+            "endLine": null,
+            "column": null,
+            "symbol": "phpunit.xml.dist",
+            "severity": "warning",
+            "pillar": "test-quality",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Add the missing attributes to the <phpunit> root so risky, warning, no-assertion, output, and global-state test smells fail the build.",
+            "fingerprint": "aa27a24331995c98",
+            "metadata": {
+                "missing": [
+                    "failOnRisky",
+                    "failOnWarning",
+                    "beStrictAboutTestsThatDoNotTestAnything",
+                    "beStrictAboutOutputDuringTests",
+                    "beStrictAboutChangesToGlobalState"
+                ]
+            }
+        },
         {
             "ruleId": "size.file-length",
             "message": "File has 14 lines, above the warning threshold of 3.",
@@ -88,7 +130,7 @@
     ],
     "score": {
         "composite": {
-            "score": 96.4,
+            "score": 93.2,
             "grade": "A"
         },
         "pillars": [
@@ -194,13 +236,13 @@
             {
                 "pillar": "test-quality",
                 "applicable": true,
-                "score": 100,
-                "grade": "A",
-                "findings": 0,
+                "score": 68,
+                "grade": "D",
+                "findings": 2,
                 "advisories": 0,
-                "warnings": 0,
+                "warnings": 2,
                 "errors": 0,
-                "penalty": 0
+                "penalty": 32
             }
         ],
         "topOffenders": [
@@ -216,6 +258,20 @@
                 "maxCyclomatic": null,
                 "maxCognitive": null,
                 "maxLines": 14,
+                "mutationScore": null
+            },
+            {
+                "file": "phpunit.xml.dist",
+                "score": 60,
+                "grade": "D",
+                "findings": 2,
+                "advisories": 0,
+                "warnings": 2,
+                "errors": 0,
+                "penalty": 40,
+                "maxCyclomatic": null,
+                "maxCognitive": null,
+                "maxLines": null,
                 "mutationScore": null
             }
         ],
