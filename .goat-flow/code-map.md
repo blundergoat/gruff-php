@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-09. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-10. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -93,6 +93,9 @@ src/
 |   |-- AnalysisUnit.php                      = parsed unit: SourceFile, source text, AST statements, token list, diagnostics; `lineCount()` helper
 |   |-- ParseDiagnostic.php                   = per-file parse error message + 1-based line
 |   `-- PhpFileParser.php                     = nikic/php-parser wrapper; attaches `ParentConnectingVisitor`; non-PHP files return empty AST/tokens
+|-- Project/
+|   |-- PhpUnitConfig.php                     = parsed PHPUnit XML config value object (absolute + display path + `SimpleXMLElement` root)
+|   `-- PhpUnitConfigDiscovery.php            = walks `phpunit.xml`/`phpunit.xml.dist`/`phpunit.dist.xml` from a project root once per analyser run; cached per root
 |-- Reporting/
 |   |-- FailThreshold.php                     = `none` / `advisory` / `warning` / `error` enum + `isTriggeredBy(Severity)` predicate
 |   |-- GithubAnnotationsReporter.php         = GitHub Actions annotation renderer with escaped annotation properties
@@ -104,7 +107,7 @@ src/
 |   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, baseline, findings, summary)
 |-- Rule/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
-|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars
+|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals)
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
 |   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs PHP rules on PHP files only, runs source-text rules on text files too, then sorts findings by file/line/ruleId/message
 |   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
@@ -173,24 +176,40 @@ src/
 |   |-- TestQuality/                          = PHPUnit/Pest AST rules scoped by `TestQualityNodeHelper`
 |   |   |-- ConditionalTestLogicRule.php      = `test-quality.conditional-logic`
 |   |   |-- DataProviderAnnotationRule.php    = `test-quality.data-provider-annotation`
-|   |   |-- EagerTestRule.php                 = `test-quality.eager-test`
+|   |   |-- EagerTestRule.php                 = `test-quality.eager-test` (filters method calls on result variables so getters on a returned value don't count as fresh SUT calls)
+|   |   |-- EmptyDataProviderRule.php         = `test-quality.empty-data-provider` (provably empty `#[DataProvider]`/`@dataProvider` targets)
+|   |   |-- ExceptionTypeOnlyRule.php         = `test-quality.exception-type-only` (`expectException()` without `expectExceptionMessage`/`Code`/`Object`)
 |   |   |-- ExcessiveMockingRule.php          = `test-quality.excessive-mocking`
+|   |   |-- ExtendsProductionClassRule.php    = `test-quality.extends-production-class` (`class FooTest extends Foo` not via `*TestCase`)
+|   |   |-- GlobalStateMutationRule.php       = `test-quality.global-state-mutation` (superglobal/`putenv`/`ini_set`/`error_reporting` writes without tearDown / `#[After]` cleanup)
+|   |   |-- LoopAssertionWithoutMessageRule.php = `test-quality.loop-assertion-without-message`
 |   |   |-- LoopInTestRule.php                = `test-quality.loop-in-test`
-|   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion`
+|   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion` (default-allowlists HTTP status codes; configurable `allowedLiterals`)
+|   |   |-- MockingDomainObjectRule.php       = `test-quality.mocking-domain-object` (default-disabled; requires `domainNamespaces` glob list)
 |   |   |-- MockOnlyTestRule.php              = `test-quality.mock-only-test`
+|   |   |-- MockWithoutExpectationRule.php    = `test-quality.mock-without-expectation` (per-finding severity: `dead-mock`/warning vs `stub-only`/advisory)
+|   |   |-- MultipleAaaCyclesRule.php         = `test-quality.multiple-aaa-cycles` (default-disabled)
 |   |   |-- MysteryGuestRule.php              = `test-quality.mystery-guest`
-|   |   |-- NoAssertionsRule.php              = `test-quality.no-assertions`
-|   |   |-- PrivateReflectionRule.php         = `test-quality.private-reflection`
+|   |   |-- NoAssertionsRule.php              = `test-quality.no-assertions` (recognises wide PHPUnit `expect*` family + Pest `expect()`)
+|   |   |-- PhpUnitCoverageSourceMissingRule.php = `test-quality.phpunit-coverage-source-missing` (project-config rule)
+|   |   |-- PhpUnitDeprecationsNotFatalRule.php = `test-quality.phpunit-deprecations-not-fatal`
+|   |   |-- PhpUnitStrictFlagsMissingRule.php = `test-quality.phpunit-strict-flags-missing`
+|   |   |-- PrivateReflectionRule.php         = `test-quality.private-reflection` (covers `ReflectionMethod`/`Class`/`Property`, `Closure::bind`, `bindTo`)
+|   |   |-- RepeatedStructureMissingDataProviderRule.php = `test-quality.repeated-structure-missing-data-provider` (3+ structurally identical methods)
 |   |   |-- SetupBloatRule.php                = `test-quality.setup-bloat`
 |   |   |-- SkippedWithoutReasonRule.php      = `test-quality.skipped-without-reason`
-|   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test`
-|   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called`
+|   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test` (covers `sleep`/`usleep` family + `time`/`microtime` + `new DateTime('now')`/`DateTimeImmutable()`)
+|   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called` (skips subprocess-execution tests; matches verb-without-trailing-`s` candidates so `testLoadsX` matches `load()`)
+|   |   |-- TautologicalTypeAssertionRule.php = `test-quality.tautological-type-assertion` (only when local static evidence proves the asserted type)
+|   |   |-- TestdoxReadabilityRule.php        = `test-quality.testdox-readability` (default-disabled; `minWords` threshold)
 |   |   |-- TestLongerThanSutRule.php         = `test-quality.test-longer-than-sut`
-|   |   |-- TestNamingConsistencyRule.php     = `test-quality.naming-consistency`
+|   |   |-- TestMethodTooLongRule.php         = `test-quality.test-method-too-long` (default 25 meaningful lines; configurable)
+|   |   |-- TestNamingConsistencyRule.php     = `test-quality.naming-consistency` (configurable `poorNamePatterns` regex list)
 |   |   |-- TestQualityNodeHelper.php         = shared test-scope/assertion/mock/SUT-call helpers
 |   |   |-- TestQualityScope.php              = detected PHPUnit/Pest scope value
 |   |   |-- TrivialAssertionRule.php          = `test-quality.trivial-assertion`
-|   |   `-- TrivialSnapshotRule.php          = `test-quality.trivial-snapshot`
+|   |   |-- TrivialSnapshotRule.php           = `test-quality.trivial-snapshot`
+|   |   `-- UnusedMockRule.php                = `test-quality.unused-mock` (mock variable never read in scope)
 |   |-- Size/
 |   |   |-- AverageMethodLengthRule.php       = `size.average-method-length`
 |   |   |-- ClassLengthRule.php               = `size.class-length`
@@ -273,22 +292,21 @@ tests/
 |       `-- WasteRulesTest.php
 |-- Scoring/
 |   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, design composite findings
-`-- Fixtures/
-    |-- M02/                                  = parser/discovery: mixed/, empty/, syntax-error/
-    |-- M03/Config/                           = JSON config: defaults, threshold override, disabled rule, unknown-rule
-    |-- M04/                                  = CLI reporting: Config/ + Golden/ (text + json snapshots)
-    |-- M05/                                  = size rules: Size/ source fixtures + Config/ low-threshold scenarios
-    |-- M06/                                  = complexity rules: Complexity/ source fixtures + Config/
-    |-- M07/                                  = dead-code & waste rules: DeadCode/ + Config/
-    |-- M08/Naming/                           = naming rule fixtures
-    |-- M09/Docs/                             = documentation rule fixtures
-    |-- M10/                                  = security rules: Security/ source + Config/disable scenarios
-    |-- M11/                                  = sensitive-data rules: Secrets/ + Config/ disable/scope scenarios (php, json, env-style)
-    |-- M12/                                  = modernisation rules: Modernisation/ + Config/ PHP-version gating scenarios
-    |-- M13/                                  = static test-quality rules: TestQuality/ + Config/ selected-rule disable scenario
-    |-- M14/                                  = Infection integration: Source/ target + Infection/ valid, clean, baseline, malformed reports
-    |-- M16/                                  = config selection, path ignore, allowlist, and invalid-selection fixtures
-    `-- M19/TestQuality/                      = non-test class with `test*` method names; regression fixture for tightened test detection
+`-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
+    |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
+    |-- Complexity/                           = complexity-rule source fixtures
+    |-- Config/                               = flat tree of all `.gruff.json` test configs (rule disable, threshold override, selection, allowlists, opt-in heuristic enables, etc.)
+    |-- DeadCode/                             = dead-code + waste rule source fixtures
+    |-- Docs/                                 = documentation-rule source fixtures
+    |-- Modernisation/                        = modernisation-rule source fixtures (incl. nested Controller/ for routing-style cases)
+    |-- Mutation/Infection/                   = Infection JSON reports: valid, clean, baseline, malformed
+    |-- Naming/                               = naming-rule source fixtures
+    |-- PhpUnitConfig/                        = PHPUnit XML configs for the project-config rules: strict/, lax/, legacy-whitelist/, no-config/
+    |-- Security/                             = security-rule source fixtures
+    |-- SensitiveData/                        = sensitive-data rule fixtures (php, json, env-style)
+    |-- Size/                                 = size-rule source fixtures
+    |-- Source/                               = parser/discovery: empty/, mixed/, syntax-error/, plus Code/ holding the mutation-target SUT
+    `-- TestQuality/                          = static test-quality rule fixtures: per-rule positive/negative/edge files plus the cumulative-test-quality file that exercises every rule once
 ```
 
 ## goat-flow harness
