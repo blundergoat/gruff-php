@@ -35,7 +35,7 @@ final class PhpFileParserTest extends TestCase
 
     private function fixturePath(string $path): string
     {
-        $fixture = realpath(__DIR__ . '/../Fixtures/M02/' . $path);
+        $fixture = realpath(__DIR__ . '/../Fixtures/Source/' . $path);
 
         self::assertIsString($fixture);
 

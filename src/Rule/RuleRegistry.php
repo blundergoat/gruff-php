@@ -57,7 +57,10 @@ use GruffPhp\Rule\Security\WeakCryptoRule;
 use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
+use GruffPhp\Rule\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
@@ -69,9 +72,11 @@ use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
 use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
+use GruffPhp\Rule\TestQuality\UnusedMockRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
@@ -174,7 +179,10 @@ final class RuleRegistry
             new ConditionalTestLogicRule(),
             new DataProviderAnnotationRule(),
             new EagerTestRule(),
+            new EmptyDataProviderRule(),
             new ExcessiveMockingRule(),
+            new ExtendsProductionClassRule(),
+            new LoopAssertionWithoutMessageRule(),
             new LoopInTestRule(),
             new MagicNumberAssertionRule(),
             new MockOnlyTestRule(),
@@ -186,9 +194,11 @@ final class RuleRegistry
             new SleepInTestRule(),
             new SutNotCalledRule(),
             new TestLongerThanSutRule(),
+            new TestMethodTooLongRule(),
             new TestQualityNamingConsistencyRule(),
             new TrivialAssertionRule(),
             new TrivialSnapshotRule(),
+            new UnusedMockRule(),
             new MissingParamTagRule(),
             new MissingPublicPhpdocRule(),
             new MissingReadmeRule(),

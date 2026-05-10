@@ -19,10 +19,10 @@ final class InfectionReportParserTest extends TestCase
     public function testParsesFullInfectionJsonReport(): void
     {
         $report = (new InfectionReportParser(self::PROJECT_ROOT))->parse(
-            'tests/Fixtures/M14/Infection/infection-valid.json',
+            'tests/Fixtures/Mutation/Infection/infection-valid.json',
         );
 
-        self::assertSame('tests/Fixtures/M14/Infection/infection-valid.json', $report->reportPath);
+        self::assertSame('tests/Fixtures/Mutation/Infection/infection-valid.json', $report->reportPath);
         self::assertSame(4, $report->totalMutants());
         self::assertSame(50.0, $report->msi());
         self::assertSame(50.0, $report->coveredMsi());
@@ -32,7 +32,7 @@ final class InfectionReportParserTest extends TestCase
         $fileSummaries = $report->fileSummaries();
 
         self::assertCount(1, $fileSummaries);
-        self::assertSame('tests/Fixtures/M14/Source/OrderCalculator.php', $fileSummaries[0]->filePath);
+        self::assertSame('tests/Fixtures/Source/Code/OrderCalculator.php', $fileSummaries[0]->filePath);
         self::assertSame(4, $fileSummaries[0]->totalMutants);
         self::assertSame(2, $fileSummaries[0]->survivedMutants);
         self::assertSame(50.0, $fileSummaries[0]->msi);
@@ -43,7 +43,7 @@ final class InfectionReportParserTest extends TestCase
         $this->expectException(MutationReportException::class);
         $this->expectExceptionMessage('contains a non-numeric stats value');
 
-        (new InfectionReportParser(self::PROJECT_ROOT))->parse('tests/Fixtures/M14/Infection/infection-malformed.json');
+        (new InfectionReportParser(self::PROJECT_ROOT))->parse('tests/Fixtures/Mutation/Infection/infection-malformed.json');
     }
 
     public function testInfectionRunnerPrefersProjectVendorBinary(): void

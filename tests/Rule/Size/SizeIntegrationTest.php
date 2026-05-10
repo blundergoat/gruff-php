@@ -25,8 +25,8 @@ final class SizeIntegrationTest extends TestCase
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/M05/Size/cumulative-violations.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/M05/Size/cumulative-violations.php'));
+        $path = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
+        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
 
         $registry = RuleRegistry::defaults();
         $config = AnalysisConfig::fromRegistry($registry);
@@ -67,8 +67,8 @@ final class SizeIntegrationTest extends TestCase
     public function testConfigOverrideChangesFindings(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/M05/Size/cumulative-violations.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/M05/Size/cumulative-violations.php'));
+        $path = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
+        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
 
         $registry = RuleRegistry::defaults();
 
@@ -93,8 +93,8 @@ final class SizeIntegrationTest extends TestCase
     public function testCleanFixtureProducesNoSizeFindings(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/M05/Size/short-method.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/M05/Size/short-method.php'));
+        $path = __DIR__ . '/../../Fixtures/Size/short-method.php';
+        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/short-method.php'));
 
         $registry = RuleRegistry::defaults();
         $config = AnalysisConfig::fromRegistry($registry);

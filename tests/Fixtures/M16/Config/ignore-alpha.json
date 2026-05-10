@@ -1,5 +1,0 @@
-{
-    "paths": {
-        "ignore": ["tests/Fixtures/M02/mixed/alpha.php"]
-    }
-}

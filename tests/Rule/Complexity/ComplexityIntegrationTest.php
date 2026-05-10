@@ -24,8 +24,8 @@ final class ComplexityIntegrationTest extends TestCase
     {
         $parser = new PhpFileParser();
         $unit = $parser->parse(new SourceFile(
-            __DIR__ . '/../../Fixtures/M06/Complexity/cyclomatic.php',
-            'tests/Fixtures/M06/Complexity/cyclomatic.php',
+            __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
+            'tests/Fixtures/Complexity/cyclomatic.php',
         ));
 
         $registry = RuleRegistry::defaults();
@@ -58,8 +58,8 @@ final class ComplexityIntegrationTest extends TestCase
     {
         $parser = new PhpFileParser();
         $unit = $parser->parse(new SourceFile(
-            __DIR__ . '/../../Fixtures/M06/Complexity/simple.php',
-            'tests/Fixtures/M06/Complexity/simple.php',
+            __DIR__ . '/../../Fixtures/Complexity/simple.php',
+            'tests/Fixtures/Complexity/simple.php',
         ));
 
         $registry = RuleRegistry::defaults();
@@ -74,8 +74,8 @@ final class ComplexityIntegrationTest extends TestCase
     {
         $parser = new PhpFileParser();
         $unit = $parser->parse(new SourceFile(
-            __DIR__ . '/../../Fixtures/M06/Complexity/cyclomatic.php',
-            'tests/Fixtures/M06/Complexity/cyclomatic.php',
+            __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
+            'tests/Fixtures/Complexity/cyclomatic.php',
         ));
 
         $registry = RuleRegistry::defaults();

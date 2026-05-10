@@ -212,8 +212,8 @@ final class DocsRulesTest extends TestCase
 
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M09/Docs/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/Docs/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M09/Docs/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Docs/' . $filename));
     }
 }

@@ -102,8 +102,8 @@ final class MethodLengthRuleTest extends TestCase
 
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M05/Size/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M05/Size/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Size/' . $filename));
     }
 }

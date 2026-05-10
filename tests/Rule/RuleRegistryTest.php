@@ -174,7 +174,7 @@ final class RuleRegistryTest extends TestCase
         );
 
         $allFindings = $registry->analyse(
-            [$this->parseFixture('tests/Fixtures/M02/mixed/alpha.php')],
+            [$this->parseFixture('tests/Fixtures/Source/mixed/alpha.php')],
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
@@ -196,7 +196,7 @@ final class RuleRegistryTest extends TestCase
         );
 
         $allFindings = $registry->analyse(
-            [$this->parseFixture('tests/Fixtures/M02/mixed/alpha.php')],
+            [$this->parseFixture('tests/Fixtures/Source/mixed/alpha.php')],
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
@@ -211,8 +211,8 @@ final class RuleRegistryTest extends TestCase
 
         $findings = $registry->analyse(
             [
-                $this->parseFixture('tests/Fixtures/M02/mixed/alpha.php'),
-                $this->parseFixture('tests/Fixtures/M02/mixed/nested/beta.php'),
+                $this->parseFixture('tests/Fixtures/Source/mixed/alpha.php'),
+                $this->parseFixture('tests/Fixtures/Source/mixed/nested/beta.php'),
             ],
             new RuleContext(__DIR__ . '/../..', $config),
         );

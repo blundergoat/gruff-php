@@ -76,7 +76,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed',
+            'tests/Fixtures/Source/mixed',
             '--no-config',
         ], self::PROJECT_ROOT);
         $process->run();
@@ -94,14 +94,14 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed/alpha.php',
-            'tests/Fixtures/M02/syntax-error/broken.php',
+            'tests/Fixtures/Source/mixed/alpha.php',
+            'tests/Fixtures/Source/syntax-error/broken.php',
             '--no-config',
         ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('[PARSE-ERROR] tests/Fixtures/M02/syntax-error/broken.php:4', $process->getOutput());
+        self::assertStringContainsString('[PARSE-ERROR] tests/Fixtures/Source/syntax-error/broken.php:4', $process->getOutput());
         self::assertStringContainsString('Parse errors: 1', $process->getOutput());
         self::assertStringContainsString('Exit code: 2', $process->getOutput());
     }
@@ -112,14 +112,14 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed/alpha.php',
+            'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/M03/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.json',
         ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $expected = file_get_contents(__DIR__ . '/../Fixtures/M04/Golden/text-warning.txt');
+        $expected = file_get_contents(__DIR__ . '/../Fixtures/Cli/Golden/text-warning.txt');
 
         self::assertIsString($expected);
         self::assertSame($expected, $process->getOutput());
@@ -131,9 +131,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed/alpha.php',
+            'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/M04/Config/file-length-error.json',
+            'tests/Fixtures/Config/file-length-error.json',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -148,9 +148,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed/alpha.php',
+            'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/M03/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.json',
             '--fail-on',
             'warning',
         ], __DIR__ . '/../..');
@@ -170,9 +170,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed/alpha.php',
+            'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/M03/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.json',
             '--format',
             'json',
         ], __DIR__ . '/../..');
@@ -180,7 +180,7 @@ final class GruffCliTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $expected = file_get_contents(__DIR__ . '/../Fixtures/M04/Golden/json-warning.json');
+        $expected = file_get_contents(__DIR__ . '/../Fixtures/Cli/Golden/json-warning.json');
 
         self::assertIsString($expected);
         self::assertSame($expected, $process->getOutput());
@@ -211,7 +211,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/syntax-error',
+            'tests/Fixtures/Source/syntax-error',
             '--format',
             'json',
             '--no-config',
@@ -241,8 +241,8 @@ final class GruffCliTest extends TestCase
             __DIR__ . '/../../bin/gruff',
             'analyse',
             '--config',
-            'tests/Fixtures/M03/Config/unknown-rule.json',
-            'tests/Fixtures/M02/mixed/alpha.php',
+            'tests/Fixtures/Config/unknown-rule.json',
+            'tests/Fixtures/Source/mixed/alpha.php',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -259,9 +259,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--config',
-            'tests/Fixtures/M16/Config/only-size-rules.json',
+            'tests/Fixtures/Config/only-size-rules.json',
             '--format',
             'json',
             '--fail-on',
@@ -285,9 +285,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M02/mixed',
+            'tests/Fixtures/Source/mixed',
             '--config',
-            'tests/Fixtures/M16/Config/ignore-alpha.json',
+            'tests/Fixtures/Config/ignore-alpha.json',
             '--fail-on',
             'none',
         ], __DIR__ . '/../..');
@@ -295,7 +295,7 @@ final class GruffCliTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('Discovered: 1', $process->getOutput());
-        self::assertStringContainsString('tests/Fixtures/M02/mixed/alpha.php', $process->getOutput());
+        self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
@@ -305,8 +305,8 @@ final class GruffCliTest extends TestCase
             __DIR__ . '/../../bin/gruff',
             'analyse',
             '--config',
-            'tests/Fixtures/M16/Config/invalid-selection-rule.json',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Config/invalid-selection-rule.json',
+            'tests/Fixtures/Source/Code',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -323,9 +323,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M11/Secrets/synthetic-secrets.php',
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
             '--config',
-            'tests/Fixtures/M16/Config/allow-aws-preview.json',
+            'tests/Fixtures/Config/allow-aws-preview.json',
             '--format',
             'json',
             '--fail-on',
@@ -355,9 +355,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--infection-report',
-            'tests/Fixtures/M14/Infection/infection-valid.json',
+            'tests/Fixtures/Mutation/Infection/infection-valid.json',
             '--format',
             'json',
             '--fail-on',
@@ -405,9 +405,9 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--infection-report',
-            'tests/Fixtures/M14/Infection/infection-valid.json',
+            'tests/Fixtures/Mutation/Infection/infection-valid.json',
             '--fail-on',
             'none',
         ], __DIR__ . '/../..');
@@ -428,11 +428,11 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--infection-report',
-            'tests/Fixtures/M14/Infection/infection-valid.json',
+            'tests/Fixtures/Mutation/Infection/infection-valid.json',
             '--mutation-baseline',
-            'tests/Fixtures/M14/Infection/infection-baseline.json',
+            'tests/Fixtures/Mutation/Infection/infection-baseline.json',
             '--mutation-budget',
             '1',
             '--format',
@@ -472,12 +472,12 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--infection-run',
             '--infection-bin',
-            'tests/Fixtures/M14/missing-infection',
+            'tests/Fixtures/Mutation/missing-infection',
             '--infection-report',
-            'tests/Fixtures/M14/Infection/infection-clean.json',
+            'tests/Fixtures/Mutation/Infection/infection-clean.json',
             '--fail-on',
             'none',
         ], __DIR__ . '/../..');
@@ -497,7 +497,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--format',
             'json',
             '--fail-on',
@@ -526,7 +526,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--format',
             'html',
             '--fail-on',
@@ -547,7 +547,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'report',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -566,7 +566,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'report',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--format',
             'json',
         ], self::PROJECT_ROOT);
@@ -588,7 +588,7 @@ final class GruffCliTest extends TestCase
                 PHP_BINARY,
                 self::PROJECT_ROOT . '/bin/gruff',
                 'report',
-                'tests/Fixtures/M14/Source',
+                'tests/Fixtures/Source/Code',
                 '--output',
                 $reportPath,
             ], self::PROJECT_ROOT);
@@ -613,7 +613,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'dashboard',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--host',
             '127.0.0.1',
             '--port',
@@ -653,7 +653,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'dashboard',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--host',
             '127.0.0.1',
             '--port',
@@ -701,7 +701,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'dashboard',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--host',
             '127.0.0.1',
             '--port',
@@ -737,7 +737,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
             'dashboard',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--host',
             '127.0.0.1',
             '--port',
@@ -768,7 +768,7 @@ final class GruffCliTest extends TestCase
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff',
             'analyse',
-            'tests/Fixtures/M14/Source',
+            'tests/Fixtures/Source/Code',
             '--format',
             'github',
             '--fail-on',
@@ -778,7 +778,7 @@ final class GruffCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('::notice file=tests/Fixtures/M14/Source/OrderCalculator.php', $process->getOutput());
+        self::assertStringContainsString('::notice file=tests/Fixtures/Source/Code/OrderCalculator.php', $process->getOutput());
     }
 
     public function testAnalyseCommandReportsNonGitDiffModeClearly(): void
@@ -821,7 +821,7 @@ final class GruffCliTest extends TestCase
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff',
                 'analyse',
-                'tests/Fixtures/M14/Source',
+                'tests/Fixtures/Source/Code',
                 '--format',
                 'json',
                 '--fail-on',
@@ -859,7 +859,7 @@ final class GruffCliTest extends TestCase
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff',
                 'analyse',
-                'tests/Fixtures/M14/Source',
+                'tests/Fixtures/Source/Code',
                 '--format',
                 'json',
                 '--fail-on',
@@ -883,7 +883,7 @@ final class GruffCliTest extends TestCase
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff',
                 'analyse',
-                'tests/Fixtures/M14/Source',
+                'tests/Fixtures/Source/Code',
                 '--format',
                 'json',
                 '--fail-on',
@@ -921,7 +921,7 @@ final class GruffCliTest extends TestCase
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff',
                 'analyse',
-                'tests/Fixtures/M14/Source',
+                'tests/Fixtures/Source/Code',
                 '--fail-on',
                 'none',
                 '--baseline',
@@ -1129,7 +1129,7 @@ final class GruffCliTest extends TestCase
 
             file_put_contents(
                 $project . '/src/OrderCalculator.php',
-                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\M14\\Source;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$tax): int\n    {\n        return \$subtotal + \$tax;\n    }\n}\n",
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$tax): int\n    {\n        return \$subtotal + \$tax;\n    }\n}\n",
             );
 
             $rerun = new Process([
@@ -1231,7 +1231,7 @@ final class GruffCliTest extends TestCase
         $project = $this->tempDir();
         self::assertTrue(mkdir($project . '/src', 0777, true));
 
-        $fixture = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/M14/Source/OrderCalculator.php');
+        $fixture = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Source/Code/OrderCalculator.php');
         self::assertIsString($fixture);
         file_put_contents($project . '/src/OrderCalculator.php', $fixture);
         // Provide a README so docs.missing-readme does not add an extra baseline entry.

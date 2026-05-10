@@ -32,8 +32,8 @@ final class ModernisationRulesTest extends TestCase
     public function testPhpVersionGatingSuppressesPhpEightSuggestions(): void
     {
         $findings = $this->analysePath(
-            'tests/Fixtures/M12/Modernisation/cumulative-modernisation.php',
-            $this->config('tests/Fixtures/M12/Config/php74.json'),
+            'tests/Fixtures/Modernisation/cumulative-modernisation.php',
+            $this->config('tests/Fixtures/Config/php74.json'),
         );
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
@@ -50,8 +50,8 @@ final class ModernisationRulesTest extends TestCase
     public function testPhpEightTwoConfigEnablesModernisationCandidates(): void
     {
         $findings = $this->analysePath(
-            'tests/Fixtures/M12/Modernisation/cumulative-modernisation.php',
-            $this->config('tests/Fixtures/M12/Config/php82.json'),
+            'tests/Fixtures/Modernisation/cumulative-modernisation.php',
+            $this->config('tests/Fixtures/Config/php82.json'),
         );
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);
@@ -67,7 +67,7 @@ final class ModernisationRulesTest extends TestCase
 
     public function testPhpEightCandidatesAreDetected(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M12/Modernisation/php80-candidates.php');
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/php80-candidates.php');
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
@@ -79,7 +79,7 @@ final class ModernisationRulesTest extends TestCase
 
     public function testPhpEightOneCandidatesAreDetected(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M12/Modernisation/php81-candidates.php');
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/php81-candidates.php');
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 2, $findings);
         self::assertRuleCount(EnumCandidateRule::ID, 1, $findings);
@@ -89,8 +89,8 @@ final class ModernisationRulesTest extends TestCase
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
         $findings = $this->analysePaths([
-            'tests/Fixtures/M12/Modernisation/non-candidates.php',
-            'tests/Fixtures/M12/Modernisation/Controller/RequestController.php',
+            'tests/Fixtures/Modernisation/non-candidates.php',
+            'tests/Fixtures/Modernisation/Controller/RequestController.php',
         ]);
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 0, $findings);
@@ -102,7 +102,7 @@ final class ModernisationRulesTest extends TestCase
 
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M12/Modernisation/cumulative-modernisation.php');
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/cumulative-modernisation.php');
         $suppressionFindings = array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => $finding->ruleId === ErrorSuppressionRule::ID,

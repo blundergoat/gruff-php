@@ -71,7 +71,7 @@ final class SourceDiscoveryTest extends TestCase
 
     private function fixtureRoot(string $name): string
     {
-        $root = realpath(__DIR__ . '/../Fixtures/M02/' . $name);
+        $root = realpath(__DIR__ . '/../Fixtures/Source/' . $name);
 
         self::assertIsString($root);
 

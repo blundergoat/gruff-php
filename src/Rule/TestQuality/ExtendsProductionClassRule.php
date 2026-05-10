@@ -1,0 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\TestQuality;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node\Stmt;
+use PhpParser\NodeFinder;
+
+final readonly class ExtendsProductionClassRule implements RuleInterface
+{
+    public const ID = 'test-quality.extends-production-class';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Test extends production class',
+            pillar: Pillar::TestQuality,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Error,
+            confidence: Confidence::High,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $finder = new NodeFinder();
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+            $className = $class->name?->toString();
+            if ($className === null || $class->extends === null) {
+                continue;
+            }
+
+            if (!str_ends_with($className, 'Test') && !str_ends_with($className, 'Tests')) {
+                continue;
+            }
+
+            $parent = $class->extends;
+            $parentShort = strtolower($parent->getLast());
+
+            if (str_ends_with($parentShort, 'testcase')) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId: self::ID,
+                message: sprintf(
+                    '%s extends %s, which is not a recognised test base class.',
+                    $className,
+                    $parent->toString(),
+                ),
+                filePath: $unit->file->displayPath,
+                line: $class->getStartLine(),
+                severity: Severity::Error,
+                pillar: Pillar::TestQuality,
+                tier: RuleTier::V01,
+                confidence: Confidence::High,
+                symbol: $className,
+                remediation: 'Test classes should extend a *TestCase base. If you need to reach private members, compose the production class as a collaborator and exercise it through its public surface.',
+                metadata: ['parent' => $parent->toString()],
+            );
+        }
+
+        return $findings;
+    }
+}

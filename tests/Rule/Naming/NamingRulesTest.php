@@ -223,8 +223,8 @@ final class NamingRulesTest extends TestCase
 
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M08/Naming/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/Naming/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M08/Naming/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Naming/' . $filename));
     }
 }

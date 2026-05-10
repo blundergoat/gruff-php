@@ -14,7 +14,10 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
+use GruffPhp\Rule\TestQuality\EmptyDataProviderRule;
 use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
+use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
@@ -26,9 +29,11 @@ use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
+use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule;
 use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
+use GruffPhp\Rule\TestQuality\UnusedMockRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
@@ -39,8 +44,8 @@ final class TestQualityRulesTest extends TestCase
     public function testPhpUnitAndPestTestScopesSupportNoAssertionAndTrivialAssertionChecks(): void
     {
         $findings = $this->analysePaths([
-            'tests/Fixtures/M13/TestQuality/phpunit-core-smells.php',
-            'tests/Fixtures/M13/TestQuality/pest-smells.php',
+            'tests/Fixtures/TestQuality/phpunit-core-smells.php',
+            'tests/Fixtures/TestQuality/pest-smells.php',
         ]);
 
         self::assertRuleCount(NoAssertionsRule::ID, 4, $findings);
@@ -49,7 +54,7 @@ final class TestQualityRulesTest extends TestCase
 
     public function testCoreControlFlowAndFlakinessSmellsAreDetected(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M13/TestQuality/phpunit-core-smells.php');
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php');
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $findings);
         self::assertRuleCount(LoopInTestRule::ID, 1, $findings);
@@ -59,7 +64,7 @@ final class TestQualityRulesTest extends TestCase
 
     public function testMechanicsSmellsAreDetected(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M13/TestQuality/phpunit-mechanics-smells.php');
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php');
 
         self::assertRuleCount(ExcessiveMockingRule::ID, 1, $findings);
         self::assertRuleCount(MockOnlyTestRule::ID, 1, $findings);
@@ -75,7 +80,7 @@ final class TestQualityRulesTest extends TestCase
 
     public function testAdvancedHeuristicSmellsAreDetected(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M13/TestQuality/phpunit-advanced-smells.php');
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-advanced-smells.php');
 
         self::assertRuleCount(EagerTestRule::ID, 1, $findings);
         self::assertRuleCount(TestLongerThanSutRule::ID, 1, $findings);
@@ -86,25 +91,65 @@ final class TestQualityRulesTest extends TestCase
 
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M13/TestQuality/non-candidates.php');
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/non-candidates.php');
 
         self::assertRuleCount(DataProviderAnnotationRule::ID, 0, $findings);
         self::assertRuleCount(SkippedWithoutReasonRule::ID, 0, $findings);
         self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
         self::assertRuleCount(SleepInTestRule::ID, 0, $findings);
         self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
+        self::assertRuleCount(ExtendsProductionClassRule::ID, 0, $findings);
+        self::assertRuleCount(EmptyDataProviderRule::ID, 0, $findings);
+        self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
+        self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 0, $findings);
+        self::assertRuleCount(UnusedMockRule::ID, 0, $findings);
+    }
+
+    public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/extends-production.php');
+
+        self::assertRuleCount(ExtendsProductionClassRule::ID, 1, $findings);
+    }
+
+    public function testTestMethodTooLongDetectedAndIgnoresWhitespaceLines(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php');
+
+        self::assertRuleCount(TestMethodTooLongRule::ID, 1, $findings);
+    }
+
+    public function testEmptyDataProviderDetectedAndYieldingProviderIsAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/empty-data-provider.php');
+
+        self::assertRuleCount(EmptyDataProviderRule::ID, 2, $findings);
+    }
+
+    public function testLoopAssertionWithoutMessageDetectedAndAssertionWithMessageAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/loop-assertion-without-message.php');
+
+        self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 2, $findings);
+    }
+
+    public function testUnusedMockDetectedAndUsedMocksAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/unused-mock.php');
+
+        self::assertRuleCount(UnusedMockRule::ID, 2, $findings);
     }
 
     public function testTestQualityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/M13/Config/disable-no-assertions.json',
+            'tests/Fixtures/Config/disable-no-assertions.json',
             $registry,
         );
 
         $findings = $this->analysePaths(
-            ['tests/Fixtures/M13/TestQuality/phpunit-core-smells.php'],
+            ['tests/Fixtures/TestQuality/phpunit-core-smells.php'],
             $config,
         );
 
@@ -114,7 +159,7 @@ final class TestQualityRulesTest extends TestCase
 
     public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M19/TestQuality/non-test-class.php');
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/non-test-class.php');
 
         $testQualityFindings = array_values(array_filter(
             $findings,
@@ -127,7 +172,7 @@ final class TestQualityRulesTest extends TestCase
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/M13/TestQuality/cumulative-test-quality.php'),
+            $this->analysePath('tests/Fixtures/TestQuality/cumulative-test-quality.php'),
             static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
         ));
 
@@ -176,6 +221,11 @@ final class TestQualityRulesTest extends TestCase
             SutNotCalledRule::ID,
             SetupBloatRule::ID,
             SkippedWithoutReasonRule::ID,
+            ExtendsProductionClassRule::ID,
+            TestMethodTooLongRule::ID,
+            EmptyDataProviderRule::ID,
+            LoopAssertionWithoutMessageRule::ID,
+            UnusedMockRule::ID,
         ];
     }
 

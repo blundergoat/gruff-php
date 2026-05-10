@@ -173,8 +173,8 @@ final class WasteRulesTest extends TestCase
 
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M07/DeadCode/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M07/DeadCode/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/DeadCode/' . $filename));
     }
 }

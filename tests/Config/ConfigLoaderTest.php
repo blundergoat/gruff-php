@@ -23,7 +23,7 @@ final class ConfigLoaderTest extends TestCase
     public function testLoadsDefaultRuleSettingsWhenNoConfigExists(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(__DIR__ . '/../Fixtures/M03'))->load(null, $registry);
+        $config = (new ConfigLoader(__DIR__ . '/../Fixtures/Source/empty'))->load(null, $registry);
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
         self::assertTrue($settings->enabled);
@@ -35,7 +35,7 @@ final class ConfigLoaderTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/M03/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.json',
             $registry,
         );
         $settings = $config->ruleSettings(FileLengthRule::ID);
@@ -49,7 +49,7 @@ final class ConfigLoaderTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/M03/Config/disabled-file-length.json',
+            'tests/Fixtures/Config/disabled-file-length.json',
             $registry,
         );
 
@@ -81,7 +81,7 @@ final class ConfigLoaderTest extends TestCase
         $this->expectExceptionMessage('Unknown rule id "size.nope".');
 
         (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/M03/Config/unknown-rule.json',
+            'tests/Fixtures/Config/unknown-rule.json',
             RuleRegistry::defaults(),
         );
     }

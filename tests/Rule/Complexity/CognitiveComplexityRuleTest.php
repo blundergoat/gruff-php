@@ -125,8 +125,8 @@ final class CognitiveComplexityRuleTest extends TestCase
 
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M06/Complexity/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M06/Complexity/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/' . $filename));
     }
 }

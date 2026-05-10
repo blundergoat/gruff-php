@@ -32,7 +32,7 @@ final class SensitiveDataRulesTest extends TestCase
 
     public function testCredentialPatternsAreDetectedWithRedactedPreviews(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M11/Secrets/synthetic-secrets.php');
+        $findings = $this->analysePath('tests/Fixtures/SensitiveData/synthetic-secrets.php');
 
         self::assertRuleCount(AwsAccessKeyRule::ID, 1, $findings);
         self::assertRuleCount(ApiKeyPatternRule::ID, 5, $findings);
@@ -53,7 +53,7 @@ final class SensitiveDataRulesTest extends TestCase
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
         $discovery = new SourceDiscovery(self::PROJECT_ROOT);
-        $result = $discovery->discover(['tests/Fixtures/M11/Secrets/config-secrets.json']);
+        $result = $discovery->discover(['tests/Fixtures/SensitiveData/config-secrets.json']);
 
         self::assertCount(1, $result->files);
         self::assertSame(SourceFile::TYPE_TEXT, $result->files[0]->type);
@@ -72,7 +72,7 @@ final class SensitiveDataRulesTest extends TestCase
 
     public function testPhiAndPiiProfilesAreDetectedInFixtureData(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/M11/Secrets/profile-data.json');
+        $findings = $this->analysePath('tests/Fixtures/SensitiveData/profile-data.json');
 
         self::assertRuleCount(PhiPatternRule::ID, 5, $findings);
         self::assertRuleCount(PiiTestFixtureRule::ID, 3, $findings);
@@ -81,7 +81,7 @@ final class SensitiveDataRulesTest extends TestCase
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/M11/Secrets/safe-dummy-values.php'),
+            $this->analysePath('tests/Fixtures/SensitiveData/safe-dummy-values.php'),
             static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
         ));
 
@@ -92,11 +92,11 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/M11/Config/disable-high-entropy.json',
+            'tests/Fixtures/Config/disable-high-entropy.json',
             $registry,
         );
         $findings = $this->analyseUnits(
-            [$this->unitForPath('tests/Fixtures/M11/Secrets/synthetic-secrets.php')],
+            [$this->unitForPath('tests/Fixtures/SensitiveData/synthetic-secrets.php')],
             $config,
         );
 
@@ -111,16 +111,16 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $text = $this->runGruff([
             'analyse',
-            'tests/Fixtures/M11/Secrets/synthetic-secrets.php',
-            'tests/Fixtures/M11/Secrets/config-secrets.json',
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+            'tests/Fixtures/SensitiveData/config-secrets.json',
             '--fail-on',
             'none',
             '--no-config',
         ]);
         $json = $this->runGruff([
             'analyse',
-            'tests/Fixtures/M11/Secrets/synthetic-secrets.php',
-            'tests/Fixtures/M11/Secrets/config-secrets.json',
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+            'tests/Fixtures/SensitiveData/config-secrets.json',
             '--format',
             'json',
             '--fail-on',

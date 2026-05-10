@@ -1,0 +1,240 @@
+{
+    "schemaVersion": "gruff.analysis.v1",
+    "tool": {
+        "name": "gruff",
+        "version": "0.1.0-dev"
+    },
+    "run": {
+        "format": "json",
+        "failOn": "error",
+        "config": "tests/Fixtures/Config/file-length-warning.json",
+        "paths": [
+            "tests/Fixtures/Source/mixed/alpha.php"
+        ]
+    },
+    "summary": {
+        "filesDiscovered": 1,
+        "filesParsed": 1,
+        "ignoredPaths": 0,
+        "missingPaths": 0,
+        "parseErrors": 0,
+        "findings": {
+            "advisory": 1,
+            "warning": 2,
+            "error": 0,
+            "total": 3
+        },
+        "exitCode": 0
+    },
+    "ignoredPaths": [],
+    "missingPaths": [],
+    "diagnostics": [],
+    "findings": [
+        {
+            "ruleId": "size.file-length",
+            "message": "File has 14 lines, above the warning threshold of 3.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 1,
+            "endLine": 14,
+            "column": null,
+            "symbol": null,
+            "severity": "warning",
+            "pillar": "size",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Split oversized files or move responsibilities into smaller units.",
+            "fingerprint": "95c884e554887c24",
+            "metadata": {
+                "lines": 14,
+                "threshold": 3,
+                "thresholdType": "warning"
+            }
+        },
+        {
+            "ruleId": "naming.class-file-mismatch",
+            "message": "Class Alpha does not match file name alpha.php.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 5,
+            "endLine": null,
+            "column": null,
+            "symbol": "Alpha",
+            "severity": "warning",
+            "pillar": "naming",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Rename the file to Alpha.php or the class to alpha.",
+            "fingerprint": "8dc7b819250a0178",
+            "metadata": []
+        },
+        {
+            "ruleId": "docs.missing-public-phpdoc",
+            "message": "Public method Alpha::value() has no PHPDoc.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 7,
+            "endLine": null,
+            "column": null,
+            "symbol": "Alpha::value()",
+            "severity": "advisory",
+            "pillar": "documentation",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Add a docblock describing the method's purpose.",
+            "fingerprint": "449db7e7ebae6987",
+            "metadata": []
+        }
+    ],
+    "score": {
+        "composite": {
+            "score": 96.4,
+            "grade": "A"
+        },
+        "pillars": [
+            {
+                "pillar": "size",
+                "applicable": true,
+                "score": 84,
+                "grade": "B",
+                "findings": 1,
+                "advisories": 0,
+                "warnings": 1,
+                "errors": 0,
+                "penalty": 16
+            },
+            {
+                "pillar": "complexity",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "maintainability",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "dead-code",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "naming",
+                "applicable": true,
+                "score": 84,
+                "grade": "B",
+                "findings": 1,
+                "advisories": 0,
+                "warnings": 1,
+                "errors": 0,
+                "penalty": 16
+            },
+            {
+                "pillar": "documentation",
+                "applicable": true,
+                "score": 96,
+                "grade": "A",
+                "findings": 1,
+                "advisories": 1,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 4
+            },
+            {
+                "pillar": "modernisation",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "security",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "sensitive-data",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            },
+            {
+                "pillar": "test-quality",
+                "applicable": true,
+                "score": 100,
+                "grade": "A",
+                "findings": 0,
+                "advisories": 0,
+                "warnings": 0,
+                "errors": 0,
+                "penalty": 0
+            }
+        ],
+        "topOffenders": [
+            {
+                "file": "tests/Fixtures/Source/mixed/alpha.php",
+                "score": 55,
+                "grade": "F",
+                "findings": 3,
+                "advisories": 1,
+                "warnings": 2,
+                "errors": 0,
+                "penalty": 45,
+                "maxCyclomatic": null,
+                "maxCognitive": null,
+                "maxLines": 14,
+                "mutationScore": null
+            }
+        ],
+        "complexityDistribution": {
+            "1-5": 0,
+            "6-10": 0,
+            "11-15": 0,
+            "16-20": 0,
+            "21+": 0
+        },
+        "scope": "full-project",
+        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
+    },
+    "diff": {
+        "active": false,
+        "mode": "full-project",
+        "base": null,
+        "changedFiles": 0,
+        "message": "Diff mode is disabled.",
+        "files": []
+    }
+}

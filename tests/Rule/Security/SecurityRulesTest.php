@@ -123,7 +123,7 @@ final class SecurityRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../../..'))->load(
-            'tests/Fixtures/M10/Config/security-disable-dangerous.json',
+            'tests/Fixtures/Config/security-disable-dangerous.json',
             $registry,
         );
 
@@ -178,9 +178,9 @@ final class SecurityRulesTest extends TestCase
 
     private function parseFixture(string $filename): AnalysisUnit
     {
-        $path = __DIR__ . '/../../Fixtures/M10/Security/' . $filename;
+        $path = __DIR__ . '/../../Fixtures/Security/' . $filename;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/M10/Security/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename));
     }
 
     private function dangerousExecutionUnit(): AnalysisUnit
@@ -206,7 +206,7 @@ final class SecurityRulesTest extends TestCase
                 '    $call($command);',
                 '}',
             ]) . "\n",
-            'tests/Fixtures/M10/Security/inline-execution-calls.php',
+            'tests/Fixtures/Security/inline-execution-calls.php',
         );
     }
 

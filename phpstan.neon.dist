@@ -4,14 +4,15 @@ parameters:
         - src
         - tests
     excludePaths:
-        - tests/Fixtures/M02/syntax-error
-        - tests/Fixtures/M05
-        - tests/Fixtures/M06
-        - tests/Fixtures/M07
-        - tests/Fixtures/M08
-        - tests/Fixtures/M09
-        - tests/Fixtures/M10
-        - tests/Fixtures/M11
-        - tests/Fixtures/M12
-        - tests/Fixtures/M13
-        - tests/Fixtures/M14
+        - tests/Fixtures/Source/syntax-error
+        - tests/Fixtures/Source/Code
+        - tests/Fixtures/Size
+        - tests/Fixtures/Complexity
+        - tests/Fixtures/DeadCode
+        - tests/Fixtures/Naming
+        - tests/Fixtures/Docs
+        - tests/Fixtures/Security
+        - tests/Fixtures/SensitiveData
+        - tests/Fixtures/Modernisation
+        - tests/Fixtures/TestQuality
+        - tests/Fixtures/Mutation/Infection
