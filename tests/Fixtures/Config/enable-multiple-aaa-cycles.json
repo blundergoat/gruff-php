@@ -1,0 +1,7 @@
+{
+    "rules": {
+        "test-quality.multiple-aaa-cycles": {
+            "enabled": true
+        }
+    }
+}

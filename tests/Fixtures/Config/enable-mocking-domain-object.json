@@ -1,0 +1,10 @@
+{
+    "rules": {
+        "test-quality.mocking-domain-object": {
+            "enabled": true,
+            "options": {
+                "domainNamespaces": ["App\\Domain\\*"]
+            }
+        }
+    }
+}

@@ -67,6 +67,8 @@ use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
+use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
@@ -79,6 +81,7 @@ use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
+use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\TestQuality\UnusedMockRule;
@@ -194,6 +197,8 @@ final class RuleRegistry
             new MagicNumberAssertionRule(),
             new MockOnlyTestRule(),
             new MockWithoutExpectationRule(),
+            new MockingDomainObjectRule(),
+            new MultipleAaaCyclesRule(),
             new MysteryGuestRule(),
             new NoAssertionsRule(),
             new PrivateReflectionRule(),
@@ -206,6 +211,7 @@ final class RuleRegistry
             new TestLongerThanSutRule(),
             new TestMethodTooLongRule(),
             new TestQualityNamingConsistencyRule(),
+            new TestdoxReadabilityRule(),
             new TrivialAssertionRule(),
             new TrivialSnapshotRule(),
             new UnusedMockRule(),

@@ -24,6 +24,8 @@ use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
+use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
+use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
@@ -36,6 +38,7 @@ use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule;
+use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\TestQuality\UnusedMockRule;
@@ -113,6 +116,9 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(GlobalStateMutationRule::ID, 0, $findings);
         self::assertRuleCount(MockWithoutExpectationRule::ID, 0, $findings);
         self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 0, $findings);
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $findings);
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $findings);
+        self::assertRuleCount(MockingDomainObjectRule::ID, 0, $findings);
     }
 
     public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
@@ -197,6 +203,60 @@ final class TestQualityRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php');
 
         self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 1, $findings);
+    }
+
+    public function testMultipleAaaCyclesIsDisabledByDefaultButFiresWhenOptedIn(): void
+    {
+        $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $defaultFindings);
+
+        $registry = RuleRegistry::defaults();
+        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+            'tests/Fixtures/Config/enable-multiple-aaa-cycles.json',
+            $registry,
+        );
+        $optedInFindings = $this->analysePaths(
+            ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
+            $config,
+        );
+
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $optedInFindings);
+    }
+
+    public function testTestdoxReadabilityIsDisabledByDefaultButFiresWhenOptedIn(): void
+    {
+        $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $defaultFindings);
+
+        $registry = RuleRegistry::defaults();
+        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+            'tests/Fixtures/Config/enable-testdox-readability.json',
+            $registry,
+        );
+        $optedInFindings = $this->analysePaths(
+            ['tests/Fixtures/TestQuality/testdox-readability.php'],
+            $config,
+        );
+
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $optedInFindings);
+    }
+
+    public function testMockingDomainObjectIsDisabledByDefaultAndRequiresPatternsToFire(): void
+    {
+        $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
+        self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
+
+        $registry = RuleRegistry::defaults();
+        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+            'tests/Fixtures/Config/enable-mocking-domain-object.json',
+            $registry,
+        );
+        $optedInFindings = $this->analysePaths(
+            ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
+            $config,
+        );
+
+        self::assertRuleCount(MockingDomainObjectRule::ID, 2, $optedInFindings);
     }
 
     public function testTestQualityRulesRespectConfigDisables(): void
