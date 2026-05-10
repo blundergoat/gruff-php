@@ -230,7 +230,22 @@ final class DashboardCommand extends Command
         }
 
         $paths = $this->parsePaths($state['paths']);
-        $command = $this->analyseCommand($paths, $state);
+        $editedUnitTestFiles = [];
+
+        if ($state['mutation'] === 'run') {
+            $editedUnitTestFiles = $this->editedUnitTestFiles($scanRoot);
+
+            if ($editedUnitTestFiles === []) {
+                return $this->errorHtml(
+                    'No edited unit test files found.',
+                    'Dashboard mutation analysis checks only PHPUnit unit test files changed relative to HEAD under tests/. Newly created untracked unit test files are included when the project is a git repository. Use scripts/mutation-test-full.sh for a full unit-suite mutation run.',
+                    Command::SUCCESS,
+                    0,
+                );
+            }
+        }
+
+        $command = $this->analyseCommand($paths, $state, $scanRoot, $editedUnitTestFiles);
         $startedAt = microtime(true);
         $process = new Process($command, $scanRoot);
         $process->setTimeout($state['mutation'] === 'run' ? null : $scanTimeout);
@@ -307,8 +322,8 @@ final class DashboardCommand extends Command
             . '<section id="mutation-run-modal" class="mutation-run-modal" role="dialog" aria-modal="true" aria-labelledby="mutation-run-title" hidden>'
             . '<div class="mutation-run-head"><strong id="mutation-run-title">Mutation analysis</strong><button type="button" id="mutation-run-close" aria-label="Close mutation analysis dialog">&times;</button></div>'
             . '<div class="mutation-run-body">'
-            . '<p>Runs Infection against the unit test suite via the dashboard.</p>'
-            . '<p><code>infection.json5</code> writes <code>infection-report.json</code> and limits Infection to PHPUnit unit tests.</p>'
+            . '<p>Runs Infection using edited unit test files as the PHPUnit oracle.</p>'
+            . '<p><code>infection.json5</code> writes <code>infection-report.json</code>. The dashboard filters to PHPUnit unit tests changed relative to <code>HEAD</code>.</p>'
             . '</div>'
             . '<div id="mutation-run-progress" class="mutation-run-progress" role="status" aria-live="polite" hidden><span class="mutation-run-spinner" aria-hidden="true"></span><span>Mutation analysis running... <strong id="mutation-run-elapsed">0s</strong></span></div>'
             . '<div class="mutation-run-actions"><button type="button" id="mutation-run-cancel">Cancel</button><a class="mutation-run-confirm" href="' . $href . '">Run mutation analysis</a></div>'
@@ -329,9 +344,10 @@ final class DashboardCommand extends Command
     /**
      * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string} $state
      * @param list<string> $paths
+     * @param list<string> $editedUnitTestFiles
      * @return list<string>
      */
-    private function analyseCommand(array $paths, array $state): array
+    private function analyseCommand(array $paths, array $state, string $projectRoot, array $editedUnitTestFiles): array
     {
         $command = [PHP_BINARY, $this->gruffBinary(), 'analyse', ...$paths, '--format', 'html', '--fail-on', $state['failOn']];
 
@@ -357,9 +373,92 @@ final class DashboardCommand extends Command
             $command[] = '--infection-run';
             $command[] = '--infection-report';
             $command[] = 'infection-report.json';
+            $command[] = '--infection-test-framework-options=' . $this->infectionTestFrameworkOptions($projectRoot, $editedUnitTestFiles);
         }
 
         return $command;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function editedUnitTestFiles(string $projectRoot): array
+    {
+        $candidates = array_merge(
+            $this->gitPaths($projectRoot, ['diff', '--name-only', '--diff-filter=AM', 'HEAD', '--', 'tests']),
+            $this->gitPaths($projectRoot, ['ls-files', '--others', '--exclude-standard', '--', 'tests']),
+        );
+        $files = [];
+        $seen = [];
+
+        foreach ($candidates as $path) {
+            if (!$this->isUnitTestFile($projectRoot, $path) || isset($seen[$path])) {
+                continue;
+            }
+
+            $seen[$path] = true;
+            $files[] = $path;
+        }
+
+        return $files;
+    }
+
+    /**
+     * @param list<string> $arguments
+     * @return list<string>
+     */
+    private function gitPaths(string $projectRoot, array $arguments): array
+    {
+        $process = new Process(['git', ...$arguments], $projectRoot);
+        $process->setTimeout(10);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            preg_split('/\r?\n/', trim($process->getOutput())) ?: [],
+            static fn (string $path): bool => $path !== '',
+        ));
+    }
+
+    private function isUnitTestFile(string $projectRoot, string $path): bool
+    {
+        return str_starts_with($path, 'tests/')
+            && str_ends_with($path, 'Test.php')
+            && !str_starts_with($path, 'tests/Console/')
+            && !str_ends_with($path, 'IntegrationTest.php')
+            && is_file(rtrim($projectRoot, '/') . '/' . $path);
+    }
+
+    /**
+     * @param list<string> $editedUnitTestFiles
+     */
+    private function infectionTestFrameworkOptions(string $projectRoot, array $editedUnitTestFiles): string
+    {
+        $filters = [];
+
+        foreach ($editedUnitTestFiles as $path) {
+            $className = $this->testClassName($projectRoot, $path);
+            if ($className !== '') {
+                $filters[] = preg_quote($className, '/');
+            }
+        }
+
+        return '--testsuite=unit --filter=' . implode('|', $filters);
+    }
+
+    private function testClassName(string $projectRoot, string $path): string
+    {
+        $absolutePath = rtrim($projectRoot, '/') . '/' . $path;
+        $contents = file_get_contents($absolutePath);
+
+        if (is_string($contents) && preg_match('/^\s*(?:final\s+|abstract\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)/m', $contents, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return basename($path, '.php');
     }
 
     /**

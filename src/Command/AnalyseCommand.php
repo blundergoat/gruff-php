@@ -65,6 +65,7 @@ final class AnalyseCommand extends Command
             ->addOption('infection-run', null, InputOption::VALUE_NONE, 'Run Infection before ingesting the report path supplied by --infection-report.')
             ->addOption('infection-bin', null, InputOption::VALUE_REQUIRED, 'Infection executable for --infection-run.', 'infection')
             ->addOption('infection-config', null, InputOption::VALUE_REQUIRED, 'Path to infection.json5 for --infection-run.')
+            ->addOption('infection-test-framework-options', null, InputOption::VALUE_REQUIRED, 'Options passed to Infection/PHPUnit for --infection-run.')
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
@@ -115,6 +116,7 @@ final class AnalyseCommand extends Command
         $infectionRun = (bool) $input->getOption('infection-run');
         $infectionBin = $this->optionalStringOption($input, 'infection-bin') ?? 'infection';
         $infectionConfigPath = $this->optionalStringOption($input, 'infection-config');
+        $infectionTestFrameworkOptions = $this->optionalStringOption($input, 'infection-test-framework-options');
         $mutationBaselinePath = $this->optionalStringOption($input, 'mutation-baseline');
         $diffMode = $this->diffMode($input);
         $historyFile = $this->optionalStringOption($input, 'history-file');
@@ -258,6 +260,7 @@ final class AnalyseCommand extends Command
             infectionRun: $infectionRun,
             infectionBin: $infectionBin,
             infectionConfigPath: $infectionConfigPath,
+            infectionTestFrameworkOptions: $infectionTestFrameworkOptions,
             mutationBaselinePath: $mutationBaselinePath,
             mutationBudget: $mutationBudget,
             diagnostics: $diagnostics,
@@ -557,18 +560,31 @@ final class AnalyseCommand extends Command
         bool $infectionRun,
         string $infectionBin,
         ?string $infectionConfigPath,
+        ?string $infectionTestFrameworkOptions,
         ?string $mutationBaselinePath,
         ?int $mutationBudget,
         array &$diagnostics,
     ): ?MutationAnalysisResult {
         if ($infectionReportPath === null) {
-            $this->addMutationOptionDiagnostics($infectionRun, $infectionConfigPath, $mutationBaselinePath, $mutationBudget, $diagnostics);
+            $this->addMutationOptionDiagnostics(
+                $infectionRun,
+                $infectionConfigPath,
+                $infectionTestFrameworkOptions,
+                $mutationBaselinePath,
+                $mutationBudget,
+                $diagnostics,
+            );
 
             return null;
         }
 
         if ($infectionRun) {
-            $runResult = (new InfectionRunner())->run($projectRoot, $infectionBin, $infectionConfigPath);
+            $runResult = (new InfectionRunner())->run(
+                $projectRoot,
+                $infectionBin,
+                $infectionConfigPath,
+                $infectionTestFrameworkOptions,
+            );
 
             if ($runResult->diagnostic instanceof RunDiagnostic) {
                 $diagnostics[] = $runResult->diagnostic;
@@ -614,6 +630,7 @@ final class AnalyseCommand extends Command
     private function addMutationOptionDiagnostics(
         bool $infectionRun,
         ?string $infectionConfigPath,
+        ?string $infectionTestFrameworkOptions,
         ?string $mutationBaselinePath,
         ?int $mutationBudget,
         array &$diagnostics,
@@ -630,6 +647,13 @@ final class AnalyseCommand extends Command
                 type: 'usage-error',
                 message: '--infection-config only applies with --infection-run and --infection-report.',
                 path: $infectionConfigPath,
+            );
+        }
+
+        if ($infectionTestFrameworkOptions !== null) {
+            $diagnostics[] = new RunDiagnostic(
+                type: 'usage-error',
+                message: '--infection-test-framework-options only applies with --infection-run and --infection-report.',
             );
         }
 

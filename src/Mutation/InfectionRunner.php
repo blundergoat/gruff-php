@@ -10,7 +10,12 @@ use Symfony\Component\Process\Process;
 
 final readonly class InfectionRunner
 {
-    public function run(string $projectRoot, string $binary, ?string $configPath): InfectionRunResult
+    public function run(
+        string $projectRoot,
+        string $binary,
+        ?string $configPath,
+        ?string $testFrameworkOptions = null,
+    ): InfectionRunResult
     {
         $resolvedBinary = $this->resolveBinary($projectRoot, $binary);
 
@@ -33,6 +38,10 @@ final readonly class InfectionRunner
         if ($effectiveConfigPath !== null) {
             $command[] = '--configuration';
             $command[] = $this->absolutePath($projectRoot, $effectiveConfigPath);
+        }
+
+        if ($testFrameworkOptions !== null && trim($testFrameworkOptions) !== '') {
+            $command[] = '--test-framework-options=' . $testFrameworkOptions;
         }
 
         $process = new Process($command, $projectRoot);

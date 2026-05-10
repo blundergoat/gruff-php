@@ -1,0 +1,15 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "testFrameworkOptions": "--testsuite=unit",
+    "mutators": {
+        "@default": true
+    },
+    "logs": {
+        "json": "infection-report.json"
+    }
+}

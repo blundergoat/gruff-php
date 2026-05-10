@@ -10,228 +10,268 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     DIM=$'\033[2m'
     GREEN=$'\033[32m'
     RED=$'\033[31m'
+    YELLOW=$'\033[33m'
+    BLUE=$'\033[34m'
     RESET=$'\033[0m'
 else
     BOLD=''
     DIM=''
     GREEN=''
     RED=''
+    YELLOW=''
+    BLUE=''
     RESET=''
 fi
 
-line() {
-    printf '%s\n' '======================================================================'
+PASS="${GREEN}✔${RESET}"
+FAIL="${RED}✘${RESET}"
+SKIP="${YELLOW}○${RESET}"
+ARROW="${BLUE}▸${RESET}"
+
+TOTAL=0
+PASSED=0
+FAILED=0
+FAILURES=()
+START_TIME=$(date +%s%N)
+MUTATION_MODE=off
+
+rule() {
+    printf '  %s\n' "${DIM}────────────────────────────────────────────${RESET}"
 }
 
-thin_line() {
-    printf '%s\n' '----------------------------------------------------------------------'
+elapsed_since() {
+    local started_at=$1
+    local finished_at
+    local elapsed_ms
+    local seconds
+    local minutes
+    local remainder
+    local frac
+
+    finished_at=$(date +%s%N)
+    elapsed_ms=$(((finished_at - started_at) / 1000000))
+
+    if ((elapsed_ms < 1000)); then
+        printf '%dms' "$elapsed_ms"
+        return
+    fi
+
+    seconds=$((elapsed_ms / 1000))
+    frac=$(((elapsed_ms % 1000) / 100))
+
+    if ((seconds < 60)); then
+        printf '%d.%ds' "$seconds" "$frac"
+        return
+    fi
+
+    minutes=$((seconds / 60))
+    remainder=$((seconds % 60))
+    printf '%dm %02d.%ds' "$minutes" "$remainder" "$frac"
 }
 
-duration() {
-    local seconds=$1
-    local minutes=$((seconds / 60))
-    local remainder=$((seconds % 60))
+header() {
+    printf '\n'
+    printf '  %sPreflight Check%s\n' "$BOLD" "$RESET"
+    printf '  %s%s%s\n' "$DIM" "$(date '+%Y-%m-%d %H:%M:%S')" "$RESET"
+    rule
+    printf '\n'
+}
 
-    if ((minutes > 0)); then
-        printf '%dm %02ds' "$minutes" "$remainder"
+step() {
+    local label=$1
+
+    TOTAL=$((TOTAL + 1))
+    printf '  %s %-40s' "$ARROW" "$label"
+}
+
+pass() {
+    local detail=${1:-}
+
+    PASSED=$((PASSED + 1))
+    if [[ -n "$detail" ]]; then
+        printf '%s  %s%s%s\n' "$PASS" "$DIM" "$detail" "$RESET"
     else
-        printf '%ds' "$remainder"
+        printf '%s\n' "$PASS"
     fi
 }
 
-command_label() {
-    local first=true
+fail() {
+    local label=$1
 
-    for part in "$@"; do
-        if [[ "$first" == true ]]; then
-            first=false
-        else
-            printf ' '
-        fi
+    FAILED=$((FAILED + 1))
+    FAILURES+=("$label")
+    printf '%s\n' "$FAIL"
+}
 
-        printf '%q' "$part"
+skip() {
+    local reason=${1:-skipped}
+
+    printf '%s  %s%s%s\n' "$SKIP" "$DIM" "$reason" "$RESET"
+}
+
+indent_output() {
+    while IFS= read -r line; do
+        printf '    %s%s%s\n' "$DIM" "$line" "$RESET"
     done
 }
 
-print_header() {
-    local with_mutation=$1
-
-    line
-    printf '%sgruff-php preflight checks%s\n' "$BOLD" "$RESET"
-    thin_line
-    printf '%sProject:%s %s\n' "$DIM" "$RESET" "$REPO_ROOT"
-
-    if command -v php >/dev/null 2>&1; then
-        printf '%sPHP:%s     %s\n' "$DIM" "$RESET" "$(php -r 'echo PHP_VERSION;')"
-    fi
-
-    printf '%sStarted:%s %s\n' "$DIM" "$RESET" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
-    if ((with_mutation == 1)); then
-        printf '%sMutation:%s enabled (unit test suite)\n' "$DIM" "$RESET"
-    else
-        printf '%sMutation:%s skipped (pass --with-mutation to run unit mutation analysis)\n' "$DIM" "$RESET"
-    fi
-    line
-}
-
 run_step() {
-    local title=$1
+    local label=$1
     shift
     local started_at
-    local finished_at
+    local output
     local status
+    local elapsed
 
-    started_at=$(date +%s)
-
-    printf '\n%s%s%s\n' "$BOLD" "$title" "$RESET"
-    thin_line
-    printf '%sCommand:%s ' "$DIM" "$RESET"
-    command_label "$@"
-    printf '\n\n'
-
-    "$@"
+    step "$label"
+    started_at=$(date +%s%N)
+    output=$("$@" 2>&1)
     status=$?
-    finished_at=$(date +%s)
-
-    printf '\n'
+    elapsed=$(elapsed_since "$started_at")
 
     if ((status == 0)); then
-        printf '%sPASS%s %s completed in %s.\n' "$GREEN" "$RESET" "$title" "$(duration "$((finished_at - started_at))")"
+        pass "${output:+$output }$elapsed"
     else
-        printf '%sFAIL%s %s exited with code %d after %s.\n' "$RED" "$RESET" "$title" "$status" "$(duration "$((finished_at - started_at))")"
+        fail "$label"
+        if [[ -n "$output" ]]; then
+            printf '%s\n' "$output" | tail -20 | indent_output
+        fi
+        printf '    %sexit %d after %s%s\n' "$DIM" "$status" "$elapsed" "$RESET"
     fi
 
     return "$status"
 }
 
-print_gruff_report_summary() {
+static_analysis_check() {
+    local output
+    local status
+
+    output=$(composer phpstan 2>&1)
+    status=$?
+
+    if ((status != 0)); then
+        printf '%s\n' "$output"
+    fi
+
+    return "$status"
+}
+
+test_suite_check() {
+    local output
+    local status
+    local summary
+
+    output=$(composer test 2>&1)
+    status=$?
+    summary=$(printf '%s\n' "$output" | grep -oE '[0-9]+ tests, [0-9]+ assertions' | tail -1 || true)
+
+    if ((status == 0)); then
+        printf '%s' "$summary"
+    else
+        printf '%s\n' "$output"
+    fi
+
+    return "$status"
+}
+
+gruff_report_summary() {
     local report_path=$1
+    local include_mutation=${2:-0}
 
     # shellcheck disable=SC2016
     php -r '
 $report = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+$includeMutation = $argv[2] === "1";
 $summary = $report["summary"] ?? [];
 $findings = $summary["findings"] ?? [];
 $score = $report["score"]["composite"] ?? null;
 
-printf("Report: %s\n", $argv[1]);
-printf(
-    "Files: %d discovered, %d parsed, %d parse errors\n",
-    (int) ($summary["filesDiscovered"] ?? 0),
-    (int) ($summary["filesParsed"] ?? 0),
-    (int) ($summary["parseErrors"] ?? 0),
-);
-printf(
-    "Findings: %d total (%d advisory, %d warning, %d error)\n",
-    (int) ($findings["total"] ?? 0),
-    (int) ($findings["advisory"] ?? 0),
-    (int) ($findings["warning"] ?? 0),
-    (int) ($findings["error"] ?? 0),
-);
+$parts = [
+    sprintf("%d findings", (int) ($findings["total"] ?? 0)),
+];
 
 if (is_array($score)) {
-    printf("Score: %s (%.2f/100)\n", (string) ($score["grade"] ?? "n/a"), (float) ($score["score"] ?? 0));
+    $parts[] = sprintf("%s %.2f/100", (string) ($score["grade"] ?? "n/a"), (float) ($score["score"] ?? 0));
 }
 
-$mutation = $report["mutation"]["totals"] ?? null;
-if (is_array($mutation)) {
-    printf(
-        "Mutation: MSI %.2f%%, covered MSI %.2f%%, survived %d/%d\n",
-        (float) ($mutation["msi"] ?? 0),
-        (float) ($mutation["coveredMsi"] ?? 0),
-        (int) ($mutation["survivedMutants"] ?? 0),
-        (int) ($mutation["totalMutants"] ?? 0),
-    );
+if ($includeMutation) {
+    $mutation = $report["mutation"]["totals"] ?? null;
+    if (is_array($mutation)) {
+        $parts[] = sprintf(
+            "unit MSI %.2f%%, survived %d/%d",
+            (float) ($mutation["msi"] ?? 0),
+            (int) ($mutation["survivedMutants"] ?? 0),
+            (int) ($mutation["totalMutants"] ?? 0),
+        );
+    } else {
+        $parts[] = "unit mutation data unavailable";
+    }
 }
-' "$report_path"
+
+echo implode(", ", $parts);
+' "$report_path" "$include_mutation"
 }
 
 gruff_source_scan() {
     local report_path="${TMPDIR:-/tmp}/gruff-preflight-source-scan.json"
+    local status
 
-    printf 'Underlying: php bin/gruff analyse src --fail-on none --format json > %s\n\n' "$report_path"
     php bin/gruff analyse src --fail-on none --format json > "$report_path"
-    local status=$?
+    status=$?
 
     if [[ -s "$report_path" ]]; then
-        print_gruff_report_summary "$report_path" || return $?
+        gruff_report_summary "$report_path" 0 || return $?
     fi
 
     return "$status"
 }
 
-gruff_unit_mutation_scan() {
-    local report_path="${TMPDIR:-/tmp}/gruff-preflight-unit-mutation.json"
+mutation_check() {
+    local mode=$1
+    local output
+    local status
+    local summary_line
 
-    printf 'Underlying: php bin/gruff analyse src --fail-on none --format json --infection-run --infection-config infection.json5 --infection-report infection-report.json > %s\n' "$report_path"
-    printf 'Mutation source: src\n'
-    printf 'Mutation test suite: PHPUnit unit (--testsuite=unit from infection.json5)\n\n'
-    php bin/gruff analyse src --fail-on none --format json --infection-run --infection-config infection.json5 --infection-report infection-report.json > "$report_path"
-    local status=$?
+    output=$(scripts/mutation-test-"$mode".sh 2>&1)
+    status=$?
 
-    if [[ -s "$report_path" ]]; then
-        print_gruff_report_summary "$report_path" || return $?
+    if ((status == 0)); then
+        summary_line=$(printf '%s\n' "$output" | grep -E 'MSI |All [0-9]+/[0-9]+ checks passed|no edited unit test files' | tail -1 || true)
+        printf '%s' "${summary_line:-completed}"
+    else
+        printf '%s\n' "$output"
     fi
 
     return "$status"
 }
 
-print_summary() {
-    local total_status=$1
-    local phpstan_status=$2
-    local test_status=$3
-    local gruff_status=$4
-    local mutation_status=$5
-    local with_mutation=$6
-    local elapsed=$7
+summary() {
+    local elapsed
 
+    elapsed=$(elapsed_since "$START_TIME")
     printf '\n'
-    line
-    printf '%sSummary%s\n' "$BOLD" "$RESET"
-    thin_line
+    rule
+    printf '\n'
 
-    if ((phpstan_status == 0)); then
-        printf '%sPASS%s PHPStan level 10\n' "$GREEN" "$RESET"
-    else
-        printf '%sFAIL%s PHPStan level 10 (exit %d)\n' "$RED" "$RESET" "$phpstan_status"
+    if ((FAILED == 0)); then
+        printf '  %sAll %d/%d checks passed%s  %s(%s)%s\n' "$GREEN$BOLD" "$PASSED" "$TOTAL" "$RESET" "$DIM" "$elapsed" "$RESET"
+        printf '\n'
+        return 0
     fi
 
-    if ((test_status == 0)); then
-        printf '%sPASS%s PHPUnit test suite\n' "$GREEN" "$RESET"
-    else
-        printf '%sFAIL%s PHPUnit test suite (exit %d)\n' "$RED" "$RESET" "$test_status"
-    fi
+    printf '  %s%d/%d checks failed%s  %s(%s)%s\n' "$RED$BOLD" "$FAILED" "$TOTAL" "$RESET" "$DIM" "$elapsed" "$RESET"
+    printf '\n'
+    for failure in "${FAILURES[@]}"; do
+        printf '    %s  %s\n' "$FAIL" "$failure"
+    done
+    printf '\n'
 
-    if ((gruff_status == 0)); then
-        printf '%sPASS%s Gruff source scan\n' "$GREEN" "$RESET"
-    else
-        printf '%sFAIL%s Gruff source scan (exit %d)\n' "$RED" "$RESET" "$gruff_status"
-    fi
-
-    if ((with_mutation == 1)); then
-        if ((mutation_status == 0)); then
-            printf '%sPASS%s Unit mutation analysis\n' "$GREEN" "$RESET"
-        else
-            printf '%sFAIL%s Unit mutation analysis (exit %d)\n' "$RED" "$RESET" "$mutation_status"
-        fi
-    else
-        printf '%sSKIP%s Unit mutation analysis (pass --with-mutation)\n' "$DIM" "$RESET"
-    fi
-
-    thin_line
-
-    if ((total_status == 0)); then
-        printf '%sAll preflight checks passed in %s.%s\n' "$GREEN" "$(duration "$elapsed")" "$RESET"
-    else
-        printf '%sPreflight failed in %s. Fix the failing step above and rerun.%s\n' "$RED" "$(duration "$elapsed")" "$RESET"
-    fi
-
-    line
+    return 1
 }
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/preflight-checks.sh [--with-mutation|--mutation]
+Usage: scripts/preflight-checks.sh [--mutate-diff|--mutate-full]
 
 Runs the standard preflight gate:
   - PHPStan
@@ -239,33 +279,32 @@ Runs the standard preflight gate:
   - Gruff source scan
 
 Options:
-  --with-mutation  Also run Infection via Gruff against the PHPUnit unit suite.
-  --mutation       Alias for --with-mutation.
+  --mutate-diff    Run Infection using edited PHPUnit unit test files only.
+  --mutate-full    Run the full Infection mutation suite against unit tests.
   -h, --help       Show this help.
 USAGE
 }
 
 main() {
-    local started_at
-    local finished_at
-    local with_mutation=0
     local phpstan_status=0
     local test_status=0
     local gruff_status=0
     local mutation_status=0
-    local total_status=0
 
     while (($# > 0)); do
         case "$1" in
-            --with-mutation|--mutation)
-                with_mutation=1
+            --mutate-diff)
+                MUTATION_MODE="diff"
+                ;;
+            --mutate-full)
+                MUTATION_MODE="full"
                 ;;
             -h|--help)
                 usage
                 return 0
                 ;;
             *)
-                printf '%sFAIL%s Unknown option: %s\n' "$RED" "$RESET" "$1" >&2
+                printf '%sUnknown option:%s %s\n' "$RED" "$RESET" "$1" >&2
                 usage >&2
                 return 64
                 ;;
@@ -274,38 +313,46 @@ main() {
         shift
     done
 
-    started_at=$(date +%s)
     cd "$REPO_ROOT" || return 1
 
-    print_header "$with_mutation"
+    header
 
     if ! command -v composer >/dev/null 2>&1; then
-        printf '%sFAIL%s Composer is not available on PATH.\n' "$RED" "$RESET"
+        step "Composer"
+        fail "Composer"
+        printf '    %sComposer is not available on PATH.%s\n' "$DIM" "$RESET"
+        summary
         return 127
     fi
 
-    run_step "Static analysis" composer phpstan
+    run_step "Static analysis (PHPStan L10)" static_analysis_check
     phpstan_status=$?
 
-    run_step "Test suite" composer test
+    run_step "Tests (PHPUnit)" test_suite_check
     test_status=$?
 
     run_step "Gruff source scan" gruff_source_scan
     gruff_status=$?
 
-    if ((with_mutation == 1)); then
-        run_step "Unit mutation analysis" gruff_unit_mutation_scan
+    if [[ "$MUTATION_MODE" == "diff" ]]; then
+        run_step "Mutation testing (edited unit tests)" mutation_check diff
         mutation_status=$?
+    elif [[ "$MUTATION_MODE" == "full" ]]; then
+        run_step "Mutation testing (full unit suite)" mutation_check full
+        mutation_status=$?
+    else
+        step "Mutation testing (Infection)"
+        skip "use --mutate-diff or --mutate-full to enable"
     fi
+
+    summary
+    local summary_status=$?
 
     if ((phpstan_status != 0 || test_status != 0 || gruff_status != 0 || mutation_status != 0)); then
-        total_status=1
+        return 1
     fi
 
-    finished_at=$(date +%s)
-    print_summary "$total_status" "$phpstan_status" "$test_status" "$gruff_status" "$mutation_status" "$with_mutation" "$((finished_at - started_at))"
-
-    return "$total_status"
+    return "$summary_status"
 }
 
 main "$@"

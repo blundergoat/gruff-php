@@ -679,8 +679,8 @@ final class GruffCliTest extends TestCase
             self::assertStringContainsString('mutation=run', $scan);
             self::assertStringContainsString('Run mutation analysis', $scan);
             self::assertStringContainsString('Mutation analysis running...', $scan);
-            self::assertStringContainsString('Runs Infection against the unit test suite via the dashboard.', $scan);
-            self::assertStringContainsString('limits Infection to PHPUnit unit tests', $scan);
+            self::assertStringContainsString('Runs Infection using edited unit test files as the PHPUnit oracle.', $scan);
+            self::assertStringContainsString('filters to PHPUnit unit tests changed relative to', $scan);
             self::assertStringNotContainsString('Mutation data unavailable. Pass <code>--infection-report</code> to score this pillar.', $scan);
             self::assertStringNotContainsString('chart-grid-solo', $scan);
         } finally {
@@ -692,7 +692,10 @@ final class GruffCliTest extends TestCase
     {
         $tempDir = $this->tempDir();
         $port = $this->unusedPort();
+        self::assertTrue(mkdir($tempDir . '/tests', 0777, true));
         file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+        file_put_contents($tempDir . '/tests/ExampleTest.php', "<?php\n\nfinal class ExampleTest extends \\PHPUnit\\Framework\\TestCase\n{\n    public function testItRuns(): void\n    {\n        self::assertTrue(true);\n    }\n}\n");
+        (new Process(['git', 'init'], $tempDir))->mustRun();
 
         $process = new Process([
             PHP_BINARY,

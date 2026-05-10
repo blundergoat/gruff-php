@@ -32,6 +32,8 @@
         "check": [
             "composer validate --strict",
             "bash -n scripts/preflight-checks.sh",
+            "bash -n scripts/mutation-test-diff.sh",
+            "bash -n scripts/mutation-test-full.sh",
             "@php -l bin/gruff",
             "@php -l src/Analysis/AnalysisReport.php",
             "@php -l src/Analysis/RunDiagnostic.php",

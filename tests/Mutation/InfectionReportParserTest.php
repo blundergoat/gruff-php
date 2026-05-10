@@ -90,6 +90,34 @@ final class InfectionReportParserTest extends TestCase
         }
     }
 
+    public function testInfectionRunnerPassesTestFrameworkOptions(): void
+    {
+        $projectRoot = $this->tempDir();
+        $binaryPath = $projectRoot . '/vendor/bin/infection';
+
+        try {
+            self::assertTrue(mkdir(dirname($binaryPath), 0777, true));
+            self::assertNotFalse(file_put_contents($binaryPath, "#!/usr/bin/env sh\nprintf 'local-infection %s' \"$*\"\n"));
+            self::assertTrue(chmod($binaryPath, 0755));
+
+            $result = (new InfectionRunner())->run(
+                $projectRoot,
+                'infection',
+                null,
+                '--testsuite=unit --filter=ExampleTest',
+            );
+
+            self::assertSame(0, $result->exitCode);
+            self::assertStringContainsString(
+                'local-infection run --no-progress --log-verbosity=none --test-framework-options=--testsuite=unit --filter=ExampleTest',
+                $result->output,
+            );
+            self::assertNull($result->diagnostic);
+        } finally {
+            $this->removeDir($projectRoot);
+        }
+    }
+
     private function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-infection-runner-' . bin2hex(random_bytes(6));
