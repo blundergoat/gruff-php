@@ -59,4 +59,35 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('<script>alert("x")</script>', $html);
         self::assertStringNotContainsString('fonts.googleapis.com', $html);
     }
+
+    public function testChartGridAlwaysRendersBothCardsWithMutationPlaceholder(): void
+    {
+        $score = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
+        $report = new AnalysisReport(
+            toolVersion: '0.1.0-test',
+            requestedPaths: ['src'],
+            format: 'html',
+            failOn: 'none',
+            filesDiscovered: 0,
+            filesParsed: 0,
+            ignoredPaths: [],
+            missingPaths: [],
+            diagnostics: [],
+            findings: [],
+            exitCode: 0,
+            score: $score,
+            diff: DiffResult::inactive(),
+        );
+
+        $html = (new HtmlReporter())->render($report);
+
+        self::assertStringNotContainsString('chart-grid-solo', $html);
+        self::assertStringContainsString('cyclomatic complexity · flagged methods', $html);
+        self::assertStringContainsString('mutation score · per file', $html);
+        self::assertStringContainsString('chart-card-empty', $html);
+        self::assertStringContainsString('data-mutation-empty="chart"', $html);
+        self::assertStringContainsString('data-mutation-empty="pillar"', $html);
+        self::assertStringContainsString('mutation-cli-hint', $html);
+        self::assertSame(2, substr_count($html, 'class="chart-card'));
+    }
 }

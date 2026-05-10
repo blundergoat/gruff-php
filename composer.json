@@ -11,6 +11,7 @@
         "symfony/process": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
+        "infection/infection": "^0.32",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.5"
     },
@@ -169,7 +170,9 @@
         "test": "phpunit"
     },
     "config": {
-        "allow-plugins": {},
+        "allow-plugins": {
+            "infection/extension-installer": true
+        },
         "sort-packages": true
     },
     "minimum-stability": "stable",

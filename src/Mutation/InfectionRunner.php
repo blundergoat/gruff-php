@@ -27,11 +27,12 @@ final readonly class InfectionRunner
             );
         }
 
+        $effectiveConfigPath = $configPath ?? $this->defaultConfigPath($projectRoot);
         $command = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
 
-        if ($configPath !== null) {
+        if ($effectiveConfigPath !== null) {
             $command[] = '--configuration';
-            $command[] = $this->absolutePath($projectRoot, $configPath);
+            $command[] = $this->absolutePath($projectRoot, $effectiveConfigPath);
         }
 
         $process = new Process($command, $projectRoot);
@@ -57,9 +58,20 @@ final readonly class InfectionRunner
             return is_file($candidate) && is_executable($candidate) ? $candidate : null;
         }
 
+        $localBinary = rtrim($projectRoot, '/') . '/vendor/bin/' . $binary;
+
+        if (is_file($localBinary) && is_executable($localBinary)) {
+            return $localBinary;
+        }
+
         $resolved = (new ExecutableFinder())->find($binary);
 
         return is_string($resolved) ? $resolved : null;
+    }
+
+    private function defaultConfigPath(string $projectRoot): ?string
+    {
+        return is_file(rtrim($projectRoot, '/') . '/infection.json5') ? 'infection.json5' : null;
     }
 
     private function absolutePath(string $projectRoot, string $path): string

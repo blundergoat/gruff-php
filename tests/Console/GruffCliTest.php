@@ -646,6 +646,84 @@ final class GruffCliTest extends TestCase
         }
     }
 
+    public function testDashboardScanInjectsRunMutationDialogWhenMutationDataAbsent(): void
+    {
+        $port = $this->unusedPort();
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'dashboard',
+            'tests/Fixtures/M14/Source',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            (string) $port,
+            '--scan-timeout',
+            '30',
+        ], self::PROJECT_ROOT);
+        $process->setTimeout(null);
+        $process->start();
+
+        try {
+            $this->waitForHttpServer($port, $process);
+
+            $scan = $this->fetchHttp($port, '/scan');
+
+            self::assertStringContainsString('HTTP/1.1 200 OK', $scan);
+            self::assertStringContainsString('class="chart-card chart-card-empty"', $scan);
+            self::assertStringContainsString('class="run-mutation-btn"', $scan);
+            self::assertStringContainsString('id="mutation-run-modal"', $scan);
+            self::assertStringContainsString('id="mutation-run-progress"', $scan);
+            self::assertStringContainsString('id="mutation-run-elapsed"', $scan);
+            self::assertStringContainsString('class="mutation-run-confirm"', $scan);
+            self::assertStringContainsString('mutation=run', $scan);
+            self::assertStringContainsString('Run mutation analysis', $scan);
+            self::assertStringContainsString('Mutation analysis running...', $scan);
+            self::assertStringContainsString('Runs Infection against the unit test suite via the dashboard.', $scan);
+            self::assertStringContainsString('limits Infection to PHPUnit unit tests', $scan);
+            self::assertStringNotContainsString('Mutation data unavailable. Pass <code>--infection-report</code> to score this pillar.', $scan);
+            self::assertStringNotContainsString('chart-grid-solo', $scan);
+        } finally {
+            $process->stop(1);
+        }
+    }
+
+    public function testDashboardScanWithMissingInfectionBinarySurfacesDiagnostic(): void
+    {
+        $tempDir = $this->tempDir();
+        $port = $this->unusedPort();
+        file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
+
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'dashboard',
+            'tests/Fixtures/M14/Source',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            (string) $port,
+            '--scan-timeout',
+            '30',
+        ], self::PROJECT_ROOT, ['PATH' => '/usr/bin:/bin']);
+        $process->setTimeout(null);
+        $process->start();
+
+        try {
+            $this->waitForHttpServer($port, $process);
+
+            $scan = $this->fetchHttp($port, '/scan?project=' . rawurlencode($tempDir) . '&paths=.&mutation=run');
+
+            self::assertStringContainsString('HTTP/1.1 200 OK', $scan);
+            self::assertStringContainsString('Infection executable not found', $scan);
+            self::assertStringContainsString('class="run-mutation-btn"', $scan);
+            self::assertStringContainsString('id="mutation-run-modal"', $scan);
+        } finally {
+            $process->stop(1);
+            $this->removeDir($tempDir);
+        }
+    }
+
     public function testDashboardCommandCanScanAnotherProjectFromBrowserQuery(): void
     {
         $tempDir = $this->tempDir();

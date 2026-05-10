@@ -30,7 +30,7 @@ final readonly class MutationFindingFactory
                 tier: RuleTier::V01,
                 confidence: Confidence::High,
                 symbol: $mutant->mutator,
-                remediation: 'Add or strengthen tests that fail when this mutant changes behavior; gruff-php consumes Infection output and does not generate mutants.',
+                remediation: 'Add or strengthen unit tests that fail when this mutant changes behavior; gruff-php consumes Infection output and does not generate mutants.',
                 metadata: [
                     'status' => $mutant->status,
                     'mutator' => $mutant->mutator,
@@ -76,7 +76,7 @@ final readonly class MutationFindingFactory
                 pillar: Pillar::Mutation,
                 tier: RuleTier::V01,
                 confidence: Confidence::High,
-                remediation: 'Inspect survived mutants introduced since the baseline and either improve tests or accept the lower MSI deliberately.',
+                remediation: 'Inspect survived mutants introduced since the baseline and either improve unit tests or accept the lower MSI deliberately.',
                 metadata: [
                     'currentMsi' => $result->report->msi(),
                     'baselineMsi' => $result->baselineReport?->msi(),
