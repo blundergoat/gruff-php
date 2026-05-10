@@ -25,7 +25,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
 {
     public const ID = 'naming.boolean-prefix';
 
-    private const GOOD_PREFIXES = ['is', 'has', 'can', 'should', 'will', 'was', 'does', 'allows'];
+    private const GOOD_PREFIXES = [
+        'is', 'has', 'can', 'should', 'will', 'was', 'does', 'allows',
+        'all', 'contains', 'extends', 'invokes', 'matches', 'refers', 'returns',
+        'supports', 'touches', 'uses',
+    ];
 
     public function definition(): RuleDefinition
     {

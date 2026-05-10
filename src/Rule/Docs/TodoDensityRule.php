@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Token;
 
 final readonly class TodoDensityRule implements RuleInterface
 {
@@ -44,13 +45,19 @@ final readonly class TodoDensityRule implements RuleInterface
         $count = 0;
         $firstLine = null;
 
-        if (preg_match_all('/\b(TODO|FIXME|HACK|XXX)\b/i', $unit->source, $matches, PREG_OFFSET_CAPTURE)) {
-            $count = count($matches[0]);
-
-            if ($count > 0) {
-                $offset = $matches[0][0][1];
-                $firstLine = substr_count($unit->source, "\n", 0, $offset) + 1;
+        foreach ($unit->tokens as $token) {
+            if (!$this->isCommentToken($token)) {
+                continue;
             }
+
+            $matches = preg_match_all('/\b(TODO|FIXME|HACK|XXX)\b/i', $token->text);
+
+            if ($matches === 0 || $matches === false) {
+                continue;
+            }
+
+            $count += $matches;
+            $firstLine ??= $token->line;
         }
 
         if ($count <= $warningThreshold) {
@@ -74,5 +81,10 @@ final readonly class TodoDensityRule implements RuleInterface
                 metadata: ['count' => $count, 'threshold' => $threshold, 'thresholdType' => $severity->value],
             ),
         ];
+    }
+
+    private function isCommentToken(Token $token): bool
+    {
+        return $token->id === T_COMMENT || $token->id === T_DOC_COMMENT;
     }
 }

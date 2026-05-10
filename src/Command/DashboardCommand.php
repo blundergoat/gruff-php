@@ -82,7 +82,7 @@ final class DashboardCommand extends Command
         ?float $scanTimeout,
     ): int {
         $host = $this->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
-        $server = @stream_socket_server(sprintf('tcp://%s:%d', $host, $port), $errorCode, $errorMessage);
+        $server = $this->createServer($host, $port, $errorCode, $errorMessage);
 
         if ($server === false) {
             $output->writeln(sprintf('<error>Unable to start dashboard on %s:%d: %s (%d)</error>', $host, $port, $errorMessage, $errorCode));
@@ -100,7 +100,7 @@ final class DashboardCommand extends Command
         $output->writeln('<comment>Use the form to refresh the scan or point gruff at another project. Press Ctrl+C to stop.</comment>');
 
         while ($this->serverOpen($server)) {
-            $client = @stream_socket_accept($server, 1);
+            $client = $this->acceptClient($server);
 
             if ($client === false) {
                 continue;
@@ -124,6 +124,37 @@ final class DashboardCommand extends Command
     private function serverOpen($server): bool
     {
         return is_resource($server);
+    }
+
+    /**
+     * @param-out int|null $errorCode
+     * @param-out string|null $errorMessage
+     * @return resource|false
+     */
+    private function createServer(string $host, int $port, ?int &$errorCode, ?string &$errorMessage)
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return stream_socket_server(sprintf('tcp://%s:%d', $host, $port), $errorCode, $errorMessage);
+        } finally {
+            restore_error_handler();
+        }
+    }
+
+    /**
+     * @param resource $server
+     * @return resource|false
+     */
+    private function acceptClient($server)
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return stream_socket_accept($server, 1);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     /**

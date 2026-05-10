@@ -40,22 +40,25 @@ final class MethodLengthRuleTest extends TestCase
         self::assertSame(MethodLengthRule::ID, $findings[0]->ruleId);
         self::assertSame(Severity::Warning, $findings[0]->severity);
         self::assertSame('LongMethodFixture::warningMethod()', $findings[0]->symbol);
-        self::assertSame(34, $findings[0]->metadata['lines']);
+        self::assertSame(31, $findings[0]->metadata['lines']);
     }
 
     public function testErrorForMethodAboveErrorThreshold(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 3, 'error' => 10]);
 
-        self::assertCount(2, $findings);
+        self::assertCount(1, $findings);
 
-        $short = $findings[0];
-        self::assertSame(Severity::Warning, $short->severity);
-        self::assertSame('LongMethodFixture::shortMethod()', $short->symbol);
-
-        $warning = $findings[1];
+        $warning = $findings[0];
         self::assertSame(Severity::Error, $warning->severity);
         self::assertSame('LongMethodFixture::warningMethod()', $warning->symbol);
+    }
+
+    public function testMultilineCallCountsAsOneLogicalLine(): void
+    {
+        $findings = $this->analyse('logical-method.php', ['warning' => 3, 'error' => 60]);
+
+        self::assertSame([], $findings);
     }
 
     public function testClosureCountedAsMethod(): void

@@ -111,12 +111,23 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     private function matchPoorNamePattern(string $methodName, array $patterns): ?string
     {
         foreach ($patterns as $pattern) {
-            if (@preg_match($pattern, $methodName) === 1) {
+            if ($this->patternMatches($pattern, $methodName)) {
                 return $pattern;
             }
         }
 
         return null;
+    }
+
+    private function patternMatches(string $pattern, string $methodName): bool
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return preg_match($pattern, $methodName) === 1;
+        } finally {
+            restore_error_handler();
+        }
     }
 
     private function className(Stmt\Class_ $class): string

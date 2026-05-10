@@ -120,6 +120,9 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('BooleanPrefixFixture::isActive()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::hasPermission()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::canEdit()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::containsValue()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
     }
 
     public function testNonBoolMethodNotFlagged(): void

@@ -45,8 +45,8 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         $finder = new NodeFinder();
         $findings = [];
 
-        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
-            if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
+        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+            if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                 continue;
             }
 
@@ -89,12 +89,6 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
             $positionalCount++;
 
-            if ($arg->value instanceof Expr\ConstFetch) {
-                $name = strtolower($arg->value->name->toString());
-                if ($name === 'true' || $name === 'false') {
-                    return 'a positional boolean argument';
-                }
-            }
         }
 
         return $positionalCount >= $minPositionalArguments ? sprintf('%d positional arguments', $positionalCount) : null;

@@ -17,6 +17,8 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
@@ -70,12 +72,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             $totalLines = 0;
 
             foreach ($methods as $method) {
-                $start = $method->getStartLine();
-                $end = $method->getEndLine();
-
-                if ($start > 0 && $end > 0) {
-                    $totalLines += $end - $start + 1;
-                }
+                $totalLines += $this->logicalLineCount($method);
             }
 
             $average = $totalLines / count($methods);
@@ -119,6 +116,22 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function logicalLineCount(ClassMethod $method): int
+    {
+        $finder = new NodeFinder();
+        $lines = [];
+
+        foreach ($finder->find($method->stmts ?? [], static fn (Node $node): bool => $node instanceof Stmt && !$node instanceof Nop) as $statement) {
+            $line = $statement->getStartLine();
+
+            if ($line > 0) {
+                $lines[$line] = true;
+            }
+        }
+
+        return count($lines);
     }
 
     private function resolveSymbol(Node $node): string

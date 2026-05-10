@@ -61,6 +61,11 @@ function shortCall(): void
     configureSafeService('host', 'user', 'database');
 }
 
+function literalStringListIsNotCallableSyntax(string $status): bool
+{
+    return in_array($status, ['open', 'closed'], true);
+}
+
 function configureSafeService(string $host, string $user, string $database): void
 {
 }

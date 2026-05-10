@@ -16,6 +16,8 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 final readonly class MaintainabilityIndexRule implements RuleInterface
@@ -107,7 +109,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             return 100.0;
         }
 
-        $lloc = max(1, $endLine - $startLine + 1);
+        $lloc = max(1, self::logicalLineCount($node));
         $ccn = CyclomaticComplexityRule::compute($node);
         $halstead = HalsteadVolumeRule::compute($node);
         $volume = max(1.0, $halstead['volume']);
@@ -115,6 +117,25 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;
 
         return max(0.0, $mi);
+    }
+
+    /**
+     * @param ClassMethod|Function_ $node
+     */
+    private static function logicalLineCount(Node $node): int
+    {
+        $finder = new NodeFinder();
+        $lines = [];
+
+        foreach ($finder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
+            $line = $statement->getStartLine();
+
+            if ($line > 0) {
+                $lines[$line] = true;
+            }
+        }
+
+        return count($lines);
     }
 
     private static function formatNumber(int|float $value): string

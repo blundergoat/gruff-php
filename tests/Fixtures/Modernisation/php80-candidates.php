@@ -39,6 +39,7 @@ function mixedBoundary(mixed $payload): mixed
     processModernOrder('customer-1', 10, true, 'priority');
     configureModernService('host', 'user', 'pass', 'database');
     configureLargeService('host', 'user', 'pass', 'database', 'primary');
+    (new ModernServiceConfigurator())->configureLargeService('host', 'user', 'pass', 'database', 'primary');
 
     return $payload;
 }
@@ -53,4 +54,11 @@ function configureModernService(string $host, string $user, string $password, st
 
 function configureLargeService(string $host, string $user, string $password, string $database, string $role): void
 {
+}
+
+final class ModernServiceConfigurator
+{
+    public function configureLargeService(string $host, string $user, string $password, string $database, string $role): void
+    {
+    }
 }

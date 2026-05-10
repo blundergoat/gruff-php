@@ -74,7 +74,16 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return false;
         }
 
-        return $array->items[1]->value instanceof Scalar\String_;
+        $target = $array->items[0]->value;
+        $method = $array->items[1]->value;
+
+        if (!$method instanceof Scalar\String_) {
+            return false;
+        }
+
+        return $target instanceof Expr\Variable
+            || $target instanceof Expr\PropertyFetch
+            || $target instanceof Expr\ClassConstFetch;
     }
 
     private function isCallableContext(Expr\Array_ $array): bool

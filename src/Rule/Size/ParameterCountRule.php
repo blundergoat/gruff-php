@@ -59,6 +59,10 @@ final readonly class ParameterCountRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_|Closure|ArrowFunction $node */
+            if ($node instanceof ClassMethod && $this->isPromotedValueObjectConstructor($node)) {
+                continue;
+            }
+
             $paramCount = count($node->params);
 
             if ($paramCount <= $warningThreshold) {
@@ -97,6 +101,26 @@ final readonly class ParameterCountRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function isPromotedValueObjectConstructor(ClassMethod $node): bool
+    {
+        if ($node->name->toString() !== '__construct' || $node->params === []) {
+            return false;
+        }
+
+        $parent = $node->getAttribute('parent');
+        if (!$parent instanceof Node\Stmt\Class_ || !$parent->isFinal() || !$parent->isReadonly()) {
+            return false;
+        }
+
+        foreach ($node->params as $param) {
+            if ($param->flags === 0 || $param->type === null) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function resolveSymbol(Node $node): string

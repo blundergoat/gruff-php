@@ -52,6 +52,10 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node */
+            if ($node instanceof ClassMethod && !$node->isPublic()) {
+                continue;
+            }
+
             $docComment = $node->getDocComment();
 
             if ($docComment === null) {

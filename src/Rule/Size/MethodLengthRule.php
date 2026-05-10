@@ -17,6 +17,8 @@ use PhpParser\Node;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\Nop;
+use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 final readonly class MethodLengthRule implements RuleInterface
@@ -56,6 +58,10 @@ final readonly class MethodLengthRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
+            if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
+                continue;
+            }
+
             $startLine = $node->getStartLine();
             $endLine = $node->getEndLine();
 
@@ -63,7 +69,7 @@ final readonly class MethodLengthRule implements RuleInterface
                 continue;
             }
 
-            $length = $endLine - $startLine + 1;
+            $length = $this->logicalLineCount($node);
 
             if ($length <= $warningThreshold) {
                 continue;
@@ -101,6 +107,22 @@ final readonly class MethodLengthRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function logicalLineCount(ClassMethod|Function_|Closure $node): int
+    {
+        $finder = new NodeFinder();
+        $lines = [];
+
+        foreach ($finder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
+            $line = $statement->getStartLine();
+
+            if ($line > 0) {
+                $lines[$line] = true;
+            }
+        }
+
+        return count($lines);
     }
 
     private function resolveSymbol(Node $node): string

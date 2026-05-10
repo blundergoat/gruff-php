@@ -48,6 +48,22 @@ final readonly class ConfigLoader
 
     private function applyConfigFile(AnalysisConfig $config, RuleRegistry $registry, string $path): AnalysisConfig
     {
+        $rootConfig = $this->readRootConfig($path);
+        $this->assertKnownRootKeys($rootConfig);
+
+        $config = $this->applyMinimumPhpVersion($config, $rootConfig);
+        $config = $this->applyPathConfig($config, $rootConfig);
+        $config = $this->applyAllowlistConfig($config, $rootConfig);
+        $config = $this->applySelectionConfig($config, $registry, $rootConfig);
+
+        return $this->applyRulesConfig($config, $registry, $rootConfig);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readRootConfig(string $path): array
+    {
         $contents = file_get_contents($path);
 
         if ($contents === false) {
@@ -55,42 +71,94 @@ final readonly class ConfigLoader
         }
 
         $decoded = $this->decodeJson($contents);
-        $rootConfig = $this->requireObject($decoded, 'Config root must be a JSON object.');
 
+        return $this->requireObject($decoded, 'Config root must be a JSON object.');
+    }
+
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function assertKnownRootKeys(array $rootConfig): void
+    {
         foreach (array_keys($rootConfig) as $rootKey) {
             if (!in_array($rootKey, ['rules', 'minimumPhpVersion', 'paths', 'allowlists', 'selection'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }
+    }
 
-        if (array_key_exists('minimumPhpVersion', $rootConfig)) {
-            $version = $rootConfig['minimumPhpVersion'];
-            if (!is_int($version) && !is_float($version)) {
-                throw new ConfigException('Config key "minimumPhpVersion" must be numeric.');
-            }
-
-            if ($version < 7.4) {
-                throw new ConfigException('Config key "minimumPhpVersion" must be at least 7.4.');
-            }
-
-            $config = $config->withMinimumPhpVersion((float) $version);
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function applyMinimumPhpVersion(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('minimumPhpVersion', $rootConfig)) {
+            return $config;
         }
 
-        if (array_key_exists('paths', $rootConfig)) {
-            $config = $config->withIgnoredPathPatterns($this->parsePathsConfig($rootConfig['paths']));
+        $version = $rootConfig['minimumPhpVersion'];
+        if (!is_int($version) && !is_float($version)) {
+            throw new ConfigException('Config key "minimumPhpVersion" must be numeric.');
         }
 
-        if (array_key_exists('allowlists', $rootConfig)) {
-            $allowlists = $this->parseAllowlistsConfig($rootConfig['allowlists']);
-            $config = $config
-                ->withAcceptedAbbreviations($allowlists['acceptedAbbreviations'])
-                ->withAllowedSecretPreviews($allowlists['secretPreviews']);
+        if ($version < 7.4) {
+            throw new ConfigException('Config key "minimumPhpVersion" must be at least 7.4.');
         }
 
-        if (array_key_exists('selection', $rootConfig)) {
-            $config = $config->withRuleSelection($this->parseSelectionConfig($rootConfig['selection'], $registry));
+        return $config->withMinimumPhpVersion((float) $version);
+    }
+
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function applyPathConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('paths', $rootConfig)) {
+            return $config;
         }
 
+        return $config->withIgnoredPathPatterns($this->parsePathsConfig($rootConfig['paths']));
+    }
+
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function applyAllowlistConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('allowlists', $rootConfig)) {
+            return $config;
+        }
+
+        $allowlists = $this->parseAllowlistsConfig($rootConfig['allowlists']);
+
+        return $config
+            ->withAcceptedAbbreviations($allowlists['acceptedAbbreviations'])
+            ->withAllowedSecretPreviews($allowlists['secretPreviews']);
+    }
+
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function applySelectionConfig(
+        AnalysisConfig $config,
+        RuleRegistry $registry,
+        array $rootConfig,
+    ): AnalysisConfig {
+        if (!array_key_exists('selection', $rootConfig)) {
+            return $config;
+        }
+
+        return $config->withRuleSelection($this->parseSelectionConfig($rootConfig['selection'], $registry));
+    }
+
+    /**
+     * @param array<string, mixed> $rootConfig
+     */
+    private function applyRulesConfig(
+        AnalysisConfig $config,
+        RuleRegistry $registry,
+        array $rootConfig,
+    ): AnalysisConfig {
         if (!isset($rootConfig['rules'])) {
             return $config;
         }

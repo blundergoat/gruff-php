@@ -60,7 +60,7 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(EnumCandidateRule::ID, 1, $findings);
         self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
         self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 1, $findings);
+        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 0, $findings);
         self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
@@ -73,7 +73,7 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(PublicPropertyRule::ID, 1, $findings);
         self::assertRuleCount(MatchExpressionCandidateRule::ID, 1, $findings);
         self::assertRuleCount(MixedTypeOveruseRule::ID, 1, $findings);
-        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 2, $findings);
+        self::assertRuleCount(NamedArgumentOpportunityRule::ID, 1, $findings);
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 2, $findings);
     }
 

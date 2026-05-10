@@ -77,6 +77,24 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('MissingPhpdocFixture::__toString()', $symbols);
     }
 
+    public function testRuleInterfaceContractMethodsInheritContractPhpdoc(): void
+    {
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('RuleContractFixture::definition()', $symbols);
+        self::assertNotContains('RuleContractFixture::analyse()', $symbols);
+    }
+
+    public function testInternalHelpersAndConventionalReportersAreExemptFromPublicPhpdoc(): void
+    {
+        $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('InternalHelper::complexUtility()', $symbols);
+        self::assertNotContains('TextReporter::render()', $symbols);
+    }
+
     public function testMissingParamTagDetectedForArrayParameters(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);

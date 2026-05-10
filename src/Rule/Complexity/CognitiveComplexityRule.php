@@ -125,94 +125,36 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     private static function walkNode(Node $node, int $nesting): int
     {
-        $total = 0;
-
         if ($node instanceof Stmt\If_) {
-            $total += 1 + $nesting;
-            $total += self::walkBooleanOperators($node->cond);
-            $total += self::walkStatements($node->stmts, $nesting + 1);
-
-            foreach ($node->elseifs as $elseif) {
-                $total += 1; // elseif: +1, no nesting penalty
-                $total += self::walkBooleanOperators($elseif->cond);
-                $total += self::walkStatements($elseif->stmts, $nesting + 1);
-            }
-
-            if ($node->else !== null) {
-                $total += 1; // else: +1, no nesting penalty
-                $total += self::walkStatements($node->else->stmts, $nesting + 1);
-            }
-
-            return $total;
+            return self::walkIf($node, $nesting);
         }
 
         if ($node instanceof Stmt\Switch_) {
-            $total += 1 + $nesting;
-
-            foreach ($node->cases as $case) {
-                $total += self::walkStatements($case->stmts, $nesting + 1);
-            }
-
-            return $total;
+            return self::walkSwitch($node, $nesting);
         }
 
-        if ($node instanceof Stmt\For_) {
-            $total += 1 + $nesting;
-            $total += self::walkStatements($node->stmts, $nesting + 1);
-
-            return $total;
-        }
-
-        if ($node instanceof Stmt\Foreach_) {
-            $total += 1 + $nesting;
-            $total += self::walkStatements($node->stmts, $nesting + 1);
-
-            return $total;
+        if ($node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_) {
+            return self::walkLoop($node->stmts, null, $nesting);
         }
 
         if ($node instanceof Stmt\While_) {
-            $total += 1 + $nesting;
-            $total += self::walkBooleanOperators($node->cond);
-            $total += self::walkStatements($node->stmts, $nesting + 1);
-
-            return $total;
+            return self::walkLoop($node->stmts, $node->cond, $nesting);
         }
 
         if ($node instanceof Stmt\Do_) {
-            $total += 1 + $nesting;
-            $total += self::walkBooleanOperators($node->cond);
-            $total += self::walkStatements($node->stmts, $nesting + 1);
-
-            return $total;
+            return self::walkLoop($node->stmts, $node->cond, $nesting);
         }
 
         if ($node instanceof Stmt\TryCatch) {
-            $total += self::walkStatements($node->stmts, $nesting);
-
-            foreach ($node->catches as $catch) {
-                $total += 1 + $nesting;
-                $total += self::walkStatements($catch->stmts, $nesting + 1);
-            }
-
-            if ($node->finally !== null) {
-                $total += self::walkStatements($node->finally->stmts, $nesting);
-            }
-
-            return $total;
+            return self::walkTryCatch($node, $nesting);
         }
 
         if ($node instanceof Stmt\Break_ || $node instanceof Stmt\Continue_) {
-            if ($node->num !== null) {
-                $total += 1; // labeled break/continue: +1, no nesting
-            }
-
-            return $total;
+            return $node->num !== null ? 1 : 0;
         }
 
         if ($node instanceof Stmt\Goto_) {
-            $total += 1;
-
-            return $total;
+            return 1;
         }
 
         if ($node instanceof Stmt\Expression) {
@@ -220,12 +162,75 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         }
 
         if ($node instanceof Stmt\Return_) {
-            if ($node->expr !== null) {
-                return self::walkExprCognitive($node->expr, $nesting);
-            }
-
-            return 0;
+            return $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0;
         }
+
+        return self::walkChildNodes($node, $nesting);
+    }
+
+    private static function walkIf(Stmt\If_ $node, int $nesting): int
+    {
+        $total = 1 + $nesting + self::walkBooleanOperators($node->cond);
+        $total += self::walkStatements($node->stmts, $nesting + 1);
+
+        foreach ($node->elseifs as $elseif) {
+            $total += 1; // elseif: +1, no nesting penalty
+            $total += self::walkBooleanOperators($elseif->cond);
+            $total += self::walkStatements($elseif->stmts, $nesting + 1);
+        }
+
+        if ($node->else !== null) {
+            $total += 1; // else: +1, no nesting penalty
+            $total += self::walkStatements($node->else->stmts, $nesting + 1);
+        }
+
+        return $total;
+    }
+
+    private static function walkSwitch(Stmt\Switch_ $node, int $nesting): int
+    {
+        $total = 1 + $nesting;
+
+        foreach ($node->cases as $case) {
+            $total += self::walkStatements($case->stmts, $nesting + 1);
+        }
+
+        return $total;
+    }
+
+    /**
+     * @param array<Node> $statements
+     */
+    private static function walkLoop(array $statements, ?Expr $condition, int $nesting): int
+    {
+        $total = 1 + $nesting;
+
+        if ($condition instanceof Expr) {
+            $total += self::walkBooleanOperators($condition);
+        }
+
+        return $total + self::walkStatements($statements, $nesting + 1);
+    }
+
+    private static function walkTryCatch(Stmt\TryCatch $node, int $nesting): int
+    {
+        $total = self::walkStatements($node->stmts, $nesting);
+
+        foreach ($node->catches as $catch) {
+            $total += 1 + $nesting;
+            $total += self::walkStatements($catch->stmts, $nesting + 1);
+        }
+
+        if ($node->finally !== null) {
+            $total += self::walkStatements($node->finally->stmts, $nesting);
+        }
+
+        return $total;
+    }
+
+    private static function walkChildNodes(Node $node, int $nesting): int
+    {
+        $total = 0;
 
         foreach ($node->getSubNodeNames() as $name) {
             $sub = $node->$name;
@@ -246,10 +251,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     private static function walkExprCognitive(Expr $expr, int $nesting): int
     {
-        $total = 0;
-
         if ($expr instanceof Expr\Ternary) {
-            $total += 1 + $nesting;
+            $total = 1 + $nesting;
             $total += self::walkExprCognitive($expr->cond, $nesting);
 
             if ($expr->if !== null) {
@@ -262,16 +265,14 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         }
 
         if ($expr instanceof Closure) {
-            $total += self::walkStatements($expr->stmts ?? [], $nesting + 1);
-
-            return $total;
+            return self::walkStatements($expr->stmts ?? [], $nesting + 1);
         }
 
         if ($expr instanceof Expr\ArrowFunction) {
-            $total += self::walkExprCognitive($expr->expr, $nesting + 1);
-
-            return $total;
+            return self::walkExprCognitive($expr->expr, $nesting + 1);
         }
+
+        $total = 0;
 
         foreach ($expr->getSubNodeNames() as $name) {
             $sub = $expr->$name;

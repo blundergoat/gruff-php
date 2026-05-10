@@ -15,7 +15,6 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
-use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 final readonly class MultipleAaaCyclesRule implements RuleInterface

@@ -50,3 +50,48 @@ class MissingPhpdocFixture
         return '';
     }
 }
+
+class RuleContractFixture implements \GruffPhp\Rule\RuleInterface
+{
+    public function definition(): \GruffPhp\Rule\RuleDefinition
+    {
+        if (rand(0, 1) === 1) {
+            throw new \RuntimeException('not executed');
+        }
+
+        throw new \RuntimeException('not executed');
+    }
+
+    public function analyse(\GruffPhp\Parser\AnalysisUnit $unit, \GruffPhp\Rule\RuleContext $context): array
+    {
+        if ($unit->lineCount() > 0 && $context->projectRoot !== '') {
+            return [];
+        }
+
+        return [];
+    }
+}
+
+class InternalHelper
+{
+    public function complexUtility(int $x): int
+    {
+        if ($x > 0) {
+            return $x;
+        }
+
+        return 0;
+    }
+}
+
+class TextReporter
+{
+    public function render(string $text): string
+    {
+        if ($text !== '') {
+            return $text;
+        }
+
+        return 'empty';
+    }
+}

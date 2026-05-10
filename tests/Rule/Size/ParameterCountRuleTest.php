@@ -79,6 +79,14 @@ final class ParameterCountRuleTest extends TestCase
         self::assertSame(6, $constructorFindings[0]->metadata['parameters']);
     }
 
+    public function testPromotedReadonlyPayloadConstructorIsExempt(): void
+    {
+        $findings = $this->analyse('promoted-payload.php', ['warning' => 5, 'error' => 8]);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
+    }
+
     public function testInterfaceParametersCounted(): void
     {
         $findings = $this->analyse('interface-fixture.php', ['warning' => 5, 'error' => 8]);

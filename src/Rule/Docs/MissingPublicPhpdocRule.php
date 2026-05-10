@@ -16,6 +16,7 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Match_;
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Do_;
@@ -83,6 +84,14 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
                     continue;
                 }
 
+                if ($this->isInheritedRuleContract($class, $name)) {
+                    continue;
+                }
+
+                if ($this->isInternalHelperMethod($class) || $this->isConventionalReporterRender($class, $name)) {
+                    continue;
+                }
+
                 if ($this->isTrivialAccessor($name)) {
                     continue;
                 }
@@ -117,6 +126,42 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         return $findings;
     }
 
+    private function isInheritedRuleContract(Class_ $class, string $methodName): bool
+    {
+        if ($methodName !== 'definition' && $methodName !== 'analyse') {
+            return false;
+        }
+
+        foreach ($class->implements as $interface) {
+            if (in_array($this->shortName($interface), ['RuleInterface', 'SourceTextRuleInterface'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isInternalHelperMethod(Class_ $class): bool
+    {
+        $className = $class->name?->toString();
+
+        return is_string($className) && str_ends_with($className, 'Helper');
+    }
+
+    private function isConventionalReporterRender(Class_ $class, string $methodName): bool
+    {
+        $className = $class->name?->toString();
+
+        return $methodName === 'render' && is_string($className) && str_ends_with($className, 'Reporter');
+    }
+
+    private function shortName(Name $name): string
+    {
+        $parts = $name->getParts();
+
+        return $parts[array_key_last($parts)];
+    }
+
     private function isImmutableValueObject(Class_ $class): bool
     {
         if (!$class->isFinal() || !$class->isReadonly()) {
@@ -135,6 +180,26 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             }
 
             $hasTypedProperty = true;
+        }
+
+        if (!$hasTypedProperty) {
+            foreach ($class->getMethods() as $method) {
+                if ($method->name->toString() !== '__construct') {
+                    continue;
+                }
+
+                foreach ($method->params as $param) {
+                    if ($param->flags === 0) {
+                        continue;
+                    }
+
+                    if ($param->type === null) {
+                        return false;
+                    }
+
+                    $hasTypedProperty = true;
+                }
+            }
         }
 
         return $hasTypedProperty;

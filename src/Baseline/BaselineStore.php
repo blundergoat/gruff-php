@@ -18,8 +18,18 @@ final readonly class BaselineStore
 
     public function read(string $path): BaselineData
     {
-        $absolutePath = $this->absolutePath($path);
+        $decoded = $this->readBaselineObject($path);
+        $findings = $this->readFindingsList($decoded);
 
+        return new BaselineData($path, $this->entriesFromFindings($findings));
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function readBaselineObject(string $path): array
+    {
+        $absolutePath = $this->absolutePath($path);
         if (!is_file($absolutePath)) {
             throw new BaselineException(sprintf('Baseline file not found: %s', $path));
         }
@@ -43,11 +53,29 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
 
+        return $decoded;
+    }
+
+    /**
+     * @param array<mixed> $decoded
+     * @return list<mixed>
+     */
+    private function readFindingsList(array $decoded): array
+    {
         $findings = $decoded['findings'] ?? null;
         if (!is_array($findings) || !array_is_list($findings)) {
             throw new BaselineException('Baseline key "findings" must be a list.');
         }
 
+        return $findings;
+    }
+
+    /**
+     * @param list<mixed> $findings
+     * @return list<BaselineEntry>
+     */
+    private function entriesFromFindings(array $findings): array
+    {
         $entries = [];
         foreach ($findings as $index => $finding) {
             if (!is_array($finding) || array_is_list($finding)) {
@@ -58,7 +86,7 @@ final readonly class BaselineStore
             $entries[] = BaselineEntry::fromArray($finding, $index);
         }
 
-        return new BaselineData($path, $entries);
+        return $entries;
     }
 
     /**

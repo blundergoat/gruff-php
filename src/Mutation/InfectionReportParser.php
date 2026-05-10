@@ -92,42 +92,74 @@ final readonly class InfectionReportParser
 
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
+        $row = $this->requireMutantRow($row, $location, $path);
+        $mutator = $this->requireMutatorObject($row, $location, $path);
+
+        return new InfectionMutant(
+            status: $status,
+            filePath: $this->displayPath($this->requireMutatorString($mutator, 'originalFilePath', $location, $path)),
+            line: $this->optionalMutatorLine($mutator, $location, $path),
+            mutator: $this->requireMutatorString($mutator, 'mutatorName', $location, $path),
+            diff: $this->optionalNonEmptyString($row['diff'] ?? null),
+            processOutput: $this->optionalNonEmptyString($row['processOutput'] ?? null),
+        );
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private function requireMutantRow(mixed $row, string $location, string $path): array
+    {
         if (!is_array($row) || array_is_list($row)) {
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
         }
 
+        return $row;
+    }
+
+    /**
+     * @param array<mixed> $row
+     * @return array<mixed>
+     */
+    private function requireMutatorObject(array $row, string $location, string $path): array
+    {
         $mutator = $row['mutator'] ?? null;
         if (!is_array($mutator) || array_is_list($mutator)) {
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
         }
 
-        $mutatorName = $mutator['mutatorName'] ?? null;
-        $filePath = $mutator['originalFilePath'] ?? null;
+        return $mutator;
+    }
+
+    /**
+     * @param array<mixed> $mutator
+     */
+    private function requireMutatorString(array $mutator, string $field, string $location, string $path): string
+    {
+        $value = $mutator[$field] ?? null;
+        if (!is_string($value) || $value === '') {
+            throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.%s.', $path, $location, $field));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<mixed> $mutator
+     */
+    private function optionalMutatorLine(array $mutator, string $location, string $path): ?int
+    {
         $line = $mutator['originalStartLine'] ?? null;
-
-        if (!is_string($mutatorName) || $mutatorName === '') {
-            throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.mutatorName.', $path, $location));
-        }
-
-        if (!is_string($filePath) || $filePath === '') {
-            throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.originalFilePath.', $path, $location));
-        }
-
         if ($line !== null && !is_int($line)) {
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s has a non-integer mutator.originalStartLine.', $path, $location));
         }
 
-        $diff = $row['diff'] ?? null;
-        $processOutput = $row['processOutput'] ?? null;
+        return $line;
+    }
 
-        return new InfectionMutant(
-            status: $status,
-            filePath: $this->displayPath($filePath),
-            line: $line,
-            mutator: $mutatorName,
-            diff: is_string($diff) && $diff !== '' ? $diff : null,
-            processOutput: is_string($processOutput) && $processOutput !== '' ? $processOutput : null,
-        );
+    private function optionalNonEmptyString(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

@@ -48,6 +48,10 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node */
+            if ($node instanceof ClassMethod && !$node->isPublic()) {
+                continue;
+            }
+
             $throws = $finder->findInstanceOf($node->stmts ?? [], Throw_::class);
 
             if ($throws === []) {
@@ -56,7 +60,11 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 
             $docComment = $node->getDocComment();
 
-            if ($docComment !== null && str_contains($docComment->getText(), '@throws')) {
+            if ($docComment === null) {
+                continue;
+            }
+
+            if (str_contains($docComment->getText(), '@throws')) {
                 continue;
             }
 
