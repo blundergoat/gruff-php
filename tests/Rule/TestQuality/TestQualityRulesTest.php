@@ -190,6 +190,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
 
         $variants = [];
+        $variables = [];
         foreach ($findings as $finding) {
             if ($finding->ruleId !== MockWithoutExpectationRule::ID) {
                 continue;
@@ -198,9 +199,14 @@ final class TestQualityRulesTest extends TestCase
             $variant = $finding->metadata['variant'] ?? null;
             self::assertIsString($variant);
             $variants[] = $variant;
+
+            $variable = $finding->metadata['variable'] ?? null;
+            self::assertIsString($variable);
+            $variables[] = $variable;
         }
         sort($variants);
         self::assertSame(['dead-mock', 'stub-only'], $variants);
+        self::assertNotContains('fake', $variables);
     }
 
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void

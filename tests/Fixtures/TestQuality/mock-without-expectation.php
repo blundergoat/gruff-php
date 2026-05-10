@@ -57,4 +57,14 @@ final class MockWithoutExpectationTest extends TestCase
 
         self::assertSame('ok', $caller->call($service));
     }
+
+    // Negative: the assigned value is a fake; only its constructor dependency is a PHPUnit stub.
+    public function testFakeWithStubDependencyIsNotTreatedAsMock(): void
+    {
+        $fake = new CapturingFake($this->createStub(TokenProvider::class));
+
+        $caller = new Caller();
+
+        self::assertSame('ok', $caller->call($fake));
+    }
 }

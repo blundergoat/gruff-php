@@ -129,6 +129,14 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('PhpdocTagsFixture::complete()', $symbols);
     }
 
+    public function testGenericParamTagsWithSpacesAreNotFlagged(): void
+    {
+        $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('PhpdocTagsFixture::genericParamDocWithSpaces()', $symbols);
+    }
+
     public function testMissingReturnTagDetectedForArrayReturnTypes(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);

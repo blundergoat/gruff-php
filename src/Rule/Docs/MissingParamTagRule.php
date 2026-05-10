@@ -147,14 +147,13 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     public static function extractParamNames(string $docText): array
     {
-        if (preg_match_all('/@param\s+\S+\s+\$(\w+)/', $docText, $matches) === 0) {
-            return [];
-        }
-
         $result = [];
+        foreach (preg_split('/\R/', $docText) ?: [] as $line) {
+            if (preg_match('/@param\s+.+?\s+\$(\w+)\b/', $line, $matches) !== 1) {
+                continue;
+            }
 
-        foreach ($matches[1] as $name) {
-            $result[] = $name;
+            $result[] = $matches[1];
         }
 
         return $result;

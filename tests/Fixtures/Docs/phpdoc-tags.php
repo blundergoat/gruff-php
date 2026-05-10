@@ -98,6 +98,15 @@ class PhpdocTagsFixture
     }
 
     /**
+     * @param array<string, mixed> $context
+     * @param list<array{label: string, value: string}> $rows
+     */
+    public function genericParamDocWithSpaces(array $context, array $rows): array
+    {
+        return [$context, $rows];
+    }
+
+    /**
      * @param int $x The value being doubled.
      */
     public function describedTagDoc(int $x): int

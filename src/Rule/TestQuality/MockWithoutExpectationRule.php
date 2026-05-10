@@ -185,15 +185,34 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
 
     private function isMockCreationExpression(Expr $expr): bool
     {
-        $finder = new NodeFinder();
+        if ($expr instanceof Expr\FuncCall || $expr instanceof Expr\StaticCall) {
+            return TestQualityNodeHelper::isMockCreationCall($expr);
+        }
 
-        $matches = $finder->find(
-            [$expr],
-            static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
-                && TestQualityNodeHelper::isMockCreationCall($node),
-        );
+        if (!$expr instanceof Expr\MethodCall) {
+            return false;
+        }
 
-        return $matches !== [];
+        return $this->methodCallChainCreatesMock($expr);
+    }
+
+    private function methodCallChainCreatesMock(Expr\MethodCall $call): bool
+    {
+        if (TestQualityNodeHelper::isMockCreationCall($call)) {
+            return true;
+        }
+
+        $receiver = $call->var;
+        while ($receiver instanceof Expr\MethodCall) {
+            if (TestQualityNodeHelper::isMockCreationCall($receiver)) {
+                return true;
+            }
+
+            $receiver = $receiver->var;
+        }
+
+        return ($receiver instanceof Expr\FuncCall || $receiver instanceof Expr\StaticCall)
+            && TestQualityNodeHelper::isMockCreationCall($receiver);
     }
 
     /**
