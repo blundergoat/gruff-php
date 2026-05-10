@@ -27,8 +27,9 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string} $state
      * @param list<string> $paths
+     * @param array<string, string> $state
+     * @phpstan-param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string} $state
      * @param list<string> $editedUnitTestFiles
      * @return list<string>
      */

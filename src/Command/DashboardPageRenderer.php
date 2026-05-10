@@ -115,6 +115,9 @@ final readonly class DashboardPageRenderer
         return $metadata . $html;
     }
 
+    /**
+     * Renders an iframe-safe dashboard error document.
+     */
     public function errorHtml(string $message, string $detail, int $exitCode, int $durationMs): string
     {
         return '<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff dashboard error</title>'

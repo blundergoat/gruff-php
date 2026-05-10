@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
-use GruffPhp\Finding\Pillar;
-use GruffPhp\Finding\RuleTier;
 use GruffPhp\Rule\RuleRegistry;
 use JsonException;
 
@@ -148,7 +146,7 @@ final readonly class ConfigLoader
             return $config;
         }
 
-        return $config->withRuleSelection($this->parseSelectionConfig($rootConfig['selection'], $registry));
+        return $config->withRuleSelection((new SelectionConfigParser())->parse($this->configValue($rootConfig['selection']), $registry));
     }
 
     /**
@@ -168,7 +166,7 @@ final readonly class ConfigLoader
             return [];
         }
 
-        return $this->parseStringList($pathsConfig['ignore'], 'paths.ignore', true, true);
+        return (new StringListConfigParser())->parse($this->configValue($pathsConfig['ignore']), 'paths.ignore', true, true);
     }
 
     /**
@@ -185,7 +183,7 @@ final readonly class ConfigLoader
         }
 
         $acceptedAbbreviations = array_key_exists('acceptedAbbreviations', $allowlists)
-            ? $this->parseStringList($allowlists['acceptedAbbreviations'], 'allowlists.acceptedAbbreviations', false, false)
+            ? (new StringListConfigParser())->parse($this->configValue($allowlists['acceptedAbbreviations']), 'allowlists.acceptedAbbreviations', false, false)
             : [];
         foreach ($acceptedAbbreviations as $abbreviation) {
             if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $abbreviation)) {
@@ -197,111 +195,13 @@ final readonly class ConfigLoader
         }
 
         $secretPreviews = array_key_exists('secretPreviews', $allowlists)
-            ? $this->parseStringList($allowlists['secretPreviews'], 'allowlists.secretPreviews', false, false)
+            ? (new StringListConfigParser())->parse($this->configValue($allowlists['secretPreviews']), 'allowlists.secretPreviews', false, false)
             : [];
 
         return [
             'acceptedAbbreviations' => $acceptedAbbreviations,
             'secretPreviews' => $secretPreviews,
         ];
-    }
-
-    private function parseSelectionConfig(mixed $value, RuleRegistry $registry): RuleSelection
-    {
-        $selection = $this->requireObject($value, 'Config key "selection" must be a JSON object.');
-
-        foreach (array_keys($selection) as $key) {
-            if (!in_array($key, ['tiers', 'pillars', 'rules', 'excludePillars', 'excludeRules'], true)) {
-                throw new ConfigException(sprintf('Unknown config key "selection.%s".', $key));
-            }
-        }
-
-        $tiers = array_key_exists('tiers', $selection)
-            ? $this->parseStringList($selection['tiers'], 'selection.tiers', false, false)
-            : [];
-        foreach ($tiers as $tier) {
-            if (RuleTier::tryFrom($tier) === null) {
-                throw new ConfigException(sprintf('Unknown rule tier "selection.tiers.%s".', $tier));
-            }
-        }
-
-        $pillars = array_key_exists('pillars', $selection)
-            ? $this->parseStringList($selection['pillars'], 'selection.pillars', false, false)
-            : [];
-        foreach ($pillars as $pillar) {
-            if (Pillar::tryFrom($pillar) === null) {
-                throw new ConfigException(sprintf('Unknown pillar "selection.pillars.%s".', $pillar));
-            }
-        }
-
-        $rules = array_key_exists('rules', $selection)
-            ? $this->parseRuleIdList($selection['rules'], 'selection.rules', $registry)
-            : [];
-
-        $excludePillars = array_key_exists('excludePillars', $selection)
-            ? $this->parseStringList($selection['excludePillars'], 'selection.excludePillars', false, false)
-            : [];
-        foreach ($excludePillars as $pillar) {
-            if (Pillar::tryFrom($pillar) === null) {
-                throw new ConfigException(sprintf('Unknown pillar "selection.excludePillars.%s".', $pillar));
-            }
-        }
-
-        $excludeRules = array_key_exists('excludeRules', $selection)
-            ? $this->parseRuleIdList($selection['excludeRules'], 'selection.excludeRules', $registry)
-            : [];
-
-        return new RuleSelection($tiers, $pillars, $rules, $excludePillars, $excludeRules);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function parseRuleIdList(mixed $value, string $path, RuleRegistry $registry): array
-    {
-        $ruleIds = $this->parseStringList($value, $path, false, false);
-
-        foreach ($ruleIds as $ruleId) {
-            if (!$registry->has($ruleId)) {
-                throw new ConfigException(sprintf('Unknown rule id "%s" in "%s".', $ruleId, $path));
-            }
-        }
-
-        return $ruleIds;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function parseStringList(mixed $value, string $path, bool $pathPatterns, bool $allowGlobs): array
-    {
-        if (!is_array($value) || !array_is_list($value)) {
-            throw new ConfigException(sprintf('Config key "%s" must be a list of strings.', $path));
-        }
-
-        $strings = [];
-
-        foreach ($value as $index => $item) {
-            if (!is_string($item) || trim($item) === '') {
-                throw new ConfigException(sprintf('Config key "%s.%d" must be a non-empty string.', $path, $index));
-            }
-
-            $normalized = str_replace('\\', '/', trim($item));
-
-            if ($pathPatterns) {
-                if (str_starts_with($normalized, '/') || str_contains($normalized, '../') || $normalized === '..') {
-                    throw new ConfigException(sprintf('Config key "%s.%d" must be a relative project path pattern.', $path, $index));
-                }
-
-                if (!$allowGlobs && str_contains($normalized, '*')) {
-                    throw new ConfigException(sprintf('Config key "%s.%d" does not support glob syntax.', $path, $index));
-                }
-            }
-
-            $strings[] = $normalized;
-        }
-
-        return array_values(array_unique($strings));
     }
 
     /**
@@ -338,5 +238,17 @@ final readonly class ConfigLoader
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<array-key, mixed>|bool|float|int|object|string|null
+     */
+    private function configValue(mixed $value): array|bool|float|int|object|string|null
+    {
+        if (is_array($value) || is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
+            return $value;
+        }
+
+        throw new ConfigException('Config value must be JSON-compatible.');
     }
 }

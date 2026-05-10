@@ -45,62 +45,81 @@ final readonly class SleepInTestRule implements RuleInterface
         $finder = new NodeFinder();
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            foreach (TestQualityNodeHelper::calls($scope) as $call) {
-                $name = TestQualityNodeHelper::callName($call);
-                if ($name === null) {
-                    continue;
-                }
+            array_push(
+                $findings,
+                ...$this->functionFindings($unit, $scope),
+                ...$this->dateTimeFindings($finder, $unit, $scope),
+            );
+        }
 
-                if (in_array($name, self::SLEEP_FUNCTIONS, true) && $call instanceof Expr\FuncCall) {
-                    $findings[] = $this->finding(
-                        $unit,
-                        $scope,
-                        $call->getStartLine(),
-                        sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
-                        'Replace sleeps with explicit clocks, retries with deadlines, or observable synchronization points.',
-                        ['variant' => 'sleep', 'function' => $name],
-                    );
-                    continue;
-                }
+        return $findings;
+    }
 
-                if (in_array($name, self::WALL_CLOCK_FUNCTIONS, true) && $call instanceof Expr\FuncCall) {
-                    $findings[] = $this->finding(
-                        $unit,
-                        $scope,
-                        $call->getStartLine(),
-                        sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
-                        'Inject a fake clock or fixed timestamp instead of calling time()/microtime() directly.',
-                        ['variant' => 'wall-clock', 'function' => $name],
-                    );
-                }
+    /**
+     * @return list<Finding>
+     */
+    private function functionFindings(AnalysisUnit $unit, TestQualityScope $scope): array
+    {
+        $findings = [];
+
+        foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            if (!$call instanceof Expr\FuncCall) {
+                continue;
             }
 
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $new) {
-                if (!$new instanceof Expr\New_ || !$new->class instanceof Name) {
-                    continue;
-                }
+            $name = TestQualityNodeHelper::callName($call);
+            if ($name === null) {
+                continue;
+            }
 
-                $className = strtolower($new->class->getLast());
-                if (!in_array($className, self::WALL_CLOCK_DATETIME_CLASSES, true)) {
-                    continue;
-                }
-
-                if (!$this->isWallClockDateTime($new)) {
-                    continue;
-                }
-
-                $findings[] = $this->finding(
-                    $unit,
-                    $scope,
-                    $new->getStartLine(),
-                    sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $new->class->toString()),
-                    'Pass a fixed timestamp to the DateTime constructor or inject a fake clock.',
-                    ['variant' => 'datetime', 'class' => $new->class->toString()],
-                );
+            $finding = $this->functionFinding($unit, $scope, $call, $name);
+            if ($finding !== null) {
+                $findings[] = $finding;
             }
         }
 
         return $findings;
+    }
+
+    private function functionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): ?Finding
+    {
+        if (in_array($name, self::SLEEP_FUNCTIONS, true)) {
+            return $this->sleepFinding($unit, $scope, $call, $name);
+        }
+
+        if (in_array($name, self::WALL_CLOCK_FUNCTIONS, true)) {
+            return $this->wallClockFunctionFinding($unit, $scope, $call, $name);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<Finding>
+     */
+    private function dateTimeFindings(NodeFinder $finder, AnalysisUnit $unit, TestQualityScope $scope): array
+    {
+        $findings = [];
+
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $new) {
+            if ($new instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($new)) {
+                $findings[] = $this->dateTimeFinding($unit, $scope, $new);
+            }
+        }
+
+        return $findings;
+    }
+
+    private function isWallClockDateTimeConstructor(Expr\New_ $new): bool
+    {
+        if (!$new->class instanceof Name) {
+            return false;
+        }
+
+        $className = strtolower($new->class->getLast());
+
+        return in_array($className, self::WALL_CLOCK_DATETIME_CLASSES, true)
+            && $this->isWallClockDateTime($new);
     }
 
     private function isWallClockDateTime(Expr\New_ $new): bool
@@ -119,29 +138,60 @@ final readonly class SleepInTestRule implements RuleInterface
         return is_string($value) && strtolower($value) === 'now';
     }
 
-    /**
-     * @param array<string, scalar> $metadata
-     */
-    private function finding(
-        AnalysisUnit $unit,
-        TestQualityScope $scope,
-        int $line,
-        string $message,
-        string $remediation,
-        array $metadata,
-    ): Finding {
+    private function sleepFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
+    {
         return new Finding(
             ruleId: self::ID,
-            message: $message,
+            message: sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
             filePath: $unit->file->displayPath,
-            line: $line,
+            line: $call->getStartLine(),
             severity: Severity::Warning,
             pillar: Pillar::TestQuality,
             tier: RuleTier::V01,
             confidence: Confidence::High,
             symbol: $scope->symbol,
-            remediation: $remediation,
-            metadata: $metadata,
+            remediation: 'Replace sleeps with explicit clocks, retries with deadlines, or observable synchronization points.',
+            metadata: ['variant' => 'sleep', 'function' => $name],
+        );
+    }
+
+    private function wallClockFunctionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
+    {
+        return new Finding(
+            ruleId: self::ID,
+            message: sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
+            filePath: $unit->file->displayPath,
+            line: $call->getStartLine(),
+            severity: Severity::Warning,
+            pillar: Pillar::TestQuality,
+            tier: RuleTier::V01,
+            confidence: Confidence::High,
+            symbol: $scope->symbol,
+            remediation: 'Inject a fake clock or fixed timestamp instead of calling time()/microtime() directly.',
+            metadata: ['variant' => 'wall-clock', 'function' => $name],
+        );
+    }
+
+    private function dateTimeFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\New_ $new): Finding
+    {
+        if (!$new->class instanceof Name) {
+            throw new \LogicException('DateTime finding requires a named class.');
+        }
+
+        $className = $new->class;
+
+        return new Finding(
+            ruleId: self::ID,
+            message: sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),
+            filePath: $unit->file->displayPath,
+            line: $new->getStartLine(),
+            severity: Severity::Warning,
+            pillar: Pillar::TestQuality,
+            tier: RuleTier::V01,
+            confidence: Confidence::High,
+            symbol: $scope->symbol,
+            remediation: 'Pass a fixed timestamp to the DateTime constructor or inject a fake clock.',
+            metadata: ['variant' => 'datetime', 'class' => $className->toString()],
         );
     }
 }
