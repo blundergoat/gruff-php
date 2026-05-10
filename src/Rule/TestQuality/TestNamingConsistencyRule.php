@@ -20,6 +20,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 {
     public const ID = 'test-quality.naming-consistency';
 
+    private const DEFAULT_POOR_NAME_PATTERNS = [
+        '/^test[A-Z][A-Za-z]*(?:Works|Basic|Simple|Ok|Test)$/',
+        '/^test[A-Z][A-Za-z]*\d+$/',
+    ];
+
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::High,
+            defaultOptions: ['poorNamePatterns' => self::DEFAULT_POOR_NAME_PATTERNS],
         );
     }
 
@@ -36,6 +42,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     {
         $finder = new NodeFinder();
         $findings = [];
+        $patterns = $context->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
             $camelCount = 0;
@@ -46,15 +53,32 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                     continue;
                 }
 
-                $afterTest = substr($method->name->toString(), 4);
-                if ($afterTest === '') {
-                    continue;
+                $methodName = $method->name->toString();
+                $afterTest = substr($methodName, 4);
+
+                if ($afterTest !== '') {
+                    if (str_contains($afterTest, '_')) {
+                        $snakeCount++;
+                    } else {
+                        $camelCount++;
+                    }
                 }
 
-                if (str_contains($afterTest, '_')) {
-                    $snakeCount++;
-                } else {
-                    $camelCount++;
+                $matchedPattern = $this->matchPoorNamePattern($methodName, $patterns);
+                if ($matchedPattern !== null) {
+                    $findings[] = new Finding(
+                        ruleId: self::ID,
+                        message: sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $this->className($class), $methodName, $matchedPattern),
+                        filePath: $unit->file->displayPath,
+                        line: $method->getStartLine(),
+                        severity: Severity::Advisory,
+                        pillar: Pillar::TestQuality,
+                        tier: RuleTier::V01,
+                        confidence: Confidence::High,
+                        symbol: sprintf('%s::%s()', $this->className($class), $methodName),
+                        remediation: 'Rename the test to describe the scenario and expected behaviour rather than a generic suffix or numeric counter.',
+                        metadata: ['variant' => 'poor-name', 'pattern' => $matchedPattern],
+                    );
                 }
             }
 
@@ -62,7 +86,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 continue;
             }
 
-            $className = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
+            $className = $this->className($class);
             $findings[] = new Finding(
                 ruleId: self::ID,
                 message: sprintf('%s mixes camelCase (%d) and snake_case (%d) test method naming.', $className, $camelCount, $snakeCount),
@@ -74,10 +98,29 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 confidence: Confidence::High,
                 symbol: $className,
                 remediation: 'Pick one naming style for test methods and apply it consistently.',
-                metadata: ['camelCase' => $camelCount, 'snake_case' => $snakeCount],
+                metadata: ['variant' => 'mixed-style', 'camelCase' => $camelCount, 'snake_case' => $snakeCount],
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * @param list<string> $patterns
+     */
+    private function matchPoorNamePattern(string $methodName, array $patterns): ?string
+    {
+        foreach ($patterns as $pattern) {
+            if (@preg_match($pattern, $methodName) === 1) {
+                return $pattern;
+            }
+        }
+
+        return null;
+    }
+
+    private function className(Stmt\Class_ $class): string
+    {
+        return $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
     }
 }

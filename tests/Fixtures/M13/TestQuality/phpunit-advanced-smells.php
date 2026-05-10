@@ -55,3 +55,21 @@ final class MixedNamingQualityTest extends TestCase
         self::assertTrue((new OrderService())->processOrder());
     }
 }
+
+final class PoorlyNamedTest extends TestCase
+{
+    public function testProcessOrderWorks(): void
+    {
+        self::assertTrue((new OrderService())->processOrder());
+    }
+
+    public function testProcessOrder1(): void
+    {
+        self::assertTrue((new OrderService())->processOrder());
+    }
+
+    public function testProcessOrderHandlesEmptyInput(): void
+    {
+        self::assertTrue((new OrderService())->processOrder());
+    }
+}

@@ -53,7 +53,8 @@ final class TestQualityRulesTest extends TestCase
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $findings);
         self::assertRuleCount(LoopInTestRule::ID, 1, $findings);
-        self::assertRuleCount(SleepInTestRule::ID, 1, $findings);
+        // sleep + time + microtime + new DateTime('now') + new DateTimeImmutable() — frozen DateTime is not flagged
+        self::assertRuleCount(SleepInTestRule::ID, 5, $findings);
     }
 
     public function testMechanicsSmellsAreDetected(): void
@@ -64,7 +65,8 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockOnlyTestRule::ID, 1, $findings);
         self::assertRuleCount(MysteryGuestRule::ID, 1, $findings);
         self::assertRuleCount(MagicNumberAssertionRule::ID, 1, $findings);
-        self::assertRuleCount(PrivateReflectionRule::ID, 1, $findings);
+        // ReflectionMethod + ReflectionClass + Closure::bind — one finding per test scope
+        self::assertRuleCount(PrivateReflectionRule::ID, 3, $findings);
         self::assertRuleCount(DataProviderAnnotationRule::ID, 1, $findings);
         self::assertRuleCount(TrivialSnapshotRule::ID, 1, $findings);
         self::assertRuleCount(SetupBloatRule::ID, 1, $findings);
@@ -78,7 +80,8 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(EagerTestRule::ID, 1, $findings);
         self::assertRuleCount(TestLongerThanSutRule::ID, 1, $findings);
         self::assertRuleCount(SutNotCalledRule::ID, 1, $findings);
-        self::assertRuleCount(TestNamingConsistencyRule::ID, 1, $findings);
+        // 1 mixed-style class finding (MixedNamingQualityTest) + 2 poor-name method findings (PoorlyNamedTest::testProcessOrderWorks, ::testProcessOrder1)
+        self::assertRuleCount(TestNamingConsistencyRule::ID, 3, $findings);
     }
 
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void

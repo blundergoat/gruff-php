@@ -159,7 +159,29 @@ final class TestQualityNodeHelper
             return true;
         }
 
-        if (in_array($name, ['expect', 'expectexception', 'expectexceptionmessage', 'expectnottoperformassertions'], true)) {
+        if (in_array($name, [
+            'expect',
+            'expectexception',
+            'expectexceptionmessage',
+            'expectexceptionmessagematches',
+            'expectexceptioncode',
+            'expectexceptionobject',
+            'expectoutputstring',
+            'expectoutputregex',
+            'expecterror',
+            'expecterrormessage',
+            'expecterrormessagematches',
+            'expectwarning',
+            'expectwarningmessage',
+            'expectwarningmessagematches',
+            'expectnotice',
+            'expectnoticemessage',
+            'expectnoticemessagematches',
+            'expectdeprecation',
+            'expectdeprecationmessage',
+            'expectdeprecationmessagematches',
+            'expectnottoperformassertions',
+        ], true)) {
             return true;
         }
 

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Fixtures\M13\TestQuality;
 
+use Closure;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use ReflectionMethod;
 
 final class MechanicsSmellTest extends TestCase
@@ -50,6 +52,26 @@ final class MechanicsSmellTest extends TestCase
         $method->setAccessible(true);
 
         self::assertSame('secret', $method->invoke(new OrderService()));
+    }
+
+    public function testReflectionClassReachesPrivate(): void
+    {
+        $reflection = new ReflectionClass(OrderService::class);
+        $property = $reflection->getProperty('secret');
+        $property->setAccessible(true);
+
+        self::assertSame('value', $property->getValue(new OrderService()));
+    }
+
+    public function testClosureBindStealsAccess(): void
+    {
+        $extractor = function (): string {
+            return $this->secret;
+        };
+
+        $bound = Closure::bind($extractor, new OrderService(), OrderService::class);
+
+        self::assertSame('value', $bound());
     }
 
     public function testMysteryGuest(): void

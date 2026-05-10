@@ -22,11 +22,13 @@ final readonly class PrivateReflectionRule implements RuleInterface
 {
     public const ID = 'test-quality.private-reflection';
 
+    private const REFLECTION_CLASSES = ['reflectionmethod', 'reflectionclass', 'reflectionproperty'];
+
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
             id: self::ID,
-            name: 'Private method reflection',
+            name: 'Private member reflection',
             pillar: Pillar::TestQuality,
             tier: RuleTier::V01,
             defaultSeverity: Severity::Warning,
@@ -41,7 +43,12 @@ final readonly class PrivateReflectionRule implements RuleInterface
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             $reflectionNode = null;
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_ || $node instanceof Expr\MethodCall) as $node) {
+            foreach ($finder->find(
+                $scope->statements,
+                static fn (Node $node): bool => $node instanceof Expr\New_
+                    || $node instanceof Expr\MethodCall
+                    || $node instanceof Expr\StaticCall,
+            ) as $node) {
                 if ($this->isPrivateReflectionNode($node)) {
                     $reflectionNode = $node;
                     break;
@@ -62,7 +69,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
                 tier: RuleTier::V01,
                 confidence: Confidence::High,
                 symbol: $scope->symbol,
-                remediation: 'Test behavior through public contracts instead of private methods.',
+                remediation: 'Test behavior through public contracts instead of private members.',
             );
         }
 
@@ -72,14 +79,26 @@ final readonly class PrivateReflectionRule implements RuleInterface
     private function isPrivateReflectionNode(Node $node): bool
     {
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {
-            return strtolower($node->class->toString()) === 'reflectionmethod';
+            return in_array(strtolower($node->class->getLast()), self::REFLECTION_CLASSES, true);
+        }
+
+        if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
+            $name = TestQualityNodeHelper::callName($node);
+            $className = strtolower($node->class->getLast());
+
+            return $className === 'closure' && $name === 'bind';
         }
 
         if ($node instanceof Expr\MethodCall) {
             $name = TestQualityNodeHelper::callName($node);
 
-            return $name === 'setaccessible'
-                && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true;
+            if ($name === 'setaccessible'
+                && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true
+            ) {
+                return true;
+            }
+
+            return $name === 'bindto';
         }
 
         return false;

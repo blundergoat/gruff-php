@@ -55,6 +55,36 @@ final class CoreSmellTest extends TestCase
         self::assertSame(2, $this->calculateTotal());
     }
 
+    public function testTimeReadsCurrentClock(): void
+    {
+        $now = time();
+        self::assertGreaterThan(0, $now);
+    }
+
+    public function testMicrotimeReadsCurrentClock(): void
+    {
+        $now = microtime(true);
+        self::assertGreaterThan(0.0, $now);
+    }
+
+    public function testDateTimeNowConstruction(): void
+    {
+        $now = new \DateTime('now');
+        self::assertNotNull($now->format('U'));
+    }
+
+    public function testDateTimeImmutableNoArg(): void
+    {
+        $now = new \DateTimeImmutable();
+        self::assertNotNull($now->format('U'));
+    }
+
+    public function testFrozenDateTimeIsNotFlagged(): void
+    {
+        $frozen = new \DateTime('2026-05-10T00:00:00Z');
+        self::assertSame('1778976000', $frozen->format('U'));
+    }
+
     private function buildInvoice(): void
     {
     }
