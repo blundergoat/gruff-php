@@ -18,6 +18,13 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
 {
     public const ID = 'test-quality.magic-number-assertion';
 
+    private const DEFAULT_ALLOWED_LITERALS = [
+        // HTTP status codes (commonly asserted in CLI/API tests, well-understood by readers).
+        200, 201, 202, 204, 301, 302, 303, 304, 307, 308,
+        400, 401, 403, 404, 405, 409, 410, 422, 429,
+        500, 502, 503, 504,
+    ];
+
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -27,17 +34,19 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::Low,
+            defaultOptions: ['allowedLiterals' => self::DEFAULT_ALLOWED_LITERALS],
         );
     }
 
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
+        $allowed = $this->loadAllowedLiterals($context);
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $number = TestQualityNodeHelper::isAssertionMagicNumber($call);
-                if ($number === null) {
+                if ($number === null || in_array($number, $allowed, true)) {
                     continue;
                 }
 
@@ -58,5 +67,25 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function loadAllowedLiterals(RuleContext $context): array
+    {
+        $raw = $context->settingsFor($this->definition())->option('allowedLiterals');
+        if (!is_array($raw)) {
+            return self::DEFAULT_ALLOWED_LITERALS;
+        }
+
+        $values = [];
+        foreach ($raw as $value) {
+            if (is_int($value)) {
+                $values[] = $value;
+            }
+        }
+
+        return $values;
     }
 }

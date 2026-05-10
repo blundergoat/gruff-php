@@ -13,6 +13,9 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\NodeFinder;
 
 final readonly class EagerTestRule implements RuleInterface
 {
@@ -68,11 +71,20 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function distinctSutCalls(TestQualityScope $scope): array
     {
+        $resultVariables = $this->collectResultVariables($scope);
         $calls = [];
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             $name = TestQualityNodeHelper::callName($call);
-            if ($name === null || TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
+            if ($name === null
+                || TestQualityNodeHelper::isAssertionCall($call)
+                || TestQualityNodeHelper::isMockCreationCall($call)
+                || TestQualityNodeHelper::isMockVerificationCall($call)
+            ) {
+                continue;
+            }
+
+            if ($call instanceof Expr\MethodCall && $this->receiverIsResultVariable($call->var, $resultVariables)) {
                 continue;
             }
 
@@ -80,5 +92,55 @@ final readonly class EagerTestRule implements RuleInterface
         }
 
         return $calls;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function collectResultVariables(TestQualityScope $scope): array
+    {
+        $finder = new NodeFinder();
+        $variables = [];
+
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
+            if (!$assign instanceof Expr\Assign) {
+                continue;
+            }
+
+            if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
+                continue;
+            }
+
+            if ($this->expressionIsCallChain($assign->expr)) {
+                $variables[$assign->var->name] = true;
+            }
+        }
+
+        return $variables;
+    }
+
+    private function expressionIsCallChain(Expr $expr): bool
+    {
+        // Method/static/function call results are "result variables" whose subsequent method
+        // calls are getters on the result, not fresh SUT calls. `new X()` is intentionally
+        // excluded - constructor outputs are usually the SUT itself, and calls on them are
+        // genuine SUT exercise.
+        return $expr instanceof Expr\MethodCall
+            || $expr instanceof Expr\StaticCall
+            || $expr instanceof Expr\FuncCall;
+    }
+
+    /**
+     * @param array<string, true> $resultVariables
+     */
+    private function receiverIsResultVariable(Expr $receiver, array $resultVariables): bool
+    {
+        while ($receiver instanceof Expr\MethodCall) {
+            $receiver = $receiver->var;
+        }
+
+        return $receiver instanceof Expr\Variable
+            && is_string($receiver->name)
+            && isset($resultVariables[$receiver->name]);
     }
 }
