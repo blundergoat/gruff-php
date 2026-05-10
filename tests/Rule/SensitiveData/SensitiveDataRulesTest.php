@@ -88,6 +88,34 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    public function testHardcodedEnvValueRequiresSecretLikeValueEvidence(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
+        self::assertIsString($path);
+        $path .= '.php';
+        self::assertNotFalse(file_put_contents($path, <<<'PHP'
+<?php
+
+$header = 'AUTH_MODE_X_API_KEY=x-api-key';
+$prefix = 'TOKEN_CACHE_KEY_PREFIX=voice.olb.oauth_token.pg_';
+$formId = 'OLB_VOICE_CSRF_TOKEN_ID=olb_voice_agent';
+$secret = 'API_TOKEN=qR8vT3mK6pL9xS2nD4eG';
+PHP));
+
+        try {
+            $unit = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
+            $findings = array_values(array_filter(
+                $this->analyseUnits([$unit]),
+                static fn (Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
+            ));
+
+            self::assertCount(1, $findings);
+            self::assertStringContainsString('API_TOKEN', $findings[0]->message);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
         $registry = RuleRegistry::defaults();
@@ -209,8 +237,8 @@ final class SensitiveDataRulesTest extends TestCase
             'eyJhbGciOiJIUzI1NiJ9.' . 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.' . 'sflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
             'mysql://appuser:' . 'rN7pQ4sV9xY2zA5b' . '@db.internal/app',
             'postgres://reporter:' . 'qR8vT3mK6pL9xS2n' . '@db.internal/reporting',
-            'DB_PASSWORD=' . 'rN7pQ4sV9xY2zA5b',
-            'API_TOKEN=' . 'qR8vT3mK6pL9xS2n',
+            'API_TOKEN=' . 'rN7pQ4sV9xY2zA5bC8dG',
+            'API_TOKEN=' . 'qR8vT3mK6pL9xS2nD4eG',
             'M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ',
             'N8pQ3rT6uW9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ',
         ];

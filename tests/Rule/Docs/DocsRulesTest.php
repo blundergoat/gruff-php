@@ -174,6 +174,19 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::throwsWithoutTag()', $symbols);
     }
 
+    public function testOverrideAwareDocRulesUseInheritedContracts(): void
+    {
+        $missingPhpdoc = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
+        $missingThrows = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
+        $symbols = array_merge(
+            array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc),
+            array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows),
+        );
+
+        self::assertNotContains('ImplementsDocumentedContract::inheritedThrows()', $symbols);
+        self::assertNotContains('OverrideDocumentedContract::inheritedThrows()', $symbols);
+    }
+
     public function testUselessPhpdocDetected(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
@@ -188,6 +201,7 @@ final class DocsRulesTest extends TestCase
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
         self::assertNotContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
+        self::assertNotContains('PhpdocTagsFixture::arrayShapeDoc()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::describedTagDoc()', $symbols);
         self::assertNotContains(
             'PhpdocTagsFixture::resourceParamDoc()',

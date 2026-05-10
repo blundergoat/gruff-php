@@ -33,6 +33,7 @@ final readonly class TextReporter
         $this->appendScore($lines, $report);
         $this->appendBaseline($lines, $report);
         $this->appendMutation($lines, $report->mutation);
+        $this->appendReview($lines, $report);
         $this->appendFindings($lines, $report->findings);
 
         $lines[] = '';
@@ -47,6 +48,46 @@ final readonly class TextReporter
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * @param list<string> $lines
+     */
+    private function appendReview(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->review === null) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Branch review';
+        $lines[] = sprintf('  Base: %s', $report->review->base);
+        $lines[] = sprintf('  Changed only: %s', $report->review->changedOnly ? 'yes' : 'no');
+        $lines[] = sprintf(
+            '  Findings: %d introduced, %d removed, %d unchanged',
+            count($report->review->introduced),
+            count($report->review->removed),
+            count($report->review->unchanged),
+        );
+
+        if ($report->review->deltaScore !== null) {
+            $lines[] = sprintf('  Score delta: %+.2f', $report->review->deltaScore);
+        }
+
+        if ($report->review->introduced === []) {
+            return;
+        }
+
+        $lines[] = '  Introduced:';
+        foreach ($report->review->introduced as $finding) {
+            $location = $finding->filePath;
+            if ($finding->line !== null) {
+                $location .= sprintf(':%d', $finding->line);
+            }
+
+            $lines[] = sprintf('    [%s] %s %s', $finding->severity->value, $finding->ruleId, $location);
+            $lines[] = sprintf('      %s', $finding->message);
+        }
     }
 
     /**

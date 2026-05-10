@@ -23,7 +23,14 @@ php bin/gruff dashboard --help
 As of this file, supported `analyse` formats are:
 
 ```text
-text, json, html, markdown, github, hotspot
+text, json, html, markdown, github, hotspot, sarif
+```
+
+Rule metadata is discoverable from the registry:
+
+```bash
+php bin/gruff list-rules
+php bin/gruff list-rules --format=json
 ```
 
 ## Full Project Scans
@@ -82,7 +89,28 @@ Compare the working tree to a base ref such as `deploy`:
 php bin/gruff analyse src --diff=deploy --format json --fail-on none > /tmp/gruff-diff.json
 ```
 
-Current `--diff=<base>` semantics use Git diff filtering against that ref. This is not yet a true introduced-findings comparison against a separately analysed base tree. M28 tracks that future branch-review mode.
+`--diff=<base>` semantics use Git diff filtering against that ref. It is still a changed-line/file filter, not base/current finding subtraction.
+
+## Branch Review / Introduced Findings
+
+Use branch-review mode when you need the answer to "what did this branch make worse?"
+
+```bash
+php bin/gruff analyse src --diff-vs=deploy --changed-only --format markdown --fail-on none
+```
+
+Agent-friendly JSON:
+
+```bash
+php bin/gruff analyse src --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
+```
+
+Branch-review mode analyses the current tree and a Git archive snapshot of the base ref, then compares findings by stable review identity:
+
+- `file + ruleId + symbol` when a symbol exists.
+- `file + ruleId + message` when no symbol exists.
+
+Line numbers remain report context only, so a moved method does not become an introduced finding just because its line changed. The JSON `review` object contains `introduced`, `removed`, `unchanged`, counts, `base`, `changedOnly`, and `deltaScore`.
 
 ## Full Project vs Diff
 
@@ -100,11 +128,19 @@ Diff:
 - Requires a Git worktree.
 - Does not prove a finding is newly introduced if the same logical issue already existed on the base branch.
 
+Branch review:
+
+- Best for coding-agent review comments.
+- Separates `introduced`, `removed`, and `unchanged` findings against a base ref.
+- Use `--changed-only` to compare only files changed from the base ref.
+- Requires Git, but does not mutate the working tree.
+
 When in doubt, run both:
 
 ```bash
 php bin/gruff analyse src --format json --fail-on none > /tmp/gruff-full.json
 php bin/gruff analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
+php bin/gruff analyse src --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
 ```
 
 ## Config
@@ -192,6 +228,8 @@ Important JSON fields:
 - `diff`
 - `baseline`
 - `score`
+- `review` when `--diff-vs` is used
+- `run.filters` when display filters are used
 
 Use Markdown when posting a short human report:
 
@@ -203,6 +241,23 @@ Use GitHub annotations in Actions:
 
 ```bash
 php bin/gruff analyse src --format github --fail-on warning
+```
+
+Use SARIF for GitHub Code Scanning ingestion:
+
+```bash
+php bin/gruff analyse src --format sarif --fail-on none > /tmp/gruff.sarif
+```
+
+## Display Filters
+
+Display filters run after analysis and before rendering. They change report contents, not rule execution, scoring, or baseline generation semantics.
+
+```bash
+php bin/gruff analyse src --format markdown --fail-on none --min-severity warning
+php bin/gruff analyse src --format json --fail-on none --include-pillar security,sensitive-data
+php bin/gruff analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
+php bin/gruff analyse src --format json --fail-on none --include-rule complexity.npath
 ```
 
 ## Dashboard
@@ -242,10 +297,5 @@ For CI gating, choose the policy explicitly:
 
 ## Current Gaps to Avoid Assuming
 
-- There is no `list-rules` command yet.
-- There is no SARIF output yet.
-- There is no true `introduced findings only` branch-review mode yet.
-- There are no `--min-severity`, `--include-pillar`, or `--exclude-rule` display filters yet.
 - `--diff=<base>` is a changed-line/file filter, not a full base/current subtraction engine.
-
-M28 tracks these improvements.
+- Packaging work beyond Composer/local checkout usage is not implemented here.

@@ -15,6 +15,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Size\FileLengthRule;
 use PHPUnit\Framework\TestCase;
 
@@ -328,6 +329,19 @@ final class ConfigLoaderTest extends TestCase
         $this->expectExceptionMessage(sprintf('Unknown option "rules.%s.options.unknown".', FixtureOptionsRule::ID));
 
         (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+    }
+
+    public function testRejectsInvalidRuleOptionType(): void
+    {
+        $path = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"options":{"minScopeReferences":"two"}}}}',
+            IdentifierQualityRule::ID,
+        ));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(sprintf('Option "rules.%s.options.minScopeReferences" must be an integer.', IdentifierQualityRule::ID));
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
     private function writeTempConfig(string $contents, string $suffix = '.yaml'): string

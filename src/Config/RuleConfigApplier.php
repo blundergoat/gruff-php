@@ -220,10 +220,68 @@ final readonly class RuleConfigApplier
                 throw new ConfigException(sprintf('Unknown option "rules.%s.options.%s".', $ruleId, $optionName));
             }
 
-            $options[$optionName] = $optionValue;
+            $options[$optionName] = $this->optionValue($ruleId, $optionName, $optionValue, $allowedOptions[$optionName]);
         }
 
         return $options;
+    }
+
+    private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): mixed
+    {
+        if (is_int($defaultValue)) {
+            if (!is_int($optionValue)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
+            }
+
+            return $optionValue;
+        }
+
+        if (is_float($defaultValue)) {
+            if (!is_int($optionValue) && !is_float($optionValue)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
+            }
+
+            return $optionValue;
+        }
+
+        if (is_bool($defaultValue)) {
+            if (!is_bool($optionValue)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
+            }
+
+            return $optionValue;
+        }
+
+        if (is_string($defaultValue)) {
+            if (!is_string($optionValue)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
+            }
+
+            return $optionValue;
+        }
+
+        if (is_array($defaultValue) && array_is_list($defaultValue)) {
+            if (!is_array($optionValue) || !array_is_list($optionValue)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a list.', $ruleId, $optionName));
+            }
+
+            if ($defaultValue === []) {
+                return $optionValue;
+            }
+
+            $sample = $defaultValue[0];
+            foreach ($optionValue as $index => $item) {
+                if (is_string($sample) && !is_string($item)) {
+                    throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
+                }
+
+                if (is_int($sample) && !is_int($item)) {
+                    throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
+                }
+            }
+        }
+
+        return $optionValue;
     }
 
     /**

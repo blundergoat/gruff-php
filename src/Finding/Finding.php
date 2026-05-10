@@ -44,7 +44,7 @@ final readonly class Finding
      *     confidence: string,
      *     remediation: string|null,
      *     fingerprint: string,
-     *     metadata: array<string, mixed>
+     *     metadata: array<string, mixed>|object
      * }
      */
     public function toArray(): array
@@ -67,7 +67,7 @@ final readonly class Finding
             'confidence' => $this->confidence->value,
             'remediation' => $this->remediation,
             'fingerprint' => $this->fingerprint(),
-            'metadata' => $this->metadata,
+            'metadata' => $this->metadata === [] ? (object) [] : $this->metadata,
         ];
     }
 

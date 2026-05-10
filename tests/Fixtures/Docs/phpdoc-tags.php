@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace Fixtures\Docs;
 
+interface DocumentedContract
+{
+    /**
+     * Contract docs live here.
+     *
+     * @throws \RuntimeException when the value is invalid.
+     */
+    public function inheritedThrows(int $value): int;
+}
+
 class PhpdocTagsFixture
 {
     /**
@@ -122,5 +132,41 @@ class PhpdocTagsFixture
     public function resourceParamDoc($stream): int
     {
         return is_resource($stream) ? 1 : 0;
+    }
+
+    /**
+     * @return list<array{label: string, value: string}>
+     */
+    public function arrayShapeDoc(): array
+    {
+        return [['label' => 'Name', 'value' => 'Ada']];
+    }
+}
+
+final class ImplementsDocumentedContract implements DocumentedContract
+{
+    public function inheritedThrows(int $value): int
+    {
+        if ($value < 0) {
+            throw new \RuntimeException('invalid');
+        }
+
+        return $value;
+    }
+}
+
+final class OverrideDocumentedContract implements DocumentedContract
+{
+    /**
+     * Local detail.
+     */
+    #[\Override]
+    public function inheritedThrows(int $value): int
+    {
+        if ($value < 0) {
+            throw new \RuntimeException('invalid');
+        }
+
+        return $value;
     }
 }

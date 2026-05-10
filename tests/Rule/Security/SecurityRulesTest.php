@@ -55,6 +55,15 @@ final class SecurityRulesTest extends TestCase
         self::assertContains('dynamic function call', $functions);
     }
 
+    public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
+    {
+        $findings = $this->findingsForRule($this->typedCallableUnit(), DangerousFunctionCallRule::ID);
+        $functions = array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
+
+        self::assertNotContains('dynamic function call', $functions);
+        self::assertContains('system', $functions);
+    }
+
     public function testRequestDataSecurityHeuristicsDetected(): void
     {
         $findings = $this->analyse('data-flow-heuristics.php');
@@ -207,6 +216,30 @@ final class SecurityRulesTest extends TestCase
                 '}',
             ]) . "\n",
             'tests/Fixtures/Security/inline-execution-calls.php',
+        );
+    }
+
+    private function typedCallableUnit(): AnalysisUnit
+    {
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+
+final class CallableFixture
+{
+    public function __construct(private \Closure $stored)
+    {
+    }
+
+    public function run(callable $mutator, string $command): void
+    {
+        $mutator($command);
+        ($this->stored)($command);
+        system($command);
+    }
+}
+PHP,
+            'tests/Fixtures/Security/inline-typed-callable.php',
         );
     }
 

@@ -15,6 +15,12 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
+use PhpParser\Node\Stmt\Class_;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 final class DangerousFunctionCallRule implements RuleInterface
@@ -49,11 +55,13 @@ final class DangerousFunctionCallRule implements RuleInterface
     {
         $finder = new NodeFinder();
         $findings = [];
+        $callableParameters = $this->callableParameterNames($unit->statements, $finder);
+        $callableProperties = $this->callablePropertyNames($unit->statements, $finder);
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === null) {
-                if (!$call->name instanceof Node\Name) {
+                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call->name, $callableParameters, $callableProperties)) {
                     $findings[] = $this->finding($unit, $call, 'dynamic function call');
                 }
 
@@ -75,6 +83,110 @@ final class DangerousFunctionCallRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * @param list<Node\Stmt> $statements
+     * @return array<string, true>
+     */
+    private function callableParameterNames(array $statements, NodeFinder $finder): array
+    {
+        $names = [];
+        $functions = $finder->find($statements, static fn (Node $node): bool => $node instanceof Function_ || $node instanceof ClassMethod);
+
+        foreach ($functions as $function) {
+            if (!$function instanceof Function_ && !$function instanceof ClassMethod) {
+                continue;
+            }
+
+            foreach ($function->params as $param) {
+                if (!$param->var instanceof Expr\Variable || !is_string($param->var->name) || !$this->isCallableType($param->type)) {
+                    continue;
+                }
+
+                $names[$param->var->name] = true;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<Node\Stmt> $statements
+     * @return array<string, true>
+     */
+    private function callablePropertyNames(array $statements, NodeFinder $finder): array
+    {
+        $names = [];
+
+        foreach ($finder->findInstanceOf($statements, Property::class) as $property) {
+            if (!$this->isCallableType($property->type)) {
+                continue;
+            }
+
+            foreach ($property->props as $prop) {
+                $names[$prop->name->toString()] = true;
+            }
+        }
+
+        foreach ($finder->findInstanceOf($statements, Class_::class) as $class) {
+            foreach ($class->getMethods() as $method) {
+                foreach ($method->params as $param) {
+                    if (
+                        $param->flags === 0
+                        || !$param->var instanceof Expr\Variable
+                        || !is_string($param->var->name)
+                        || !$this->isCallableType($param->type)
+                    ) {
+                        continue;
+                    }
+
+                    $names[$param->var->name] = true;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param array<string, true> $callableParameters
+     * @param array<string, true> $callableProperties
+     */
+    private function isKnownCallableInvocation(Node $name, array $callableParameters, array $callableProperties): bool
+    {
+        if ($name instanceof Expr\Variable && is_string($name->name)) {
+            return isset($callableParameters[$name->name]);
+        }
+
+        if ($name instanceof Expr\PropertyFetch && $name->name instanceof Identifier) {
+            return isset($callableProperties[$name->name->toString()]);
+        }
+
+        return false;
+    }
+
+    private function isCallableType(?Node $type): bool
+    {
+        if ($type instanceof Identifier) {
+            return strtolower($type->toString()) === 'callable';
+        }
+
+        if ($type instanceof Name) {
+            $shortName = strtolower($type->getLast());
+
+            return $shortName === 'closure' || str_ends_with($shortName, 'callable');
+        }
+
+        if ($type instanceof Node\UnionType) {
+            foreach ($type->types as $innerType) {
+                if ($this->isCallableType($innerType)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function finding(AnalysisUnit $unit, Node $node, string $function): Finding

@@ -34,6 +34,7 @@ use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
 use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
@@ -75,6 +76,7 @@ use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
+use GruffPhp\Rule\Waste\OneLineMethodRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
@@ -106,9 +108,11 @@ final class RuleRegistryTest extends TestCase
         self::assertTrue($registry->has(CommentedOutCodeRule::ID));
         self::assertTrue($registry->has(EmptyClassRule::ID));
         self::assertTrue($registry->has(EmptyMethodRule::ID));
+        self::assertTrue($registry->has(OneLineMethodRule::ID));
         self::assertTrue($registry->has(UnreachableCodeRule::ID));
         self::assertTrue($registry->has(UnusedImportRule::ID));
         self::assertTrue($registry->has(UnusedParameterRule::ID));
+        self::assertTrue($registry->has(IdentifierQualityRule::ID));
         self::assertTrue($registry->has(ConstructorPromotionCandidateRule::ID));
         self::assertTrue($registry->has(EnumCandidateRule::ID));
         self::assertTrue($registry->has(FirstClassCallableCandidateRule::ID));
@@ -231,6 +235,15 @@ final class RuleRegistryTest extends TestCase
             $this->fakeRule('test.duplicate'),
             $this->fakeRule('test.duplicate'),
         ]);
+    }
+
+    public function testDefaultRulesHaveListableDescriptions(): void
+    {
+        foreach (RuleRegistry::defaults()->all() as $rule) {
+            $definition = $rule->definition();
+
+            self::assertNotSame('', trim($definition->description()), $definition->id);
+        }
     }
 
     private function parseFixture(string $displayPath): AnalysisUnit

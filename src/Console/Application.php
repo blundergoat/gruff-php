@@ -6,6 +6,7 @@ namespace GruffPhp\Console;
 
 use GruffPhp\Command\AnalyseCommand;
 use GruffPhp\Command\DashboardCommand;
+use GruffPhp\Command\ListRulesCommand;
 use GruffPhp\Command\ReportCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
@@ -19,6 +20,7 @@ final class Application extends SymfonyApplication
 
         $this->add(new AnalyseCommand());
         $this->add(new DashboardCommand());
+        $this->add(new ListRulesCommand());
         $this->add(new ReportCommand());
     }
 }

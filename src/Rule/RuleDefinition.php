@@ -28,6 +28,7 @@ final readonly class RuleDefinition
         public array $secondaryPillars = [],
         public bool $defaultEnabled = true,
         public array $defaultOptions = [],
+        public string $description = '',
     ) {
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
@@ -44,5 +45,10 @@ final readonly class RuleDefinition
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid option name.', $id));
             }
         }
+    }
+
+    public function description(): string
+    {
+        return $this->description !== '' ? $this->description : $this->name;
     }
 }

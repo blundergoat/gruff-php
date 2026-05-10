@@ -12,6 +12,7 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
+use GruffPhp\Rule\Waste\OneLineMethodRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
@@ -153,6 +154,26 @@ final class WasteRulesTest extends TestCase
 
         self::assertNotSame([], $findings);
         self::assertSame(Severity::Advisory, $findings[0]->severity);
+    }
+
+    public function testOneLineCallWrapperMethodsAreDetected(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
+        self::assertSame(Severity::Advisory, $findings[0]->severity);
+        self::assertSame('return', $findings[0]->metadata['statementKind']);
+    }
+
+    public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
+        self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
+        self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
     }
 
     public function testCleanFileHasNoWasteFindings(): void

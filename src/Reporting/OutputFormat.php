@@ -12,6 +12,7 @@ enum OutputFormat: string
     case Markdown = 'markdown';
     case Github = 'github';
     case Hotspot = 'hotspot';
+    case Sarif = 'sarif';
 
     public static function fromInput(string $value): ?self
     {
@@ -22,6 +23,7 @@ enum OutputFormat: string
             self::Markdown->value => self::Markdown,
             self::Github->value => self::Github,
             self::Hotspot->value => self::Hotspot,
+            self::Sarif->value => self::Sarif,
             default => null,
         };
     }

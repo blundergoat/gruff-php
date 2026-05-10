@@ -12,6 +12,8 @@ use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
+use GruffPhp\Rule\Naming\IdentifierTokenizer;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\RuleContext;
@@ -195,6 +197,108 @@ final class NamingRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
+    }
+
+    public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
+    {
+        $tokenizer = new IdentifierTokenizer();
+
+        self::assertSame(['http', 'response', 'code'], $tokenizer->tokenize('HTTPResponseCode'));
+        self::assertSame(['order', 'item', '2'], $tokenizer->tokenize('order_item2'));
+        self::assertSame(['temp'], $tokenizer->tokenize('_temp'));
+    }
+
+    public function testIdentifierQualityFindsPlaceholderGenericAndNumberedNames(): void
+    {
+        $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
+        $reported = [];
+
+        foreach ($findings as $finding) {
+            $identifierKind = $finding->metadata['identifierKind'] ?? null;
+            $identifierName = $finding->metadata['identifierName'] ?? null;
+            self::assertIsString($identifierKind);
+            self::assertIsString($identifierName);
+            $reported[$identifierKind . ':' . $identifierName] = $finding->metadata['variant'] ?? null;
+        }
+
+        self::assertSame('generic', $reported['class:Thing'] ?? null);
+        self::assertSame('placeholder', $reported['method:temp'] ?? null);
+        self::assertSame('placeholder', $reported['parameter:foo'] ?? null);
+        self::assertSame('generic', $reported['property:stuff'] ?? null);
+        self::assertSame('generic', $reported['variable:item'] ?? null);
+        self::assertSame('numbered', $reported['variable:item2'] ?? null);
+        self::assertSame('generic', $reported['interface:Data'] ?? null);
+        self::assertSame('generic', $reported['trait:HelperThing'] ?? null);
+        self::assertSame('placeholder', $reported['function:bar'] ?? null);
+        self::assertSame('placeholder', $reported['parameter:obj'] ?? null);
+        self::assertSame('placeholder', $reported['variable:tmp'] ?? null);
+    }
+
+    public function testIdentifierQualityExemptsCommonNoiseSources(): void
+    {
+        $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
+        $names = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertNotContains('provideThings', $names);
+        self::assertNotContains('userName', $names);
+        self::assertNotContains('api', $names);
+        self::assertNotContains('value', $names);
+        self::assertNotContains('i', $names);
+        self::assertNotContains('e', $names);
+        self::assertNotContains('calculateInvoiceTotal', $names);
+        self::assertNotContains('invoiceTotal', $names);
+    }
+
+    public function testIdentifierQualityMetadataIsSpecific(): void
+    {
+        $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
+        $itemFinding = null;
+
+        foreach ($findings as $finding) {
+            if (($finding->metadata['identifierName'] ?? null) === 'item') {
+                $itemFinding = $finding;
+                break;
+            }
+        }
+
+        self::assertNotNull($itemFinding);
+        self::assertSame('variable', $itemFinding->metadata['identifierKind']);
+        self::assertSame('generic', $itemFinding->metadata['variant']);
+        self::assertSame(['item'], $itemFinding->metadata['tokens']);
+        self::assertSame('item', $itemFinding->metadata['matchedToken']);
+        self::assertSame(Severity::Advisory, $itemFinding->severity);
+    }
+
+    public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
+    {
+        $unit = $this->parseFixture('identifier-quality.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(IdentifierQualityRule::ID);
+        $config = AnalysisConfig::fromRegistry($registry)
+            ->withAcceptedAbbreviations(['api'])
+            ->withRuleSettings(IdentifierQualityRule::ID, new \GruffPhp\Config\RuleSettings(
+                enabled: true,
+                thresholds: $settings->thresholds,
+                options: array_merge($settings->options, [
+                    'placeholderNames' => ['foo', 'bar', 'baz', 'tmp', 'temp'],
+                    'ignoredNames' => ['thing', 'data', 'helperthing'],
+                ]),
+            ));
+
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $identifierFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
+        ));
+        $names = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $identifierFindings);
+
+        self::assertNotContains('obj', $names);
+        self::assertNotContains('Thing', $names);
+        self::assertNotContains('Data', $names);
+        self::assertNotContains('HelperThing', $names);
+        self::assertNotContains('api', $names);
+        self::assertContains('foo', $names);
+        self::assertContains('temp', $names);
     }
 
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void

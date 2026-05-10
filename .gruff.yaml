@@ -121,6 +121,39 @@ rules:
     # Hungarian notation duplicates types and obscures meaning.
     naming.hungarian-notation:
         enabled: true
+    # Placeholder and generic names hide the role an identifier plays.
+    naming.identifier-quality:
+        enabled: true
+        options:
+            placeholderNames:
+                - foo
+                - bar
+                - baz
+                - tmp
+                - temp
+                - obj
+                - arr
+            genericTokens:
+                - data
+                - info
+                - item
+                - thing
+                - stuff
+                - helper
+                - util
+            ignoredNames:
+                - _
+                - e
+                - exception
+                - throwable
+                - i
+                - j
+                - k
+                - idx
+                - index
+                - key
+                - value
+            minScopeReferences: 1
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true
@@ -383,6 +416,11 @@ rules:
     # Empty methods hide incomplete or unnecessary behavior.
     waste.empty-method:
         enabled: true
+    # One-line wrapper methods can hide simple expressions behind extra indirection.
+    waste.one-line-method:
+        enabled: true
+        options:
+            minParameters: 1
     # Unreachable code is dead logic that cannot be tested.
     waste.unreachable-code:
         enabled: true

@@ -101,4 +101,26 @@ final class ComplexityIntegrationTest extends TestCase
 
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));
     }
+
+    public function testNpathCapIsExplicitInMetadataAndMessage(): void
+    {
+        $parser = new PhpFileParser();
+        $unit = $parser->parse(new SourceFile(
+            __DIR__ . '/../../Fixtures/Complexity/npath-cap.php',
+            'tests/Fixtures/Complexity/npath-cap.php',
+        ));
+        $registry = RuleRegistry::defaults();
+        $config = AnalysisConfig::fromRegistry($registry)
+            ->withRuleSettings(NpathComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 2]));
+
+        $findings = array_values(array_filter(
+            $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config)),
+            static fn ($finding): bool => $finding->ruleId === NpathComplexityRule::ID,
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame(100000, $findings[0]->metadata['npath']);
+        self::assertTrue($findings[0]->metadata['capped']);
+        self::assertStringContainsString('>=100,000 (cap reached)', $findings[0]->message);
+    }
 }

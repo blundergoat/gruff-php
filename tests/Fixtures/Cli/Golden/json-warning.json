@@ -10,7 +10,15 @@
         "config": "tests/Fixtures/Config/file-length-warning.yaml",
         "paths": [
             "tests/Fixtures/Source/mixed/alpha.php"
-        ]
+        ],
+        "filters": {
+            "active": false,
+            "minSeverity": null,
+            "includePillars": [],
+            "excludePillars": [],
+            "includeRules": [],
+            "excludeRules": []
+        }
     },
     "summary": {
         "filesDiscovered": 1,
@@ -66,7 +74,7 @@
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
             "fingerprint": "8dc7b819250a0178",
-            "metadata": []
+            "metadata": {}
         },
         {
             "ruleId": "docs.missing-public-phpdoc",
@@ -83,7 +91,7 @@
             "confidence": "high",
             "remediation": "Add a docblock describing the method's purpose.",
             "fingerprint": "449db7e7ebae6987",
-            "metadata": []
+            "metadata": {}
         }
     ],
     "score": {

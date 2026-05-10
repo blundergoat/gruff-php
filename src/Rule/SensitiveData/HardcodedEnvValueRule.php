@@ -47,7 +47,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             $key = $matches['key'][$index][0];
             $value = $matches['value'][$index][0];
             $offset = $match[1];
-            if (SecretScannerHelper::isLikelyDummyValue($value)) {
+            if (SecretScannerHelper::isLikelyDummyValue($value) || !$this->hasSecretValueEvidence($key, $value)) {
                 continue;
             }
 
@@ -65,5 +65,54 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         }
 
         return $findings;
+    }
+
+    private function hasSecretValueEvidence(string $key, string $value): bool
+    {
+        $normalizedValue = trim($value, "\"' \t\r\n");
+        $upperKey = strtoupper($key);
+
+        if ($this->isConservativeKeySuffix($upperKey) && !$this->hasStrongSecretShape($normalizedValue)) {
+            return false;
+        }
+
+        if ($this->isCommonNonSecretValue($normalizedValue)) {
+            return false;
+        }
+
+        return $this->hasStrongSecretShape($normalizedValue);
+    }
+
+    private function hasStrongSecretShape(string $value): bool
+    {
+        return strlen($value) >= 20 && SecretScannerHelper::entropy($value) >= 3.5;
+    }
+
+    private function isConservativeKeySuffix(string $key): bool
+    {
+        foreach (['_NAME', '_PREFIX', '_ID', '_MODE'] as $suffix) {
+            if (str_ends_with($key, $suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isCommonNonSecretValue(string $value): bool
+    {
+        if (preg_match('/^[a-z][a-z0-9-]{1,24}$/', $value) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^[a-z][a-z0-9_]{1,40}$/', $value) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^[a-z][a-z0-9_.-]+[._-]$/', $value) === 1) {
+            return true;
+        }
+
+        return false;
     }
 }

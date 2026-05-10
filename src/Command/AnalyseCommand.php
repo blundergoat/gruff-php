@@ -26,7 +26,11 @@ use GruffPhp\Reporting\HtmlReporter;
 use GruffPhp\Reporting\JsonReporter;
 use GruffPhp\Reporting\MarkdownReporter;
 use GruffPhp\Reporting\OutputFormat;
+use GruffPhp\Reporting\SarifReporter;
 use GruffPhp\Reporting\TextReporter;
+use GruffPhp\Review\BranchReviewComparator;
+use GruffPhp\Review\BranchReviewResult;
+use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
@@ -49,7 +53,7 @@ final class AnalyseCommand extends Command
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.yaml file for this run.')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, or hotspot.', OutputFormat::Text->value)
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, hotspot, or sarif.', OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', FailThreshold::Error->value)
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', 'none')
             ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', null)
@@ -62,6 +66,14 @@ final class AnalyseCommand extends Command
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
+            ->addOption('diff-vs', null, InputOption::VALUE_REQUIRED, 'Compare current findings against a base Git ref and report introduced/removed/unchanged findings.')
+            ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
+            ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
+            ->addOption('min-severity', null, InputOption::VALUE_REQUIRED, 'Display only findings at or above advisory, warning, or error.')
+            ->addOption('include-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars or repeated values.')
+            ->addOption('exclude-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated pillars or repeated values.')
+            ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated rule IDs or repeated values.')
+            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated rule IDs or repeated values.')
             ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.')
             ->addOption(
                 'baseline',
@@ -120,6 +132,11 @@ final class AnalyseCommand extends Command
         }
 
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
+        $reviewDiff = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
+        if ($options->diffVs !== null && $options->changedOnly && $reviewDiff instanceof DiffResult) {
+            $findings = $this->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
+        }
+
         $diff = $this->buildDiffResult($projectRoot, $options->diffMode, $diagnostics);
         if ($diff instanceof DiffResult && $diff->active) {
             $findings = (new DiffFindingFilter())->filter($findings, $diff);
@@ -133,8 +150,19 @@ final class AnalyseCommand extends Command
             $diff,
             $diagnostics,
         );
+        $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
         $score = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $review = $this->buildBranchReview(
+            $projectRoot,
+            $options,
+            $config,
+            $registry,
+            $findings,
+            $score->composite->score,
+            $reviewDiff,
+            $diagnostics,
+        );
         $trend = null;
 
         if ($options->historyFile !== null) {
@@ -150,6 +178,9 @@ final class AnalyseCommand extends Command
         }
 
         $exitCode = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
+        $displayFilter = $options->displayFilter();
+        $displayFindings = $displayFilter->apply($findings);
+        $displayReview = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
         $report = new AnalysisReport(
             toolVersion: Application::VERSION,
             requestedPaths: $options->paths,
@@ -160,7 +191,7 @@ final class AnalyseCommand extends Command
             ignoredPaths: $sources->discovery->ignoredPaths,
             missingPaths: $sources->discovery->missingPaths,
             diagnostics: $diagnostics,
-            findings: $findings,
+            findings: $displayFindings,
             exitCode: $exitCode,
             configPath: $options->configPath,
             mutation: $mutationAnalysis,
@@ -168,6 +199,8 @@ final class AnalyseCommand extends Command
             diff: $diff,
             trend: $trend,
             baseline: $baselineReport,
+            review: $displayReview,
+            filters: $displayFilter,
         );
 
         $this->renderReport(
@@ -275,10 +308,162 @@ final class AnalyseCommand extends Command
             OutputFormat::Markdown => new MarkdownReporter(),
             OutputFormat::Github => new GithubAnnotationsReporter(),
             OutputFormat::Hotspot => new HotspotReporter(),
+            OutputFormat::Sarif => new SarifReporter(),
             OutputFormat::Text => new TextReporter(),
         };
         // OUTPUT_RAW skips Symfony's OutputFormatter tag scan, which would otherwise
         // parse every <...> in HTML/JSON/Markdown output as a console style tag.
         $output->write($renderer->render($report), false, OutputInterface::OUTPUT_RAW);
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @param list<string> $changedFiles
+     * @return list<Finding>
+     */
+    private function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
+    {
+        if ($changedFiles === []) {
+            return [];
+        }
+
+        $changed = array_fill_keys($changedFiles, true);
+
+        return array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => isset($changed[$finding->filePath]),
+        ));
+    }
+
+    /**
+     * @param list<Finding> $currentFindings
+     * @param list<RunDiagnostic> $diagnostics
+     */
+    private function buildBranchReview(
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        AnalysisConfig $config,
+        \GruffPhp\Rule\RuleRegistry $registry,
+        array $currentFindings,
+        float $currentScore,
+        ?DiffResult $reviewDiff,
+        array &$diagnostics,
+    ): ?BranchReviewResult {
+        if ($options->diffVs === null || $reviewDiff === null) {
+            return null;
+        }
+
+        $snapshot = new GitArchiveSnapshot();
+        $baseRoot = null;
+
+        try {
+            $baseRoot = $snapshot->create($projectRoot, $options->diffVs);
+            $basePaths = $this->existingSnapshotPaths($baseRoot, $options->paths);
+            $baseFindings = [];
+
+            if ($basePaths !== []) {
+                $baseSources = (new AnalysisSourceLoader())->load(
+                    $baseRoot,
+                    $basePaths,
+                    $options->includeIgnored,
+                    $config->ignoredPathPatterns(),
+                );
+                $baseFindings = $registry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config));
+                $baseFindings = array_merge($baseFindings, (new CompositeFindingFactory())->build($baseFindings));
+                $baseFindings = $this->filterAllowedSecretPreviews($baseFindings, $config);
+            }
+
+            if ($options->changedOnly) {
+                $baseFindings = $this->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
+            }
+
+            $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
+            $baseScore = (new ScoreCalculator())->calculate($baseFindings, null, null);
+
+            return (new BranchReviewComparator())->compare(
+                current: $currentFindings,
+                base: $baseFindings,
+                baseRef: $options->diffVs,
+                changedOnly: $options->changedOnly,
+                deltaScore: $currentScore - $baseScore->composite->score,
+            );
+        } catch (DiffException | RuntimeException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type: 'review-mode-error',
+                message: $exception->getMessage(),
+            );
+
+            return null;
+        } finally {
+            if ($baseRoot !== null) {
+                $snapshot->remove($baseRoot);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $paths
+     * @return list<string>
+     */
+    private function existingSnapshotPaths(string $baseRoot, array $paths): array
+    {
+        $requested = $paths === [] ? ['.'] : $paths;
+        $existing = [];
+
+        foreach ($requested as $path) {
+            $absolute = str_starts_with($path, '/') ? $path : rtrim($baseRoot, '/') . '/' . $path;
+            if (file_exists($absolute)) {
+                $existing[] = $path;
+            }
+        }
+
+        return $existing === [] ? [] : $existing;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
+    {
+        if ($pathsRelativeTo === null) {
+            return $findings;
+        }
+
+        $root = realpath($pathsRelativeTo);
+        if ($root === false) {
+            return $findings;
+        }
+
+        $root = rtrim(str_replace('\\', '/', $root), '/');
+        $normalized = [];
+
+        foreach ($findings as $finding) {
+            $path = str_replace('\\', '/', $finding->filePath);
+            if (!str_starts_with($path, '/')) {
+                $normalized[] = $finding;
+                continue;
+            }
+
+            $filePath = str_starts_with($path, $root . '/') ? substr($path, strlen($root) + 1) : $finding->filePath;
+            $normalized[] = new Finding(
+                ruleId: $finding->ruleId,
+                message: $finding->message,
+                filePath: $filePath,
+                line: $finding->line,
+                severity: $finding->severity,
+                pillar: $finding->pillar,
+                tier: $finding->tier,
+                confidence: $finding->confidence,
+                endLine: $finding->endLine,
+                column: $finding->column,
+                symbol: $finding->symbol,
+                remediation: $finding->remediation,
+                secondaryPillars: $finding->secondaryPillars,
+                metadata: $finding->metadata,
+            );
+        }
+
+        return $normalized;
     }
 }

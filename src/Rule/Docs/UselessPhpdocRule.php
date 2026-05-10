@@ -54,6 +54,10 @@ final readonly class UselessPhpdocRule implements RuleInterface
             }
 
             $docText = $docComment->getText();
+            if ($this->containsLoadBearingTypeDoc($docText)) {
+                continue;
+            }
+
             $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
             $stripped = trim($stripped);
 
@@ -141,5 +145,16 @@ final readonly class UselessPhpdocRule implements RuleInterface
         }
 
         return true;
+    }
+
+    private function containsLoadBearingTypeDoc(string $docText): bool
+    {
+        foreach (['array{', 'list<', 'non-empty-array', 'Collection<', 'class-string', '@phpstan-'] as $marker) {
+            if (str_contains($docText, $marker)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

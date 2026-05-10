@@ -9,6 +9,8 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Baseline\BaselineReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Diff\DiffResult;
+use GruffPhp\Reporting\FindingDisplayFilter;
+use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Trend\TrendReport;
 
@@ -41,6 +43,8 @@ final readonly class AnalysisReport
         public ?DiffResult $diff = null,
         public ?TrendReport $trend = null,
         public ?BaselineReport $baseline = null,
+        public ?BranchReviewResult $review = null,
+        public ?FindingDisplayFilter $filters = null,
     ) {
     }
 
@@ -87,6 +91,7 @@ final readonly class AnalysisReport
                 'failOn' => $this->failOn,
                 'config' => $this->configPath,
                 'paths' => $this->requestedPaths,
+                'filters' => $this->filters?->toArray(),
             ],
             'summary' => [
                 'filesDiscovered' => $this->filesDiscovered,
@@ -127,6 +132,10 @@ final readonly class AnalysisReport
 
         if ($this->baseline instanceof BaselineReport) {
             $report['baseline'] = $this->baseline->toArray();
+        }
+
+        if ($this->review instanceof BranchReviewResult) {
+            $report['review'] = $this->review->toArray();
         }
 
         return $report;

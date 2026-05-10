@@ -68,6 +68,10 @@ final readonly class MissingThrowsTagRule implements RuleInterface
                 continue;
             }
 
+            if ($node instanceof ClassMethod && (new DocsInheritanceHelper())->hasInheritedContractDoc($node, $unit->statements, $finder)) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(

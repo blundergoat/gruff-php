@@ -22,6 +22,7 @@ use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
@@ -91,6 +92,7 @@ use GruffPhp\Rule\TestQuality\UnusedMockRule;
 use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
+use GruffPhp\Rule\Waste\OneLineMethodRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
@@ -148,6 +150,7 @@ final class RuleRegistry
             new CommentedOutCodeRule(),
             new EmptyClassRule(),
             new EmptyMethodRule(),
+            new OneLineMethodRule(),
             new UnreachableCodeRule(),
             new UnusedImportRule(),
             new UnusedParameterRule(),
@@ -156,6 +159,7 @@ final class RuleRegistry
             new ConfusingNameRule(),
             new GenericMethodNameRule(),
             new HungarianNotationRule(),
+            new IdentifierQualityRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
             new ConstructorPromotionCandidateRule(),

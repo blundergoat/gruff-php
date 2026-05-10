@@ -69,13 +69,15 @@ final readonly class NpathComplexityRule implements RuleInterface
             $severity = $npath > $errorThreshold ? Severity::Error : Severity::Warning;
             $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $capped = $npath >= self::MAX_NPATH;
+            $npathLabel = $capped ? '>=' . self::formatNumber(self::MAX_NPATH) . ' (cap reached)' : self::formatNumber($npath);
 
             $findings[] = new Finding(
                 ruleId: $definition->id,
                 message: sprintf(
-                    '%s has an NPath complexity of %d, above the %s threshold of %s.',
+                    '%s has an NPath complexity of %s, above the %s threshold of %s.',
                     $symbol,
-                    $npath,
+                    $npathLabel,
                     $severity->value,
                     self::formatNumber($threshold),
                 ),
@@ -91,6 +93,7 @@ final readonly class NpathComplexityRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'npath' => $npath,
+                    'capped' => $capped,
                     'threshold' => $threshold,
                     'thresholdType' => $severity->value,
                 ],
@@ -206,6 +209,6 @@ final readonly class NpathComplexityRule implements RuleInterface
             return (string) $value;
         }
 
-        return (string) (int) $value;
+        return number_format((int) $value);
     }
 }

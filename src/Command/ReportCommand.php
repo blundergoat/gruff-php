@@ -32,6 +32,14 @@ final class ReportCommand extends Command
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', null)
+            ->addOption('diff-vs', null, InputOption::VALUE_REQUIRED, 'Compare current findings against a base Git ref and report introduced/removed/unchanged findings.')
+            ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
+            ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
+            ->addOption('min-severity', null, InputOption::VALUE_REQUIRED, 'Display only findings at or above advisory, warning, or error.')
+            ->addOption('include-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars or repeated values.')
+            ->addOption('exclude-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated pillars or repeated values.')
+            ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated rule IDs or repeated values.')
+            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated rule IDs or repeated values.')
             ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.')
             ->addOption(
                 'baseline',
@@ -97,7 +105,7 @@ final class ReportCommand extends Command
         $command[] = '--fail-on';
         $command[] = $this->optionalStringOption($input, 'fail-on') ?? 'none';
 
-        foreach (['config', 'infection-report', 'mutation-baseline', 'mutation-budget', 'history-file'] as $option) {
+        foreach (['config', 'infection-report', 'mutation-baseline', 'mutation-budget', 'history-file', 'diff-vs', 'paths-relative-to', 'min-severity'] as $option) {
             $value = $this->optionalStringOption($input, $option);
 
             if ($value === null) {
@@ -133,6 +141,25 @@ final class ReportCommand extends Command
 
         if ((bool) $input->getOption('include-ignored')) {
             $command[] = '--include-ignored';
+        }
+
+        if ((bool) $input->getOption('changed-only')) {
+            $command[] = '--changed-only';
+        }
+
+        foreach (['include-pillar', 'exclude-pillar', 'include-rule', 'exclude-rule'] as $option) {
+            $values = $input->getOption($option);
+
+            if (!is_array($values)) {
+                continue;
+            }
+
+            foreach ($values as $value) {
+                if (is_string($value) && $value !== '') {
+                    $command[] = '--' . $option;
+                    $command[] = $value;
+                }
+            }
         }
 
         if ($input->hasParameterOption('--report-interactive', true)) {

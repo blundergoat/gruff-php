@@ -100,7 +100,7 @@ final readonly class AnalyseCommandSetupBuilder
         $format = OutputFormat::fromInput($rawValue);
 
         return $format ?? sprintf(
-            '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, or hotspot.</error>',
+            '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, hotspot, or sarif.</error>',
             $rawValue,
         );
     }

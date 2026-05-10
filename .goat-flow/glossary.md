@@ -28,11 +28,15 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `Application`
 
-`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse`, `report`, and `dashboard` commands.
+`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse`, `report`, `dashboard`, and `list-rules` commands.
 
 ### `analyse` command
 
-`src/Command/AnalyseCommand.php`. Primary analysis command. Accepts a variadic `paths` argument and the options `--config`, `--no-config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--report-editor-link` (`none`|`vscode`|`phpstorm`, default `none`), `--report-interactive` (optional boolean for HTML findings filters), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline`.
+`src/Command/AnalyseCommand.php`. Primary analysis command. Accepts a variadic `paths` argument and the options `--config`, `--no-config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`|`sarif`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--report-editor-link` (`none`|`vscode`|`phpstorm`, default `none`), `--report-interactive` (optional boolean for HTML findings filters), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--diff-vs`, `--changed-only`, display filters, `--paths-relative-to`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline`.
+
+### `list-rules` command
+
+`src/Command/ListRulesCommand.php`. Registry metadata command. Emits rule id, name, pillar, tier, default severity, confidence, default enabled state, thresholds, options, and description as a table or JSON (`--format=json`) so agents do not need to scrape source code.
 
 ### `report` command
 
@@ -180,6 +184,14 @@ Project-root config file consumed by `ConfigLoader`. Default location is `<proje
 
 `src/Diff/GitDiffProvider.php` and `src/Diff/DiffFindingFilter.php`. Enabled by `--diff` with an optional mode. Supported modes are `working-tree` (default when the flag has no value), `staged`, `unstaged`, or a base ref. Diff mode requires a Git worktree, parses zero-context `git diff`, keeps findings on changed line ranges, and falls back to changed-file filtering for line-less findings.
 
+### Branch Review Mode
+
+`src/Review/` and `--diff-vs=<base>`. Compares current findings against a Git archive snapshot of the base ref without mutating the working tree. Findings are matched by `file + ruleId + symbol`, falling back to `file + ruleId + message`, so line shifts do not make unchanged logical findings look introduced. `--changed-only` limits comparison to files changed from the base ref.
+
+### Display Filters
+
+`src/Reporting/FindingDisplayFilter.php` plus `--min-severity`, `--include-pillar`, `--exclude-pillar`, `--include-rule`, and `--exclude-rule`. Filters run after analysis/scoring/baseline/review and before rendering. They affect report contents and are recorded in `run.filters`; they do not change rule execution, scoring, or baseline generation.
+
 ### Trend History
 
 `src/Trend/TrendRecorder.php`. Optional score-history writer enabled only by `--history-file <path>`. It appends a bounded JSON entry with timestamp, composite score, letter grade, and finding count, then reports current-vs-previous score delta.
@@ -210,7 +222,19 @@ Project-root config file consumed by `ConfigLoader`. Default location is `<proje
 
 ### Finding
 
-`src/Finding/Finding.php`. Readonly value object representing a single rule hit. Carries `ruleId`, `message`, `filePath`, optional location (`line`, `endLine`, `column`, `symbol`), `severity`, `pillar`, `secondaryPillars`, `tier`, `confidence`, optional `remediation`, and free-form `metadata`. `fingerprint()` returns a stable 16-character sha256 prefix derived from `(ruleId, file, line, endLine, column, symbol)`.
+`src/Finding/Finding.php`. Readonly value object representing a single rule hit. Carries `ruleId`, `message`, `filePath`, optional location (`line`, `endLine`, `column`, `symbol`), `severity`, `pillar`, `secondaryPillars`, `tier`, `confidence`, optional `remediation`, and free-form `metadata`. Empty metadata serializes as `{}` in JSON. `fingerprint()` returns a stable 16-character sha256 prefix derived from `(ruleId, file, line, endLine, column, symbol)`.
+
+### SARIF
+
+`src/Reporting/SarifReporter.php` and `--format=sarif`. Emits SARIF 2.1.0 JSON with rule metadata, locations, severity mapping, and gruff partial fingerprints for code-scanning consumers.
+
+### Identifier Quality
+
+`src/Rule/Naming/IdentifierQualityRule.php`. Advisory naming rule (`naming.identifier-quality`) that catches high-signal placeholder, all-generic, and numbered identifiers from AST nodes. Uses `IdentifierTokenizer` plus rule-local options (`placeholderNames`, `genericTokens`, `ignoredNames`, `minScopeReferences`) and `allowlists.acceptedAbbreviations`.
+
+### One-Line Method
+
+`src/Rule/Waste/OneLineMethodRule.php`. Advisory waste/dead-code rule (`waste.one-line-method`) that flags trivial class methods whose whole body is a single-line return or expression wrapping a call. It skips magic, lifecycle, test, provider, and no-parameter accessor-like cases by default.
 
 ### Fingerprint
 
@@ -252,7 +276,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `AnalysisReport` / `gruff.analysis.v1`
 
-`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths), summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, optional score data, optional diff metadata, optional trend data, and optional baseline metadata.
+`src/Analysis/AnalysisReport.php`. The schema-versioned payload (`SCHEMA_VERSION = 'gruff.analysis.v1'`). Includes tool metadata, run metadata (format, failOn, configPath, paths, filters), summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, optional score data, optional diff metadata, optional branch-review metadata, optional trend data, and optional baseline metadata.
 
 ### `RunDiagnostic`
 

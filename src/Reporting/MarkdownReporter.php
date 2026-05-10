@@ -20,12 +20,42 @@ final readonly class MarkdownReporter
             sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
+        ];
+
+        if ($report->filters !== null && $report->filters->active()) {
+            $lines[] = sprintf('**Filters:** `%s`', $this->inlineJson($report->filters->toArray()));
+        }
+
+        if ($report->review !== null) {
+            $lines[] = sprintf(
+                '**Branch review:** base `%s`, %d introduced, %d removed, %d unchanged',
+                $report->review->base,
+                count($report->review->introduced),
+                count($report->review->removed),
+                count($report->review->unchanged),
+            );
+        }
+
+        $lines[] = '';
+        $lines[] = '## Branch Review';
+        $lines[] = '';
+
+        if ($report->review === null) {
+            $lines[] = 'Not enabled.';
+        } else {
+            $this->appendFindingGroups($lines, 'Introduced findings', $report->review->introduced);
+            $this->appendFindingGroups($lines, 'Removed findings', $report->review->removed);
+            $this->appendFindingGroups($lines, 'Unchanged findings', $report->review->unchanged);
+        }
+
+        array_push(
+            $lines,
             '',
             '## Pillars',
             '',
             '| Pillar | Grade | Score | Findings |',
             '| --- | --- | ---: | ---: |',
-        ];
+        );
 
         foreach ($pillars as $pillar) {
             $lines[] = sprintf(
@@ -44,9 +74,7 @@ final readonly class MarkdownReporter
         if ($report->findings === []) {
             $lines[] = 'No findings.';
         } else {
-            foreach (array_slice($report->findings, 0, 20) as $finding) {
-                $lines[] = $this->findingLine($finding);
-            }
+            $this->appendFindingGroups($lines, 'Current findings', $report->findings, includeHeading: false);
         }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
@@ -55,14 +83,72 @@ final readonly class MarkdownReporter
     private function findingLine(Finding $finding): string
     {
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
+        $symbol = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
         return sprintf(
-            '- **%s** `%s` %s - %s',
+            '- **%s** `%s` %s%s - %s',
             $finding->severity->value,
             $finding->ruleId,
             $location,
+            $symbol,
             $finding->message,
         );
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param list<Finding> $findings
+     */
+    private function appendFindingGroups(array &$lines, string $title, array $findings, bool $includeHeading = true): void
+    {
+        if ($includeHeading) {
+            $lines[] = sprintf('### %s', $title);
+            $lines[] = '';
+        }
+
+        if ($findings === []) {
+            $lines[] = 'None.';
+            $lines[] = '';
+            return;
+        }
+
+        $groups = [];
+        foreach ($findings as $finding) {
+            $groups[$finding->severity->value][$finding->filePath][] = $finding;
+        }
+
+        foreach (['error', 'warning', 'advisory'] as $severity) {
+            if (!isset($groups[$severity])) {
+                continue;
+            }
+
+            ksort($groups[$severity], SORT_STRING);
+            $count = array_sum(array_map('count', $groups[$severity]));
+            $lines[] = sprintf('<details open><summary>%s (%d)</summary>', ucfirst($severity), $count);
+            $lines[] = '';
+
+            foreach ($groups[$severity] as $file => $fileFindings) {
+                $lines[] = sprintf('**%s**', $file);
+                $lines[] = '';
+
+                foreach ($fileFindings as $finding) {
+                    $lines[] = $this->findingLine($finding);
+                }
+
+                $lines[] = '';
+            }
+
+            $lines[] = '</details>';
+            $lines[] = '';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $value
+     */
+    private function inlineJson(array $value): string
+    {
+        return json_encode($value, JSON_UNESCAPED_SLASHES) ?: '{}';
     }
 
     private function escapeTable(string $value): string

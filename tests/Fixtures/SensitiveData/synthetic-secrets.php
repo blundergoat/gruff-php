@@ -10,7 +10,7 @@ $anthropic = 'sk-ant-api03-uQ7vR2mN5xP8zL1kC4bH9sT6wY3aD0fG';
 $slack = 'xoxb-123456789012-987654321098-AbCdEfGhIjKlMnOpQrSt';
 $jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 $database = 'mysql://appuser:rN7pQ4sV9xY2zA5b@db.internal/app';
-$envSnippet = 'DB_PASSWORD=rN7pQ4sV9xY2zA5b';
+$envSnippet = 'API_TOKEN=rN7pQ4sV9xY2zA5bC8dG';
 $entropy = 'M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ';
 $privateKey = <<<KEY
 -----BEGIN RSA PRIVATE KEY-----

@@ -67,6 +67,10 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
 
         foreach ($this->documentableClasses($unit, $finder) as $class) {
             foreach ($this->methodsMissingPhpdoc($class, $finder, $minBodyLines, $minParameters) as $method) {
+                if ((new DocsInheritanceHelper())->hasInheritedContractDoc($method, $unit->statements, $finder)) {
+                    continue;
+                }
+
                 $findings[] = $this->findingForMethod($unit, $definition, $method);
             }
         }

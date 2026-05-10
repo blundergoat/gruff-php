@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-10. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-11. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -46,7 +46,7 @@ scripts/
 
 src/
 |-- Analysis/
-|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/trend/baseline
+|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/review/trend/baseline/filter metadata
 |   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/baseline/history errors)
 |-- Baseline/
 |   |-- BaselineData.php                      = loaded/generated baseline entries indexed by fingerprint
@@ -56,8 +56,9 @@ src/
 |   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
 |   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
 |-- Command/
-|   |-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, scores, renders, and resolves exit code
+|   |-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
 |   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
+|   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
 |   `-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
@@ -66,7 +67,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`
+|   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`; registers `analyse`, `dashboard`, `list-rules`, and `report`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception
@@ -79,6 +80,11 @@ src/
 |   |-- Pillar.php                            = quality pillar enum (size, complexity, coupling, dead-code, naming, documentation, security, sensitive-data, design, modernisation, test-quality, architecture, maintainability, mutation)
 |   |-- RuleTier.php                          = release-tier enum (currently only `v0.1`)
 |   `-- Severity.php                          = `advisory` / `warning` / `error` enum
+|-- Review/
+|   |-- BranchReviewComparator.php            = stable-identity introduced/removed/unchanged finding comparison
+|   |-- BranchReviewResult.php                = branch-review metadata exposed in reports
+|   |-- FindingReviewIdentity.php             = review identity key: file + rule + symbol/message
+|   `-- GitArchiveSnapshot.php                = temporary `git archive` extraction for base-ref analysis without worktree mutation
 |-- Mutation/
 |   |-- InfectionMutant.php                   = parsed Infection mutant row with status, file, line, mutator, diff, and process output
 |   |-- InfectionReport.php                   = parsed Infection report plus MSI, covered MSI, survived-mutant, and per-file summary helpers
@@ -98,16 +104,18 @@ src/
 |   `-- PhpUnitConfigDiscovery.php            = walks `phpunit.xml`/`phpunit.xml.dist`/`phpunit.dist.xml` from a project root once per analyser run; cached per root
 |-- Reporting/
 |   |-- FailThreshold.php                     = `none` / `advisory` / `warning` / `error` enum + `isTriggeredBy(Severity)` predicate
+|   |-- FindingDisplayFilter.php              = post-analysis display filter for severity, pillar, and rule include/exclude flags
 |   |-- GithubAnnotationsReporter.php         = GitHub Actions annotation renderer with escaped annotation properties
 |   |-- HotspotReporter.php                   = hotspot-map JSON renderer based on file scores
 |   |-- HtmlReporter.php                      = self-contained escaped HTML report renderer
 |   |-- JsonReporter.php                      = pretty-printed JSON renderer of `AnalysisReport::toArray()`
-|   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer
-|   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` enum
+|   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer with branch-review and grouped findings
+|   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` / `sarif` enum
+|   |-- SarifReporter.php                     = SARIF 2.1.0 renderer for code-scanning ingestion
 |   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, baseline, findings, summary)
 |-- Rule/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
-|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals)
+|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
 |   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs PHP rules on PHP files only, runs source-text rules on text files too, then sorts findings by file/line/ruleId/message
 |   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
@@ -136,6 +144,8 @@ src/
 |   |   |-- ConfusingNameRule.php             = `naming.confusing-name`
 |   |   |-- GenericMethodNameRule.php         = `naming.generic-method`
 |   |   |-- HungarianNotationRule.php         = `naming.hungarian-notation`
+|   |   |-- IdentifierQualityRule.php         = `naming.identifier-quality`
+|   |   |-- IdentifierTokenizer.php           = shared camel/snake/acronym tokenizer for identifier-quality
 |   |   |-- ShortVariableRule.php             = `naming.short-variable`
 |   |   `-- TestNamingConsistencyRule.php     = `naming.test-naming-consistency`
 |   |-- Modernisation/                        = AST-driven PHP-modernisation opportunity rules; PHP syntax suggestions respect `minimumPhpVersion`
@@ -222,6 +232,7 @@ src/
 |       |-- CommentedOutCodeRule.php          = `waste.commented-out-code`
 |       |-- EmptyClassRule.php                = `waste.empty-class`
 |       |-- EmptyMethodRule.php               = `waste.empty-method`
+|       |-- OneLineMethodRule.php             = `waste.one-line-method`
 |       |-- UnreachableCodeRule.php           = `waste.unreachable-code`
 |       |-- UnusedImportRule.php              = `waste.unused-import`
 |       `-- UnusedParameterRule.php           = `waste.unused-parameter`
@@ -261,6 +272,8 @@ tests/
 |   `-- PhpFileParserTest.php                 = valid parse, syntax-error diagnostics, parent-connecting visitor
 |-- Reporting/
 |   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
+|-- Review/
+|   `-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
