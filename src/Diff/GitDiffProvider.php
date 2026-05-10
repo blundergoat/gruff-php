@@ -74,10 +74,17 @@ final readonly class GitDiffProvider
         $changedFiles = [];
         $changedLines = [];
         $currentFile = null;
+        $oldFile = null;
 
         foreach (preg_split('/\R/', $diff) ?: [] as $line) {
+            if (str_starts_with($line, '--- ')) {
+                $oldFile = $this->parseOldFilePath($line);
+                continue;
+            }
+
             if (str_starts_with($line, '+++ ')) {
-                $currentFile = $this->parseNewFilePath($line);
+                $currentFile = $this->parseNewFilePath($line) ?? $oldFile;
+                $oldFile = null;
 
                 if ($currentFile !== null && !in_array($currentFile, $changedFiles, true)) {
                     $changedFiles[] = $currentFile;
@@ -114,6 +121,21 @@ final readonly class GitDiffProvider
         }
 
         if (str_starts_with($rawPath, 'b/')) {
+            return substr($rawPath, 2);
+        }
+
+        return $rawPath;
+    }
+
+    private function parseOldFilePath(string $line): ?string
+    {
+        $rawPath = substr($line, 4);
+
+        if ($rawPath === '/dev/null') {
+            return null;
+        }
+
+        if (str_starts_with($rawPath, 'a/')) {
             return substr($rawPath, 2);
         }
 

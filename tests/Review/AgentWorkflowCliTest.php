@@ -248,6 +248,175 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * @throws JsonException
      */
+    public function testBranchReviewAddedFileDoesNotFailBaseSnapshot(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($repo . '/src', 0777, true));
+            $this->runGit($repo, 'init');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            file_put_contents($repo . '/src/Existing.php', $this->baseExampleSource());
+            $this->runGit($repo, 'add', 'src/Existing.php');
+            $this->runGit($repo, 'commit', '-m', 'base');
+
+            file_put_contents($repo . '/src/NewRisk.php', $this->addedRiskSource());
+            $this->runGit($repo, 'add', 'src/NewRisk.php');
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff',
+                'analyse',
+                'src/NewRisk.php',
+                '--format=json',
+                '--fail-on=none',
+                '--no-config',
+                '--no-baseline',
+                '--diff-vs=HEAD',
+                '--changed-only',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJson($process);
+            self::assertSame([], $this->diagnosticTypes($report));
+
+            $review = $this->arrayValue($report, 'review');
+            $counts = $this->arrayValue($review, 'counts');
+
+            self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'introduced'));
+            self::assertSame(0, $this->intValue($counts, 'removed'));
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testBranchReviewChangedOnlyWithoutPathsScopesCurrentScanToChangedFiles(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($repo . '/src', 0777, true));
+            $this->runGit($repo, 'init');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            file_put_contents($repo . '/src/Target.php', $this->baseExampleSource());
+            file_put_contents($repo . '/src/Unrelated.php', $this->addedRiskSource());
+            $this->runGit($repo, 'add', 'src/Target.php', 'src/Unrelated.php');
+            $this->runGit($repo, 'commit', '-m', 'base');
+
+            file_put_contents($repo . '/src/Target.php', $this->changedExampleSource());
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff',
+                'analyse',
+                '--format=json',
+                '--fail-on=none',
+                '--no-config',
+                '--no-baseline',
+                '--diff-vs=HEAD',
+                '--changed-only',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJson($process);
+            self::assertSame([], $this->diagnosticTypes($report));
+
+            $summary = $this->arrayValue($report, 'summary');
+            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
+
+            $review = $this->arrayValue($report, 'review');
+            $counts = $this->arrayValue($review, 'counts');
+
+            self::assertSame(1, $this->intValue($counts, 'introduced'));
+            self::assertContains('Example::newRisk()', $this->symbolsFromFindings($review['introduced'] ?? null));
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testBranchReviewDeletedFileReportsRemovedFindings(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($repo . '/src', 0777, true));
+            $this->runGit($repo, 'init');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            file_put_contents($repo . '/src/Deleted.php', $this->removedBaseExampleSource());
+            $this->runGit($repo, 'add', 'src/Deleted.php');
+            $this->runGit($repo, 'commit', '-m', 'base');
+
+            unlink($repo . '/src/Deleted.php');
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff',
+                'analyse',
+                'src',
+                '--format=json',
+                '--fail-on=none',
+                '--no-config',
+                '--no-baseline',
+                '--diff-vs=HEAD',
+                '--changed-only',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJson($process);
+            self::assertSame([], $this->diagnosticTypes($report));
+
+            $review = $this->arrayValue($report, 'review');
+            $counts = $this->arrayValue($review, 'counts');
+
+            self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'removed'));
+            self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($review['removed'] ?? null));
+
+            $explicitPathProcess = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff',
+                'analyse',
+                'src/Deleted.php',
+                '--format=json',
+                '--fail-on=none',
+                '--no-config',
+                '--no-baseline',
+                '--diff-vs=HEAD',
+                '--changed-only',
+            ], $repo);
+            $explicitPathProcess->run();
+
+            self::assertSame(0, $explicitPathProcess->getExitCode(), $explicitPathProcess->getOutput() . $explicitPathProcess->getErrorOutput());
+            $explicitPathReport = $this->decodeJson($explicitPathProcess);
+            self::assertSame([], $this->diagnosticTypes($explicitPathReport));
+
+            $explicitPathReview = $this->arrayValue($explicitPathReport, 'review');
+            $explicitPathCounts = $this->arrayValue($explicitPathReview, 'counts');
+
+            self::assertGreaterThanOrEqual(1, $this->intValue($explicitPathCounts, 'removed'));
+            self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($explicitPathReview['removed'] ?? null));
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
     public function testReviewModeReportsNonGitDiagnostic(): void
     {
         $repo = $this->tempDir();
@@ -476,6 +645,21 @@ final class Example
     public function oldRisk(string $left, string $right): string
     {
         return $left . $right;
+    }
+}
+PHP;
+    }
+
+    private function addedRiskSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+final class NewRisk
+{
+    public function decode(string $payload): mixed
+    {
+        return unserialize($payload);
     }
 }
 PHP;

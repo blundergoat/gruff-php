@@ -93,24 +93,15 @@ php bin/gruff analyse src --diff=deploy --format json --fail-on none > /tmp/gruf
 
 ## Branch Review / Introduced Findings
 
-Use branch-review mode when you need the answer to "what did this branch make worse?"
+Use branch-review mode when you need the answer to "what did this branch make worse?" Load [`gruff-cli-branch-review.md`](./gruff-cli-branch-review.md) for the full agent playbook, including the recommended no-path command.
+
+Quick JSON command from the target project root:
 
 ```bash
-php bin/gruff analyse src --diff-vs=deploy --changed-only --format markdown --fail-on none
+php /path/to/gruff-php/bin/gruff analyse --diff-vs=origin/deploy --changed-only --format=json --fail-on=none > /tmp/gruff-review.json
 ```
 
-Agent-friendly JSON:
-
-```bash
-php bin/gruff analyse src --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
-```
-
-Branch-review mode analyses the current tree and a Git archive snapshot of the base ref, then compares findings by stable review identity:
-
-- `file + ruleId + symbol` when a symbol exists.
-- `file + ruleId + message` when no symbol exists.
-
-Line numbers remain report context only, so a moved method does not become an introduced finding just because its line changed. The JSON `review` object contains `introduced`, `removed`, `unchanged`, counts, `base`, `changedOnly`, and `deltaScore`.
+With `--changed-only` and no explicit paths, gruff derives changed files from Git internally. Do not wrap the command in a separate `git diff | mapfile` step unless intentionally forcing a custom path list.
 
 ## Full Project vs Diff
 
@@ -133,6 +124,7 @@ Branch review:
 - Best for coding-agent review comments.
 - Separates `introduced`, `removed`, and `unchanged` findings against a base ref.
 - Use `--changed-only` to compare only files changed from the base ref.
+- With no explicit paths, derives changed files from Git internally.
 - Requires Git, but does not mutate the working tree.
 
 When in doubt, run both:
@@ -140,7 +132,7 @@ When in doubt, run both:
 ```bash
 php bin/gruff analyse src --format json --fail-on none > /tmp/gruff-full.json
 php bin/gruff analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
-php bin/gruff analyse src --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
+php bin/gruff analyse --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
 ```
 
 ## Config

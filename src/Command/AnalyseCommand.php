@@ -34,6 +34,7 @@ use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
+use GruffPhp\Source\SourceDiscoveryResult;
 use GruffPhp\Trend\TrendRecorder;
 use JsonException;
 use RuntimeException;
@@ -111,14 +112,22 @@ final class AnalyseCommand extends Command
         $failThreshold = $setup->failThreshold;
         $config = $setup->config;
         $registry = $setup->registry;
+        $diagnostics = [];
+        $reviewDiff = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
+        $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
 
-        $sources = (new AnalysisSourceLoader())->load(
-            $projectRoot,
-            $options->paths,
-            $options->includeIgnored,
-            $config->ignoredPathPatterns(),
+        $sources = $analysisPaths === null
+            ? new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], [])
+            : (new AnalysisSourceLoader())->load(
+                $projectRoot,
+                $analysisPaths,
+                $options->includeIgnored,
+                $config->ignoredPathPatterns(),
+            );
+        $diagnostics = array_merge(
+            $diagnostics,
+            $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
-        $diagnostics = $sources->diagnostics;
 
         $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
@@ -132,7 +141,6 @@ final class AnalyseCommand extends Command
         }
 
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        $reviewDiff = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
         if ($options->diffVs !== null && $options->changedOnly && $reviewDiff instanceof DiffResult) {
             $findings = $this->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }
@@ -275,6 +283,55 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * @return list<string>|null Null means the changed-only review diff is empty, so no current files should be scanned.
+     */
+    private function currentAnalysisPaths(AnalyseCommandOptions $options, ?DiffResult $reviewDiff): ?array
+    {
+        if (!$options->changedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
+            return $options->paths;
+        }
+
+        return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
+    }
+
+    /**
+     * @param list<RunDiagnostic> $diagnostics
+     * @return list<RunDiagnostic>
+     */
+    private function filterSourceDiagnostics(
+        array $diagnostics,
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        ?DiffResult $reviewDiff,
+    ): array {
+        if (!$options->changedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
+            return $diagnostics;
+        }
+
+        return array_values(array_filter(
+            $diagnostics,
+            function (RunDiagnostic $diagnostic) use ($projectRoot, $reviewDiff): bool {
+                if ($diagnostic->type !== 'missing-path' || $diagnostic->path === null) {
+                    return true;
+                }
+
+                $requestedPaths = $this->normaliseRequestedPaths($projectRoot, [$diagnostic->path]);
+                if ($requestedPaths === []) {
+                    return true;
+                }
+
+                foreach ($reviewDiff->changedFiles as $changedFile) {
+                    if ($this->matchesRequestedPath($changedFile, $requestedPaths)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+        ));
+    }
+
+    /**
      * @param list<RunDiagnostic> $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
      */
@@ -355,10 +412,24 @@ final class AnalyseCommand extends Command
 
         $snapshot = new GitArchiveSnapshot();
         $baseRoot = null;
+        $baseSnapshotPaths = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff);
+        $baseAnalysisPaths = $this->baseAnalysisPaths($projectRoot, $options);
+
+        if ($options->changedOnly && $baseSnapshotPaths === []) {
+            $baseScore = (new ScoreCalculator())->calculate([], null, null);
+
+            return (new BranchReviewComparator())->compare(
+                current: $currentFindings,
+                base: [],
+                baseRef: $options->diffVs,
+                changedOnly: true,
+                deltaScore: $currentScore - $baseScore->composite->score,
+            );
+        }
 
         try {
-            $baseRoot = $snapshot->create($projectRoot, $options->diffVs);
-            $basePaths = $this->existingSnapshotPaths($baseRoot, $options->paths);
+            $baseRoot = $snapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
+            $basePaths = $this->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
 
             if ($basePaths !== []) {
@@ -402,6 +473,49 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * @return list<string>
+     */
+    private function baseSnapshotPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
+    {
+        if (!$options->changedOnly) {
+            return $this->normaliseRequestedPaths($projectRoot, $options->paths);
+        }
+
+        if ($reviewDiff->changedFiles === []) {
+            return [];
+        }
+
+        if ($options->paths === []) {
+            return $reviewDiff->changedFiles;
+        }
+
+        $requestedPaths = $this->normaliseRequestedPaths($projectRoot, $options->paths);
+        if ($requestedPaths === []) {
+            return [];
+        }
+
+        $paths = array_values(array_filter(
+            $reviewDiff->changedFiles,
+            fn (string $changedFile): bool => $this->matchesRequestedPath($changedFile, $requestedPaths),
+        ));
+        sort($paths, SORT_STRING);
+
+        return $paths;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options): array
+    {
+        if ($options->paths === []) {
+            return [];
+        }
+
+        return $this->normaliseRequestedPaths($projectRoot, $options->paths);
+    }
+
+    /**
      * @param list<string> $paths
      * @return list<string>
      */
@@ -418,6 +532,76 @@ final class AnalyseCommand extends Command
         }
 
         return $existing === [] ? [] : $existing;
+    }
+
+    /**
+     * @param list<string> $paths
+     * @return list<string>
+     */
+    private function normaliseRequestedPaths(string $projectRoot, array $paths): array
+    {
+        $root = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
+        $normalised = [];
+
+        foreach ($paths as $path) {
+            $candidate = $this->normalisePath($path);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (str_starts_with($candidate, '/')) {
+                if ($candidate === $root) {
+                    $candidate = '.';
+                } elseif (str_starts_with($candidate, $root . '/')) {
+                    $candidate = substr($candidate, strlen($root) + 1);
+                } else {
+                    continue;
+                }
+            }
+
+            while (str_starts_with($candidate, './')) {
+                $candidate = substr($candidate, 2);
+            }
+
+            $candidate = rtrim($candidate, '/');
+            $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
+        }
+
+        $paths = array_values($normalised);
+        sort($paths, SORT_STRING);
+
+        return $paths;
+    }
+
+    /**
+     * @param list<string> $requestedPaths
+     */
+    private function matchesRequestedPath(string $changedFile, array $requestedPaths): bool
+    {
+        $changedFile = $this->normalisePath($changedFile);
+
+        foreach ($requestedPaths as $requestedPath) {
+            if ($requestedPath === '.') {
+                return true;
+            }
+
+            if ($changedFile === $requestedPath || str_starts_with($changedFile, $requestedPath . '/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalisePath(string $path): string
+    {
+        $path = str_replace('\\', '/', trim($path));
+
+        while (str_contains($path, '//')) {
+            $path = str_replace('//', '/', $path);
+        }
+
+        return $path;
     }
 
     /**

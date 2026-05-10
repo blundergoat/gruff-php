@@ -56,7 +56,7 @@ src/
 |   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
 |   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
 |-- Command/
-|   |-- AnalyseCommand.php                    = `analyse` command; loads config, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
+|   |-- AnalyseCommand.php                    = `analyse` command; loads config, derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
 |   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
 |   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
 |   `-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
@@ -73,7 +73,7 @@ src/
 |   |-- DiffException.php                     = diff-mode failure exception
 |   |-- DiffFindingFilter.php                 = keeps findings touching changed ranges or changed files
 |   |-- DiffResult.php                        = diff-mode metadata exposed in reports
-|   `-- GitDiffProvider.php                   = zero-context `git diff` parser for working-tree, staged, unstaged, or base-ref modes
+|   `-- GitDiffProvider.php                   = zero-context `git diff` parser for working-tree, staged, unstaged, or base-ref modes; includes deleted-file paths for branch-review removed findings
 |-- Finding/
 |   |-- Confidence.php                        = `low` / `medium` / `high` enum
 |   |-- Finding.php                           = readonly finding value with stable `fingerprint()` (sha256 of identity fields, truncated)
@@ -84,7 +84,7 @@ src/
 |   |-- BranchReviewComparator.php            = stable-identity introduced/removed/unchanged finding comparison
 |   |-- BranchReviewResult.php                = branch-review metadata exposed in reports
 |   |-- FindingReviewIdentity.php             = review identity key: file + rule + symbol/message
-|   `-- GitArchiveSnapshot.php                = temporary `git archive` extraction for base-ref analysis without worktree mutation
+|   `-- GitArchiveSnapshot.php                = temporary path-limited `git archive` extraction for base-ref analysis without worktree mutation or buffered tar handoff
 |-- Mutation/
 |   |-- InfectionMutant.php                   = parsed Infection mutant row with status, file, line, mutator, diff, and process output
 |   |-- InfectionReport.php                   = parsed Infection report plus MSI, covered MSI, survived-mutant, and per-file summary helpers
