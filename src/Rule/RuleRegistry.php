@@ -58,19 +58,24 @@ use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
 use GruffPhp\Rule\TestQuality\EmptyDataProviderRule;
+use GruffPhp\Rule\TestQuality\ExceptionTypeOnlyRule;
 use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
 use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
+use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
+use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
+use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
@@ -180,19 +185,24 @@ final class RuleRegistry
             new DataProviderAnnotationRule(),
             new EagerTestRule(),
             new EmptyDataProviderRule(),
+            new ExceptionTypeOnlyRule(),
             new ExcessiveMockingRule(),
             new ExtendsProductionClassRule(),
+            new GlobalStateMutationRule(),
             new LoopAssertionWithoutMessageRule(),
             new LoopInTestRule(),
             new MagicNumberAssertionRule(),
             new MockOnlyTestRule(),
+            new MockWithoutExpectationRule(),
             new MysteryGuestRule(),
             new NoAssertionsRule(),
             new PrivateReflectionRule(),
+            new RepeatedStructureMissingDataProviderRule(),
             new SetupBloatRule(),
             new SkippedWithoutReasonRule(),
             new SleepInTestRule(),
             new SutNotCalledRule(),
+            new TautologicalTypeAssertionRule(),
             new TestLongerThanSutRule(),
             new TestMethodTooLongRule(),
             new TestQualityNamingConsistencyRule(),

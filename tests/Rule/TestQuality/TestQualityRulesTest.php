@@ -15,19 +15,24 @@ use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
 use GruffPhp\Rule\TestQuality\EmptyDataProviderRule;
+use GruffPhp\Rule\TestQuality\ExceptionTypeOnlyRule;
 use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
 use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
+use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
+use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
+use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
+use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule;
@@ -103,6 +108,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
         self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 0, $findings);
         self::assertRuleCount(UnusedMockRule::ID, 0, $findings);
+        self::assertRuleCount(ExceptionTypeOnlyRule::ID, 0, $findings);
+        self::assertRuleCount(TautologicalTypeAssertionRule::ID, 0, $findings);
+        self::assertRuleCount(GlobalStateMutationRule::ID, 0, $findings);
+        self::assertRuleCount(MockWithoutExpectationRule::ID, 0, $findings);
+        self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 0, $findings);
     }
 
     public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
@@ -138,6 +148,55 @@ final class TestQualityRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/unused-mock.php');
 
         self::assertRuleCount(UnusedMockRule::ID, 2, $findings);
+    }
+
+    public function testExceptionTypeOnlyDetectedAndPairedAssertionsAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/exception-type-only.php');
+
+        self::assertRuleCount(ExceptionTypeOnlyRule::ID, 1, $findings);
+    }
+
+    public function testTautologicalTypeAssertionDetectedAndCrossClassAssertionsAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/tautological-type-assertion.php');
+
+        self::assertRuleCount(TautologicalTypeAssertionRule::ID, 2, $findings);
+    }
+
+    public function testGlobalStateMutationDetectedAndCleanedUpClassAllowed(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/global-state-mutation.php');
+
+        // 3 mutations in the leaky class (superglobal write + putenv + ini_set), 0 in the cleaned-up class, 0 in the read-only class.
+        self::assertRuleCount(GlobalStateMutationRule::ID, 3, $findings);
+    }
+
+    public function testMockWithoutExpectationDetectedWithVariantSeverities(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/mock-without-expectation.php');
+
+        self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
+
+        $variants = [];
+        foreach ($findings as $finding) {
+            if ($finding->ruleId !== MockWithoutExpectationRule::ID) {
+                continue;
+            }
+
+            $variant = $finding->metadata['variant'] ?? null;
+            self::assertIsString($variant);
+            $variants[] = $variant;
+        }
+        sort($variants);
+        self::assertSame(['dead-mock', 'stub-only'], $variants);
+    }
+
+    public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php');
+
+        self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 1, $findings);
     }
 
     public function testTestQualityRulesRespectConfigDisables(): void
@@ -226,6 +285,11 @@ final class TestQualityRulesTest extends TestCase
             EmptyDataProviderRule::ID,
             LoopAssertionWithoutMessageRule::ID,
             UnusedMockRule::ID,
+            ExceptionTypeOnlyRule::ID,
+            TautologicalTypeAssertionRule::ID,
+            GlobalStateMutationRule::ID,
+            MockWithoutExpectationRule::ID,
+            RepeatedStructureMissingDataProviderRule::ID,
         ];
     }
 

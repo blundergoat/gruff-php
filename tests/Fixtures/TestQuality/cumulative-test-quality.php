@@ -208,6 +208,27 @@ final class CumulativeQualityTest extends TestCase
 
         self::assertSame(351, $sum + $tail);
     }
+
+    public function testBareExpectExceptionTypeOnly(): void
+    {
+        $this->expectException(\RuntimeException::class);
+
+        throw new \RuntimeException('boom');
+    }
+
+    public function testAssertInstanceOfTautological(): void
+    {
+        $service = new OrderService();
+
+        self::assertInstanceOf(OrderService::class, $service);
+    }
+
+    public function testWritesSuperglobalWithoutCleanup(): void
+    {
+        $_GET['user'] = 'leaked';
+
+        self::assertSame('leaked', $_GET['user']);
+    }
 }
 
 final class CumulativeQualityProductionExtenderTest extends OrderService
@@ -215,5 +236,29 @@ final class CumulativeQualityProductionExtenderTest extends OrderService
     public function testExtendsProductionInsteadOfTestBase(): void
     {
         // intentionally hollow.
+    }
+}
+
+final class CumulativeRepeatedShapesTest extends \PHPUnit\Framework\TestCase
+{
+    public function testSumsAlpha(): void
+    {
+        $service = new OrderService();
+
+        self::assertSame(1, $service->sum('a'));
+    }
+
+    public function testSumsBeta(): void
+    {
+        $service = new OrderService();
+
+        self::assertSame(2, $service->sum('b'));
+    }
+
+    public function testSumsGamma(): void
+    {
+        $service = new OrderService();
+
+        self::assertSame(3, $service->sum('c'));
     }
 }
