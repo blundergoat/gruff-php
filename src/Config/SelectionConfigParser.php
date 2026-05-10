@@ -114,14 +114,14 @@ final readonly class SelectionConfigParser
     private function requireObject(object|array|string|int|float|bool|null $value): array
     {
         if (!is_array($value) || ($value !== [] && array_is_list($value))) {
-            throw new ConfigException('Config key "selection" must be a JSON object.');
+            throw new ConfigException('Config key "selection" must be an object.');
         }
 
         $result = [];
 
         foreach ($value as $key => $item) {
             if (!is_string($key)) {
-                throw new ConfigException('Config key "selection" must be a JSON object.');
+                throw new ConfigException('Config key "selection" must be an object.');
             }
 
             $result[$key] = $item;
@@ -139,6 +139,6 @@ final readonly class SelectionConfigParser
             return $value;
         }
 
-        throw new ConfigException('Config value must be JSON-compatible.');
+        throw new ConfigException('Config value must be YAML/JSON-compatible.');
     }
 }

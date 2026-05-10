@@ -123,7 +123,7 @@ final class SecurityRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../../..'))->load(
-            'tests/Fixtures/Config/security-disable-dangerous.json',
+            'tests/Fixtures/Config/security-disable-dangerous.yaml',
             $registry,
         );
 

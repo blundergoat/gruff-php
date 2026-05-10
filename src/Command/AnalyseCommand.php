@@ -47,10 +47,12 @@ final class AnalyseCommand extends Command
             ->setName('analyse')
             ->setDescription('Run gruff analysis.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
-            ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
-            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for this run.')
+            ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
+            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.yaml file for this run.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, or hotspot.', OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', FailThreshold::Error->value)
+            ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', 'none')
+            ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', null)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.')
             ->addOption('infection-report', null, InputOption::VALUE_REQUIRED, 'Path to a full Infection JSON report to ingest.')
             ->addOption('infection-run', null, InputOption::VALUE_NONE, 'Run Infection before ingesting the report path supplied by --infection-report.')
@@ -168,7 +170,14 @@ final class AnalyseCommand extends Command
             baseline: $baselineReport,
         );
 
-        $this->renderReport($report, $format, $output);
+        $this->renderReport(
+            $report,
+            $format,
+            $output,
+            $projectRoot,
+            $options->reportEditorLink,
+            $options->reportInteractive,
+        );
 
         return $exitCode;
     }
@@ -251,11 +260,18 @@ final class AnalyseCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function renderReport(AnalysisReport $report, OutputFormat $format, OutputInterface $output): void
+    private function renderReport(
+        AnalysisReport $report,
+        OutputFormat $format,
+        OutputInterface $output,
+        ?string $projectRoot = null,
+        string $reportEditorLink = 'none',
+        bool $reportInteractive = false,
+    ): void
     {
         $renderer = match ($format) {
             OutputFormat::Json => new JsonReporter(),
-            OutputFormat::Html => new HtmlReporter(),
+            OutputFormat::Html => new HtmlReporter($projectRoot ?? '', $reportEditorLink, $reportInteractive),
             OutputFormat::Markdown => new MarkdownReporter(),
             OutputFormat::Github => new GithubAnnotationsReporter(),
             OutputFormat::Hotspot => new HotspotReporter(),

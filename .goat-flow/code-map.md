@@ -62,7 +62,7 @@ src/
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
-|   |-- ConfigLoader.php                      = `.gruff.json` / `--config` JSON loader; strict unknown-key, path, allowlist, selection, type, and threshold validation
+|   |-- ConfigLoader.php                      = `.gruff.yaml` / `--config` YAML loader (`.yaml`/`.yml` only); strict unknown-key, path, allowlist, selection, type, and threshold validation
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
@@ -248,7 +248,7 @@ Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.fleet`, 
 ```text
 tests/
 |-- Config/
-|   `-- ConfigLoaderTest.php                  = default config, JSON overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
+|   `-- ConfigLoaderTest.php                  = default config, YAML overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
 |-- Console/
 |   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
 |-- Diff/
@@ -295,7 +295,7 @@ tests/
 `-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
     |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
     |-- Complexity/                           = complexity-rule source fixtures
-    |-- Config/                               = flat tree of all `.gruff.json` test configs (rule disable, threshold override, selection, allowlists, opt-in heuristic enables, etc.)
+    |-- Config/                               = flat tree of explicit config fixtures (rule disable, threshold override, selection, allowlists, opt-in heuristic enables, etc.)
     |-- DeadCode/                             = dead-code + waste rule source fixtures
     |-- Docs/                                 = documentation-rule source fixtures
     |-- Modernisation/                        = modernisation-rule source fixtures (incl. nested Controller/ for routing-style cases)

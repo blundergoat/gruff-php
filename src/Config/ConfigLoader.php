@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace GruffPhp\Config;
 
 use GruffPhp\Rule\RuleRegistry;
-use JsonException;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 
 final readonly class ConfigLoader
 {
-    private const DEFAULT_CONFIG_FILE = '.gruff.json';
+    public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
 
     public function __construct(private string $projectRoot)
     {
@@ -68,9 +69,9 @@ final readonly class ConfigLoader
             throw new ConfigException(sprintf('Unable to read config file: %s', $path));
         }
 
-        $decoded = $this->decodeJson($contents);
+        $decoded = $this->decodeConfig($contents, $path);
 
-        return $this->requireObject($decoded, 'Config root must be a JSON object.');
+        return $this->requireObject($decoded, 'Config root must be an object.');
     }
 
     /**
@@ -154,7 +155,7 @@ final readonly class ConfigLoader
      */
     private function parsePathsConfig(mixed $value): array
     {
-        $pathsConfig = $this->requireObject($value, 'Config key "paths" must be a JSON object.');
+        $pathsConfig = $this->requireObject($value, 'Config key "paths" must be an object.');
 
         foreach (array_keys($pathsConfig) as $key) {
             if ($key !== 'ignore') {
@@ -174,7 +175,7 @@ final readonly class ConfigLoader
      */
     private function parseAllowlistsConfig(mixed $value): array
     {
-        $allowlists = $this->requireObject($value, 'Config key "allowlists" must be a JSON object.');
+        $allowlists = $this->requireObject($value, 'Config key "allowlists" must be an object.');
 
         foreach (array_keys($allowlists) as $key) {
             if (!in_array($key, ['acceptedAbbreviations', 'secretPreviews'], true)) {
@@ -207,15 +208,24 @@ final readonly class ConfigLoader
     /**
      * @return array<string, mixed>
      */
-    private function decodeJson(string $contents): array
+    private function decodeConfig(string $contents, string $path): array
     {
-        try {
-            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new ConfigException(sprintf('Invalid JSON config: %s', $exception->getMessage()), 0, $exception);
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        if (!in_array($extension, ['yaml', 'yml'], true)) {
+            throw new ConfigException(sprintf(
+                'Config file must use a .yaml or .yml extension: %s',
+                $path,
+            ));
         }
 
-        return $this->requireObject($decoded, 'Config root must be a JSON object.');
+        try {
+            $decoded = Yaml::parse($contents, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
+        } catch (ParseException $exception) {
+            throw new ConfigException(sprintf('Invalid YAML config: %s', $exception->getMessage()), 0, $exception);
+        }
+
+        return $this->requireObject($decoded, 'Config root must be an object.');
     }
 
     /**
@@ -249,6 +259,6 @@ final readonly class ConfigLoader
             return $value;
         }
 
-        throw new ConfigException('Config value must be JSON-compatible.');
+        throw new ConfigException('Config value must be YAML/JSON-compatible.');
     }
 }

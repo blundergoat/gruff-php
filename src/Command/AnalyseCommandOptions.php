@@ -24,6 +24,9 @@ final readonly class AnalyseCommandOptions
         public ?string $historyFile,
         public bool $noBaseline,
         public BaselineApplicationOptions $baseline,
+        public string $reportEditorLink,
+        public bool $reportInteractive,
+        private ?string $optionError = null,
     ) {
     }
 
@@ -34,6 +37,18 @@ final readonly class AnalyseCommandOptions
         $configPath = $input->getOption('config');
         $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
         $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
+        $reportEditorLink = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
+        $reportInteractive = self::reportInteractive($input);
+        $optionError = null;
+
+        if (!in_array($reportEditorLink, ['none', 'vscode', 'phpstorm'], true)) {
+            $optionError = '--report-editor-link must be one of: vscode, phpstorm, none.';
+        }
+
+        if (is_string($reportInteractive)) {
+            $optionError = $reportInteractive;
+            $reportInteractive = false;
+        }
 
         return new self(
             paths: $paths,
@@ -61,6 +76,9 @@ final readonly class AnalyseCommandOptions
                     ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                     : null,
             ),
+            reportEditorLink: $reportEditorLink,
+            reportInteractive: $reportInteractive,
+            optionError: $optionError,
         );
     }
 
@@ -84,6 +102,9 @@ final readonly class AnalyseCommandOptions
             historyFile: $this->historyFile,
             noBaseline: $this->noBaseline,
             baseline: $this->baseline,
+            reportEditorLink: $this->reportEditorLink,
+            reportInteractive: $this->reportInteractive,
+            optionError: $this->optionError,
         );
     }
 
@@ -112,11 +133,18 @@ final readonly class AnalyseCommandOptions
                 baselineExplicit: false,
                 generateBaselinePath: null,
             ),
+            reportEditorLink: $this->reportEditorLink,
+            reportInteractive: $this->reportInteractive,
+            optionError: $this->optionError,
         );
     }
 
     public function usageError(): ?string
     {
+        if ($this->optionError !== null) {
+            return $this->optionError;
+        }
+
         if ($this->noConfig && $this->configPath !== null) {
             return '--no-config cannot be combined with --config.';
         }
@@ -130,6 +158,33 @@ final readonly class AnalyseCommandOptions
         }
 
         return null;
+    }
+
+    private static function reportInteractive(InputInterface $input): bool|string
+    {
+        if (!$input->hasParameterOption('--report-interactive', true)) {
+            return false;
+        }
+
+        $value = $input->getOption('report-interactive');
+
+        if ($value === null || $value === true || $value === '') {
+            return true;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (!is_string($value)) {
+            return '--report-interactive must be true or false.';
+        }
+
+        return match (strtolower($value)) {
+            '1', 'true', 'yes', 'on' => true,
+            '0', 'false', 'no', 'off' => false,
+            default => '--report-interactive must be true or false.',
+        };
     }
 
     private static function optionalStringOption(InputInterface $input, string $name): ?string

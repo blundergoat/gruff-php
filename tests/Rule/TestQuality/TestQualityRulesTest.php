@@ -217,7 +217,7 @@ final class TestQualityRulesTest extends TestCase
 
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/enable-multiple-aaa-cycles.json',
+            'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
             $registry,
         );
         $optedInFindings = $this->analysePaths(
@@ -235,7 +235,7 @@ final class TestQualityRulesTest extends TestCase
 
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/enable-testdox-readability.json',
+            'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
         $optedInFindings = $this->analysePaths(
@@ -253,7 +253,7 @@ final class TestQualityRulesTest extends TestCase
 
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/enable-mocking-domain-object.json',
+            'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
             $registry,
         );
         $optedInFindings = $this->analysePaths(
@@ -339,7 +339,7 @@ final class TestQualityRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/disable-no-assertions.json',
+            'tests/Fixtures/Config/disable-no-assertions.yaml',
             $registry,
         );
 

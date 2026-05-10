@@ -1,0 +1,3 @@
+rules:
+    security.dangerous-function-call:
+        enabled: false

@@ -35,7 +35,7 @@ final class ConfigLoaderTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.yaml',
             $registry,
         );
         $settings = $config->ruleSettings(FileLengthRule::ID);
@@ -45,11 +45,128 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(999, $settings->numericThreshold('error'));
     }
 
+    public function testLoadsDefaultYamlConfigFile(): void
+    {
+        $directory = sys_get_temp_dir() . '/gruff-config-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($directory));
+        self::assertNotFalse(file_put_contents(
+            $directory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE,
+            "rules:\n    size.file-length:\n        thresholds:\n            warning: 7\n            error: 70\n",
+        ));
+
+        try {
+            $config = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
+            $settings = $config->ruleSettings(FileLengthRule::ID);
+
+            self::assertSame(7, $settings->numericThreshold('warning'));
+            self::assertSame(70, $settings->numericThreshold('error'));
+        } finally {
+            @unlink($directory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+            @rmdir($directory);
+        }
+    }
+
+    public function testLoadsExplicitYamlConfigFile(): void
+    {
+        $path = $this->writeTempConfig(
+            "rules:\n    size.file-length:\n        thresholds:\n            warning: 9\n            error: 90\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(FileLengthRule::ID);
+
+        self::assertSame(9, $settings->numericThreshold('warning'));
+        self::assertSame(90, $settings->numericThreshold('error'));
+    }
+
+    public function testLoadsBinaryThresholdWithErrorSeverity(): void
+    {
+        $path = $this->writeTempConfig(
+            "rules:\n    size.file-length:\n        threshold: 70\n        severity: error\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(FileLengthRule::ID);
+
+        self::assertSame(70, $settings->numericThreshold('warning'));
+        self::assertSame(70, $settings->numericThreshold('error'));
+    }
+
+    public function testLoadsBinaryThresholdWithWarningSeverity(): void
+    {
+        $path = $this->writeTempConfig(
+            "rules:\n    size.file-length:\n        threshold: 70\n        severity: warning\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(FileLengthRule::ID);
+
+        self::assertSame(70, $settings->numericThreshold('warning'));
+        self::assertSame(PHP_INT_MAX, $settings->numericThreshold('error'));
+    }
+
+    public function testLoadsBinaryThresholdWithWarningSeverityForInverseThresholdRule(): void
+    {
+        $path = $this->writeTempConfig(
+            "rules:\n    complexity.maintainability-index:\n        threshold: 45\n        severity: warning\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings('complexity.maintainability-index');
+
+        self::assertSame(45, $settings->numericThreshold('warning'));
+        self::assertSame(-PHP_INT_MAX, $settings->numericThreshold('error'));
+    }
+
+    public function testRejectsBinaryThresholdWithoutSeverity(): void
+    {
+        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70}}}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Config key "rules.size.file-length.severity" must be "warning" or "error".');
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    public function testRejectsSeverityWithoutBinaryThreshold(): void
+    {
+        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"severity":"error"}}}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Config key "rules.size.file-length.severity" requires "threshold".');
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    public function testRejectsBinaryThresholdForNamedTuningThresholdRule(): void
+    {
+        $path = $this->writeTempConfig('{"rules":{"docs.missing-public-phpdoc":{"threshold":8,"severity":"error"}}}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Config key "rules.docs.missing-public-phpdoc.threshold" is only supported for rules with warning/error thresholds.');
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    public function testRejectsCombiningBinaryThresholdAndThresholdMap(): void
+    {
+        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('Config key "rules.size.file-length" cannot combine "threshold" and "thresholds".');
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
     public function testCanDisableARule(): void
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/Config/disabled-file-length.json',
+            'tests/Fixtures/Config/disabled-file-length.yaml',
             $registry,
         );
 
@@ -81,7 +198,7 @@ final class ConfigLoaderTest extends TestCase
         $this->expectExceptionMessage('Unknown rule id "size.nope".');
 
         (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/Config/unknown-rule.json',
+            'tests/Fixtures/Config/unknown-rule.yaml',
             RuleRegistry::defaults(),
         );
     }
@@ -213,11 +330,17 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
     }
 
-    private function writeTempConfig(string $contents): string
+    private function writeTempConfig(string $contents, string $suffix = '.yaml'): string
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-config-');
 
         self::assertIsString($path);
+
+        if ($suffix !== '') {
+            self::assertTrue(unlink($path));
+            $path .= $suffix;
+        }
+
         self::assertNotFalse(file_put_contents($path, $contents));
 
         return $path;

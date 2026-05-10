@@ -1,0 +1,394 @@
+minimumPhpVersion: 8.3
+paths:
+    ignore:
+        - 'tests/Fixtures/**'
+allowlists:
+    acceptedAbbreviations: []
+    secretPreviews: []
+selection:
+    tiers: []
+    pillars: []
+    rules: []
+    excludePillars: []
+    excludeRules: []
+rules:
+    # Hard-to-follow decision flow raises change risk.
+    complexity.cognitive:
+        enabled: true
+        threshold: 30
+        severity: error
+    # Too many branches make behavior harder to test.
+    complexity.cyclomatic:
+        enabled: true
+        threshold: 20
+        severity: error
+    # Dense logic makes code harder to understand.
+    complexity.halstead-volume:
+        enabled: true
+        threshold: 2000
+        severity: error
+    # Low maintainability signals code that is costly to change.
+    complexity.maintainability-index:
+        enabled: true
+        threshold: 35
+        severity: error
+    # Deep nesting hides control flow and edge cases.
+    complexity.nesting-depth:
+        enabled: true
+        threshold: 6
+        severity: error
+    # Too many execution paths make testing unreliable.
+    complexity.npath:
+        enabled: true
+        threshold: 500
+        severity: error
+    # Unused private methods add noise and mislead readers.
+    dead-code.unused-private-method:
+        enabled: true
+    # Unused private state hides design drift and dead assumptions.
+    dead-code.unused-private-property:
+        enabled: true
+    # Parameter docs clarify contracts that signatures miss.
+    docs.missing-param-tag:
+        enabled: true
+    # Public APIs need enough context for callers and maintainers.
+    docs.missing-public-phpdoc:
+        enabled: true
+        thresholds:
+            minBodyLines: 8
+            minParameters: 2
+    # A project README gives newcomers a reliable starting point.
+    docs.missing-readme:
+        enabled: true
+    # Return docs clarify nullable, collection, and domain meanings.
+    docs.missing-return-tag:
+        enabled: true
+    # Throws docs make failure modes visible to callers.
+    docs.missing-throws-tag:
+        enabled: true
+    # Stale parameter docs are worse than missing docs.
+    docs.stale-param-tag:
+        enabled: true
+    # Dense TODOs mark deferred work that may become invisible debt.
+    docs.todo-density:
+        enabled: true
+        threshold: 10
+        severity: error
+    # Empty or redundant comments make real documentation harder to find.
+    docs.useless-phpdoc:
+        enabled: true
+    # Constructor promotion reduces boilerplate and keeps state obvious.
+    modernisation.constructor-promotion-candidate:
+        enabled: true
+    # Enums make fixed value sets explicit and type-safe.
+    modernisation.enum-candidate:
+        enabled: true
+    # First-class callables avoid fragile string and array references.
+    modernisation.first-class-callable-candidate:
+        enabled: true
+    # Global access hides dependencies and complicates tests.
+    modernisation.forbidden-global-access:
+        enabled: true
+    # Match expressions make simple branching stricter and clearer.
+    modernisation.match-expression-candidate:
+        enabled: true
+    # Too much mixed typing weakens static guarantees.
+    modernisation.mixed-type-overuse:
+        enabled: true
+    # Named arguments make long calls easier to read safely.
+    modernisation.named-argument-opportunity:
+        enabled: true
+        thresholds:
+            minPositionalArguments: 5
+    # Public mutable state makes object behavior harder to control.
+    modernisation.public-property:
+        enabled: true
+    # Readonly properties protect values that should not change.
+    modernisation.readonly-property-candidate:
+        enabled: true
+    # Boolean names should read clearly at call sites.
+    naming.boolean-prefix:
+        enabled: true
+    # Matching class and file names keeps navigation predictable.
+    naming.class-file-mismatch:
+        enabled: true
+    # Confusing names slow review and invite wrong assumptions.
+    naming.confusing-name:
+        enabled: true
+    # Generic method names hide intent and responsibility.
+    naming.generic-method:
+        enabled: true
+    # Hungarian notation duplicates types and obscures meaning.
+    naming.hungarian-notation:
+        enabled: true
+    # Over-short names make logic harder to scan.
+    naming.short-variable:
+        enabled: true
+    # Consistent test names make failures easier to triage.
+    naming.test-naming-consistency:
+        enabled: true
+    # Dangerous calls can execute attacker-controlled input.
+    security.dangerous-function-call:
+        enabled: true
+    # Disabled TLS checks can expose private traffic.
+    security.disabled-ssl-verification:
+        enabled: true
+    # Error suppression hides failures and security signals.
+    security.error-suppression:
+        enabled: true
+    # Request-driven extract or compact can create unsafe variables.
+    security.extract-compact-user-input:
+        enabled: true
+    # Unsanitized header values can enable response splitting.
+    security.header-injection:
+        enabled: true
+    # Weak randomness undermines tokens and secrets.
+    security.insecure-random:
+        enabled: true
+    # Silent catches hide failures that need handling.
+    security.silent-catch:
+        enabled: true
+    # SQL string concatenation can expose injection paths.
+    security.sql-concatenation:
+        enabled: true
+    # Untrusted unserialize can create object injection risk.
+    security.unsafe-unserialize:
+        enabled: true
+    # Variable includes can load unintended code paths.
+    security.variable-include:
+        enabled: true
+    # Weak crypto leaves protected data easier to break.
+    security.weak-crypto:
+        enabled: true
+    # API-key patterns catch leaked credentials early.
+    sensitive-data.api-key-pattern:
+        enabled: true
+    # AWS keys in source can compromise cloud accounts.
+    sensitive-data.aws-access-key:
+        enabled: true
+    # Database URLs with passwords expose direct data access.
+    sensitive-data.database-url-password:
+        enabled: true
+    # Hardcoded env secrets leak outside runtime secret stores.
+    sensitive-data.hardcoded-env-value:
+        enabled: true
+    # High-entropy strings often indicate embedded secrets.
+    sensitive-data.high-entropy-string:
+        enabled: true
+        thresholds:
+            minLength: 32
+            entropy: 4.2
+    # JWTs in source can expose signed session data.
+    sensitive-data.jwt-token:
+        enabled: true
+    # PHI patterns help prevent regulated health data leaks.
+    sensitive-data.phi-pattern:
+        enabled: true
+    # Realistic PII in tests can still leak sensitive data.
+    sensitive-data.pii-test-fixture:
+        enabled: true
+    # Private keys in source can compromise systems immediately.
+    sensitive-data.private-key:
+        enabled: true
+    # Long average methods make classes harder to reason about.
+    size.average-method-length:
+        enabled: true
+        threshold: 40
+        severity: error
+    # Large classes often mix too many responsibilities.
+    size.class-length:
+        enabled: true
+        threshold: 500
+        severity: error
+    # Very large files slow navigation and review.
+    size.file-length:
+        enabled: true
+        threshold: 800
+        severity: error
+    # Long methods are harder to test and safely modify.
+    size.method-length:
+        enabled: true
+        threshold: 60
+        severity: error
+    # Too many parameters make calls error-prone.
+    size.parameter-count:
+        enabled: true
+        threshold: 8
+        severity: error
+    # Too many properties suggest unfocused state.
+    size.property-count:
+        enabled: true
+        threshold: 25
+        severity: error
+    # Too many public methods widen the maintenance surface.
+    size.public-method-count:
+        enabled: true
+        threshold: 25
+        severity: error
+    # Conditional tests can hide multiple behaviors in one case.
+    test-quality.conditional-logic:
+        enabled: true
+    # Native data providers are clearer and easier to run selectively.
+    test-quality.data-provider-annotation:
+        enabled: true
+    # Eager tests assert too much and make failures noisy.
+    test-quality.eager-test:
+        enabled: true
+        thresholds:
+            minAssertions: 3
+    # Empty providers make tests pass without exercising cases.
+    test-quality.empty-data-provider:
+        enabled: true
+    # Exception-only assertions miss important error details.
+    test-quality.exception-type-only:
+        enabled: true
+    # Excessive mocks can make tests mirror implementation details.
+    test-quality.excessive-mocking:
+        enabled: true
+        thresholds:
+            maxMocks: 3
+    # Tests should not inherit production behavior accidentally.
+    test-quality.extends-production-class:
+        enabled: true
+    # Global state mutation makes tests order-dependent.
+    test-quality.global-state-mutation:
+        enabled: true
+    # Loop assertions need messages to identify the failing case.
+    test-quality.loop-assertion-without-message:
+        enabled: true
+    # Loops in tests can hide missing individual cases.
+    test-quality.loop-in-test:
+        enabled: true
+    # Magic numbers obscure what a test is proving.
+    test-quality.magic-number-assertion:
+        enabled: true
+        options:
+            allowedLiterals:
+                - 200
+                - 201
+                - 202
+                - 204
+                - 301
+                - 302
+                - 303
+                - 304
+                - 307
+                - 308
+                - 400
+                - 401
+                - 403
+                - 404
+                - 405
+                - 409
+                - 410
+                - 422
+                - 429
+                - 500
+                - 502
+                - 503
+                - 504
+    # Mock-only tests can verify wiring without real behavior.
+    test-quality.mock-only-test:
+        enabled: true
+    # Mocks without expectations may not prove anything useful.
+    test-quality.mock-without-expectation:
+        enabled: true
+    # Mocking domain objects can hide important business behavior.
+    test-quality.mocking-domain-object:
+        enabled: false
+        options:
+            domainNamespaces: []
+    # Multiple arrange-act-assert cycles blur test intent.
+    test-quality.multiple-aaa-cycles:
+        enabled: false
+        thresholds:
+            minCycles: 2
+    # Mystery guests make tests depend on hidden fixtures.
+    test-quality.mystery-guest:
+        enabled: true
+    # Poor test names make failures harder to understand.
+    test-quality.naming-consistency:
+        enabled: true
+        options:
+            poorNamePatterns:
+                - '/^test[A-Z][A-Za-z]*(?:Works|Basic|Simple|Test)$/'
+                - '/^test[A-Z][A-Za-z]*\d+$/'
+    # Tests without assertions may only execute code.
+    test-quality.no-assertions:
+        enabled: true
+    # Coverage source config keeps reports focused on production code.
+    test-quality.phpunit-coverage-source-missing:
+        enabled: true
+    # Deprecations should fail before upgrades become risky.
+    test-quality.phpunit-deprecations-not-fatal:
+        enabled: true
+    # Strict PHPUnit flags catch risky or incomplete tests.
+    test-quality.phpunit-strict-flags-missing:
+        enabled: true
+    # Private reflection couples tests to internals.
+    test-quality.private-reflection:
+        enabled: true
+    # Repeated test structures are clearer as data providers.
+    test-quality.repeated-structure-missing-data-provider:
+        enabled: true
+    # Bloated setup hides the behavior each test needs.
+    test-quality.setup-bloat:
+        enabled: true
+        thresholds:
+            minSetupLines: 8
+    # Skipped tests need a reason to remain accountable.
+    test-quality.skipped-without-reason:
+        enabled: true
+    # Sleeps make tests slow and timing-dependent.
+    test-quality.sleep-in-test:
+        enabled: true
+    # Tests should exercise the subject they set up.
+    test-quality.sut-not-called:
+        enabled: true
+    # Tautological type checks do not add useful confidence.
+    test-quality.tautological-type-assertion:
+        enabled: true
+    # Tests much longer than the SUT are hard to trust.
+    test-quality.test-longer-than-sut:
+        enabled: true
+        thresholds:
+            minTestLines: 12
+    # Long tests are harder to understand and debug.
+    test-quality.test-method-too-long:
+        enabled: true
+        thresholds:
+            maxMeaningfulLines: 25
+    # Readable TestDox names make behavior reports useful.
+    test-quality.testdox-readability:
+        enabled: false
+        thresholds:
+            minWords: 3
+    # Trivial assertions can pass without testing behavior.
+    test-quality.trivial-assertion:
+        enabled: true
+    # Tiny snapshots rarely justify snapshot maintenance.
+    test-quality.trivial-snapshot:
+        enabled: true
+        thresholds:
+            maxLiteralLength: 5
+    # Unused mocks add setup noise without coverage.
+    test-quality.unused-mock:
+        enabled: true
+    # Commented-out code confuses the real implementation.
+    waste.commented-out-code:
+        enabled: true
+    # Empty classes add structure without behavior.
+    waste.empty-class:
+        enabled: true
+    # Empty methods hide incomplete or unnecessary behavior.
+    waste.empty-method:
+        enabled: true
+    # Unreachable code is dead logic that cannot be tested.
+    waste.unreachable-code:
+        enabled: true
+    # Unused imports add noise and stale dependencies.
+    waste.unused-import:
+        enabled: true
+    # Unused parameters obscure the real method contract.
+    waste.unused-parameter:
+        enabled: true

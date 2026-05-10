@@ -114,7 +114,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.yaml',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -133,7 +133,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/Config/file-length-error.json',
+            'tests/Fixtures/Config/file-length-error.yaml',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -150,7 +150,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.yaml',
             '--fail-on',
             'warning',
         ], __DIR__ . '/../..');
@@ -172,7 +172,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
-            'tests/Fixtures/Config/file-length-warning.json',
+            'tests/Fixtures/Config/file-length-warning.yaml',
             '--format',
             'json',
         ], __DIR__ . '/../..');
@@ -246,7 +246,7 @@ final class GruffCliTest extends TestCase
             __DIR__ . '/../../bin/gruff',
             'analyse',
             '--config',
-            'tests/Fixtures/Config/unknown-rule.json',
+            'tests/Fixtures/Config/unknown-rule.yaml',
             'tests/Fixtures/Source/mixed/alpha.php',
         ], __DIR__ . '/../..');
         $process->run();
@@ -266,7 +266,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/Code',
             '--config',
-            'tests/Fixtures/Config/only-size-rules.json',
+            'tests/Fixtures/Config/only-size-rules.yaml',
             '--format',
             'json',
             '--fail-on',
@@ -292,7 +292,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--config',
-            'tests/Fixtures/Config/ignore-alpha.json',
+            'tests/Fixtures/Config/ignore-alpha.yaml',
             '--fail-on',
             'none',
         ], __DIR__ . '/../..');
@@ -310,7 +310,7 @@ final class GruffCliTest extends TestCase
             __DIR__ . '/../../bin/gruff',
             'analyse',
             '--config',
-            'tests/Fixtures/Config/invalid-selection-rule.json',
+            'tests/Fixtures/Config/invalid-selection-rule.yaml',
             'tests/Fixtures/Source/Code',
         ], __DIR__ . '/../..');
         $process->run();
@@ -330,7 +330,7 @@ final class GruffCliTest extends TestCase
             'analyse',
             'tests/Fixtures/SensitiveData/synthetic-secrets.php',
             '--config',
-            'tests/Fixtures/Config/allow-aws-preview.json',
+            'tests/Fixtures/Config/allow-aws-preview.yaml',
             '--format',
             'json',
             '--fail-on',
@@ -546,6 +546,129 @@ final class GruffCliTest extends TestCase
         self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
     }
 
+    public function testAnalyseCommandSupportsHtmlEditorLinks(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-editor-link',
+            'vscode',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('href="vscode://file/', $process->getOutput());
+        self::assertStringContainsString('tests/Fixtures/Source/Code/OrderCalculator.php:9', $process->getOutput());
+    }
+
+    public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-editor-link',
+            'none',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="tests/Fixtures/Source/Code/OrderCalculator.php:9">', $process->getOutput());
+        self::assertStringNotContainsString('vscode://file/', $process->getOutput());
+        self::assertStringNotContainsString('phpstorm://open', $process->getOutput());
+    }
+
+    public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-interactive',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('class="finding-filters"', $process->getOutput());
+        self::assertStringContainsString('<script type="module">', $process->getOutput());
+
+        $static = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-interactive=false',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $static->run();
+
+        self::assertSame(0, $static->getExitCode(), $static->getErrorOutput());
+        self::assertStringNotContainsString('class="finding-filters"', $static->getOutput());
+        self::assertStringNotContainsString('<script type="module">', $static->getOutput());
+    }
+
+    public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
+    {
+        $editor = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-editor-link=bad',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $editor->run();
+
+        self::assertSame(2, $editor->getExitCode());
+        self::assertStringContainsString('<section class="diagnostics">', $editor->getOutput());
+        self::assertStringContainsString('--report-editor-link must be one of: vscode, phpstorm, none.', $editor->getOutput());
+
+        $interactive = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'html',
+            '--fail-on',
+            'none',
+            '--report-interactive=maybe',
+            '--no-config',
+        ], __DIR__ . '/../..');
+        $interactive->run();
+
+        self::assertSame(2, $interactive->getExitCode());
+        self::assertStringContainsString('<section class="diagnostics">', $interactive->getOutput());
+        self::assertStringContainsString('--report-interactive must be true or false.', $interactive->getOutput());
+    }
+
     public function testReportCommandOutputsStaticHtmlReport(): void
     {
         $process = new Process([
@@ -560,6 +683,42 @@ final class GruffCliTest extends TestCase
         self::assertStringContainsString('<section class="verdict">', $process->getOutput());
         self::assertStringContainsString('inspection report', $process->getOutput());
         self::assertStringNotContainsString('gruff-dashboard-toolbar', $process->getOutput());
+    }
+
+    public function testReportCommandForwardsHtmlReportFlags(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--fail-on',
+            'none',
+            '--report-editor-link',
+            'vscode',
+            '--report-interactive',
+            '--no-config',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('href="vscode://file/', $process->getOutput());
+        self::assertStringContainsString('class="finding-filters"', $process->getOutput());
+
+        $static = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--fail-on',
+            'none',
+            '--report-interactive=false',
+            '--no-config',
+        ], self::PROJECT_ROOT);
+        $static->run();
+
+        self::assertSame(0, $static->getExitCode(), $static->getErrorOutput());
+        self::assertStringNotContainsString('class="finding-filters"', $static->getOutput());
     }
 
     /**
@@ -639,6 +798,13 @@ final class GruffCliTest extends TestCase
             self::assertStringContainsString('controls-toggle', $response);
             self::assertStringContainsString('Dashboard controls', $response);
             self::assertStringContainsString('Project root', $response);
+            self::assertStringContainsString('copy-scan-meta', $response);
+            self::assertStringContainsString('name="reportInteractive"', $response);
+            self::assertStringContainsString('name="scanScope"', $response);
+            self::assertStringContainsString('whole branch', $response);
+            self::assertStringContainsString('diff only', $response);
+            self::assertStringContainsString('value=".gruff.yaml"', $response);
+            self::assertStringContainsString('class="field-grid"', $response);
 
             $scan = $this->fetchHttp($port, '/scan');
 
@@ -646,6 +812,18 @@ final class GruffCliTest extends TestCase
             self::assertStringContainsString('gruff-dashboard-meta', $scan);
             self::assertStringNotContainsString('gruff-dashboard-toolbar', $scan);
             self::assertStringContainsString('<section class="verdict">', $scan);
+            self::assertStringNotContainsString('finding-filters', $scan);
+
+            $interactiveScan = $this->fetchHttp($port, '/scan?reportInteractive=1');
+
+            self::assertStringContainsString('HTTP/1.1 200 OK', $interactiveScan);
+            self::assertStringContainsString('class="finding-filters"', $interactiveScan);
+            self::assertStringContainsString('--report-interactive', $interactiveScan);
+
+            $diffScan = $this->fetchHttp($port, '/scan?scanScope=diff');
+
+            self::assertStringContainsString('HTTP/1.1 200 OK', $diffScan);
+            self::assertStringContainsString('--diff', $diffScan);
         } finally {
             $process->stop(1);
         }

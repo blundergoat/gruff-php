@@ -68,6 +68,11 @@ final class PoorlyNamedTest extends TestCase
         self::assertTrue((new OrderService())->processOrder());
     }
 
+    public function testReturnsOk(): void
+    {
+        self::assertTrue((new OrderService())->processOrder());
+    }
+
     public function testProcessOrderHandlesEmptyInput(): void
     {
         self::assertTrue((new OrderService())->processOrder());

@@ -1,7 +1,0 @@
-{
-  "rules": {
-    "test-quality.no-assertions": {
-      "enabled": false
-    }
-  }
-}

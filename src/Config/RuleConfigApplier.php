@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\RuleRegistry;
 
 final readonly class RuleConfigApplier
@@ -17,7 +18,7 @@ final readonly class RuleConfigApplier
             return $config;
         }
 
-        $rulesConfig = $this->requireObject($rootConfig['rules'], 'Config key "rules" must be a JSON object.');
+        $rulesConfig = $this->requireObject($rootConfig['rules'], 'Config key "rules" must be an object.');
 
         foreach ($rulesConfig as $ruleId => $ruleConfigValue) {
             if (!$registry->has($ruleId)) {
@@ -28,7 +29,7 @@ final readonly class RuleConfigApplier
                 $config,
                 $registry,
                 $ruleId,
-                $this->requireObject($ruleConfigValue, sprintf('Config for rule "%s" must be a JSON object.', $ruleId)),
+                $this->requireObject($ruleConfigValue, sprintf('Config for rule "%s" must be an object.', $ruleId)),
             );
         }
 
@@ -61,7 +62,7 @@ final readonly class RuleConfigApplier
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
     {
         foreach (array_keys($ruleConfig) as $key) {
-            if ($key !== 'enabled' && $key !== 'thresholds' && $key !== 'options') {
+            if (!in_array($key, ['enabled', 'threshold', 'severity', 'thresholds', 'options'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
             }
         }
@@ -94,6 +95,23 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array $defaultThresholds,
     ): array {
+        if (array_key_exists('threshold', $ruleConfig)) {
+            if (array_key_exists('thresholds', $ruleConfig)) {
+                throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
+            }
+
+            return $this->binaryThresholds(
+                $ruleId,
+                $ruleConfig['threshold'],
+                $ruleConfig['severity'] ?? null,
+                $registry->get($ruleId)->definition()->defaultThresholds,
+            );
+        }
+
+        if (array_key_exists('severity', $ruleConfig)) {
+            throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
+        }
+
         if (!array_key_exists('thresholds', $ruleConfig)) {
             return $defaultThresholds;
         }
@@ -101,7 +119,7 @@ final readonly class RuleConfigApplier
         $thresholds = $defaultThresholds;
         $thresholdConfig = $this->requireObject(
             $ruleConfig['thresholds'],
-            sprintf('Config key "rules.%s.thresholds" must be a JSON object.', $ruleId),
+            sprintf('Config key "rules.%s.thresholds" must be an object.', $ruleId),
         );
         $allowedThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
 
@@ -113,6 +131,44 @@ final readonly class RuleConfigApplier
                 $allowedThresholds,
             );
         }
+
+        return $thresholds;
+    }
+
+    /**
+     * @param array<string, int|float> $defaultThresholds
+     * @return array<string, int|float>
+     */
+    private function binaryThresholds(
+        string $ruleId,
+        mixed $thresholdValue,
+        mixed $severityValue,
+        array $defaultThresholds,
+    ): array {
+        if (!array_key_exists('warning', $defaultThresholds) || !array_key_exists('error', $defaultThresholds) || count($defaultThresholds) !== 2) {
+            throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with warning/error thresholds.', $ruleId));
+        }
+
+        if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
+            throw new ConfigException(sprintf('Config key "rules.%s.threshold" must be numeric.', $ruleId));
+        }
+
+        if (!is_string($severityValue) || !in_array($severityValue, [Severity::Warning->value, Severity::Error->value], true)) {
+            throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "warning" or "error".', $ruleId));
+        }
+
+        $thresholds = $defaultThresholds;
+        $highValueIsWorse = $defaultThresholds['warning'] <= $defaultThresholds['error'];
+
+        if ($severityValue === Severity::Error->value) {
+            $thresholds['warning'] = $thresholdValue;
+            $thresholds['error'] = $thresholdValue;
+
+            return $thresholds;
+        }
+
+        $thresholds['warning'] = $thresholdValue;
+        $thresholds['error'] = $highValueIsWorse ? PHP_INT_MAX : -PHP_INT_MAX;
 
         return $thresholds;
     }
@@ -155,7 +211,7 @@ final readonly class RuleConfigApplier
         $options = $defaultOptions;
         $optionsConfig = $this->requireObject(
             $ruleConfig['options'],
-            sprintf('Config key "rules.%s.options" must be a JSON object.', $ruleId),
+            sprintf('Config key "rules.%s.options" must be an object.', $ruleId),
         );
         $allowedOptions = $registry->get($ruleId)->definition()->defaultOptions;
 

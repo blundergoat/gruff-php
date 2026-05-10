@@ -1,6 +1,6 @@
 # Glossary - gruff-php
 
-Last reviewed 2026-05-09. Terms are grouped by domain. Each entry points at the file or files that own the concept; if you change behaviour, update the glossary entry too.
+Last reviewed 2026-05-11. Terms are grouped by domain. Each entry points at the file or files that own the concept; if you change behaviour, update the glossary entry too.
 
 ## Project shape
 
@@ -28,11 +28,19 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `Application`
 
-`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse` command.
+`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse`, `report`, and `dashboard` commands.
 
 ### `analyse` command
 
-`src/Command/AnalyseCommand.php`. The single user-facing command. Accepts a variadic `paths` argument and the options `--config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, and `--generate-baseline`.
+`src/Command/AnalyseCommand.php`. Primary analysis command. Accepts a variadic `paths` argument and the options `--config`, `--no-config`, `--format` (`text`|`json`|`html`|`markdown`|`github`|`hotspot`, default `text`), `--fail-on` (`none`|`advisory`|`warning`|`error`, default `error`), `--report-editor-link` (`none`|`vscode`|`phpstorm`, default `none`), `--report-interactive` (optional boolean for HTML findings filters), `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline`.
+
+### `report` command
+
+`src/Command/ReportCommand.php`. Static report convenience command that delegates to `analyse`, supports HTML or JSON output, can write to `--output`, and forwards supported analysis/report flags including baselines, config, `--report-editor-link`, and `--report-interactive`.
+
+### `dashboard` command
+
+`src/Command/DashboardCommand.php` plus `src/Command/DashboardPageRenderer.php` and `src/Command/DashboardScanCommandBuilder.php`. Developer-local HTTP dashboard for refreshable HTML scans. Its controls can set project root, paths, config, baseline behaviour, scan scope (`whole branch` or `diff only`), fail threshold, include-ignored, and the opt-in interactive findings flag; scan metadata includes a wrapping copyable command field.
 
 ### Exit codes
 
@@ -48,7 +56,7 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### Default ignored directories
 
-`SourceDiscovery::IGNORED_DIRECTORIES`: `.git`, `.hg`, `.svn`, `.phpunit.cache`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `var/cache`, `vendor`. Matched as path-segment sequences against the canonical display path.
+`SourceDiscovery::IGNORED_DIRECTORIES`: `.fleet`, `.git`, `.goat-flow/logs`, `.goat-flow/scratchpad`, `.goat-flow/tasks`, `.hg`, `.idea`, `.phpunit.cache`, `.svn`, `.vscode`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `tmp`, `var/cache`, `vendor`. Matched as path-segment sequences against the canonical display path.
 
 ### Display path
 
@@ -82,37 +90,37 @@ Project-relative path used in findings and reports. Computed in `SourceDiscovery
 
 ## Configuration
 
-### `.gruff.json`
+### `.gruff.yaml`
 
-Optional project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.json`; `--config <path>` overrides it. Recognised root keys are `minimumPhpVersion`, `paths`, `selection`, `allowlists`, and `rules`; everything else throws `ConfigException`.
+Project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.yaml`; `--config <path>` overrides it and `--no-config` opts out for a run. Recognised root keys are `minimumPhpVersion`, `paths`, `selection`, `allowlists`, and `rules`; everything else throws `ConfigException`. The repository's root `.gruff.yaml` lists the default config surface explicitly and does not contain an absolute project-root setting. Only `.yaml` and `.yml` extensions are accepted; passing `.json` raises a `ConfigException`.
 
 ### Minimum PHP Version
 
-`minimumPhpVersion` in `.gruff.json`, defaulting to `AnalysisConfig::DEFAULT_MINIMUM_PHP_VERSION` (`8.3`). Must be numeric and at least `7.4`. Modernisation rules that suggest PHP 8.0/8.1 syntax use it to suppress findings unsupported by the configured target.
+`minimumPhpVersion` in `.gruff.yaml`, defaulting to `AnalysisConfig::DEFAULT_MINIMUM_PHP_VERSION` (`8.3`). Must be numeric and at least `7.4`. Modernisation rules that suggest PHP 8.0/8.1 syntax use it to suppress findings unsupported by the configured target.
 
 ### `AnalysisConfig`
 
-`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id plus the configured minimum PHP version, rule selection, path ignore patterns, accepted abbreviations, and allowed secret previews. Constructed from the registry defaults via `fromRegistry()` and then overlayed by JSON config.
+`src/Config/AnalysisConfig.php`. Resolved per-rule settings keyed by rule id plus the configured minimum PHP version, rule selection, path ignore patterns, accepted abbreviations, and allowed secret previews. Constructed from the registry defaults via `fromRegistry()` and then overlayed by the YAML config file.
 
 ### Path Ignores
 
-`paths.ignore` in `.gruff.json`. A list of project-relative exact or glob-like patterns (`*`, `?`, `**`) applied by `SourceDiscovery`. Absolute paths and parent traversal are rejected so config cannot silently point outside the project.
+`paths.ignore` in `.gruff.yaml`. A list of project-relative exact or glob-like patterns (`*`, `?`, `**`) applied by `SourceDiscovery`. Absolute paths and parent traversal are rejected so config cannot silently point outside the project.
 
 ### Rule Selection
 
-`src/Config/RuleSelection.php` and `selection` in `.gruff.json`. Includes can target `tiers`, `pillars`, and explicit `rules`; exclusions can target `excludePillars` and `excludeRules`. If any include list is non-empty, a rule must match at least one include before exclusions apply. Per-rule `enabled: false` still disables a selected rule.
+`src/Config/RuleSelection.php` and `selection` in `.gruff.yaml`. Includes can target `tiers`, `pillars`, and explicit `rules`; exclusions can target `excludePillars` and `excludeRules`. If any include list is non-empty, a rule must match at least one include before exclusions apply. Per-rule `enabled: false` still disables a selected rule.
 
 ### Allowlists
 
-`allowlists` in `.gruff.json`. `acceptedAbbreviations` feeds naming rules such as `naming.short-variable`; `secretPreviews` suppresses exact redacted secret previews already emitted by gruff findings. This avoids putting raw secret values in normal config for known synthetic fixtures.
+`allowlists` in `.gruff.yaml`. `acceptedAbbreviations` feeds naming rules such as `naming.short-variable`; `secretPreviews` suppresses exact redacted secret previews already emitted by gruff findings. This avoids putting raw secret values in normal config for known synthetic fixtures.
 
 ### `RuleSettings`
 
-`src/Config/RuleSettings.php`. `enabled` flag plus a `thresholds` map of `string => int|float`. `numericThreshold($name)` throws if the named threshold is missing.
+`src/Config/RuleSettings.php`. Internal resolved rule state: `enabled` flag plus a `thresholds` map of `string => int|float`. Config can provide either named `thresholds` values or, for warning/error metric rules, a single `threshold` plus `severity` that `RuleConfigApplier` converts into this map. `numericThreshold($name)` throws if the named threshold is missing.
 
 ### `ConfigLoader`
 
-`src/Config/ConfigLoader.php`. Loads and validates JSON config. Strict on unknown root keys, invalid `minimumPhpVersion`, path ignore values, allowlist values, selection tiers/pillars/rules, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
+`src/Config/ConfigLoader.php`. Loads and validates YAML config (`.yaml` or `.yml` extensions only); any other extension raises a `ConfigException`. Strict on unknown root keys, invalid `minimumPhpVersion`, path ignore values, allowlist values, selection tiers/pillars/rules, unknown rule ids, unknown rule sub-keys (anything other than `enabled`/`threshold`/`severity`/`thresholds`/`options`), invalid `threshold`/`severity` combinations, unknown threshold names, unknown option names, non-boolean `enabled`, and non-numeric thresholds. All failures throw `ConfigException`.
 
 ### `ConfigException`
 
@@ -126,11 +134,11 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### `SourceTextRuleInterface`
 
-`src/Rule/SourceTextRuleInterface.php`. Marker subinterface of `RuleInterface`. Rules implementing it also receive non-PHP text/config units; PHP-only rules are skipped on those units. The Secrets pillar uses this interface so JSON, YAML, INI, and `.env` files are scanned.
+`src/Rule/SourceTextRuleInterface.php`. Marker subinterface of `RuleInterface`. Rules implementing it also receive non-PHP text/config units; PHP-only rules are skipped on those units. The SensitiveData pillar uses this interface so JSON, YAML, INI, and `.env` files are scanned.
 
 ### `RuleDefinition`
 
-`src/Rule/RuleDefinition.php`. Stable rule metadata: `id` (validated against `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`), `name`, `pillar`, `tier`, `defaultSeverity`, `confidence`, `defaultThresholds`, and optional `secondaryPillars`. Constructing a rule with an invalid id or empty threshold name throws `InvalidArgumentException`.
+`src/Rule/RuleDefinition.php`. Stable rule metadata: `id` (validated against `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`), `name`, `pillar`, `tier`, `defaultSeverity`, `confidence`, `defaultThresholds`, optional `secondaryPillars`, `defaultEnabled` (default-disabled heuristics opt in via config), and `defaultOptions` (non-numeric configuration like namespace globs, poor-name patterns, allowed literals). Constructing a rule with an invalid id or empty threshold/option name throws `InvalidArgumentException`.
 
 ### `RuleContext`
 
@@ -142,7 +150,7 @@ Optional project-root config file consumed by `ConfigLoader`. Default location i
 
 ### Pillar
 
-`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted by static rules: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `secrets`, `test-quality`. Optional Infection ingestion emits `mutation`, and `CompositeFindingFactory` can emit `design`. Reserved (no rules yet): `coupling`, `architecture`.
+`src/Finding/Pillar.php`. String-backed enum tagging the quality dimension a finding belongs to. Currently emitted by static rules: `size`, `complexity`, `maintainability`, `dead-code`, `naming`, `documentation`, `modernisation`, `security`, `sensitive-data`, `test-quality`. Optional Infection ingestion emits `mutation`, and `CompositeFindingFactory` can emit `design`. Reserved (no rules yet): `coupling`, `architecture`.
 
 ### Infection Report
 
@@ -228,7 +236,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `HtmlReporter`
 
-`src/Reporting/HtmlReporter.php`. Self-contained dashboard renderer with inline CSS, escaped run data, masthead, verdict, stats, pillar grades (mutation pillar omitted), top offenders, complexity distribution, and findings list.
+`src/Reporting/HtmlReporter.php`. Self-contained HTML renderer with inline CSS, escaped run data, masthead, verdict, canonical severity stats (`errors`, `warnings`, `advisories`), pillar grades (mutation pillar omitted), top offenders, cyclomatic-complexity summary plus histogram, and findings list. Locations render as selectable copy spans by default or `vscode` / `phpstorm` editor links when requested. When `--report-interactive` is set, the findings list gains dependency-free inline filtering, search, grouping, and URL-hash state; static output remains script-free.
 
 ### `MarkdownReporter`
 
@@ -270,4 +278,4 @@ Runs `composer phpstan` then `composer test` and prints a coloured summary. Used
 
 ## Milestones (M0X)
 
-Test fixtures and decision records refer to milestone codes (`M01`, `M02`, ...). Each represents a delivery slice that introduced a specific surface; `tests/Fixtures/M0X/` holds the fixtures from that slice. Per the user's standing memory, milestone IDs do not appear in commit messages — only in fixtures, ADRs, and internal task notes. See `.goat-flow/footguns/setup.md` and `.goat-flow/decisions/ADR-001-package-baseline-and-integrations.md` for the M01 baseline.
+Decision records and internal task notes under `.goat-flow/tasks/` refer to milestone codes (`M01`, `M02`, ...) for delivery slices. Test fixtures used to live under `tests/Fixtures/M0X/` but were renamed to descriptive pillar directories (`Cli/`, `Complexity/`, `Config/`, `DeadCode/`, `Docs/`, `Modernisation/`, `Mutation/`, `Naming/`, `PhpUnitConfig/`, `Reporting/`, `Security/`, `SensitiveData/`, `Size/`, `Source/`, `TestQuality/`); milestone IDs no longer appear in fixture paths. Per the user's standing memory, milestone IDs do not appear in commit messages, file names, namespaces, or comments either — only in ADRs and internal task notes. See `.goat-flow/footguns/setup.md` and `.goat-flow/decisions/ADR-001-package-baseline-and-integrations.md` for the M01 baseline.

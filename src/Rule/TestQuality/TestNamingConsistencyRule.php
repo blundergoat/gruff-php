@@ -21,7 +21,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     public const ID = 'test-quality.naming-consistency';
 
     private const DEFAULT_POOR_NAME_PATTERNS = [
-        '/^test[A-Z][A-Za-z]*(?:Works|Basic|Simple|Ok|Test)$/',
+        '/^test[A-Z][A-Za-z]*(?:Works|Basic|Simple|Test)$/',
         '/^test[A-Z][A-Za-z]*\d+$/',
     ];
 

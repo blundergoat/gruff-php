@@ -33,7 +33,7 @@ final class ModernisationRulesTest extends TestCase
     {
         $findings = $this->analysePath(
             'tests/Fixtures/Modernisation/cumulative-modernisation.php',
-            $this->config('tests/Fixtures/Config/php74.json'),
+            $this->config('tests/Fixtures/Config/php74.yaml'),
         );
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
@@ -51,7 +51,7 @@ final class ModernisationRulesTest extends TestCase
     {
         $findings = $this->analysePath(
             'tests/Fixtures/Modernisation/cumulative-modernisation.php',
-            $this->config('tests/Fixtures/Config/php82.json'),
+            $this->config('tests/Fixtures/Config/php82.yaml'),
         );
 
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 2, $findings);

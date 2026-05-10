@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.5.1"
+goat-flow-reference-version: "1.6.0"
 ---
 # Skill Preamble
 
@@ -30,7 +30,7 @@ Order findings by severity, not by file or discovery order.
 ## Evidence Standard
 
 - Every live review finding MUST include file evidence. Prefer `file` plus a grep-friendly semantic anchor (`(search: "pattern")`, function name, or unique string). Line numbers are session-local navigation hints only.
-- For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible tasks, check `.goat-flow/skill-reference/browser-use.md` and run `command -v browser-use && browser-use doctor` before claiming browser automation is unavailable.
+- For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible tasks, check `.goat-flow/skill-playbooks/browser-use.md` and run `command -v browser-use && browser-use doctor` before claiming browser automation is unavailable.
 - Durable learning-loop artifacts (footguns, lessons, patterns, decisions) MUST use file paths plus grep-friendly semantic anchors (function name, unique string, or `(search: "pattern")`) instead of line numbers.
 - MUST NOT fabricate file paths, function names, or artifact content
 - Before presenting findings, re-read each cited file and semantic anchor to confirm accuracy
@@ -63,6 +63,23 @@ Before any completion, fix, or "passing" claim:
 5. **Cite** `file + semantic anchor` for live code claims, semantic anchors for durable learning-loop artifacts, or the literal pass/fail summary line for command claims.
 
 The red-flags name what NOT to claim; this gate names HOW to substantiate a claim. If you cannot run the proof in this session, mark the claim **UNVERIFIED** and state what evidence is missing. Never substitute "should work", "probably fine", "looks good", or a confidence score.
+
+### Rationalisations to reject (Excuse / Reality)
+
+If you catch yourself thinking the Excuse, run the proof or mark the claim `UNVERIFIED`. New rows require a verbatim source from this repo or the prime corpus.
+
+| Excuse | Reality |
+|---|---|
+| "Should work now" / "Probably fixed" | Re-run the original failing reproduction. |
+| "I'm confident" | Confidence ≠ evidence. |
+| "Linter / typecheck passed" | Linter ≠ compiler ≠ test suite. |
+| "Sub-agent said success" | Re-read the diff yourself. |
+| "Just this once" | No exemption. |
+| "Partial check is enough" | A subset of tests is not the test suite. |
+| "Looks correct to me" | Structural inspection ≠ verification. |
+| "Different words, rule doesn't apply" | Spirit over letter — paraphrases count. |
+
+Concrete claim/proof examples live in `.goat-flow/skill-playbooks/skill-quality-testing.md`.
 
 ## Ceremony Level
 

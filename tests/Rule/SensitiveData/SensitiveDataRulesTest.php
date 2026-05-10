@@ -92,7 +92,7 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/disable-high-entropy.json',
+            'tests/Fixtures/Config/disable-high-entropy.yaml',
             $registry,
         );
         $findings = $this->analyseUnits(

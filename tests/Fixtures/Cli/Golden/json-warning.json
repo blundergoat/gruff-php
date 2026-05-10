@@ -7,7 +7,7 @@
     "run": {
         "format": "json",
         "failOn": "error",
-        "config": "tests/Fixtures/Config/file-length-warning.json",
+        "config": "tests/Fixtures/Config/file-length-warning.yaml",
         "paths": [
             "tests/Fixtures/Source/mixed/alpha.php"
         ]

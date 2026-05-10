@@ -22,9 +22,11 @@ final class ReportCommand extends Command
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Report format: html or json.', 'html')
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Write the report to this file.')
-            ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff JSON config file.')
-            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for this run.')
+            ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
+            ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.yaml file for this run.')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', 'none')
+            ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', 'none')
+            ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', null)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.')
             ->addOption('infection-report', null, InputOption::VALUE_REQUIRED, 'Path to a full Infection JSON report to ingest.')
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
@@ -106,6 +108,12 @@ final class ReportCommand extends Command
             $command[] = $value;
         }
 
+        $reportEditorLink = $this->optionalStringOption($input, 'report-editor-link');
+        if ($reportEditorLink !== null && $reportEditorLink !== 'none') {
+            $command[] = '--report-editor-link';
+            $command[] = $reportEditorLink;
+        }
+
         if ($input->hasParameterOption('--baseline', true)) {
             $value = $this->optionalStringOption($input, 'baseline');
             $command[] = '--baseline';
@@ -125,6 +133,16 @@ final class ReportCommand extends Command
 
         if ((bool) $input->getOption('include-ignored')) {
             $command[] = '--include-ignored';
+        }
+
+        if ($input->hasParameterOption('--report-interactive', true)) {
+            $interactive = $input->getOption('report-interactive');
+
+            if (is_string($interactive) && $interactive !== '') {
+                $command[] = '--report-interactive=' . $interactive;
+            } else {
+                $command[] = '--report-interactive';
+            }
         }
 
         if ($input->hasParameterOption('--diff', true)) {

@@ -1,6 +1,6 @@
 # Architecture - gruff-php
 
-Last reviewed 2026-05-09. All claims map to a real file in `src/`, `tests/`, or top-level config; cross-check before broadening any of them.
+Last reviewed 2026-05-11. All claims map to a real file in `src/`, `tests/`, or top-level config; cross-check before broadening any of them.
 
 ## System Overview
 
@@ -33,9 +33,9 @@ The current request flow is CLI-first; `dashboard` additionally starts a local H
 
 1. `bin/gruff` runs `(new \GruffPhp\Console\Application())->run()` after loading `vendor/autoload.php`.
 2. `Application` (Symfony Console subclass) registers the `analyse`, `report`, and `dashboard` commands with version constant `0.1.0-dev`.
-3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--no-config`, `--format`, `--fail-on`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline` options, validating `--format`, `--fail-on`, mutually exclusive baseline modes, mutually exclusive `--config`/`--no-config` modes, and mutation budget input up front. Both `--baseline` and `--generate-baseline` accept an optional path that defaults to `gruff-baseline.json` at the project root; bare `--baseline` resolves to that default file when present. With no explicit `--config`, `AnalyseCommand` auto-loads `.gruff.json` at the project root if present; `--no-config` opts a single run out.
+3. `AnalyseCommand::execute()` reads the working directory, paths argument, and `--config`, `--no-config`, `--format`, `--fail-on`, `--report-editor-link`, `--report-interactive`, `--include-ignored`, `--infection-report`, `--infection-run`, `--infection-bin`, `--infection-config`, `--mutation-baseline`, `--mutation-budget`, `--diff`, `--history-file`, `--baseline`, `--no-baseline`, and `--generate-baseline` options, validating `--format`, `--fail-on`, mutually exclusive baseline modes, mutually exclusive `--config`/`--no-config` modes, report editor-link values, report-interactive booleans, and mutation budget input up front. Both `--baseline` and `--generate-baseline` accept an optional path that defaults to `gruff-baseline.json` at the project root; bare `--baseline` resolves to that default file when present. With no explicit `--config`, `AnalyseCommand` auto-loads `.gruff.yaml` at the project root if present; `--no-config` opts a single run out.
 4. `RuleRegistry::defaults()` constructs the v0.1 catalogue (sorted by id via `ksort`).
-5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.json` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist values, selection values, rule ids, rule keys, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
+5. `ConfigLoader::load()` produces an `AnalysisConfig` from the registry defaults, then overlays `.gruff.yaml` (or the explicit `--config` path); unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist values, selection values, rule ids, rule keys, threshold/severity settings, threshold names, and non-numeric thresholds throw `ConfigException`, which becomes a `config-error` `RunDiagnostic`.
 6. `SourceDiscovery::discover()` expands the input paths (defaulting to `.`), records missing inputs, applies configured path ignores plus the default ignored-directory list, and yields `SourceFile` values typed `php` or `text`.
 7. For each discovered file, `PhpFileParser::parse()` reads the source. PHP files are parsed by `nikic/php-parser` and decorated with a `ParentConnectingVisitor`; non-PHP text/config files short-circuit to an `AnalysisUnit` with raw source but no AST or tokens. Parse failures produce one `ParseDiagnostic` per error and are surfaced as `parse-error` `RunDiagnostic` entries.
 8. `RuleRegistry::analyse()` skips units with parse errors, then iterates rules allowed by `RuleSelection` and per-rule `enabled` settings. PHP-only rules run only against `SourceFile::isPhp()` units; rules implementing `SourceTextRuleInterface` also run against text/config units, so secret/PII scanners cover JSON, YAML, env, and similar files. Findings from all units are sorted by `(filePath, line, ruleId, message)` for deterministic output.
@@ -45,10 +45,10 @@ The current request flow is CLI-first; `dashboard` additionally starts a local H
 12. Configured secret preview allowlists remove matching `SensitiveData` findings by redacted preview, after rules run and before scoring.
 13. If `--generate-baseline` is supplied, `BaselineStore` writes the current scoped findings to a `gruff.baseline.v1` JSON file (defaulting to `gruff-baseline.json` at the project root, overwriting silently). If `--baseline` is supplied, `BaselineStore` reads that file and `BaselineFilter` suppresses matching findings by fingerprint, rule id, and file path. With no explicit baseline flag, `AnalyseCommand` auto-discovers `gruff-baseline.json` at the project root and applies it unless `--no-baseline` is set. The `BaselineReport` payload distinguishes `source: "explicit"` from `source: "default"` so reporters can communicate whether application was auto-discovered. Stale entries are evaluated only in full-project scope; diff scope reports that stale evaluation is skipped.
 14. `ScoreCalculator` computes per-pillar scores, top-offender file scores, complexity distribution buckets, optional mutation scoring, and the composite A-F grade. If `--history-file` is supplied, `TrendRecorder` appends a bounded JSON history entry.
-15. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, optional trend data, and optional baseline metadata, then renders it via the selected reporter. Reporter output is written using `OutputInterface::OUTPUT_RAW` so Symfony Console does not scan rendered HTML/JSON/Markdown payloads as console formatting tags.
+15. `AnalyseCommand` builds an `AnalysisReport` with tool/run metadata, summary counts, ignored/missing paths, diagnostics, findings, optional mutation data, score, diff metadata, optional trend data, and optional baseline metadata, then renders it via the selected reporter. HTML rendering also consumes render-only options for editor links (`none`, `vscode`, `phpstorm`) and opt-in interactive findings controls. Reporter output is written using `OutputInterface::OUTPUT_RAW` so Symfony Console does not scan rendered HTML/JSON/Markdown payloads as console formatting tags.
 16. `resolveExitCode()` returns `Command::INVALID` (`2`) if any `RunDiagnostic` was recorded, `Command::FAILURE` (`1`) when at least one finding satisfies `--fail-on`, and `Command::SUCCESS` (`0`) otherwise.
-17. `ReportCommand` builds a safe Symfony Process argument vector for `bin/gruff analyse <paths> --format <html|json> --fail-on <threshold>`, preserving supported analysis options including `--baseline` and `--no-baseline`, then writes the static report to stdout (also via `OUTPUT_RAW`) or to `--output`.
-18. `DashboardCommand` binds a local socket (default `127.0.0.1:8765`), renders a control page at `GET /` (now including baseline path and skip-baseline form fields), re-runs analysis at `GET /scan` using query-supplied project root, paths, and baseline state, injects a no-store dashboard toolbar into the HTML report, and exposes `GET /health` for smoke tests. The dashboard does not expose a mutation trigger and the HTML report omits the mutation pillar/chart; full Infection runs are driven from `scripts/mutation-test-full.sh` or by passing `--infection-run --infection-report` to `analyse` directly. `scripts/start-dev.sh` starts the dashboard with environment-overridable host, port, project root, and scan timeout.
+17. `ReportCommand` builds a safe Symfony Process argument vector for `bin/gruff analyse <paths> --format <html|json> --fail-on <threshold>`, preserving supported analysis options including `--baseline`, `--no-baseline`, `--report-editor-link`, and `--report-interactive`, then writes the static report to stdout (also via `OUTPUT_RAW`) or to `--output`.
+18. `DashboardCommand` binds a local socket (default `127.0.0.1:8765`), renders a control page at `GET /` (including baseline, config, scan-scope, include-ignored, and interactive-findings controls), re-runs analysis at `GET /scan` using query-supplied project root, paths, baseline, config, scan scope, include-ignored, and report-interactive state, injects scan metadata into the HTML report, and exposes `GET /health` for smoke tests. The config control defaults to `.gruff.yaml` without pinning an absolute project root; the scan-scope control maps `whole branch` to a full selected-path scan and `diff only` to `analyse --diff`. The scan metadata command line is displayed in a wrapping copyable field. The dashboard does not expose a mutation trigger and the HTML report omits the mutation pillar/chart; full Infection runs are driven from `scripts/mutation-test-full.sh` or by passing `--infection-run --infection-report` to `analyse` directly. `scripts/start-dev.sh` starts the dashboard with environment-overridable host, port, project root, and scan timeout.
 
 Static finding baselines default to `gruff-baseline.json` at the project root: `--generate-baseline` writes it (overwriting silently), bare `--baseline` or no flag at all picks it up automatically, `--baseline=<path>` forces an explicit file, and `--no-baseline` opts a single run out. Mutation-specific baseline MSI comparison remains separate through `--mutation-baseline`.
 
@@ -67,7 +67,7 @@ The default registry-backed static rule set covers ten pillars (`Size`, `Complex
 | Modernisation | `modernisation.constructor-promotion-candidate`, `modernisation.enum-candidate`, `modernisation.first-class-callable-candidate`, `modernisation.forbidden-global-access`, `modernisation.match-expression-candidate`, `modernisation.mixed-type-overuse`, `modernisation.named-argument-opportunity`, `modernisation.public-property`, `modernisation.readonly-property-candidate` | PHP-version-gated opportunity checks where syntax support matters; no autofix behavior; `ModernisationNodeHelper` is shared infrastructure |
 | Security | `security.dangerous-function-call`, `security.disabled-ssl-verification`, `security.error-suppression`, `security.extract-compact-user-input`, `security.header-injection`, `security.insecure-random`, `security.silent-catch`, `security.sql-concatenation`, `security.unsafe-unserialize`, `security.variable-include`, `security.weak-crypto` | Heuristic AST checks; some carry secondary pillars (e.g. `Pillar::Complexity` or `Pillar::Modernisation`); `SecurityNodeHelper` is shared infrastructure |
 | SensitiveData | `sensitive-data.api-key-pattern`, `sensitive-data.aws-access-key`, `sensitive-data.database-url-password`, `sensitive-data.hardcoded-env-value`, `sensitive-data.high-entropy-string`, `sensitive-data.jwt-token`, `sensitive-data.phi-pattern`, `sensitive-data.pii-test-fixture`, `sensitive-data.private-key` | All implement `SourceTextRuleInterface`, so they also scan JSON/YAML/INI/.env-style files; `SecretScannerHelper` is shared infrastructure |
-| TestQuality | Source-test rules: `test-quality.no-assertions`, `test-quality.trivial-assertion`, `test-quality.conditional-logic`, `test-quality.loop-in-test`, `test-quality.loop-assertion-without-message`, `test-quality.test-longer-than-sut`, `test-quality.test-method-too-long`, `test-quality.eager-test`, `test-quality.mystery-guest`, `test-quality.excessive-mocking`, `test-quality.mock-only-test`, `test-quality.mock-without-expectation`, `test-quality.unused-mock`, `test-quality.sleep-in-test`, `test-quality.naming-consistency`, `test-quality.magic-number-assertion`, `test-quality.private-reflection`, `test-quality.data-provider-annotation`, `test-quality.empty-data-provider`, `test-quality.trivial-snapshot`, `test-quality.sut-not-called`, `test-quality.setup-bloat`, `test-quality.skipped-without-reason`, `test-quality.extends-production-class`, `test-quality.tautological-type-assertion`, `test-quality.exception-type-only`, `test-quality.global-state-mutation`, `test-quality.repeated-structure-missing-data-provider`. Default-disabled heuristics (opt in via `.gruff.json`): `test-quality.multiple-aaa-cycles`, `test-quality.testdox-readability`, `test-quality.mocking-domain-object`. Project-config rules (one finding per analyse run, read from `phpunit.xml`/`phpunit.xml.dist`/`phpunit.dist.xml`): `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-coverage-source-missing`. PHPUnit/Pest AST heuristics scoped to detected test methods or closures; confidence labels identify noisier smells; `TestQualityNodeHelper` is shared infrastructure |
+| TestQuality | Source-test rules: `test-quality.no-assertions`, `test-quality.trivial-assertion`, `test-quality.conditional-logic`, `test-quality.loop-in-test`, `test-quality.loop-assertion-without-message`, `test-quality.test-longer-than-sut`, `test-quality.test-method-too-long`, `test-quality.eager-test`, `test-quality.mystery-guest`, `test-quality.excessive-mocking`, `test-quality.mock-only-test`, `test-quality.mock-without-expectation`, `test-quality.unused-mock`, `test-quality.sleep-in-test`, `test-quality.naming-consistency`, `test-quality.magic-number-assertion`, `test-quality.private-reflection`, `test-quality.data-provider-annotation`, `test-quality.empty-data-provider`, `test-quality.trivial-snapshot`, `test-quality.sut-not-called`, `test-quality.setup-bloat`, `test-quality.skipped-without-reason`, `test-quality.extends-production-class`, `test-quality.tautological-type-assertion`, `test-quality.exception-type-only`, `test-quality.global-state-mutation`, `test-quality.repeated-structure-missing-data-provider`. Default-disabled heuristics (opt in via `.gruff.yaml`): `test-quality.multiple-aaa-cycles`, `test-quality.testdox-readability`, `test-quality.mocking-domain-object`. Project-config rules (one finding per analyse run, read from `phpunit.xml`/`phpunit.xml.dist`/`phpunit.dist.xml`): `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-coverage-source-missing`. PHPUnit/Pest AST heuristics scoped to detected test methods or closures; confidence labels identify noisier smells; `TestQualityNodeHelper` is shared infrastructure |
 | Design | `design.god-method` | Not registry-backed; emitted when size and complexity findings overlap on a method/function symbol |
 | Mutation | `mutation.survived-mutant`, `mutation.budget-exceeded`, `mutation.msi-regression` | Not registry-backed static rules; emitted only from optional Infection JSON ingestion |
 
@@ -78,7 +78,7 @@ The default registry-backed static rule set covers ten pillars (`Size`, `Complex
 There is no runtime authentication or authorisation surface. The analyser only reads local files supplied by the user. Trust boundaries that exist:
 
 - **Source discovery** treats any path provided on the CLI as user-trusted and applies configured path ignores plus the default ignored-directory list (default ignores are overridable with `--include-ignored`; configured ignores still apply).
-- **Config loading** treats `.gruff.json` and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist entries, rule selection entries, rule ids, rule sub-keys, and non-numeric thresholds all raise `ConfigException`.
+- **Config loading** treats `.gruff.yaml` and `--config` as user-trusted but validates strictly: unknown root keys, invalid `minimumPhpVersion`, path ignore patterns, allowlist entries, rule selection entries, rule ids, rule sub-keys, invalid threshold/severity pairs, unknown named thresholds, and non-numeric thresholds all raise `ConfigException`.
 - **Baselines** are explicit JSON files supplied by the user. They suppress only exact fingerprint/rule/file matches and report suppression counts plus stale-entry status; inline suppression comments are not supported in v0.1.
 - **Agent tooling** is gated independently by `.claude/hooks/deny-dangerous.sh` and `.codex/hooks/deny-dangerous.sh`, which reject dangerous shell commands before agent execution.
 
@@ -97,43 +97,45 @@ There is no runtime authentication or authorisation surface. The analyser only r
 
 ## Configuration
 
-`ConfigLoader::load()` always seeds an `AnalysisConfig` from the registry's default thresholds (`AnalysisConfig::fromRegistry`). It then loads JSON from the resolved path (`--config` or `.gruff.json` in the project root). The supported shape is:
+`ConfigLoader::load()` always seeds an `AnalysisConfig` from the registry's default thresholds (`AnalysisConfig::fromRegistry`). It then loads YAML from the resolved path (`--config` or `.gruff.yaml` in the project root). Only `.yaml` and `.yml` extensions are accepted; any other extension raises a `ConfigException`. The supported shape is:
 
-```json
-{
-  "minimumPhpVersion": 8.3,
-  "paths": {
-    "ignore": ["legacy/**", "generated"]
-  },
-  "selection": {
-    "tiers": ["v0.1"],
-    "pillars": ["security", "sensitive-data"],
-    "rules": ["size.file-length"],
-    "excludePillars": ["documentation"],
-    "excludeRules": ["security.weak-crypto"]
-  },
-  "allowlists": {
-    "acceptedAbbreviations": ["id", "db"],
-    "secretPreviews": ["AKIA...T3R2 (redacted, 20 chars)"]
-  },
-  "rules": {
-    "<rule.id>": {
-      "enabled": true,
-      "thresholds": { "<name>": <int|float> }
-    }
-  }
-}
+```yaml
+minimumPhpVersion: 8.3
+paths:
+    ignore: ["legacy/**", "generated"]
+selection:
+    tiers: ["v0.1"]
+    pillars: ["security", "sensitive-data"]
+    rules: ["size.file-length"]
+    excludePillars: ["documentation"]
+    excludeRules: ["security.weak-crypto"]
+allowlists:
+    acceptedAbbreviations: ["id", "db"]
+    secretPreviews: ["AKIA...T3R2 (redacted, 20 chars)"]
+rules:
+    complexity.cognitive:
+        enabled: true
+        threshold: 30
+        severity: error
+    docs.missing-public-phpdoc:
+        enabled: true
+        thresholds:
+            minBodyLines: 8
+    test-quality.magic-number-assertion:
+        enabled: true
+        options:
+            allowedLiterals: [200, 201, 204]
 ```
 
-`minimumPhpVersion` is optional, defaults to `8.3`, and must be numeric and at least `7.4`; PHP syntax opportunity rules use it to suppress suggestions unsupported by the configured target. `paths.ignore` contains project-relative exact or glob-like patterns (`*`, `?`, `**`) and cannot escape the project with absolute or parent paths. `selection` is explicit: if any of `tiers`, `pillars`, or `rules` is present, a rule must match at least one include; `excludePillars` and `excludeRules` subtract from that set. Per-rule `enabled: false` still disables a rule; `enabled: true` does not force a rule back into an excluded selection. `allowlists.acceptedAbbreviations` feeds naming rules, while `allowlists.secretPreviews` suppresses exact redacted secret previews already printed by gruff.
+`minimumPhpVersion` is optional, defaults to `8.3`, and must be numeric and at least `7.4`; PHP syntax opportunity rules use it to suppress suggestions unsupported by the configured target. `paths.ignore` contains project-relative exact or glob-like patterns (`*`, `?`, `**`) and cannot escape the project with absolute or parent paths. `selection` is explicit: if any of `tiers`, `pillars`, or `rules` is present, a rule must match at least one include; `excludePillars` and `excludeRules` subtract from that set. Per-rule `enabled: false` still disables a rule; `enabled: true` does not force a rule back into an excluded selection. `threshold` + `severity` is the concise form for rules whose defaults are exactly `warning`/`error`; `severity: error` compiles both internal thresholds to the same value so matching findings are errors only. `thresholds` remains the named-knob map for rules with semantic settings such as `minBodyLines`, `minPositionalArguments`, or `entropy`, and cannot be combined with `threshold`. `allowlists.acceptedAbbreviations` feeds naming rules, while `allowlists.secretPreviews` suppresses exact redacted secret previews already printed by gruff.
 
-Unknown top-level keys, unknown path/allowlist/selection keys, unknown rule ids, unknown pillars, unknown tiers, unknown rule sub-keys (anything other than `enabled`/`thresholds`), unknown threshold names, non-boolean `enabled`, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`.
+Unknown top-level keys, unknown path/allowlist/selection keys, unknown rule ids, unknown pillars, unknown tiers, unknown rule sub-keys (anything other than `enabled`/`threshold`/`severity`/`thresholds`/`options`), unknown threshold names, unknown option names, non-boolean `enabled`, invalid `threshold`/`severity` combinations, and non-numeric threshold values all raise `ConfigException`. Threshold names must already exist in the rule's `RuleDefinition::$defaultThresholds`; option names must already exist in `RuleDefinition::$defaultOptions`.
 
 ## Reporting
 
 - Text output (`TextReporter`): header (`gruff <version>`, format, fail threshold), file counts, optional ignored/missing/diagnostics sections, score summary, optional baseline summary, optional mutation summary, findings section grouped by file/line, and a final summary line with severity counts and exit code.
 - JSON output (`JsonReporter`): `JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR`, schema rooted at `gruff.analysis.v1` (`AnalysisReport::SCHEMA_VERSION`) with optional `mutation`, `score`, `diff`, `trend`, and `baseline` objects.
-- HTML output (`HtmlReporter`): a self-contained report with inline CSS, escaped run data, masthead, verdict, stats, pillar grades (mutation pillar omitted), top offenders, complexity distribution, and findings list.
+- HTML output (`HtmlReporter`): a self-contained report with inline CSS, escaped run data, masthead, verdict, canonical severity stats (`errors`, `warnings`, `advisories`), semantic section headings, scoped table headers, pillar grades (mutation pillar omitted), top offenders, a cyclomatic-complexity distribution with a summary line, and findings list. File locations are selectable copy spans by default or editor links when `--report-editor-link=vscode|phpstorm` is set. `--report-interactive` adds inline dependency-free filtering, search, grouping, and URL-hash state to the findings list; the default static output has no script or filter chrome.
 - Markdown output (`MarkdownReporter`): PR-comment style summary with score, counts, top offenders, and findings.
 - GitHub annotations output (`GithubAnnotationsReporter`): GitHub Actions workflow commands for findings, with annotation properties escaped.
 - Hotspot output (`HotspotReporter`): JSON hotspot map focused on file scores and known limitations; Git churn is not available yet.
@@ -156,4 +158,4 @@ There is no deployment pipeline, Packagist release flow, or persistent runtime s
 - `final readonly class` is the default for value objects (`AnalysisReport`, `RunDiagnostic`, `RuleDefinition`, `RuleContext`, `RuleSettings`, `Finding`, `SourceFile`, `SourceDiscoveryResult`, `AnalysisUnit`, `ParseDiagnostic`).
 - Enums (`Severity`, `Pillar`, `RuleTier`, `Confidence`, `OutputFormat`, `FailThreshold`) are string-backed; CLI parsers use `fromInput()` static helpers that return `null` for unknown values so the command can emit a `usage-error` diagnostic.
 - Rules expose a `public const ID` matching the slug returned by `definition()->id`, so test code and config can use the constant rather than re-typing the string.
-- All test fixtures live under `tests/Fixtures/M0X/` matching the milestone that introduced them; new milestones add their own subtree rather than reusing earlier ones.
+- Test fixtures live under descriptive pillar directories (`tests/Fixtures/Cli/`, `Complexity/`, `Config/`, `DeadCode/`, `Docs/`, `Modernisation/`, `Mutation/`, `Naming/`, `PhpUnitConfig/`, `Reporting/`, `Security/`, `SensitiveData/`, `Size/`, `Source/`, `TestQuality/`); the previous milestone-prefix layout (`tests/Fixtures/M0X/`) was retired.

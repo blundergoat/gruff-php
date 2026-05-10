@@ -1,0 +1,3 @@
+rules:
+    sensitive-data.high-entropy-string:
+        enabled: false
