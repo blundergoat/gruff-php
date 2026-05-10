@@ -205,35 +205,31 @@ final class TestQualityNodeHelper
             return false;
         }
 
-        if ($name === 'asserttrue' && self::literalValue(self::firstArgValue($call)) === true) {
-            return true;
-        }
+        return match ($name) {
+            'asserttrue' => self::literalValue(self::firstArgValue($call)) === true,
+            'assertfalse' => self::literalValue(self::firstArgValue($call)) === false,
+            'tobetrue' => $call instanceof Expr\MethodCall
+                && self::literalValue(self::pestExpectationValue($call)) === true,
+            'tobefalse' => $call instanceof Expr\MethodCall
+                && self::literalValue(self::pestExpectationValue($call)) === false,
+            'assertequals', 'assertsame' => self::sameLiteralArguments($call),
+            'tobe', 'toequal' => $call instanceof Expr\MethodCall && self::samePestLiteralArguments($call),
+            default => false,
+        };
+    }
 
-        if ($name === 'assertfalse' && self::literalValue(self::firstArgValue($call)) === false) {
-            return true;
-        }
+    private static function sameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $expected = self::literalValue(self::firstArgValue($call));
 
-        if ($name === 'tobetrue' && $call instanceof Expr\MethodCall && self::literalValue(self::pestExpectationValue($call)) === true) {
-            return true;
-        }
+        return $expected !== null && $expected === self::literalValue(self::argValue($call, 1));
+    }
 
-        if ($name === 'tobefalse' && $call instanceof Expr\MethodCall && self::literalValue(self::pestExpectationValue($call)) === false) {
-            return true;
-        }
+    private static function samePestLiteralArguments(Expr\MethodCall $call): bool
+    {
+        $expected = self::literalValue(self::firstArgValue($call));
 
-        if (in_array($name, ['assertequals', 'assertsame'], true)) {
-            return self::literalValue(self::firstArgValue($call)) === self::literalValue(self::argValue($call, 1))
-                && self::literalValue(self::firstArgValue($call)) !== null;
-        }
-
-        if (in_array($name, ['tobe', 'toequal'], true) && $call instanceof Expr\MethodCall) {
-            $expected = self::literalValue(self::firstArgValue($call));
-            $actual = self::literalValue(self::pestExpectationValue($call));
-
-            return $expected !== null && $expected === $actual;
-        }
-
-        return false;
+        return $expected !== null && $expected === self::literalValue(self::pestExpectationValue($call));
     }
 
     public static function callName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string

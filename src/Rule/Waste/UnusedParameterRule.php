@@ -40,70 +40,127 @@ final readonly class UnusedParameterRule implements RuleInterface
     {
         $definition = $this->definition();
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
-            if ($node instanceof Function_) {
-                return true;
-            }
-
-            return $node instanceof ClassMethod && $node->isPrivate();
-        });
-
         $findings = [];
 
-        foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+        foreach ($this->analysableNodes($unit, $finder) as $node) {
+            array_push($findings, ...$this->findingsForNode($unit, $definition, $finder, $node));
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @return list<ClassMethod|Function_>
+     */
+    private function analysableNodes(AnalysisUnit $unit, NodeFinder $finder): array
+    {
+        $foundNodes = $finder->find($unit->statements, static function (Node $node): bool {
+            return $node instanceof Function_ || ($node instanceof ClassMethod && $node->isPrivate());
+        });
+        $nodes = [];
+
+        foreach ($foundNodes as $node) {
+            if (!$node instanceof ClassMethod && !$node instanceof Function_) {
+                continue;
+            }
+
             if ($node instanceof ClassMethod && $node->isAbstract()) {
                 continue;
             }
 
-            if ($node->stmts === null || $node->params === []) {
-                continue;
+            if (($node->stmts ?? []) !== [] && $node->params !== []) {
+                $nodes[] = $node;
             }
+        }
 
-            $paramNames = [];
+        return $nodes;
+    }
 
-            foreach ($node->params as $param) {
-                if ($param->var instanceof Variable && is_string($param->var->name)) {
-                    $paramNames[$param->var->name] = $param;
-                }
-            }
+    /**
+     * @param ClassMethod|Function_ $node
+     * @return list<Finding>
+     */
+    private function findingsForNode(
+        AnalysisUnit $unit,
+        RuleDefinition $definition,
+        NodeFinder $finder,
+        ClassMethod|Function_ $node,
+    ): array {
+        $usedNames = $this->usedVariableNames($node, $finder);
+        $findings = [];
 
-            $usedVars = $finder->find($node->stmts, static function (Node $child): bool {
-                return $child instanceof Variable && is_string($child->name);
-            });
-
-            $usedNames = [];
-
-            foreach ($usedVars as $var) {
-                /** @var Variable $var */
-                if (is_string($var->name)) {
-                    $usedNames[$var->name] = true;
-                }
-            }
-
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
-
-            foreach ($paramNames as $name => $param) {
-                if (isset($usedNames[$name])) {
-                    continue;
-                }
-
-                $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Parameter $%s in %s is never used.', $name, $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $param->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
-                    remediation: 'Remove the parameter or use it in the method body.',
-                    metadata: ['parameter' => $name],
-                );
+        foreach ($this->parameterNames($node) as $name => $param) {
+            if (!isset($usedNames[$name])) {
+                $findings[] = $this->findingForParameter($unit, $definition, $node, $name, $param);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * @param ClassMethod|Function_ $node
+     * @return array<string, \PhpParser\Node\Param>
+     */
+    private function parameterNames(ClassMethod|Function_ $node): array
+    {
+        $paramNames = [];
+
+        foreach ($node->params as $param) {
+            if ($param->flags !== 0) {
+                continue;
+            }
+
+            if ($param->var instanceof Variable && is_string($param->var->name)) {
+                $paramNames[$param->var->name] = $param;
+            }
+        }
+
+        return $paramNames;
+    }
+
+    /**
+     * @param ClassMethod|Function_ $node
+     * @return array<string, true>
+     */
+    private function usedVariableNames(ClassMethod|Function_ $node, NodeFinder $finder): array
+    {
+        $usedNames = [];
+        $usedVars = $finder->find($node->stmts ?? [], static function (Node $child): bool {
+            return $child instanceof Variable && is_string($child->name);
+        });
+
+        foreach ($usedVars as $var) {
+            /** @var Variable $var */
+            if (is_string($var->name)) {
+                $usedNames[$var->name] = true;
+            }
+        }
+
+        return $usedNames;
+    }
+
+    private function findingForParameter(
+        AnalysisUnit $unit,
+        RuleDefinition $definition,
+        ClassMethod|Function_ $node,
+        string $name,
+        Node\Param $param,
+    ): Finding {
+        $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+
+        return new Finding(
+            ruleId: $definition->id,
+            message: sprintf('Parameter $%s in %s is never used.', $name, $symbol),
+            filePath: $unit->file->displayPath,
+            line: $param->getStartLine(),
+            severity: $definition->defaultSeverity,
+            pillar: $definition->pillar,
+            tier: $definition->tier,
+            confidence: $definition->confidence,
+            symbol: $symbol,
+            remediation: 'Remove the parameter or use it in the method body.',
+            metadata: ['parameter' => $name],
+        );
     }
 }

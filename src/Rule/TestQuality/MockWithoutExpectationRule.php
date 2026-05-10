@@ -42,89 +42,145 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $assignments = $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
+            $findings = array_merge($findings, $this->findingsForScope($unit, $scope, $finder));
+        }
 
-            $mockAssignments = [];
-            $assignedVarObjectIds = [];
+        return $findings;
+    }
 
-            foreach ($assignments as $assign) {
-                if (!$assign instanceof Expr\Assign) {
-                    continue;
-                }
+    /**
+     * @return list<Finding>
+     */
+    private function findingsForScope(AnalysisUnit $unit, TestQualityScope $scope, NodeFinder $finder): array
+    {
+        $assignedVarObjectIds = [];
+        $mockAssignments = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
 
-                if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
-                    continue;
-                }
+        if ($mockAssignments === []) {
+            return [];
+        }
 
-                $assignedVarObjectIds[spl_object_id($assign->var)] = true;
+        $reads = $this->variableReads($scope, $finder, $assignedVarObjectIds);
+        $findings = [];
 
-                if (!$this->isMockCreationExpression($assign->expr)) {
-                    continue;
-                }
+        foreach ($mockAssignments as $varName => $assignment) {
+            $finding = $this->findingForMock($unit, $scope, $finder, $varName, $assignment, $reads);
 
-                $varName = $assign->var->name;
-                $mockAssignments[$varName] ??= [
-                    'line' => $assign->getStartLine(),
-                    'name' => $varName,
-                ];
-            }
-
-            if ($mockAssignments === []) {
-                continue;
-            }
-
-            $reads = [];
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
-                if (!$var instanceof Expr\Variable || !is_string($var->name)) {
-                    continue;
-                }
-
-                if (isset($assignedVarObjectIds[spl_object_id($var)])) {
-                    continue;
-                }
-
-                $reads[$var->name] ??= [];
-                $reads[$var->name][] = $var;
-            }
-
-            foreach ($mockAssignments as $varName => $assignment) {
-                if (!isset($reads[$varName])) {
-                    // Variable never read at all - that's the unused-mock rule's territory; skip.
-                    continue;
-                }
-
-                $methodNames = $this->methodNamesCalledOnVariable($scope, $finder, $varName);
-
-                $hasVerification = $this->intersectsAny($methodNames, self::VERIFICATION_METHODS);
-                if ($hasVerification) {
-                    continue;
-                }
-
-                $hasStub = $this->intersectsAny($methodNames, self::STUB_METHODS);
-                $variant = $hasStub ? 'stub-only' : 'dead-mock';
-                $severity = $hasStub ? Severity::Advisory : Severity::Warning;
-
-                $message = $hasStub
-                    ? sprintf('%s sets up mock $%s with stub return values but never verifies any call.', $scope->symbol, $varName)
-                    : sprintf('%s passes mock $%s around without setting up an expectation or stub.', $scope->symbol, $varName);
-
-                $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: $message,
-                    filePath: $unit->file->displayPath,
-                    line: $assignment['line'],
-                    severity: $severity,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Medium,
-                    symbol: $scope->symbol,
-                    remediation: 'Either verify a method call with $mock->expects(...) / shouldReceive(), or replace the mock with a stub created via createStub() to make the intent explicit.',
-                    metadata: ['variable' => $varName, 'variant' => $variant],
-                );
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * @param array<int, true> $assignedVarObjectIds
+     * @return array<string, array{line: int, name: string}>
+     */
+    private function mockAssignments(
+        TestQualityScope $scope,
+        NodeFinder $finder,
+        array &$assignedVarObjectIds,
+    ): array {
+        $mockAssignments = [];
+        $assignments = $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
+
+        foreach ($assignments as $assign) {
+            if (!$assign instanceof Expr\Assign) {
+                continue;
+            }
+
+            if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
+                continue;
+            }
+
+            $assignedVarObjectIds[spl_object_id($assign->var)] = true;
+
+            if (!$this->isMockCreationExpression($assign->expr)) {
+                continue;
+            }
+
+            $varName = $assign->var->name;
+            $mockAssignments[$varName] ??= [
+                'line' => $assign->getStartLine(),
+                'name' => $varName,
+            ];
+        }
+
+        return $mockAssignments;
+    }
+
+    /**
+     * @param array<int, true> $assignedVarObjectIds
+     * @return array<string, list<Expr\Variable>>
+     */
+    private function variableReads(TestQualityScope $scope, NodeFinder $finder, array $assignedVarObjectIds): array
+    {
+        $reads = [];
+
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
+            if (!$var instanceof Expr\Variable || !is_string($var->name)) {
+                continue;
+            }
+
+            if (isset($assignedVarObjectIds[spl_object_id($var)])) {
+                continue;
+            }
+
+            $reads[$var->name] ??= [];
+            $reads[$var->name][] = $var;
+        }
+
+        return $reads;
+    }
+
+    /**
+     * @param array{line: int, name: string} $assignment
+     * @param array<string, list<Expr\Variable>> $reads
+     */
+    private function findingForMock(
+        AnalysisUnit $unit,
+        TestQualityScope $scope,
+        NodeFinder $finder,
+        string $varName,
+        array $assignment,
+        array $reads,
+    ): ?Finding {
+        if (!isset($reads[$varName])) {
+            return null;
+        }
+
+        $methodNames = $this->methodNamesCalledOnVariable($scope, $finder, $varName);
+        if ($this->intersectsAny($methodNames, self::VERIFICATION_METHODS)) {
+            return null;
+        }
+
+        $hasStub = $this->intersectsAny($methodNames, self::STUB_METHODS);
+        $variant = $hasStub ? 'stub-only' : 'dead-mock';
+
+        return new Finding(
+            ruleId: self::ID,
+            message: $this->mockMessage($scope->symbol, $varName, $hasStub),
+            filePath: $unit->file->displayPath,
+            line: $assignment['line'],
+            severity: $hasStub ? Severity::Advisory : Severity::Warning,
+            pillar: Pillar::TestQuality,
+            tier: RuleTier::V01,
+            confidence: Confidence::Medium,
+            symbol: $scope->symbol,
+            remediation: 'Either verify a method call with $mock->expects(...) / shouldReceive(), or replace the mock with a stub created via createStub() to make the intent explicit.',
+            metadata: ['variable' => $varName, 'variant' => $variant],
+        );
+    }
+
+    private function mockMessage(string $symbol, string $varName, bool $hasStub): string
+    {
+        if ($hasStub) {
+            return sprintf('%s sets up mock $%s with stub return values but never verifies any call.', $symbol, $varName);
+        }
+
+        return sprintf('%s passes mock $%s around without setting up an expectation or stub.', $symbol, $varName);
     }
 
     private function isMockCreationExpression(Expr $expr): bool

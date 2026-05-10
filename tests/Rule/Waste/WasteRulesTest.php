@@ -139,6 +139,14 @@ final class WasteRulesTest extends TestCase
         }
     }
 
+    public function testPromotedPrivateConstructorParametersAreUsedAsProperties(): void
+    {
+        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
+
+        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $findings);
+        self::assertNotContains('promoted', $params);
+    }
+
     public function testCommentedOutCodeDetected(): void
     {
         $findings = $this->analyseRule('commented-out-code.php', CommentedOutCodeRule::ID);

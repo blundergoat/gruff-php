@@ -114,77 +114,89 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $totalOperators = 0;
         $totalOperands = 0;
 
-        $body = $node->stmts ?? [];
         $finder = new NodeFinder();
+        $all = $finder->find($node->stmts ?? [], static fn (): bool => true);
 
-        $all = $finder->find($body, static fn (): bool => true);
-
-        foreach ($all as $child) {
-            if ($child instanceof BinaryOp
-                || $child instanceof Expr\AssignOp
-                || $child instanceof Expr\Assign
-            ) {
-                $key = $child::class;
-                $operators[$key] = true;
+        foreach ($all as $childNode) {
+            $operatorKey = self::operatorKey($childNode);
+            if ($operatorKey !== null) {
+                $operators[$operatorKey] = true;
                 $totalOperators++;
             }
 
-            if ($child instanceof Stmt\If_
-                || $child instanceof Stmt\For_
-                || $child instanceof Stmt\Foreach_
-                || $child instanceof Stmt\While_
-                || $child instanceof Stmt\Do_
-                || $child instanceof Stmt\Switch_
-                || $child instanceof Stmt\Catch_
-                || $child instanceof Stmt\Return_
-            ) {
-                $key = $child::class;
-                $operators[$key] = true;
-                $totalOperators++;
-            }
-
-            if ($child instanceof Expr\Variable) {
-                $name = $child->name;
-
-                if (is_string($name)) {
-                    $operands['$' . $name] = true;
-                    $totalOperands++;
-                }
-            }
-
-            if ($child instanceof Node\Scalar) {
-                $key = 'scalar:' . $child::class;
-                $operands[$key] = true;
-                $totalOperands++;
-            }
-
-            if ($child instanceof Node\Param && $child->var instanceof Expr\Variable && is_string($child->var->name)) {
-                $operands['$' . $child->var->name] = true;
+            $operandKey = self::operandKey($childNode);
+            if ($operandKey !== null) {
+                $operands[$operandKey] = true;
                 $totalOperands++;
             }
         }
 
-        $n1 = count($operators);
-        $n2 = count($operands);
-        $bigN1 = $totalOperators;
-        $bigN2 = $totalOperands;
-        $bigN = $bigN1 + $bigN2;
-        $n = $n1 + $n2;
+        return self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
+    }
 
-        if ($n === 0 || $n2 === 0 || $bigN2 === 0) {
+    private static function operatorKey(Node $node): ?string
+    {
+        return match (true) {
+            $node instanceof BinaryOp,
+            $node instanceof Expr\AssignOp,
+            $node instanceof Expr\Assign,
+            $node instanceof Stmt\If_,
+            $node instanceof Stmt\For_,
+            $node instanceof Stmt\Foreach_,
+            $node instanceof Stmt\While_,
+            $node instanceof Stmt\Do_,
+            $node instanceof Stmt\Switch_,
+            $node instanceof Stmt\Catch_,
+            $node instanceof Stmt\Return_ => $node::class,
+            default => null,
+        };
+    }
+
+    private static function operandKey(Node $node): ?string
+    {
+        return match (true) {
+            $node instanceof Expr\Variable => self::variableOperandKey($node),
+            $node instanceof Node\Scalar => 'scalar:' . $node::class,
+            $node instanceof Node\Param => self::parameterOperandKey($node),
+            default => null,
+        };
+    }
+
+    private static function variableOperandKey(Expr\Variable $variable): ?string
+    {
+        return is_string($variable->name) ? '$' . $variable->name : null;
+    }
+
+    private static function parameterOperandKey(Node\Param $parameter): ?string
+    {
+        if (!$parameter->var instanceof Expr\Variable) {
+            return null;
+        }
+
+        return self::variableOperandKey($parameter->var);
+    }
+
+    /**
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
+     */
+    private static function metricsForCounts(int $uniqueOperators, int $uniqueOperands, int $totalOperators, int $totalOperands): array
+    {
+        $length = $totalOperators + $totalOperands;
+        $vocabulary = $uniqueOperators + $uniqueOperands;
+
+        if ($vocabulary === 0 || $uniqueOperands === 0 || $totalOperands === 0) {
             return ['volume' => 0.0, 'difficulty' => 0.0, 'effort' => 0.0, 'vocabulary' => 0, 'length' => 0];
         }
 
-        $volume = $bigN * log($n, 2);
-        $difficulty = ($n1 / 2) * ($bigN2 / $n2);
-        $effort = $volume * $difficulty;
+        $volume = $length * log($vocabulary, 2);
+        $difficulty = ($uniqueOperators / 2) * ($totalOperands / $uniqueOperands);
 
         return [
             'volume' => $volume,
             'difficulty' => $difficulty,
-            'effort' => $effort,
-            'vocabulary' => $n,
-            'length' => $bigN,
+            'effort' => $volume * $difficulty,
+            'vocabulary' => $vocabulary,
+            'length' => $length,
         ];
     }
 

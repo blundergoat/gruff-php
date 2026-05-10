@@ -39,76 +39,116 @@ final readonly class UnusedMockRule implements RuleInterface
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $assignments = $finder->find(
-                $scope->statements,
-                static fn (Node $node): bool => $node instanceof Expr\Assign,
-            );
-
-            $mockAssignments = [];
             $assignedVarObjectIds = [];
-
-            foreach ($assignments as $assign) {
-                if (!$assign instanceof Expr\Assign) {
-                    continue;
-                }
-
-                if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
-                    continue;
-                }
-
-                $assignedVarObjectIds[spl_object_id($assign->var)] = true;
-
-                if (!$this->isMockCreationExpression($assign->expr)) {
-                    continue;
-                }
-
-                $varName = $assign->var->name;
-                $mockAssignments[$varName] ??= [
-                    'line' => $assign->getStartLine(),
-                    'name' => $varName,
-                ];
-            }
+            $mockAssignments = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
 
             if ($mockAssignments === []) {
                 continue;
             }
 
-            $reads = [];
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
-                if (!$var instanceof Expr\Variable || !is_string($var->name)) {
-                    continue;
-                }
+            $findings = array_merge(
+                $findings,
+                $this->findingsForUnreadMocks($unit, $scope, $mockAssignments, $this->variableReads($scope, $finder, $assignedVarObjectIds)),
+            );
+        }
 
-                if (isset($assignedVarObjectIds[spl_object_id($var)])) {
-                    continue;
-                }
+        return $findings;
+    }
 
-                $reads[$var->name] = true;
+    /**
+     * @param array<int, true> $assignedVarObjectIds
+     * @return array<string, array{line: int, name: string}>
+     */
+    private function mockAssignments(
+        TestQualityScope $scope,
+        NodeFinder $finder,
+        array &$assignedVarObjectIds,
+    ): array {
+        $mockAssignments = [];
+        $assignments = $finder->find(
+            $scope->statements,
+            static fn (Node $node): bool => $node instanceof Expr\Assign,
+        );
+
+        foreach ($assignments as $assign) {
+            if (!$assign instanceof Expr\Assign) {
+                continue;
             }
 
-            foreach ($mockAssignments as $varName => $assignment) {
-                if (isset($reads[$varName])) {
-                    continue;
-                }
-
-                $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf(
-                        '%s creates mock $%s but never reads it.',
-                        $scope->symbol,
-                        $varName,
-                    ),
-                    filePath: $unit->file->displayPath,
-                    line: $assignment['line'],
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::High,
-                    symbol: $scope->symbol,
-                    remediation: 'Use the mock to set expectations or pass it to the SUT, or remove the unused mock creation.',
-                    metadata: ['variable' => $varName],
-                );
+            if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
+                continue;
             }
+
+            $assignedVarObjectIds[spl_object_id($assign->var)] = true;
+
+            if (!$this->isMockCreationExpression($assign->expr)) {
+                continue;
+            }
+
+            $varName = $assign->var->name;
+            $mockAssignments[$varName] ??= [
+                'line' => $assign->getStartLine(),
+                'name' => $varName,
+            ];
+        }
+
+        return $mockAssignments;
+    }
+
+    /**
+     * @param array<int, true> $assignedVarObjectIds
+     * @return array<string, true>
+     */
+    private function variableReads(TestQualityScope $scope, NodeFinder $finder, array $assignedVarObjectIds): array
+    {
+        $reads = [];
+
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
+            if (!$var instanceof Expr\Variable || !is_string($var->name)) {
+                continue;
+            }
+
+            if (isset($assignedVarObjectIds[spl_object_id($var)])) {
+                continue;
+            }
+
+            $reads[$var->name] = true;
+        }
+
+        return $reads;
+    }
+
+    /**
+     * @param array<string, array{line: int, name: string}> $mockAssignments
+     * @param array<string, true> $reads
+     * @return list<Finding>
+     */
+    private function findingsForUnreadMocks(
+        AnalysisUnit $unit,
+        TestQualityScope $scope,
+        array $mockAssignments,
+        array $reads,
+    ): array {
+        $findings = [];
+
+        foreach ($mockAssignments as $varName => $assignment) {
+            if (isset($reads[$varName])) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId: self::ID,
+                message: sprintf('%s creates mock $%s but never reads it.', $scope->symbol, $varName),
+                filePath: $unit->file->displayPath,
+                line: $assignment['line'],
+                severity: Severity::Advisory,
+                pillar: Pillar::TestQuality,
+                tier: RuleTier::V01,
+                confidence: Confidence::High,
+                symbol: $scope->symbol,
+                remediation: 'Use the mock to set expectations or pass it to the SUT, or remove the unused mock creation.',
+                metadata: ['variable' => $varName],
+            );
         }
 
         return $findings;

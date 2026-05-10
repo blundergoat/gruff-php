@@ -124,60 +124,62 @@ final readonly class NpathComplexityRule implements RuleInterface
 
     private static function walkStatement(Node $node): int
     {
-        if ($node instanceof Stmt\If_) {
-            $paths = self::walkBlock($node->stmts) + self::countConditionPaths($node->cond);
+        return match (true) {
+            $node instanceof Stmt\If_ => self::walkIf($node),
+            $node instanceof Stmt\Switch_ => self::walkSwitch($node),
+            $node instanceof Stmt\For_ => self::walkBlock($node->stmts) + 1,
+            $node instanceof Stmt\Foreach_ => self::walkBlock($node->stmts) + 1,
+            $node instanceof Stmt\While_ => self::walkBlock($node->stmts) + 1,
+            $node instanceof Stmt\Do_ => self::walkBlock($node->stmts) + 1,
+            $node instanceof Stmt\TryCatch => self::walkTryCatch($node),
+            default => 1,
+        };
+    }
 
-            foreach ($node->elseifs as $elseif) {
-                $paths += self::walkBlock($elseif->stmts) + self::countConditionPaths($elseif->cond);
-            }
+    private static function walkIf(Stmt\If_ $node): int
+    {
+        $paths = self::walkBlock($node->stmts) + self::countConditionPaths($node->cond);
 
-            if ($node->else !== null) {
-                $paths += self::walkBlock($node->else->stmts);
-            } else {
-                $paths += 1; // implicit else
-            }
-
-            return $paths;
+        foreach ($node->elseifs as $elseif) {
+            $paths += self::walkBlock($elseif->stmts) + self::countConditionPaths($elseif->cond);
         }
 
-        if ($node instanceof Stmt\Switch_) {
-            $paths = 0;
-            $hasDefault = false;
-
-            foreach ($node->cases as $case) {
-                $paths += max(1, self::walkBlock($case->stmts));
-
-                if ($case->cond === null) {
-                    $hasDefault = true;
-                }
-            }
-
-            if (!$hasDefault) {
-                $paths += 1;
-            }
-
-            return max(1, $paths);
+        if ($node->else !== null) {
+            return $paths + self::walkBlock($node->else->stmts);
         }
 
-        if ($node instanceof Stmt\For_
-            || $node instanceof Stmt\Foreach_
-            || $node instanceof Stmt\While_
-            || $node instanceof Stmt\Do_
-        ) {
-            return self::walkBlock($node->stmts) + 1;
-        }
+        return $paths + 1;
+    }
 
-        if ($node instanceof Stmt\TryCatch) {
-            $paths = self::walkBlock($node->stmts);
+    private static function walkSwitch(Stmt\Switch_ $node): int
+    {
+        $paths = 0;
+        $hasDefault = false;
 
-            foreach ($node->catches as $catch) {
-                $paths += self::walkBlock($catch->stmts);
+        foreach ($node->cases as $case) {
+            $paths += max(1, self::walkBlock($case->stmts));
+
+            if ($case->cond === null) {
+                $hasDefault = true;
             }
-
-            return max(1, $paths);
         }
 
-        return 1;
+        if (!$hasDefault) {
+            $paths += 1;
+        }
+
+        return max(1, $paths);
+    }
+
+    private static function walkTryCatch(Stmt\TryCatch $node): int
+    {
+        $paths = self::walkBlock($node->stmts);
+
+        foreach ($node->catches as $catch) {
+            $paths += self::walkBlock($catch->stmts);
+        }
+
+        return max(1, $paths);
     }
 
     private static function countConditionPaths(Expr $expr): int

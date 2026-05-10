@@ -63,67 +63,93 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $minBodyLines = (int) $settings->numericThreshold('minBodyLines');
         $minParameters = (int) $settings->numericThreshold('minParameters');
         $finder = new NodeFinder();
-        $classes = $finder->findInstanceOf($unit->statements, Class_::class);
-
         $findings = [];
 
-        foreach ($classes as $class) {
-            /** @var Class_ $class */
-            if ($this->isImmutableValueObject($class)) {
-                continue;
-            }
-
-            foreach ($class->getMethods() as $method) {
-                if (!$method->isPublic() || $method->isAbstract()) {
-                    continue;
-                }
-
-                $name = $method->name->toString();
-
-                if (in_array($name, self::MAGIC_METHODS, true)) {
-                    continue;
-                }
-
-                if ($this->isInheritedRuleContract($class, $name)) {
-                    continue;
-                }
-
-                if ($this->isInternalHelperMethod($class) || $this->isConventionalReporterRender($class, $name)) {
-                    continue;
-                }
-
-                if ($this->isTrivialAccessor($name)) {
-                    continue;
-                }
-
-                $docComment = $method->getDocComment();
-
-                if ($docComment !== null) {
-                    continue;
-                }
-
-                if (!$this->needsIntentDoc($method, $finder, $minBodyLines, $minParameters)) {
-                    continue;
-                }
-
-                $symbol = CyclomaticComplexityRule::resolveSymbol($method);
-
-                $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Public method %s has no PHPDoc.', $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $method->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
-                    remediation: 'Add a docblock describing the method\'s purpose.',
-                );
+        foreach ($this->documentableClasses($unit, $finder) as $class) {
+            foreach ($this->methodsMissingPhpdoc($class, $finder, $minBodyLines, $minParameters) as $method) {
+                $findings[] = $this->findingForMethod($unit, $definition, $method);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * @return list<Class_>
+     */
+    private function documentableClasses(AnalysisUnit $unit, NodeFinder $finder): array
+    {
+        $classes = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, Class_::class) as $class) {
+            /** @var Class_ $class */
+            if (!$this->isImmutableValueObject($class)) {
+                $classes[] = $class;
+            }
+        }
+
+        return $classes;
+    }
+
+    /**
+     * @return list<ClassMethod>
+     */
+    private function methodsMissingPhpdoc(
+        Class_ $class,
+        NodeFinder $finder,
+        int $minBodyLines,
+        int $minParameters,
+    ): array {
+        $methods = [];
+
+        foreach ($class->getMethods() as $method) {
+            if ($this->shouldSkipMethod($class, $method)) {
+                continue;
+            }
+
+            if ($method->getDocComment() !== null) {
+                continue;
+            }
+
+            if ($this->needsIntentDoc($method, $finder, $minBodyLines, $minParameters)) {
+                $methods[] = $method;
+            }
+        }
+
+        return $methods;
+    }
+
+    private function shouldSkipMethod(Class_ $class, ClassMethod $method): bool
+    {
+        if (!$method->isPublic() || $method->isAbstract()) {
+            return true;
+        }
+
+        $name = $method->name->toString();
+
+        return in_array($name, self::MAGIC_METHODS, true)
+            || $this->isInheritedRuleContract($class, $name)
+            || $this->isInternalHelperMethod($class)
+            || $this->isConventionalReporterRender($class, $name)
+            || $this->isTrivialAccessor($name);
+    }
+
+    private function findingForMethod(AnalysisUnit $unit, RuleDefinition $definition, ClassMethod $method): Finding
+    {
+        $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+
+        return new Finding(
+            ruleId: $definition->id,
+            message: sprintf('Public method %s has no PHPDoc.', $symbol),
+            filePath: $unit->file->displayPath,
+            line: $method->getStartLine(),
+            severity: $definition->defaultSeverity,
+            pillar: $definition->pillar,
+            tier: $definition->tier,
+            confidence: $definition->confidence,
+            symbol: $symbol,
+            remediation: 'Add a docblock describing the method\'s purpose.',
+        );
     }
 
     private function isInheritedRuleContract(Class_ $class, string $methodName): bool

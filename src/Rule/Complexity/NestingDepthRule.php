@@ -122,58 +122,59 @@ final readonly class NestingDepthRule implements RuleInterface
 
     private static function walkNode(Node $node, int $depth): int
     {
-        if ($node instanceof Stmt\If_) {
-            $inner = $depth + 1;
-            $max = self::walkStatements($node->stmts, $inner);
+        return match (true) {
+            $node instanceof Stmt\If_ => self::walkIf($node, $depth),
+            $node instanceof Stmt\For_ => self::walkStatements($node->stmts, $depth + 1),
+            $node instanceof Stmt\Foreach_ => self::walkStatements($node->stmts, $depth + 1),
+            $node instanceof Stmt\While_ => self::walkStatements($node->stmts, $depth + 1),
+            $node instanceof Stmt\Do_ => self::walkStatements($node->stmts, $depth + 1),
+            $node instanceof Stmt\Switch_ => self::walkSwitch($node, $depth),
+            $node instanceof Stmt\TryCatch => self::walkTryCatch($node, $depth),
+            $node instanceof Stmt\Expression => self::walkExprNesting($node->expr, $depth),
+            default => $depth,
+        };
+    }
 
-            foreach ($node->elseifs as $elseif) {
-                $max = max($max, self::walkStatements($elseif->stmts, $inner));
-            }
+    private static function walkIf(Stmt\If_ $node, int $depth): int
+    {
+        $inner = $depth + 1;
+        $max = self::walkStatements($node->stmts, $inner);
 
-            if ($node->else !== null) {
-                $max = max($max, self::walkStatements($node->else->stmts, $inner));
-            }
-
-            return $max;
+        foreach ($node->elseifs as $elseif) {
+            $max = max($max, self::walkStatements($elseif->stmts, $inner));
         }
 
-        if ($node instanceof Stmt\For_
-            || $node instanceof Stmt\Foreach_
-            || $node instanceof Stmt\While_
-            || $node instanceof Stmt\Do_
-        ) {
-            return self::walkStatements($node->stmts, $depth + 1);
+        if ($node->else !== null) {
+            $max = max($max, self::walkStatements($node->else->stmts, $inner));
         }
 
-        if ($node instanceof Stmt\Switch_) {
-            $max = $depth + 1;
+        return $max;
+    }
 
-            foreach ($node->cases as $case) {
-                $max = max($max, self::walkStatements($case->stmts, $depth + 1));
-            }
+    private static function walkSwitch(Stmt\Switch_ $node, int $depth): int
+    {
+        $max = $depth + 1;
 
-            return $max;
+        foreach ($node->cases as $case) {
+            $max = max($max, self::walkStatements($case->stmts, $depth + 1));
         }
 
-        if ($node instanceof Stmt\TryCatch) {
-            $max = self::walkStatements($node->stmts, $depth);
+        return $max;
+    }
 
-            foreach ($node->catches as $catch) {
-                $max = max($max, self::walkStatements($catch->stmts, $depth + 1));
-            }
+    private static function walkTryCatch(Stmt\TryCatch $node, int $depth): int
+    {
+        $max = self::walkStatements($node->stmts, $depth);
 
-            if ($node->finally !== null) {
-                $max = max($max, self::walkStatements($node->finally->stmts, $depth));
-            }
-
-            return $max;
+        foreach ($node->catches as $catch) {
+            $max = max($max, self::walkStatements($catch->stmts, $depth + 1));
         }
 
-        if ($node instanceof Stmt\Expression) {
-            return self::walkExprNesting($node->expr, $depth);
+        if ($node->finally !== null) {
+            $max = max($max, self::walkStatements($node->finally->stmts, $depth));
         }
 
-        return $depth;
+        return $max;
     }
 
     private static function walkExprNesting(Expr $expr, int $depth): int

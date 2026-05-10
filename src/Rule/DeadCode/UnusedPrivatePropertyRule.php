@@ -51,81 +51,146 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike */
-            $privateProps = [];
-
-            foreach ($classLike->stmts as $stmt) {
-                if ($stmt instanceof Stmt\Property && $stmt->isPrivate()) {
-                    foreach ($stmt->props as $prop) {
-                        $privateProps[$prop->name->toString()] = $stmt;
-                    }
-                }
-            }
+            $privateProps = $this->privateProperties($classLike);
 
             if ($privateProps === []) {
                 continue;
             }
 
-            $reads = [];
-            $writes = [];
-            $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
-            $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
-
-            foreach ($allNodes as $node) {
-                $name = $this->propertyAccessName($node, $ownClassName);
-
-                if ($name === null || !isset($privateProps[$name])) {
-                    continue;
-                }
-
-                $parent = $node->getAttribute('parent');
-
-                if ($parent instanceof Expr\Assign && $parent->var === $node) {
-                    $writes[$name] = true;
-                } elseif ($parent instanceof Expr\AssignOp && $parent->var === $node) {
-                    $writes[$name] = true;
-                    $reads[$name] = true;
-                } else {
-                    $reads[$name] = true;
-                }
-            }
-
-            $className = $this->resolveClassName($classLike);
-
-            foreach ($privateProps as $name => $stmt) {
-                $isRead = isset($reads[$name]);
-                $isWritten = isset($writes[$name]) || $stmt->props[0]->default !== null;
-
-                if ($isRead && $isWritten) {
-                    continue;
-                }
-
-                $symbol = sprintf('%s::$%s', $className, $name);
-
-                if (!$isRead && !$isWritten) {
-                    $message = sprintf('Private property %s is never used.', $symbol);
-                } elseif (!$isRead) {
-                    $message = sprintf('Private property %s is written but never read.', $symbol);
-                } else {
-                    $message = sprintf('Private property %s is read but never explicitly written.', $symbol);
-                }
-
-                $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: $message,
-                    filePath: $unit->file->displayPath,
-                    line: $stmt->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
-                    remediation: 'Remove the unused property or add the missing read/write.',
-                    metadata: ['read' => $isRead, 'written' => $isWritten],
-                );
-            }
+            $usage = $this->propertyUsage($finder, $classLike, $privateProps);
+            $findings = array_merge(
+                $findings,
+                $this->findingsForProperties($unit, $definition, $classLike, $privateProps, $usage),
+            );
         }
 
         return $findings;
+    }
+
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @return array<string, Stmt\Property>
+     */
+    private function privateProperties(Class_|Trait_|Enum_ $classLike): array
+    {
+        $privateProps = [];
+
+        foreach ($classLike->stmts as $stmt) {
+            if (!$stmt instanceof Stmt\Property || !$stmt->isPrivate()) {
+                continue;
+            }
+
+            foreach ($stmt->props as $prop) {
+                $privateProps[$prop->name->toString()] = $stmt;
+            }
+        }
+
+        return $privateProps;
+    }
+
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @param array<string, Stmt\Property> $privateProps
+     * @return array{reads: array<string, true>, writes: array<string, true>}
+     */
+    private function propertyUsage(NodeFinder $finder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
+    {
+        $reads = [];
+        $writes = [];
+        $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+        $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
+
+        foreach ($allNodes as $node) {
+            $name = $this->propertyAccessName($node, $ownClassName);
+
+            if ($name === null || !isset($privateProps[$name])) {
+                continue;
+            }
+
+            $this->recordPropertyUsage($node, $name, $reads, $writes);
+        }
+
+        return ['reads' => $reads, 'writes' => $writes];
+    }
+
+    /**
+     * @param array<string, true> $reads
+     * @param array<string, true> $writes
+     */
+    private function recordPropertyUsage(Node $node, string $name, array &$reads, array &$writes): void
+    {
+        $parent = $node->getAttribute('parent');
+
+        if ($parent instanceof Expr\Assign && $parent->var === $node) {
+            $writes[$name] = true;
+
+            return;
+        }
+
+        if ($parent instanceof Expr\AssignOp && $parent->var === $node) {
+            $writes[$name] = true;
+            $reads[$name] = true;
+
+            return;
+        }
+
+        $reads[$name] = true;
+    }
+
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @param array<string, Stmt\Property> $privateProps
+     * @param array{reads: array<string, true>, writes: array<string, true>} $usage
+     * @return list<Finding>
+     */
+    private function findingsForProperties(
+        AnalysisUnit $unit,
+        RuleDefinition $definition,
+        Class_|Trait_|Enum_ $classLike,
+        array $privateProps,
+        array $usage,
+    ): array {
+        $findings = [];
+        $className = $this->resolveClassName($classLike);
+
+        foreach ($privateProps as $name => $stmt) {
+            $isRead = isset($usage['reads'][$name]);
+            $isWritten = isset($usage['writes'][$name]) || $stmt->props[0]->default !== null;
+
+            if ($isRead && $isWritten) {
+                continue;
+            }
+
+            $symbol = sprintf('%s::$%s', $className, $name);
+            $findings[] = new Finding(
+                ruleId: $definition->id,
+                message: $this->propertyMessage($symbol, $isRead, $isWritten),
+                filePath: $unit->file->displayPath,
+                line: $stmt->getStartLine(),
+                severity: $definition->defaultSeverity,
+                pillar: $definition->pillar,
+                tier: $definition->tier,
+                confidence: $definition->confidence,
+                symbol: $symbol,
+                remediation: 'Remove the unused property or add the missing read/write.',
+                metadata: ['read' => $isRead, 'written' => $isWritten],
+            );
+        }
+
+        return $findings;
+    }
+
+    private function propertyMessage(string $symbol, bool $isRead, bool $isWritten): string
+    {
+        if (!$isRead && !$isWritten) {
+            return sprintf('Private property %s is never used.', $symbol);
+        }
+
+        if (!$isRead) {
+            return sprintf('Private property %s is written but never read.', $symbol);
+        }
+
+        return sprintf('Private property %s is read but never explicitly written.', $symbol);
     }
 
     /**

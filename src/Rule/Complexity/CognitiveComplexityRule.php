@@ -125,47 +125,31 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     private static function walkNode(Node $node, int $nesting): int
     {
-        if ($node instanceof Stmt\If_) {
-            return self::walkIf($node, $nesting);
-        }
+        return match (true) {
+            $node instanceof Stmt\If_ => self::walkIf($node, $nesting),
+            $node instanceof Stmt\Switch_ => self::walkSwitch($node, $nesting),
+            $node instanceof Stmt\For_ => self::walkLoop($node->stmts, null, $nesting),
+            $node instanceof Stmt\Foreach_ => self::walkLoop($node->stmts, null, $nesting),
+            $node instanceof Stmt\While_ => self::walkLoop($node->stmts, $node->cond, $nesting),
+            $node instanceof Stmt\Do_ => self::walkLoop($node->stmts, $node->cond, $nesting),
+            $node instanceof Stmt\TryCatch => self::walkTryCatch($node, $nesting),
+            $node instanceof Stmt\Break_ => self::walkJump($node),
+            $node instanceof Stmt\Continue_ => self::walkJump($node),
+            $node instanceof Stmt\Goto_ => 1,
+            $node instanceof Stmt\Expression => self::walkExprCognitive($node->expr, $nesting),
+            $node instanceof Stmt\Return_ => self::walkReturn($node, $nesting),
+            default => self::walkChildNodes($node, $nesting),
+        };
+    }
 
-        if ($node instanceof Stmt\Switch_) {
-            return self::walkSwitch($node, $nesting);
-        }
+    private static function walkJump(Stmt\Break_|Stmt\Continue_ $node): int
+    {
+        return $node->num !== null ? 1 : 0;
+    }
 
-        if ($node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_) {
-            return self::walkLoop($node->stmts, null, $nesting);
-        }
-
-        if ($node instanceof Stmt\While_) {
-            return self::walkLoop($node->stmts, $node->cond, $nesting);
-        }
-
-        if ($node instanceof Stmt\Do_) {
-            return self::walkLoop($node->stmts, $node->cond, $nesting);
-        }
-
-        if ($node instanceof Stmt\TryCatch) {
-            return self::walkTryCatch($node, $nesting);
-        }
-
-        if ($node instanceof Stmt\Break_ || $node instanceof Stmt\Continue_) {
-            return $node->num !== null ? 1 : 0;
-        }
-
-        if ($node instanceof Stmt\Goto_) {
-            return 1;
-        }
-
-        if ($node instanceof Stmt\Expression) {
-            return self::walkExprCognitive($node->expr, $nesting);
-        }
-
-        if ($node instanceof Stmt\Return_) {
-            return $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0;
-        }
-
-        return self::walkChildNodes($node, $nesting);
+    private static function walkReturn(Stmt\Return_ $node, int $nesting): int
+    {
+        return $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0;
     }
 
     private static function walkIf(Stmt\If_ $node, int $nesting): int

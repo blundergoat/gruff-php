@@ -43,46 +43,107 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $finder = new NodeFinder();
         $findings = [];
 
+        foreach ($this->candidateClasses($unit, $finder) as $class) {
+            array_push($findings, ...$this->findingsForClass($unit, $class));
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @return list<Stmt\Class_>
+     */
+    private function candidateClasses(AnalysisUnit $unit, NodeFinder $finder): array
+    {
+        $classes = [];
+
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
-            if ($class->extends !== null || $class->getTraitUses() !== []) {
-                continue;
+            /** @var Stmt\Class_ $class */
+            if ($this->classAllowsPromotion($class)) {
+                $classes[] = $class;
             }
+        }
 
-            $constructor = $this->constructor($class);
-            if (!$constructor instanceof Stmt\ClassMethod) {
-                continue;
-            }
+        return $classes;
+    }
 
-            $properties = $this->declaredProperties($class);
-            $lateAssignments = $this->lateAssignments($class);
-            foreach ($constructor->stmts ?? [] as $statement) {
-                if (!$statement instanceof Stmt\Expression || !$statement->expr instanceof Expr\Assign) {
-                    continue;
-                }
+    private function classAllowsPromotion(Stmt\Class_ $class): bool
+    {
+        return $class->extends === null
+            && $class->getTraitUses() === []
+            && $this->constructor($class) instanceof Stmt\ClassMethod;
+    }
 
-                $assign = $statement->expr;
-                $property = ModernisationNodeHelper::propertyFetchName($assign->var);
-                if (
-                    $property === null
-                    || !ModernisationNodeHelper::isThisPropertyFetch($assign->var)
-                    || !isset($properties[$property])
-                ) {
-                    continue;
-                }
+    /**
+     * @return list<Finding>
+     */
+    private function findingsForClass(AnalysisUnit $unit, Stmt\Class_ $class): array
+    {
+        $constructor = $this->constructor($class);
+        if (!$constructor instanceof Stmt\ClassMethod) {
+            return [];
+        }
 
-                if (!$assign->expr instanceof Expr\Variable || $assign->expr->name !== $property) {
-                    continue;
-                }
+        $properties = $this->declaredProperties($class);
+        $lateAssignments = $this->lateAssignments($class);
+        $findings = [];
 
-                if (isset($lateAssignments[$property]) || !$this->constructorHasPlainParameter($constructor, $property)) {
-                    continue;
-                }
+        foreach ($this->constructorAssignments($constructor) as $assign) {
+            $property = $this->promotableProperty($assign, $constructor, $properties, $lateAssignments);
 
+            if ($property !== null) {
                 $findings[] = $this->finding($unit, $assign, $property);
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * @return list<Expr\Assign>
+     */
+    private function constructorAssignments(Stmt\ClassMethod $constructor): array
+    {
+        $assignments = [];
+
+        foreach ($constructor->stmts ?? [] as $statement) {
+            if ($statement instanceof Stmt\Expression && $statement->expr instanceof Expr\Assign) {
+                $assignments[] = $statement->expr;
+            }
+        }
+
+        return $assignments;
+    }
+
+    /**
+     * @param array<string, true> $properties
+     * @param array<string, true> $lateAssignments
+     */
+    private function promotableProperty(
+        Expr\Assign $assign,
+        Stmt\ClassMethod $constructor,
+        array $properties,
+        array $lateAssignments,
+    ): ?string {
+        $property = ModernisationNodeHelper::propertyFetchName($assign->var);
+
+        if (
+            $property === null
+            || !ModernisationNodeHelper::isThisPropertyFetch($assign->var)
+            || !isset($properties[$property])
+        ) {
+            return null;
+        }
+
+        if (!$assign->expr instanceof Expr\Variable || $assign->expr->name !== $property) {
+            return null;
+        }
+
+        if (isset($lateAssignments[$property]) || !$this->constructorHasPlainParameter($constructor, $property)) {
+            return null;
+        }
+
+        return $property;
     }
 
     private function constructor(Stmt\Class_ $class): ?Stmt\ClassMethod

@@ -21,6 +21,14 @@ class UnusedParameterFixture
     }
 }
 
+final readonly class PromotedPrivateConstructorFixture
+{
+    private function __construct(
+        public string $promoted,
+    ) {
+    }
+}
+
 function standaloneFunction(int $used, string $unused): int
 {
     return $used;

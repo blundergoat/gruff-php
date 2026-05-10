@@ -56,7 +56,7 @@ final readonly class ConfigLoader
         $config = $this->applyAllowlistConfig($config, $rootConfig);
         $config = $this->applySelectionConfig($config, $registry, $rootConfig);
 
-        return $this->applyRulesConfig($config, $registry, $rootConfig);
+        return (new RuleConfigApplier())->apply($config, $registry, $rootConfig);
     }
 
     /**
@@ -149,117 +149,6 @@ final readonly class ConfigLoader
         }
 
         return $config->withRuleSelection($this->parseSelectionConfig($rootConfig['selection'], $registry));
-    }
-
-    /**
-     * @param array<string, mixed> $rootConfig
-     */
-    private function applyRulesConfig(
-        AnalysisConfig $config,
-        RuleRegistry $registry,
-        array $rootConfig,
-    ): AnalysisConfig {
-        if (!isset($rootConfig['rules'])) {
-            return $config;
-        }
-
-        $rulesConfig = $this->requireObject($rootConfig['rules'], 'Config key "rules" must be a JSON object.');
-
-        foreach ($rulesConfig as $ruleId => $ruleConfigValue) {
-            if (!$registry->has($ruleId)) {
-                throw new ConfigException(sprintf('Unknown rule id "%s".', $ruleId));
-            }
-
-            $ruleConfig = $this->requireObject(
-                $ruleConfigValue,
-                sprintf('Config for rule "%s" must be a JSON object.', $ruleId),
-            );
-
-            $config = $this->applyRuleConfig($config, $registry, $ruleId, $ruleConfig);
-        }
-
-        return $config;
-    }
-
-    /**
-     * @param array<string, mixed> $ruleConfig
-     */
-    private function applyRuleConfig(
-        AnalysisConfig $config,
-        RuleRegistry $registry,
-        string $ruleId,
-        array $ruleConfig,
-    ): AnalysisConfig {
-        foreach (array_keys($ruleConfig) as $key) {
-            if ($key !== 'enabled' && $key !== 'thresholds' && $key !== 'options') {
-                throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
-            }
-        }
-
-        $settings = $config->ruleSettings($ruleId);
-        $enabled = $settings->enabled;
-        $thresholds = $settings->thresholds;
-        $options = $settings->options;
-
-        if (array_key_exists('enabled', $ruleConfig)) {
-            if (!is_bool($ruleConfig['enabled'])) {
-                throw new ConfigException(sprintf('Config key "rules.%s.enabled" must be boolean.', $ruleId));
-            }
-
-            $enabled = $ruleConfig['enabled'];
-        }
-
-        if (array_key_exists('thresholds', $ruleConfig)) {
-            $thresholdConfig = $this->requireObject(
-                $ruleConfig['thresholds'],
-                sprintf('Config key "rules.%s.thresholds" must be a JSON object.', $ruleId),
-            );
-
-            $allowedThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
-
-            foreach ($thresholdConfig as $thresholdName => $thresholdValue) {
-                if (!array_key_exists($thresholdName, $allowedThresholds)) {
-                    throw new ConfigException(sprintf(
-                        'Unknown threshold "rules.%s.thresholds.%s".',
-                        $ruleId,
-                        $thresholdName,
-                    ));
-                }
-
-                if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
-                    throw new ConfigException(sprintf(
-                        'Threshold "rules.%s.thresholds.%s" must be numeric.',
-                        $ruleId,
-                        $thresholdName,
-                    ));
-                }
-
-                $thresholds[$thresholdName] = $thresholdValue;
-            }
-        }
-
-        if (array_key_exists('options', $ruleConfig)) {
-            $optionsConfig = $this->requireObject(
-                $ruleConfig['options'],
-                sprintf('Config key "rules.%s.options" must be a JSON object.', $ruleId),
-            );
-
-            $allowedOptions = $registry->get($ruleId)->definition()->defaultOptions;
-
-            foreach ($optionsConfig as $optionName => $optionValue) {
-                if (!array_key_exists($optionName, $allowedOptions)) {
-                    throw new ConfigException(sprintf(
-                        'Unknown option "rules.%s.options.%s".',
-                        $ruleId,
-                        $optionName,
-                    ));
-                }
-
-                $options[$optionName] = $optionValue;
-            }
-        }
-
-        return $config->withRuleSettings($ruleId, new RuleSettings($enabled, $thresholds, $options));
     }
 
     /**

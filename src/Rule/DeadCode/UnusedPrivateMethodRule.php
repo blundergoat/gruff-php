@@ -58,78 +58,135 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
 
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike */
-            $privateMethods = [];
-            $calledNames = [];
-
-            foreach ($classLike->stmts as $stmt) {
-                if ($stmt instanceof Stmt\ClassMethod && $stmt->isPrivate()) {
-                    $name = $stmt->name->toString();
-
-                    if (!in_array($name, self::MAGIC_METHODS, true)) {
-                        $privateMethods[$name] = $stmt;
-                    }
-                }
-            }
+            $privateMethods = $this->privateMethods($classLike);
 
             if ($privateMethods === []) {
                 continue;
             }
 
-            $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+            $calledNames = $this->calledPrivateMethodNames($finder, $classLike);
+            $findings = array_merge(
+                $findings,
+                $this->findingsForUnusedMethods($unit, $definition, $classLike, $privateMethods, $calledNames),
+            );
+        }
 
-            foreach ($allNodes as $node) {
-                if ($node instanceof Expr\MethodCall
-                    && $node->var instanceof Expr\Variable
-                    && $node->var->name === 'this'
-                    && $node->name instanceof Node\Identifier
-                ) {
-                    $calledNames[$node->name->toString()] = true;
-                }
+        return $findings;
+    }
 
-                if ($node instanceof Expr\StaticCall
-                    && ($node->class instanceof Node\Name)
-                    && in_array($node->class->toString(), ['self', 'static'], true)
-                    && $node->name instanceof Node\Identifier
-                ) {
-                    $calledNames[$node->name->toString()] = true;
-                }
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @return array<string, Stmt\ClassMethod>
+     */
+    private function privateMethods(Class_|Trait_|Enum_ $classLike): array
+    {
+        $privateMethods = [];
 
-                if ($node instanceof Expr\Array_) {
-                    foreach ($node->items as $item) {
-                        if ($this->isCallableReference($item->value)) {
-                            $name = $this->extractCallableName($item->value);
-
-                            if ($name !== null) {
-                                $calledNames[$name] = true;
-                            }
-                        }
-                    }
-                }
+        foreach ($classLike->stmts as $stmt) {
+            if (!$stmt instanceof Stmt\ClassMethod || !$stmt->isPrivate()) {
+                continue;
             }
 
-            $className = $this->resolveClassName($classLike);
-
-            foreach ($privateMethods as $name => $method) {
-                if (isset($calledNames[$name])) {
-                    continue;
-                }
-
-                $symbol = sprintf('%s::%s()', $className, $name);
-
-                $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Private method %s is never called.', $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $method->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    endLine: $method->getEndLine() > 0 ? $method->getEndLine() : null,
-                    symbol: $symbol,
-                    remediation: 'Remove the unused private method.',
-                );
+            $name = $stmt->name->toString();
+            if (!in_array($name, self::MAGIC_METHODS, true)) {
+                $privateMethods[$name] = $stmt;
             }
+        }
+
+        return $privateMethods;
+    }
+
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @return array<string, true>
+     */
+    private function calledPrivateMethodNames(NodeFinder $finder, Class_|Trait_|Enum_ $classLike): array
+    {
+        $calledNames = [];
+        $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+
+        foreach ($allNodes as $node) {
+            $name = $this->calledMethodName($node) ?? $this->callableArrayName($node);
+
+            if ($name !== null) {
+                $calledNames[$name] = true;
+            }
+        }
+
+        return $calledNames;
+    }
+
+    private function calledMethodName(Node $node): ?string
+    {
+        if ($node instanceof Expr\MethodCall
+            && $node->var instanceof Expr\Variable
+            && $node->var->name === 'this'
+            && $node->name instanceof Node\Identifier
+        ) {
+            return $node->name->toString();
+        }
+
+        if ($node instanceof Expr\StaticCall
+            && ($node->class instanceof Node\Name)
+            && in_array($node->class->toString(), ['self', 'static'], true)
+            && $node->name instanceof Node\Identifier
+        ) {
+            return $node->name->toString();
+        }
+
+        return null;
+    }
+
+    private function callableArrayName(Node $node): ?string
+    {
+        if (!$node instanceof Expr\Array_) {
+            return null;
+        }
+
+        foreach ($node->items as $item) {
+            if ($this->isCallableReference($item->value)) {
+                return $this->extractCallableName($item->value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Class_|Trait_|Enum_ $classLike
+     * @param array<string, Stmt\ClassMethod> $privateMethods
+     * @param array<string, true> $calledNames
+     * @return list<Finding>
+     */
+    private function findingsForUnusedMethods(
+        AnalysisUnit $unit,
+        RuleDefinition $definition,
+        Class_|Trait_|Enum_ $classLike,
+        array $privateMethods,
+        array $calledNames,
+    ): array {
+        $findings = [];
+        $className = $this->resolveClassName($classLike);
+
+        foreach ($privateMethods as $name => $method) {
+            if (isset($calledNames[$name])) {
+                continue;
+            }
+
+            $symbol = sprintf('%s::%s()', $className, $name);
+            $findings[] = new Finding(
+                ruleId: $definition->id,
+                message: sprintf('Private method %s is never called.', $symbol),
+                filePath: $unit->file->displayPath,
+                line: $method->getStartLine(),
+                severity: $definition->defaultSeverity,
+                pillar: $definition->pillar,
+                tier: $definition->tier,
+                confidence: $definition->confidence,
+                endLine: $method->getEndLine() > 0 ? $method->getEndLine() : null,
+                symbol: $symbol,
+                remediation: 'Remove the unused private method.',
+            );
         }
 
         return $findings;

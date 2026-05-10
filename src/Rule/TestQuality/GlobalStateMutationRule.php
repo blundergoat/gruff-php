@@ -44,61 +44,95 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $cleanupCache = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            if ($scope->isPest) {
+            if (!$this->scopeNeedsCleanupCheck($scope, $cleanupCache)) {
                 continue;
             }
 
-            $class = $scope->node->getAttribute('parent');
-            if (!$class instanceof Stmt\Class_) {
+            $findings = array_merge(
+                $findings,
+                $this->superglobalFindings($unit, $scope, $finder),
+                $this->stateFunctionFindings($unit, $scope),
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @param array<int, bool> $cleanupCache
+     */
+    private function scopeNeedsCleanupCheck(TestQualityScope $scope, array &$cleanupCache): bool
+    {
+        if ($scope->isPest) {
+            return false;
+        }
+
+        $class = $scope->node->getAttribute('parent');
+        if (!$class instanceof Stmt\Class_) {
+            return false;
+        }
+
+        $classKey = spl_object_id($class);
+        if (!array_key_exists($classKey, $cleanupCache)) {
+            $cleanupCache[$classKey] = $this->classHasCleanup($class);
+        }
+
+        return !$cleanupCache[$classKey];
+    }
+
+    /**
+     * @return list<Finding>
+     */
+    private function superglobalFindings(AnalysisUnit $unit, TestQualityScope $scope, NodeFinder $finder): array
+    {
+        $findings = [];
+
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
+            if (!$assign instanceof Expr\Assign) {
                 continue;
             }
 
-            $classKey = spl_object_id($class);
-            if (!array_key_exists($classKey, $cleanupCache)) {
-                $cleanupCache[$classKey] = $this->classHasCleanup($class);
-            }
-
-            if ($cleanupCache[$classKey]) {
+            $superglobal = $this->superglobalWriteName($assign->var);
+            if ($superglobal === null) {
                 continue;
             }
 
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
-                if (!$assign instanceof Expr\Assign) {
-                    continue;
-                }
+            $findings[] = $this->finding(
+                $unit,
+                $scope,
+                $assign->getStartLine(),
+                sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
+                ['variant' => 'superglobal', 'name' => $superglobal],
+            );
+        }
 
-                $superglobal = $this->superglobalWriteName($assign->var);
-                if ($superglobal === null) {
-                    continue;
-                }
+        return $findings;
+    }
 
-                $findings[] = $this->finding(
-                    $unit,
-                    $scope,
-                    $assign->getStartLine(),
-                    sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
-                    ['variant' => 'superglobal', 'name' => $superglobal],
-                );
+    /**
+     * @return list<Finding>
+     */
+    private function stateFunctionFindings(AnalysisUnit $unit, TestQualityScope $scope): array
+    {
+        $findings = [];
+
+        foreach (TestQualityNodeHelper::calls($scope) as $call) {
+            if (!$call instanceof Expr\FuncCall) {
+                continue;
             }
 
-            foreach (TestQualityNodeHelper::calls($scope) as $call) {
-                if (!$call instanceof Expr\FuncCall) {
-                    continue;
-                }
-
-                $name = TestQualityNodeHelper::functionName($call);
-                if ($name === null || !in_array($name, self::STATE_FUNCTIONS, true)) {
-                    continue;
-                }
-
-                $findings[] = $this->finding(
-                    $unit,
-                    $scope,
-                    $call->getStartLine(),
-                    sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
-                    ['variant' => 'function', 'name' => $name],
-                );
+            $name = TestQualityNodeHelper::functionName($call);
+            if ($name === null || !in_array($name, self::STATE_FUNCTIONS, true)) {
+                continue;
             }
+
+            $findings[] = $this->finding(
+                $unit,
+                $scope,
+                $call->getStartLine(),
+                sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
+                ['variant' => 'function', 'name' => $name],
+            );
         }
 
         return $findings;
