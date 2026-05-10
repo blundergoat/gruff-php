@@ -7,7 +7,7 @@ namespace GruffPhp\Command;
 final readonly class DashboardPageRenderer
 {
     /**
-     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string} $state
+     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string} $state
      */
     public function dashboardHtml(array $state): string
     {
@@ -35,49 +35,6 @@ final readonly class DashboardPageRenderer
             . '<div class="panel-actions"><button type="button" id="refresh">Refresh</button><button type="submit" id="run-scan">Run scan</button></div></form></section>'
             . sprintf('<iframe id="report-frame" title="gruff report" data-initial-src="%s" srcdoc="%s"></iframe>', $this->escape($scanUrl), $this->escape($this->loadingFrame()))
             . '<script>' . $this->dashboardJs() . '</script></body></html>';
-    }
-
-    /**
-     * @param array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string} $state
-     */
-    public function injectMutationButtons(string $html, array $state): string
-    {
-        if (!str_contains($html, 'mutation-cli-hint')) {
-            return $html;
-        }
-
-        $params = $state;
-        $params['mutation'] = 'run';
-        $url = '/scan?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-        $href = $this->escape($url);
-
-        $html = str_replace('Mutation data unavailable. Pass <code>--infection-report</code> to score this pillar.', '', $html);
-        $button = '<button type="button" class="run-mutation-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="mutation-run-modal">Run mutation analysis</button>';
-        $replaced = preg_replace(
-            '#(<div class="(?:empty-hint|empty) mutation-cli-hint">)(.*?)(</div>)#s',
-            '$1$2' . $button . '$3',
-            $html,
-        );
-
-        if (!is_string($replaced)) {
-            return $html;
-        }
-
-        $dialog = $this->mutationRunDialog($href);
-
-        if (str_contains($replaced, '</body>')) {
-            $replaced = str_replace('</body>', $dialog . '</body>', $replaced);
-        } else {
-            $replaced .= $dialog;
-        }
-
-        $style = '<style>' . $this->mutationRunDialogCss() . '</style>';
-
-        if (str_contains($replaced, '</head>')) {
-            return str_replace('</head>', $style . '</head>', $replaced);
-        }
-
-        return $style . $replaced;
     }
 
     /**
@@ -129,31 +86,6 @@ final readonly class DashboardPageRenderer
             . '</main></body></html>';
     }
 
-    private function mutationRunDialog(string $href): string
-    {
-        return '<div id="mutation-run-backdrop" class="mutation-run-backdrop" hidden></div>'
-            . '<section id="mutation-run-modal" class="mutation-run-modal" role="dialog" aria-modal="true" aria-labelledby="mutation-run-title" hidden>'
-            . '<div class="mutation-run-head"><strong id="mutation-run-title">Mutation analysis</strong><button type="button" id="mutation-run-close" aria-label="Close mutation analysis dialog">&times;</button></div>'
-            . '<div class="mutation-run-body">'
-            . '<p>Runs Infection using edited unit test files as the PHPUnit oracle.</p>'
-            . '<p><code>infection.json5</code> writes <code>infection-report.json</code>. The dashboard filters to PHPUnit unit tests changed relative to <code>HEAD</code>.</p>'
-            . '</div>'
-            . '<div id="mutation-run-progress" class="mutation-run-progress" role="status" aria-live="polite" hidden><span class="mutation-run-spinner" aria-hidden="true"></span><span>Mutation analysis running... <strong id="mutation-run-elapsed">0s</strong></span></div>'
-            . '<div class="mutation-run-actions"><button type="button" id="mutation-run-cancel">Cancel</button><a class="mutation-run-confirm" href="' . $href . '">Run mutation analysis</a></div>'
-            . '</section>'
-            . '<script>' . $this->mutationRunDialogJs() . '</script>';
-    }
-
-    private function mutationRunDialogCss(): string
-    {
-        return '.run-mutation-btn{display:block;margin:8px 0 0;padding:8px 14px;border:1px solid #e85d04;background:#e85d04;color:#120f0d;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;cursor:pointer}.chart-card-empty .empty.mutation-cli-hint{flex-direction:column;gap:8px}.chart-card-empty .empty.mutation-cli-hint .run-mutation-btn{margin:0 auto}.mutation-run-backdrop{position:fixed;inset:0;z-index:90;background:rgba(13,12,10,.64)}.mutation-run-modal{position:fixed;top:66px;right:24px;z-index:91;width:min(430px,calc(100vw - 48px));max-height:calc(100vh - 86px);overflow:auto;background:#1b1815;border:1px solid #332d27;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:16px;color:#f3e9d2;font-family:var(--mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace)}.mutation-run-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #332d27}.mutation-run-head strong{font:italic 22px Georgia,Iowan Old Style,serif}.mutation-run-head button{width:34px;height:34px;padding:0;border:1px solid #332d27;background:#0d0c0a;color:#f3e9d2;font-size:22px;line-height:1;cursor:pointer}.mutation-run-body{display:grid;gap:10px;margin:14px 0;padding:12px;background:#0d0c0a;border:1px solid #332d27;color:#b5ab94;font-size:12px;line-height:1.6}.mutation-run-body code{display:inline-block;font-family:inherit;font-size:11px;color:#e85d04;background:#161412;border:1px solid #332d27;padding:1px 6px;white-space:nowrap}.mutation-run-progress{display:flex;align-items:center;gap:10px;margin:14px 0;padding:12px;background:#0d0c0a;border:1px solid #332d27;color:#f3e9d2;font-size:12px;line-height:1.4}.mutation-run-progress[hidden]{display:none}.mutation-run-spinner{width:16px;height:16px;border:2px solid #332d27;border-top-color:#e85d04;border-radius:50%;animation:mutation-spin .8s linear infinite;flex:none}.mutation-run-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mutation-run-actions button,.mutation-run-actions a{border:1px solid #e85d04;background:#e85d04;color:#120f0d;padding:10px 12px;font:700 13px var(--mono,ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace);cursor:pointer;text-align:center;text-decoration:none}.mutation-run-actions button{background:#0d0c0a;color:#f3e9d2;border-color:#332d27}.mutation-run-actions a.running{opacity:.75;cursor:wait;pointer-events:none}.mutation-run-head button:disabled,.mutation-run-actions button:disabled{opacity:.55;cursor:wait}@keyframes mutation-spin{to{transform:rotate(360deg)}}@media(max-width:640px){.mutation-run-modal{top:60px;right:18px;width:calc(100vw - 36px)}}';
-    }
-
-    private function mutationRunDialogJs(): string
-    {
-        return "(()=>{const modal=document.getElementById('mutation-run-modal');const backdrop=document.getElementById('mutation-run-backdrop');const triggers=[...document.querySelectorAll('.run-mutation-btn')];const close=document.getElementById('mutation-run-close');const cancel=document.getElementById('mutation-run-cancel');const confirm=document.querySelector('.mutation-run-confirm');const progress=document.getElementById('mutation-run-progress');const elapsed=document.getElementById('mutation-run-elapsed');let lastFocus=null;let running=false;let started=0;let timer=null;function renderElapsed(){if(elapsed){elapsed.textContent=Math.floor((Date.now()-started)/1000)+'s';}if(confirm){confirm.textContent='Running... '+(elapsed?elapsed.textContent:'');}}function setRunning(){running=true;started=Date.now();modal.setAttribute('aria-busy','true');progress.hidden=false;close.disabled=true;cancel.disabled=true;confirm.classList.add('running');confirm.setAttribute('aria-disabled','true');renderElapsed();timer=setInterval(renderElapsed,1000);}function setOpen(open){if(running&&!open){return;}modal.hidden=!open;backdrop.hidden=!open;triggers.forEach(trigger=>trigger.setAttribute('aria-expanded',open?'true':'false'));if(open){lastFocus=document.activeElement;confirm&&confirm.focus();}else if(lastFocus&&lastFocus.focus){lastFocus.focus();}}triggers.forEach(trigger=>trigger.addEventListener('click',event=>{event.preventDefault();setOpen(true);}));[close,cancel,backdrop].forEach(element=>element&&element.addEventListener('click',()=>setOpen(false)));document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.hidden){setOpen(false);}});confirm&&confirm.addEventListener('click',event=>{event.preventDefault();if(running){return;}setRunning();if(window.parent&&window.parent!==window){window.parent.postMessage({type:'gruff-scan-start',reason:'mutation'},window.location.origin);}setTimeout(()=>{window.location.href=confirm.href;},80);});window.addEventListener('pagehide',()=>{if(timer){clearInterval(timer);}});})();";
-    }
-
     private function field(string $label, string $name, string $value): string
     {
         return sprintf(
@@ -181,7 +113,7 @@ final readonly class DashboardPageRenderer
 
     private function dashboardJs(): string
     {
-        return "const form=document.getElementById('scan-form');const frame=document.getElementById('report-frame');const refresh=document.getElementById('refresh');const runButton=document.getElementById('run-scan');const status=document.getElementById('scan-status');const scanMeta=document.getElementById('scan-meta');const toggle=document.getElementById('controls-toggle');const panel=document.getElementById('controls-panel');const close=document.getElementById('controls-close');let scans=0;let busyTimer=null;let busyStarted=0;let busyLabel='Scanning';function params(){return new URLSearchParams(new FormData(form));}function setOpen(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',open?'true':'false');if(open){form.elements.project.focus();}}function stopBusyTimer(){if(busyTimer!==null){clearInterval(busyTimer);busyTimer=null;}}function renderBusy(){status.textContent=busyLabel+'... '+Math.floor((Date.now()-busyStarted)/1000)+'s';}function setBusy(busy,label='Scanning'){refresh.disabled=busy;runButton.disabled=busy;toggle.classList.toggle('busy',busy);toggle.setAttribute('aria-label',busy?label:'Dashboard controls');stopBusyTimer();if(busy){busyStarted=Date.now();busyLabel=label;renderBusy();busyTimer=setInterval(renderBusy,1000);}else{status.textContent='Scan loaded';}}function updateMeta(data){if(!data||data.type!=='gruff-scan-complete'){return;}const exit=Number.isInteger(data.exitCode)?data.exitCode:'?';const duration=Number.isInteger(data.durationMs)?data.durationMs+'ms':'duration n/a';const command=typeof data.command==='string'?data.command:'';scanMeta.textContent='exit '+exit+' · '+duration+(command===''?'':' · '+command);}function run(){const qs=params();const visible=new URLSearchParams(qs);qs.set('_run',Date.now().toString()+'-'+(++scans));setBusy(true,'Scanning');frame.removeAttribute('srcdoc');frame.src='/scan?'+qs.toString();history.replaceState(null,'','/?'+visible.toString());}toggle.addEventListener('click',event=>{event.stopPropagation();setOpen(panel.hidden);});close.addEventListener('click',()=>setOpen(false));document.addEventListener('click',event=>{if(!panel.hidden&&!panel.contains(event.target)&&event.target!==toggle){setOpen(false);}});document.addEventListener('keydown',event=>{if(event.key==='Escape'){setOpen(false);}});window.addEventListener('message',event=>{if(event.origin!==window.location.origin)return;const data=event.data;if(data&&data.type==='gruff-scan-start'){setBusy(true,data.reason==='mutation'?'Mutation running':'Scanning');}else{updateMeta(data);}});frame.addEventListener('load',()=>{setBusy(false);try{const el=frame.contentDocument&&frame.contentDocument.getElementById('gruff-dashboard-meta');if(el){updateMeta(JSON.parse(el.textContent||'{}'));}}catch(error){}});form.addEventListener('submit',event=>{event.preventDefault();run();});refresh.addEventListener('click',run);setTimeout(run,0);";
+        return "const form=document.getElementById('scan-form');const frame=document.getElementById('report-frame');const refresh=document.getElementById('refresh');const runButton=document.getElementById('run-scan');const status=document.getElementById('scan-status');const scanMeta=document.getElementById('scan-meta');const toggle=document.getElementById('controls-toggle');const panel=document.getElementById('controls-panel');const close=document.getElementById('controls-close');let scans=0;let busyTimer=null;let busyStarted=0;function params(){return new URLSearchParams(new FormData(form));}function setOpen(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',open?'true':'false');if(open){form.elements.project.focus();}}function stopBusyTimer(){if(busyTimer!==null){clearInterval(busyTimer);busyTimer=null;}}function renderBusy(){status.textContent='Scanning... '+Math.floor((Date.now()-busyStarted)/1000)+'s';}function setBusy(busy){refresh.disabled=busy;runButton.disabled=busy;toggle.classList.toggle('busy',busy);toggle.setAttribute('aria-label',busy?'Scanning':'Dashboard controls');stopBusyTimer();if(busy){busyStarted=Date.now();renderBusy();busyTimer=setInterval(renderBusy,1000);}else{status.textContent='Scan loaded';}}function updateMeta(data){if(!data||data.type!=='gruff-scan-complete'){return;}const exit=Number.isInteger(data.exitCode)?data.exitCode:'?';const duration=Number.isInteger(data.durationMs)?data.durationMs+'ms':'duration n/a';const command=typeof data.command==='string'?data.command:'';scanMeta.textContent='exit '+exit+' · '+duration+(command===''?'':' · '+command);}function run(){const qs=params();const visible=new URLSearchParams(qs);qs.set('_run',Date.now().toString()+'-'+(++scans));setBusy(true);frame.removeAttribute('srcdoc');frame.src='/scan?'+qs.toString();history.replaceState(null,'','/?'+visible.toString());}toggle.addEventListener('click',event=>{event.stopPropagation();setOpen(panel.hidden);});close.addEventListener('click',()=>setOpen(false));document.addEventListener('click',event=>{if(!panel.hidden&&!panel.contains(event.target)&&event.target!==toggle){setOpen(false);}});document.addEventListener('keydown',event=>{if(event.key==='Escape'){setOpen(false);}});window.addEventListener('message',event=>{if(event.origin!==window.location.origin)return;updateMeta(event.data);});frame.addEventListener('load',()=>{setBusy(false);try{const el=frame.contentDocument&&frame.contentDocument.getElementById('gruff-dashboard-meta');if(el){updateMeta(JSON.parse(el.textContent||'{}'));}}catch(error){}});form.addEventListener('submit',event=>{event.preventDefault();run();});refresh.addEventListener('click',run);setTimeout(run,0);";
     }
 
     private function loadingFrame(): string

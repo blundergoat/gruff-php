@@ -24,7 +24,7 @@ final class DashboardCommand extends Command
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Initial project root for scans.')
             ->addOption('host', null, InputOption::VALUE_REQUIRED, 'Host for the dashboard server.', self::DEFAULT_HOST)
             ->addOption('port', null, InputOption::VALUE_REQUIRED, 'Port for the dashboard server.', (string) self::DEFAULT_PORT)
-            ->addOption('scan-timeout', null, InputOption::VALUE_REQUIRED, 'Seconds to allow each refresh scan. Mutation runs are not timed out. Use 0 to disable.', '120')
+            ->addOption('scan-timeout', null, InputOption::VALUE_REQUIRED, 'Seconds to allow each refresh scan. Use 0 to disable.', '120')
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the scan: advisory, warning, error, or none.', 'none')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Initial gruff JSON config path.')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.json file for dashboard scans.')

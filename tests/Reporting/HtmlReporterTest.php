@@ -53,14 +53,14 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('<section class="verdict">', $html);
         self::assertStringContainsString('pillar grades', $html);
         self::assertStringContainsString('top offenders', $html);
-        self::assertStringContainsString('Mutation data unavailable', $html);
         self::assertStringContainsString('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;', $html);
         self::assertStringContainsString('src/&lt;bad&gt;.php', $html);
         self::assertStringNotContainsString('<script>alert("x")</script>', $html);
         self::assertStringNotContainsString('fonts.googleapis.com', $html);
+        self::assertStringNotContainsString('mutation', $html);
     }
 
-    public function testChartGridAlwaysRendersBothCardsWithMutationPlaceholder(): void
+    public function testHtmlReporterOmitsMutationVisualization(): void
     {
         $score = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
         $report = new AnalysisReport(
@@ -81,13 +81,8 @@ final class HtmlReporterTest extends TestCase
 
         $html = (new HtmlReporter())->render($report);
 
-        self::assertStringNotContainsString('chart-grid-solo', $html);
         self::assertStringContainsString('cyclomatic complexity · flagged methods', $html);
-        self::assertStringContainsString('mutation score · per file', $html);
-        self::assertStringContainsString('chart-card-empty', $html);
-        self::assertStringContainsString('data-mutation-empty="chart"', $html);
-        self::assertStringContainsString('data-mutation-empty="pillar"', $html);
-        self::assertStringContainsString('mutation-cli-hint', $html);
-        self::assertSame(2, substr_count($html, 'class="chart-card'));
+        self::assertStringNotContainsString('mutation', $html);
+        self::assertStringNotContainsString('MSI', $html);
     }
 }

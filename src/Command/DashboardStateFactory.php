@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputInterface;
 final class DashboardStateFactory
 {
     /**
-     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string}
+     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string}
      */
     public function defaultQuery(InputInterface $input, string $projectRoot): array
     {
@@ -28,7 +28,6 @@ final class DashboardStateFactory
             'noBaseline' => (bool) $input->getOption('no-baseline') ? '1' : '0',
             'noConfig' => (bool) $input->getOption('no-config') ? '1' : '0',
             'includeIgnored' => (bool) $input->getOption('include-ignored') ? '1' : '0',
-            'mutation' => 'off',
         ];
     }
 
@@ -42,7 +41,7 @@ final class DashboardStateFactory
 
     /**
      * @param array<string, string> $query
-     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, mutation: string}
+     * @return array{project: string, paths: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string}
      */
     public function state(InputInterface $input, string $projectRoot, array $query): array
     {
@@ -57,7 +56,6 @@ final class DashboardStateFactory
             'noBaseline' => ($query['noBaseline'] ?? $defaults['noBaseline']) === '1' ? '1' : '0',
             'noConfig' => ($query['noConfig'] ?? $defaults['noConfig']) === '1' ? '1' : '0',
             'includeIgnored' => ($query['includeIgnored'] ?? $defaults['includeIgnored']) === '1' ? '1' : '0',
-            'mutation' => ($query['mutation'] ?? $defaults['mutation']) === 'run' ? 'run' : 'off',
         ];
     }
 

@@ -85,63 +85,24 @@ final readonly class HtmlReporter
         $html = '<section class="pillars"><div class="section-head">pillar grades <span class="aside">weighted composite</span></div><div class="pillar-grid">';
 
         foreach ($items as $pillar) {
+            if (strtolower($pillar->pillar) === 'mutation') {
+                continue;
+            }
+
             $html .= $this->pillarCard($pillar);
         }
 
-        // Fill the trailing 4-column grid slot with an informational mutation card when no
-        // Infection report is supplied; otherwise an empty cell shows through the grid background.
-        $hasMutationPillar = false;
-        foreach ($items as $pillar) {
-            if (strtolower($pillar->pillar) === 'mutation') {
-                $hasMutationPillar = true;
-                break;
-            }
-        }
-
-        if (!$hasMutationPillar) {
-            $html .= $this->mutationPlaceholderCard($report);
-        }
-
         return $html . '</div></section>';
-    }
-
-    private function mutationPlaceholderCard(AnalysisReport $report): string
-    {
-        return '<div class="pillar pillar-empty" data-mutation-empty="pillar">'
-            . '<div class="name">mutation</div>'
-            . '<div class="grade n">n/a</div>'
-            . '<div class="breakdown">'
-            . '<div class="row"><span class="key">score</span><span class="val">not scored</span></div>'
-            . '<div class="row"><span class="key">findings</span><span class="val">—</span></div>'
-            . '<div class="row"><span class="key">errors/warnings</span><span class="val">— / —</span></div>'
-            . '</div>'
-            . sprintf('<div class="empty-hint mutation-cli-hint">%s</div>', $this->mutationEmptyHint($report))
-            . '</div>';
-    }
-
-    private function mutationEmptyHint(AnalysisReport $report): string
-    {
-        foreach ($report->diagnostics as $diagnostic) {
-            if (in_array($diagnostic->type, ['mutation-tool-error', 'mutation-run-error', 'mutation-report-error'], true)) {
-                return sprintf(
-                    'Mutation run failed: %s (%s)',
-                    $this->escape($diagnostic->message),
-                    $this->escape($diagnostic->type),
-                );
-            }
-        }
-
-        return 'Mutation data unavailable. Pass <code>--infection-report</code> to score this pillar.';
     }
 
     private function offenders(AnalysisReport $report): string
     {
         $items = $report->score === null ? [] : $report->score->topOffenders;
         $html = '<section class="offenders"><div class="section-head">top offenders <span class="aside">sorted by score</span></div>'
-            . '<table class="offender-list"><thead><tr><th>file</th><th class="num">cyclo</th><th class="num">cognit.</th><th class="num">LOC</th><th class="num">MSI</th><th class="num">findings</th><th class="num">grade</th></tr></thead><tbody>';
+            . '<table class="offender-list"><thead><tr><th>file</th><th class="num">cyclo</th><th class="num">cognit.</th><th class="num">LOC</th><th class="num">findings</th><th class="num">grade</th></tr></thead><tbody>';
 
         if ($items === []) {
-            $html .= '<tr><td colspan="7">No offenders found.</td></tr>';
+            $html .= '<tr><td colspan="6">No offenders found.</td></tr>';
         }
 
         foreach ($items as $item) {
@@ -165,44 +126,9 @@ final readonly class HtmlReporter
             $axis .= sprintf('<span>%s</span>', $this->escape($label));
         }
 
-        $histogram = '<div class="chart-card"><div class="title">cyclomatic complexity · flagged methods</div>'
-            . '<div class="histogram">' . $bars . '</div><div class="histogram-axis">' . $axis . '</div></div>';
-
-        return '<section class="chart-section"><div class="section-head">distribution <span class="aside">complexity and mutation</span></div>'
-            . '<div class="chart-grid">' . $histogram . $this->mutationChartCard($report) . '</div></section>';
-    }
-
-    private function mutationChartCard(AnalysisReport $report): string
-    {
-        if ($report->mutation === null) {
-            return '<div class="chart-card chart-card-empty" data-mutation-empty="chart">'
-                . '<div class="title">mutation score · per file</div>'
-                . sprintf('<div class="empty mutation-cli-hint">%s</div>', $this->mutationEmptyHint($report))
-                . '</div>';
-        }
-
-        return '<div class="chart-card"><div class="title">mutation score · per file</div>' . $this->mutationList($report) . '</div>';
-    }
-
-    private function mutationList(AnalysisReport $report): string
-    {
-        if ($report->mutation === null) {
-            return '';
-        }
-
-        $html = '<div class="mutation-list">';
-        foreach ($report->mutation->report->fileSummaries() as $summary) {
-            $class = $summary->msi >= 80.0 ? 'ok' : ($summary->msi >= 60.0 ? 'warn' : 'bad');
-            $html .= sprintf(
-                '<div class="mut-row"><div class="name">%s</div><div class="mut-bar %s"><span style="width:%d%%;"></span></div><div class="val">%.1f%%</div></div>',
-                $this->escape($summary->filePath),
-                $class,
-                (int) max(0, min(100, round($summary->msi))),
-                $summary->msi,
-            );
-        }
-
-        return $html . '</div>';
+        return '<section class="chart-section"><div class="section-head">distribution <span class="aside">cyclomatic complexity</span></div>'
+            . '<div class="chart-card"><div class="title">cyclomatic complexity · flagged methods</div>'
+            . '<div class="histogram">' . $bars . '</div><div class="histogram-axis">' . $axis . '</div></div></section>';
     }
 
     private function findings(AnalysisReport $report): string
@@ -255,7 +181,6 @@ final readonly class HtmlReporter
             . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxCyclomatic)))
             . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxCognitive)))
             . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxLines)))
-            . sprintf('<td class="num">%s</td>', $this->escape($file->mutationScore === null ? 'n/a' : sprintf('%.1f%%', $file->mutationScore)))
             . sprintf('<td class="num">%d</td>', $file->findings)
             . sprintf('<td class="num"><span class="grade-pill %s">%s</span></td>', strtolower($file->grade->letter), $this->escape($file->grade->letter))
             . '</tr>';
@@ -313,7 +238,7 @@ final readonly class HtmlReporter
     private function css(): string
     {
         return <<<'CSS'
-:root{--ink:#0d0c0a;--ink-2:#161412;--ink-3:#1f1c19;--paper:#f3e9d2;--paper-dim:#b5ab94;--paper-mute:#7d735f;--rule:#2a2622;--forge:#e85d04;--grade-a:#7fa15a;--grade-b:#b8b450;--grade-c:#d08c36;--grade-d:#c2552b;--grade-f:#8b2828;--serif:Georgia,'Iowan Old Style',serif;--mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace}*{box-sizing:border-box;margin:0;padding:0}html{background:var(--ink);scrollbar-gutter:stable}body{font-family:var(--mono);color:var(--paper);background:var(--ink);min-height:100vh;line-height:1.5;font-size:14px;padding:48px 32px}.paper{max-width:1180px;margin:0 auto 24px;background:var(--ink-2);border:1px solid var(--rule);position:relative;padding:56px 64px 48px;scrollbar-gutter:stable}.corner-tr,.corner-bl,.paper:before,.paper:after{content:'';position:absolute;width:22px;height:22px;border:1px solid var(--forge)}.paper:before{top:12px;left:12px;border-right:0;border-bottom:0}.paper:after{bottom:12px;right:12px;border-left:0;border-top:0}.corner-tr{top:12px;right:12px;border-left:0;border-bottom:0}.corner-bl{bottom:12px;left:12px;border-right:0;border-top:0}.masthead{display:grid;grid-template-columns:1fr auto;gap:32px;padding-bottom:28px;border-bottom:1px solid var(--rule);align-items:end}.wordmark{font-family:var(--serif);font-weight:900;font-size:96px;line-height:.85;color:var(--paper);font-style:italic}.wordmark:after{content:'·php';color:var(--forge);font-style:normal;font-size:.45em;margin-left:.15em;vertical-align:super}.tagline{margin-top:12px;font-size:11px;letter-spacing:.24em;color:var(--paper-mute);text-transform:uppercase}.meta{text-align:right;font-size:11px;color:var(--paper-dim);line-height:1.9}.label{color:var(--paper-mute);text-transform:uppercase;letter-spacing:.16em;margin-right:8px}.val{color:var(--paper)}.inspection-id{margin-top:10px;color:var(--forge);font-weight:700;font-size:12px;letter-spacing:.1em}.section-head{font-size:11px;letter-spacing:.32em;color:var(--paper-mute);text-transform:uppercase;padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:baseline}.section-head:before{content:'§';margin-right:10px;color:var(--forge);font-family:var(--serif);font-size:14px;font-style:italic}.aside{color:var(--paper-mute);font-size:10px;letter-spacing:.24em}.verdict{display:grid;grid-template-columns:auto 1fr;gap:56px;padding:48px 0;border-bottom:1px solid var(--rule);align-items:center}.grade-stamp{width:220px;height:220px;border:3px solid var(--grade-b);color:var(--grade-b);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-4deg)}.grade-letter{font-family:var(--serif);font-style:italic;font-weight:900;font-size:112px;line-height:1}.grade-score{font-size:13px;letter-spacing:.1em}.verdict-body{display:flex;flex-direction:column;gap:18px}.verdict-headline{font-family:var(--serif);font-style:italic;font-weight:600;font-size:38px;line-height:1.15}.verdict-headline em{color:var(--forge)}.verdict-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);padding-top:20px}.stat{border-right:1px solid var(--rule);padding:0 18px}.stat:first-child{padding-left:0}.stat:last-child{border-right:0}.verdict-stats .num{font-family:var(--serif);font-weight:800;font-size:32px;line-height:1}.verdict-stats .num.warn{color:var(--grade-c)}.verdict-stats .num.fail{color:var(--grade-f)}.verdict-stats .num.ok{color:var(--grade-a)}.lbl{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--paper-mute);margin-top:8px}.pillars,.offenders,.chart-section{padding:48px 0;border-bottom:1px solid var(--rule)}.pillar-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}.pillar{background:var(--ink-2);padding:24px 20px;display:flex;flex-direction:column;gap:14px}.pillar-empty .grade.n{color:var(--paper-mute);opacity:.5;font-size:42px}.pillar-empty .empty-hint{font-size:10px;line-height:1.5;color:var(--paper-mute);padding-top:10px;border-top:1px dashed var(--rule);word-break:break-word;overflow-wrap:anywhere}.pillar-empty .empty-hint code{display:inline-block;font-family:var(--mono);font-size:10px;color:var(--forge);background:var(--ink-3);padding:0 4px;border:1px solid var(--rule);white-space:nowrap}.pillar .name{font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--paper-mute)}.pillar .grade{font-family:var(--serif);font-weight:800;font-style:italic;font-size:52px;line-height:.9}.grade.a,.grade-pill.a{color:var(--grade-a)}.grade.b,.grade-pill.b{color:var(--grade-b)}.grade.c,.grade-pill.c{color:var(--grade-c)}.grade.d,.grade-pill.d{color:var(--grade-d)}.grade.f,.grade-pill.f{color:var(--grade-f)}.breakdown{font-size:11px;color:var(--paper-dim);line-height:1.7}.row{display:flex;justify-content:space-between;gap:8px}.key{color:var(--paper-mute)}table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;font-family:var(--mono)}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--paper-mute);font-weight:500;padding:12px 14px 12px 0;border-bottom:1px solid var(--rule)}th:last-child,td:last-child{padding-right:0}th.num,td.num{text-align:right;padding-left:18px}td{padding:14px 14px 14px 0;border-bottom:1px solid var(--ink-3);color:var(--paper-dim);font-size:13px;font-family:var(--mono);font-weight:500;line-height:1.4}td.num{color:var(--paper);font-variant-numeric:tabular-nums}.file-path{color:var(--paper);font-weight:500}.grade-pill{display:inline-block;font-family:var(--serif);font-style:italic;font-weight:800;font-size:18px;line-height:1;padding:4px 10px;border:1.5px solid currentColor;min-width:36px;text-align:center}.chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:48px}.chart-card{border:1px solid var(--rule);padding:24px;background:var(--ink-3)}.chart-card-empty{display:flex;flex-direction:column}.chart-card-empty .empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;line-height:1.6;border-top:1px dashed var(--rule);margin-top:0}.chart-card-empty .empty code{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--forge);background:var(--ink-2);padding:1px 6px;border:1px solid var(--rule);white-space:nowrap}.title{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--paper-mute);margin-bottom:24px}.histogram{display:flex;align-items:flex-end;gap:6px;height:180px;padding-bottom:20px;border-bottom:1px solid var(--rule)}.bar{flex:1;background:var(--forge);position:relative;min-height:4px}.bar.warn{background:var(--grade-c)}.bar.fail{background:var(--grade-f)}.bar .count{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px}.histogram-axis{display:flex;gap:6px;margin-top:8px;font-size:10px;color:var(--paper-mute)}.histogram-axis span{flex:1;text-align:center}.mutation-list{display:flex;flex-direction:column;gap:10px}.mut-row{display:grid;grid-template-columns:1fr 120px auto;gap:12px;align-items:center}.mut-row .name{font-size:11px;color:var(--paper-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mut-bar{height:6px;background:var(--ink-2);overflow:hidden}.mut-bar span{display:block;height:100%;background:var(--forge)}.mut-bar.bad span{background:var(--grade-d)}.mut-bar.warn span{background:var(--grade-c)}.mut-bar.ok span{background:var(--grade-a)}.mut-row .val{font-size:11px;font-weight:500;text-align:right;color:var(--paper);min-width:48px}.findings{padding:48px 0}.finding{display:grid;grid-template-columns:auto 1fr auto;gap:24px;padding:18px 0;border-bottom:1px solid var(--ink-3);align-items:start}.severity{font-size:9px;text-transform:uppercase;letter-spacing:.24em;padding:4px 10px;border:1px solid currentColor;margin-top:2px;min-width:76px;text-align:center}.severity.fail{color:var(--grade-f)}.severity.warn{color:var(--grade-c)}.severity.note{color:var(--paper-mute)}.rule{font-size:10px;color:var(--forge);text-transform:uppercase;letter-spacing:.16em;margin-bottom:6px}.msg{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--paper);line-height:1.4}.loc{font-size:11px;color:var(--paper-mute);margin-top:8px}.loc code{color:var(--paper-dim);background:var(--ink-3);padding:1px 6px;border:1px solid var(--rule)}.points{font-size:10px;color:var(--paper-mute);text-align:right;letter-spacing:.1em;min-width:96px;padding-left:12px}.empty{color:var(--paper-dim);font-size:12px}.footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--rule);display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;font-size:10px;color:var(--paper-mute);letter-spacing:.12em;text-transform:uppercase}.center{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--paper-dim);text-transform:none;letter-spacing:0}.right{text-align:right}@media(max-width:900px){body{padding:16px}.paper{padding:28px 20px}.wordmark{font-size:64px}.masthead,.verdict,.chart-grid{grid-template-columns:1fr}.meta{text-align:left}.grade-stamp{margin:0 auto}.pillar-grid{grid-template-columns:repeat(2,1fr)}.verdict-stats{grid-template-columns:repeat(2,1fr);gap:16px}.stat{border-right:0;padding:0}.verdict-headline{font-size:28px}}
+:root{--ink:#0d0c0a;--ink-2:#161412;--ink-3:#1f1c19;--paper:#f3e9d2;--paper-dim:#b5ab94;--paper-mute:#7d735f;--rule:#2a2622;--forge:#e85d04;--grade-a:#7fa15a;--grade-b:#b8b450;--grade-c:#d08c36;--grade-d:#c2552b;--grade-f:#8b2828;--serif:Georgia,'Iowan Old Style',serif;--mono:'JetBrains Mono','IBM Plex Mono',ui-monospace,monospace}*{box-sizing:border-box;margin:0;padding:0}html{background:var(--ink);scrollbar-gutter:stable}body{font-family:var(--mono);color:var(--paper);background:var(--ink);min-height:100vh;line-height:1.5;font-size:14px;padding:48px 32px}.paper{max-width:1180px;margin:0 auto 24px;background:var(--ink-2);border:1px solid var(--rule);position:relative;padding:56px 64px 48px;scrollbar-gutter:stable}.corner-tr,.corner-bl,.paper:before,.paper:after{content:'';position:absolute;width:22px;height:22px;border:1px solid var(--forge)}.paper:before{top:12px;left:12px;border-right:0;border-bottom:0}.paper:after{bottom:12px;right:12px;border-left:0;border-top:0}.corner-tr{top:12px;right:12px;border-left:0;border-bottom:0}.corner-bl{bottom:12px;left:12px;border-right:0;border-top:0}.masthead{display:grid;grid-template-columns:1fr auto;gap:32px;padding-bottom:28px;border-bottom:1px solid var(--rule);align-items:end}.wordmark{font-family:var(--serif);font-weight:900;font-size:96px;line-height:.85;color:var(--paper);font-style:italic}.wordmark:after{content:'·php';color:var(--forge);font-style:normal;font-size:.45em;margin-left:.15em;vertical-align:super}.tagline{margin-top:12px;font-size:11px;letter-spacing:.24em;color:var(--paper-mute);text-transform:uppercase}.meta{text-align:right;font-size:11px;color:var(--paper-dim);line-height:1.9}.label{color:var(--paper-mute);text-transform:uppercase;letter-spacing:.16em;margin-right:8px}.val{color:var(--paper)}.inspection-id{margin-top:10px;color:var(--forge);font-weight:700;font-size:12px;letter-spacing:.1em}.section-head{font-size:11px;letter-spacing:.32em;color:var(--paper-mute);text-transform:uppercase;padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:baseline}.section-head:before{content:'§';margin-right:10px;color:var(--forge);font-family:var(--serif);font-size:14px;font-style:italic}.aside{color:var(--paper-mute);font-size:10px;letter-spacing:.24em}.verdict{display:grid;grid-template-columns:auto 1fr;gap:56px;padding:48px 0;border-bottom:1px solid var(--rule);align-items:center}.grade-stamp{width:220px;height:220px;border:3px solid var(--grade-b);color:var(--grade-b);display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-4deg)}.grade-letter{font-family:var(--serif);font-style:italic;font-weight:900;font-size:112px;line-height:1}.grade-score{font-size:13px;letter-spacing:.1em}.verdict-body{display:flex;flex-direction:column;gap:18px}.verdict-headline{font-family:var(--serif);font-style:italic;font-weight:600;font-size:38px;line-height:1.15}.verdict-headline em{color:var(--forge)}.verdict-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);padding-top:20px}.stat{border-right:1px solid var(--rule);padding:0 18px}.stat:first-child{padding-left:0}.stat:last-child{border-right:0}.verdict-stats .num{font-family:var(--serif);font-weight:800;font-size:32px;line-height:1}.verdict-stats .num.warn{color:var(--grade-c)}.verdict-stats .num.fail{color:var(--grade-f)}.verdict-stats .num.ok{color:var(--grade-a)}.lbl{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--paper-mute);margin-top:8px}.pillars,.offenders,.chart-section{padding:48px 0;border-bottom:1px solid var(--rule)}.pillar-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}.pillar{background:var(--ink-2);padding:24px 20px;display:flex;flex-direction:column;gap:14px}.pillar .name{font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--paper-mute)}.pillar .grade{font-family:var(--serif);font-weight:800;font-style:italic;font-size:52px;line-height:.9}.grade.a,.grade-pill.a{color:var(--grade-a)}.grade.b,.grade-pill.b{color:var(--grade-b)}.grade.c,.grade-pill.c{color:var(--grade-c)}.grade.d,.grade-pill.d{color:var(--grade-d)}.grade.f,.grade-pill.f{color:var(--grade-f)}.breakdown{font-size:11px;color:var(--paper-dim);line-height:1.7}.row{display:flex;justify-content:space-between;gap:8px}.key{color:var(--paper-mute)}table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto;font-family:var(--mono)}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--paper-mute);font-weight:500;padding:12px 14px 12px 0;border-bottom:1px solid var(--rule)}th:last-child,td:last-child{padding-right:0}th.num,td.num{text-align:right;padding-left:18px}td{padding:14px 14px 14px 0;border-bottom:1px solid var(--ink-3);color:var(--paper-dim);font-size:13px;font-family:var(--mono);font-weight:500;line-height:1.4}td.num{color:var(--paper);font-variant-numeric:tabular-nums}.file-path{color:var(--paper);font-weight:500}.grade-pill{display:inline-block;font-family:var(--serif);font-style:italic;font-weight:800;font-size:18px;line-height:1;padding:4px 10px;border:1.5px solid currentColor;min-width:36px;text-align:center}.chart-card{border:1px solid var(--rule);padding:24px;background:var(--ink-3)}.title{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--paper-mute);margin-bottom:24px}.histogram{display:flex;align-items:flex-end;gap:6px;height:180px;padding-bottom:20px;border-bottom:1px solid var(--rule)}.bar{flex:1;background:var(--forge);position:relative;min-height:4px}.bar.warn{background:var(--grade-c)}.bar.fail{background:var(--grade-f)}.bar .count{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px}.histogram-axis{display:flex;gap:6px;margin-top:8px;font-size:10px;color:var(--paper-mute)}.histogram-axis span{flex:1;text-align:center}.findings{padding:48px 0}.finding{display:grid;grid-template-columns:auto 1fr auto;gap:24px;padding:18px 0;border-bottom:1px solid var(--ink-3);align-items:start}.severity{font-size:9px;text-transform:uppercase;letter-spacing:.24em;padding:4px 10px;border:1px solid currentColor;margin-top:2px;min-width:76px;text-align:center}.severity.fail{color:var(--grade-f)}.severity.warn{color:var(--grade-c)}.severity.note{color:var(--paper-mute)}.rule{font-size:10px;color:var(--forge);text-transform:uppercase;letter-spacing:.16em;margin-bottom:6px}.msg{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--paper);line-height:1.4}.loc{font-size:11px;color:var(--paper-mute);margin-top:8px}.loc code{color:var(--paper-dim);background:var(--ink-3);padding:1px 6px;border:1px solid var(--rule)}.points{font-size:10px;color:var(--paper-mute);text-align:right;letter-spacing:.1em;min-width:96px;padding-left:12px}.empty{color:var(--paper-dim);font-size:12px}.footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--rule);display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;font-size:10px;color:var(--paper-mute);letter-spacing:.12em;text-transform:uppercase}.center{font-family:var(--serif);font-style:italic;font-size:13px;color:var(--paper-dim);text-transform:none;letter-spacing:0}.right{text-align:right}@media(max-width:900px){body{padding:16px}.paper{padding:28px 20px}.wordmark{font-size:64px}.masthead,.verdict{grid-template-columns:1fr}.meta{text-align:left}.grade-stamp{margin:0 auto}.pillar-grid{grid-template-columns:repeat(2,1fr)}.verdict-stats{grid-template-columns:repeat(2,1fr);gap:16px}.stat{border-right:0;padding:0}.verdict-headline{font-size:28px}}
 CSS;
     }
 }

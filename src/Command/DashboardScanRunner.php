@@ -37,25 +37,10 @@ final readonly class DashboardScanRunner
         }
 
         $paths = $commandBuilder->parsePaths($state['paths']);
-        $editedUnitTestFiles = [];
-
-        if ($state['mutation'] === 'run') {
-            $editedUnitTestFiles = $commandBuilder->editedUnitTestFiles($scanRoot);
-
-            if ($editedUnitTestFiles === []) {
-                return $renderer->errorHtml(
-                    'No edited unit test files found.',
-                    'Dashboard mutation analysis checks only PHPUnit unit test files changed relative to HEAD under tests/. Newly created untracked unit test files are included when the project is a git repository. Use scripts/mutation-test-full.sh for a full unit-suite mutation run.',
-                    Command::SUCCESS,
-                    0,
-                );
-            }
-        }
-
-        $command = $commandBuilder->analyseCommand($paths, $state, $scanRoot, $editedUnitTestFiles);
+        $command = $commandBuilder->analyseCommand($paths, $state);
         $startedAt = microtime(true);
         $process = new Process($command, $scanRoot);
-        $process->setTimeout($state['mutation'] === 'run' ? null : $context->scanTimeout);
+        $process->setTimeout($context->scanTimeout);
         $stderr = '';
         $exitCode = Command::SUCCESS;
 
@@ -74,8 +59,6 @@ final readonly class DashboardScanRunner
         if ($html === '') {
             return $renderer->errorHtml('The scan did not produce HTML output.', $stderr === '' ? 'No stderr output.' : $stderr, $exitCode, $durationMs);
         }
-
-        $html = $renderer->injectMutationButtons($html, $state);
 
         return $renderer->injectDashboardMetadata(html: $html, projectRoot: $scanRoot, command: $command, exitCode: $exitCode, durationMs: $durationMs);
     }

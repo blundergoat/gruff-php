@@ -228,7 +228,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `HtmlReporter`
 
-`src/Reporting/HtmlReporter.php`. Self-contained dashboard renderer with inline CSS, escaped run data, masthead, verdict, stats, pillar grades, top offenders, complexity distribution, mutation state, and findings list.
+`src/Reporting/HtmlReporter.php`. Self-contained dashboard renderer with inline CSS, escaped run data, masthead, verdict, stats, pillar grades (mutation pillar omitted), top offenders, complexity distribution, and findings list.
 
 ### `MarkdownReporter`
 
