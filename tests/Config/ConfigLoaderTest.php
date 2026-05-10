@@ -6,7 +6,14 @@ namespace GruffPhp\Tests\Config;
 
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
 use PHPUnit\Framework\TestCase;
@@ -156,6 +163,56 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    public function testHonoursDefaultEnabledFromRuleDefinition(): void
+    {
+        $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
+
+        $config = (new ConfigLoader(__DIR__))->load(null, $registry);
+
+        self::assertFalse($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
+    }
+
+    public function testCanEnableDefaultDisabledRuleViaConfig(): void
+    {
+        $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
+        $path = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"enabled":true}}}',
+            FixtureDefaultDisabledRule::ID,
+        ));
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+
+        self::assertTrue($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
+    }
+
+    public function testLoadsRuleOptions(): void
+    {
+        $registry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"options":{"patterns":["foo","bar"]}}}}',
+            FixtureOptionsRule::ID,
+        ));
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        $settings = $config->ruleSettings(FixtureOptionsRule::ID);
+
+        self::assertSame(['foo', 'bar'], $settings->stringListOption('patterns'));
+    }
+
+    public function testRejectsUnknownRuleOptionKey(): void
+    {
+        $registry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"options":{"unknown":[]}}}}',
+            FixtureOptionsRule::ID,
+        ));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(sprintf('Unknown option "rules.%s.options.unknown".', FixtureOptionsRule::ID));
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+    }
+
     private function writeTempConfig(string $contents): string
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-config-');
@@ -164,5 +221,51 @@ final class ConfigLoaderTest extends TestCase
         self::assertNotFalse(file_put_contents($path, $contents));
 
         return $path;
+    }
+}
+
+final readonly class FixtureDefaultDisabledRule implements RuleInterface
+{
+    public const ID = 'fixture.default-disabled';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Fixture default-disabled rule',
+            pillar: Pillar::Naming,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::Low,
+            defaultEnabled: false,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        return [];
+    }
+}
+
+final readonly class FixtureOptionsRule implements RuleInterface
+{
+    public const ID = 'fixture.options';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Fixture options rule',
+            pillar: Pillar::Naming,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::Low,
+            defaultOptions: ['patterns' => []],
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        return [];
     }
 }

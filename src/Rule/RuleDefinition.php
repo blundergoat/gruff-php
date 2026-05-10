@@ -15,6 +15,7 @@ final readonly class RuleDefinition
     /**
      * @param array<string, int|float> $defaultThresholds
      * @param list<Pillar> $secondaryPillars
+     * @param array<string, mixed> $defaultOptions
      */
     public function __construct(
         public string $id,
@@ -25,6 +26,8 @@ final readonly class RuleDefinition
         public Confidence $confidence = Confidence::High,
         public array $defaultThresholds = [],
         public array $secondaryPillars = [],
+        public bool $defaultEnabled = true,
+        public array $defaultOptions = [],
     ) {
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
@@ -33,6 +36,12 @@ final readonly class RuleDefinition
         foreach (array_keys($defaultThresholds) as $name) {
             if ($name === '') {
                 throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid threshold name.', $id));
+            }
+        }
+
+        foreach (array_keys($defaultOptions) as $name) {
+            if ($name === '') {
+                throw new InvalidArgumentException(sprintf('Rule "%s" has an invalid option name.', $id));
             }
         }
     }

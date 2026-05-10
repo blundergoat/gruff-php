@@ -36,7 +36,11 @@ final readonly class AnalysisConfig
 
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
-            $rules[$definition->id] = new RuleSettings(true, $definition->defaultThresholds);
+            $rules[$definition->id] = new RuleSettings(
+                $definition->defaultEnabled,
+                $definition->defaultThresholds,
+                $definition->defaultOptions,
+            );
         }
 
         return new self($rules);

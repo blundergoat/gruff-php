@@ -58,7 +58,16 @@ final readonly class BooleanPrefixRule implements RuleInterface
             $name = $node->name->toString();
 
             foreach (self::GOOD_PREFIXES as $prefix) {
-                if (str_starts_with($name, $prefix) && strlen($name) > strlen($prefix)) {
+                if (!str_starts_with($name, $prefix)) {
+                    continue;
+                }
+
+                if (strlen($name) === strlen($prefix)) {
+                    continue 2;
+                }
+
+                $nextChar = $name[strlen($prefix)];
+                if ($nextChar >= 'A' && $nextChar <= 'Z') {
                     continue 2;
                 }
             }

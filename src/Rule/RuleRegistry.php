@@ -95,7 +95,7 @@ use InvalidArgumentException;
 final class RuleRegistry
 {
     /** @var array<string, RuleInterface> */
-    private array $rules;
+    private readonly array $rules;
 
     /**
      * @param list<RuleInterface> $rules

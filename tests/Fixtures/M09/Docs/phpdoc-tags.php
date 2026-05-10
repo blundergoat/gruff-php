@@ -29,6 +29,17 @@ class PhpdocTagsFixture
     }
 
     /**
+     * Missing the array @param tag.
+     *
+     * @param int $x The first value.
+     * @return int
+     */
+    public function missingArrayParam(int $x, array $y): int
+    {
+        return $x + count($y);
+    }
+
+    /**
      * Does not document the return value.
      *
      * @param int $x The value.
@@ -36,6 +47,16 @@ class PhpdocTagsFixture
     public function missingReturn(int $x): int
     {
         return $x;
+    }
+
+    /**
+     * Does not document the array return shape.
+     *
+     * @param int $x The value.
+     */
+    public function missingArrayReturn(int $x): array
+    {
+        return [$x];
     }
 
     /**

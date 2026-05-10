@@ -15,6 +15,8 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
@@ -58,6 +60,10 @@ final readonly class GenericMethodNameRule implements RuleInterface
                 continue;
             }
 
+            if ($node instanceof ClassMethod && $this->matchesFrameworkOverride($node)) {
+                continue;
+            }
+
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
@@ -75,5 +81,45 @@ final readonly class GenericMethodNameRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function matchesFrameworkOverride(ClassMethod $method): bool
+    {
+        $name = strtolower($method->name->toString());
+
+        if ($name === 'execute' && $this->matchesSymfonyConsoleExecute($method)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function matchesSymfonyConsoleExecute(ClassMethod $method): bool
+    {
+        if (count($method->params) !== 2) {
+            return false;
+        }
+
+        $first = $method->params[0]->type ?? null;
+        $second = $method->params[1]->type ?? null;
+
+        return $this->parameterTypeShortNameMatches($first, 'InputInterface')
+            && $this->parameterTypeShortNameMatches($second, 'OutputInterface');
+    }
+
+    private function parameterTypeShortNameMatches(?Node $type, string $shortName): bool
+    {
+        if ($type instanceof Name) {
+            $parts = $type->getParts();
+            $last = $parts[count($parts) - 1] ?? null;
+
+            return $last === $shortName;
+        }
+
+        if ($type instanceof Identifier) {
+            return $type->toString() === $shortName;
+        }
+
+        return false;
     }
 }

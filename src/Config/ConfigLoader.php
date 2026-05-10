@@ -123,7 +123,7 @@ final readonly class ConfigLoader
         array $ruleConfig,
     ): AnalysisConfig {
         foreach (array_keys($ruleConfig) as $key) {
-            if ($key !== 'enabled' && $key !== 'thresholds') {
+            if ($key !== 'enabled' && $key !== 'thresholds' && $key !== 'options') {
                 throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
             }
         }
@@ -131,6 +131,7 @@ final readonly class ConfigLoader
         $settings = $config->ruleSettings($ruleId);
         $enabled = $settings->enabled;
         $thresholds = $settings->thresholds;
+        $options = $settings->options;
 
         if (array_key_exists('enabled', $ruleConfig)) {
             if (!is_bool($ruleConfig['enabled'])) {
@@ -169,7 +170,28 @@ final readonly class ConfigLoader
             }
         }
 
-        return $config->withRuleSettings($ruleId, new RuleSettings($enabled, $thresholds));
+        if (array_key_exists('options', $ruleConfig)) {
+            $optionsConfig = $this->requireObject(
+                $ruleConfig['options'],
+                sprintf('Config key "rules.%s.options" must be a JSON object.', $ruleId),
+            );
+
+            $allowedOptions = $registry->get($ruleId)->definition()->defaultOptions;
+
+            foreach ($optionsConfig as $optionName => $optionValue) {
+                if (!array_key_exists($optionName, $allowedOptions)) {
+                    throw new ConfigException(sprintf(
+                        'Unknown option "rules.%s.options.%s".',
+                        $ruleId,
+                        $optionName,
+                    ));
+                }
+
+                $options[$optionName] = $optionValue;
+            }
+        }
+
+        return $config->withRuleSettings($ruleId, new RuleSettings($enabled, $thresholds, $options));
     }
 
     /**

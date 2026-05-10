@@ -16,6 +16,7 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Match_;
+use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Do_;
 use PhpParser\Node\Stmt\For_;
@@ -61,52 +62,82 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $minBodyLines = (int) $settings->numericThreshold('minBodyLines');
         $minParameters = (int) $settings->numericThreshold('minParameters');
         $finder = new NodeFinder();
-        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+        $classes = $finder->findInstanceOf($unit->statements, Class_::class);
 
         $findings = [];
 
-        foreach ($methods as $method) {
-            if (!$method->isPublic() || $method->isAbstract()) {
+        foreach ($classes as $class) {
+            /** @var Class_ $class */
+            if ($this->isImmutableValueObject($class)) {
                 continue;
             }
 
-            $name = $method->name->toString();
+            foreach ($class->getMethods() as $method) {
+                if (!$method->isPublic() || $method->isAbstract()) {
+                    continue;
+                }
 
-            if (in_array($name, self::MAGIC_METHODS, true)) {
-                continue;
+                $name = $method->name->toString();
+
+                if (in_array($name, self::MAGIC_METHODS, true)) {
+                    continue;
+                }
+
+                if ($this->isTrivialAccessor($name)) {
+                    continue;
+                }
+
+                $docComment = $method->getDocComment();
+
+                if ($docComment !== null) {
+                    continue;
+                }
+
+                if (!$this->needsIntentDoc($method, $finder, $minBodyLines, $minParameters)) {
+                    continue;
+                }
+
+                $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+
+                $findings[] = new Finding(
+                    ruleId: $definition->id,
+                    message: sprintf('Public method %s has no PHPDoc.', $symbol),
+                    filePath: $unit->file->displayPath,
+                    line: $method->getStartLine(),
+                    severity: $definition->defaultSeverity,
+                    pillar: $definition->pillar,
+                    tier: $definition->tier,
+                    confidence: $definition->confidence,
+                    symbol: $symbol,
+                    remediation: 'Add a docblock describing the method\'s purpose.',
+                );
             }
-
-            if ($this->isTrivialAccessor($name)) {
-                continue;
-            }
-
-            $docComment = $method->getDocComment();
-
-            if ($docComment !== null) {
-                continue;
-            }
-
-            if (!$this->needsIntentDoc($method, $finder, $minBodyLines, $minParameters)) {
-                continue;
-            }
-
-            $symbol = CyclomaticComplexityRule::resolveSymbol($method);
-
-            $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('Public method %s has no PHPDoc.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $method->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $symbol,
-                remediation: 'Add a docblock describing the method\'s purpose.',
-            );
         }
 
         return $findings;
+    }
+
+    private function isImmutableValueObject(Class_ $class): bool
+    {
+        if (!$class->isFinal() || !$class->isReadonly()) {
+            return false;
+        }
+
+        if ($class->extends !== null) {
+            return false;
+        }
+
+        $hasTypedProperty = false;
+
+        foreach ($class->getProperties() as $property) {
+            if ($property->type === null) {
+                return false;
+            }
+
+            $hasTypedProperty = true;
+        }
+
+        return $hasTypedProperty;
     }
 
     private function isTrivialAccessor(string $name): bool

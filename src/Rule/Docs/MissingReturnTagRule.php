@@ -16,8 +16,12 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\IntersectionType;
+use PhpParser\Node\Name;
+use PhpParser\Node\NullableType;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\UnionType;
 use PhpParser\NodeFinder;
 
 final readonly class MissingReturnTagRule implements RuleInterface
@@ -64,6 +68,10 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 continue;
             }
 
+            if ($this->signatureTypeFullyDescribes($returnType)) {
+                continue;
+            }
+
             $docText = $docComment->getText();
 
             if (str_contains($docText, '@return')) {
@@ -91,5 +99,41 @@ final readonly class MissingReturnTagRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function signatureTypeFullyDescribes(?Node $type): bool
+    {
+        if ($type === null) {
+            return false;
+        }
+
+        if ($type instanceof Identifier) {
+            $name = strtolower($type->toString());
+            return $name !== 'array' && $name !== 'iterable';
+        }
+
+        if ($type instanceof Name) {
+            return true;
+        }
+
+        if ($type instanceof NullableType) {
+            return $this->signatureTypeFullyDescribes($type->type);
+        }
+
+        if ($type instanceof UnionType) {
+            foreach ($type->types as $member) {
+                if (!$this->signatureTypeFullyDescribes($member)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if ($type instanceof IntersectionType) {
+            return true;
+        }
+
+        return false;
     }
 }

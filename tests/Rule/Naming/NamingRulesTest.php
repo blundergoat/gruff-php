@@ -50,6 +50,14 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('GenericMethodFixture::calculateTotal()', $symbols);
     }
 
+    public function testSymfonyConsoleExecuteOverrideNotFlagged(): void
+    {
+        $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('FrameworkOverrideFixture::execute()', $symbols);
+    }
+
     public function testSingleCharVariablesDetected(): void
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);

@@ -47,6 +47,10 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
                 continue;
             }
 
+            if ($class->isReadonly()) {
+                continue;
+            }
+
             $constructorAssignments = $this->constructorAssignments($class);
             $lateAssignments = $this->lateAssignments($class);
 

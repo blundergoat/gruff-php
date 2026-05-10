@@ -16,8 +16,13 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\IntersectionType;
+use PhpParser\Node\Name;
+use PhpParser\Node\NullableType;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\UnionType;
 use PhpParser\NodeFinder;
 
 final readonly class MissingParamTagRule implements RuleInterface
@@ -74,6 +79,10 @@ final readonly class MissingParamTagRule implements RuleInterface
                     continue;
                 }
 
+                if ($this->signatureTypeFullyDescribes($param->type)) {
+                    continue;
+                }
+
                 $findings[] = new Finding(
                     ruleId: $definition->id,
                     message: sprintf('Parameter $%s in %s has no @param tag.', $paramName, $symbol),
@@ -91,6 +100,42 @@ final readonly class MissingParamTagRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    private function signatureTypeFullyDescribes(?Node $type): bool
+    {
+        if ($type === null) {
+            return false;
+        }
+
+        if ($type instanceof Identifier) {
+            $name = strtolower($type->toString());
+            return $name !== 'array' && $name !== 'iterable';
+        }
+
+        if ($type instanceof Name) {
+            return true;
+        }
+
+        if ($type instanceof NullableType) {
+            return $this->signatureTypeFullyDescribes($type->type);
+        }
+
+        if ($type instanceof UnionType) {
+            foreach ($type->types as $member) {
+                if (!$this->signatureTypeFullyDescribes($member)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if ($type instanceof IntersectionType) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
