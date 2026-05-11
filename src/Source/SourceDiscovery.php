@@ -60,6 +60,9 @@ final readonly class SourceDiscovery
         'yarn.lock',
     ];
 
+    /**
+     * Build the source-discovery scanner for the given project root.
+     */
     public function __construct(private string $projectRoot)
     {
     }
@@ -173,6 +176,11 @@ final readonly class SourceDiscovery
         }
     }
 
+    /**
+     * Resolve a user-supplied path against the project root, returning an absolute filesystem path.
+     *
+     * @return string
+     */
     private function absolutePath(string $path): string
     {
         if ($path === '') {
@@ -186,6 +194,11 @@ final readonly class SourceDiscovery
         return $this->projectRoot . '/' . $path;
     }
 
+    /**
+     * Canonicalise a path via realpath(), falling back to the original string when the file does not exist.
+     *
+     * @return string
+     */
     private function canonicalPath(string $path): string
     {
         $realPath = realpath($path);
@@ -193,6 +206,11 @@ final readonly class SourceDiscovery
         return $realPath === false ? $path : $realPath;
     }
 
+    /**
+     * Format a path for user-facing output relative to the project root; the root itself renders as ".".
+     *
+     * @return string
+     */
     private function displayPath(string $path): string
     {
         $canonicalPath = $this->canonicalPath($path);
@@ -209,6 +227,11 @@ final readonly class SourceDiscovery
         return $canonicalPath;
     }
 
+    /**
+     * Classify the file as PHP, text-config, or unsupported (null) based on extension and env-like naming.
+     *
+     * @return string|null One of SourceFile::TYPE_PHP / TYPE_TEXT, or null when unsupported.
+     */
     private function sourceType(string $path): ?string
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -224,6 +247,11 @@ final readonly class SourceDiscovery
         return null;
     }
 
+    /**
+     * Detect whether the file's basename is `.env` or `.env.*`.
+     *
+     * @return bool
+     */
     private function isEnvLikeFile(string $path): bool
     {
         $basename = basename($path);
@@ -231,6 +259,11 @@ final readonly class SourceDiscovery
         return $basename === '.env' || str_starts_with($basename, '.env.');
     }
 
+    /**
+     * Detect whether the path matches a built-in ignored directory or filename (vendor, node_modules, lock files, etc.).
+     *
+     * @return bool
+     */
     private function isDefaultIgnoredPath(string $path): bool
     {
         $displayPath = str_replace('\\', '/', $this->displayPath($path));
@@ -274,6 +307,11 @@ final readonly class SourceDiscovery
         return false;
     }
 
+    /**
+     * Detect whether the display path matches a glob-style pattern (`*`, `**`, `?` supported).
+     *
+     * @return bool
+     */
     private function matchesPathPattern(string $displayPath, string $pattern): bool
     {
         $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');

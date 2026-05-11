@@ -26,6 +26,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 {
     public const ID = 'complexity.cognitive';
 
+    /**
+     * Describe the rule for the registry and reports.
+     *
+     * @return RuleDefinition
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -42,6 +47,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         );
     }
 
+    /**
+     * Flag methods whose cognitive complexity exceeds the configured threshold.
+     *
+     * @return list<Finding>
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -120,6 +130,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total;
     }
 
+    /**
+     * Dispatch a statement node to the matching cognitive-complexity handler.
+     *
+     * @return int The complexity contribution of this node and its descendants.
+     */
     private static function walkNode(Node $node, int $nesting): int
     {
         return match (true) {
@@ -139,16 +154,31 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         };
     }
 
+    /**
+     * Score a `break` / `continue` statement; labelled jumps add 1, plain jumps add 0.
+     *
+     * @return int
+     */
     private static function walkJump(Stmt\Break_|Stmt\Continue_ $node): int
     {
         return $node->num !== null ? 1 : 0;
     }
 
+    /**
+     * Score a return statement by descending into its expression for nested complexity.
+     *
+     * @return int
+     */
     private static function walkReturn(Stmt\Return_ $node, int $nesting): int
     {
         return $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0;
     }
 
+    /**
+     * Score an `if` chain: +1 + nesting for the head, +1 per elseif / else, plus recursive child scoring.
+     *
+     * @return int
+     */
     private static function walkIf(Stmt\If_ $node, int $nesting): int
     {
         $total = 1 + $nesting + self::walkBooleanOperators($node->cond);
@@ -168,6 +198,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total;
     }
 
+    /**
+     * Score a `switch` statement: +1 + nesting for the switch, plus recursive scoring of each case body.
+     *
+     * @return int
+     */
     private static function walkSwitch(Stmt\Switch_ $node, int $nesting): int
     {
         $total = 1 + $nesting;
@@ -193,6 +228,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total + self::walkStatements($statements, $nesting + 1);
     }
 
+    /**
+     * Score a try/catch/finally block; catches add +1 + nesting each, finally inherits the outer nesting level.
+     *
+     * @return int
+     */
     private static function walkTryCatch(Stmt\TryCatch $node, int $nesting): int
     {
         $total = self::walkStatements($node->stmts, $nesting);
@@ -209,6 +249,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total;
     }
 
+    /**
+     * Fallback walker that descends into every child Node / array-of-Node sub-property.
+     *
+     * @return int
+     */
     private static function walkChildNodes(Node $node, int $nesting): int
     {
         $total = 0;
@@ -230,6 +275,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total;
     }
 
+    /**
+     * Score an expression's contribution to cognitive complexity (ternaries, closures, arrow fns, nested expressions).
+     *
+     * @return int
+     */
     private static function walkExprCognitive(Expr $expr, int $nesting): int
     {
         if ($expr instanceof Expr\Ternary) {
@@ -272,6 +322,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         return $total;
     }
 
+    /**
+     * Count boolean-operator transitions in a flattened chain (`a && b && c` is +1, `a && b || c` is +2).
+     *
+     * @return int
+     */
     private static function walkBooleanOperators(Expr $expr): int
     {
         if (!$expr instanceof BinaryOp\BooleanAnd
@@ -318,6 +373,11 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         self::flattenBooleanChain($expr->right, $result);
     }
 
+    /**
+     * Format a numeric threshold as a string, preserving fractional values that are not whole.
+     *
+     * @return string
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

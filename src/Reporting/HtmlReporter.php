@@ -12,6 +12,9 @@ use GruffPhp\Scoring\PillarScore;
 
 final readonly class HtmlReporter
 {
+    /**
+     * Build the HTML reporter with the project root and editor-link preferences.
+     */
     public function __construct(
         private string $projectRoot = '',
         private string $editorLink = 'none',
@@ -19,6 +22,11 @@ final readonly class HtmlReporter
     ) {
     }
 
+    /**
+     * Render the full inspection report as a single HTML document.
+     *
+     * @return string The rendered HTML document.
+     */
     public function render(AnalysisReport $report): string
     {
         $score = $report->score;
@@ -54,6 +62,11 @@ final readonly class HtmlReporter
             . '</html>' . PHP_EOL;
     }
 
+    /**
+     * Render the report masthead (brand, paths, scope, format).
+     *
+     * @return string HTML for the report header.
+     */
     private function masthead(AnalysisReport $report): string
     {
         $paths = $report->requestedPaths === [] ? ['.'] : $report->requestedPaths;
@@ -72,6 +85,11 @@ final readonly class HtmlReporter
             . '</div></header>';
     }
 
+    /**
+     * Render the diagnostics section listing run messages, or empty when there are none.
+     *
+     * @return string HTML for the diagnostics section.
+     */
     private function diagnostics(AnalysisReport $report): string
     {
         if ($report->diagnostics === []) {
@@ -109,6 +127,11 @@ final readonly class HtmlReporter
             . '</div></div></section>';
     }
 
+    /**
+     * Render the pillar-grade grid (one card per non-mutation pillar).
+     *
+     * @return string HTML for the pillars section.
+     */
     private function pillars(AnalysisReport $report): string
     {
         $items = $report->score === null ? [] : $report->score->pillars;
@@ -125,6 +148,11 @@ final readonly class HtmlReporter
         return $html . '</div></section>';
     }
 
+    /**
+     * Render the top-offenders table sorted by score.
+     *
+     * @return string HTML for the offenders section.
+     */
     private function offenders(AnalysisReport $report): string
     {
         $items = $report->score === null ? [] : $report->score->topOffenders;
@@ -142,6 +170,11 @@ final readonly class HtmlReporter
         return $html . '</tbody></table></section>';
     }
 
+    /**
+     * Render the cyclomatic-complexity distribution histogram.
+     *
+     * @return string HTML for the chart section.
+     */
     private function distribution(AnalysisReport $report): string
     {
         $distribution = $report->score === null ? [] : $report->score->complexityDistribution;
@@ -162,6 +195,11 @@ final readonly class HtmlReporter
             . '<div class="histogram">' . $bars . '</div><div class="histogram-axis">' . $axis . '</div></div></section>';
     }
 
+    /**
+     * Render the flagged-findings section with optional interactive filters.
+     *
+     * @return string HTML for the findings section.
+     */
     private function findings(AnalysisReport $report): string
     {
         $listAttributes = $this->interactive ? ' data-findings-list' : '';
@@ -183,6 +221,11 @@ final readonly class HtmlReporter
         return $html . '</div></section>';
     }
 
+    /**
+     * Render the report footer with tool version and schema id.
+     *
+     * @return string HTML for the footer.
+     */
     private function footer(AnalysisReport $report): string
     {
         return '<footer class="footer">'
@@ -192,6 +235,11 @@ final readonly class HtmlReporter
             . '</footer>';
     }
 
+    /**
+     * Render a single pillar card with grade and finding breakdown.
+     *
+     * @return string HTML for one pillar card.
+     */
     private function pillarCard(PillarScore $pillar): string
     {
         $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
@@ -210,6 +258,11 @@ final readonly class HtmlReporter
             . '</div></div>';
     }
 
+    /**
+     * Render a single row of the top-offenders table.
+     *
+     * @return string HTML for one offender row.
+     */
     private function offenderRow(FileScore $file): string
     {
         return '<tr>'
@@ -222,6 +275,11 @@ final readonly class HtmlReporter
             . '</tr>';
     }
 
+    /**
+     * Render a single flagged-finding row with severity, rule, and location.
+     *
+     * @return string HTML for one finding row.
+     */
     private function findingRow(Finding $finding): string
     {
         $severityClass = match ($finding->severity->value) {
@@ -249,6 +307,11 @@ final readonly class HtmlReporter
             . '</div>';
     }
 
+    /**
+     * Render a label-value pair for the masthead meta panel.
+     *
+     * @return string HTML for one meta row.
+     */
     private function metaRow(string $label, string $value): string
     {
         return sprintf(
@@ -258,6 +321,11 @@ final readonly class HtmlReporter
         );
     }
 
+    /**
+     * Render a single statistic block inside the verdict stats grid.
+     *
+     * @return string HTML for one statistic block.
+     */
     private function stat(string $number, string $label, string $class): string
     {
         return sprintf(
@@ -268,6 +336,11 @@ final readonly class HtmlReporter
         );
     }
 
+    /**
+     * Stringify an optional integer; null renders as "n/a".
+     *
+     * @return string The integer as a decimal string, or "n/a".
+     */
     private function optionalInt(?int $value): string
     {
         return $value === null ? 'n/a' : (string) $value;
@@ -323,6 +396,11 @@ final readonly class HtmlReporter
         );
     }
 
+    /**
+     * Render a clickable file-and-line span; emits an editor-link anchor when configured.
+     *
+     * @return string HTML for the location markup.
+     */
     private function locationMarkup(string $filePath, ?int $line): string
     {
         $text = $line === null ? $filePath : sprintf('%s:%d', $filePath, $line);
@@ -341,6 +419,11 @@ final readonly class HtmlReporter
         return sprintf('<span class="loc-link" tabindex="0"%s>%s</span>', $data, $this->escape($text));
     }
 
+    /**
+     * Build the editor-link URL for the configured editor, or null when disabled.
+     *
+     * @return string|null The editor-protocol URL, or null when editor links are off or the editor is unsupported.
+     */
     private function editorHref(string $filePath, ?int $line): ?string
     {
         if ($this->editorLink === 'none') {
@@ -356,6 +439,11 @@ final readonly class HtmlReporter
         };
     }
 
+    /**
+     * Resolve the absolute path of a report-relative file path, using the configured project root.
+     *
+     * @return string The absolute filesystem path.
+     */
     private function absolutePath(string $filePath): string
     {
         if (str_starts_with($filePath, '/')) {
@@ -371,11 +459,21 @@ final readonly class HtmlReporter
         return rtrim($projectRoot, '/') . '/' . ltrim($filePath, '/');
     }
 
+    /**
+     * URL-encode a filesystem path segment-by-segment for use in editor-protocol URLs.
+     *
+     * @return string The encoded path with forward-slash separators preserved.
+     */
     private function urlPath(string $path): string
     {
         return implode('/', array_map(rawurlencode(...), explode('/', $path)));
     }
 
+    /**
+     * Render the interactive filter form for findings (severity, pillar, path, text, group-by).
+     *
+     * @return string HTML for the filter form.
+     */
     private function findingFilters(AnalysisReport $report): string
     {
         $pillars = [];
@@ -411,11 +509,21 @@ final readonly class HtmlReporter
             . '</form>';
     }
 
+    /**
+     * Render a single <option> element for the interactive filters.
+     *
+     * @return string HTML for one option element.
+     */
     private function filterOption(string $value): string
     {
         return sprintf('<option value="%s">%s</option>', $this->escape($value), $this->escape($value));
     }
 
+    /**
+     * Render a single row of the diagnostics list.
+     *
+     * @return string HTML for one diagnostic row.
+     */
     private function diagnosticRow(RunDiagnostic $diagnostic): string
     {
         return sprintf(
@@ -426,6 +534,11 @@ final readonly class HtmlReporter
         );
     }
 
+    /**
+     * Render the file-and-line span for a diagnostic, or empty when no location is set.
+     *
+     * @return string HTML for the location span, or an empty string when absent.
+     */
     private function diagnosticLocation(RunDiagnostic $diagnostic): string
     {
         $location = $diagnostic->filePath ?? $diagnostic->path;
@@ -441,11 +554,21 @@ final readonly class HtmlReporter
         return sprintf('<span class="diagnostic-location">%s</span>', $this->escape($location));
     }
 
+    /**
+     * Escape a value for safe insertion into HTML attribute or text content.
+     *
+     * @return string The escaped value.
+     */
     private function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    /**
+     * Inline JavaScript that powers the interactive finding filters (severity, pillar, path, text, group-by).
+     *
+     * @return string The inline JavaScript body.
+     */
     private function interactiveScript(): string
     {
         return <<<'JS'
@@ -485,6 +608,11 @@ render();
 JS;
     }
 
+    /**
+     * Inline CSS for the report; appends diagnostic-specific rules when present.
+     *
+     * @return string The inline stylesheet body.
+     */
     private function css(bool $includeDiagnostics = false): string
     {
         $css = <<<'CSS'

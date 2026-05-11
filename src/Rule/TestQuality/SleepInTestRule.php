@@ -27,6 +27,11 @@ final readonly class SleepInTestRule implements RuleInterface
     private const WALL_CLOCK_FUNCTIONS = ['time', 'microtime'];
     private const WALL_CLOCK_DATETIME_CLASSES = ['datetime', 'datetimeimmutable'];
 
+    /**
+     * Describe the rule for the registry and reports.
+     *
+     * @return RuleDefinition
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -39,6 +44,11 @@ final readonly class SleepInTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
+     *
+     * @return list<Finding>
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];
@@ -81,6 +91,11 @@ final readonly class SleepInTestRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Build a Finding for a sleep or wall-clock function call, or null when the call is neither.
+     *
+     * @return Finding|null
+     */
     private function functionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): ?Finding
     {
         if (in_array($name, self::SLEEP_FUNCTIONS, true)) {
@@ -110,6 +125,11 @@ final readonly class SleepInTestRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect whether a `new DateTime(...)` / `new DateTimeImmutable(...)` reads the current time.
+     *
+     * @return bool True when the class is a DateTime variant constructed with "now" or no argument.
+     */
     private function isWallClockDateTimeConstructor(Expr\New_ $new): bool
     {
         if (!$new->class instanceof Name) {
@@ -122,6 +142,11 @@ final readonly class SleepInTestRule implements RuleInterface
             && $this->isWallClockDateTime($new);
     }
 
+    /**
+     * Detect whether the DateTime constructor argument is empty or the literal string "now".
+     *
+     * @return bool
+     */
     private function isWallClockDateTime(Expr\New_ $new): bool
     {
         if ($new->args === []) {
@@ -138,6 +163,11 @@ final readonly class SleepInTestRule implements RuleInterface
         return is_string($value) && strtolower($value) === 'now';
     }
 
+    /**
+     * Build the Finding for a sleep / usleep / time_nanosleep call inside a test.
+     *
+     * @return Finding
+     */
     private function sleepFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
@@ -155,6 +185,11 @@ final readonly class SleepInTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Build the Finding for a time() / microtime() call inside a test.
+     *
+     * @return Finding
+     */
     private function wallClockFunctionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
@@ -172,6 +207,11 @@ final readonly class SleepInTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Build the Finding for a `new DateTime("now")` / `new DateTimeImmutable()` inside a test.
+     *
+     * @return Finding
+     */
     private function dateTimeFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\New_ $new): Finding
     {
         if (!$new->class instanceof Name) {

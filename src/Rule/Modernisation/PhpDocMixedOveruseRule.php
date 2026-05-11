@@ -39,6 +39,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     ];
     private const TYPE_ALIAS_TAGS = ['phpstan-type', 'phpstan-import-type'];
 
+    /**
+     * Describe the rule for the registry and reports.
+     *
+     * @return RuleDefinition
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -51,6 +56,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         );
     }
 
+    /**
+     * Detect PHPDoc tags that use `mixed` where a narrower type would carry more meaning.
+     *
+     * @return list<Finding>
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -119,6 +129,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect whether the tag is one this rule examines (param / return / var / property / type-alias variants).
+     *
+     * @return bool
+     */
     private function isScannedTag(string $tag): bool
     {
         return in_array($tag, self::PARAM_TAGS, true)
@@ -128,16 +143,31 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             || in_array($tag, self::TYPE_ALIAS_TAGS, true);
     }
 
+    /**
+     * Detect whether the tag is a @param variant (including phpstan- and psalm- prefixes).
+     *
+     * @return bool
+     */
     private function isParamTag(string $tag): bool
     {
         return in_array($tag, self::PARAM_TAGS, true);
     }
 
+    /**
+     * Detect whether the tag is a @return variant.
+     *
+     * @return bool
+     */
     private function isReturnTag(string $tag): bool
     {
         return in_array($tag, self::RETURN_TAGS, true);
     }
 
+    /**
+     * Detect whether the tag is a @var variant.
+     *
+     * @return bool
+     */
     private function isVarTag(string $tag): bool
     {
         return in_array($tag, self::VAR_TAGS, true);
@@ -181,6 +211,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return $blocks;
     }
 
+    /**
+     * Strip the leading `/**`, trailing `*​/`, and per-line `*` characters from a docblock line.
+     *
+     * @return string The line's textual content without the docblock framing.
+     */
     private function stripDocPrefix(string $line): string
     {
         $trimmed = ltrim($line);
@@ -207,6 +242,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return ['hasMixed' => true, 'isStandalone' => $standalone];
     }
 
+    /**
+     * Extract the leading type expression from a tag body, balancing generics / arrays / shapes.
+     *
+     * @return string|null The type expression, or null when the body is empty.
+     */
     private function extractTypeExpression(string $body): ?string
     {
         $body = trim($body);
@@ -239,6 +279,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return $type === '' ? null : $type;
     }
 
+    /**
+     * Extract the parameter variable name from a @param body, or null when none is present.
+     *
+     * @return string|null
+     */
     private function extractParamName(string $body): ?string
     {
         if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)/', $body, $matches) === 1) {
@@ -248,6 +293,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Detect whether the signature's typed declaration already says `mixed`, in which case the PHPDoc tag is not adding noise.
+     *
+     * @return bool True when the docblock's standalone `mixed` mirrors a `mixed` in the signature.
+     */
     private function signatureAlreadyCoversMixed(Node $node, string $tagKind, ?string $paramName): bool
     {
         if ($this->isParamTag($tagKind)) {
@@ -288,11 +338,21 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect whether the parameter's declared type is `mixed`.
+     *
+     * @return bool
+     */
     private function isMixedType(Param $param): bool
     {
         return ModernisationNodeHelper::typeName($param->type) === 'mixed';
     }
 
+    /**
+     * Render a readable symbol for the finding: method/function name, property list, or constant list.
+     *
+     * @return string The display symbol, or "unknown" when the node kind is unrecognised.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod || $node instanceof Function_) {

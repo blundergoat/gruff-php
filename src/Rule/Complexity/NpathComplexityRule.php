@@ -27,6 +27,11 @@ final readonly class NpathComplexityRule implements RuleInterface
 
     private const MAX_NPATH = 100_000;
 
+    /**
+     * Describe the rule for the registry and reports.
+     *
+     * @return RuleDefinition
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -43,6 +48,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         );
     }
 
+    /**
+     * Flag methods whose NPath complexity (independent execution paths) exceeds the configured threshold.
+     *
+     * @return list<Finding>
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -122,6 +132,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         return $npath;
     }
 
+    /**
+     * Dispatch a statement node to the NPath handler matching its control-flow shape.
+     *
+     * @return int The NPath contribution of this statement.
+     */
     private static function walkStatement(Node $node): int
     {
         return match (true) {
@@ -136,6 +151,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         };
     }
 
+    /**
+     * Sum the NPath contributions of an `if` chain (if + elseifs + else, plus boolean-condition expansion).
+     *
+     * @return int
+     */
     private static function walkIf(Stmt\If_ $node): int
     {
         $paths = self::walkBlock($node->stmts) + self::countConditionPaths($node->cond);
@@ -151,6 +171,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         return $paths + 1;
     }
 
+    /**
+     * Sum the NPath contributions of a `switch` statement; each case body adds its own path count plus an implicit default.
+     *
+     * @return int
+     */
     private static function walkSwitch(Stmt\Switch_ $node): int
     {
         $paths = 0;
@@ -171,6 +196,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         return max(1, $paths);
     }
 
+    /**
+     * Sum the NPath contributions of a try / catch block (each catch arm adds its own paths).
+     *
+     * @return int
+     */
     private static function walkTryCatch(Stmt\TryCatch $node): int
     {
         $paths = self::walkBlock($node->stmts);
@@ -182,6 +212,11 @@ final readonly class NpathComplexityRule implements RuleInterface
         return max(1, $paths);
     }
 
+    /**
+     * Count the boolean-operator paths in a condition expression (`a && b` adds 1, `a && b || c` adds 2, etc.).
+     *
+     * @return int
+     */
     private static function countConditionPaths(Expr $expr): int
     {
         if ($expr instanceof BinaryOp\BooleanAnd
@@ -195,11 +230,21 @@ final readonly class NpathComplexityRule implements RuleInterface
         return 0;
     }
 
+    /**
+     * Cap the NPath score at the configured maximum so wildly branching methods do not overflow.
+     *
+     * @return int
+     */
     private static function clamp(int $value): int
     {
         return min($value, self::MAX_NPATH);
     }
 
+    /**
+     * Format an NPath value with thousands separators; preserves fractional values that are not whole.
+     *
+     * @return string
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

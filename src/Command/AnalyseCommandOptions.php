@@ -45,6 +45,11 @@ final readonly class AnalyseCommandOptions
     ) {
     }
 
+    /**
+     * Build an options object from the Symfony Console InputInterface, recording any usage errors found.
+     *
+     * @return self
+     */
     public static function fromInput(InputInterface $input): self
     {
         /** @var list<string> $paths */
@@ -105,6 +110,11 @@ final readonly class AnalyseCommandOptions
         );
     }
 
+    /**
+     * Return a copy with the mutation budget set (used after parsing the `--mutation-budget` value).
+     *
+     * @return self
+     */
     public function withMutationBudget(?int $mutationBudget): self
     {
         return new self(
@@ -139,6 +149,11 @@ final readonly class AnalyseCommandOptions
         );
     }
 
+    /**
+     * Return a copy that auto-applies the project's default baseline when one exists and no other baseline flag is set.
+     *
+     * @return self
+     */
     public function withDefaultBaseline(string $projectRoot): self
     {
         if (
@@ -178,6 +193,11 @@ final readonly class AnalyseCommandOptions
         );
     }
 
+    /**
+     * Return the first usage-error message the input produced, or null when the combination is valid.
+     *
+     * @return string|null
+     */
     public function usageError(): ?string
     {
         if ($this->optionError !== null) {
@@ -211,6 +231,11 @@ final readonly class AnalyseCommandOptions
         return null;
     }
 
+    /**
+     * Build the FindingDisplayFilter from the parsed display options (min-severity, include/exclude pillars and rules).
+     *
+     * @return FindingDisplayFilter
+     */
     public function displayFilter(): FindingDisplayFilter
     {
         return new FindingDisplayFilter(
@@ -222,6 +247,11 @@ final readonly class AnalyseCommandOptions
         );
     }
 
+    /**
+     * Parse the `--report-interactive` option; returns true/false or a usage-error message string.
+     *
+     * @return bool|string True/false when the option is well-formed, or the error message string.
+     */
     private static function reportInteractive(InputInterface $input): bool|string
     {
         if (!$input->hasParameterOption('--report-interactive', true)) {
@@ -249,6 +279,11 @@ final readonly class AnalyseCommandOptions
         };
     }
 
+    /**
+     * Read a string option and return it only when non-empty; otherwise null.
+     *
+     * @return string|null
+     */
     private static function optionalStringOption(InputInterface $input, string $name): ?string
     {
         $value = $input->getOption($name);
@@ -285,6 +320,11 @@ final readonly class AnalyseCommandOptions
         return array_values(array_unique($items));
     }
 
+    /**
+     * Parse the `--diff` option; null when absent, "working-tree" when bare, or the explicit value.
+     *
+     * @return string|null
+     */
     private static function diffMode(InputInterface $input): ?string
     {
         if (!$input->hasParameterOption('--diff')) {
@@ -296,6 +336,11 @@ final readonly class AnalyseCommandOptions
         return is_string($value) && $value !== '' ? $value : 'working-tree';
     }
 
+    /**
+     * Validate the display-filter inputs (min-severity, include/exclude pillars); return the first error or null.
+     *
+     * @return string|null
+     */
     private function displayFilterError(): ?string
     {
         if ($this->minSeverity !== null && Severity::tryFrom($this->minSeverity) === null) {

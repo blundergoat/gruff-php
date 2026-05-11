@@ -24,6 +24,11 @@ final readonly class UnusedParameterRule implements RuleInterface
 {
     public const ID = 'waste.unused-parameter';
 
+    /**
+     * Describe the rule for the registry and reports.
+     *
+     * @return RuleDefinition
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         );
     }
 
+    /**
+     * Flag function and method parameters that are declared but never read in the body.
+     *
+     * @return list<Finding>
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -76,6 +86,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return $nodes;
     }
 
+    /**
+     * Detect whether the method's parameters can be analysed for unused-ness (skips abstract, magic, and contract overrides).
+     *
+     * @return bool True when the method body is in scope and not bound to an external interface contract.
+     */
     private function isAnalysableMethod(ClassMethod $method): bool
     {
         if ($method->isAbstract() || $this->isMagicContractMethod($method)) {
@@ -89,6 +104,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return !$this->hasExternalMethodContract($method);
     }
 
+    /**
+     * Detect whether the method is a magic / contract method (`__toString`, `__get`, etc.) where parameter shape is fixed.
+     *
+     * @return bool True when the name begins with `__` and is not `__construct`.
+     */
     private function isMagicContractMethod(ClassMethod $method): bool
     {
         $name = strtolower($method->name->toString());
@@ -96,6 +116,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return str_starts_with($name, '__') && $name !== '__construct';
     }
 
+    /**
+     * Detect whether the method overrides or implements an external contract whose signature is mandatory.
+     *
+     * @return bool True when an Override attribute, inheritDoc marker, or `extends` / `implements` ancestor exists.
+     */
     private function hasExternalMethodContract(ClassMethod $method): bool
     {
         if ($this->hasOverrideAttribute($method) || $this->hasInheritDoc($method)) {
@@ -115,6 +140,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect whether the method carries a `#[\Override]` attribute.
+     *
+     * @return bool
+     */
     private function hasOverrideAttribute(ClassMethod $method): bool
     {
         foreach ($method->attrGroups as $attributeGroup) {
@@ -128,6 +158,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect whether the method's docblock contains `@inheritdoc` or `{@inheritdoc}`.
+     *
+     * @return bool
+     */
     private function hasInheritDoc(ClassMethod $method): bool
     {
         $docComment = $method->getDocComment();
@@ -202,6 +237,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         return $usedNames;
     }
 
+    /**
+     * Detect whether the variable reference counts as a use; `unset($x)` is a placeholder, not a use.
+     *
+     * @return bool
+     */
     private static function isVariableUse(Variable $variable): bool
     {
         $parent = $variable->getAttribute('parent');
@@ -210,6 +250,11 @@ final readonly class UnusedParameterRule implements RuleInterface
             || !in_array($variable, $parent->vars, true);
     }
 
+    /**
+     * Build the Finding for one unused parameter.
+     *
+     * @return Finding
+     */
     private function findingForParameter(
         AnalysisUnit $unit,
         RuleDefinition $definition,
@@ -235,6 +280,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         );
     }
 
+    /**
+     * Compute the 1-based column of the parameter's start position within its line, or null when unknown.
+     *
+     * @return int|null
+     */
     private function startColumn(AnalysisUnit $unit, Node\Param $param): ?int
     {
         $startFilePosition = $param->getStartFilePos();
