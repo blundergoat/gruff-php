@@ -27,9 +27,9 @@ final readonly class ContinueCommentRule implements RuleInterface
             name: 'Continue comment',
             pillar: Pillar::Documentation,
             tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
+            defaultSeverity: Severity::Advisory,
             confidence: Confidence::High,
-            description: 'Requires a one-line comment directly above each continue statement.',
+            description: 'Requires a one-line comment directly above each continue statement. Advisory by default; opt in to stricter enforcement via .gruff.yaml.',
         );
     }
 

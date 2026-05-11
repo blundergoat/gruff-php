@@ -52,6 +52,8 @@ rules:
     design.single-implementor-interface:
         enabled: true
     # Loop skips need local context at the exact branch that exits early.
+    # Advisory by default (gruff v0.2/M02); teams that want strict comment
+    # discipline can override with `severity: warning` here.
     docs.continue-comment:
         enabled: true
     # Classes, interfaces, traits, and enums need a docblock explaining their purpose.
@@ -79,6 +81,8 @@ rules:
     docs.missing-return-tag:
         enabled: true
     # Return paths need local context at the exact branch that exits.
+    # Advisory by default (gruff v0.2/M02); teams that want strict comment
+    # discipline can override with `severity: warning` here.
     docs.return-comment:
         enabled: true
     # Throws docs make failure modes visible to callers.
@@ -179,10 +183,12 @@ rules:
                 - value
             minScopeReferences: 1
     # Class-typed parameters should carry their object role in the variable name.
-    # The ignoredParameterNames list exempts AST-walker / visitor conventions used
-    # throughout gruff (Stmt $stmt, Expr $expr, Node $node, AnalysisUnit $unit,
-    # RuleContext $context). Downstream projects should review and pick their own
-    # list rather than inheriting gruff's vocabulary verbatim.
+    # The ignoredParameterNames list exempts gruff's own AST-walker, visitor, and
+    # framework conventions (Stmt $stmt, NodeFinder $finder, ClassMethod $method,
+    # RuleRegistry $registry, AnalysisConfig $config, RuleDefinition $definition,
+    # TextReporter $report, etc.). The list is project-specific - downstream
+    # projects should review and pick their own list rather than inheriting
+    # gruff's vocabulary verbatim.
     naming.parameter-type-name:
         enabled: true
         options:
@@ -192,6 +198,15 @@ rules:
                 - node
                 - stmt
                 - expr
+                - finder
+                - method
+                - call
+                - registry
+                - config
+                - definition
+                - scope
+                - report
+                - options
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true

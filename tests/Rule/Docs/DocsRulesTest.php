@@ -298,6 +298,10 @@ final class DocsRulesTest extends TestCase
         $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
 
         self::assertSame([19, 30], $lines);
+
+        foreach ($findings as $finding) {
+            self::assertSame(\GruffPhp\Finding\Severity::Advisory, $finding->severity);
+        }
     }
 
     public function testReturnRequiresDirectOneLineComment(): void
@@ -306,6 +310,10 @@ final class DocsRulesTest extends TestCase
         $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
 
         self::assertSame([35, 46], $lines);
+
+        foreach ($findings as $finding) {
+            self::assertSame(\GruffPhp\Finding\Severity::Advisory, $finding->severity);
+        }
     }
 
     public function testVarAnnotationsRequireDescription(): void
