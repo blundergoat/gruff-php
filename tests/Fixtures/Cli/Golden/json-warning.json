@@ -40,10 +40,10 @@
     "findings": [
         {
             "ruleId": "size.file-length",
-            "message": "File has 19 lines, above the warning threshold of 3.",
+            "message": "File has 26 lines, above the warning threshold of 3.",
             "file": "tests/Fixtures/Source/mixed/alpha.php",
             "line": 1,
-            "endLine": 19,
+            "endLine": 26,
             "column": null,
             "symbol": null,
             "severity": "warning",
@@ -52,9 +52,9 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
-            "fingerprint": "c1ed1502dfd480e6",
+            "fingerprint": "948aa2b0a79cff86",
             "metadata": {
-                "lines": 19,
+                "lines": 26,
                 "threshold": 3,
                 "thresholdType": "warning"
             }
@@ -63,7 +63,7 @@
             "ruleId": "naming.class-file-mismatch",
             "message": "Class Alpha does not match file name alpha.php.",
             "file": "tests/Fixtures/Source/mixed/alpha.php",
-            "line": 5,
+            "line": 12,
             "endLine": null,
             "column": null,
             "symbol": "Alpha",
@@ -73,7 +73,7 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
-            "fingerprint": "8dc7b819250a0178",
+            "fingerprint": "1e6a244048103717",
             "metadata": {}
         }
     ],
@@ -206,7 +206,7 @@
                 "penalty": 40,
                 "maxCyclomatic": null,
                 "maxCognitive": null,
-                "maxLines": 19,
+                "maxLines": 26,
                 "mutationScore": null
             }
         ],

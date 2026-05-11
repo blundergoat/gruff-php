@@ -117,7 +117,8 @@ src/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
 |   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
-|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs PHP rules on PHP files only, runs source-text rules on text files too, then sorts findings by file/line/ruleId/message
+|   |-- ProjectRuleInterface.php              = `definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>` contract; project-wide rules run once after the per-unit loop (see ADR-003)
+|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs per-unit `RuleInterface` rules first, then project-wide `ProjectRuleInterface` rules over the full unit list, then sorts findings by file/line/ruleId/message
 |   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
 |   |-- Complexity/
 |   |   |-- CognitiveComplexityRule.php       = `complexity.cognitive`
@@ -129,8 +130,14 @@ src/
 |   |-- DeadCode/
 |   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
+|   |-- Design/
+|   |   `-- SingleImplementorInterfaceRule.php = `design.single-implementor-interface` (ProjectRuleInterface; flags internal interfaces with exactly one implementor and no external type-hint usage; configurable external prefixes, framework attributes, mock-as-implementor toggle, and additional excluded paths)
 |   |-- Docs/
+|   |   |-- MissingClassPhpdocRule.php        = `docs.missing-class-phpdoc` (flags class/interface/trait/enum declarations without a docblock; skips anonymous classes)
+|   |   |-- MissingConstantPhpdocRule.php     = `docs.missing-constant-phpdoc` (flags class constants without a docblock; enum cases exempt when the enclosing enum is documented)
+|   |   |-- MissingFilePhpdocRule.php         = `docs.missing-file-phpdoc` (flags files without a file-level docblock; single-class-per-file with class docblock acts as exemption)
 |   |   |-- MissingParamTagRule.php           = `docs.missing-param-tag`
+|   |   |-- MissingPropertyPhpdocRule.php     = `docs.missing-property-phpdoc` (flags declared properties without docblock; constructor-promoted properties satisfied by constructor `@param`)
 |   |   |-- MissingPublicPhpdocRule.php       = `docs.missing-public-phpdoc` (error for any method declaration without local PHPDoc)
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag`
@@ -154,9 +161,10 @@ src/
 |   |   |-- FirstClassCallableCandidateRule.php = `modernisation.first-class-callable-candidate`
 |   |   |-- ForbiddenGlobalAccessRule.php      = `modernisation.forbidden-global-access`
 |   |   |-- MatchExpressionCandidateRule.php   = `modernisation.match-expression-candidate`
-|   |   |-- MixedTypeOveruseRule.php           = `modernisation.mixed-type-overuse`
+|   |   |-- MixedTypeOveruseRule.php           = `modernisation.mixed-type-overuse` (signature surface only)
 |   |   |-- ModernisationNodeHelper.php        = shared PHP-version/type/parent-node helpers
 |   |   |-- NamedArgumentOpportunityRule.php   = `modernisation.named-argument-opportunity`
+|   |   |-- PhpDocMixedOveruseRule.php         = `modernisation.phpdoc-mixed-overuse` (PHPDoc surface: array shapes / unions / nested generics containing mixed across `@param`, `@return`, `@var`, `@property`, `@phpstan-*`, `@psalm-*`; suppresses standalone PHPDoc-only mixed already reported by the signature rule)
 |   |   |-- PublicPropertyRule.php             = `modernisation.public-property`
 |   |   `-- ReadonlyPropertyCandidateRule.php = `modernisation.readonly-property-candidate`
 |   |-- SensitiveData/                        = SensitiveData-pillar SourceTextRuleInterface rules; scan PHP plus config/text/env files

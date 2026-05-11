@@ -9,7 +9,12 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
+use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
+use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
+use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rule\Docs\MissingParamTagRule;
+use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
@@ -33,6 +38,7 @@ use GruffPhp\Rule\Modernisation\ForbiddenGlobalAccessRule;
 use GruffPhp\Rule\Modernisation\MatchExpressionCandidateRule;
 use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
 use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
+use GruffPhp\Rule\Modernisation\PhpDocMixedOveruseRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
 use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
@@ -112,11 +118,11 @@ use InvalidArgumentException;
 
 final class RuleRegistry
 {
-    /** @var array<string, RuleInterface> */
+    /** @var array<string, RuleInterface|ProjectRuleInterface> */
     private readonly array $rules;
 
     /**
-     * @param list<RuleInterface> $rules
+     * @param list<RuleInterface|ProjectRuleInterface> $rules
      */
     public function __construct(array $rules)
     {
@@ -169,6 +175,7 @@ final class RuleRegistry
             new MatchExpressionCandidateRule(),
             new MixedTypeOveruseRule(),
             new NamedArgumentOpportunityRule(),
+            new PhpDocMixedOveruseRule(),
             new PublicPropertyRule(),
             new ReadonlyPropertyCandidateRule(),
             new ApiKeyPatternRule(),
@@ -225,7 +232,11 @@ final class RuleRegistry
             new TrivialAssertionRule(),
             new TrivialSnapshotRule(),
             new UnusedMockRule(),
+            new MissingClassPhpdocRule(),
+            new MissingConstantPhpdocRule(),
+            new MissingFilePhpdocRule(),
             new MissingParamTagRule(),
+            new MissingPropertyPhpdocRule(),
             new MissingPublicPhpdocRule(),
             new MissingReadmeRule(),
             new MissingReturnTagRule(),
@@ -240,11 +251,12 @@ final class RuleRegistry
             new ParameterCountRule(),
             new PropertyCountRule(),
             new PublicMethodCountRule(),
+            new SingleImplementorInterfaceRule(),
         ]);
     }
 
     /**
-     * @return list<RuleInterface>
+     * @return list<RuleInterface|ProjectRuleInterface>
      */
     public function all(): array
     {
@@ -256,20 +268,20 @@ final class RuleRegistry
         return isset($this->rules[$ruleId]);
     }
 
-    public function get(string $ruleId): RuleInterface
+    public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
         return $this->rules[$ruleId]
             ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
-     * @return list<RuleInterface>
+     * @return list<RuleInterface|ProjectRuleInterface>
      */
     public function enabledRules(AnalysisConfig $config): array
     {
         return array_values(array_filter(
             $this->rules,
-            static function (RuleInterface $rule) use ($config): bool {
+            static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
                 $definition = $rule->definition();
 
                 return $config->ruleSettings($definition->id)->enabled
@@ -295,11 +307,30 @@ final class RuleRegistry
             $isPhp = $unit->file->isPhp();
 
             foreach ($enabledRules as $rule) {
+                if (!$rule instanceof RuleInterface) {
+                    continue;
+                }
+
                 if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                     continue;
                 }
 
                 array_push($findings, ...$rule->analyse($unit, $context));
+            }
+        }
+
+        $analyseableUnits = array_values(array_filter(
+            $units,
+            static fn (AnalysisUnit $unit): bool => !$unit->hasParseErrors() && $unit->file->isPhp(),
+        ));
+
+        if ($analyseableUnits !== []) {
+            foreach ($enabledRules as $rule) {
+                if (!$rule instanceof ProjectRuleInterface) {
+                    continue;
+                }
+
+                array_push($findings, ...$rule->analyseProject($analyseableUnits, $context));
             }
         }
 

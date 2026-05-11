@@ -1,0 +1,92 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Rule\Docs;
+
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Stmt\Class_;
+use PhpParser\Node\Stmt\ClassLike;
+use PhpParser\Node\Stmt\Enum_;
+use PhpParser\Node\Stmt\Interface_;
+use PhpParser\Node\Stmt\Trait_;
+use PhpParser\NodeFinder;
+
+final readonly class MissingClassPhpdocRule implements RuleInterface
+{
+    public const ID = 'docs.missing-class-phpdoc';
+
+    public function definition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            id: self::ID,
+            name: 'Missing class PHPDoc',
+            pillar: Pillar::Documentation,
+            tier: RuleTier::V01,
+            defaultSeverity: Severity::Advisory,
+            confidence: Confidence::High,
+        );
+    }
+
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    {
+        $definition = $this->definition();
+        $finder = new NodeFinder();
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $node) {
+            if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
+                continue;
+            }
+
+            if ($node->name === null) {
+                continue;
+            }
+
+            if ($node->getDocComment() !== null) {
+                continue;
+            }
+
+            $kind = $this->classKind($node);
+            $name = $node->name->toString();
+
+            $findings[] = new Finding(
+                ruleId: $definition->id,
+                message: sprintf('%s %s has no PHPDoc.', ucfirst($kind), $name),
+                filePath: $unit->file->displayPath,
+                line: $node->getStartLine(),
+                severity: $definition->defaultSeverity,
+                pillar: $definition->pillar,
+                tier: $definition->tier,
+                confidence: $definition->confidence,
+                symbol: $name,
+                remediation: 'Add a docblock describing the type\'s purpose.',
+                metadata: [
+                    'classKind' => $kind,
+                    'name' => $name,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+
+    private function classKind(Node $node): string
+    {
+        return match (true) {
+            $node instanceof Interface_ => 'interface',
+            $node instanceof Trait_ => 'trait',
+            $node instanceof Enum_ => 'enum',
+            default => 'class',
+        };
+    }
+}

@@ -6,7 +6,11 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
+use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
+use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rule\Docs\MissingParamTagRule;
+use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
@@ -279,6 +283,142 @@ final class DocsRulesTest extends TestCase
 
         $docFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'docs.'));
         self::assertSame([], array_values($docFindings));
+    }
+
+    public function testMissingClassPhpdocFlagsClassInterfaceTraitEnum(): void
+    {
+        $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        sort($symbols);
+
+        self::assertSame(
+            [
+                'UndocumentedClass',
+                'UndocumentedEnum',
+                'UndocumentedInterface',
+                'UndocumentedTrait',
+            ],
+            $symbols,
+        );
+
+        $kinds = array_map(static fn ($f) => $f->metadata['classKind'], $findings);
+        sort($kinds);
+        self::assertSame(['class', 'enum', 'interface', 'trait'], $kinds);
+    }
+
+    public function testMissingClassPhpdocSkipsAnonymousAndDocumentedClasses(): void
+    {
+        $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('DocumentedClass', $symbols);
+        self::assertNotContains('AnonymousFactory', $symbols);
+    }
+
+    public function testMissingFilePhpdocFlagsFilesWithoutAnyDocblock(): void
+    {
+        $findings = $this->analyseRule(
+            'missing-file-phpdoc/without-any-docblock.php',
+            MissingFilePhpdocRule::ID,
+        );
+
+        self::assertCount(1, $findings);
+        self::assertSame('tests/Fixtures/Docs/missing-file-phpdoc/without-any-docblock.php', $findings[0]->symbol);
+        self::assertSame(1, $findings[0]->line);
+    }
+
+    public function testMissingFilePhpdocSkipsFileWithExplicitFileDocblock(): void
+    {
+        $findings = $this->analyseRule(
+            'missing-file-phpdoc/with-file-docblock.php',
+            MissingFilePhpdocRule::ID,
+        );
+
+        self::assertSame([], $findings);
+    }
+
+    public function testMissingFilePhpdocSkipsSingleDocumentedClassFile(): void
+    {
+        $findings = $this->analyseRule(
+            'missing-file-phpdoc/with-only-class-docblock.php',
+            MissingFilePhpdocRule::ID,
+        );
+
+        self::assertSame([], $findings);
+    }
+
+    public function testMissingPropertyPhpdocFlagsDeclaredAndPromotedProperties(): void
+    {
+        $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        sort($symbols);
+
+        self::assertSame(
+            [
+                'DocumentedProperty::$undocumented',
+                'PromotedPropertyNoDoc::__construct($first)',
+                'PromotedPropertyNoDoc::__construct($second)',
+                'PromotedPropertyWithPartialDoc::__construct($undocumentedPromoted)',
+            ],
+            $symbols,
+        );
+    }
+
+    public function testMissingPropertyPhpdocRecordsKindMetadata(): void
+    {
+        $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
+
+        $byKind = ['declared' => 0, 'promoted' => 0];
+        foreach ($findings as $finding) {
+            $kind = $finding->metadata['kind'] ?? null;
+            self::assertContains($kind, ['declared', 'promoted']);
+            self::assertIsString($kind);
+            $byKind[$kind]++;
+        }
+
+        self::assertSame(['declared' => 1, 'promoted' => 3], $byKind);
+    }
+
+    public function testMissingPropertyPhpdocSkipsAnonymousClassProperty(): void
+    {
+        $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
+
+        foreach ($findings as $finding) {
+            self::assertNotNull($finding->symbol);
+            self::assertStringNotContainsString('$exempt', $finding->symbol);
+        }
+    }
+
+    public function testMissingConstantPhpdocFlagsClassConstantsAndEnumCases(): void
+    {
+        $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        sort($symbols);
+
+        self::assertSame(
+            [
+                'DocumentedConstants::UNDOCUMENTED',
+                'UndocumentedEnum::FIRST',
+                'UndocumentedEnum::SECOND',
+            ],
+            $symbols,
+        );
+
+        $kinds = array_map(static fn ($f) => $f->metadata['kind'], $findings);
+        sort($kinds);
+        self::assertSame(['class-constant', 'enum-case', 'enum-case'], $kinds);
+    }
+
+    public function testMissingConstantPhpdocExemptsEnumCasesWhenEnumHasDocblock(): void
+    {
+        $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('DocumentedEnum::FIRST', $symbols);
+        self::assertNotContains('DocumentedEnum::SECOND', $symbols);
     }
 
     /**

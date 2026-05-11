@@ -565,7 +565,7 @@ final class GruffCliTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('href="vscode://file/', $process->getOutput());
-        self::assertStringContainsString('tests/Fixtures/Source/Code/OrderCalculator.php:9', $process->getOutput());
+        self::assertStringContainsString('tests/Fixtures/Source/Code/OrderCalculator.php:16', $process->getOutput());
     }
 
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
@@ -586,7 +586,7 @@ final class GruffCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="tests/Fixtures/Source/Code/OrderCalculator.php:9">', $process->getOutput());
+        self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="tests/Fixtures/Source/Code/OrderCalculator.php:16">', $process->getOutput());
         self::assertStringNotContainsString('vscode://file/', $process->getOutput());
         self::assertStringNotContainsString('phpstorm://open', $process->getOutput());
     }

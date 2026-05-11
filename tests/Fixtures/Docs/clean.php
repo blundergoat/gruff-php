@@ -1,9 +1,16 @@
 <?php
 
+/**
+ * Clean docs fixture used as the gold standard for the documentation pillar.
+ */
+
 declare(strict_types=1);
 
 namespace Fixtures\Docs;
 
+/**
+ * Cleanly documented class.
+ */
 class CleanDocsFixture
 {
     /**

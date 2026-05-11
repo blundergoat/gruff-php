@@ -48,8 +48,23 @@ rules:
     # Unused private state hides design drift and dead assumptions.
     dead-code.unused-private-property:
         enabled: true
+    # Single-implementor interfaces add abstraction overhead without polymorphism payoff.
+    design.single-implementor-interface:
+        enabled: true
+    # Classes, interfaces, traits, and enums need a docblock explaining their purpose.
+    docs.missing-class-phpdoc:
+        enabled: true
+    # Class constants and enum cases need a one-line docblock so readers grasp intent.
+    docs.missing-constant-phpdoc:
+        enabled: true
+    # File-level docblocks (or a single documented type per file) orient new readers.
+    docs.missing-file-phpdoc:
+        enabled: true
     # Parameter docs clarify contracts that signatures miss.
     docs.missing-param-tag:
+        enabled: true
+    # Properties need a docblock describing purpose or shape; promoted properties use the constructor @param.
+    docs.missing-property-phpdoc:
         enabled: true
     # Methods need local PHPDoc contracts for callers and maintainers.
     docs.missing-public-phpdoc:
@@ -97,6 +112,9 @@ rules:
         enabled: true
         thresholds:
             minPositionalArguments: 5
+    # PHPDoc array shapes containing mixed weaken contracts the signature cannot express.
+    modernisation.phpdoc-mixed-overuse:
+        enabled: true
     # Public mutable state makes object behavior harder to control.
     modernisation.public-property:
         enabled: true

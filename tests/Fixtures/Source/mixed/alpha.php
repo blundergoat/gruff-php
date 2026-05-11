@@ -1,7 +1,14 @@
 <?php
 
+/**
+ * Alpha fixture for CLI discovery and warning-threshold tests.
+ */
+
 declare(strict_types=1);
 
+/**
+ * Alpha class used by CLI tests.
+ */
 final class Alpha
 {
     /**
