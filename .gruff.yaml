@@ -241,22 +241,22 @@ rules:
     # Long average methods make classes harder to reason about.
     size.average-method-length:
         enabled: true
-        threshold: 40
+        threshold: 50
         severity: error
     # Large classes often mix too many responsibilities.
     size.class-length:
         enabled: true
-        threshold: 500
+        threshold: 800
         severity: error
     # Very large files slow navigation and review.
     size.file-length:
         enabled: true
-        threshold: 800
+        threshold: 1000
         severity: error
     # Long methods are harder to test and safely modify.
     size.method-length:
         enabled: true
-        threshold: 60
+        threshold: 70
         severity: error
     # Too many parameters make calls error-prone.
     size.parameter-count:

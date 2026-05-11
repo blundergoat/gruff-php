@@ -12,14 +12,22 @@ final readonly class ConfigLoader
 {
     public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
 
-    public function __construct(private string $projectRoot)
+    public function __construct(
+        private string $projectRoot,
+        private ?string $fallbackConfigRoot = null,
+    )
     {
+    }
+
+    public static function packageRoot(): string
+    {
+        return dirname(__DIR__, 2);
     }
 
     public function load(?string $configPath, RuleRegistry $registry): AnalysisConfig
     {
         $config = AnalysisConfig::fromRegistry($registry);
-        $resolvedPath = $this->resolvePath($configPath);
+        $resolvedPath = $this->resolveConfigPath($configPath);
 
         if ($resolvedPath === null) {
             return $config;
@@ -28,7 +36,7 @@ final readonly class ConfigLoader
         return $this->applyConfigFile($config, $registry, $resolvedPath);
     }
 
-    private function resolvePath(?string $configPath): ?string
+    public function resolveConfigPath(?string $configPath): ?string
     {
         if ($configPath !== null && $configPath !== '') {
             $path = $configPath[0] === '/' ? $configPath : $this->projectRoot . '/' . $configPath;
@@ -40,9 +48,23 @@ final readonly class ConfigLoader
             return $path;
         }
 
-        $defaultPath = $this->projectRoot . '/' . self::DEFAULT_CONFIG_FILE;
+        $defaultPath = $this->defaultConfigPath($this->projectRoot);
+        if (is_file($defaultPath)) {
+            return $defaultPath;
+        }
 
-        return is_file($defaultPath) ? $defaultPath : null;
+        if ($this->fallbackConfigRoot === null) {
+            return null;
+        }
+
+        $fallbackPath = $this->defaultConfigPath($this->fallbackConfigRoot);
+
+        return $fallbackPath !== $defaultPath && is_file($fallbackPath) ? $fallbackPath : null;
+    }
+
+    private function defaultConfigPath(string $root): string
+    {
+        return rtrim($root, '/') . '/' . self::DEFAULT_CONFIG_FILE;
     }
 
     private function applyConfigFile(AnalysisConfig $config, RuleRegistry $registry, string $path): AnalysisConfig

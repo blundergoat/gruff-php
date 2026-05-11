@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Config;
 
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
@@ -67,6 +68,30 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    public function testFallsBackToPackageDefaultYamlConfigFile(): void
+    {
+        $projectDirectory = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
+        $fallbackDirectory = sys_get_temp_dir() . '/gruff-config-fallback-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($projectDirectory));
+        self::assertTrue(mkdir($fallbackDirectory));
+        self::assertNotFalse(file_put_contents(
+            $fallbackDirectory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE,
+            "rules:\n    size.file-length:\n        thresholds:\n            warning: 11\n            error: 110\n",
+        ));
+
+        try {
+            $config = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
+            $settings = $config->ruleSettings(FileLengthRule::ID);
+
+            self::assertSame(11, $settings->numericThreshold('warning'));
+            self::assertSame(110, $settings->numericThreshold('error'));
+        } finally {
+            @unlink($fallbackDirectory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+            @rmdir($fallbackDirectory);
+            @rmdir($projectDirectory);
+        }
+    }
+
     public function testLoadsExplicitYamlConfigFile(): void
     {
         $path = $this->writeTempConfig(
@@ -81,7 +106,7 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(90, $settings->numericThreshold('error'));
     }
 
-    public function testLoadsBinaryThresholdWithErrorSeverity(): void
+    public function testLoadsSeverityThresholdWithErrorSeverity(): void
     {
         $path = $this->writeTempConfig(
             "rules:\n    size.file-length:\n        threshold: 70\n        severity: error\n",
@@ -91,11 +116,19 @@ final class ConfigLoaderTest extends TestCase
         $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
-        self::assertSame(70, $settings->numericThreshold('warning'));
-        self::assertSame(70, $settings->numericThreshold('error'));
+        self::assertSame(400, $settings->numericThreshold('warning'));
+        self::assertSame(800, $settings->numericThreshold('error'));
+        self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+        self::assertSame(70, $settings->severityThreshold->threshold);
+        self::assertSame(Severity::Error, $settings->severityThreshold->severity);
+        self::assertNull($settings->highValueThresholdMatch(70));
+        $thresholdMatch = $settings->highValueThresholdMatch(71);
+        self::assertNotNull($thresholdMatch);
+        self::assertSame(70, $thresholdMatch->threshold);
+        self::assertSame(Severity::Error, $thresholdMatch->severity);
     }
 
-    public function testLoadsBinaryThresholdWithWarningSeverity(): void
+    public function testLoadsSeverityThresholdWithWarningSeverity(): void
     {
         $path = $this->writeTempConfig(
             "rules:\n    size.file-length:\n        threshold: 70\n        severity: warning\n",
@@ -105,11 +138,19 @@ final class ConfigLoaderTest extends TestCase
         $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
-        self::assertSame(70, $settings->numericThreshold('warning'));
-        self::assertSame(PHP_INT_MAX, $settings->numericThreshold('error'));
+        self::assertSame(400, $settings->numericThreshold('warning'));
+        self::assertSame(800, $settings->numericThreshold('error'));
+        self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+        self::assertSame(70, $settings->severityThreshold->threshold);
+        self::assertSame(Severity::Warning, $settings->severityThreshold->severity);
+        self::assertNull($settings->highValueThresholdMatch(70));
+        $thresholdMatch = $settings->highValueThresholdMatch(71);
+        self::assertNotNull($thresholdMatch);
+        self::assertSame(70, $thresholdMatch->threshold);
+        self::assertSame(Severity::Warning, $thresholdMatch->severity);
     }
 
-    public function testLoadsBinaryThresholdWithWarningSeverityForInverseThresholdRule(): void
+    public function testLoadsSeverityThresholdWithWarningSeverityForInverseThresholdRule(): void
     {
         $path = $this->writeTempConfig(
             "rules:\n    complexity.maintainability-index:\n        threshold: 45\n        severity: warning\n",
@@ -119,11 +160,19 @@ final class ConfigLoaderTest extends TestCase
         $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings('complexity.maintainability-index');
 
-        self::assertSame(45, $settings->numericThreshold('warning'));
-        self::assertSame(-PHP_INT_MAX, $settings->numericThreshold('error'));
+        self::assertSame(55, $settings->numericThreshold('warning'));
+        self::assertSame(35, $settings->numericThreshold('error'));
+        self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+        self::assertSame(45, $settings->severityThreshold->threshold);
+        self::assertSame(Severity::Warning, $settings->severityThreshold->severity);
+        self::assertNull($settings->lowValueThresholdMatch(45));
+        $thresholdMatch = $settings->lowValueThresholdMatch(44);
+        self::assertNotNull($thresholdMatch);
+        self::assertSame(45, $thresholdMatch->threshold);
+        self::assertSame(Severity::Warning, $thresholdMatch->severity);
     }
 
-    public function testRejectsBinaryThresholdWithoutSeverity(): void
+    public function testRejectsSeverityThresholdWithoutSeverity(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70}}}');
 
@@ -133,7 +182,7 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
-    public function testRejectsSeverityWithoutBinaryThreshold(): void
+    public function testRejectsSeverityWithoutThreshold(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"severity":"error"}}}');
 
@@ -143,7 +192,7 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
-    public function testRejectsBinaryThresholdForNamedTuningThresholdRule(): void
+    public function testRejectsSeverityThresholdForNamedTuningThresholdRule(): void
     {
         $path = $this->writeTempConfig('{"rules":{"docs.missing-public-phpdoc":{"threshold":8,"severity":"error"}}}');
 
@@ -153,7 +202,7 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
-    public function testRejectsCombiningBinaryThresholdAndThresholdMap(): void
+    public function testRejectsCombiningSeverityThresholdAndThresholdMap(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}');
 

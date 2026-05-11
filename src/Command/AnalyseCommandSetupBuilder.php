@@ -79,7 +79,8 @@ final readonly class AnalyseCommandSetupBuilder
 
         $options = $options->withDefaultBaseline($projectRoot);
         $registry = RuleRegistry::defaults();
-        $configResult = $this->config($projectRoot, $options, $registry, $formatResult, $failThreshold);
+        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        $configResult = $this->config($options, $registry, $formatResult, $failThreshold, $configLoader);
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
@@ -90,6 +91,7 @@ final readonly class AnalyseCommandSetupBuilder
             format: $formatResult,
             failThreshold: $failThreshold,
             config: $configResult,
+            configPath: $this->effectiveConfigPath($options, $configLoader),
             registry: $registry,
         ));
     }
@@ -122,19 +124,28 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     private function config(
-        string $projectRoot,
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
         OutputFormat $format,
         FailThreshold $failThreshold,
+        ConfigLoader $configLoader,
     ): AnalysisConfig|AnalysisReport {
         try {
             return $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
-                : (new ConfigLoader($projectRoot))->load($options->configPath, $registry);
+                : $configLoader->load($options->configPath, $registry);
         } catch (ConfigException $exception) {
             return $this->usageReport($options, $format, $failThreshold->value, $exception->getMessage(), 'config-error');
         }
+    }
+
+    private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
+    {
+        if ($options->noConfig) {
+            return null;
+        }
+
+        return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
     private function usageReport(

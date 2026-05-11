@@ -46,8 +46,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $nodes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -60,13 +58,12 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node */
             $cc = self::compute($node);
+            $thresholdMatch = $settings->highValueThresholdMatch($cc);
 
-            if ($cc <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $cc > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
@@ -75,12 +72,12 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                     '%s has a cognitive complexity of %d, above the %s threshold of %s.',
                     $symbol,
                     $cc,
-                    $severity->value,
-                    self::formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    self::formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $node->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -90,8 +87,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'complexity' => $cc,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

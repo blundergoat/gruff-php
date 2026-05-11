@@ -50,6 +50,16 @@ final readonly class SourceDiscovery
         'vendor',
     ];
 
+    /** @var list<string> */
+    private const IGNORED_FILENAMES = [
+        'bun.lockb',
+        'composer.lock',
+        'npm-shrinkwrap.json',
+        'package-lock.json',
+        'pnpm-lock.yaml',
+        'yarn.lock',
+    ];
+
     public function __construct(private string $projectRoot)
     {
     }
@@ -235,6 +245,10 @@ final readonly class SourceDiscovery
                     return true;
                 }
             }
+        }
+
+        if (in_array(basename($path), self::IGNORED_FILENAMES, true)) {
+            return true;
         }
 
         return false;

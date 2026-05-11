@@ -45,8 +45,6 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $nodes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -60,13 +58,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             /** @var ClassMethod|Function_ $node */
             $metrics = self::compute($node);
             $volume = $metrics['volume'];
+            $thresholdMatch = $settings->highValueThresholdMatch($volume);
 
-            if ($volume <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $volume > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
@@ -75,12 +72,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                     '%s has a Halstead volume of %.1f, above the %s threshold of %s.',
                     $symbol,
                     $volume,
-                    $severity->value,
-                    self::formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    self::formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $node->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -94,8 +91,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                     'effort' => round($metrics['effort'], 1),
                     'vocabulary' => $metrics['vocabulary'],
                     'length' => $metrics['length'],
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

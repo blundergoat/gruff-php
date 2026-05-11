@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use GruffPhp\Finding\Severity;
 use LogicException;
 
 final readonly class RuleSettings
@@ -16,6 +17,7 @@ final readonly class RuleSettings
         public bool $enabled,
         public array $thresholds,
         public array $options = [],
+        public ?SeverityThreshold $severityThreshold = null,
     ) {
     }
 
@@ -28,6 +30,50 @@ final readonly class RuleSettings
         }
 
         return $value;
+    }
+
+    public function highValueThresholdMatch(int|float $value): ?ThresholdMatch
+    {
+        if ($this->severityThreshold instanceof SeverityThreshold) {
+            return $value > $this->severityThreshold->threshold
+                ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
+                : null;
+        }
+
+        $warningThreshold = $this->numericThreshold('warning');
+        if ($value <= $warningThreshold) {
+            return null;
+        }
+
+        $errorThreshold = $this->numericThreshold('error');
+        $severity = $value > $errorThreshold ? Severity::Error : Severity::Warning;
+
+        return new ThresholdMatch(
+            $severity === Severity::Error ? $errorThreshold : $warningThreshold,
+            $severity,
+        );
+    }
+
+    public function lowValueThresholdMatch(int|float $value): ?ThresholdMatch
+    {
+        if ($this->severityThreshold instanceof SeverityThreshold) {
+            return $value < $this->severityThreshold->threshold
+                ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
+                : null;
+        }
+
+        $warningThreshold = $this->numericThreshold('warning');
+        if ($value >= $warningThreshold) {
+            return null;
+        }
+
+        $errorThreshold = $this->numericThreshold('error');
+        $severity = $value < $errorThreshold ? Severity::Error : Severity::Warning;
+
+        return new ThresholdMatch(
+            $severity === Severity::Error ? $errorThreshold : $warningThreshold,
+            $severity,
+        );
     }
 
     public function hasOption(string $name): bool

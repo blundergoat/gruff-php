@@ -48,11 +48,15 @@ final readonly class RuleConfigApplier
         $this->assertKnownRuleKeys($ruleId, $ruleConfig);
 
         $settings = $config->ruleSettings($ruleId);
+        $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry);
 
         return $config->withRuleSettings($ruleId, new RuleSettings(
             enabled: $this->enabled($ruleId, $ruleConfig, $settings->enabled),
-            thresholds: $this->thresholds($ruleId, $ruleConfig, $registry, $settings->thresholds),
+            thresholds: $severityThreshold instanceof SeverityThreshold
+                ? $settings->thresholds
+                : $this->thresholds($ruleId, $ruleConfig, $registry, $settings->thresholds),
             options: $this->options($ruleId, $ruleConfig, $registry, $settings->options),
+            severityThreshold: $severityThreshold,
         ));
     }
 
@@ -95,19 +99,6 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
         array $defaultThresholds,
     ): array {
-        if (array_key_exists('threshold', $ruleConfig)) {
-            if (array_key_exists('thresholds', $ruleConfig)) {
-                throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
-            }
-
-            return $this->binaryThresholds(
-                $ruleId,
-                $ruleConfig['threshold'],
-                $ruleConfig['severity'] ?? null,
-                $registry->get($ruleId)->definition()->defaultThresholds,
-            );
-        }
-
         if (array_key_exists('severity', $ruleConfig)) {
             throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
         }
@@ -136,15 +127,25 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, int|float> $defaultThresholds
-     * @return array<string, int|float>
+     * @param array<string, mixed> $ruleConfig
      */
-    private function binaryThresholds(
+    private function severityThreshold(
         string $ruleId,
-        mixed $thresholdValue,
-        mixed $severityValue,
-        array $defaultThresholds,
-    ): array {
+        array $ruleConfig,
+        RuleRegistry $registry,
+    ): ?SeverityThreshold {
+        if (!array_key_exists('threshold', $ruleConfig)) {
+            return null;
+        }
+
+        if (array_key_exists('thresholds', $ruleConfig)) {
+            throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
+        }
+
+        $thresholdValue = $ruleConfig['threshold'];
+        $severityValue = $ruleConfig['severity'] ?? null;
+        $defaultThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
+
         if (!array_key_exists('warning', $defaultThresholds) || !array_key_exists('error', $defaultThresholds) || count($defaultThresholds) !== 2) {
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with warning/error thresholds.', $ruleId));
         }
@@ -157,20 +158,7 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "warning" or "error".', $ruleId));
         }
 
-        $thresholds = $defaultThresholds;
-        $highValueIsWorse = $defaultThresholds['warning'] <= $defaultThresholds['error'];
-
-        if ($severityValue === Severity::Error->value) {
-            $thresholds['warning'] = $thresholdValue;
-            $thresholds['error'] = $thresholdValue;
-
-            return $thresholds;
-        }
-
-        $thresholds['warning'] = $thresholdValue;
-        $thresholds['error'] = $highValueIsWorse ? PHP_INT_MAX : -PHP_INT_MAX;
-
-        return $thresholds;
+        return new SeverityThreshold($thresholdValue, Severity::from($severityValue));
     }
 
     /**

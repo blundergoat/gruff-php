@@ -17,6 +17,7 @@ final readonly class AnalyseCommandSetup
         public OutputFormat $format,
         public FailThreshold $failThreshold,
         public AnalysisConfig $config,
+        public ?string $configPath,
         public RuleRegistry $registry,
     ) {
     }

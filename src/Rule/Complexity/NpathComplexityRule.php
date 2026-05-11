@@ -47,8 +47,6 @@ final readonly class NpathComplexityRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $nodes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -61,13 +59,12 @@ final readonly class NpathComplexityRule implements RuleInterface
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node */
             $npath = self::compute($node);
+            $thresholdMatch = $settings->highValueThresholdMatch($npath);
 
-            if ($npath <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $npath > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
             $capped = $npath >= self::MAX_NPATH;
             $npathLabel = $capped ? '>=' . self::formatNumber(self::MAX_NPATH) . ' (cap reached)' : self::formatNumber($npath);
@@ -78,12 +75,12 @@ final readonly class NpathComplexityRule implements RuleInterface
                     '%s has an NPath complexity of %s, above the %s threshold of %s.',
                     $symbol,
                     $npathLabel,
-                    $severity->value,
-                    self::formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    self::formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $node->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -94,8 +91,8 @@ final readonly class NpathComplexityRule implements RuleInterface
                 metadata: [
                     'npath' => $npath,
                     'capped' => $capped,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

@@ -48,6 +48,10 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
             return [];
         }
 
+        if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($unit)) {
+            return [];
+        }
+
         $config = $this->discovery->discover($root);
         if ($config === null) {
             return [];

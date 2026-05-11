@@ -43,8 +43,6 @@ final readonly class PublicMethodCountRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -62,13 +60,12 @@ final readonly class PublicMethodCountRule implements RuleInterface
                     $publicCount++;
                 }
             }
+            $thresholdMatch = $settings->highValueThresholdMatch($publicCount);
 
-            if ($publicCount <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $publicCount > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = $classLike instanceof Class_
                 ? ($classLike->name?->toString() ?? sprintf('class@anonymous:%d', $classLike->getStartLine()))
                 : ($classLike->name?->toString() ?? sprintf('enum@%d', $classLike->getStartLine()));
@@ -79,12 +76,12 @@ final readonly class PublicMethodCountRule implements RuleInterface
                     '%s has %d public methods, above the %s threshold of %s.',
                     $symbol,
                     $publicCount,
-                    $severity->value,
-                    $this->formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    $this->formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $classLike->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -94,8 +91,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'publicMethods' => $publicCount,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

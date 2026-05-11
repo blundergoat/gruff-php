@@ -44,8 +44,6 @@ final readonly class ParameterCountRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $nodes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -64,13 +62,12 @@ final readonly class ParameterCountRule implements RuleInterface
             }
 
             $paramCount = count($node->params);
+            $thresholdMatch = $settings->highValueThresholdMatch($paramCount);
 
-            if ($paramCount <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $paramCount > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = $this->resolveSymbol($node);
 
             $findings[] = new Finding(
@@ -79,12 +76,12 @@ final readonly class ParameterCountRule implements RuleInterface
                     '%s has %d parameters, above the %s threshold of %s.',
                     $symbol,
                     $paramCount,
-                    $severity->value,
-                    $this->formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    $this->formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $node->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -94,8 +91,8 @@ final readonly class ParameterCountRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'parameters' => $paramCount,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

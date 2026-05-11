@@ -38,16 +38,12 @@ final readonly class FileLengthRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
         $lineCount = $unit->lineCount();
+        $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
-        if ($lineCount <= $warningThreshold) {
+        if ($thresholdMatch === null) {
             return [];
         }
-
-        $severity = $lineCount > $errorThreshold ? Severity::Error : Severity::Warning;
-        $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
 
         return [
             new Finding(
@@ -55,12 +51,12 @@ final readonly class FileLengthRule implements RuleInterface
                 message: sprintf(
                     'File has %d lines, above the %s threshold of %s.',
                     $lineCount,
-                    $severity->value,
-                    $this->formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    $this->formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: 1,
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -69,8 +65,8 @@ final readonly class FileLengthRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'lines' => $lineCount,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             ),
         ];

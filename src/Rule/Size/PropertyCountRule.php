@@ -45,8 +45,6 @@ final readonly class PropertyCountRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -60,13 +58,12 @@ final readonly class PropertyCountRule implements RuleInterface
         foreach ($classLikes as $classLike) {
             /** @var Class_|Trait_|Enum_ $classLike */
             $propertyCount = $this->countProperties($classLike);
+            $thresholdMatch = $settings->highValueThresholdMatch($propertyCount);
 
-            if ($propertyCount <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $propertyCount > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = $this->resolveSymbol($classLike);
 
             $findings[] = new Finding(
@@ -75,12 +72,12 @@ final readonly class PropertyCountRule implements RuleInterface
                     '%s has %d properties, above the %s threshold of %s.',
                     $symbol,
                     $propertyCount,
-                    $severity->value,
-                    $this->formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    $this->formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $classLike->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -90,8 +87,8 @@ final readonly class PropertyCountRule implements RuleInterface
                 secondaryPillars: $definition->secondaryPillars,
                 metadata: [
                     'properties' => $propertyCount,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }

@@ -20,6 +20,19 @@ final class TestQualityNodeHelper
     /** @var \WeakMap<AnalysisUnit, list<TestQualityScope>>|null */
     private static ?\WeakMap $scopeCache = null;
 
+    public static function looksLikePhpUnitTestFile(AnalysisUnit $unit): bool
+    {
+        $displayPath = '/' . str_replace('\\', '/', $unit->file->displayPath);
+
+        if (str_contains($displayPath, '/tests/') || str_contains($displayPath, '/Tests/')) {
+            return true;
+        }
+
+        $basename = basename($unit->file->displayPath);
+
+        return str_ends_with($basename, 'Test.php') || str_ends_with($basename, 'TestCase.php');
+    }
+
     /**
      * @return list<TestQualityScope>
      */

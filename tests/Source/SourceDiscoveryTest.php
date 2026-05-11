@@ -37,8 +37,28 @@ final class SourceDiscoveryTest extends TestCase
             'cache/ignored.php',
             'generated/ignored.php',
             'nested/beta.php',
+            'package-lock.json',
             'vendor/ignored.php',
         ], array_map(static fn ($file): string => $file->displayPath, $result->files));
+    }
+
+    public function testDefaultIgnoresWellKnownLockfileNames(): void
+    {
+        $root = $this->fixtureRoot('mixed');
+        $result = (new SourceDiscovery($root))->discover(['.']);
+
+        $paths = array_map(static fn ($file): string => $file->displayPath, $result->files);
+        self::assertNotContains('package-lock.json', $paths, 'package-lock.json must be ignored by default.');
+        self::assertNotContains('composer.lock', $paths, 'composer.lock must be ignored by default.');
+    }
+
+    public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
+    {
+        $root = $this->fixtureRoot('mixed');
+        $result = (new SourceDiscovery($root))->discover(['package-lock.json']);
+
+        self::assertSame([], $result->files);
+        self::assertContains('package-lock.json', $result->ignoredPaths);
     }
 
     public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
@@ -54,6 +74,7 @@ final class SourceDiscoveryTest extends TestCase
             'alpha.php',
             'cache/ignored.php',
             'generated/ignored.php',
+            'package-lock.json',
             'vendor/ignored.php',
         ], array_map(static fn ($file): string => $file->displayPath, $result->files));
         self::assertContains('nested/beta.php', $result->ignoredPaths);

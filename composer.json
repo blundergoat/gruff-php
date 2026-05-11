@@ -52,6 +52,8 @@
             "@php -l src/Config/ConfigLoader.php",
             "@php -l src/Config/RuleSelection.php",
             "@php -l src/Config/RuleSettings.php",
+            "@php -l src/Config/SeverityThreshold.php",
+            "@php -l src/Config/ThresholdMatch.php",
             "@php -l src/Console/Application.php",
             "@php -l src/Diff/ChangedLineRange.php",
             "@php -l src/Diff/DiffException.php",

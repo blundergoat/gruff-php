@@ -201,7 +201,7 @@ final class AnalyseCommand extends Command
             diagnostics: $diagnostics,
             findings: $displayFindings,
             exitCode: $exitCode,
-            configPath: $options->configPath,
+            configPath: $setup->configPath,
             mutation: $mutationAnalysis,
             score: $score,
             diff: $diff,

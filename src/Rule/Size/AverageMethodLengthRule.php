@@ -46,8 +46,6 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     {
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
-        $warningThreshold = $settings->numericThreshold('warning');
-        $errorThreshold = $settings->numericThreshold('error');
 
         $finder = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
@@ -76,13 +74,12 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             }
 
             $average = $totalLines / count($methods);
+            $thresholdMatch = $settings->highValueThresholdMatch($average);
 
-            if ($average <= $warningThreshold) {
+            if ($thresholdMatch === null) {
                 continue;
             }
 
-            $severity = $average > $errorThreshold ? Severity::Error : Severity::Warning;
-            $threshold = $severity === Severity::Error ? $errorThreshold : $warningThreshold;
             $symbol = $this->resolveSymbol($classLike);
 
             $findings[] = new Finding(
@@ -92,12 +89,12 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                     $symbol,
                     $average,
                     count($methods),
-                    $severity->value,
-                    $this->formatNumber($threshold),
+                    $thresholdMatch->severity->value,
+                    $this->formatNumber($thresholdMatch->threshold),
                 ),
                 filePath: $unit->file->displayPath,
                 line: $classLike->getStartLine(),
-                severity: $severity,
+                severity: $thresholdMatch->severity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
                 confidence: $definition->confidence,
@@ -109,8 +106,8 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                     'averageLength' => round($average, 1),
                     'methodCount' => count($methods),
                     'totalLines' => $totalLines,
-                    'threshold' => $threshold,
-                    'thresholdType' => $severity->value,
+                    'threshold' => $thresholdMatch->threshold,
+                    'thresholdType' => $thresholdMatch->severity->value,
                 ],
             );
         }
