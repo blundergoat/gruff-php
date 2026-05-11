@@ -163,9 +163,6 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         }
 
         $first = array_shift($tokens);
-        if ($first === null) {
-            return null;
-        }
 
         return $first . implode('', array_map(static fn (string $token): string => ucfirst($token), $tokens));
     }

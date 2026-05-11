@@ -18,6 +18,7 @@ final class Alpha
      */
     public function value(): int
     {
+        // Match exhaustively to return the canonical fixture value.
         return match (true) {
             true => 1,
         };

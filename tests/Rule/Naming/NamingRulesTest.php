@@ -276,7 +276,9 @@ final class NamingRulesTest extends TestCase
 
         $reported = [];
         foreach ($findings as $finding) {
-            $reported[$finding->metadata['parameter'] ?? ''] = $finding->metadata['expectedName'] ?? null;
+            $parameter = $finding->metadata['parameter'] ?? '';
+            self::assertIsString($parameter);
+            $reported[$parameter] = $finding->metadata['expectedName'] ?? null;
         }
 
         self::assertSame('bookingSession', $reported['session'] ?? null);

@@ -188,7 +188,7 @@ final class RuleRegistryTest extends TestCase
         self::assertSame(FileLengthRule::ID, $findings[0]->ruleId);
         self::assertSame(Severity::Warning, $findings[0]->severity);
         self::assertSame(Pillar::Size, $findings[0]->pillar);
-        self::assertSame(['lines' => 26, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
+        self::assertSame(['lines' => 27, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
     }
 
     public function testSkipsDisabledRules(): void

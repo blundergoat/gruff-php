@@ -40,10 +40,10 @@
     "findings": [
         {
             "ruleId": "size.file-length",
-            "message": "File has 26 lines, above the warning threshold of 3.",
+            "message": "File has 27 lines, above the warning threshold of 3.",
             "file": "tests/Fixtures/Source/mixed/alpha.php",
             "line": 1,
-            "endLine": 26,
+            "endLine": 27,
             "column": null,
             "symbol": null,
             "severity": "warning",
@@ -52,9 +52,9 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
-            "fingerprint": "948aa2b0a79cff86",
+            "fingerprint": "a4a4a727bb1fd409",
             "metadata": {
-                "lines": 26,
+                "lines": 27,
                 "threshold": 3,
                 "thresholdType": "warning"
             }
@@ -206,7 +206,7 @@
                 "penalty": 40,
                 "maxCyclomatic": null,
                 "maxCognitive": null,
-                "maxLines": 26,
+                "maxLines": 27,
                 "mutationScore": null
             }
         ],

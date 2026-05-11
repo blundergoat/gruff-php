@@ -15,6 +15,7 @@ final readonly class OrderCalculator
 {
     public function calculateTotal(int $subtotal, int $tax): int
     {
+        // Sum subtotal and tax to produce the gross order total.
         return $subtotal + $tax;
     }
 }

@@ -57,52 +57,59 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * @param list<Stmt> $statements
+     * @param array<Stmt> $statements
      * @param list<Finding> &$findings
      */
     private function checkBlock(array $statements, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
     {
-        for ($index = 0; $index < count($statements) - 1; $index++) {
-            $assignment = $statements[$index];
-            $return = $statements[$index + 1];
+        $statements = array_values($statements);
 
-            if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
-                continue;
-            }
-
-            $assignedVariable = $assignment->expr->var;
-            if (!$assignedVariable instanceof Variable || !is_string($assignedVariable->name)) {
-                continue;
-            }
-
-            if (!$return instanceof Stmt\Return_ || !$return->expr instanceof Variable) {
-                continue;
-            }
-
-            $returnedVariable = $return->expr;
-            if (!is_string($returnedVariable->name) || $returnedVariable->name !== $assignedVariable->name) {
-                continue;
-            }
-
-            $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
-                filePath: $unit->file->displayPath,
-                line: $assignment->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $return->getStartLine(),
-                symbol: '$' . $assignedVariable->name,
-                remediation: sprintf('Return the assigned expression directly instead of storing it in $%s.', $assignedVariable->name),
-                metadata: ['variable' => $assignedVariable->name],
-            );
+        if (count($statements) === 2) {
+            $this->flagRedundantPair($statements[0], $statements[1], $unit, $definition, $findings);
         }
 
         foreach ($statements as $statement) {
             $this->checkChildBlocks($statement, $unit, $definition, $findings);
         }
+    }
+
+    /**
+     * @param list<Finding> &$findings
+     */
+    private function flagRedundantPair(Stmt $assignment, Stmt $return, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
+    {
+        if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
+            return;
+        }
+
+        $assignedVariable = $assignment->expr->var;
+        if (!$assignedVariable instanceof Variable || !is_string($assignedVariable->name)) {
+            return;
+        }
+
+        if (!$return instanceof Stmt\Return_ || !$return->expr instanceof Variable) {
+            return;
+        }
+
+        $returnedVariable = $return->expr;
+        if (!is_string($returnedVariable->name) || $returnedVariable->name !== $assignedVariable->name) {
+            return;
+        }
+
+        $findings[] = new Finding(
+            ruleId: $definition->id,
+            message: sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
+            filePath: $unit->file->displayPath,
+            line: $assignment->getStartLine(),
+            severity: $definition->defaultSeverity,
+            pillar: $definition->pillar,
+            tier: $definition->tier,
+            confidence: $definition->confidence,
+            endLine: $return->getStartLine(),
+            symbol: '$' . $assignedVariable->name,
+            remediation: sprintf('Return the assigned expression directly instead of storing it in $%s.', $assignedVariable->name),
+            metadata: ['variable' => $assignedVariable->name],
+        );
     }
 
     /**
