@@ -4,8 +4,17 @@ declare(strict_types=1);
 
 namespace Fixtures\Docs;
 
+#[\Attribute]
+final class VarAnnotationDescriptionSample
+{
+}
+
 final class VarAnnotationDescriptionFixture
 {
+    /** @var string $attributedProperty */
+    #[VarAnnotationDescriptionSample]
+    public string $attributedProperty = 'value';
+
     /**
      * Exercise inline var assertion descriptions.
      *
@@ -34,5 +43,12 @@ final class VarAnnotationDescriptionFixture
         };
 
         return $token . $missing . $documentedOnSeparateLine . $local->declaredProperty;
+    }
+
+    /** @var string $attributedMethodResult */
+    #[VarAnnotationDescriptionSample]
+    public function attributedMethod(): string
+    {
+        return $this->attributedProperty;
     }
 }

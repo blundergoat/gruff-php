@@ -40,4 +40,20 @@ final class ParameterTypeNameFixture
     public function handlesNullable(?DateTimeImmutable $dateTimeImmutable): void
     {
     }
+
+    public function unionNullableLeft(BookingSession|null $thing): void
+    {
+    }
+
+    public function unionNullableRight(null|BookingSession $thing): void
+    {
+    }
+
+    public function realUnion(BookingSession|BookingIntent $thing): void
+    {
+    }
+
+    public function realIntersectionNullable((\Stringable&\Countable)|null $thing): void
+    {
+    }
 }

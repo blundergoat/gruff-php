@@ -21,6 +21,7 @@ use PhpParser\Node\Name;
 use PhpParser\Node\NullableType;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\UnionType;
 use PhpParser\NodeFinder;
 
 final readonly class ParameterTypeNameRule implements RuleInterface
@@ -134,6 +135,24 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
         if ($type instanceof Identifier) {
             return $type->toString();
+        }
+
+        if ($type instanceof UnionType) {
+            $nonNull = array_values(array_filter(
+                $type->types,
+                static fn (Node $arm): bool => !($arm instanceof Identifier && $arm->toLowerString() === 'null'),
+            ));
+
+            if (count($nonNull) !== 1) {
+                return null;
+            }
+
+            $arm = $nonNull[0];
+            if (!$arm instanceof Name && !$arm instanceof Identifier) {
+                return null;
+            }
+
+            return $this->shortTypeName($arm);
         }
 
         return null;

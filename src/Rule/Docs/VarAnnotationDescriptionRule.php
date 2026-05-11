@@ -13,7 +13,16 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
-use PhpParser\Token;
+use PhpParser\Comment\Doc;
+use PhpParser\Node;
+use PhpParser\Node\Param;
+use PhpParser\Node\Stmt\ClassConst;
+use PhpParser\Node\Stmt\ClassLike;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Const_;
+use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\Property;
+use PhpParser\NodeFinder;
 
 final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
@@ -34,24 +43,43 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
+        // AST-driven detection: PhpParser attaches each docblock to the immediately following
+        // statement/declaration. A `@var` docblock on a property/method declaration documents
+        // the declaration itself - not a local variable assertion - even when attribute groups
+        // sit between the docblock and the property/function keyword. Walking the AST keeps
+        // this distinction reliable; a token-stream walker has to skip past `T_ATTRIBUTE` tokens
+        // by counting brackets, which is the "Heuristic rules overmatch nested syntax shapes"
+        // footgun documented at `.goat-flow/footguns/rules.md`.
         $definition = $this->definition();
         $findings = [];
+        $finder = new NodeFinder();
 
-        foreach ($unit->tokens as $index => $token) {
-            if ($token->id !== T_DOC_COMMENT || !str_contains($token->text, '@var')) {
+        $candidates = $finder->find(
+            $unit->statements,
+            static fn (Node $node): bool => $node->getDocComment() instanceof Doc,
+        );
+
+        foreach ($candidates as $node) {
+            $doc = $node->getDocComment();
+            if (!$doc instanceof Doc) {
                 continue;
             }
 
-            if (!$this->isLocalVarAssertion($unit->tokens, $index)) {
+            $docText = $doc->getText();
+            if (!str_contains($docText, '@var')) {
                 continue;
             }
 
-            foreach ($this->bareVarAnnotations($token->text) as $variable) {
+            if ($this->isDeclarationNode($node)) {
+                continue;
+            }
+
+            foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
                     ruleId: $definition->id,
                     message: sprintf('@var assertion for $%s must explain why the asserted type is needed.', $variable),
                     filePath: $unit->file->displayPath,
-                    line: $token->line,
+                    line: $doc->getStartLine(),
                     severity: $definition->defaultSeverity,
                     pillar: $definition->pillar,
                     tier: $definition->tier,
@@ -66,47 +94,15 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         return $findings;
     }
 
-    /**
-     * @param list<Token> $tokens
-     */
-    private function isLocalVarAssertion(array $tokens, int $commentIndex): bool
+    private function isDeclarationNode(Node $node): bool
     {
-        for ($index = $commentIndex + 1; $index < count($tokens); $index++) {
-            $token = $tokens[$index];
-
-            if ($this->isTrivia($token)) {
-                continue;
-            }
-
-            return !$this->isDeclarationToken($token);
-        }
-
-        return false;
-    }
-
-    private function isTrivia(Token $token): bool
-    {
-        return in_array($token->id, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true);
-    }
-
-    private function isDeclarationToken(Token $token): bool
-    {
-        return in_array($token->id, [
-            T_ABSTRACT,
-            T_CLASS,
-            T_CONST,
-            T_ENUM,
-            T_FINAL,
-            T_FUNCTION,
-            T_INTERFACE,
-            T_PRIVATE,
-            T_PROTECTED,
-            T_PUBLIC,
-            T_READONLY,
-            T_STATIC,
-            T_TRAIT,
-            T_VAR,
-        ], true);
+        return $node instanceof Property
+            || $node instanceof ClassMethod
+            || $node instanceof Function_
+            || $node instanceof ClassConst
+            || $node instanceof Const_
+            || $node instanceof ClassLike
+            || $node instanceof Param;
     }
 
     /**

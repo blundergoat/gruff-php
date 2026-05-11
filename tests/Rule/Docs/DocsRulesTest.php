@@ -303,6 +303,26 @@ final class DocsRulesTest extends TestCase
         self::assertSame('$missing', $findings[0]->symbol);
     }
 
+    public function testVarAnnotationOnAttributeDecoratedPropertyDoesNotFlag(): void
+    {
+        // Regression: a property declaration with `@var` in its docblock and a `#[Attr]`
+        // between the docblock and the property keyword used to trip the token-stream
+        // heuristic. The AST-driven detection skips any docblock attached to a
+        // declaration node (Stmt\Property here) regardless of attribute decoration.
+        $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('$attributedProperty', $symbols);
+    }
+
+    public function testVarAnnotationOnAttributeDecoratedMethodDoesNotFlag(): void
+    {
+        $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('$attributedMethodResult', $symbols);
+    }
+
     public function testCleanFixtureHasNoDocFindings(): void
     {
         $unit = $this->parseFixture('clean.php');

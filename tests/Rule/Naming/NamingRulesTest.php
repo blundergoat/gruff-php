@@ -300,6 +300,33 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('dateTimeImmutable', $reported);
     }
 
+    public function testParameterTypeNameFlagsUnionWithNullSymmetrically(): void
+    {
+        // Regression: `Foo|null` used to be silently ignored because shortTypeName fell
+        // through `UnionType` to `return null`. After M32 Phase 1 the rule unwraps any
+        // union whose non-null arm count is exactly one and recurses, matching `?Foo`.
+        $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
+
+        $bySymbol = [];
+        foreach ($findings as $finding) {
+            $symbol = $finding->symbol;
+            self::assertIsString($symbol);
+            $bySymbol[$symbol] = $finding->metadata['expectedName'] ?? null;
+        }
+
+        self::assertSame('bookingSession', $bySymbol['ParameterTypeNameFixture::unionNullableLeft()'] ?? null);
+        self::assertSame('bookingSession', $bySymbol['ParameterTypeNameFixture::unionNullableRight()'] ?? null);
+    }
+
+    public function testParameterTypeNameLeavesTrueUnionAndIntersectionArmSilent(): void
+    {
+        $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
+
+        $symbols = array_map(static fn ($finding): mixed => $finding->symbol, $findings);
+        self::assertNotContains('ParameterTypeNameFixture::realUnion()', $symbols);
+        self::assertNotContains('ParameterTypeNameFixture::realIntersectionNullable()', $symbols);
+    }
+
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
         $unit = $this->parseFixture('identifier-quality.php');
