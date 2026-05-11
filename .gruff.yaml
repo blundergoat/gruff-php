@@ -179,8 +179,19 @@ rules:
                 - value
             minScopeReferences: 1
     # Class-typed parameters should carry their object role in the variable name.
+    # The ignoredParameterNames list exempts AST-walker / visitor conventions used
+    # throughout gruff (Stmt $stmt, Expr $expr, Node $node, AnalysisUnit $unit,
+    # RuleContext $context). Downstream projects should review and pick their own
+    # list rather than inheriting gruff's vocabulary verbatim.
     naming.parameter-type-name:
         enabled: true
+        options:
+            ignoredParameterNames:
+                - unit
+                - context
+                - node
+                - stmt
+                - expr
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true

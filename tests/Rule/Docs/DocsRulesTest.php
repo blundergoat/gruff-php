@@ -218,6 +218,20 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('PhpdocTagsFixture::privateCompleteReturnTag()', $returnSymbols);
     }
 
+    public function testVoidMethodWithDocblockTriggersMissingReturnTag(): void
+    {
+        // Policy lock: per .goat-flow/lessons/workflow.md "Respect explicit rule style
+        // even when it restates native syntax", every documented method without @return
+        // must fire — including methods declared void or never. The pre-M31 short-circuit
+        // that skipped void was an unintended narrowing; M32 Phase 2 locks the broader
+        // contract with explicit fixtures so a future agent cannot silently re-narrow it.
+        $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertContains('PhpdocTagsFixture::voidWithDocblock()', $symbols);
+        self::assertContains('PhpdocTagsFixture::neverWithDocblock()', $symbols);
+    }
+
     public function testStaleParamTagDetected(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', StaleParamTagRule::ID);

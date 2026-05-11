@@ -327,6 +327,37 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('ParameterTypeNameFixture::realIntersectionNullable()', $symbols);
     }
 
+    public function testParameterTypeNameRespectsIgnoredParameterNamesOption(): void
+    {
+        // Configured exemption: parameters whose name appears in
+        // ignoredParameterNames are skipped regardless of type. Gruff's own
+        // .gruff.yaml uses this for AST-walker conventions ($node, $context, etc.);
+        // downstream projects can pick their own list.
+        $unit = $this->parseFixture('parameter-type-name.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ParameterTypeNameRule::ID);
+        $config = AnalysisConfig::fromRegistry($registry)
+            ->withRuleSettings(ParameterTypeNameRule::ID, new \GruffPhp\Config\RuleSettings(
+                enabled: true,
+                thresholds: $settings->thresholds,
+                options: array_merge($settings->options, [
+                    'ignoredParameterNames' => ['session', 'thing'],
+                ]),
+            ));
+
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $parameterFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === ParameterTypeNameRule::ID,
+        ));
+        $parameters = array_map(static fn ($finding): mixed => $finding->metadata['parameter'] ?? null, $parameterFindings);
+
+        self::assertNotContains('session', $parameters);
+        self::assertNotContains('thing', $parameters);
+        self::assertContains('intent', $parameters);
+        self::assertContains('requestContext', $parameters);
+    }
+
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
         $unit = $this->parseFixture('identifier-quality.php');

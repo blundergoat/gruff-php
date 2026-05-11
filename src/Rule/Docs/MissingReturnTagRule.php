@@ -32,6 +32,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::High,
+            description: 'Every documented method must declare its return contract with an @return tag, including methods declared void or never. Constructors and destructors are exempt.',
         );
     }
 

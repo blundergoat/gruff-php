@@ -59,8 +59,9 @@ final readonly class ParameterTypeNameRule implements RuleInterface
             confidence: Confidence::Medium,
             defaultOptions: [
                 'typeSuffixesToTrim' => ['Interface'],
+                'ignoredParameterNames' => [],
             ],
-            description: 'Flags class-typed parameters whose variable name does not match the lower-camel type name.',
+            description: 'Flags class-typed parameters whose variable name does not match the lower-camel type name. Configure ignoredParameterNames to exempt project-specific parameter names (e.g., AST-walker conventions like $node or $context).',
         );
     }
 
@@ -69,6 +70,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         $definition = $this->definition();
         $settings = $context->settingsFor($definition);
         $typeSuffixesToTrim = $settings->stringListOption('typeSuffixesToTrim');
+        $ignoredParameterNames = $settings->stringListOption('ignoredParameterNames');
         $finder = new NodeFinder();
         $tokenizer = new IdentifierTokenizer();
         $findings = [];
@@ -79,6 +81,10 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
             foreach ($function->params as $param) {
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                    continue;
+                }
+
+                if (in_array($param->var->name, $ignoredParameterNames, true)) {
                     continue;
                 }
 

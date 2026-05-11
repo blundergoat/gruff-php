@@ -99,6 +99,22 @@ class PhpdocTagsFixture
     }
 
     /**
+     * Performs a side-effect with no return value.
+     */
+    public function voidWithDocblock(int $x): void
+    {
+        unset($x);
+    }
+
+    /**
+     * Always throws; never returns.
+     */
+    public function neverWithDocblock(int $x): never
+    {
+        throw new \RuntimeException('always: ' . $x);
+    }
+
+    /**
      * Stale param.
      *
      * @param int $x Exists.

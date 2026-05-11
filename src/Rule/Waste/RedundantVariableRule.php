@@ -33,7 +33,7 @@ final readonly class RedundantVariableRule implements RuleInterface
             tier: RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence: Confidence::High,
-            description: 'Flags variables that only store a value immediately returned by the next statement.',
+            description: 'Flags variables that only store a value immediately returned by the next statement, when the assignment and the return are the only two statements in their block.',
         );
     }
 
