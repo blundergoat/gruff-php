@@ -1,0 +1,192 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Tests\Console;
+
+use JsonException;
+use PHPUnit\Framework\TestCase;
+use RuntimeException;
+use Symfony\Component\Process\Process;
+
+abstract class CliTestCase extends TestCase
+{
+    protected const PROJECT_ROOT = __DIR__ . '/../..';
+
+    protected function createBaselineProject(): string
+    {
+        $project = $this->tempDir();
+        self::assertTrue(mkdir($project . '/src', 0777, true));
+
+        $fixture = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Source/Code/OrderCalculator.php');
+        self::assertIsString($fixture);
+        file_put_contents($project . '/src/OrderCalculator.php', $fixture);
+        // Provide a README so docs.missing-readme does not add an extra baseline entry.
+        file_put_contents($project . '/README.md', "Baseline workflow fixture.\n");
+
+        return $project;
+    }
+
+    /**
+     * @return array<string, mixed>
+     * @throws JsonException
+     */
+    protected function decodeJsonOutput(Process $process): array
+    {
+        $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        $report = [];
+
+        foreach ($decoded as $key => $value) {
+            self::assertIsString($key);
+            $report[$key] = $value;
+        }
+
+        return $report;
+    }
+
+    protected function tempDir(): string
+    {
+        $path = sys_get_temp_dir() . '/gruff-cli-' . bin2hex(random_bytes(6));
+
+        self::assertTrue(mkdir($path));
+
+        return $path;
+    }
+
+    protected function removeDir(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $items = scandir($path);
+        self::assertIsArray($items);
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $child = $path . '/' . $item;
+            if (is_dir($child) && !is_link($child)) {
+                $this->removeDir($child);
+                continue;
+            }
+
+            unlink($child);
+        }
+
+        rmdir($path);
+    }
+
+    protected function copyPackageTree(string $source, string $destination): void
+    {
+        self::assertTrue(mkdir($destination, 0777, true));
+
+        $source = rtrim($source, '/');
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+                static function (\SplFileInfo $file) use ($source): bool {
+                    $name = $file->getFilename();
+
+                    if ($file->isDir() && in_array($name, ['.git', 'vendor', 'node_modules', '.idea'], true)) {
+                        return false;
+                    }
+
+                    $relativePath = substr($file->getPathname(), strlen($source) + 1);
+                    $relativePath = str_replace('\\', '/', $relativePath);
+
+                    foreach (['.goat-flow/logs/', '.goat-flow/scratchpad/', '.goat-flow/tasks/'] as $ignoredPrefix) {
+                        if (str_starts_with($relativePath, $ignoredPrefix)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                },
+            ),
+            \RecursiveIteratorIterator::SELF_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            self::assertInstanceOf(\SplFileInfo::class, $item);
+            $relativePath = substr($item->getPathname(), strlen($source) + 1);
+            $targetPath = $destination . '/' . $relativePath;
+
+            if ($item->isDir()) {
+                if (!is_dir($targetPath)) {
+                    self::assertTrue(mkdir($targetPath, 0777, true));
+                }
+
+                continue;
+            }
+
+            self::assertTrue(copy($item->getPathname(), $targetPath));
+        }
+    }
+
+    protected function unusedPort(): int
+    {
+        $server = @stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+
+        if ($server === false) {
+            throw new RuntimeException(sprintf('Unable to allocate test port: %s (%d)', $errorMessage, $errorCode));
+        }
+
+        $name = stream_socket_get_name($server, false);
+        fclose($server);
+
+        if (!is_string($name) || !preg_match('/:(\d+)$/', $name, $matches)) {
+            throw new RuntimeException('Unable to read allocated test port.');
+        }
+
+        return (int) $matches[1];
+    }
+
+    protected function waitForHttpServer(int $port, Process $process): void
+    {
+        $deadline = microtime(true) + 5.0;
+
+        do {
+            if (!$process->isRunning()) {
+                self::fail($process->getErrorOutput() . $process->getOutput());
+            }
+
+            try {
+                $response = $this->fetchHttp($port, '/health');
+
+                if (str_contains($response, "HTTP/1.1 200 OK\r\n")) {
+                    return;
+                }
+            } catch (RuntimeException) {
+                usleep(50_000);
+            }
+        } while (microtime(true) < $deadline);
+
+        self::fail('Timed out waiting for gruff dashboard server. ' . $process->getErrorOutput() . $process->getOutput());
+    }
+
+    protected function fetchHttp(int $port, string $path): string
+    {
+        $socket = @stream_socket_client(sprintf('tcp://127.0.0.1:%d', $port), $errorCode, $errorMessage, 1.0);
+
+        if ($socket === false) {
+            throw new RuntimeException(sprintf('Unable to connect to report server: %s (%d)', $errorMessage, $errorCode));
+        }
+
+        stream_set_timeout($socket, 5);
+        fwrite($socket, sprintf("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n\r\n", $path, $port));
+        $response = stream_get_contents($socket);
+        fclose($socket);
+
+        if (!is_string($response)) {
+            throw new RuntimeException('Unable to read HTTP response.');
+        }
+
+        return $response;
+    }
+}

@@ -27,7 +27,7 @@ final class PhpUnitConfigDiscovery
             }
 
             $previous = libxml_use_internal_errors(true);
-            $loaded = simplexml_load_file($absolute);
+            $loaded = simplexml_load_file($absolute, SimpleXMLElement::class, LIBXML_NONET);
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
 

@@ -6,6 +6,10 @@ namespace GruffPhp\Command;
 
 final readonly class DashboardRequestHandler
 {
+    private const MAX_REQUEST_LINE_BYTES = 8192;
+    private const MAX_HEADER_LINES = 100;
+    private const MAX_HEADER_BYTES = 16384;
+
     public function __construct(
         private DashboardRequestContext $context,
         private DashboardStateFactory $stateFactory,
@@ -27,34 +31,56 @@ final readonly class DashboardRequestHandler
             return;
         }
 
-        $this->drainHeaders($client);
+        if ($request instanceof DashboardHttpResponse) {
+            $this->responder->write($client, $request, false);
+
+            return;
+        }
 
         $this->responder->write(
             $client,
-            $this->responseFor($request['method'], $request['target']),
+            $this->responseFor($request['method'], $request['target'], $request['headers']),
             $request['method'] === 'HEAD',
         );
     }
 
     /**
      * @param resource $client
-     * @return array{method: string, target: string}|null
+     * @return array{method: string, target: string, headers: array<string, string>}|DashboardHttpResponse|null
      */
-    private function request($client): ?array
+    private function request($client): array|DashboardHttpResponse|null
     {
-        $requestLine = fgets($client);
+        $requestLine = fgets($client, self::MAX_REQUEST_LINE_BYTES + 2);
 
-        if (!is_string($requestLine) || !preg_match('/^([A-Z]+)\s+(\S+)\s+HTTP\/\d(?:\.\d)?\r?\n$/', $requestLine, $matches)) {
+        if (!is_string($requestLine)) {
             return null;
+        }
+
+        if (strlen($requestLine) > self::MAX_REQUEST_LINE_BYTES) {
+            return $this->tooLargeResponse();
+        }
+
+        if (!preg_match('/^([A-Z]+)\s+(\S+)\s+HTTP\/\d(?:\.\d)?\r?\n$/', $requestLine, $matches)) {
+            return null;
+        }
+
+        $headers = $this->headers($client);
+
+        if ($headers instanceof DashboardHttpResponse) {
+            return $headers;
         }
 
         return [
             'method' => $matches[1],
             'target' => $matches[2],
+            'headers' => $headers,
         ];
     }
 
-    private function responseFor(string $method, string $target): DashboardHttpResponse
+    /**
+     * @param array<string, string> $headers
+     */
+    private function responseFor(string $method, string $target, array $headers): DashboardHttpResponse
     {
         if ($method !== 'GET' && $method !== 'HEAD') {
             return new DashboardHttpResponse(405, 'Method Not Allowed', 'Method Not Allowed', 'text/plain; charset=UTF-8');
@@ -62,6 +88,11 @@ final readonly class DashboardRequestHandler
 
         $path = parse_url($target, PHP_URL_PATH);
         $path = is_string($path) ? $path : '/';
+
+        if ($path !== '/health' && !$this->hostAllowed($headers['host'] ?? null)) {
+            return new DashboardHttpResponse(421, 'Misdirected Request', 'Misdirected Request', 'text/plain; charset=UTF-8');
+        }
+
         $query = $this->query($target);
 
         return match ($path) {
@@ -110,13 +141,77 @@ final readonly class DashboardRequestHandler
 
     /**
      * @param resource $client
+     * @return array<string, string>|DashboardHttpResponse
      */
-    private function drainHeaders($client): void
+    private function headers($client): array|DashboardHttpResponse
     {
-        while (($line = fgets($client)) !== false) {
-            if ($line === "\r\n" || $line === "\n") {
-                return;
+        $headers = [];
+        $lineCount = 0;
+        $byteCount = 0;
+
+        while (($line = fgets($client, self::MAX_HEADER_BYTES + 2)) !== false) {
+            $lineCount++;
+            $byteCount += strlen($line);
+
+            if ($lineCount > self::MAX_HEADER_LINES || $byteCount > self::MAX_HEADER_BYTES) {
+                return $this->tooLargeResponse();
             }
+
+            if ($line === "\r\n" || $line === "\n") {
+                return $headers;
+            }
+
+            $separator = strpos($line, ':');
+            if ($separator === false) {
+                continue;
+            }
+
+            $name = strtolower(trim(substr($line, 0, $separator)));
+            if ($name === '') {
+                continue;
+            }
+
+            $headers[$name] = trim(substr($line, $separator + 1));
         }
+
+        return $headers;
+    }
+
+    private function hostAllowed(?string $hostHeader): bool
+    {
+        if ($hostHeader === null || $hostHeader === '') {
+            return false;
+        }
+
+        $host = strtolower($hostHeader);
+        $port = null;
+
+        if (preg_match('/^\[(?<host>[^\]]+)\]:(?<port>\d+)$/', $host, $matches) === 1) {
+            $host = '[' . $matches['host'] . ']';
+            $port = (int) $matches['port'];
+        } elseif (preg_match('/^(?<host>[^:]+):(?<port>\d+)$/', $host, $matches) === 1) {
+            $host = $matches['host'];
+            $port = (int) $matches['port'];
+        }
+
+        if ($port !== $this->context->bindPort) {
+            return false;
+        }
+
+        if ($this->bindHostIsLoopback()) {
+            return in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true);
+        }
+
+        return $host === strtolower($this->context->bindHost);
+    }
+
+    private function bindHostIsLoopback(): bool
+    {
+        return in_array(strtolower($this->context->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
+    }
+
+    private function tooLargeResponse(): DashboardHttpResponse
+    {
+        return new DashboardHttpResponse(431, 'Request Header Fields Too Large', 'Request Header Fields Too Large', 'text/plain; charset=UTF-8');
     }
 }

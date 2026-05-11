@@ -121,11 +121,55 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Unable to encode baseline: %s', $exception->getMessage()), 0, $exception);
         }
 
-        if (file_put_contents($absolutePath, $json . PHP_EOL) === false) {
-            throw new BaselineException(sprintf('Unable to write baseline file: %s', $path));
-        }
+        $this->writeAtomically($absolutePath, $json . PHP_EOL, $path);
 
         return $data;
+    }
+
+    private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
+    {
+        $directory = dirname($absolutePath);
+        $tempPath = tempnam($directory, 'gruff-baseline-');
+
+        if (!is_string($tempPath)) {
+            throw new BaselineException(sprintf('Unable to create temporary baseline file: %s', $displayPath));
+        }
+
+        $handle = fopen($tempPath, 'wb');
+        if ($handle === false) {
+            @unlink($tempPath);
+            throw new BaselineException(sprintf('Unable to write baseline file: %s', $displayPath));
+        }
+
+        try {
+            $offset = 0;
+            $length = strlen($payload);
+
+            while ($offset < $length) {
+                $written = fwrite($handle, substr($payload, $offset));
+
+                if ($written === false || $written === 0) {
+                    throw new BaselineException(sprintf('Unable to write baseline file: %s', $displayPath));
+                }
+
+                $offset += $written;
+            }
+
+            if (fflush($handle) === false) {
+                throw new BaselineException(sprintf('Unable to write baseline file: %s', $displayPath));
+            }
+
+            if (function_exists('fsync') && !fsync($handle)) {
+                throw new BaselineException(sprintf('Unable to flush baseline file: %s', $displayPath));
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        if (!rename($tempPath, $absolutePath)) {
+            @unlink($tempPath);
+            throw new BaselineException(sprintf('Unable to replace baseline file: %s', $displayPath));
+        }
     }
 
     private function absolutePath(string $path): string

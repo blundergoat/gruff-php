@@ -42,9 +42,10 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $finder = new NodeFinder();
         $findings = [];
         $cleanupCache = [];
+        $classesByName = $this->classesByName($unit, $finder);
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            if (!$this->scopeNeedsCleanupCheck($scope, $cleanupCache)) {
+            if (!$this->scopeNeedsCleanupCheck($scope, $cleanupCache, $classesByName)) {
                 continue;
             }
 
@@ -60,8 +61,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
     /**
      * @param array<int, bool> $cleanupCache
+     * @param array<string, Stmt\Class_> $classesByName
      */
-    private function scopeNeedsCleanupCheck(TestQualityScope $scope, array &$cleanupCache): bool
+    private function scopeNeedsCleanupCheck(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
         if ($scope->isPest) {
             return false;
@@ -74,7 +76,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
         $classKey = spl_object_id($class);
         if (!array_key_exists($classKey, $cleanupCache)) {
-            $cleanupCache[$classKey] = $this->classHasCleanup($class);
+            $cleanupCache[$classKey] = $this->classHasCleanup($class, $classesByName);
         }
 
         return !$cleanupCache[$classKey];
@@ -156,8 +158,19 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         return in_array($variable->name, self::SUPERGLOBALS, true) ? $variable->name : null;
     }
 
-    private function classHasCleanup(Stmt\Class_ $class): bool
+    /**
+     * @param array<string, Stmt\Class_> $classesByName
+     * @param array<int, true> $visited
+     */
+    private function classHasCleanup(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
     {
+        $classId = spl_object_id($class);
+        if (isset($visited[$classId])) {
+            return false;
+        }
+
+        $visited[$classId] = true;
+
         foreach ($class->getMethods() as $method) {
             $methodName = strtolower($method->name->toString());
 
@@ -177,7 +190,49 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
         }
 
-        return false;
+        if ($class->extends === null) {
+            return false;
+        }
+
+        $parentName = $class->extends->toString();
+        $parent = $classesByName[$parentName] ?? $classesByName[$this->shortName($parentName)] ?? null;
+
+        if (!$parent instanceof Stmt\Class_) {
+            return !in_array($this->shortName($parentName), ['TestCase'], true);
+        }
+
+        return $this->classHasCleanup($parent, $classesByName, $visited);
+    }
+
+    /**
+     * @return array<string, Stmt\Class_>
+     */
+    private function classesByName(AnalysisUnit $unit, NodeFinder $finder): array
+    {
+        $classes = [];
+
+        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+            if (!$class->name instanceof Node\Identifier) {
+                continue;
+            }
+
+            $name = $class->name->toString();
+            $classes[$name] = $class;
+            $namespacedName = $class->getAttribute('namespacedName');
+
+            if ($namespacedName instanceof Node\Name) {
+                $classes[$namespacedName->toString()] = $class;
+            }
+        }
+
+        return $classes;
+    }
+
+    private function shortName(string $name): string
+    {
+        $parts = explode('\\', $name);
+
+        return $parts[array_key_last($parts)] ?? $name;
     }
 
     /**

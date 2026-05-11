@@ -143,6 +143,14 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn += count($all);
 
+        foreach ($finder->findInstanceOf($body, Expr\Match_::class) as $match) {
+            foreach ($match->arms as $arm) {
+                if ($arm->conds !== null) {
+                    $ccn += count($arm->conds);
+                }
+            }
+        }
+
         return $ccn;
     }
 

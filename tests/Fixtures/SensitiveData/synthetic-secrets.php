@@ -12,6 +12,8 @@ $jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sflKxwRJSMeKKF2QT4fwpMe
 $database = 'mysql://appuser:rN7pQ4sV9xY2zA5b@db.internal/app';
 $envSnippet = 'API_TOKEN=rN7pQ4sV9xY2zA5bC8dG';
 $entropy = 'M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ';
+$hexDigest = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+$alphaPassword = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZzQqRr';
 $privateKey = <<<KEY
 -----BEGIN RSA PRIVATE KEY-----
 synthetic fixture body redacted

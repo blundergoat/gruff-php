@@ -38,6 +38,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
             'if/elseif' => ['ifElseIf', 3],
             'loop with condition' => ['loopWithCondition', 4],
             'switch block' => ['switchBlock', 4],
+            'match block' => ['matchBlock', 4],
             'mixed operators' => ['mixedOperators', 7],
             'try/catch loop' => ['tryCatchLoop', 4],
         ];

@@ -71,7 +71,7 @@ final class DashboardCommand extends Command
         }
 
         $host = $stateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
-        $context = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout);
+        $context = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
         $server = new DashboardServer($stateFactory, $this->gruffBinary());
 
         return $server->serve($output, $host, $port, $context);

@@ -23,7 +23,12 @@ final readonly class DashboardScanCommandBuilder
             return ['.'];
         }
 
-        return array_values(array_filter($parts, static fn (string $path): bool => $path !== ''));
+        $paths = array_values(array_filter(
+            $parts,
+            static fn (string $path): bool => $path !== '' && !str_starts_with($path, '-'),
+        ));
+
+        return $paths === [] ? ['.'] : $paths;
     }
 
     /**
@@ -34,7 +39,7 @@ final readonly class DashboardScanCommandBuilder
      */
     public function analyseCommand(array $paths, array $state): array
     {
-        $command = [PHP_BINARY, $this->gruffBinary, 'analyse', ...$paths, '--format', 'html', '--fail-on', $state['failOn']];
+        $command = [PHP_BINARY, $this->gruffBinary, 'analyse', '--format', 'html', '--fail-on', $state['failOn']];
 
         if ($state['noConfig'] === '1') {
             $command[] = '--no-config';
@@ -61,6 +66,9 @@ final readonly class DashboardScanCommandBuilder
         if ($state['scanScope'] === 'diff') {
             $command[] = '--diff';
         }
+
+        $command[] = '--';
+        array_push($command, ...$paths);
 
         return $command;
     }

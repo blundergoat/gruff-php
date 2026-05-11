@@ -42,4 +42,14 @@ final class MultipleAaaCyclesTest extends TestCase
         self::assertSame(1, $result);
         self::assertNotNull($result);
     }
+
+    // Edge: an act statement followed by an inline act-and-assert statement is one cycle, not two.
+    public function testActThenInlineActAssertCountsAsOneCycle(): void
+    {
+        $service = new OrderService();
+
+        $service->run('warmup');
+
+        self::assertSame(1, $service->run('one'));
+    }
 }

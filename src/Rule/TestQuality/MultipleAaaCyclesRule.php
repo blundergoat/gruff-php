@@ -91,19 +91,16 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                 }
             }
 
-            if ($hasAssertion && $sawNonAssertionCall) {
-                $cycles++;
+            if ($hasAssertion) {
+                if ($sawNonAssertionCall || $hasNonAssertionCall) {
+                    $cycles++;
+                }
+
                 $sawNonAssertionCall = false;
+                continue;
             }
 
-            if ($hasNonAssertionCall && !$hasAssertion) {
-                $sawNonAssertionCall = true;
-            }
-
-            // Statement that has both act and assert (e.g. assertSame($x, $sut->run())) counts as one mini-cycle.
-            if ($hasAssertion && $hasNonAssertionCall) {
-                $cycles++;
-            }
+            $sawNonAssertionCall = $hasNonAssertionCall;
         }
 
         return $cycles;

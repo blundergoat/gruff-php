@@ -15,8 +15,9 @@ final readonly class GitArchiveSnapshot
      */
     public function create(string $projectRoot, string $ref, array $paths = []): string
     {
+        $ref = $this->validatedRef($ref);
         $tempRoot = rtrim(sys_get_temp_dir(), '/') . '/gruff-review-' . bin2hex(random_bytes(6));
-        if (!mkdir($tempRoot, 0777, true) && !is_dir($tempRoot)) {
+        if (!mkdir($tempRoot, 0700, true) && !is_dir($tempRoot)) {
             throw new RuntimeException(sprintf('Unable to create review snapshot directory "%s".', $tempRoot));
         }
 
@@ -179,5 +180,14 @@ final readonly class GitArchiveSnapshot
         }
 
         return $path;
+    }
+
+    private function validatedRef(string $ref): string
+    {
+        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {
+            throw new DiffException(sprintf('Git archive base ref "%s" is not a safe git ref name.', $ref));
+        }
+
+        return $ref;
     }
 }

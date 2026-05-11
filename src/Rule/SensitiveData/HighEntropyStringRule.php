@@ -53,7 +53,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             }
 
             $entropy = SecretScannerHelper::entropy($value);
-            if ($entropy < $entropyThreshold) {
+            if ($entropy < $entropyThreshold && !(strlen($value) >= 64 && ctype_xdigit($value))) {
                 continue;
             }
 
@@ -83,8 +83,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || str_starts_with($value, 'ghp_')
             || str_starts_with($value, 'xox')
             || substr_count($value, '.') === 2
-            || ctype_xdigit($value)
-            || ctype_alpha($value);
+            || (strlen($value) <= 48 && ctype_alpha($value));
     }
 
     private function isPathLikeLiteral(string $value): bool

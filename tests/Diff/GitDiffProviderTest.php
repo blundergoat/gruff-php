@@ -80,6 +80,37 @@ final class GitDiffProviderTest extends TestCase
         }
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function unsafeDiffModeProvider(): array
+    {
+        return [
+            'no-renames option' => ['--no-renames'],
+            'upload-pack option' => ['--upload-pack=anything'],
+            'leading hyphen ref' => ['-x'],
+            'whitespace ref' => ['feature branch'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
+    public function testGitDiffProviderRejectsUnsafeBaseRefs(string $mode): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->runGit($tempDir, 'init');
+
+            self::expectException(DiffException::class);
+            self::expectExceptionMessage('safe git ref name');
+
+            (new GitDiffProvider())->changedLines($tempDir, $mode);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
     private function finding(string $filePath, int $line): Finding
     {
         return new Finding(

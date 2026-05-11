@@ -53,6 +53,16 @@ class CyclomaticFixture
         }
     }
 
+    // CCN = 4 (1 + two concrete match conditions + one multi-condition arm; default excluded)
+    public function matchBlock(int $x): string
+    {
+        return match ($x) {
+            1 => 'one',
+            2, 3 => 'small',
+            default => 'other',
+        };
+    }
+
     // CCN = 7 (1 + foreach + if + || + ternary + ?? + ??)
     public function mixedOperators(array $items, ?int $fallback): int
     {

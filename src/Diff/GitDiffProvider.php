@@ -52,8 +52,17 @@ final readonly class GitDiffProvider
             'staged' => ['git', 'diff', '--cached', '--unified=0', '--no-ext-diff', '--'],
             'unstaged' => ['git', 'diff', '--unified=0', '--no-ext-diff', '--'],
             'working-tree' => ['git', 'diff', '--unified=0', '--no-ext-diff', 'HEAD', '--'],
-            default => ['git', 'diff', '--unified=0', '--no-ext-diff', $mode, '--'],
+            default => ['git', 'diff', '--unified=0', '--no-ext-diff', $this->validatedRef($mode), '--'],
         };
+    }
+
+    private function validatedRef(string $ref): string
+    {
+        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {
+            throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
+        }
+
+        return $ref;
     }
 
     private function normaliseMode(string $mode): string

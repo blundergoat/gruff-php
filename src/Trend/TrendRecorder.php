@@ -29,11 +29,13 @@ final readonly class TrendRecorder
         $entries = array_slice($entries, -50);
         $directory = dirname($resolvedPath);
 
-        if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException(sprintf('Unable to create history directory: %s', $directory));
         }
 
-        file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL);
+        if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL) === false) {
+            throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
+        }
 
         return new TrendReport(
             path: $this->displayPath($projectRoot, $resolvedPath),

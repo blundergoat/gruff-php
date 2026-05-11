@@ -13,6 +13,8 @@ final readonly class DashboardRequestContext
         public string $launchRoot,
         public string $projectRoot,
         public ?float $scanTimeout,
+        public string $bindHost,
+        public int $bindPort,
     ) {
     }
 }

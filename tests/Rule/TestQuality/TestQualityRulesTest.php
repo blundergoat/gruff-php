@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
@@ -179,7 +180,7 @@ final class TestQualityRulesTest extends TestCase
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/global-state-mutation.php');
 
-        // 3 mutations in the leaky class (superglobal write + putenv + ini_set), 0 in the cleaned-up class, 0 in the read-only class.
+        // 3 mutations in the leaky class (superglobal write + putenv + ini_set), 0 in classes with local or inherited cleanup, 0 in the read-only class.
         self::assertRuleCount(GlobalStateMutationRule::ID, 3, $findings);
     }
 
@@ -232,6 +233,24 @@ final class TestQualityRulesTest extends TestCase
         );
 
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $optedInFindings);
+    }
+
+    public function testMultipleAaaCyclesDoesNotDoubleCountInlineActAssertAfterActStatement(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(MultipleAaaCyclesRule::ID);
+        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            MultipleAaaCyclesRule::ID,
+            new RuleSettings(true, ['minCycles' => 1], $settings->options),
+        );
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config),
+            static fn (Finding $finding): bool => $finding->ruleId === MultipleAaaCyclesRule::ID
+                && $finding->symbol === 'MultipleAaaCyclesTest::testActThenInlineActAssertCountsAsOneCycle()',
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame(1, $findings[0]->metadata['cycles']);
     }
 
     public function testTestdoxReadabilityIsDisabledByDefaultButFiresWhenOptedIn(): void

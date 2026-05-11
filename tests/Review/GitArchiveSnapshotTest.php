@@ -78,6 +78,35 @@ final class GitArchiveSnapshotTest extends TestCase
         }
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function unsafeRefProvider(): array
+    {
+        return [
+            'no-renames option' => ['--no-renames'],
+            'upload-pack option' => ['--upload-pack=anything'],
+            'leading hyphen ref' => ['-x'],
+            'whitespace ref' => ['feature branch'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
+    public function testCreateRejectsUnsafeRefsBeforeArchiving(string $ref): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->repoWithBaseFiles();
+
+        try {
+            self::expectException(DiffException::class);
+            self::expectExceptionMessage('safe git ref name');
+
+            (new GitArchiveSnapshot())->create($repo, $ref);
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
     private function repoWithBaseFiles(): string
     {
         $repo = $this->tempDir('gruff-snapshot-repo-');

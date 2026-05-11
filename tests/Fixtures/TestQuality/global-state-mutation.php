@@ -72,3 +72,22 @@ final class GlobalStateMutationReadOnlyTest extends TestCase
         self::assertNotSame('', $value);
     }
 }
+
+abstract class GlobalStateMutationBaseCleanupTest extends TestCase
+{
+    protected function tearDown(): void
+    {
+        unset($_SERVER['GLOBAL_STATE_MUTATION']);
+    }
+}
+
+// Edge: cleanup inherited from a same-file parent class satisfies the rule.
+final class GlobalStateMutationInheritedCleanupTest extends GlobalStateMutationBaseCleanupTest
+{
+    public function testWritesWithInheritedCleanup(): void
+    {
+        $_SERVER['GLOBAL_STATE_MUTATION'] = 'changed';
+
+        self::assertSame('changed', $_SERVER['GLOBAL_STATE_MUTATION']);
+    }
+}

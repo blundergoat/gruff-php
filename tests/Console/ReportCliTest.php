@@ -1,0 +1,157 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Tests\Console;
+
+use JsonException;
+use Symfony\Component\Process\Process;
+
+final class ReportCliTest extends CliTestCase
+{
+    public function testReportCommandOutputsStaticHtmlReport(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('<section class="verdict">', $process->getOutput());
+        self::assertStringContainsString('inspection report', $process->getOutput());
+        self::assertStringNotContainsString('gruff-dashboard-toolbar', $process->getOutput());
+    }
+
+    public function testReportCommandForwardsHtmlReportFlags(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--fail-on',
+            'none',
+            '--report-editor-link',
+            'vscode',
+            '--report-interactive',
+            '--no-config',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('href="vscode://file/', $process->getOutput());
+        self::assertStringContainsString('class="finding-filters"', $process->getOutput());
+
+        $static = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--fail-on',
+            'none',
+            '--report-interactive=false',
+            '--no-config',
+        ], self::PROJECT_ROOT);
+        $static->run();
+
+        self::assertSame(0, $static->getExitCode(), $static->getErrorOutput());
+        self::assertStringNotContainsString('class="finding-filters"', $static->getOutput());
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testReportCommandOutputsJsonReport(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'json',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report = $this->decodeJsonOutput($process);
+        self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
+    }
+
+    public function testReportCommandWritesStaticHtmlReport(): void
+    {
+        $tempDir = $this->tempDir();
+        $reportPath = $tempDir . '/gruff-report.html';
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff',
+                'report',
+                'tests/Fixtures/Source/Code',
+                '--output',
+                $reportPath,
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertStringContainsString('Report written to', $process->getOutput());
+            self::assertFileExists($reportPath);
+
+            $html = file_get_contents($reportPath);
+            self::assertIsString($html);
+            self::assertStringContainsString('<section class="verdict">', $html);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    public function testReportCommandForwardsBaselineFlag(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $generate = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'src',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--generate-baseline',
+            ], $project);
+            $generate->run();
+            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+
+            $report = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'report',
+                'src',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--baseline=gruff-baseline.json',
+            ], $project);
+            $report->run();
+
+            self::assertSame(0, $report->getExitCode(), $report->getErrorOutput());
+            $decoded = $this->decodeJsonOutput($report);
+            $baseline = $decoded['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            self::assertSame(1, $baseline['suppressedFindings'] ?? null);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+}

@@ -39,7 +39,7 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
         self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
-        self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
+        self::assertRuleCount(HighEntropyStringRule::ID, 3, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
         foreach ($this->secretValues() as $secret) {
@@ -240,6 +240,8 @@ PHP));
             'API_TOKEN=' . 'rN7pQ4sV9xY2zA5bC8dG',
             'API_TOKEN=' . 'qR8vT3mK6pL9xS2nD4eG',
             'M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ',
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+            'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZzQqRr',
             'N8pQ3rT6uW9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ',
         ];
     }
