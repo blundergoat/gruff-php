@@ -8,6 +8,7 @@ use GruffPhp\Command\AnalyseCommand;
 use GruffPhp\Command\DashboardCommand;
 use GruffPhp\Command\ListRulesCommand;
 use GruffPhp\Command\ReportCommand;
+use GruffPhp\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
 final class Application extends SymfonyApplication
@@ -22,5 +23,6 @@ final class Application extends SymfonyApplication
         $this->add(new DashboardCommand());
         $this->add(new ListRulesCommand());
         $this->add(new ReportCommand());
+        $this->add(new SummaryCommand());
     }
 }

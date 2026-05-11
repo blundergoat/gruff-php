@@ -59,10 +59,20 @@ php bin/gruff analyse src/ --no-config
 | Command | Purpose |
 |---------|---------|
 | [`analyse`](src/Command/AnalyseCommand.php) | Run the rule registry over the supplied paths and emit a report in the chosen format. The main command. |
+| [`summary`](src/Command/SummaryCommand.php) | Run a scan and print a compact digest only &mdash; composite score, per-pillar finding counts, top rules, top file offenders &mdash; with no per-finding spam. See [`docs/gruff-cli-summary.md`](docs/gruff-cli-summary.md). |
 | [`report`](src/Command/ReportCommand.php) | Convenience wrapper around `analyse` for static HTML or JSON reports written to stdout or `--output <file>`. |
 | [`dashboard`](src/Command/DashboardCommand.php) | Serve a local interactive dashboard (default `127.0.0.1:8765`) that re-runs scans against the current or another project root on demand. |
+| [`list-rules`](src/Command/ListRulesCommand.php) | Print rule metadata (id, pillar, default severity, description) as a table or JSON. |
 
 `php bin/gruff list` shows the full Symfony Console listing including `help` and `completion`.
+
+```bash
+# Quick digest of the project (text)
+php bin/gruff summary src/
+
+# JSON for tooling (schema: gruff.summary.v1)
+php bin/gruff summary src/ --format=json --top=5
+```
 
 ## Output formats
 
