@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-05-10
+last_reviewed: 2026-05-11
 ---
 
 # Workflow Lessons
@@ -43,3 +43,13 @@ last_reviewed: 2026-05-10
 3. **Inline expected-value assertions in `tests/Console/` and `tests/Rule/`.** Search for the affected fixture's filename plus literal numbers (line counts, line numbers) before assuming the file is unaffected. The `RuleRegistry::analyse` finding count and the file-length metadata `lines` value drift even when no test directly mentions the new rule.
 
 For the dogfood snapshots also expect new findings on the gruff source tree itself (new rule fires on the new rule files) and on test files that don't have docblocks. Those are signal, not regression, as long as every diff is contained to files added in the same PR.
+
+## Lesson: Respect explicit rule style even when it restates native syntax
+
+**Created:** 2026-05-11
+
+**What happened:** During healthkit dogfooding, the user asked why private helper docblocks without `@return` were not being flagged. The agent initially pushed back that adding bare `@return string` / `@return bool` tags restated native signatures and created comment noise. The user clarified that gruff's project standard is stricter: `docs.missing-return-tag` must catch every documented method/function without `@return`, including private helpers.
+
+**Root cause:** The agent applied a general PHPDoc minimalism preference instead of treating the user's explicit rule standard as the source of truth for this analyser. gruff is an opinionated scanner; some rules intentionally require documentation that another project might consider redundant.
+
+**Prevention:** When the user specifies a rule standard, implement and verify that standard directly. Do not soften it based on generic style guidance unless the user asks for trade-offs. For PHPDoc rules in this repo, preserve the rule contract in tests using examples from both public methods and private helpers so future agents cannot narrow behavior back to "public contract only" or "only when the native signature is insufficient."

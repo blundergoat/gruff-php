@@ -10,6 +10,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
+use GruffPhp\Rule\Docs\ContinueCommentRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
@@ -19,15 +20,18 @@ use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
+use GruffPhp\Rule\Docs\ReturnCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
+use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rule\Naming\BooleanPrefixRule;
 use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
+use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
@@ -99,6 +103,7 @@ use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
 use GruffPhp\Rule\Waste\OneLineMethodRule;
+use GruffPhp\Rule\Waste\RedundantVariableRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
@@ -157,6 +162,7 @@ final class RuleRegistry
             new EmptyClassRule(),
             new EmptyMethodRule(),
             new OneLineMethodRule(),
+            new RedundantVariableRule(),
             new UnreachableCodeRule(),
             new UnusedImportRule(),
             new UnusedParameterRule(),
@@ -166,6 +172,7 @@ final class RuleRegistry
             new GenericMethodNameRule(),
             new HungarianNotationRule(),
             new IdentifierQualityRule(),
+            new ParameterTypeNameRule(),
             new ShortVariableRule(),
             new TestNamingConsistencyRule(),
             new ConstructorPromotionCandidateRule(),
@@ -232,6 +239,7 @@ final class RuleRegistry
             new TrivialAssertionRule(),
             new TrivialSnapshotRule(),
             new UnusedMockRule(),
+            new ContinueCommentRule(),
             new MissingClassPhpdocRule(),
             new MissingConstantPhpdocRule(),
             new MissingFilePhpdocRule(),
@@ -241,9 +249,11 @@ final class RuleRegistry
             new MissingReadmeRule(),
             new MissingReturnTagRule(),
             new MissingThrowsTagRule(),
+            new ReturnCommentRule(),
             new StaleParamTagRule(),
             new TodoDensityRule(),
             new UselessPhpdocRule(),
+            new VarAnnotationDescriptionRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),
             new FileLengthRule(),

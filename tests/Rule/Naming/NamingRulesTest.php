@@ -14,6 +14,7 @@ use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Naming\IdentifierTokenizer;
+use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\RuleContext;
@@ -267,6 +268,34 @@ final class NamingRulesTest extends TestCase
         self::assertSame(['item'], $itemFinding->metadata['tokens']);
         self::assertSame('item', $itemFinding->metadata['matchedToken']);
         self::assertSame(Severity::Advisory, $itemFinding->severity);
+    }
+
+    public function testParameterNamesMatchObjectTypeNames(): void
+    {
+        $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
+
+        $reported = [];
+        foreach ($findings as $finding) {
+            $reported[$finding->metadata['parameter'] ?? ''] = $finding->metadata['expectedName'] ?? null;
+        }
+
+        self::assertSame('bookingSession', $reported['session'] ?? null);
+        self::assertSame('bookingIntent', $reported['intent'] ?? null);
+        self::assertSame('bookingRequestContext', $reported['requestContext'] ?? null);
+    }
+
+    public function testParameterTypeNameExemptsAlreadySpecificAndBuiltinNames(): void
+    {
+        $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
+        $reported = array_map(static fn ($finding): mixed => $finding->metadata['parameter'] ?? null, $findings);
+
+        self::assertNotContains('bookingSession', $reported);
+        self::assertNotContains('bookingIntent', $reported);
+        self::assertNotContains('bookingRequestContext', $reported);
+        self::assertNotContains('entityManager', $reported);
+        self::assertNotContains('name', $reported);
+        self::assertNotContains('items', $reported);
+        self::assertNotContains('dateTimeImmutable', $reported);
     }
 
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void

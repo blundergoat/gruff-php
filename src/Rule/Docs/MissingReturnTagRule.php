@@ -15,7 +15,6 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
-use PhpParser\Node\Identifier;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
@@ -48,7 +47,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node */
-            if ($node instanceof ClassMethod && !$node->isPublic()) {
+            if ($node instanceof ClassMethod && $this->isReturnlessMagicMethod($node)) {
                 continue;
             }
 
@@ -58,23 +57,9 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 continue;
             }
 
-            $returnType = $node->getReturnType();
-
-            if ($returnType === null) {
-                continue;
-            }
-
-            if ($returnType instanceof Identifier && $returnType->toString() === 'void') {
-                continue;
-            }
-
             $docText = $docComment->getText();
 
             if (str_contains($docText, '@return')) {
-                continue;
-            }
-
-            if (!$this->hasContractDoc($docText)) {
                 continue;
             }
 
@@ -97,17 +82,8 @@ final readonly class MissingReturnTagRule implements RuleInterface
         return $findings;
     }
 
-    private function hasContractDoc(string $docText): bool
+    private function isReturnlessMagicMethod(ClassMethod $method): bool
     {
-        foreach (preg_split('/\R/', $docText) ?: [] as $line) {
-            $line = trim($line, " \t\n\r\0\x0B/*");
-            if ($line === '' || str_starts_with($line, '@')) {
-                continue;
-            }
-
-            return true;
-        }
-
-        return preg_match('/@(param|throws|var|template|phpstan-return|psalm-return)\b/', $docText) === 1;
+        return in_array($method->name->toString(), ['__construct', '__destruct'], true);
     }
 }

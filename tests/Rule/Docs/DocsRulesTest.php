@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Rule\Docs\ContinueCommentRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
@@ -14,9 +15,11 @@ use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
+use GruffPhp\Rule\Docs\ReturnCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
+use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
@@ -201,17 +204,18 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::missingReturnForDescriptiveDocblock()', $symbols);
     }
 
-    public function testSemanticOnlyDocblockDoesNotRequireSignatureTags(): void
+    public function testAnyDocumentedMethodRequiresReturnTag(): void
     {
         $paramFindings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
         $returnFindings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $symbols = array_merge(
-            array_map(static fn ($f) => $f->symbol, $paramFindings),
-            array_map(static fn ($f) => $f->symbol, $returnFindings),
-        );
+        $paramSymbols = array_map(static fn ($f) => $f->symbol, $paramFindings);
+        $returnSymbols = array_map(static fn ($f) => $f->symbol, $returnFindings);
 
-        self::assertNotContains('PhpdocTagsFixture::apiMarkerOnly()', $symbols);
+        self::assertNotContains('PhpdocTagsFixture::apiMarkerOnly()', $paramSymbols);
+        self::assertContains('PhpdocTagsFixture::apiMarkerOnly()', $returnSymbols);
+        self::assertContains('PhpdocTagsFixture::privateMissingReturnTag()', $returnSymbols);
+        self::assertNotContains('PhpdocTagsFixture::privateCompleteReturnTag()', $returnSymbols);
     }
 
     public function testStaleParamTagDetected(): void
@@ -272,6 +276,31 @@ final class DocsRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame(6, $findings[0]->metadata['count']);
+    }
+
+    public function testContinueRequiresDirectOneLineComment(): void
+    {
+        $findings = $this->analyseRule('control-flow-comments.php', ContinueCommentRule::ID);
+        $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
+
+        self::assertSame([19, 30], $lines);
+    }
+
+    public function testReturnRequiresDirectOneLineComment(): void
+    {
+        $findings = $this->analyseRule('control-flow-comments.php', ReturnCommentRule::ID);
+        $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
+
+        self::assertSame([35, 46], $lines);
+    }
+
+    public function testVarAnnotationsRequireDescription(): void
+    {
+        $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
+
+        self::assertCount(1, $findings);
+        self::assertSame('missing', $findings[0]->metadata['variable'] ?? null);
+        self::assertSame('$missing', $findings[0]->symbol);
     }
 
     public function testCleanFixtureHasNoDocFindings(): void

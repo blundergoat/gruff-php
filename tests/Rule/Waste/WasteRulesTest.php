@@ -13,6 +13,7 @@ use GruffPhp\Rule\Waste\CommentedOutCodeRule;
 use GruffPhp\Rule\Waste\EmptyClassRule;
 use GruffPhp\Rule\Waste\EmptyMethodRule;
 use GruffPhp\Rule\Waste\OneLineMethodRule;
+use GruffPhp\Rule\Waste\RedundantVariableRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
@@ -194,6 +195,14 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
         self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
         self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
+    }
+
+    public function testRedundantVariableBeforeReturnDetected(): void
+    {
+        $findings = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
+        $variables = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
+
+        self::assertSame(['result', 'branchResult'], $variables);
     }
 
     public function testCleanFileHasNoWasteFindings(): void

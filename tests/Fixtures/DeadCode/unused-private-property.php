@@ -24,3 +24,18 @@ class UnusedPrivatePropertyFixture
         return $this->usedProp;
     }
 }
+
+final readonly class PromotedPrivatePropertyFixture
+{
+    public function __construct(
+        private string $usedPromoted,
+        private string $neverReadPromoted,
+        public string $publicPromoted,
+    ) {
+    }
+
+    public function value(): string
+    {
+        return $this->usedPromoted;
+    }
+}

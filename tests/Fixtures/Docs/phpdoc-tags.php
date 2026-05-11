@@ -9,6 +9,7 @@ interface DocumentedContract
     /**
      * Contract docs live here.
      *
+     * @return int The accepted value.
      * @throws \RuntimeException when the value is invalid.
      */
     public function inheritedThrows(int $value): int;
@@ -169,6 +170,24 @@ class PhpdocTagsFixture
     public function arrayShapeDoc(): array
     {
         return [['label' => 'Name', 'value' => 'Ada']];
+    }
+
+    /**
+     * Private helpers with docs still need return tags.
+     */
+    private function privateMissingReturnTag(): string
+    {
+        return 'value';
+    }
+
+    /**
+     * Private helpers are clean when the return tag is present.
+     *
+     * @return string The resolved value.
+     */
+    private function privateCompleteReturnTag(): string
+    {
+        return 'value';
     }
 }
 

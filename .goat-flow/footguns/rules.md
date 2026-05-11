@@ -29,6 +29,14 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
 
+## Footgun: Constructor-promoted properties bypass property-node scans
+
+**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
+
+Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rule/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as healthkit's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
+
+**Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
+
 ## Footgun: Project rules need full project context, not `--changed-only`
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED

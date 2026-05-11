@@ -51,6 +51,9 @@ rules:
     # Single-implementor interfaces add abstraction overhead without polymorphism payoff.
     design.single-implementor-interface:
         enabled: true
+    # Loop skips need local context at the exact branch that exits early.
+    docs.continue-comment:
+        enabled: true
     # Classes, interfaces, traits, and enums need a docblock explaining their purpose.
     docs.missing-class-phpdoc:
         enabled: true
@@ -75,6 +78,9 @@ rules:
     # Return docs clarify nullable, collection, and domain meanings.
     docs.missing-return-tag:
         enabled: true
+    # Return paths need local context at the exact branch that exits.
+    docs.return-comment:
+        enabled: true
     # Throws docs make failure modes visible to callers.
     docs.missing-throws-tag:
         enabled: true
@@ -88,6 +94,9 @@ rules:
         severity: error
     # Empty or redundant comments make real documentation harder to find.
     docs.useless-phpdoc:
+        enabled: true
+    # Inline @var type assertions need a reason, not just a restated type.
+    docs.var-annotation-description:
         enabled: true
     # Constructor promotion reduces boilerplate and keeps state obvious.
     modernisation.constructor-promotion-candidate:
@@ -169,6 +178,9 @@ rules:
                 - key
                 - value
             minScopeReferences: 1
+    # Class-typed parameters should carry their object role in the variable name.
+    naming.parameter-type-name:
+        enabled: true
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true
@@ -436,6 +448,9 @@ rules:
         enabled: true
         options:
             minParameters: 1
+    # Variables assigned only to be returned add noise without naming value.
+    waste.redundant-variable:
+        enabled: true
     # Unreachable code is dead logic that cannot be tested.
     waste.unreachable-code:
         enabled: true

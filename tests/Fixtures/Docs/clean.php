@@ -27,6 +27,7 @@ class CleanDocsFixture
             $total += $item;
         }
 
+        // The accumulated total is the documented result of this fixture.
         return $total;
     }
 }

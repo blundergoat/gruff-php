@@ -98,6 +98,28 @@ final class DeadCodeRulesTest extends TestCase
         self::assertStringContainsString('written but never read', $neverRead[0]->message);
     }
 
+    public function testPromotedPrivatePropertyDetectedWhenNeverRead(): void
+    {
+        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
+
+        $neverRead = array_values(array_filter(
+            $findings,
+            static fn ($f) => $f->symbol === 'PromotedPrivatePropertyFixture::$neverReadPromoted',
+        ));
+
+        self::assertCount(1, $neverRead);
+        self::assertStringContainsString('written but never read', $neverRead[0]->message);
+    }
+
+    public function testUsedPromotedPrivatePropertyNotFlagged(): void
+    {
+        $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertNotContains('PromotedPrivatePropertyFixture::$usedPromoted', $symbols);
+        self::assertNotContains('PromotedPrivatePropertyFixture::$publicPromoted', $symbols);
+    }
+
     public function testCleanFileHasNoDeadCodeFindings(): void
     {
         $findings = array_merge(

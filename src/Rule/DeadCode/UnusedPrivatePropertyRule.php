@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Modifiers;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
@@ -69,7 +70,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
     /**
      * @param Class_|Trait_|Enum_ $classLike
-     * @return array<string, Stmt\Property>
+     * @return array<string, array{line: int, writtenByDeclaration: bool}>
      */
     private function privateProperties(Class_|Trait_|Enum_ $classLike): array
     {
@@ -81,7 +82,31 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             }
 
             foreach ($stmt->props as $prop) {
-                $privateProps[$prop->name->toString()] = $stmt;
+                $privateProps[$prop->name->toString()] = [
+                    'line' => $prop->getStartLine(),
+                    'writtenByDeclaration' => $prop->default !== null,
+                ];
+            }
+        }
+
+        foreach ($classLike->stmts as $stmt) {
+            if (!$stmt instanceof Stmt\ClassMethod || strtolower($stmt->name->toString()) !== '__construct') {
+                continue;
+            }
+
+            foreach ($stmt->params as $param) {
+                if (($param->flags & Modifiers::PRIVATE) === 0) {
+                    continue;
+                }
+
+                if (!$param->var instanceof Expr\Variable || !is_string($param->var->name)) {
+                    continue;
+                }
+
+                $privateProps[$param->var->name] = [
+                    'line' => $param->getStartLine(),
+                    'writtenByDeclaration' => true,
+                ];
             }
         }
 
@@ -90,7 +115,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
     /**
      * @param Class_|Trait_|Enum_ $classLike
-     * @param array<string, Stmt\Property> $privateProps
+     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
      * @return array{reads: array<string, true>, writes: array<string, true>}
      */
     private function propertyUsage(NodeFinder $finder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
@@ -139,7 +164,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
     /**
      * @param Class_|Trait_|Enum_ $classLike
-     * @param array<string, Stmt\Property> $privateProps
+     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
      * @param array{reads: array<string, true>, writes: array<string, true>} $usage
      * @return list<Finding>
      */
@@ -153,9 +178,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         $findings = [];
         $className = $this->resolveClassName($classLike);
 
-        foreach ($privateProps as $name => $stmt) {
+        foreach ($privateProps as $name => $property) {
             $isRead = isset($usage['reads'][$name]);
-            $isWritten = isset($usage['writes'][$name]) || $stmt->props[0]->default !== null;
+            $isWritten = isset($usage['writes'][$name]) || $property['writtenByDeclaration'];
 
             if ($isRead && $isWritten) {
                 continue;
@@ -166,7 +191,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
                 ruleId: $definition->id,
                 message: $this->propertyMessage($symbol, $isRead, $isWritten),
                 filePath: $unit->file->displayPath,
-                line: $stmt->getStartLine(),
+                line: $property['line'],
                 severity: $definition->defaultSeverity,
                 pillar: $definition->pillar,
                 tier: $definition->tier,
