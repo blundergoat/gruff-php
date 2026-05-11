@@ -108,7 +108,7 @@ final class DocsRulesTest extends TestCase
         self::assertContains('y', $params);
     }
 
-    public function testMissingParamTagNotFlaggedWhenSignatureTypeFullyDescribesParameter(): void
+    public function testMissingParamTagDetectedForDocumentedMethodsEvenWhenSignatureTypeDescribesParameter(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
 
@@ -118,7 +118,33 @@ final class DocsRulesTest extends TestCase
         );
 
         $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $scalarParamFindings);
-        self::assertNotContains('y', $params);
+        self::assertContains('y', $params);
+    }
+
+    public function testMissingParamTagDetectedWhenThrowsDocOmitsScalarParam(): void
+    {
+        $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
+
+        $scalarParamFindings = array_filter(
+            $findings,
+            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingScalarParamWithThrows()',
+        );
+
+        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $scalarParamFindings);
+        self::assertContains('groupId', $params);
+    }
+
+    public function testMissingParamTagDetectedForDescriptiveDocblock(): void
+    {
+        $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
+
+        $descriptiveDocFindings = array_filter(
+            $findings,
+            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingReturnForDescriptiveDocblock()',
+        );
+
+        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $descriptiveDocFindings);
+        self::assertContains('groupId', $params);
     }
 
     public function testCompleteParamTagNotFlagged(): void
@@ -145,12 +171,20 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::missingArrayReturn()', $symbols);
     }
 
-    public function testMissingReturnTagNotFlaggedWhenSignatureFullyDescribesReturn(): void
+    public function testMissingReturnTagDetectedWhenSignatureFullyDescribesReturn(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('PhpdocTagsFixture::missingReturn()', $symbols);
+        self::assertContains('PhpdocTagsFixture::missingReturn()', $symbols);
+    }
+
+    public function testMissingReturnTagDetectedForDescriptiveDocblock(): void
+    {
+        $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
+
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertContains('PhpdocTagsFixture::missingReturnForDescriptiveDocblock()', $symbols);
     }
 
     public function testSemanticOnlyDocblockDoesNotRequireSignatureTags(): void

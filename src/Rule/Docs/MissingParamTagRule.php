@@ -16,13 +16,8 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Identifier;
-use PhpParser\Node\IntersectionType;
-use PhpParser\Node\Name;
-use PhpParser\Node\NullableType;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\Node\UnionType;
 use PhpParser\NodeFinder;
 
 final readonly class MissingParamTagRule implements RuleInterface
@@ -64,12 +59,12 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             $docText = $docComment->getText();
-            $documentedParams = $this->extractParamNames($docText);
 
-            if ($documentedParams === []) {
+            if (!$this->hasContractDoc($docText)) {
                 continue;
             }
 
+            $documentedParams = $this->extractParamNames($docText);
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             foreach ($node->params as $param) {
@@ -80,10 +75,6 @@ final readonly class MissingParamTagRule implements RuleInterface
                 $paramName = $param->var->name;
 
                 if (in_array($paramName, $documentedParams, true)) {
-                    continue;
-                }
-
-                if ($this->signatureTypeFullyDescribes($param->type)) {
                     continue;
                 }
 
@@ -106,42 +97,6 @@ final readonly class MissingParamTagRule implements RuleInterface
         return $findings;
     }
 
-    private function signatureTypeFullyDescribes(?Node $type): bool
-    {
-        if ($type === null) {
-            return false;
-        }
-
-        if ($type instanceof Identifier) {
-            $name = strtolower($type->toString());
-            return $name !== 'array' && $name !== 'iterable';
-        }
-
-        if ($type instanceof Name) {
-            return true;
-        }
-
-        if ($type instanceof NullableType) {
-            return $this->signatureTypeFullyDescribes($type->type);
-        }
-
-        if ($type instanceof UnionType) {
-            foreach ($type->types as $member) {
-                if (!$this->signatureTypeFullyDescribes($member)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if ($type instanceof IntersectionType) {
-            return true;
-        }
-
-        return false;
-    }
-
     /**
      * @return list<string>
      */
@@ -157,5 +112,19 @@ final readonly class MissingParamTagRule implements RuleInterface
         }
 
         return $result;
+    }
+
+    private function hasContractDoc(string $docText): bool
+    {
+        foreach (preg_split('/\R/', $docText) ?: [] as $line) {
+            $line = trim($line, " \t\n\r\0\x0B/*");
+            if ($line === '' || str_starts_with($line, '@')) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return preg_match('/@(param|return|throws|var|template|phpstan-param|psalm-param)\b/', $docText) === 1;
     }
 }

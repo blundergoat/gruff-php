@@ -39,6 +39,20 @@ class PhpdocTagsFixture
     }
 
     /**
+     * Documents the exceptional case.
+     *
+     * @throws \RuntimeException when the value is invalid.
+     */
+    public function missingScalarParamWithThrows(string $groupId): string
+    {
+        if ($groupId === '') {
+            throw new \RuntimeException('invalid');
+        }
+
+        return $groupId;
+    }
+
+    /**
      * Missing the array @param tag.
      *
      * @param int $x The first value.
@@ -57,6 +71,12 @@ class PhpdocTagsFixture
     public function missingReturn(int $x): int
     {
         return $x;
+    }
+
+    /** Delete one configured item. */
+    public function missingReturnForDescriptiveDocblock(string $groupId): bool
+    {
+        return $groupId !== '';
     }
 
     /**
