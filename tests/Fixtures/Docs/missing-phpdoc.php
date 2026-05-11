@@ -45,6 +45,10 @@ class MissingPhpdocFixture
     {
     }
 
+    protected function protectedMethod(): void
+    {
+    }
+
     public function __toString(): string
     {
         return '';
@@ -94,4 +98,9 @@ class TextReporter
 
         return 'empty';
     }
+}
+
+abstract class AbstractFixture
+{
+    abstract protected function inheritedHook(): void;
 }

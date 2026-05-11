@@ -31,8 +31,17 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        self::assertCount(1, $findings);
-        self::assertSame('MissingPhpdocFixture::undocumented()', $findings[0]->symbol);
+        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        self::assertContains('MissingPhpdocFixture::undocumented()', $symbols);
+        self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
+        self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
+        self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
+        self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
+        self::assertContains('AbstractFixture::inheritedHook()', $symbols);
+
+        foreach ($findings as $finding) {
+            self::assertSame(\GruffPhp\Finding\Severity::Error, $finding->severity);
+        }
     }
 
     public function testDocumentedMethodNotFlagged(): void
@@ -43,56 +52,57 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
     }
 
-    public function testGetterSetterExemptFromPhpdoc(): void
+    public function testAccessorsRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('MissingPhpdocFixture::getTitle()', $symbols);
-        self::assertNotContains('MissingPhpdocFixture::setTitle()', $symbols);
-        self::assertNotContains('MissingPhpdocFixture::isActive()', $symbols);
+        self::assertContains('MissingPhpdocFixture::getTitle()', $symbols);
+        self::assertContains('MissingPhpdocFixture::setTitle()', $symbols);
+        self::assertContains('MissingPhpdocFixture::isActive()', $symbols);
     }
 
-    public function testPrivateMethodExemptFromPhpdoc(): void
+    public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('MissingPhpdocFixture::privateMethod()', $symbols);
+        self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
+        self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
     }
 
-    public function testTrivialTypedPublicMethodExemptFromPhpdoc(): void
+    public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
+        self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
     }
 
-    public function testMagicMethodExemptFromPhpdoc(): void
+    public function testMagicMethodRequiresPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('MissingPhpdocFixture::__toString()', $symbols);
+        self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
     }
 
-    public function testRuleInterfaceContractMethodsInheritContractPhpdoc(): void
+    public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('RuleContractFixture::definition()', $symbols);
-        self::assertNotContains('RuleContractFixture::analyse()', $symbols);
+        self::assertContains('RuleContractFixture::definition()', $symbols);
+        self::assertContains('RuleContractFixture::analyse()', $symbols);
     }
 
-    public function testInternalHelpersAndConventionalReportersAreExemptFromPublicPhpdoc(): void
+    public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
         $symbols = array_map(static fn ($f) => $f->symbol, $findings);
-        self::assertNotContains('InternalHelper::complexUtility()', $symbols);
-        self::assertNotContains('TextReporter::render()', $symbols);
+        self::assertContains('InternalHelper::complexUtility()', $symbols);
+        self::assertContains('TextReporter::render()', $symbols);
     }
 
     public function testMissingParamTagDetectedForArrayParameters(): void
@@ -216,17 +226,17 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::throwsWithoutTag()', $symbols);
     }
 
-    public function testOverrideAwareDocRulesUseInheritedContracts(): void
+    public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
         $missingPhpdoc = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
         $missingThrows = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
-        $symbols = array_merge(
-            array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc),
-            array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows),
-        );
+        $missingPhpdocSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc);
+        $missingThrowsSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows);
 
-        self::assertNotContains('ImplementsDocumentedContract::inheritedThrows()', $symbols);
-        self::assertNotContains('OverrideDocumentedContract::inheritedThrows()', $symbols);
+        self::assertContains('ImplementsDocumentedContract::inheritedThrows()', $missingPhpdocSymbols);
+        self::assertNotContains('OverrideDocumentedContract::inheritedThrows()', $missingPhpdocSymbols);
+        self::assertNotContains('ImplementsDocumentedContract::inheritedThrows()', $missingThrowsSymbols);
+        self::assertNotContains('OverrideDocumentedContract::inheritedThrows()', $missingThrowsSymbols);
     }
 
     public function testUselessPhpdocDetected(): void

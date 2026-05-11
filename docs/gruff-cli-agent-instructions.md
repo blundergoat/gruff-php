@@ -159,7 +159,7 @@ rules:
         severity: error
 ```
 
-Use `threshold` + `severity` for rules with warning/error metric defaults. Keep `thresholds` for named tuning values such as `minBodyLines`, `minPositionalArguments`, or `entropy`.
+Use `threshold` + `severity` for rules with warning/error metric defaults. Keep `thresholds` for named tuning values such as `minPositionalArguments` or `entropy`.
 
 Skip config for one run:
 

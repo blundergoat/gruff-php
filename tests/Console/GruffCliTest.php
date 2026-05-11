@@ -194,7 +194,7 @@ final class GruffCliTest extends TestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(3, $findings);
+        self::assertCount(2, $findings);
 
         $sizeFinding = null;
         foreach ($findings as $finding) {
@@ -911,7 +911,8 @@ final class GruffCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('::notice file=tests/Fixtures/Source/Code/OrderCalculator.php', $process->getOutput());
+        self::assertStringContainsString('::error file=tests/Fixtures/Source/Code/OrderCalculator.php', $process->getOutput());
+        self::assertStringContainsString('title=docs.missing-public-phpdoc', $process->getOutput());
     }
 
     public function testAnalyseCommandReportsNonGitDiffModeClearly(): void

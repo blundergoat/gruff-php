@@ -51,12 +51,9 @@ rules:
     # Parameter docs clarify contracts that signatures miss.
     docs.missing-param-tag:
         enabled: true
-    # Public APIs need enough context for callers and maintainers.
+    # Methods need local PHPDoc contracts for callers and maintainers.
     docs.missing-public-phpdoc:
         enabled: true
-        thresholds:
-            minBodyLines: 8
-            minParameters: 2
     # A project README gives newcomers a reliable starting point.
     docs.missing-readme:
         enabled: true

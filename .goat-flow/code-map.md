@@ -131,7 +131,7 @@ src/
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
 |   |-- Docs/
 |   |   |-- MissingParamTagRule.php           = `docs.missing-param-tag`
-|   |   |-- MissingPublicPhpdocRule.php       = `docs.missing-public-phpdoc`
+|   |   |-- MissingPublicPhpdocRule.php       = `docs.missing-public-phpdoc` (error for any method declaration without local PHPDoc)
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag`
 |   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
