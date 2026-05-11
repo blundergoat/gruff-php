@@ -128,16 +128,36 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('b', $params);
     }
 
-    public function testPublicMethodParametersNotChecked(): void
+    public function testUnusedParameterInPublicMethodWithoutExternalContract(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $reported = [];
+        foreach ($findings as $finding) {
+            self::assertNotNull($finding->symbol);
+            $parameter = $finding->metadata['parameter'] ?? null;
+            if (!is_string($parameter)) {
+                continue;
+            }
 
-        foreach ($symbols as $symbol) {
-            self::assertNotNull($symbol);
-            self::assertStringNotContainsString('publicMethod', $symbol);
+            $reported[$finding->symbol . ':' . $parameter] = true;
         }
+
+        self::assertArrayHasKey('UnusedParameterFixture::publicMethod():detailed', $reported);
+    }
+
+    public function testPublicMethodParametersWithExternalContractsAreNotChecked(): void
+    {
+        $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
+
+        $paramsBySymbol = [];
+        foreach ($findings as $finding) {
+            self::assertNotNull($finding->symbol);
+            $paramsBySymbol[$finding->symbol][] = $finding->metadata['parameter'] ?? null;
+        }
+
+        self::assertArrayNotHasKey('InheritedParameterFixture::hook()', $paramsBySymbol);
+        self::assertArrayNotHasKey('ContractParameterFixture::handle()', $paramsBySymbol);
     }
 
     public function testPromotedPrivateConstructorParametersAreUsedAsProperties(): void

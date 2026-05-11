@@ -21,6 +21,14 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Prevention:** When changing rule semantics, update `RuleDefinition` names, config comments, docs, tests, and golden fixtures together while preserving rule IDs only when output compatibility requires it. Regression tests should assert representative methods across all visibilities so the compatibility name cannot silently narrow behavior again.
 
+## Footgun: Conservative member scopes can hide concrete public waste
+
+**Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
+
+`src/Rule/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like healthkit's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
+
+**Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
+
 ## Footgun: Project rules need full project context, not `--changed-only`
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED

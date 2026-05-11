@@ -16,7 +16,46 @@ class UnusedParameterFixture
         return $a + $b;
     }
 
-    public function publicMethod(int $unused): void
+    public function publicMethod(string $event, array $structural, array $detailed = [], ?string $transport = null): void
+    {
+        unset($detailed);
+        $payload = ['event' => $event] + $structural;
+        if ($transport !== null) {
+            $payload = ['event' => $event, 'transport' => $transport] + $structural;
+        }
+
+        echo json_encode($payload);
+    }
+}
+
+class BaseParameterFixture
+{
+    protected function touch(): void
+    {
+    }
+}
+
+class InheritedParameterFixture extends BaseParameterFixture
+{
+    public function hook(string $hookParam): void
+    {
+        $this->touch();
+    }
+}
+
+interface ParameterContract
+{
+    public function handle(string $contractParam): void;
+}
+
+class ContractParameterFixture implements ParameterContract
+{
+    public function handle(string $contractParam): void
+    {
+        $this->touch();
+    }
+
+    private function touch(): void
     {
     }
 }

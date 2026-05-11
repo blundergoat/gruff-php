@@ -55,7 +55,7 @@ final readonly class UnusedParameterRule implements RuleInterface
     private function analysableNodes(AnalysisUnit $unit, NodeFinder $finder): array
     {
         $foundNodes = $finder->find($unit->statements, static function (Node $node): bool {
-            return $node instanceof Function_ || ($node instanceof ClassMethod && $node->isPrivate());
+            return $node instanceof Function_ || $node instanceof ClassMethod;
         });
         $nodes = [];
 
@@ -64,7 +64,7 @@ final readonly class UnusedParameterRule implements RuleInterface
                 continue;
             }
 
-            if ($node instanceof ClassMethod && $node->isAbstract()) {
+            if ($node instanceof ClassMethod && !$this->isAnalysableMethod($node)) {
                 continue;
             }
 
@@ -74,6 +74,66 @@ final readonly class UnusedParameterRule implements RuleInterface
         }
 
         return $nodes;
+    }
+
+    private function isAnalysableMethod(ClassMethod $method): bool
+    {
+        if ($method->isAbstract() || $this->isMagicContractMethod($method)) {
+            return false;
+        }
+
+        if ($method->isPrivate()) {
+            return true;
+        }
+
+        return !$this->hasExternalMethodContract($method);
+    }
+
+    private function isMagicContractMethod(ClassMethod $method): bool
+    {
+        $name = strtolower($method->name->toString());
+
+        return str_starts_with($name, '__') && $name !== '__construct';
+    }
+
+    private function hasExternalMethodContract(ClassMethod $method): bool
+    {
+        if ($this->hasOverrideAttribute($method) || $this->hasInheritDoc($method)) {
+            return true;
+        }
+
+        $parent = $method->getAttribute('parent');
+
+        if ($parent instanceof Node\Stmt\Class_) {
+            return $parent->extends !== null || $parent->implements !== [];
+        }
+
+        if ($parent instanceof Node\Stmt\Enum_) {
+            return $parent->implements !== [];
+        }
+
+        return false;
+    }
+
+    private function hasOverrideAttribute(ClassMethod $method): bool
+    {
+        foreach ($method->attrGroups as $attributeGroup) {
+            foreach ($attributeGroup->attrs as $attribute) {
+                if (strtolower($attribute->name->getLast()) === 'override') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function hasInheritDoc(ClassMethod $method): bool
+    {
+        $docComment = $method->getDocComment();
+
+        return $docComment !== null
+            && preg_match('/\\{?@inheritdoc\\b\\}?/i', $docComment->getText()) === 1;
     }
 
     /**
@@ -127,7 +187,9 @@ final readonly class UnusedParameterRule implements RuleInterface
     {
         $usedNames = [];
         $usedVars = $finder->find($node->stmts ?? [], static function (Node $child): bool {
-            return $child instanceof Variable && is_string($child->name);
+            return $child instanceof Variable
+                && is_string($child->name)
+                && self::isVariableUse($child);
         });
 
         foreach ($usedVars as $var) {
@@ -138,6 +200,14 @@ final readonly class UnusedParameterRule implements RuleInterface
         }
 
         return $usedNames;
+    }
+
+    private static function isVariableUse(Variable $variable): bool
+    {
+        $parent = $variable->getAttribute('parent');
+
+        return !$parent instanceof Node\Stmt\Unset_
+            || !in_array($variable, $parent->vars, true);
     }
 
     private function findingForParameter(
@@ -154,6 +224,7 @@ final readonly class UnusedParameterRule implements RuleInterface
             message: sprintf('Parameter $%s in %s is never used.', $name, $symbol),
             filePath: $unit->file->displayPath,
             line: $param->getStartLine(),
+            column: $this->startColumn($unit, $param),
             severity: $definition->defaultSeverity,
             pillar: $definition->pillar,
             tier: $definition->tier,
@@ -162,5 +233,19 @@ final readonly class UnusedParameterRule implements RuleInterface
             remediation: 'Remove the parameter or use it in the method body.',
             metadata: ['parameter' => $name],
         );
+    }
+
+    private function startColumn(AnalysisUnit $unit, Node\Param $param): ?int
+    {
+        $startFilePosition = $param->getStartFilePos();
+
+        if ($startFilePosition < 0) {
+            return null;
+        }
+
+        $sourceBeforeParameter = substr($unit->source, 0, $startFilePosition);
+        $lineStartPosition = strrpos($sourceBeforeParameter, "\n");
+
+        return $startFilePosition - ($lineStartPosition === false ? -1 : $lineStartPosition);
     }
 }
