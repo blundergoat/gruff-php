@@ -34,36 +34,36 @@ final readonly class UnusedImportRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unused import',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unused import',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for unused import statements.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $uses = $finder->findInstanceOf($unit->statements, Use_::class);
+        $finder     = new NodeFinder();
+        $uses       = $finder->findInstanceOf($unit->statements, Use_::class);
 
         if ($uses === []) {
             return [];
         }
 
         /** @var list<Use_> $useStatements NodeFinder returns only use statement nodes for this query. */
-        $useStatements = $uses;
+        $useStatements     = $uses;
         $sourceWithoutUses = $this->removeUseStatements($unit->source, $useStatements);
-        $findings = [];
+        $findings          = [];
 
         foreach ($useStatements as $use) {
             foreach ($use->uses as $useUse) {
@@ -76,15 +76,15 @@ final readonly class UnusedImportRule implements RuleInterface
                 $fullName = $useUse->name->toString();
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Import %s is unused.', $fullName),
-                    filePath: $unit->file->displayPath,
-                    line: $use->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $alias,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Import %s is unused.', $fullName),
+                    filePath:    $unit->file->displayPath,
+                    line:        $use->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $alias,
                     remediation: 'Remove the unused import statement.',
                 );
             }
@@ -104,7 +104,7 @@ final readonly class UnusedImportRule implements RuleInterface
 
         foreach ($uses as $use) {
             $startLine = $use->getStartLine();
-            $endLine = $use->getEndLine();
+            $endLine   = $use->getEndLine();
 
             if ($startLine > 0 && $endLine > 0) {
                 for ($i = $startLine - 1; $i < $endLine; $i++) {

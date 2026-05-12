@@ -34,23 +34,26 @@ final class ExtractCompactUserInputRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'extract or compact on request data',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'extract or compact on request data',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find extract and compact calls that operate on user-controlled input.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for risky variable table operations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
@@ -65,16 +68,16 @@ final class ExtractCompactUserInputRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('Heuristic %s() call on request-controlled data detected.', $name),
-                filePath: $unit->file->displayPath,
-                line: $call->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     sprintf('Heuristic %s() call on request-controlled data detected.', $name),
+                filePath:    $unit->file->displayPath,
+                line:        $call->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Map request fields explicitly instead of mass-importing user input into local variables.',
-                metadata: [
+                metadata:    [
                     'function' => $name,
                 ],
             );

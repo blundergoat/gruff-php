@@ -66,13 +66,13 @@ final readonly class OneLineMethodRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'One-line method',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'One-line method',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
-            defaultOptions: [
+            confidence:      Confidence::Medium,
+            defaultOptions:  [
                 'minParameters' => 1,
             ],
             description: 'Flags trivial methods that only wrap a one-line call expression.',
@@ -82,16 +82,19 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find trivial methods that only wrap a single call expression.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for one-line wrapper methods.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $definition         = $this->definition();
+        $settings           = $context->settingsFor($definition);
         $minParameterOption = $settings->option('minParameters');
-        $minParameters = is_int($minParameterOption) ? max(0, $minParameterOption) : 1;
-        $finder = new NodeFinder();
-        $findings = [];
+        $minParameters      = is_int($minParameterOption) ? max(0, $minParameterOption) : 1;
+        $finder             = new NodeFinder();
+        $findings           = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
             if ($this->shouldSkip($method, $minParameters)) {
@@ -115,18 +118,18 @@ final readonly class OneLineMethodRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($method);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s only wraps a one-line call expression.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $method->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $method->getEndLine() > 0 ? $method->getEndLine() : null,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('%s only wraps a one-line call expression.', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $method->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                endLine:     $method->getEndLine() > 0 ? $method->getEndLine() : null,
+                symbol:      $symbol,
                 remediation: 'Inline the expression at the call site or expand the method so it owns a meaningful contract.',
-                metadata: [
+                metadata:    [
                     'method' => $method->name->toString(),
                     'parameterCount' => count($method->params),
                     'statementKind' => $statement instanceof Return_ ? 'return' : 'expression',

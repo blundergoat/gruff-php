@@ -38,27 +38,27 @@ final readonly class MissingParamTagRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing @param tag',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing @param tag',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find documented public function-like declarations with undocumented parameters.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for missing parameter tags.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
@@ -83,7 +83,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             $documentedParams = $this->extractParamNames($docText);
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+            $symbol           = CyclomaticComplexityRule::resolveSymbol($node);
 
             foreach ($node->params as $param) {
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -97,17 +97,17 @@ final readonly class MissingParamTagRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Parameter $%s in %s has no @param tag.', $paramName, $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $param->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Parameter $%s in %s has no @param tag.', $paramName, $symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $param->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: sprintf('Add @param tag for $%s.', $paramName),
-                    metadata: ['parameter' => $paramName],
+                    metadata:    ['parameter' => $paramName],
                 );
             }
         }

@@ -36,23 +36,26 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Tautological type assertion',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Tautological type assertion',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find `assertInstanceOf` calls where the value type is already proven locally.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for redundant type assertions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -76,22 +79,22 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
+                    ruleId:  self::ID,
                     message: sprintf(
                         '%s asserts $%s is an instance of %s, but it is statically already that type.',
                         $scope->symbol,
                         $this->describeValue($valueArg),
                         $expected,
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Warning,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::High,
-                    symbol: $scope->symbol,
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Warning,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::High,
+                    symbol:      $scope->symbol,
                     remediation: 'Drop the redundant assertInstanceOf or assert behaviour on the value instead of its type.',
-                    metadata: ['expected' => $expected],
+                    metadata:    ['expected' => $expected],
                 );
             }
         }

@@ -12,9 +12,9 @@ final readonly class MutationAnalysisResult
     /**
      * Create a mutation analysis result with optional baseline and budget context.
      *
-     * @param InfectionReport $report Current mutation report.
+     * @param InfectionReport      $report         Current mutation report.
      * @param InfectionReport|null $baselineReport Baseline mutation report, when supplied.
-     * @param int|null $mutationBudget Allowed survived-mutant budget, when configured.
+     * @param int|null             $mutationBudget Allowed survived-mutant budget, when configured.
      */
     public function __construct(
         public InfectionReport $report,

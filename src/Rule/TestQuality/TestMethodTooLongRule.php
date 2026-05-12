@@ -32,12 +32,12 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test method too long',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Test method too long',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::High,
             defaultThresholds: ['maxMeaningfulLines' => 25],
         );
     }
@@ -45,14 +45,17 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Find test methods whose line count exceeds configured thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for oversized test methods.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
-        $threshold = (int) $context->settingsFor($definition)->numericThreshold('maxMeaningfulLines');
+        $definition  = $this->definition();
+        $threshold   = (int) $context->settingsFor($definition)->numericThreshold('maxMeaningfulLines');
         $sourceLines = explode("\n", $unit->source);
-        $findings = [];
+        $findings    = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             if ($scope->endLine === null) {
@@ -66,23 +69,23 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s spans %d meaningful lines, above the threshold of %d.',
                     $scope->symbol,
                     $count,
                     $threshold,
                 ),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                endLine: $scope->endLine,
-                symbol: $scope->symbol,
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                endLine:     $scope->endLine,
+                symbol:      $scope->symbol,
                 remediation: 'Split the scenario into focused tests, extract setup helpers, or move shared arrangement into setUp().',
-                metadata: ['meaningfulLines' => $count, 'threshold' => $threshold],
+                metadata:    ['meaningfulLines' => $count, 'threshold' => $threshold],
             );
         }
 

@@ -16,11 +16,11 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Create a setup result variant.
      *
-     * @param AnalyseCommandSetup|null $setup Ready setup payload, when setup succeeded.
-     * @param AnalysisReport|null $report Report-formatted setup error payload, when available.
-     * @param OutputFormat|null $format Output format for a report-formatted setup error.
-     * @param string|null $plainError Plain console error message, when setup failed before report formatting.
-     * @param int $exitCode Symfony command exit code for this result.
+     * @param AnalyseCommandSetup|null $setup      Ready setup payload, when setup succeeded.
+     * @param AnalysisReport|null      $report     Report-formatted setup error payload, when available.
+     * @param OutputFormat|null        $format     Output format for a report-formatted setup error.
+     * @param string|null              $plainError Plain console error message, when setup failed before report formatting.
+     * @param int                      $exitCode   Symfony command exit code for this result.
      */
     private function __construct(
         public ?AnalyseCommandSetup $setup,
@@ -45,8 +45,8 @@ final readonly class AnalyseCommandSetupResult
     /**
      * Build a plain console error result.
      *
-     * @param string $message Plain error message for console output.
-     * @param int $exitCode Symfony command exit code for the failure.
+     * @param string $message  Plain error message for console output.
+     * @param int    $exitCode Symfony command exit code for the failure.
      * @return self Plain error setup result.
      */
     public static function plainError(string $message, int $exitCode): self
@@ -58,7 +58,7 @@ final readonly class AnalyseCommandSetupResult
      * Build a report-formatted setup error result.
      *
      * @param AnalysisReport $report Report payload describing the setup failure.
-     * @param OutputFormat $format Output format selected for the report.
+     * @param OutputFormat   $format Output format selected for the report.
      * @return self Report error setup result.
      */
     public static function reportError(AnalysisReport $report, OutputFormat $format): self

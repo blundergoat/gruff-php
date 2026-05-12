@@ -30,7 +30,7 @@ final readonly class InfectionReportParser
     public function parse(string $path): InfectionReport
     {
         $resolvedPath = $this->resolvePath($path);
-        $contents = file_get_contents($resolvedPath);
+        $contents     = file_get_contents($resolvedPath);
 
         if ($contents === false) {
             throw new MutationReportException(sprintf('Unable to read Infection report: %s', $path));
@@ -46,7 +46,7 @@ final readonly class InfectionReportParser
             throw new MutationReportException(sprintf('Infection report "%s" must be a JSON object.', $path));
         }
 
-        $stats = $this->parseStats($decoded, $path);
+        $stats   = $this->parseStats($decoded, $path);
         $mutants = [];
 
         foreach ($this->statusSections() as $section => $status) {
@@ -117,15 +117,15 @@ final readonly class InfectionReportParser
      */
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
-        $row = $this->requireMutantRow($row, $location, $path);
+        $row     = $this->requireMutantRow($row, $location, $path);
         $mutator = $this->requireMutatorObject($row, $location, $path);
 
         return new InfectionMutant(
-            status: $status,
-            filePath: $this->displayPath($this->requireMutatorString($mutator, 'originalFilePath', $location, $path)),
-            line: $this->optionalMutatorLine($mutator, $location, $path),
-            mutator: $this->requireMutatorString($mutator, 'mutatorName', $location, $path),
-            diff: $this->optionalNonEmptyString($row['diff'] ?? null),
+            status:        $status,
+            filePath:      $this->displayPath($this->requireMutatorString($mutator, 'originalFilePath', $location, $path)),
+            line:          $this->optionalMutatorLine($mutator, $location, $path),
+            mutator:       $this->requireMutatorString($mutator, 'mutatorName', $location, $path),
+            diff:          $this->optionalNonEmptyString($row['diff'] ?? null),
             processOutput: $this->optionalNonEmptyString($row['processOutput'] ?? null),
         );
     }
@@ -220,9 +220,9 @@ final readonly class InfectionReportParser
      */
     private function displayPath(string $path): string
     {
-        $normalizedPath = str_replace('\\', '/', $path);
+        $normalizedPath  = str_replace('\\', '/', $path);
         $realProjectRoot = realpath($this->projectRoot);
-        $normalizedRoot = rtrim(str_replace('\\', '/', is_string($realProjectRoot) ? $realProjectRoot : $this->projectRoot), '/');
+        $normalizedRoot  = rtrim(str_replace('\\', '/', is_string($realProjectRoot) ? $realProjectRoot : $this->projectRoot), '/');
 
         if (str_starts_with($normalizedPath, $normalizedRoot . '/')) {
             return substr($normalizedPath, strlen($normalizedRoot) + 1);

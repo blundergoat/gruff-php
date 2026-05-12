@@ -42,30 +42,33 @@ final readonly class ConfusingNameRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Confusing standalone class name',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Confusing standalone class name',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find identifiers whose names are ambiguous or visually confusing.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for confusing identifiers.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $classes = $finder->findInstanceOf($unit->statements, Class_::class);
+        $finder     = new NodeFinder();
+        $classes    = $finder->findInstanceOf($unit->statements, Class_::class);
 
         $findings = [];
 
         foreach ($classes as $class) {
-            /** @var Class_ $class */
+            /** @var Class_ $class Finder predicate restricts results to class declarations. */
             $name = $class->name?->toString();
 
             if ($name === null) {
@@ -77,15 +80,15 @@ final readonly class ConfusingNameRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('Class %s is a vague standalone name that does not communicate responsibility.', $name),
-                filePath: $unit->file->displayPath,
-                line: $class->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $name,
+                ruleId:      $definition->id,
+                message:     sprintf('Class %s is a vague standalone name that does not communicate responsibility.', $name),
+                filePath:    $unit->file->displayPath,
+                line:        $class->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $name,
                 remediation: 'Use a domain-specific name, e.g. UserManager → UserRegistrar, Helper → InvoiceFormatter.',
             );
         }

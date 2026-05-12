@@ -6,7 +6,6 @@ namespace GruffPhp\Tests\Rule\Complexity;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\RuleContext;

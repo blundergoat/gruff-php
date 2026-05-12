@@ -34,26 +34,29 @@ final readonly class ReturnCommentRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Return comment',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Return comment',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
-            description: 'Requires a one-line comment directly above each return statement. Advisory by default; opt in to stricter enforcement via .gruff.yaml.',
+            confidence:      Confidence::High,
+            description:     'Requires a one-line comment directly above each return statement. Advisory by default; opt in to stricter enforcement via .gruff.yaml.',
         );
     }
 
     /**
      * Find return statements without a direct explanatory comment.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for undocumented return statements.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Return_::class) as $return) {
             if (DirectLineComment::existsAbove($unit, $return->getStartLine())) {
@@ -61,14 +64,14 @@ final readonly class ReturnCommentRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: 'return statement must have a one-line comment directly above it.',
-                filePath: $unit->file->displayPath,
-                line: $return->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
+                ruleId:      $definition->id,
+                message:     'return statement must have a one-line comment directly above it.',
+                filePath:    $unit->file->displayPath,
+                line:        $return->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
                 remediation: 'Add a short comment immediately above the return explaining why that value or early exit is returned.',
             );
         }

@@ -36,25 +36,25 @@ final readonly class UnreachableCodeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unreachable code',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unreachable code',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find statements that appear after a terminating statement in function-like bodies.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for unreachable statements.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder    = new NodeFinder();
         $functions = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Stmt\ClassMethod
                 || $node instanceof Stmt\Function_
@@ -73,7 +73,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
 
     /**
      * @param array<Node\Stmt> $stmts
-     * @param list<Finding> &$findings
+     * @param list<Finding>    &$findings
      *
      * @return void No return value.
      */
@@ -85,15 +85,15 @@ final readonly class UnreachableCodeRule implements RuleInterface
         foreach ($stmts as $stmt) {
             if ($terminated && $stmt->getStartLine() > 0) {
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: 'Unreachable code after terminating statement.',
-                    filePath: $unit->file->displayPath,
-                    line: $stmt->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    endLine: $stmt->getEndLine() > 0 ? $stmt->getEndLine() : null,
+                    ruleId:      $definition->id,
+                    message:     'Unreachable code after terminating statement.',
+                    filePath:    $unit->file->displayPath,
+                    line:        $stmt->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    endLine:     $stmt->getEndLine() > 0 ? $stmt->getEndLine() : null,
                     remediation: 'Remove dead code or fix the control flow.',
                 );
 

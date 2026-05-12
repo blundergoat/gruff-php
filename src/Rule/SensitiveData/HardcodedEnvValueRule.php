@@ -31,17 +31,20 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Hardcoded environment value',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Hardcoded environment value',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find env-style assignments that look like committed secrets.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious env-style values.
      */
@@ -60,22 +63,22 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 
         $findings = [];
         foreach ($matches[0] as $index => $match) {
-            $key = $matches['key'][$index][0];
-            $value = $matches['value'][$index][0];
+            $key    = $matches['key'][$index][0];
+            $value  = $matches['value'][$index][0];
             $offset = $match[1];
             if (SecretScannerHelper::isLikelyDummyValue($value) || !$this->hasSecretValueEvidence($key, $value)) {
                 continue;
             }
 
-            $preview = SecretScannerHelper::redactedKeyValue($key, $value);
+            $preview    = SecretScannerHelper::redactedKeyValue($key, $value);
             $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: sprintf('Hardcoded env-style secret value detected: %s.', $preview),
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::Medium,
-                detector: 'env-style-secret',
-                preview: $preview,
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     sprintf('Hardcoded env-style secret value detected: %s.', $preview),
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::Medium,
+                detector:    'env-style-secret',
+                preview:     $preview,
                 remediation: 'Move env-style secret values out of committed source files.',
             );
         }
@@ -91,7 +94,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     private function hasSecretValueEvidence(string $key, string $value): bool
     {
         $normalizedValue = trim($value, "\"' \t\r\n");
-        $upperKey = strtoupper($key);
+        $upperKey        = strtoupper($key);
 
         if ($this->isConservativeKeySuffix($upperKey) && !$this->hasStrongSecretShape($normalizedValue)) {
             return false;

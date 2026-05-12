@@ -72,25 +72,28 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PHPDoc mixed overuse',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PHPDoc mixed overuse',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Detect PHPDoc tags that use `mixed` where a narrower type would carry more meaning.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         $targets = $finder->find(
             $unit->statements,
@@ -128,21 +131,21 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
+                    ruleId:  $definition->id,
                     message: sprintf(
                         '%s has @%s using mixed; prefer a narrower PHPDoc type.',
                         $symbol,
                         $tagKind,
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $block['line'],
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    filePath:    $unit->file->displayPath,
+                    line:        $block['line'],
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: 'Prefer a narrower PHPDoc type than mixed (named class, value object, union, or bounded generic). gruff-php reports only.',
-                    metadata: [
+                    metadata:    [
                         'tagKind' => $tagKind,
                         'paramName' => $paramName,
                         'snippet' => trim($block['body']),
@@ -204,9 +207,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function extractTagBlocks(Doc $doc): array
     {
         $startLine = $doc->getStartLine();
-        $lines = preg_split('/\R/', $doc->getText()) ?: [];
+        $lines     = preg_split('/\R/', $doc->getText()) ?: [];
 
-        $blocks = [];
+        $blocks  = [];
         $current = null;
 
         foreach ($lines as $offset => $rawLine) {
@@ -261,7 +264,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return ['hasMixed' => false, 'isStandalone' => false];
         }
 
-        $type = $this->extractTypeExpression($body);
+        $type       = $this->extractTypeExpression($body);
         $standalone = $type !== null && strcasecmp($type, 'mixed') === 0;
 
         return ['hasMixed' => true, 'isStandalone' => $standalone];
@@ -279,8 +282,8 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return null;
         }
 
-        $type = '';
-        $depth = 0;
+        $type   = '';
+        $depth  = 0;
         $length = strlen($body);
 
         for ($i = 0; $i < $length; $i++) {

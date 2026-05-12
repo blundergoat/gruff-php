@@ -13,8 +13,8 @@ use GruffPhp\Rule\RuleRegistry;
 final readonly class RuleConfigApplier
 {
     /**
-     * @param AnalysisConfig $config Config to update.
-     * @param RuleRegistry $registry Rule registry used to validate rule ids.
+     * @param AnalysisConfig       $config     Config to update.
+     * @param RuleRegistry         $registry   Rule registry used to validate rule ids.
      * @param array<string, mixed> $rootConfig Parsed root config object.
      * @throws ConfigException When rule config references unknown ids or invalid values.
      * @return AnalysisConfig Config with rule-specific overrides applied.
@@ -55,15 +55,15 @@ final readonly class RuleConfigApplier
     ): AnalysisConfig {
         $this->assertKnownRuleKeys($ruleId, $ruleConfig);
 
-        $settings = $config->ruleSettings($ruleId);
+        $settings          = $config->ruleSettings($ruleId);
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry);
 
         return $config->withRuleSettings($ruleId, new RuleSettings(
-            enabled: $this->enabled($ruleId, $ruleConfig, $settings->enabled),
+            enabled:    $this->enabled($ruleId, $ruleConfig, $settings->enabled),
             thresholds: $severityThreshold instanceof SeverityThreshold
                 ? $settings->thresholds
                 : $this->thresholds($ruleId, $ruleConfig, $registry, $settings->thresholds),
-            options: $this->options($ruleId, $ruleConfig, $registry, $settings->options),
+            options:           $this->options($ruleId, $ruleConfig, $registry, $settings->options),
             severityThreshold: $severityThreshold,
         ));
     }
@@ -99,7 +99,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
+     * @param array<string, mixed>     $ruleConfig
      * @param array<string, int|float> $defaultThresholds
      * @return array<string, int|float>
      */
@@ -117,7 +117,7 @@ final readonly class RuleConfigApplier
             return $defaultThresholds;
         }
 
-        $thresholds = $defaultThresholds;
+        $thresholds      = $defaultThresholds;
         $thresholdConfig = $this->requireObject(
             $ruleConfig['thresholds'],
             sprintf('Config key "rules.%s.thresholds" must be an object.', $ruleId),
@@ -153,8 +153,8 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s" cannot combine "threshold" and "thresholds".', $ruleId));
         }
 
-        $thresholdValue = $ruleConfig['threshold'];
-        $severityValue = $ruleConfig['severity'] ?? null;
+        $thresholdValue    = $ruleConfig['threshold'];
+        $severityValue     = $ruleConfig['severity'] ?? null;
         $defaultThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
 
         if (!array_key_exists('warning', $defaultThresholds) || !array_key_exists('error', $defaultThresholds) || count($defaultThresholds) !== 2) {
@@ -208,7 +208,7 @@ final readonly class RuleConfigApplier
             return $defaultOptions;
         }
 
-        $options = $defaultOptions;
+        $options       = $defaultOptions;
         $optionsConfig = $this->requireObject(
             $ruleConfig['options'],
             sprintf('Config key "rules.%s.options" must be an object.', $ruleId),

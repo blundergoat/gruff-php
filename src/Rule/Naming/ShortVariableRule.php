@@ -16,11 +16,11 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\For_;
 use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\Node\Stmt\Catch_;
 use PhpParser\NodeFinder;
 
 /**
@@ -51,28 +51,28 @@ final readonly class ShortVariableRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Short variable name',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Short variable name',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find short variable names outside accepted local conventions.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for overly short variable names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
 
-        $loopVars = $this->collectLoopVars($unit->statements, $finder);
+        $loopVars  = $this->collectLoopVars($unit->statements, $finder);
         $catchVars = $this->collectCatchVars($unit->statements, $finder);
 
         $functions = $finder->find($unit->statements, static function (Node $node): bool {
@@ -84,7 +84,7 @@ final readonly class ShortVariableRule implements RuleInterface
 
         foreach ($functions as $fn) {
             /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
-            $vars = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
+            $vars   = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
             $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
 
             foreach ($vars as $var) {
@@ -120,17 +120,17 @@ final readonly class ShortVariableRule implements RuleInterface
                 $reported[$key] = true;
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Variable $%s in %s is a single character.', $name, $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $var->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Variable $%s in %s is a single character.', $name, $symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $var->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: 'Use a descriptive name that communicates the variable\'s purpose.',
-                    metadata: ['variable' => $name],
+                    metadata:    ['variable' => $name],
                 );
             }
         }
@@ -144,7 +144,7 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function collectLoopVars(array $stmts, NodeFinder $finder): array
     {
-        $vars = [];
+        $vars  = [];
         $loops = $finder->find($stmts, static function (Node $node): bool {
             return $node instanceof For_ || $node instanceof Foreach_;
         });
@@ -172,7 +172,7 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function collectCatchVars(array $stmts, NodeFinder $finder): array
     {
-        $vars = [];
+        $vars    = [];
         $catches = $finder->findInstanceOf($stmts, Catch_::class);
 
         foreach ($catches as $catch) {

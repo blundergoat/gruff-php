@@ -35,18 +35,21 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Named argument opportunity',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            id:                self::ID,
+            name:              'Named argument opportunity',
+            pillar:            Pillar::Modernisation,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Low,
             defaultThresholds: ['minPositionalArguments' => 5],
         );
     }
 
     /**
      * Find calls with many positional arguments that would read better named.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for named argument opportunities.
      */
@@ -56,10 +59,10 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             return [];
         }
 
-        $definition = $this->definition();
+        $definition             = $this->definition();
         $minPositionalArguments = (int) $context->settingsFor($definition)->numericThreshold('minPositionalArguments');
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder                 = new NodeFinder();
+        $findings               = [];
 
         foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
             if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
@@ -72,16 +75,16 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('Call with %s may be clearer with PHP 8 named arguments.', $reason),
-                filePath: $unit->file->displayPath,
-                line: $call->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
+                ruleId:      self::ID,
+                message:     sprintf('Call with %s may be clearer with PHP 8 named arguments.', $reason),
+                filePath:    $unit->file->displayPath,
+                line:        $call->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::Modernisation,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
                 remediation: 'Consider named arguments only for stable APIs where parameter names are part of the intended contract; gruff-php reports only.',
-                metadata: [
+                metadata:    [
                     'requiresPhp' => 8.0,
                     'reason' => $reason,
                 ],

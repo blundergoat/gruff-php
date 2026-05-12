@@ -12,8 +12,11 @@ use GruffPhp\Finding\Finding;
 final readonly class BranchReviewComparator
 {
     /**
-     * @param list<Finding> $current
-     * @param list<Finding> $base
+     * @param list<Finding> $current     Current branch findings to compare.
+     * @param list<Finding> $base        Base branch findings to compare against.
+     * @param string        $baseRef     Base ref used to produce the comparison.
+     * @param bool          $changedOnly Whether unchanged changed-file scope applies.
+     * @param float|null    $deltaScore  Optional score delta between base and current runs.
      * @return BranchReviewResult Introduced, removed, and unchanged finding sets.
      */
     public function compare(
@@ -23,12 +26,12 @@ final readonly class BranchReviewComparator
         bool $changedOnly,
         ?float $deltaScore,
     ): BranchReviewResult {
-        $identity = new FindingReviewIdentity();
+        $identity     = new FindingReviewIdentity();
         $currentByKey = $this->index($current, $identity);
-        $baseByKey = $this->index($base, $identity);
-        $introduced = [];
-        $unchanged = [];
-        $removed = [];
+        $baseByKey    = $this->index($base, $identity);
+        $introduced   = [];
+        $unchanged    = [];
+        $removed      = [];
 
         foreach ($currentByKey as $key => $finding) {
             if (isset($baseByKey[$key])) {

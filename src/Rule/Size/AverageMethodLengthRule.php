@@ -14,11 +14,11 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Nop;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
@@ -40,12 +40,12 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Average method length',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Average method length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 20,
                 'error' => 40,
@@ -56,14 +56,17 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose average method length exceeds thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for large average method bodies.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
@@ -73,7 +76,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         $findings = [];
 
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Trait_|Enum_ $classLike */
+            /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $methods = array_filter(
                 $classLike->stmts,
                 static fn (Node $stmt): bool => $stmt instanceof ClassMethod,
@@ -89,7 +92,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                 $totalLines += $this->logicalLineCount($method);
             }
 
-            $average = $totalLines / count($methods);
+            $average        = $totalLines / count($methods);
             $thresholdMatch = $settings->highValueThresholdMatch($average);
 
             if ($thresholdMatch === null) {
@@ -99,7 +102,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             $symbol = $this->resolveSymbol($classLike);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has an average method length of %.1f lines across %d methods, above the %s threshold of %s.',
                     $symbol,
@@ -108,17 +111,17 @@ final readonly class AverageMethodLengthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $classLike->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Refactor long methods into smaller units to reduce average length.',
+                filePath:         $unit->file->displayPath,
+                line:             $classLike->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Refactor long methods into smaller units to reduce average length.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'averageLength' => round($average, 1),
                     'methodCount' => count($methods),
                     'totalLines' => $totalLines,
@@ -139,7 +142,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     private function logicalLineCount(ClassMethod $method): int
     {
         $finder = new NodeFinder();
-        $lines = [];
+        $lines  = [];
 
         foreach ($finder->find($method->stmts ?? [], static fn (Node $node): bool => $node instanceof Stmt && !$node instanceof Nop) as $statement) {
             $line = $statement->getStartLine();

@@ -15,7 +15,7 @@ final readonly class GitDiffProvider
      * Read changed files and line ranges from git diff output.
      *
      * @param string $projectRoot Git working tree root.
-     * @param string $mode Diff mode or base ref.
+     * @param string $mode        Diff mode or base ref.
      * @throws DiffException When git diff cannot run or the base ref is unsafe.
      * @return DiffResult Diff metadata and changed-line ranges for the requested mode.
      */
@@ -35,12 +35,12 @@ final readonly class GitDiffProvider
         $parsed = $this->parseUnifiedDiff($process->getOutput());
 
         return new DiffResult(
-            active: true,
-            mode: $this->normaliseMode($mode),
-            base: $this->baseForMode($mode),
+            active:       true,
+            mode:         $this->normaliseMode($mode),
+            base:         $this->baseForMode($mode),
             changedLines: $parsed['lines'],
             changedFiles: $parsed['files'],
-            message: 'Diff mode filters findings to changed lines when line ranges are available, otherwise to changed files.',
+            message:      'Diff mode filters findings to changed lines when line ranges are available, otherwise to changed files.',
         );
     }
 
@@ -113,8 +113,8 @@ final readonly class GitDiffProvider
     {
         $changedFiles = [];
         $changedLines = [];
-        $currentFile = null;
-        $oldFile = null;
+        $currentFile  = null;
+        $oldFile      = null;
 
         foreach (preg_split('/\R/', $diff) ?: [] as $line) {
             if (str_starts_with($line, '--- ')) {
@@ -124,10 +124,10 @@ final readonly class GitDiffProvider
 
             if (str_starts_with($line, '+++ ')) {
                 $currentFile = $this->parseNewFilePath($line) ?? $oldFile;
-                $oldFile = null;
+                $oldFile     = null;
 
                 if ($currentFile !== null && !in_array($currentFile, $changedFiles, true)) {
-                    $changedFiles[] = $currentFile;
+                    $changedFiles[]             = $currentFile;
                     $changedLines[$currentFile] = [];
                 }
 
@@ -138,8 +138,8 @@ final readonly class GitDiffProvider
                 continue;
             }
 
-            $startLine = (int) $matches[1];
-            $length = isset($matches[2]) ? (int) $matches[2] : 1;
+            $startLine                    = (int) $matches[1];
+            $length                       = isset($matches[2]) ? (int) $matches[2] : 1;
             $changedLines[$currentFile][] = ChangedLineRange::fromStartAndLength($startLine, $length);
         }
 

@@ -12,11 +12,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Size\FileLengthRule;
 use PHPUnit\Framework\TestCase;
 

@@ -13,10 +13,10 @@ use LogicException;
 final readonly class RuleSettings
 {
     /**
-     * @param bool $enabled Whether the rule should run for this config.
-     * @param array<string, int|float> $thresholds Named numeric thresholds available to the rule.
-     * @param array<string, mixed> $options Rule-specific option values from config.
-     * @param SeverityThreshold|null $severityThreshold Optional single threshold/severity override.
+     * @param bool                     $enabled           Whether the rule should run for this config.
+     * @param array<string, int|float> $thresholds        Named numeric thresholds available to the rule.
+     * @param array<string, mixed>     $options           Rule-specific option values from config.
+     * @param SeverityThreshold|null   $severityThreshold Optional single threshold/severity override.
      */
     public function __construct(
         public bool $enabled,
@@ -64,7 +64,7 @@ final readonly class RuleSettings
         }
 
         $errorThreshold = $this->numericThreshold('error');
-        $severity = $value > $errorThreshold ? Severity::Error : Severity::Warning;
+        $severity       = $value > $errorThreshold ? Severity::Error : Severity::Warning;
 
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
@@ -92,7 +92,7 @@ final readonly class RuleSettings
         }
 
         $errorThreshold = $this->numericThreshold('error');
-        $severity = $value < $errorThreshold ? Severity::Error : Severity::Warning;
+        $severity       = $value < $errorThreshold ? Severity::Error : Severity::Warning;
 
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,

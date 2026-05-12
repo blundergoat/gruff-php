@@ -43,17 +43,20 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PII in test fixture',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PII in test fixture',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find realistic PII-like values inside test fixture files.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious fixture values.
      */
@@ -77,16 +80,16 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $line = SecretScannerHelper::lineNumberForOffset($unit->source, $offset);
-                $preview = SecretScannerHelper::redactedPreview($value);
+                $line       = SecretScannerHelper::lineNumberForOffset($unit->source, $offset);
+                $preview    = SecretScannerHelper::redactedPreview($value);
                 $findings[] = SecretScannerHelper::finding(
-                    unit: $unit,
-                    ruleId: self::ID,
-                    message: sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
-                    line: $line,
-                    confidence: Confidence::Medium,
-                    detector: $definition['name'],
-                    preview: $preview,
+                    unit:        $unit,
+                    ruleId:      self::ID,
+                    message:     sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
+                    line:        $line,
+                    confidence:  Confidence::Medium,
+                    detector:    $definition['name'],
+                    preview:     $preview,
                     remediation: 'Use reserved example domains, obviously synthetic phone numbers, and fake fixture addresses.',
                 );
             }
@@ -121,9 +124,9 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     {
         $lineStart = strrpos(substr($source, 0, $offset), "\n");
         $lineStart = $lineStart === false ? 0 : $lineStart + 1;
-        $lineEnd = strpos($source, "\n", $offset);
-        $lineEnd = $lineEnd === false ? strlen($source) : $lineEnd;
-        $line = strtolower(substr($source, $lineStart, $lineEnd - $lineStart));
+        $lineEnd   = strpos($source, "\n", $offset);
+        $lineEnd   = $lineEnd === false ? strlen($source) : $lineEnd;
+        $line      = strtolower(substr($source, $lineStart, $lineEnd - $lineStart));
 
         return str_contains($line, '@author')
             || str_contains($line, 'copyright')

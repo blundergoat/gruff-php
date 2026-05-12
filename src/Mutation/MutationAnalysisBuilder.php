@@ -13,7 +13,9 @@ use Symfony\Component\Console\Command\Command;
 final readonly class MutationAnalysisBuilder
 {
     /**
-     * @param list<RunDiagnostic> $diagnostics
+     * @param string                  $projectRoot Project root used to resolve mutation report paths.
+     * @param MutationAnalysisOptions $options     Mutation-analysis options selected for the run.
+     * @param list<RunDiagnostic>     $diagnostics Diagnostics collected while loading mutation data.
      * @return MutationAnalysisResult|null Mutation report result when one can be built.
      */
     public function build(
@@ -34,15 +36,15 @@ final readonly class MutationAnalysisBuilder
         $parser = new InfectionReportParser($projectRoot);
 
         try {
-            $report = $parser->parse($options->infectionReportPath);
+            $report         = $parser->parse($options->infectionReportPath);
             $baselineReport = $options->mutationBaselinePath === null
                 ? null
                 : $parser->parse($options->mutationBaselinePath);
         } catch (MutationReportException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'mutation-report-error',
+                type:    'mutation-report-error',
                 message: $exception->getMessage(),
-                path: $options->infectionReportPath,
+                path:    $options->infectionReportPath,
             );
 
             return null;
@@ -82,7 +84,7 @@ final readonly class MutationAnalysisBuilder
         }
 
         $diagnostics[] = new RunDiagnostic(
-            type: 'mutation-run-error',
+            type:    'mutation-run-error',
             message: sprintf(
                 'Infection exited with code %d before producing the requested report.',
                 $runResult->exitCode,
@@ -101,37 +103,37 @@ final readonly class MutationAnalysisBuilder
     {
         if ($options->infectionRun) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--infection-run requires --infection-report because Infection writes full JSON through configured log paths.',
             );
         }
 
         if ($options->infectionConfigPath !== null) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--infection-config only applies with --infection-run and --infection-report.',
-                path: $options->infectionConfigPath,
+                path:    $options->infectionConfigPath,
             );
         }
 
         if ($options->infectionTestFrameworkOptions !== null) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--infection-test-framework-options only applies with --infection-run and --infection-report.',
             );
         }
 
         if ($options->mutationBaselinePath !== null) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--mutation-baseline requires --infection-report.',
-                path: $options->mutationBaselinePath,
+                path:    $options->mutationBaselinePath,
             );
         }
 
         if ($options->mutationBudget !== null) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--mutation-budget requires --infection-report.',
             );
         }

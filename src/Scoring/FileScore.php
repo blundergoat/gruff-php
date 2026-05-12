@@ -12,16 +12,16 @@ final readonly class FileScore
     /**
      * Capture score, finding totals, and optional metrics for one file.
      *
-     * @param string $filePath Display path for the scored file.
-     * @param Grade $grade Letter grade and numeric score for the file.
-     * @param int $findings Total findings counted for the file.
-     * @param int $advisories Advisory findings counted for the file.
-     * @param int $warnings Warning findings counted for the file.
-     * @param int $errors Error findings counted for the file.
-     * @param float $penalty Score penalty applied to the file.
-     * @param int|null $maxCyclomatic Highest cyclomatic complexity found in the file.
-     * @param int|null $maxCognitive Highest cognitive complexity found in the file.
-     * @param int|null $maxLines Highest method line count found in the file.
+     * @param string     $filePath      Display path for the scored file.
+     * @param Grade      $grade         Letter grade and numeric score for the file.
+     * @param int        $findings      Total findings counted for the file.
+     * @param int        $advisories    Advisory findings counted for the file.
+     * @param int        $warnings      Warning findings counted for the file.
+     * @param int        $errors        Error findings counted for the file.
+     * @param float      $penalty       Score penalty applied to the file.
+     * @param int|null   $maxCyclomatic Highest cyclomatic complexity found in the file.
+     * @param int|null   $maxCognitive  Highest cognitive complexity found in the file.
+     * @param int|null   $maxLines      Highest method line count found in the file.
      * @param float|null $mutationScore Mutation score for the file, when available.
      */
     public function __construct(

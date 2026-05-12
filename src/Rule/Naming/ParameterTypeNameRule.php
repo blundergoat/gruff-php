@@ -65,13 +65,13 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Parameter type name',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Parameter type name',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
-            defaultOptions: [
+            confidence:      Confidence::Medium,
+            defaultOptions:  [
                 'typeSuffixesToTrim' => ['Interface'],
                 'ignoredParameterNames' => [],
             ],
@@ -82,20 +82,23 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     /**
      * Find class-typed parameters whose names do not match their type names.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for mismatched parameter/type names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
-        $typeSuffixesToTrim = $settings->stringListOption('typeSuffixesToTrim');
+        $definition            = $this->definition();
+        $settings              = $context->settingsFor($definition);
+        $typeSuffixesToTrim    = $settings->stringListOption('typeSuffixesToTrim');
         $ignoredParameterNames = $settings->stringListOption('ignoredParameterNames');
-        $finder = new NodeFinder();
-        $tokenizer = new IdentifierTokenizer();
-        $findings = [];
+        $finder                = new NodeFinder();
+        $tokenizer             = new IdentifierTokenizer();
+        $findings              = [];
 
         foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof ClassMethod || $node instanceof Function_) as $function) {
-            /** @var ClassMethod|Function_ $function */
+            /** @var ClassMethod|Function_ $function Finder predicate restricts results to function-like nodes. */
             $symbol = CyclomaticComplexityRule::resolveSymbol($function);
 
             foreach ($function->params as $param) {
@@ -118,7 +121,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
+                    ruleId:  $definition->id,
                     message: sprintf(
                         'Parameter $%s in %s should be named $%s to match %s.',
                         $param->var->name,
@@ -126,15 +129,15 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                         $expectedName,
                         $typeName,
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $param->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    filePath:    $unit->file->displayPath,
+                    line:        $param->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: sprintf('Rename $%s to $%s.', $param->var->name, $expectedName),
-                    metadata: [
+                    metadata:    [
                         'parameter' => $param->var->name,
                         'type' => $typeName,
                         'expectedName' => $expectedName,

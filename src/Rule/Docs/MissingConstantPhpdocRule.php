@@ -40,25 +40,28 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing constant PHPDoc',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing constant PHPDoc',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find class constants and enum cases without PHPDoc.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for undocumented constants.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
             if (!$classLike instanceof Class_
@@ -82,20 +85,20 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
 
                     foreach ($statement->consts as $const) {
                         $constantName = $const->name->toString();
-                        $symbol = sprintf('%s::%s', $className, $constantName);
+                        $symbol       = sprintf('%s::%s', $className, $constantName);
 
                         $findings[] = new Finding(
-                            ruleId: $definition->id,
-                            message: sprintf('Constant %s has no PHPDoc.', $symbol),
-                            filePath: $unit->file->displayPath,
-                            line: $statement->getStartLine(),
-                            severity: $definition->defaultSeverity,
-                            pillar: $definition->pillar,
-                            tier: $definition->tier,
-                            confidence: $definition->confidence,
-                            symbol: $symbol,
+                            ruleId:      $definition->id,
+                            message:     sprintf('Constant %s has no PHPDoc.', $symbol),
+                            filePath:    $unit->file->displayPath,
+                            line:        $statement->getStartLine(),
+                            severity:    $definition->defaultSeverity,
+                            pillar:      $definition->pillar,
+                            tier:        $definition->tier,
+                            confidence:  $definition->confidence,
+                            symbol:      $symbol,
                             remediation: 'Add a one-line docblock above the constant.',
-                            metadata: [
+                            metadata:    [
                                 'constantName' => $constantName,
                                 'kind' => 'class-constant',
                                 'className' => $className,
@@ -123,20 +126,20 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 }
 
                 $caseName = $statement->name->toString();
-                $symbol = sprintf('%s::%s', $className, $caseName);
+                $symbol   = sprintf('%s::%s', $className, $caseName);
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $statement->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $statement->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: 'Document either each case or add a class-level docblock to the enum.',
-                    metadata: [
+                    metadata:    [
                         'constantName' => $caseName,
                         'kind' => 'enum-case',
                         'className' => $className,

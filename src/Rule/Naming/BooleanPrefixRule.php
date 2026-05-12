@@ -48,32 +48,35 @@ final readonly class BooleanPrefixRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Boolean method prefix',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Boolean method prefix',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find bool-returning functions and methods without a boolean-style prefix.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for poorly named boolean callables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             if (!$this->returnsBool($node)) {
                 continue;
             }
@@ -98,15 +101,15 @@ final readonly class BooleanPrefixRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s returns bool but does not use a boolean prefix (is, has, can, should, will).', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('%s returns bool but does not use a boolean prefix (is, has, can, should, will).', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $node->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $symbol,
                 remediation: 'Rename to use a boolean prefix, e.g. isActive(), hasPermission().',
             );
         }

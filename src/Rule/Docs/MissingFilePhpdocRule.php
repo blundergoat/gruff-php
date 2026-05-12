@@ -36,17 +36,20 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing file PHPDoc',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing file PHPDoc',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find files that lack a file-level docblock or a documented sole class-like declaration.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for missing file-level documentation.
      */
@@ -138,17 +141,17 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: $definition->id,
-                message: sprintf('File %s has no file-level docblock.', $unit->file->displayPath),
-                filePath: $unit->file->displayPath,
-                line: 1,
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $unit->file->displayPath,
+                ruleId:      $definition->id,
+                message:     sprintf('File %s has no file-level docblock.', $unit->file->displayPath),
+                filePath:    $unit->file->displayPath,
+                line:        1,
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $unit->file->displayPath,
                 remediation: 'Add a file-level docblock describing the file\'s purpose, or document the file\'s single declared type with a class-level docblock.',
-                metadata: [
+                metadata:    [
                     'firstStatementKind' => $this->statementKind($first),
                 ],
             ),

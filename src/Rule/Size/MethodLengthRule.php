@@ -15,10 +15,10 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Nop;
-use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
 /**
@@ -39,12 +39,12 @@ final readonly class MethodLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Method length',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Method length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 30,
                 'error' => 60,
@@ -55,15 +55,18 @@ final readonly class MethodLengthRule implements RuleInterface
     /**
      * Find callables whose logical statement line count exceeds thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for long callables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_
                 || $node instanceof Closure;
@@ -77,13 +80,13 @@ final readonly class MethodLengthRule implements RuleInterface
             }
 
             $startLine = $node->getStartLine();
-            $endLine = $node->getEndLine();
+            $endLine   = $node->getEndLine();
 
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
 
-            $length = $this->logicalLineCount($node);
+            $length         = $this->logicalLineCount($node);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
             if ($thresholdMatch === null) {
@@ -93,7 +96,7 @@ final readonly class MethodLengthRule implements RuleInterface
             $symbol = $this->resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s is %d lines, above the %s threshold of %s.',
                     $symbol,
@@ -101,17 +104,17 @@ final readonly class MethodLengthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $startLine,
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $endLine,
-                symbol: $symbol,
-                remediation: 'Extract logic into smaller methods or functions.',
+                filePath:         $unit->file->displayPath,
+                line:             $startLine,
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $endLine,
+                symbol:           $symbol,
+                remediation:      'Extract logic into smaller methods or functions.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'lines' => $length,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
@@ -130,7 +133,7 @@ final readonly class MethodLengthRule implements RuleInterface
     private function logicalLineCount(ClassMethod|Function_|Closure $node): int
     {
         $finder = new NodeFinder();
-        $lines = [];
+        $lines  = [];
 
         foreach ($finder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
             $line = $statement->getStartLine();
@@ -151,7 +154,7 @@ final readonly class MethodLengthRule implements RuleInterface
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod) {
-            $parent = $node->getAttribute('parent');
+            $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
                 || $parent instanceof Node\Stmt\Trait_
                 || $parent instanceof Node\Stmt\Enum_

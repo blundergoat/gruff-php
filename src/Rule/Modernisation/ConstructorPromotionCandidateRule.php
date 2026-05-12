@@ -36,17 +36,20 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Constructor property promotion candidate',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Constructor property promotion candidate',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find constructor assignments that can likely use property promotion.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for promotable constructor assignments.
      */
@@ -56,7 +59,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($this->candidateClasses($unit, $finder) as $class) {
@@ -74,7 +77,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $classes = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
-            /** @var Stmt\Class_ $class */
+            /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
             if ($this->classAllowsPromotion($class)) {
                 $classes[] = $class;
             }
@@ -105,9 +108,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return [];
         }
 
-        $properties = $this->declaredProperties($class);
+        $properties      = $this->declaredProperties($class);
         $lateAssignments = $this->lateAssignments($class);
-        $findings = [];
+        $findings        = [];
 
         foreach ($this->constructorAssignments($constructor) as $assign) {
             $property = $this->promotableProperty($assign, $constructor, $properties, $lateAssignments);
@@ -210,7 +213,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function lateAssignments(Stmt\Class_ $class): array
     {
         $assignments = [];
-        $finder = new NodeFinder();
+        $finder      = new NodeFinder();
 
         foreach ($class->getMethods() as $method) {
             if (strtolower($method->name->toString()) === '__construct') {
@@ -252,16 +255,16 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function finding(AnalysisUnit $unit, Node $node, string $property): Finding
     {
         return new Finding(
-            ruleId: self::ID,
-            message: sprintf('Property $%s is assigned directly from the same constructor parameter; PHP 8 property promotion may reduce boilerplate.', $property),
-            filePath: $unit->file->displayPath,
-            line: $node->getStartLine(),
-            severity: Severity::Advisory,
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
-            confidence: Confidence::Medium,
+            ruleId:      self::ID,
+            message:     sprintf('Property $%s is assigned directly from the same constructor parameter; PHP 8 property promotion may reduce boilerplate.', $property),
+            filePath:    $unit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    Severity::Advisory,
+            pillar:      Pillar::Modernisation,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
             remediation: 'Consider constructor property promotion after confirming the rewrite preserves constructor semantics; gruff-php reports only.',
-            metadata: [
+            metadata:    [
                 'property' => $property,
                 'requiresPhp' => 8.0,
             ],

@@ -30,6 +30,7 @@ final readonly class RuleSelection
     /**
      * Decide whether a rule definition passes the include and exclude filters.
      *
+     * @param RuleDefinition $definition Rule definition to test against selection filters.
      * @return bool True when the rule should remain enabled for the selection.
      */
     public function allows(RuleDefinition $definition): bool

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Analysis;
 
+use GruffPhp\Baseline\BaselineReport;
+use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
-use GruffPhp\Baseline\BaselineReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
-use GruffPhp\Diff\DiffResult;
 use GruffPhp\Reporting\FindingDisplayFilter;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Scoring\ScoreReport;
@@ -25,25 +25,25 @@ final readonly class AnalysisReport
     public const SCHEMA_VERSION = 'gruff.analysis.v1';
 
     /**
-     * @param string $toolVersion Gruff version used to produce the report.
-     * @param list<string> $requestedPaths Paths requested for analysis.
-     * @param string $format Output format requested for report serialization.
-     * @param string $failOn Severity gate used to determine the process exit code.
-     * @param int $filesDiscovered Number of source files discovered before parsing.
-     * @param int $filesParsed Number of source files parsed successfully.
-     * @param list<string> $ignoredPaths Requested paths ignored by discovery.
-     * @param list<string> $missingPaths Requested paths that did not resolve to files.
-     * @param list<RunDiagnostic> $diagnostics Non-finding diagnostics emitted during the run.
-     * @param list<Finding> $findings Findings included in the report.
-     * @param int $exitCode Process exit code represented by the report.
-     * @param string|null $configPath Config file path used for the run, when available.
-     * @param MutationAnalysisResult|null $mutation Mutation analysis result attached to the report.
-     * @param ScoreReport|null $score Score summary attached to the report.
-     * @param DiffResult|null $diff Diff context attached to the report.
-     * @param TrendReport|null $trend Trend history attached to the report.
-     * @param BaselineReport|null $baseline Baseline application result attached to the report.
-     * @param BranchReviewResult|null $review Branch review result attached to the report.
-     * @param FindingDisplayFilter|null $filters Display filters applied to the report output.
+     * @param string                      $toolVersion     Gruff version used to produce the report.
+     * @param list<string>                $requestedPaths  Paths requested for analysis.
+     * @param string                      $format          Output format requested for report serialization.
+     * @param string                      $failOn          Severity gate used to determine the process exit code.
+     * @param int                         $filesDiscovered Number of source files discovered before parsing.
+     * @param int                         $filesParsed     Number of source files parsed successfully.
+     * @param list<string>                $ignoredPaths    Requested paths ignored by discovery.
+     * @param list<string>                $missingPaths    Requested paths that did not resolve to files.
+     * @param list<RunDiagnostic>         $diagnostics     Non-finding diagnostics emitted during the run.
+     * @param list<Finding>               $findings        Findings included in the report.
+     * @param int                         $exitCode        Process exit code represented by the report.
+     * @param string|null                 $configPath      Config file path used for the run, when available.
+     * @param MutationAnalysisResult|null $mutation        Mutation analysis result attached to the report.
+     * @param ScoreReport|null            $score           Score summary attached to the report.
+     * @param DiffResult|null             $diff            Diff context attached to the report.
+     * @param TrendReport|null            $trend           Trend history attached to the report.
+     * @param BaselineReport|null         $baseline        Baseline application result attached to the report.
+     * @param BranchReviewResult|null     $review          Branch review result attached to the report.
+     * @param FindingDisplayFilter|null   $filters         Display filters applied to the report output.
      */
     public function __construct(
         public string $toolVersion,

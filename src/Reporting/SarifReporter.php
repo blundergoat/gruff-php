@@ -17,6 +17,7 @@ final readonly class SarifReporter
     /**
      * Render findings as a SARIF 2.1.0 JSON document.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string SARIF JSON document or encoded error payload.
      */
     public function render(AnalysisReport $report): string

@@ -40,12 +40,12 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Cognitive complexity',
-            pillar: Pillar::Complexity,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Cognitive complexity',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 15,
                 'error' => 30,
@@ -56,17 +56,17 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Flag methods whose cognitive complexity exceeds the configured threshold.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context carrying thresholds.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context carrying thresholds.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -75,7 +75,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $cc = self::compute($node);
+            $cc             = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($cc);
 
             if ($thresholdMatch === null) {
@@ -85,7 +85,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has a cognitive complexity of %d, above the %s threshold of %s.',
                     $symbol,
@@ -93,17 +93,17 @@ final readonly class CognitiveComplexityRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Reduce nesting and extract complex conditions into named methods.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Reduce nesting and extract complex conditions into named methods.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'complexity' => $cc,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
@@ -349,7 +349,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         }
 
         $total = 0;
-        $flat = [];
+        $flat  = [];
         self::flattenBooleanChain($expr, $flat);
 
         $lastOperatorClass = null;

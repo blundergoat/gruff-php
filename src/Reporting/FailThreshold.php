@@ -34,6 +34,7 @@ enum FailThreshold: string
     /**
      * Convert a CLI fail threshold string into the matching enum case.
      *
+     * @param string $value CLI fail-on value to parse.
      * @return self|null Matching threshold, or null for unsupported input.
      */
     public static function fromInput(string $value): ?self
@@ -50,6 +51,7 @@ enum FailThreshold: string
     /**
      * Decide whether a finding severity should fail for this threshold.
      *
+     * @param Severity $severity Finding severity to compare with this threshold.
      * @return bool True when the severity meets or exceeds the threshold.
      */
     public function isTriggeredBy(Severity $severity): bool

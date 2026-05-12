@@ -46,25 +46,28 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Global state mutation in test',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Global state mutation in test',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find tests that mutate global state without detected cleanup hooks.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for unscoped global state mutation.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
-        $findings = [];
-        $cleanupCache = [];
+        $finder        = new NodeFinder();
+        $findings      = [];
+        $cleanupCache  = [];
         $classesByName = $this->classesByName($unit, $finder);
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -83,7 +86,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * @param array<int, bool> $cleanupCache
+     * @param array<int, bool>           $cleanupCache
      * @param array<string, Stmt\Class_> $classesByName
      *
      * @return bool True when the scope should be scanned for cleanup-sensitive mutations.
@@ -190,7 +193,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
     /**
      * @param array<string, Stmt\Class_> $classesByName
-     * @param array<int, true> $visited
+     * @param array<int, true>           $visited
      *
      * @return bool True when the class or an ancestor declares a cleanup hook.
      */
@@ -227,7 +230,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         }
 
         $parentName = $class->extends->toString();
-        $parent = $classesByName[$parentName] ?? $classesByName[$this->shortName($parentName)] ?? null;
+        $parent     = $classesByName[$parentName] ?? $classesByName[$this->shortName($parentName)] ?? null;
 
         if (!$parent instanceof Stmt\Class_) {
             return !in_array($this->shortName($parentName), ['TestCase'], true);
@@ -248,7 +251,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
                 continue;
             }
 
-            $name = $class->name->toString();
+            $name           = $class->name->toString();
             $classes[$name] = $class;
             $namespacedName = $class->getAttribute('namespacedName');
 
@@ -285,17 +288,17 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         array $metadata,
     ): Finding {
         return new Finding(
-            ruleId: self::ID,
-            message: $message,
-            filePath: $unit->file->displayPath,
-            line: $line,
-            severity: Severity::Warning,
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            confidence: Confidence::Medium,
-            symbol: $scope->symbol,
+            ruleId:      self::ID,
+            message:     $message,
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    Severity::Warning,
+            pillar:      Pillar::TestQuality,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
+            symbol:      $scope->symbol,
             remediation: 'Reset the value in tearDown / #[After] or scope the change to a fixture-managed environment so the next test starts clean.',
-            metadata: $metadata,
+            metadata:    $metadata,
         );
     }
 }

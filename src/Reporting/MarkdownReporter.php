@@ -15,14 +15,15 @@ final readonly class MarkdownReporter
     /**
      * Render an analysis report as Markdown.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string Markdown report output.
      */
     public function render(AnalysisReport $report): string
     {
-        $score = $report->score;
-        $counts = $report->findingCounts();
+        $score   = $report->score;
+        $counts  = $report->findingCounts();
         $pillars = $score === null ? [] : $score->pillars;
-        $lines = [
+        $lines   = [
             '# gruff-php report',
             '',
             sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
@@ -96,7 +97,7 @@ final readonly class MarkdownReporter
     private function findingLine(Finding $finding): string
     {
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
-        $symbol = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
+        $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
         return sprintf(
             '- **%s** `%s` %s%s - %s',
@@ -109,7 +110,7 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * @param list<string> $lines
+     * @param list<string>  $lines
      * @param list<Finding> $findings
      *
      * @return void No return value.
@@ -138,7 +139,7 @@ final readonly class MarkdownReporter
             }
 
             ksort($groups[$severity], SORT_STRING);
-            $count = array_sum(array_map('count', $groups[$severity]));
+            $count   = array_sum(array_map('count', $groups[$severity]));
             $lines[] = sprintf('<details open><summary>%s (%d)</summary>', ucfirst($severity), $count);
             $lines[] = '';
 

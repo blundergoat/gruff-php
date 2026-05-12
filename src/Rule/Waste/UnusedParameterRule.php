@@ -38,27 +38,27 @@ final readonly class UnusedParameterRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unused parameter',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unused parameter',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Flag function and method parameters that are declared but never read in the body.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($this->analysableNodes($unit, $finder) as $node) {
             array_push($findings, ...$this->findingsForNode($unit, $definition, $finder, $node));
@@ -190,7 +190,7 @@ final readonly class UnusedParameterRule implements RuleInterface
         ClassMethod|Function_ $node,
     ): array {
         $usedNames = $this->usedVariableNames($node, $finder);
-        $findings = [];
+        $findings  = [];
 
         foreach ($this->parameterNames($node) as $name => $param) {
             if (!isset($usedNames[$name])) {
@@ -229,7 +229,7 @@ final readonly class UnusedParameterRule implements RuleInterface
     private function usedVariableNames(ClassMethod|Function_ $node, NodeFinder $finder): array
     {
         $usedNames = [];
-        $usedVars = $finder->find($node->stmts ?? [], static function (Node $child): bool {
+        $usedVars  = $finder->find($node->stmts ?? [], static function (Node $child): bool {
             return $child instanceof Variable
                 && is_string($child->name)
                 && self::isVariableUse($child);
@@ -273,18 +273,18 @@ final readonly class UnusedParameterRule implements RuleInterface
         $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
         return new Finding(
-            ruleId: $definition->id,
-            message: sprintf('Parameter $%s in %s is never used.', $name, $symbol),
-            filePath: $unit->file->displayPath,
-            line: $param->getStartLine(),
-            column: $this->startColumn($unit, $param),
-            severity: $definition->defaultSeverity,
-            pillar: $definition->pillar,
-            tier: $definition->tier,
-            confidence: $definition->confidence,
-            symbol: $symbol,
+            ruleId:      $definition->id,
+            message:     sprintf('Parameter $%s in %s is never used.', $name, $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $param->getStartLine(),
+            column:      $this->startColumn($unit, $param),
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
             remediation: 'Remove the parameter or use it in the method body.',
-            metadata: ['parameter' => $name],
+            metadata:    ['parameter' => $name],
         );
     }
 
@@ -302,7 +302,7 @@ final readonly class UnusedParameterRule implements RuleInterface
         }
 
         $sourceBeforeParameter = substr($unit->source, 0, $startFilePosition);
-        $lineStartPosition = strrpos($sourceBeforeParameter, "\n");
+        $lineStartPosition     = strrpos($sourceBeforeParameter, "\n");
 
         return $startFilePosition - ($lineStartPosition === false ? -1 : $lineStartPosition);
     }

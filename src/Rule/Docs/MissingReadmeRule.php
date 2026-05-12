@@ -40,17 +40,20 @@ final class MissingReadmeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing README',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing README',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Emit one finding when the project root has no README.md file.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Missing README finding, or an empty list.
      */
@@ -60,7 +63,7 @@ final class MissingReadmeRule implements RuleInterface
             return [];
         }
 
-        $root = $context->projectRoot;
+        $root          = $context->projectRoot;
         $readmePresent = $this->readmePresenceByRoot[$root]
             ??= file_exists($root . '/README.md');
 
@@ -69,18 +72,18 @@ final class MissingReadmeRule implements RuleInterface
         }
 
         $this->emitted = true;
-        $definition = $this->definition();
+        $definition    = $this->definition();
 
         return [
             new Finding(
-                ruleId: $definition->id,
-                message: 'Project root has no README.md.',
-                filePath: 'README.md',
-                line: null,
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
+                ruleId:      $definition->id,
+                message:     'Project root has no README.md.',
+                filePath:    'README.md',
+                line:        null,
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
                 remediation: 'Add a README.md describing the project.',
             ),
         ];

@@ -41,23 +41,26 @@ final readonly class PrivateReflectionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Private member reflection',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Private member reflection',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find tests that use reflection or binding to reach private implementation details.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for private-reflection test access.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -79,15 +82,15 @@ final readonly class PrivateReflectionRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s uses reflection to reach implementation details.', $scope->symbol),
-                filePath: $unit->file->displayPath,
-                line: $reflectionNode->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s uses reflection to reach implementation details.', $scope->symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $reflectionNode->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $scope->symbol,
                 remediation: 'Test behavior through public contracts instead of private members.',
             );
         }
@@ -107,7 +110,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
         }
 
         if ($node instanceof Expr\StaticCall && $node->class instanceof Name) {
-            $name = TestQualityNodeHelper::callName($node);
+            $name      = TestQualityNodeHelper::callName($node);
             $className = strtolower($node->class->getLast());
 
             return $className === 'closure' && $name === 'bind';

@@ -35,26 +35,29 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Multiple arrange-act-assert cycles',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            id:                self::ID,
+            name:              'Multiple arrange-act-assert cycles',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Low,
             defaultThresholds: ['minCycles' => 2],
-            defaultEnabled: false,
+            defaultEnabled:    false,
         );
     }
 
     /**
      * Find tests that appear to repeat act/assert cycles in one method.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for repeated AAA cycles.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minCycles');
-        $findings = [];
+        $findings  = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             $cycles = $this->countActAssertCycles($scope);
@@ -64,21 +67,21 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s contains %d act-then-assert cycles; consider splitting into focused tests.',
                     $scope->symbol,
                     $cycles,
                 ),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
-                symbol: $scope->symbol,
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
+                symbol:      $scope->symbol,
                 remediation: 'Each test should arrange once, act once, and assert once. Split this method into separate tests for each scenario.',
-                metadata: ['cycles' => $cycles, 'threshold' => $threshold],
+                metadata:    ['cycles' => $cycles, 'threshold' => $threshold],
             );
         }
 
@@ -92,12 +95,12 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
      */
     private function countActAssertCycles(TestQualityScope $scope): int
     {
-        $cycles = 0;
+        $cycles              = 0;
         $sawNonAssertionCall = false;
-        $finder = new NodeFinder();
+        $finder              = new NodeFinder();
 
         foreach ($scope->statements as $stmt) {
-            $hasAssertion = false;
+            $hasAssertion        = false;
             $hasNonAssertionCall = false;
 
             foreach ($finder->find([$stmt], static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {

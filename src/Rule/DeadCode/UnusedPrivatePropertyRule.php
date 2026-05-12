@@ -40,24 +40,27 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unused private property',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unused private property',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find private properties that are never read, never written, or unused entirely.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for unused private properties.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
@@ -67,14 +70,14 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         $findings = [];
 
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Trait_|Enum_ $classLike */
+            /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $privateProps = $this->privateProperties($classLike);
 
             if ($privateProps === []) {
                 continue;
             }
 
-            $usage = $this->propertyUsage($finder, $classLike, $privateProps);
+            $usage    = $this->propertyUsage($finder, $classLike, $privateProps);
             $findings = array_merge(
                 $findings,
                 $this->findingsForProperties($unit, $definition, $classLike, $privateProps, $usage),
@@ -130,15 +133,15 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_                                         $classLike
      * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
      * @return array{reads: array<string, true>, writes: array<string, true>}
      */
     private function propertyUsage(NodeFinder $finder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
     {
-        $reads = [];
-        $writes = [];
-        $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+        $reads        = [];
+        $writes       = [];
+        $allNodes     = $finder->find($classLike->stmts, static fn (): bool => true);
         $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
 
         foreach ($allNodes as $node) {
@@ -174,7 +177,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
         if ($parent instanceof Expr\AssignOp && $parent->var === $node) {
             $writes[$name] = true;
-            $reads[$name] = true;
+            $reads[$name]  = true;
 
             return;
         }
@@ -183,8 +186,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
-     * @param Class_|Trait_|Enum_ $classLike
-     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
+     * @param Class_|Trait_|Enum_                                            $classLike
+     * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps
      * @param array{reads: array<string, true>, writes: array<string, true>} $usage
      * @return list<Finding>
      */
@@ -195,30 +198,30 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         array $privateProps,
         array $usage,
     ): array {
-        $findings = [];
+        $findings  = [];
         $className = $this->resolveClassName($classLike);
 
         foreach ($privateProps as $name => $property) {
-            $isRead = isset($usage['reads'][$name]);
+            $isRead    = isset($usage['reads'][$name]);
             $isWritten = isset($usage['writes'][$name]) || $property['writtenByDeclaration'];
 
             if ($isRead && $isWritten) {
                 continue;
             }
 
-            $symbol = sprintf('%s::$%s', $className, $name);
+            $symbol     = sprintf('%s::$%s', $className, $name);
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: $this->propertyMessage($symbol, $isRead, $isWritten),
-                filePath: $unit->file->displayPath,
-                line: $property['line'],
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     $this->propertyMessage($symbol, $isRead, $isWritten),
+                filePath:    $unit->file->displayPath,
+                line:        $property['line'],
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $symbol,
                 remediation: 'Remove the unused property or add the missing read/write.',
-                metadata: ['read' => $isRead, 'written' => $isWritten],
+                metadata:    ['read' => $isRead, 'written' => $isWritten],
             );
         }
 

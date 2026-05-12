@@ -14,9 +14,9 @@ final readonly class PhpUnitConfig
     /**
      * Capture a discovered PHPUnit configuration file and loaded XML root.
      *
-     * @param string $absolutePath Absolute path to the PHPUnit config file.
-     * @param string $displayPath Project-relative display path for the config file.
-     * @param SimpleXMLElement $root Parsed PHPUnit XML root element.
+     * @param string           $absolutePath Absolute path to the PHPUnit config file.
+     * @param string           $displayPath  Project-relative display path for the config file.
+     * @param SimpleXMLElement $root         Parsed PHPUnit XML root element.
      */
     public function __construct(
         public string $absolutePath,

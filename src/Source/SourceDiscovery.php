@@ -76,17 +76,17 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<string> $paths Requested paths to discover.
-     * @param bool $includeIgnored Whether built-in ignored paths should still be included.
+     * @param list<string> $paths                    Requested paths to discover.
+     * @param bool         $includeIgnored           Whether built-in ignored paths should still be included.
      * @param list<string> $configuredIgnorePatterns Additional ignore patterns from config.
      * @return SourceDiscoveryResult Files, missing inputs, and ignored paths.
      */
     public function discover(array $paths, bool $includeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
     {
         $requestedPaths = $paths === [] ? ['.'] : $paths;
-        $files = [];
-        $missingPaths = [];
-        $ignoredPaths = [];
+        $files          = [];
+        $missingPaths   = [];
+        $ignoredPaths   = [];
 
         foreach ($requestedPaths as $path) {
             $absolutePath = $this->absolutePath($path);
@@ -122,7 +122,7 @@ final readonly class SourceDiscovery
             if (is_dir($absolutePath)) {
                 foreach ($this->walkDirectory($absolutePath, $includeIgnored, $configuredIgnorePatterns, $ignoredPaths) as $file) {
                     $canonicalPath = $this->canonicalPath($file->getPathname());
-                    $type = $this->sourceType($canonicalPath);
+                    $type          = $this->sourceType($canonicalPath);
 
                     if ($type !== null) {
                         $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath), $type);
@@ -148,13 +148,12 @@ final readonly class SourceDiscovery
         bool $includeIgnored,
         array $configuredIgnorePatterns,
         array &$ignoredPaths,
-    ): iterable
-    {
-        $inner = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
+    ): iterable {
+        $inner  = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
         $filter = new RecursiveCallbackFilterIterator(
             $inner,
             function (SplFileInfo $file, mixed $key, RecursiveIterator $iterator) use ($includeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
-                $path = $file->getPathname();
+                $path  = $file->getPathname();
                 $isDir = $file->isDir();
 
                 if ($this->isConfiguredIgnoredPath($path, $configuredIgnorePatterns)) {
@@ -224,7 +223,7 @@ final readonly class SourceDiscovery
     private function displayPath(string $path): string
     {
         $canonicalPath = $this->canonicalPath($path);
-        $root = rtrim($this->canonicalPath($this->projectRoot), '/');
+        $root          = rtrim($this->canonicalPath($this->projectRoot), '/');
 
         if ($canonicalPath === $root) {
             return '.';
@@ -277,11 +276,11 @@ final readonly class SourceDiscovery
     private function isDefaultIgnoredPath(string $path): bool
     {
         $displayPath = str_replace('\\', '/', $this->displayPath($path));
-        $segments = explode('/', trim($displayPath, '/'));
+        $segments    = explode('/', trim($displayPath, '/'));
 
         foreach (self::IGNORED_DIRECTORIES as $ignoredDirectory) {
             $ignoredSegments = explode('/', $ignoredDirectory);
-            $ignoredCount = count($ignoredSegments);
+            $ignoredCount    = count($ignoredSegments);
 
             for ($i = 0, $max = count($segments) - $ignoredCount; $i <= $max; $i++) {
                 if (array_slice($segments, $i, $ignoredCount) === $ignoredSegments) {
@@ -326,7 +325,7 @@ final readonly class SourceDiscovery
     private function matchesPathPattern(string $displayPath, string $pattern): bool
     {
         $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
-        $normalizedPath = trim($displayPath, '/');
+        $normalizedPath    = trim($displayPath, '/');
 
         if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
             return true;

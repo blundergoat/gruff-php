@@ -8,7 +8,13 @@ use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rule\Complexity\NestingDepthRule;
+use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
+use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
 use GruffPhp\Rule\Docs\ContinueCommentRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
@@ -25,16 +31,6 @@ use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
 use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
-use GruffPhp\Rule\Naming\BooleanPrefixRule;
-use GruffPhp\Rule\Naming\ClassFileMismatchRule;
-use GruffPhp\Rule\Naming\ConfusingNameRule;
-use GruffPhp\Rule\Naming\GenericMethodNameRule;
-use GruffPhp\Rule\Naming\HungarianNotationRule;
-use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\ParameterTypeNameRule;
-use GruffPhp\Rule\Naming\ShortVariableRule;
-use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
-use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
 use GruffPhp\Rule\Modernisation\EnumCandidateRule;
 use GruffPhp\Rule\Modernisation\FirstClassCallableCandidateRule;
@@ -45,15 +41,15 @@ use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rule\Modernisation\PhpDocMixedOveruseRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
-use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
-use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
-use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
-use GruffPhp\Rule\SensitiveData\JwtTokenRule;
-use GruffPhp\Rule\SensitiveData\PhiPatternRule;
-use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
-use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\Naming\BooleanPrefixRule;
+use GruffPhp\Rule\Naming\ClassFileMismatchRule;
+use GruffPhp\Rule\Naming\ConfusingNameRule;
+use GruffPhp\Rule\Naming\GenericMethodNameRule;
+use GruffPhp\Rule\Naming\HungarianNotationRule;
+use GruffPhp\Rule\Naming\IdentifierQualityRule;
+use GruffPhp\Rule\Naming\ParameterTypeNameRule;
+use GruffPhp\Rule\Naming\ShortVariableRule;
+use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
@@ -65,6 +61,22 @@ use GruffPhp\Rule\Security\SqlConcatenationRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
+use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
+use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
+use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
+use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
+use GruffPhp\Rule\SensitiveData\JwtTokenRule;
+use GruffPhp\Rule\SensitiveData\PhiPatternRule;
+use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
+use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\Size\AverageMethodLengthRule;
+use GruffPhp\Rule\Size\ClassLengthRule;
+use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\Size\MethodLengthRule;
+use GruffPhp\Rule\Size\ParameterCountRule;
+use GruffPhp\Rule\Size\PropertyCountRule;
+use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
@@ -76,9 +88,9 @@ use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
 use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
+use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
-use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
@@ -92,10 +104,10 @@ use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
+use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule as TestQualityNamingConsistencyRule;
-use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\TestQuality\UnusedMockRule;
@@ -107,18 +119,6 @@ use GruffPhp\Rule\Waste\RedundantVariableRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
-use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
-use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
-use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\Complexity\NpathComplexityRule;
-use GruffPhp\Rule\Size\AverageMethodLengthRule;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Rule\Size\ParameterCountRule;
-use GruffPhp\Rule\Size\PropertyCountRule;
-use GruffPhp\Rule\Size\PublicMethodCountRule;
 use InvalidArgumentException;
 
 /**
@@ -328,13 +328,13 @@ final class RuleRegistry
     /**
      * Run all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit> $units Parsed units to analyse.
-     * @param RuleContext $context Rule execution context.
+     * @param list<AnalysisUnit> $units   Parsed units to analyse.
+     * @param RuleContext        $context Rule execution context.
      * @return list<Finding> Findings produced by enabled rules.
      */
     public function analyse(array $units, RuleContext $context): array
     {
-        $findings = [];
+        $findings     = [];
         $enabledRules = $this->enabledRules($context->config);
 
         foreach ($units as $unit) {
@@ -398,7 +398,7 @@ final class RuleRegistry
      */
     private function deduplicateFindings(array $findings): array
     {
-        $seen = [];
+        $seen           = [];
         $uniqueFindings = [];
 
         foreach ($findings as $finding) {
@@ -417,7 +417,7 @@ final class RuleRegistry
                 continue;
             }
 
-            $seen[$key] = true;
+            $seen[$key]       = true;
             $uniqueFindings[] = $finding;
         }
 

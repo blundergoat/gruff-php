@@ -12,10 +12,10 @@ final readonly class DashboardHttpResponse
     /**
      * Capture the HTTP response fields returned by the dashboard server.
      *
-     * @param int $statusCode HTTP status code.
+     * @param int    $statusCode   HTTP status code.
      * @param string $reasonPhrase HTTP reason phrase.
-     * @param string $body Response body bytes.
-     * @param string $contentType Response Content-Type header value.
+     * @param string $body         Response body bytes.
+     * @param string $contentType  Response Content-Type header value.
      */
     public function __construct(
         public int $statusCode,

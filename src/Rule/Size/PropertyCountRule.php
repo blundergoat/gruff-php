@@ -39,12 +39,12 @@ final readonly class PropertyCountRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Property count',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Property count',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 15,
                 'error' => 25,
@@ -55,14 +55,17 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Find class-like scopes whose declared property count exceeds thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for classes, traits, or enums with too many properties.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
@@ -72,8 +75,8 @@ final readonly class PropertyCountRule implements RuleInterface
         $findings = [];
 
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Trait_|Enum_ $classLike */
-            $propertyCount = $this->countProperties($classLike);
+            /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
+            $propertyCount  = $this->countProperties($classLike);
             $thresholdMatch = $settings->highValueThresholdMatch($propertyCount);
 
             if ($thresholdMatch === null) {
@@ -83,7 +86,7 @@ final readonly class PropertyCountRule implements RuleInterface
             $symbol = $this->resolveSymbol($classLike);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has %d properties, above the %s threshold of %s.',
                     $symbol,
@@ -91,17 +94,17 @@ final readonly class PropertyCountRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $classLike->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Group related properties into value objects or extract sub-components.',
+                filePath:         $unit->file->displayPath,
+                line:             $classLike->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $classLike->getEndLine() > 0 ? $classLike->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Group related properties into value objects or extract sub-components.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'properties' => $propertyCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,

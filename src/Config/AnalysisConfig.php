@@ -18,12 +18,12 @@ final readonly class AnalysisConfig
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
     /**
-     * @param array<string, RuleSettings> $rules Effective settings keyed by rule id.
-     * @param float $minimumPhpVersion Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection $ruleSelection Include/exclude rule selection for the run.
-     * @param list<string> $ignoredPathPatterns Path patterns skipped during discovery.
-     * @param list<string> $acceptedAbbreviations Abbreviations accepted by naming rules.
-     * @param list<string> $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * @param array<string, RuleSettings> $rules                 Effective settings keyed by rule id.
+     * @param float                       $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection               $ruleSelection         Include/exclude rule selection for the run.
+     * @param list<string>                $ignoredPathPatterns   Path patterns skipped during discovery.
+     * @param list<string>                $acceptedAbbreviations Abbreviations accepted by naming rules.
+     * @param list<string>                $allowedSecretPreviews Secret previews explicitly allowed by config.
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
     public function __construct(
@@ -50,7 +50,7 @@ final readonly class AnalysisConfig
         $rules = [];
 
         foreach ($registry->all() as $rule) {
-            $definition = $rule->definition();
+            $definition             = $rule->definition();
             $rules[$definition->id] = new RuleSettings(
                 $definition->defaultEnabled,
                 $definition->defaultThresholds,
@@ -77,7 +77,7 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with one rule's settings replaced.
      *
-     * @param string $ruleId Rule identifier to replace.
+     * @param string       $ruleId   Rule identifier to replace.
      * @param RuleSettings $settings New settings for the rule.
      * @throws InvalidArgumentException When the rule id is unknown.
      * @return self Config carrying the updated rule settings.
@@ -88,7 +88,7 @@ final readonly class AnalysisConfig
             throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
         }
 
-        $rules = $this->rules;
+        $rules          = $this->rules;
         $rules[$ruleId] = $settings;
 
         return new self(

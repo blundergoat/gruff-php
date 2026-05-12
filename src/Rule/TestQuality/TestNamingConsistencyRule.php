@@ -42,24 +42,27 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test naming consistency',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Test naming consistency',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
-            defaultOptions: ['poorNamePatterns' => self::DEFAULT_POOR_NAME_PATTERNS],
+            confidence:      Confidence::High,
+            defaultOptions:  ['poorNamePatterns' => self::DEFAULT_POOR_NAME_PATTERNS],
         );
     }
 
     /**
      * Find mixed test naming styles and weakly descriptive test names.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for inconsistent or poor test names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
         $patterns = $context->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
@@ -73,7 +76,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 }
 
                 $methodName = $method->name->toString();
-                $afterTest = substr($methodName, 4);
+                $afterTest  = substr($methodName, 4);
 
                 if ($afterTest !== '') {
                     if (str_contains($afterTest, '_')) {
@@ -86,17 +89,17 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 $matchedPattern = $this->matchPoorNamePattern($methodName, $patterns);
                 if ($matchedPattern !== null) {
                     $findings[] = new Finding(
-                        ruleId: self::ID,
-                        message: sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $this->className($class), $methodName, $matchedPattern),
-                        filePath: $unit->file->displayPath,
-                        line: $method->getStartLine(),
-                        severity: Severity::Advisory,
-                        pillar: Pillar::TestQuality,
-                        tier: RuleTier::V01,
-                        confidence: Confidence::High,
-                        symbol: sprintf('%s::%s()', $this->className($class), $methodName),
+                        ruleId:      self::ID,
+                        message:     sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $this->className($class), $methodName, $matchedPattern),
+                        filePath:    $unit->file->displayPath,
+                        line:        $method->getStartLine(),
+                        severity:    Severity::Advisory,
+                        pillar:      Pillar::TestQuality,
+                        tier:        RuleTier::V01,
+                        confidence:  Confidence::High,
+                        symbol:      sprintf('%s::%s()', $this->className($class), $methodName),
                         remediation: 'Rename the test to describe the scenario and expected behaviour rather than a generic suffix or numeric counter.',
-                        metadata: ['variant' => 'poor-name', 'pattern' => $matchedPattern],
+                        metadata:    ['variant' => 'poor-name', 'pattern' => $matchedPattern],
                     );
                 }
             }
@@ -105,19 +108,19 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 continue;
             }
 
-            $className = $this->className($class);
+            $className  = $this->className($class);
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s mixes camelCase (%d) and snake_case (%d) test method naming.', $className, $camelCount, $snakeCount),
-                filePath: $unit->file->displayPath,
-                line: $class->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $className,
+                ruleId:      self::ID,
+                message:     sprintf('%s mixes camelCase (%d) and snake_case (%d) test method naming.', $className, $camelCount, $snakeCount),
+                filePath:    $unit->file->displayPath,
+                line:        $class->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $className,
                 remediation: 'Pick one naming style for test methods and apply it consistently.',
-                metadata: ['variant' => 'mixed-style', 'camelCase' => $camelCount, 'snake_case' => $snakeCount],
+                metadata:    ['variant' => 'mixed-style', 'camelCase' => $camelCount, 'snake_case' => $snakeCount],
             );
         }
 

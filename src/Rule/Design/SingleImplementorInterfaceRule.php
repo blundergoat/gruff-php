@@ -81,13 +81,13 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Single-implementor interface',
-            pillar: Pillar::Design,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Single-implementor interface',
+            pillar:          Pillar::Design,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
-            defaultOptions: [
+            confidence:      Confidence::Medium,
+            defaultOptions:  [
                 'externalNamespacePrefixes' => self::DEFAULT_EXTERNAL_PREFIXES,
                 'frameworkAttributePrefixes' => self::DEFAULT_FRAMEWORK_ATTRIBUTE_PREFIXES,
                 'treatMockUsageAsImplementor' => false,
@@ -99,30 +99,30 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     /**
      * Analyse all project units for interfaces with exactly one concrete implementor.
      *
-     * @param list<AnalysisUnit> $units Parsed project units to analyse together.
-     * @param RuleContext $context Rule context carrying config and settings.
+     * @param list<AnalysisUnit> $units   Parsed project units to analyse together.
+     * @param RuleContext        $context Rule context carrying config and settings.
      *
      * @return list<Finding> Findings for interfaces that lack substitutability value.
      */
     public function analyseProject(array $units, RuleContext $context): array
     {
-        $settings = $context->settingsFor($this->definition());
-        $externalPrefixes = $this->lowercaseList($settings->stringListOption('externalNamespacePrefixes'));
+        $settings                   = $context->settingsFor($this->definition());
+        $externalPrefixes           = $this->lowercaseList($settings->stringListOption('externalNamespacePrefixes'));
         $frameworkAttributePrefixes = $this->lowercaseList($settings->stringListOption('frameworkAttributePrefixes'));
-        $excludedPaths = $settings->stringListOption('additionalExcludedPaths');
+        $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
 
         $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);
         $resolvedUnits = $this->resolveNames($eligibleUnits);
 
-        $interfaces = [];
-        $implementations = [];
-        $typeReferences = [];
+        $interfaces         = [];
+        $implementations    = [];
+        $typeReferences     = [];
         $extendedInterfaces = [];
 
         foreach ($resolvedUnits as $resolved) {
-            $unit = $resolved['unit'];
+            $unit       = $resolved['unit'];
             $statements = $resolved['statements'];
-            $finder = new NodeFinder();
+            $finder     = new NodeFinder();
 
             /** @var list<Interface_> $interfaceNodes NodeFinder narrows the statement walk to interface declarations. */
             $interfaceNodes = $finder->findInstanceOf($statements, Interface_::class);
@@ -191,11 +191,11 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
 
     /**
      * @param array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}> $interfaces
-     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>> $implementations
-     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>> $typeReferences
-     * @param array<string, true> $extendedInterfaces
-     * @param list<string> $externalPrefixes
-     * @param list<string> $frameworkAttributePrefixes
+     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>                                       $implementations
+     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>                                       $typeReferences
+     * @param array<string, true>                                                                                               $extendedInterfaces
+     * @param list<string>                                                                                                      $externalPrefixes
+     * @param list<string>                                                                                                      $frameworkAttributePrefixes
      * @return list<Finding>
      */
     private function buildFindings(
@@ -206,7 +206,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         array $externalPrefixes,
         array $frameworkAttributePrefixes,
     ): array {
-        $findings = [];
+        $findings   = [];
         $definition = $this->definition();
 
         foreach ($interfaces as $fqn => $interface) {
@@ -222,14 +222,14 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 continue;
             }
 
-            $implementors = $implementations[$fqn] ?? [];
+            $implementors     = $implementations[$fqn] ?? [];
             $implementorCount = count($implementors);
 
             if ($implementorCount !== 1) {
                 continue;
             }
 
-            $implementor = $implementors[0];
+            $implementor    = $implementors[0];
             $implementorFqn = $implementor['classFqn'];
 
             $externalUsages = 0;
@@ -244,21 +244,21 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             }
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     'Interface %s has one implementor (%s) and no external type-hint usage; consider removing the interface and depending on the class directly.',
                     $fqn,
                     $implementorFqn,
                 ),
-                filePath: $interface['unit']->file->displayPath,
-                line: $interface['line'],
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $fqn,
+                filePath:    $interface['unit']->file->displayPath,
+                line:        $interface['line'],
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $fqn,
                 remediation: 'Either delete the interface and depend on the concrete class, or add a second implementor / external type-hint usage that justifies the abstraction.',
-                metadata: [
+                metadata:    [
                     'interfaceFqn' => $fqn,
                     'implementorCount' => $implementorCount,
                     'implementorFqn' => $implementorFqn,
@@ -273,7 +273,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
 
     /**
      * @param list<AnalysisUnit> $units
-     * @param list<string> $excludedPaths
+     * @param list<string>       $excludedPaths
      * @return list<AnalysisUnit>
      */
     private function filterEligibleUnits(array $units, array $excludedPaths): array
@@ -311,7 +311,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             $traverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
             /** @var list<Node\Stmt> $resolvedStatements NameResolver preserves the statement list shape. */
             $resolvedStatements = $traverser->traverse($unit->statements);
-            $resolved[] = ['unit' => $unit, 'statements' => $resolvedStatements];
+            $resolved[]         = ['unit' => $unit, 'statements' => $resolvedStatements];
         }
 
         return $resolved;

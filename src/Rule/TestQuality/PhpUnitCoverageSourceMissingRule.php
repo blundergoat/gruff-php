@@ -51,20 +51,20 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PHPUnit coverage source missing',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PHPUnit coverage source missing',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Report a project once when its PHPUnit config lacks coverage source configuration.
      *
-     * @param AnalysisUnit $unit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext $context Rule context carrying project root.
+     * @param AnalysisUnit $unit    Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $context Rule context carrying project root.
      * @return list<Finding> Findings for missing PHPUnit coverage source settings.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -91,18 +91,18 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s does not declare a coverage <source> (or legacy <filter><whitelist>) include path.',
                     $config->displayPath,
                 ),
-                filePath: $config->displayPath,
-                line: 1,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $config->displayPath,
+                filePath:    $config->displayPath,
+                line:        1,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $config->displayPath,
                 remediation: 'Declare a <source><include><directory>src</directory></include></source> block (PHPUnit 10+) or <filter><whitelist> (PHPUnit 9) so coverage measures the right files.',
             ),
         ];

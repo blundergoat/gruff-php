@@ -33,26 +33,29 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Testdox readability',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            id:                self::ID,
+            name:              'Testdox readability',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Low,
             defaultThresholds: ['minWords' => 3],
-            defaultEnabled: false,
+            defaultEnabled:    false,
         );
     }
 
     /**
      * Find test names that produce hard-to-read TestDox output.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for unreadable TestDox names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minWords');
-        $findings = [];
+        $findings  = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             if ($scope->isPest || !$scope->node instanceof ClassMethod) {
@@ -60,14 +63,14 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             }
 
             $methodName = $scope->name;
-            $words = $this->splitWords($methodName);
+            $words      = $this->splitWords($methodName);
 
             if (count($words) >= $threshold) {
                 continue;
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s would render as testdox "%s" (%d words), below the %d-word readability threshold.',
                     $scope->symbol,
@@ -75,15 +78,15 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                     count($words),
                     $threshold,
                 ),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
-                symbol: $scope->symbol,
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
+                symbol:      $scope->symbol,
                 remediation: 'Rename the test so it reads as a sentence describing the scenario and expected behaviour (e.g. testProcessOrder -> testProcessOrderMarksItAsPaid).',
-                metadata: ['words' => count($words), 'threshold' => $threshold],
+                metadata:    ['words' => count($words), 'threshold' => $threshold],
             );
         }
 
@@ -95,8 +98,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
      */
     private function splitWords(string $methodName): array
     {
-        $name = preg_replace('/^test[_]?/i', '', $methodName) ?? $methodName;
-        $name = (string) preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
+        $name   = preg_replace('/^test[_]?/i', '', $methodName) ?? $methodName;
+        $name   = (string) preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
         $tokens = preg_split('/[\s_]+/', $name) ?: [];
 
         return array_values(array_filter($tokens, static fn (string $token): bool => $token !== ''));

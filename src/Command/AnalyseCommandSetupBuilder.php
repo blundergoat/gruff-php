@@ -24,6 +24,7 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build the validated analysis setup from console input.
      *
+     * @param InputInterface $input Symfony console input for the analyse command.
      * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
      */
     public function build(InputInterface $input): AnalyseCommandSetupResult
@@ -76,7 +77,7 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        $options = $options->withMutationBudget($mutationBudget);
+        $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
         if ($usageError !== null) {
             return AnalyseCommandSetupResult::reportError(
@@ -85,8 +86,8 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
-        $options = $options->withDefaultBaseline($projectRoot);
-        $registry = RuleRegistry::defaults();
+        $options      = $options->withDefaultBaseline($projectRoot);
+        $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
         $configResult = $this->config($options, $registry, $formatResult, $failThreshold, $configLoader);
         if ($configResult instanceof AnalysisReport) {
@@ -94,13 +95,13 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
-            projectRoot: $projectRoot,
-            options: $options,
-            format: $formatResult,
+            projectRoot:   $projectRoot,
+            options:       $options,
+            format:        $formatResult,
             failThreshold: $failThreshold,
-            config: $configResult,
-            configPath: $this->effectiveConfigPath($options, $configLoader),
-            registry: $registry,
+            config:        $configResult,
+            configPath:    $this->effectiveConfigPath($options, $configLoader),
+            registry:      $registry,
         ));
     }
 
@@ -112,7 +113,7 @@ final readonly class AnalyseCommandSetupBuilder
     private function format(mixed $value): OutputFormat|string
     {
         $rawValue = is_string($value) ? $value : OutputFormat::Text->value;
-        $format = OutputFormat::fromInput($rawValue);
+        $format   = OutputFormat::fromInput($rawValue);
 
         return $format ?? sprintf(
             '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, hotspot, or sarif.</error>',
@@ -194,18 +195,18 @@ final readonly class AnalyseCommandSetupBuilder
         string $type = 'usage-error',
     ): AnalysisReport {
         return new AnalysisReport(
-            toolVersion: Application::VERSION,
-            requestedPaths: $options->paths,
-            format: $format->value,
-            failOn: $failOn,
+            toolVersion:     Application::VERSION,
+            requestedPaths:  $options->paths,
+            format:          $format->value,
+            failOn:          $failOn,
             filesDiscovered: 0,
-            filesParsed: 0,
-            ignoredPaths: [],
-            missingPaths: [],
-            diagnostics: [new RunDiagnostic($type, $message)],
-            findings: [],
-            exitCode: Command::INVALID,
-            configPath: $options->configPath,
+            filesParsed:     0,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [new RunDiagnostic($type, $message)],
+            findings:        [],
+            exitCode:        Command::INVALID,
+            configPath:      $options->configPath,
         );
     }
 }

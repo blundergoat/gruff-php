@@ -18,26 +18,26 @@ use Symfony\Component\Console\Input\InputInterface;
 final readonly class AnalyseCommandOptions
 {
     /**
-     * @param list<string> $paths Paths requested for analysis.
-     * @param bool $includeIgnored Whether ignored files should be included.
-     * @param string|null $configPath Explicit config path supplied by the CLI.
-     * @param bool $noConfig Whether config loading is disabled.
-     * @param MutationAnalysisOptions $mutation Parsed mutation-analysis options.
-     * @param string|null $diffMode Requested diff mode, when diff analysis is enabled.
-     * @param string|null $diffVs Comparison ref used for diff and changed-only analysis.
-     * @param bool $changedOnly Whether analysis should be restricted to changed files.
-     * @param string|null $historyFile Trend history file path, when configured.
-     * @param bool $noBaseline Whether baseline loading and application are disabled.
-     * @param BaselineApplicationOptions $baseline Parsed baseline application options.
-     * @param string $reportEditorLink Editor-link style requested for reports.
-     * @param bool $reportInteractive Whether interactive report behavior is enabled.
-     * @param string|null $pathsRelativeTo Base path used to normalize reported paths.
-     * @param string|null $minSeverity Minimum severity filter requested for output.
-     * @param list<string> $includePillars Pillars explicitly included in report output.
-     * @param list<string> $excludePillars Pillars explicitly excluded from report output.
-     * @param list<string> $includeRules Rule IDs explicitly included in report output.
-     * @param list<string> $excludeRules Rule IDs explicitly excluded from report output.
-     * @param string|null $optionError First usage error discovered while parsing options.
+     * @param list<string>               $paths             Paths requested for analysis.
+     * @param bool                       $includeIgnored    Whether ignored files should be included.
+     * @param string|null                $configPath        Explicit config path supplied by the CLI.
+     * @param bool                       $noConfig          Whether config loading is disabled.
+     * @param MutationAnalysisOptions    $mutation          Parsed mutation-analysis options.
+     * @param string|null                $diffMode          Requested diff mode, when diff analysis is enabled.
+     * @param string|null                $diffVs            Comparison ref used for diff and changed-only analysis.
+     * @param bool                       $changedOnly       Whether analysis should be restricted to changed files.
+     * @param string|null                $historyFile       Trend history file path, when configured.
+     * @param bool                       $noBaseline        Whether baseline loading and application are disabled.
+     * @param BaselineApplicationOptions $baseline          Parsed baseline application options.
+     * @param string                     $reportEditorLink  Editor-link style requested for reports.
+     * @param bool                       $reportInteractive Whether interactive report behavior is enabled.
+     * @param string|null                $pathsRelativeTo   Base path used to normalize reported paths.
+     * @param string|null                $minSeverity       Minimum severity filter requested for output.
+     * @param list<string>               $includePillars    Pillars explicitly included in report output.
+     * @param list<string>               $excludePillars    Pillars explicitly excluded from report output.
+     * @param list<string>               $includeRules      Rule IDs explicitly included in report output.
+     * @param list<string>               $excludeRules      Rule IDs explicitly excluded from report output.
+     * @param string|null                $optionError       First usage error discovered while parsing options.
      */
     public function __construct(
         public array $paths,
@@ -76,60 +76,60 @@ final readonly class AnalyseCommandOptions
     public static function fromInput(InputInterface $input): self
     {
         /** @var list<string> $paths The command definition declares a variadic paths argument. */
-        $paths = $input->getArgument('paths');
-        $configPath = $input->getOption('config');
+        $paths               = $input->getArgument('paths');
+        $configPath          = $input->getOption('config');
         $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
         $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
-        $reportEditorLink = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
-        $reportInteractive = self::reportInteractive($input);
-        $optionError = null;
+        $reportEditorLink    = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
+        $reportInteractive   = self::reportInteractive($input);
+        $optionError         = null;
 
         if (!in_array($reportEditorLink, ['none', 'vscode', 'phpstorm'], true)) {
             $optionError = '--report-editor-link must be one of: vscode, phpstorm, none.';
         }
 
         if (is_string($reportInteractive)) {
-            $optionError = $reportInteractive;
+            $optionError       = $reportInteractive;
             $reportInteractive = false;
         }
 
         return new self(
-            paths: $paths,
-            includeIgnored: (bool) $input->getOption('include-ignored'),
-            configPath: is_string($configPath) ? $configPath : null,
-            noConfig: (bool) $input->getOption('no-config'),
-            mutation: new MutationAnalysisOptions(
-                infectionReportPath: self::optionalStringOption($input, 'infection-report'),
-                infectionRun: (bool) $input->getOption('infection-run'),
-                infectionBin: self::optionalStringOption($input, 'infection-bin') ?? 'infection',
-                infectionConfigPath: self::optionalStringOption($input, 'infection-config'),
+            paths:                         $paths,
+            includeIgnored:                (bool) $input->getOption('include-ignored'),
+            configPath:                    is_string($configPath) ? $configPath : null,
+            noConfig:                      (bool) $input->getOption('no-config'),
+            mutation:                      new MutationAnalysisOptions(
+                infectionReportPath:           self::optionalStringOption($input, 'infection-report'),
+                infectionRun:                  (bool) $input->getOption('infection-run'),
+                infectionBin:                  self::optionalStringOption($input, 'infection-bin') ?? 'infection',
+                infectionConfigPath:           self::optionalStringOption($input, 'infection-config'),
                 infectionTestFrameworkOptions: self::optionalStringOption($input, 'infection-test-framework-options'),
-                mutationBaselinePath: self::optionalStringOption($input, 'mutation-baseline'),
-                mutationBudget: null,
+                mutationBaselinePath:          self::optionalStringOption($input, 'mutation-baseline'),
+                mutationBudget:                null,
             ),
-            diffMode: self::diffMode($input),
-            diffVs: self::optionalStringOption($input, 'diff-vs'),
-            changedOnly: (bool) $input->getOption('changed-only'),
-            historyFile: self::optionalStringOption($input, 'history-file'),
-            noBaseline: (bool) $input->getOption('no-baseline'),
-            baseline: new BaselineApplicationOptions(
+            diffMode:     self::diffMode($input),
+            diffVs:       self::optionalStringOption($input, 'diff-vs'),
+            changedOnly:  (bool) $input->getOption('changed-only'),
+            historyFile:  self::optionalStringOption($input, 'history-file'),
+            noBaseline:   (bool) $input->getOption('no-baseline'),
+            baseline:     new BaselineApplicationOptions(
                 baselinePath: $baselineFlagPresent
                     ? (self::optionalStringOption($input, 'baseline') ?? BaselineStore::DEFAULT_FILENAME)
                     : null,
-                baselineExplicit: $baselineFlagPresent,
+                baselineExplicit:     $baselineFlagPresent,
                 generateBaselinePath: $generateFlagPresent
                     ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                     : null,
             ),
-            reportEditorLink: $reportEditorLink,
+            reportEditorLink:  $reportEditorLink,
             reportInteractive: $reportInteractive,
-            pathsRelativeTo: self::optionalStringOption($input, 'paths-relative-to'),
-            minSeverity: self::optionalStringOption($input, 'min-severity'),
-            includePillars: self::stringListOption($input, 'include-pillar'),
-            excludePillars: self::stringListOption($input, 'exclude-pillar'),
-            includeRules: self::stringListOption($input, 'include-rule'),
-            excludeRules: self::stringListOption($input, 'exclude-rule'),
-            optionError: $optionError,
+            pathsRelativeTo:   self::optionalStringOption($input, 'paths-relative-to'),
+            minSeverity:       self::optionalStringOption($input, 'min-severity'),
+            includePillars:    self::stringListOption($input, 'include-pillar'),
+            excludePillars:    self::stringListOption($input, 'exclude-pillar'),
+            includeRules:      self::stringListOption($input, 'include-rule'),
+            excludeRules:      self::stringListOption($input, 'exclude-rule'),
+            optionError:       $optionError,
         );
     }
 
@@ -142,34 +142,34 @@ final readonly class AnalyseCommandOptions
     public function withMutationBudget(?int $mutationBudget): self
     {
         return new self(
-            paths: $this->paths,
-            includeIgnored: $this->includeIgnored,
-            configPath: $this->configPath,
-            noConfig: $this->noConfig,
-            mutation: new MutationAnalysisOptions(
-                infectionReportPath: $this->mutation->infectionReportPath,
-                infectionRun: $this->mutation->infectionRun,
-                infectionBin: $this->mutation->infectionBin,
-                infectionConfigPath: $this->mutation->infectionConfigPath,
+            paths:                         $this->paths,
+            includeIgnored:                $this->includeIgnored,
+            configPath:                    $this->configPath,
+            noConfig:                      $this->noConfig,
+            mutation:                      new MutationAnalysisOptions(
+                infectionReportPath:           $this->mutation->infectionReportPath,
+                infectionRun:                  $this->mutation->infectionRun,
+                infectionBin:                  $this->mutation->infectionBin,
+                infectionConfigPath:           $this->mutation->infectionConfigPath,
                 infectionTestFrameworkOptions: $this->mutation->infectionTestFrameworkOptions,
-                mutationBaselinePath: $this->mutation->mutationBaselinePath,
-                mutationBudget: $mutationBudget,
+                mutationBaselinePath:          $this->mutation->mutationBaselinePath,
+                mutationBudget:                $mutationBudget,
             ),
-            diffMode: $this->diffMode,
-            diffVs: $this->diffVs,
-            changedOnly: $this->changedOnly,
-            historyFile: $this->historyFile,
-            noBaseline: $this->noBaseline,
-            baseline: $this->baseline,
-            reportEditorLink: $this->reportEditorLink,
+            diffMode:          $this->diffMode,
+            diffVs:            $this->diffVs,
+            changedOnly:       $this->changedOnly,
+            historyFile:       $this->historyFile,
+            noBaseline:        $this->noBaseline,
+            baseline:          $this->baseline,
+            reportEditorLink:  $this->reportEditorLink,
             reportInteractive: $this->reportInteractive,
-            pathsRelativeTo: $this->pathsRelativeTo,
-            minSeverity: $this->minSeverity,
-            includePillars: $this->includePillars,
-            excludePillars: $this->excludePillars,
-            includeRules: $this->includeRules,
-            excludeRules: $this->excludeRules,
-            optionError: $this->optionError,
+            pathsRelativeTo:   $this->pathsRelativeTo,
+            minSeverity:       $this->minSeverity,
+            includePillars:    $this->includePillars,
+            excludePillars:    $this->excludePillars,
+            includeRules:      $this->includeRules,
+            excludeRules:      $this->excludeRules,
+            optionError:       $this->optionError,
         );
     }
 
@@ -191,30 +191,30 @@ final readonly class AnalyseCommandOptions
         }
 
         return new self(
-            paths: $this->paths,
-            includeIgnored: $this->includeIgnored,
-            configPath: $this->configPath,
-            noConfig: $this->noConfig,
-            mutation: $this->mutation,
-            diffMode: $this->diffMode,
-            diffVs: $this->diffVs,
-            changedOnly: $this->changedOnly,
-            historyFile: $this->historyFile,
-            noBaseline: $this->noBaseline,
-            baseline: new BaselineApplicationOptions(
-                baselinePath: BaselineStore::DEFAULT_FILENAME,
-                baselineExplicit: false,
+            paths:                $this->paths,
+            includeIgnored:       $this->includeIgnored,
+            configPath:           $this->configPath,
+            noConfig:             $this->noConfig,
+            mutation:             $this->mutation,
+            diffMode:             $this->diffMode,
+            diffVs:               $this->diffVs,
+            changedOnly:          $this->changedOnly,
+            historyFile:          $this->historyFile,
+            noBaseline:           $this->noBaseline,
+            baseline:             new BaselineApplicationOptions(
+                baselinePath:         BaselineStore::DEFAULT_FILENAME,
+                baselineExplicit:     false,
                 generateBaselinePath: null,
             ),
-            reportEditorLink: $this->reportEditorLink,
+            reportEditorLink:  $this->reportEditorLink,
             reportInteractive: $this->reportInteractive,
-            pathsRelativeTo: $this->pathsRelativeTo,
-            minSeverity: $this->minSeverity,
-            includePillars: $this->includePillars,
-            excludePillars: $this->excludePillars,
-            includeRules: $this->includeRules,
-            excludeRules: $this->excludeRules,
-            optionError: $this->optionError,
+            pathsRelativeTo:   $this->pathsRelativeTo,
+            minSeverity:       $this->minSeverity,
+            includePillars:    $this->includePillars,
+            excludePillars:    $this->excludePillars,
+            includeRules:      $this->includeRules,
+            excludeRules:      $this->excludeRules,
+            optionError:       $this->optionError,
         );
     }
 
@@ -264,11 +264,11 @@ final readonly class AnalyseCommandOptions
     public function displayFilter(): FindingDisplayFilter
     {
         return new FindingDisplayFilter(
-            minSeverity: $this->minSeverity === null ? null : Severity::from($this->minSeverity),
+            minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
             includePillars: array_map(static fn (string $value): Pillar => Pillar::from($value), $this->includePillars),
             excludePillars: array_map(static fn (string $value): Pillar => Pillar::from($value), $this->excludePillars),
-            includeRules: $this->includeRules,
-            excludeRules: $this->excludeRules,
+            includeRules:   $this->includeRules,
+            excludeRules:   $this->excludeRules,
         );
     }
 

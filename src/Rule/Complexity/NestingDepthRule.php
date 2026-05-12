@@ -39,12 +39,12 @@ final readonly class NestingDepthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Maximum nesting depth',
-            pillar: Pillar::Complexity,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Maximum nesting depth',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 4,
                 'error' => 6,
@@ -55,15 +55,18 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Detect functions and methods whose control flow nests too deeply.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Nesting-depth findings for the analysed unit.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -71,8 +74,8 @@ final readonly class NestingDepthRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
-            $maxDepth = self::compute($node);
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            $maxDepth       = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($maxDepth);
 
             if ($thresholdMatch === null) {
@@ -82,7 +85,7 @@ final readonly class NestingDepthRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has a maximum nesting depth of %d, above the %s threshold of %s.',
                     $symbol,
@@ -90,17 +93,17 @@ final readonly class NestingDepthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Reduce nesting by using early returns, guard clauses, or extracting nested logic.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Reduce nesting by using early returns, guard clauses, or extracting nested logic.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'depth' => $maxDepth,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
@@ -163,7 +166,7 @@ final readonly class NestingDepthRule implements RuleInterface
     private static function walkIf(Stmt\If_ $node, int $depth): int
     {
         $inner = $depth + 1;
-        $max = self::walkStatements($node->stmts, $inner);
+        $max   = self::walkStatements($node->stmts, $inner);
 
         foreach ($node->elseifs as $elseif) {
             $max = max($max, self::walkStatements($elseif->stmts, $inner));

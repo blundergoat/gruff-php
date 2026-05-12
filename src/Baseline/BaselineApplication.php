@@ -14,8 +14,11 @@ use GruffPhp\Finding\Finding;
 final readonly class BaselineApplication
 {
     /**
-     * @param list<Finding> $findings
-     * @param list<RunDiagnostic> $diagnostics
+     * @param string                     $projectRoot Project root used to resolve baseline paths.
+     * @param BaselineApplicationOptions $options     Baseline application options selected for this run.
+     * @param list<Finding>              $findings    Findings to generate from or filter in place.
+     * @param DiffResult|null            $diff        Diff scope used to preserve changed-line findings when present.
+     * @param list<RunDiagnostic>        $diagnostics Diagnostics collected during baseline handling.
      * @return BaselineReport|null Baseline report when a baseline was generated or applied.
      */
     public function apply(
@@ -39,7 +42,7 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding>       $findings
      * @param list<RunDiagnostic> $diagnostics
      * @return BaselineReport|null Generated baseline report, or null when writing fails.
      */
@@ -53,28 +56,28 @@ final readonly class BaselineApplication
             $baseline = $store->write($generateBaselinePath, $findings);
         } catch (BaselineException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'baseline-error',
+                type:    'baseline-error',
                 message: $exception->getMessage(),
-                path: $generateBaselinePath,
+                path:    $generateBaselinePath,
             );
 
             return null;
         }
 
         return new BaselineReport(
-            path: $baseline->path,
-            generated: true,
-            totalEntries: count($baseline->entries),
+            path:               $baseline->path,
+            generated:          true,
+            totalEntries:       count($baseline->entries),
             suppressedFindings: 0,
-            staleEvaluation: 'generated',
-            source: $generateBaselinePath === BaselineStore::DEFAULT_FILENAME
+            staleEvaluation:    'generated',
+            source:             $generateBaselinePath === BaselineStore::DEFAULT_FILENAME
                 ? BaselineReport::SOURCE_DEFAULT
                 : BaselineReport::SOURCE_EXPLICIT,
         );
     }
 
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding>       $findings
      * @param list<RunDiagnostic> $diagnostics
      * @return BaselineReport|null Applied baseline report, or null when reading fails.
      */
@@ -86,29 +89,29 @@ final readonly class BaselineApplication
         array &$diagnostics,
     ): ?BaselineReport {
         try {
-            $baseline = $store->read($options->baselinePath ?? '');
+            $baseline    = $store->read($options->baselinePath ?? '');
             $application = (new BaselineFilter())->apply($baseline, $findings, $diff instanceof DiffResult && $diff->active);
         } catch (BaselineException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'baseline-error',
+                type:    'baseline-error',
                 message: $exception->getMessage(),
-                path: $options->baselinePath,
+                path:    $options->baselinePath,
             );
 
             return null;
         }
 
         $findings = $application['findings'];
-        $report = $application['report'];
+        $report   = $application['report'];
 
         return new BaselineReport(
-            path: $report->path,
-            generated: $report->generated,
-            totalEntries: $report->totalEntries,
+            path:               $report->path,
+            generated:          $report->generated,
+            totalEntries:       $report->totalEntries,
             suppressedFindings: $report->suppressedFindings,
-            staleEvaluation: $report->staleEvaluation,
-            staleEntries: $report->staleEntries,
-            source: $options->baselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
+            staleEvaluation:    $report->staleEvaluation,
+            staleEntries:       $report->staleEntries,
+            source:             $options->baselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
         );
     }
 }

@@ -43,8 +43,8 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * @param list<string> $paths
-     * @param array<string, string> $state
+     * @param         list<string>                                                                                                                                                                                        $paths
+     * @param         array<string, string>                                                                                                                                                                               $state
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
      * @return list<string>
      */

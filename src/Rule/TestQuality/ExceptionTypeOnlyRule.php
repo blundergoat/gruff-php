@@ -48,17 +48,20 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Exception type-only assertion',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Exception type-only assertion',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find tests that assert only an exception type without message or state.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for type-only exception tests.
      */
@@ -67,7 +70,7 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $typeOnlyCall = null;
+            $typeOnlyCall     = null;
             $hasSupplementary = false;
 
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
@@ -95,18 +98,18 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s expects an exception type but does not assert its message, code, or object.',
                     $scope->symbol,
                 ),
-                filePath: $unit->file->displayPath,
-                line: $typeOnlyCall->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $scope->symbol,
+                filePath:    $unit->file->displayPath,
+                line:        $typeOnlyCall->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $scope->symbol,
                 remediation: 'Pair expectException() with expectExceptionMessage(), expectExceptionMessageMatches(), expectExceptionCode(), or expectExceptionObject() so a different exception with the same type still fails the test.',
             );
         }

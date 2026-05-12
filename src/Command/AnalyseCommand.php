@@ -10,12 +10,12 @@ use GruffPhp\Baseline\BaselineApplication;
 use GruffPhp\Baseline\BaselineStore;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Console\Application;
-use GruffPhp\Finding\Finding;
-use GruffPhp\Finding\Pillar;
 use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Diff\GitDiffProvider;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
 use GruffPhp\Mutation\MutationAnalysisBuilder;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Mutation\MutationFindingFactory;
@@ -384,8 +384,7 @@ final class AnalyseCommand extends Command
         ?string $projectRoot = null,
         string $reportEditorLink = 'none',
         bool $reportInteractive = false,
-    ): void
-    {
+    ): void {
         $renderer = match ($format) {
             OutputFormat::Json => new JsonReporter(),
             OutputFormat::Html => new HtmlReporter($projectRoot ?? '', $reportEditorLink, $reportInteractive),

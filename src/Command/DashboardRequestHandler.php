@@ -27,10 +27,10 @@ final readonly class DashboardRequestHandler
     /**
      * Create a request handler for one dashboard server context.
      *
-     * @param DashboardRequestContext $context Request context shared by dashboard routes.
-     * @param DashboardStateFactory $stateFactory Factory used to build dashboard state.
-     * @param DashboardScanRunner $scanRunner Runner used for scan requests.
-     * @param DashboardHttpResponder $responder Responder used to write HTTP responses.
+     * @param DashboardRequestContext $context      Request context shared by dashboard routes.
+     * @param DashboardStateFactory   $stateFactory Factory used to build dashboard state.
+     * @param DashboardScanRunner     $scanRunner   Runner used for scan requests.
+     * @param DashboardHttpResponder  $responder    Responder used to write HTTP responses.
      */
     public function __construct(
         private DashboardRequestContext $context,
@@ -175,7 +175,7 @@ final readonly class DashboardRequestHandler
      */
     private function headers($client): array|DashboardHttpResponse
     {
-        $headers = [];
+        $headers   = [];
         $lineCount = 0;
         $byteCount = 0;
 

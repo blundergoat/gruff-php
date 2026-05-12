@@ -35,23 +35,26 @@ final class DisabledSslVerificationRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Disabled SSL verification',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Disabled SSL verification',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find cURL calls that disable peer or hostname verification.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for disabled SSL verification.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
@@ -76,7 +79,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     private function isDisabledCurlSetopt(Expr\FuncCall $call): bool
     {
         $optionArg = SecurityNodeHelper::argumentValue($call->args, 1);
-        $valueArg = SecurityNodeHelper::argumentValue($call->args, 2);
+        $valueArg  = SecurityNodeHelper::argumentValue($call->args, 2);
 
         if ($optionArg === null || $valueArg === null) {
             return false;
@@ -136,14 +139,14 @@ final class DisabledSslVerificationRule implements RuleInterface
     private function finding(AnalysisUnit $unit, Node $node): Finding
     {
         return new Finding(
-            ruleId: self::ID,
-            message: 'cURL SSL verification is disabled.',
-            filePath: $unit->file->displayPath,
-            line: $node->getStartLine(),
-            severity: Severity::Warning,
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
-            confidence: Confidence::High,
+            ruleId:      self::ID,
+            message:     'cURL SSL verification is disabled.',
+            filePath:    $unit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::Security,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
             remediation: 'Keep CURLOPT_SSL_VERIFYPEER enabled and require hostname verification.',
         );
     }

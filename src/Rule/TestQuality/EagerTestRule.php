@@ -35,12 +35,12 @@ final readonly class EagerTestRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Eager test',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            id:                self::ID,
+            name:              'Eager test',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Low,
             defaultThresholds: ['minAssertions' => 3],
         );
     }
@@ -48,34 +48,37 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Find tests that assert many times across multiple apparent SUT calls.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for eager tests.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
+        $definition    = $this->definition();
         $minAssertions = (int) $context->settingsFor($definition)->numericThreshold('minAssertions');
-        $findings = [];
+        $findings      = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             $assertionCount = count(TestQualityNodeHelper::assertionCalls($scope));
-            $sutCalls = $this->distinctSutCalls($scope);
+            $sutCalls       = $this->distinctSutCalls($scope);
 
             if ($assertionCount < $minAssertions || count($sutCalls) < 2) {
                 continue;
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s asserts %d times across multiple apparent SUT calls.', $scope->symbol, $assertionCount),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s asserts %d times across multiple apparent SUT calls.', $scope->symbol, $assertionCount),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
+                symbol:      $scope->symbol,
                 remediation: 'Split unrelated behaviors into focused tests when the assertions cover different responsibilities.',
-                metadata: ['assertions' => $assertionCount, 'sutCalls' => array_values($sutCalls)],
+                metadata:    ['assertions' => $assertionCount, 'sutCalls' => array_values($sutCalls)],
             );
         }
 
@@ -88,7 +91,7 @@ final readonly class EagerTestRule implements RuleInterface
     private function distinctSutCalls(TestQualityScope $scope): array
     {
         $resultVariables = $this->collectResultVariables($scope);
-        $calls = [];
+        $calls           = [];
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             $name = TestQualityNodeHelper::callName($call);
@@ -115,7 +118,7 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function collectResultVariables(TestQualityScope $scope): array
     {
-        $finder = new NodeFinder();
+        $finder    = new NodeFinder();
         $variables = [];
 
         foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {

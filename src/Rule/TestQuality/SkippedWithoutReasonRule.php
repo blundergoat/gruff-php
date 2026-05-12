@@ -32,17 +32,20 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Skipped test without reason',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Skipped test without reason',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find skipped or incomplete tests without an explanatory reason.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unexplained skipped tests.
      */
@@ -62,15 +65,15 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s skips without an explanatory reason.', $scope->symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Warning,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::High,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s skips without an explanatory reason.', $scope->symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Warning,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::High,
+                    symbol:      $scope->symbol,
                     remediation: 'Include the condition or ticket that explains why this test is skipped.',
                 );
             }

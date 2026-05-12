@@ -38,12 +38,12 @@ final readonly class ParameterCountRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Parameter count',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Parameter count',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 5,
                 'error' => 8,
@@ -54,15 +54,18 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Find functions, methods, and closures with too many parameters.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for callables above configured thresholds.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_
                 || $node instanceof Closure
@@ -72,12 +75,12 @@ final readonly class ParameterCountRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_|Closure|ArrowFunction $node */
+            /** @var ClassMethod|Function_|Closure|ArrowFunction $node Finder predicate restricts results to parameter-bearing function-like nodes. */
             if ($node instanceof ClassMethod && $this->isPromotedValueObjectConstructor($node)) {
                 continue;
             }
 
-            $paramCount = count($node->params);
+            $paramCount     = count($node->params);
             $thresholdMatch = $settings->highValueThresholdMatch($paramCount);
 
             if ($thresholdMatch === null) {
@@ -87,7 +90,7 @@ final readonly class ParameterCountRule implements RuleInterface
             $symbol = $this->resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has %d parameters, above the %s threshold of %s.',
                     $symbol,
@@ -95,17 +98,17 @@ final readonly class ParameterCountRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Group related parameters into a value object or configuration class.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Group related parameters into a value object or configuration class.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'parameters' => $paramCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
@@ -149,7 +152,7 @@ final readonly class ParameterCountRule implements RuleInterface
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod) {
-            $parent = $node->getAttribute('parent');
+            $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Node\Stmt\Class_
                 || $parent instanceof Node\Stmt\Trait_
                 || $parent instanceof Node\Stmt\Enum_

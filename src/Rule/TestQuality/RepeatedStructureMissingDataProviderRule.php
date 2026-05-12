@@ -42,23 +42,26 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Repeated test structure missing data provider',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Repeated test structure missing data provider',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            confidence:      Confidence::Low,
         );
     }
 
     /**
      * Find repeated test bodies that look like data-provider candidates.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for repeated test structures.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
@@ -97,22 +100,22 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                 $first = $methods[0];
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
+                    ruleId:  self::ID,
                     message: sprintf(
                         '%s has %d structurally identical test methods (%s) that look like a data provider would replace.',
                         $className,
                         count($methods),
                         implode(', ', $names),
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $first->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Low,
-                    symbol: sprintf('%s::%s()', $className, $first->name->toString()),
+                    filePath:    $unit->file->displayPath,
+                    line:        $first->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::Low,
+                    symbol:      sprintf('%s::%s()', $className, $first->name->toString()),
                     remediation: 'Collapse the repeated tests into one method driven by #[DataProvider] or @dataProvider with the differing values as data rows.',
-                    metadata: ['count' => count($methods), 'methods' => $names],
+                    metadata:    ['count' => count($methods), 'methods' => $names],
                 );
             }
         }

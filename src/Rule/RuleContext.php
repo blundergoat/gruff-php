@@ -15,8 +15,8 @@ final readonly class RuleContext
     /**
      * Capture project-level context and effective rule configuration.
      *
-     * @param string $projectRoot Project root for the analysis run.
-     * @param AnalysisConfig $config Effective analysis configuration.
+     * @param string         $projectRoot Project root for the analysis run.
+     * @param AnalysisConfig $config      Effective analysis configuration.
      */
     public function __construct(
         public string $projectRoot,

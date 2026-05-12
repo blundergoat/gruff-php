@@ -31,17 +31,20 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Database URL password',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Database URL password',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find database connection URLs that embed passwords.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for credential-bearing database URLs.
      */
@@ -57,7 +60,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         $findings = [];
         foreach ($matches[0] as $index => $match) {
             [$value, $offset] = $match;
-            $password = $matches['password'][$index][0];
+            $password         = $matches['password'][$index][0];
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
@@ -68,13 +71,13 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             }
 
             $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: sprintf('Database connection string contains an inline password: %s.', $preview),
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::High,
-                detector: 'database-url-password',
-                preview: $preview,
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     sprintf('Database connection string contains an inline password: %s.', $preview),
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::High,
+                detector:    'database-url-password',
+                preview:     $preview,
                 remediation: 'Move database passwords into a secret store or runtime environment variable.',
             );
         }

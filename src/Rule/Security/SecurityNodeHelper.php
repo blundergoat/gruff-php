@@ -45,8 +45,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args Call argument nodes to inspect.
-     * @param int $index Zero-based argument index.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args  Call argument nodes to inspect.
+     * @param int                                                  $index Zero-based argument index.
      * @return Expr|null Argument expression at the requested index, or null when absent.
      */
     public static function argumentValue(array $args, int $index): ?Expr

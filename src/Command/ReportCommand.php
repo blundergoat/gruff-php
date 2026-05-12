@@ -77,7 +77,7 @@ final class ReportCommand extends Command
         $process->setTimeout(null);
         $process->run();
         $this->writeStderr($output, $process->getErrorOutput());
-        $report = $process->getOutput();
+        $report     = $process->getOutput();
         $outputPath = $this->optionalStringOption($input, 'output');
 
         if ($outputPath === null) {
@@ -86,7 +86,7 @@ final class ReportCommand extends Command
             return $process->getExitCode() ?? Command::FAILURE;
         }
 
-        $path = $this->absolutePath($outputPath, $projectRoot);
+        $path      = $this->absolutePath($outputPath, $projectRoot);
         $directory = dirname($path);
 
         if (!is_dir($directory)) {
@@ -111,9 +111,9 @@ final class ReportCommand extends Command
      */
     private function analyseCommand(InputInterface $input): array
     {
-        /** @var list<string> $paths */
-        $paths = $input->getArgument('paths');
-        $command = [PHP_BINARY, $this->gruffBinary(), 'analyse', ...$paths, '--format'];
+        /** @var list<string> $paths The command definition declares a variadic paths argument. */
+        $paths     = $input->getArgument('paths');
+        $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', ...$paths, '--format'];
         $command[] = $this->optionalStringOption($input, 'format') ?? 'html';
         $command[] = '--fail-on';
         $command[] = $this->optionalStringOption($input, 'fail-on') ?? 'none';
@@ -136,7 +136,7 @@ final class ReportCommand extends Command
         }
 
         if ($input->hasParameterOption('--baseline', true)) {
-            $value = $this->optionalStringOption($input, 'baseline');
+            $value     = $this->optionalStringOption($input, 'baseline');
             $command[] = '--baseline';
 
             if ($value !== null) {
@@ -187,7 +187,7 @@ final class ReportCommand extends Command
 
         if ($input->hasParameterOption('--diff', true)) {
             $command[] = '--diff';
-            $diff = $input->getOption('diff');
+            $diff      = $input->getOption('diff');
 
             if (is_string($diff) && $diff !== '') {
                 $command[] = $diff;

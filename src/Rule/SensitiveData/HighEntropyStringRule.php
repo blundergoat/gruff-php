@@ -31,12 +31,12 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'High entropy string',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            id:                self::ID,
+            name:              'High entropy string',
+            pillar:            Pillar::SensitiveData,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::Medium,
             defaultThresholds: [
                 'minLength' => 32,
                 'entropy' => 4.2,
@@ -47,12 +47,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Find long high-entropy string literals that may be secrets.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious high-entropy literals.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $settings = $context->settingsFor($this->definition());
-        $minLength = (int) $settings->numericThreshold('minLength');
+        $settings         = $context->settingsFor($this->definition());
+        $minLength        = (int) $settings->numericThreshold('minLength');
         $entropyThreshold = (float) $settings->numericThreshold('entropy');
 
         preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
@@ -73,15 +76,15 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview = SecretScannerHelper::redactedPreview($value);
+            $preview    = SecretScannerHelper::redactedPreview($value);
             $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: sprintf('High-entropy string literal detected: %s.', $preview),
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::Medium,
-                detector: 'high-entropy-string',
-                preview: $preview,
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     sprintf('High-entropy string literal detected: %s.', $preview),
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::Medium,
+                detector:    'high-entropy-string',
+                preview:     $preview,
                 remediation: 'Confirm this is not a credential; move real secrets out of source.',
             );
         }

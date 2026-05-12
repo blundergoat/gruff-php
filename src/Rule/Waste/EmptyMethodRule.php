@@ -37,27 +37,27 @@ final readonly class EmptyMethodRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Empty method',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Empty method',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find function-like declarations with empty bodies.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for empty methods or functions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
@@ -80,16 +80,16 @@ final readonly class EmptyMethodRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s has an empty body.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('%s has an empty body.', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $node->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                endLine:     $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:      $symbol,
                 remediation: 'Implement the method or remove it if unneeded.',
             );
         }

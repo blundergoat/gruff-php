@@ -41,17 +41,20 @@ final readonly class SutNotCalledRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test name mentions SUT that is not called',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Test name mentions SUT that is not called',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            confidence:      Confidence::Low,
         );
     }
 
     /**
      * Find tests whose name implies a SUT call that is absent from the body.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mismatched test names and calls.
      */
@@ -74,17 +77,17 @@ final readonly class SutNotCalledRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
+                symbol:      $scope->symbol,
                 remediation: 'Check whether the test name still matches the behavior under test; this heuristic ignores custom dispatch and helpers.',
-                metadata: ['candidates' => $candidates],
+                metadata:    ['candidates' => $candidates],
             );
         }
 
@@ -183,7 +186,7 @@ final readonly class SutNotCalledRule implements RuleInterface
         $candidates = [TestQualityNodeHelper::normalizedTestName($beforeMarker)];
 
         if (preg_match('/^([A-Z][a-z]+)/', $beforeMarker, $verbMatch) === 1) {
-            $verb = $verbMatch[1];
+            $verb         = $verbMatch[1];
             $candidates[] = TestQualityNodeHelper::normalizedTestName($verb);
 
             if (str_ends_with($verb, 's') && strlen($verb) >= 4) {

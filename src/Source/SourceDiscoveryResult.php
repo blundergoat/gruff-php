@@ -11,8 +11,8 @@ final readonly class SourceDiscoveryResult
 {
     /**
      * @param list<SourceFile> $files
-     * @param list<string> $missingPaths
-     * @param list<string> $ignoredPaths
+     * @param list<string>     $missingPaths
+     * @param list<string>     $ignoredPaths
      */
     public function __construct(
         public array $files,

@@ -28,7 +28,7 @@ final class SecretScannerHelper
      * Compute the 1-based line number for a byte offset within a source string.
      *
      * @param string $source Source text being scanned.
-     * @param int $offset Zero-based byte offset inside the source text.
+     * @param int    $offset Zero-based byte offset inside the source text.
      * @return int
      */
     public static function lineNumberForOffset(string $source, int $offset): int
@@ -55,7 +55,7 @@ final class SecretScannerHelper
     /**
      * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
-     * @param string $key Environment-style key name.
+     * @param string $key   Environment-style key name.
      * @param string $value Sensitive value associated with the key.
      * @return string
      */
@@ -147,7 +147,7 @@ final class SecretScannerHelper
             return 0.0;
         }
 
-        $counts = count_chars($value, 1);
+        $counts  = count_chars($value, 1);
         $entropy = 0.0;
 
         foreach ($counts as $count) {
@@ -161,14 +161,14 @@ final class SecretScannerHelper
     /**
      * Build a sensitive-data Finding with redacted preview / detector metadata.
      *
-     * @param AnalysisUnit $unit Parsed unit that owns the finding.
-     * @param string $ruleId Sensitive-data rule identifier.
-     * @param string $message Human-readable finding message.
-     * @param int $line Source line for the detected secret.
-     * @param Confidence $confidence Confidence level assigned by the detector.
-     * @param string $detector Detector name written to finding metadata.
-     * @param string $preview Redacted preview written to finding metadata.
-     * @param string $remediation Suggested remediation text for the finding.
+     * @param AnalysisUnit $unit        Parsed unit that owns the finding.
+     * @param string       $ruleId      Sensitive-data rule identifier.
+     * @param string       $message     Human-readable finding message.
+     * @param int          $line        Source line for the detected secret.
+     * @param Confidence   $confidence  Confidence level assigned by the detector.
+     * @param string       $detector    Detector name written to finding metadata.
+     * @param string       $preview     Redacted preview written to finding metadata.
+     * @param string       $remediation Suggested remediation text for the finding.
      * @return Finding
      */
     public static function finding(
@@ -182,16 +182,16 @@ final class SecretScannerHelper
         string $remediation,
     ): Finding {
         return new Finding(
-            ruleId: $ruleId,
-            message: $message,
-            filePath: $unit->file->displayPath,
-            line: $line,
-            severity: Severity::Warning,
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
-            confidence: $confidence,
+            ruleId:      $ruleId,
+            message:     $message,
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    Severity::Warning,
+            pillar:      Pillar::SensitiveData,
+            tier:        RuleTier::V01,
+            confidence:  $confidence,
             remediation: $remediation,
-            metadata: [
+            metadata:    [
                 'detector' => $detector,
                 'preview' => $preview,
             ],

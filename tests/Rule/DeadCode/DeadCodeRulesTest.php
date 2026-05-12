@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\DeadCode;
 
 use GruffPhp\Config\AnalysisConfig;
-use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;

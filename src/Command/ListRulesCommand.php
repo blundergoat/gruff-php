@@ -46,14 +46,14 @@ final class ListRulesCommand extends Command
         }
 
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
-        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, mixed>|\stdClass, description: string}> $rows */
+        $config   = AnalysisConfig::fromRegistry($registry);
+        /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, mixed>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
         $rows = [];
 
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
-            $settings = $config->ruleSettings($definition->id);
-            $rows[] = $this->row($definition, $settings->enabled);
+            $settings   = $config->ruleSettings($definition->id);
+            $rows[]     = $this->row($definition, $settings->enabled);
         }
 
         if ($format === 'json') {

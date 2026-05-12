@@ -14,12 +14,12 @@ final readonly class BaselineEntry
     /**
      * Capture the stable fields used to match a finding against a baseline.
      *
-     * @param string $fingerprint Stable finding fingerprint used for baseline matching.
-     * @param string $ruleId Rule identifier that produced the finding.
-     * @param string $filePath Display path recorded for the finding.
-     * @param int|null $line Source line recorded for the finding, when known.
-     * @param string|null $symbol Symbol recorded for the finding, when available.
-     * @param string $message Finding message preserved for stale-entry reporting.
+     * @param string      $fingerprint Stable finding fingerprint used for baseline matching.
+     * @param string      $ruleId      Rule identifier that produced the finding.
+     * @param string      $filePath    Display path recorded for the finding.
+     * @param int|null    $line        Source line recorded for the finding, when known.
+     * @param string|null $symbol      Symbol recorded for the finding, when available.
+     * @param string      $message     Finding message preserved for stale-entry reporting.
      */
     public function __construct(
         public string $fingerprint,
@@ -41,17 +41,17 @@ final readonly class BaselineEntry
     {
         return new self(
             fingerprint: $finding->fingerprint(),
-            ruleId: $finding->ruleId,
-            filePath: $finding->filePath,
-            line: $finding->line,
-            symbol: $finding->symbol,
-            message: $finding->message,
+            ruleId:      $finding->ruleId,
+            filePath:    $finding->filePath,
+            line:        $finding->line,
+            symbol:      $finding->symbol,
+            message:     $finding->message,
         );
     }
 
     /**
-     * @param array<string, mixed> $data Serialized baseline row decoded from JSON.
-     * @param int $index Zero-based baseline entry position for error messages.
+     * @param array<string, mixed> $data  Serialized baseline row decoded from JSON.
+     * @param int                  $index Zero-based baseline entry position for error messages.
      * @throws BaselineException When required fields are missing or malformed.
      * @return self Baseline entry decoded from serialized baseline data.
      */
@@ -75,11 +75,11 @@ final readonly class BaselineEntry
 
         return new self(
             fingerprint: $data['fingerprint'],
-            ruleId: $data['ruleId'],
-            filePath: $data['file'],
-            line: $line,
-            symbol: $symbol,
-            message: $data['message'],
+            ruleId:      $data['ruleId'],
+            filePath:    $data['file'],
+            line:        $line,
+            symbol:      $symbol,
+            message:     $data['message'],
         );
     }
 

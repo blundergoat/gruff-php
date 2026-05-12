@@ -38,39 +38,42 @@ final readonly class StaleParamTagRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Stale @param tag',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Stale @param tag',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find @param tags that no longer match function parameters.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for stale @param tags.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $docComment = $node->getDocComment();
 
             if ($docComment === null) {
                 continue;
             }
 
-            $docText = $docComment->getText();
+            $docText          = $docComment->getText();
             $documentedParams = MissingParamTagRule::extractParamNames($docText);
 
             if ($documentedParams === []) {
@@ -93,17 +96,17 @@ final readonly class StaleParamTagRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('@param $%s in %s does not match any parameter.', $docParam, $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $node->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('@param $%s in %s does not match any parameter.', $docParam, $symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $node->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: sprintf('Remove or update the stale @param $%s tag.', $docParam),
-                    metadata: ['parameter' => $docParam],
+                    metadata:    ['parameter' => $docParam],
                 );
             }
         }

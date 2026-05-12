@@ -6,7 +6,6 @@ namespace GruffPhp\Tests\Rule\Size;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\RuleSettings;
-use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;

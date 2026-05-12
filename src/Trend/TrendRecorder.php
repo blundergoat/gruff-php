@@ -16,21 +16,21 @@ final readonly class TrendRecorder
     /**
      * Append a score snapshot to the bounded history file.
      *
-     * @param string $projectRoot Project root used to resolve the history path.
-     * @param string $path History file path to write.
-     * @param ScoreReport $score Score report to snapshot.
-     * @param int $findingCount Total finding count for the snapshot.
+     * @param string      $projectRoot  Project root used to resolve the history path.
+     * @param string      $path         History file path to write.
+     * @param ScoreReport $score        Score report to snapshot.
+     * @param int         $findingCount Total finding count for the snapshot.
      * @throws RuntimeException When the history file cannot be read, validated, or written.
      * @throws \JsonException When history JSON cannot be decoded or encoded.
      * @return TrendReport Report describing the current score and prior delta.
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
-        $resolvedPath = $this->absolutePath($projectRoot, $path);
-        $entries = $this->readEntries($resolvedPath);
-        $previous = $entries === [] ? null : $entries[array_key_last($entries)];
+        $resolvedPath  = $this->absolutePath($projectRoot, $path);
+        $entries       = $this->readEntries($resolvedPath);
+        $previous      = $entries === [] ? null : $entries[array_key_last($entries)];
         $previousScore = $this->scoreFromEntry($previous);
-        $entry = [
+        $entry         = [
             'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
             'timestamp' => gmdate(DATE_ATOM),
             'score' => $score->composite->score,
@@ -40,7 +40,7 @@ final readonly class TrendRecorder
         ];
 
         $entries[] = $entry;
-        $entries = array_slice($entries, -50);
+        $entries   = array_slice($entries, -50);
         $directory = dirname($resolvedPath);
 
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
@@ -52,11 +52,11 @@ final readonly class TrendRecorder
         }
 
         return new TrendReport(
-            path: $this->displayPath($projectRoot, $resolvedPath),
-            currentScore: $score->composite->score,
+            path:          $this->displayPath($projectRoot, $resolvedPath),
+            currentScore:  $score->composite->score,
             previousScore: $previousScore,
-            delta: $previousScore === null ? null : round($score->composite->score - $previousScore, 2),
-            entries: $entries,
+            delta:         $previousScore === null ? null : round($score->composite->score - $previousScore, 2),
+            entries:       $entries,
         );
     }
 
@@ -133,7 +133,7 @@ final readonly class TrendRecorder
      */
     private function displayPath(string $projectRoot, string $path): string
     {
-        $root = rtrim(str_replace('\\', '/', realpath($projectRoot) ?: $projectRoot), '/');
+        $root           = rtrim(str_replace('\\', '/', realpath($projectRoot) ?: $projectRoot), '/');
         $normalisedPath = str_replace('\\', '/', realpath($path) ?: $path);
 
         if (str_starts_with($normalisedPath, $root . '/')) {

@@ -33,17 +33,20 @@ final readonly class NoAssertionsRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test without assertions',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Test without assertions',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find tests that do not contain an observable assertion or expectation.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for assertion-free tests.
      */
@@ -57,17 +60,17 @@ final readonly class NoAssertionsRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Warning,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Warning,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $scope->symbol,
                 remediation: 'Add an assertion or expectation that proves observable behavior, or disable this rule for custom assertion wrappers.',
-                metadata: ['framework' => $scope->isPest ? 'pest' : 'phpunit'],
+                metadata:    ['framework' => $scope->isPest ? 'pest' : 'phpunit'],
             );
         }
 

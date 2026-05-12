@@ -88,7 +88,7 @@ final class SummaryCommand extends Command
 
         $configPath = $input->getOption('config');
         $configPath = is_string($configPath) ? $configPath : null;
-        $noConfig = (bool) $input->getOption('no-config');
+        $noConfig   = (bool) $input->getOption('no-config');
         if ($noConfig && $configPath !== null) {
             $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
@@ -99,10 +99,10 @@ final class SummaryCommand extends Command
         if (!is_array($paths)) {
             $paths = [];
         }
-        /** @var list<string> $paths */
+        /** @var list<string> $paths Symfony exposes the variadic paths argument as a mixed console value. */
         $paths = array_values(array_filter($paths, 'is_string'));
 
-        $registry = RuleRegistry::defaults();
+        $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
 
         try {
@@ -116,8 +116,8 @@ final class SummaryCommand extends Command
         }
 
         $effectiveConfigPath = $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null));
-        $includeIgnored = (bool) $input->getOption('include-ignored');
-        $sources = (new AnalysisSourceLoader())->load(
+        $includeIgnored      = (bool) $input->getOption('include-ignored');
+        $sources             = (new AnalysisSourceLoader())->load(
             $projectRoot,
             $paths,
             $includeIgnored,
@@ -126,34 +126,34 @@ final class SummaryCommand extends Command
 
         $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
         $pillarLookup = [];
         foreach ($registry->all() as $rule) {
-            $definition = $rule->definition();
+            $definition                    = $rule->definition();
             $pillarLookup[$definition->id] = $definition->pillar->value;
         }
 
         $ruleAggregates = $this->aggregateByRule($findings, $pillarLookup);
-        $totals = $this->severityTotals($findings);
-        $parseErrors = $this->parseErrorCount($sources->diagnostics);
-        $topRules = array_slice($ruleAggregates, 0, $top);
-        $topOffenders = array_slice($score->topOffenders, 0, $top);
+        $totals         = $this->severityTotals($findings);
+        $parseErrors    = $this->parseErrorCount($sources->diagnostics);
+        $topRules       = array_slice($ruleAggregates, 0, $top);
+        $topOffenders   = array_slice($score->topOffenders, 0, $top);
 
         if ($format === 'json') {
             try {
                 $output->write($this->renderJson(
-                    paths: $paths,
-                    configPath: $effectiveConfigPath,
+                    paths:             $paths,
+                    configPath:        $effectiveConfigPath,
                     sourcesDiscovered: count($sources->discovery->files),
-                    sourcesParsed: $sources->parsedFileCount(),
-                    ignoredPaths: count($sources->discovery->ignoredPaths),
-                    missingPaths: count($sources->discovery->missingPaths),
-                    parseErrors: $parseErrors,
-                    score: $score,
-                    totals: $totals,
-                    topRules: $topRules,
-                    topOffenders: $topOffenders,
+                    sourcesParsed:     $sources->parsedFileCount(),
+                    ignoredPaths:      count($sources->discovery->ignoredPaths),
+                    missingPaths:      count($sources->discovery->missingPaths),
+                    parseErrors:       $parseErrors,
+                    score:             $score,
+                    totals:            $totals,
+                    topRules:          $topRules,
+                    topOffenders:      $topOffenders,
                 ) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode summary: %s</error>', $exception->getMessage()));
@@ -165,24 +165,24 @@ final class SummaryCommand extends Command
         }
 
         $output->write($this->renderText(
-            paths: $paths,
-            configPath: $effectiveConfigPath,
+            paths:             $paths,
+            configPath:        $effectiveConfigPath,
             sourcesDiscovered: count($sources->discovery->files),
-            sourcesParsed: $sources->parsedFileCount(),
-            ignoredPaths: count($sources->discovery->ignoredPaths),
-            missingPaths: count($sources->discovery->missingPaths),
-            parseErrors: $parseErrors,
-            score: $score,
-            totals: $totals,
-            topRules: $topRules,
-            topOffenders: $topOffenders,
+            sourcesParsed:     $sources->parsedFileCount(),
+            ignoredPaths:      count($sources->discovery->ignoredPaths),
+            missingPaths:      count($sources->discovery->missingPaths),
+            parseErrors:       $parseErrors,
+            score:             $score,
+            totals:            $totals,
+            topRules:          $topRules,
+            topOffenders:      $topOffenders,
         ));
 
         return Command::SUCCESS;
     }
 
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding>         $findings
      * @param array<string, string> $pillarLookup
      * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}>
      */
@@ -250,10 +250,10 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * @param list<string> $paths
-     * @param array{advisory: int, warning: int, error: int, total: int} $totals
+     * @param list<string>                                                                                     $paths
+     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals
      * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
-     * @param list<\GruffPhp\Scoring\FileScore> $topOffenders
+     * @param list<\GruffPhp\Scoring\FileScore>                                                                $topOffenders
      * @return string Human-readable summary report.
      */
     private function renderText(
@@ -269,13 +269,19 @@ final class SummaryCommand extends Command
         array $topRules,
         array $topOffenders,
     ): string {
-        $lines = [];
+        $lines   = [];
         $lines[] = sprintf('gruff %s — summary', Application::VERSION);
         $lines[] = '';
         $lines[] = sprintf('Paths     %s', $paths === [] ? '(none)' : implode(', ', $paths));
         $lines[] = sprintf('Config    %s', $configPath ?? '(none)');
-        $lines[] = sprintf('Files     %d discovered, %d parsed, %d ignored, %d missing, %d parse errors',
-            $sourcesDiscovered, $sourcesParsed, $ignoredPaths, $missingPaths, $parseErrors);
+        $lines[] = sprintf(
+            'Files     %d discovered, %d parsed, %d ignored, %d missing, %d parse errors',
+            $sourcesDiscovered,
+            $sourcesParsed,
+            $ignoredPaths,
+            $missingPaths,
+            $parseErrors
+        );
         $lines[] = '';
         $lines[] = sprintf('Composite %s (%.2f / 100)', $score->composite->letter, $score->composite->score);
         $lines[] = sprintf('Scope     %s', $score->scope);
@@ -289,9 +295,9 @@ final class SummaryCommand extends Command
 
         $pillarWidth = $this->columnWidth(array_map(static fn ($pillar): string => $pillar->pillar, $sortedPillars), 14);
         foreach ($sortedPillars as $pillar) {
-            $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            $grade     = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
             $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
-            $lines[] = sprintf(
+            $lines[]   = sprintf(
                 '  %-' . $pillarWidth . 's %s %s findings=%-5d advisory=%-5d warning=%-5d error=%-5d',
                 $pillar->pillar,
                 $grade,
@@ -321,8 +327,8 @@ final class SummaryCommand extends Command
         }
 
         if ($topOffenders !== []) {
-            $lines[] = '';
-            $lines[] = sprintf('Top %d file offenders', count($topOffenders));
+            $lines[]   = '';
+            $lines[]   = sprintf('Top %d file offenders', count($topOffenders));
             $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $topOffenders), 30);
             foreach ($topOffenders as $file) {
                 $lines[] = sprintf(
@@ -351,12 +357,12 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * @param list<string> $paths
-     * @param array{advisory: int, warning: int, error: int, total: int} $totals
+     * @param list<string>                                                                                     $paths
+     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals
      * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
-     * @param list<\GruffPhp\Scoring\FileScore> $topOffenders
+     * @param list<\GruffPhp\Scoring\FileScore>                                                                $topOffenders
      * @return string JSON-encoded summary report.
-     * @throws JsonException
+     * @throws JsonException When the summary payload cannot be encoded.
      */
     private function renderJson(
         array $paths,

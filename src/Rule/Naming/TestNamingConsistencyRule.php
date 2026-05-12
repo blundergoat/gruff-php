@@ -35,30 +35,33 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test method naming consistency',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Test method naming consistency',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find test method names that do not follow the configured convention.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for inconsistent test names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $classes = $finder->findInstanceOf($unit->statements, Class_::class);
+        $finder     = new NodeFinder();
+        $classes    = $finder->findInstanceOf($unit->statements, Class_::class);
 
         $findings = [];
 
         foreach ($classes as $class) {
-            /** @var Class_ $class */
+            /** @var Class_ $class Finder predicate restricts results to class declarations. */
             $testMethods = [];
 
             foreach ($class->stmts as $stmt) {
@@ -75,7 +78,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             $snakeCount = 0;
 
             foreach ($testMethods as $method) {
-                $name = $method->name->toString();
+                $name      = $method->name->toString();
                 $afterTest = substr($name, 4);
 
                 if ($afterTest === '') {
@@ -93,22 +96,22 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 $className = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
+                    ruleId:  $definition->id,
                     message: sprintf(
                         '%s mixes camelCase (%d) and snake_case (%d) test method naming.',
                         $className,
                         $camelCount,
                         $snakeCount,
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $class->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $className,
+                    filePath:    $unit->file->displayPath,
+                    line:        $class->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $className,
                     remediation: 'Pick one naming style for test methods and apply it consistently.',
-                    metadata: ['camelCase' => $camelCount, 'snake_case' => $snakeCount],
+                    metadata:    ['camelCase' => $camelCount, 'snake_case' => $snakeCount],
                 );
             }
         }

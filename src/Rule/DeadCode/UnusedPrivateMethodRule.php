@@ -49,24 +49,27 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unused private method',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unused private method',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find private methods that are not referenced inside their class-like scope.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for unused private methods.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
@@ -76,7 +79,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         $findings = [];
 
         foreach ($classLikes as $classLike) {
-            /** @var Class_|Trait_|Enum_ $classLike */
+            /** @var Class_|Trait_|Enum_ $classLike Finder predicate restricts results to class-like declarations. */
             $privateMethods = $this->privateMethods($classLike);
 
             if ($privateMethods === []) {
@@ -84,7 +87,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
 
             $calledNames = $this->calledPrivateMethodNames($finder, $classLike);
-            $findings = array_merge(
+            $findings    = array_merge(
                 $findings,
                 $this->findingsForUnusedMethods($unit, $definition, $classLike, $privateMethods, $calledNames),
             );
@@ -122,7 +125,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     private function calledPrivateMethodNames(NodeFinder $finder, Class_|Trait_|Enum_ $classLike): array
     {
         $calledNames = [];
-        $allNodes = $finder->find($classLike->stmts, static fn (): bool => true);
+        $allNodes    = $finder->find($classLike->stmts, static fn (): bool => true);
 
         foreach ($allNodes as $node) {
             $name = $this->calledMethodName($node) ?? $this->callableArrayName($node);
@@ -182,9 +185,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_             $classLike
      * @param array<string, Stmt\ClassMethod> $privateMethods
-     * @param array<string, true> $calledNames
+     * @param array<string, true>             $calledNames
      * @return list<Finding>
      */
     private function findingsForUnusedMethods(
@@ -194,7 +197,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         array $privateMethods,
         array $calledNames,
     ): array {
-        $findings = [];
+        $findings  = [];
         $className = $this->resolveClassName($classLike);
 
         foreach ($privateMethods as $name => $method) {
@@ -202,18 +205,18 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 continue;
             }
 
-            $symbol = sprintf('%s::%s()', $className, $name);
+            $symbol     = sprintf('%s::%s()', $className, $name);
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('Private method %s is never called.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $method->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $method->getEndLine() > 0 ? $method->getEndLine() : null,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('Private method %s is never called.', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $method->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                endLine:     $method->getEndLine() > 0 ? $method->getEndLine() : null,
+                symbol:      $symbol,
                 remediation: 'Remove the unused private method.',
             );
         }
@@ -232,7 +235,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return false;
         }
 
-        $first = $expr->items[0]->value;
+        $first  = $expr->items[0]->value;
         $second = $expr->items[1]->value;
 
         return ($first instanceof Expr\Variable && $first->name === 'this')

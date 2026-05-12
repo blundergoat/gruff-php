@@ -17,12 +17,13 @@ final readonly class TextReporter
     /**
      * Render an analysis report as the default human-readable text output.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string Text report with summary, diagnostics, and findings.
      */
     public function render(AnalysisReport $report): string
     {
         $counts = $report->findingCounts();
-        $lines = [
+        $lines  = [
             sprintf('gruff %s', $report->toolVersion),
             sprintf('Format: %s', $report->format),
             sprintf('Fail threshold: %s', $report->failOn),
@@ -128,8 +129,8 @@ final readonly class TextReporter
 
         $lines[] = '  Pillars:';
         foreach ($report->score->pillars as $pillar) {
-            $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
-            $score = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
+            $grade   = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+            $score   = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
             $lines[] = sprintf(
                 '    %s: %s (%s) findings=%d',
                 $pillar->pillar,
@@ -214,7 +215,7 @@ final readonly class TextReporter
         }
 
         if ($mutation->mutationBudget !== null) {
-            $status = $mutation->budgetExceeded() ? 'exceeded' : 'within budget';
+            $status  = $mutation->budgetExceeded() ? 'exceeded' : 'within budget';
             $lines[] = sprintf('  Budget: %d survived mutants allowed (%s)', $mutation->mutationBudget, $status);
         }
 
@@ -256,7 +257,7 @@ final readonly class TextReporter
     }
 
     /**
-     * @param list<string> $lines
+     * @param list<string>        $lines
      * @param list<RunDiagnostic> $diagnostics
      * @return void
      */
@@ -280,7 +281,7 @@ final readonly class TextReporter
                 $location = $diagnostic->path;
             }
 
-            $prefix = strtoupper(str_replace('-', '-', $diagnostic->type));
+            $prefix  = strtoupper(str_replace('-', '-', $diagnostic->type));
             $lines[] = $location === null
                 ? sprintf('  [%s] %s', $prefix, $diagnostic->message)
                 : sprintf('  [%s] %s %s', $prefix, $location, $diagnostic->message);
@@ -288,7 +289,7 @@ final readonly class TextReporter
     }
 
     /**
-     * @param list<string> $lines
+     * @param list<string>  $lines
      * @param list<Finding> $findings
      * @return void
      */

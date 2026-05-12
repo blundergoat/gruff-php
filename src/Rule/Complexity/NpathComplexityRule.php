@@ -44,12 +44,12 @@ final readonly class NpathComplexityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'NPath complexity',
-            pillar: Pillar::Complexity,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'NPath complexity',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 200,
                 'error' => 500,
@@ -60,15 +60,18 @@ final readonly class NpathComplexityRule implements RuleInterface
     /**
      * Flag methods whose NPath complexity (independent execution paths) exceeds the configured threshold.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -76,20 +79,20 @@ final readonly class NpathComplexityRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
-            $npath = self::compute($node);
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            $npath          = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($npath);
 
             if ($thresholdMatch === null) {
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
-            $capped = $npath >= self::MAX_NPATH;
+            $symbol     = CyclomaticComplexityRule::resolveSymbol($node);
+            $capped     = $npath >= self::MAX_NPATH;
             $npathLabel = $capped ? '>=' . self::formatNumber(self::MAX_NPATH) . ' (cap reached)' : self::formatNumber($npath);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has an NPath complexity of %s, above the %s threshold of %s.',
                     $symbol,
@@ -97,17 +100,17 @@ final readonly class NpathComplexityRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Reduce the number of independent execution paths by simplifying conditionals.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Reduce the number of independent execution paths by simplifying conditionals.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'npath' => $npath,
                     'capped' => $capped,
                     'threshold' => $thresholdMatch->threshold,
@@ -189,7 +192,7 @@ final readonly class NpathComplexityRule implements RuleInterface
      */
     private static function walkSwitch(Stmt\Switch_ $node): int
     {
-        $paths = 0;
+        $paths      = 0;
         $hasDefault = false;
 
         foreach ($node->cases as $case) {

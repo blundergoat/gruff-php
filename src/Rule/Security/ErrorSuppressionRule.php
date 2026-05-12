@@ -34,12 +34,12 @@ final class ErrorSuppressionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Error suppression operator',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:               self::ID,
+            name:             'Error suppression operator',
+            pillar:           Pillar::Security,
+            tier:             RuleTier::V01,
+            defaultSeverity:  Severity::Warning,
+            confidence:       Confidence::High,
             secondaryPillars: [Pillar::Modernisation],
         );
     }
@@ -47,24 +47,27 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Find uses of PHP error suppression that can hide failures.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for suppressed expressions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Error suppression operator hides failures.',
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                remediation: 'Handle the specific failure mode explicitly instead of suppressing errors with @.',
+                ruleId:           self::ID,
+                message:          'Error suppression operator hides failures.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         Severity::Warning,
+                pillar:           Pillar::Security,
+                tier:             RuleTier::V01,
+                confidence:       Confidence::High,
+                remediation:      'Handle the specific failure mode explicitly instead of suppressing errors with @.',
                 secondaryPillars: [Pillar::Modernisation],
             );
         }

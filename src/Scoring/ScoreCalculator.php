@@ -34,7 +34,9 @@ final readonly class ScoreCalculator
     ];
 
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings Findings included in the score calculation.
+     * @param MutationAnalysisResult|null $mutation Optional mutation result included in scoring.
+     * @param DiffResult|null $diff Optional diff result limiting the scoring scope label.
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
     public function calculate(array $findings, ?MutationAnalysisResult $mutation, ?DiffResult $diff): ScoreReport

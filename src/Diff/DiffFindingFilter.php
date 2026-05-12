@@ -12,7 +12,8 @@ use GruffPhp\Finding\Finding;
 final readonly class DiffFindingFilter
 {
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings Findings to filter against the diff scope.
+     * @param DiffResult    $diff     Diff result used to retain changed-file findings.
      * @return list<Finding>
      */
     public function filter(array $findings, DiffResult $diff): array

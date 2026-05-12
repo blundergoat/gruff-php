@@ -45,23 +45,26 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Mock without expectation',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Mock without expectation',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find mocks that are read without any verification call.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for mock variables that lack expectations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -77,13 +80,13 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     private function findingsForScope(AnalysisUnit $unit, TestQualityScope $scope, NodeFinder $finder): array
     {
         $assignedVarObjectIds = [];
-        $mockAssignments = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
+        $mockAssignments      = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
 
         if ($mockAssignments === []) {
             return [];
         }
 
-        $reads = $this->variableReads($scope, $finder, $assignedVarObjectIds);
+        $reads    = $this->variableReads($scope, $finder, $assignedVarObjectIds);
         $findings = [];
 
         foreach ($mockAssignments as $varName => $assignment) {
@@ -107,7 +110,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
-        $assignments = $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
+        $assignments     = $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
 
         foreach ($assignments as $assign) {
             if (!$assign instanceof Expr\Assign) {
@@ -159,7 +162,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
-     * @param array{line: int, name: string} $assignment
+     * @param array{line: int, name: string}     $assignment
      * @param array<string, list<Expr\Variable>> $reads
      *
      * @return Finding|null Finding for the mock assignment, or null when verified.
@@ -185,17 +188,17 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $variant = $hasStub ? 'stub-only' : 'dead-mock';
 
         return new Finding(
-            ruleId: self::ID,
-            message: $this->mockMessage($scope->symbol, $varName, $hasStub),
-            filePath: $unit->file->displayPath,
-            line: $assignment['line'],
-            severity: $hasStub ? Severity::Advisory : Severity::Warning,
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            confidence: Confidence::Medium,
-            symbol: $scope->symbol,
+            ruleId:      self::ID,
+            message:     $this->mockMessage($scope->symbol, $varName, $hasStub),
+            filePath:    $unit->file->displayPath,
+            line:        $assignment['line'],
+            severity:    $hasStub ? Severity::Advisory : Severity::Warning,
+            pillar:      Pillar::TestQuality,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
+            symbol:      $scope->symbol,
             remediation: 'Either verify a method call with $mock->expects(...) / shouldReceive(), or replace the mock with a stub created via createStub() to make the intent explicit.',
-            metadata: ['variable' => $varName, 'variant' => $variant],
+            metadata:    ['variable' => $varName, 'variant' => $variant],
         );
     }
 

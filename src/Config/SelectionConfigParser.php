@@ -23,10 +23,10 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<array-key, mixed>|bool|float|int|object|string|null $value Raw selection config value.
-     * @param RuleRegistry $registry Registry used to validate selected rule ids.
+     * @param array<array-key, mixed>|bool|float|int|object|string|null $value    Raw selection config value.
+     * @param RuleRegistry                                              $registry Registry used to validate selected rule ids.
      * @return RuleSelection Parsed rule selection filters.
-     * @throws ConfigException
+     * @throws ConfigException When the selection config has unknown keys or invalid values.
      */
     public function parse(object|array|string|int|float|bool|null $value, RuleRegistry $registry): RuleSelection
     {
@@ -34,11 +34,11 @@ final readonly class SelectionConfigParser
         $this->assertKnownKeys($selection);
 
         return new RuleSelection(
-            tiers: $this->tiers($selection),
-            pillars: $this->pillars($selection, 'pillars'),
-            rules: $this->ruleIds($selection, 'rules', $registry),
+            tiers:          $this->tiers($selection),
+            pillars:        $this->pillars($selection, 'pillars'),
+            rules:          $this->ruleIds($selection, 'rules', $registry),
             excludePillars: $this->pillars($selection, 'excludePillars'),
-            excludeRules: $this->ruleIds($selection, 'excludeRules', $registry),
+            excludeRules:   $this->ruleIds($selection, 'excludeRules', $registry),
         );
     }
 

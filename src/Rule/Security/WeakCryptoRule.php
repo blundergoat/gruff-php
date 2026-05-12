@@ -34,23 +34,26 @@ final class WeakCryptoRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Weak cryptography primitives',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Weak cryptography primitives',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find weak hashing and cryptography primitives in source code.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for weak cryptography usage.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
@@ -64,16 +67,16 @@ final class WeakCryptoRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('Weak cryptography primitive detected: %s().', $name),
-                filePath: $unit->file->displayPath,
-                line: $call->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
+                ruleId:      self::ID,
+                message:     sprintf('Weak cryptography primitive detected: %s().', $name),
+                filePath:    $unit->file->displayPath,
+                line:        $call->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
                 remediation: 'Use password_hash(), hash_hmac(), random_bytes(), or libsodium/OpenSSL primitives appropriate to the use case.',
-                metadata: [
+                metadata:    [
                     'function' => $name,
                 ],
             );

@@ -39,17 +39,20 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Forbidden direct global access',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Forbidden direct global access',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find direct superglobal access outside controller boundaries.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for forbidden global reads.
      */
@@ -59,9 +62,9 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
-        $seen = [];
+        $seen     = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\Variable::class) as $variable) {
             if (!is_string($variable->name) || !in_array($variable->name, self::FORBIDDEN_GLOBALS, true)) {
@@ -75,16 +78,16 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             $seen[$key] = true;
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('Direct access to $%s outside a controller boundary.', $variable->name),
-                filePath: $unit->file->displayPath,
-                line: $variable->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     sprintf('Direct access to $%s outside a controller boundary.', $variable->name),
+                filePath:    $unit->file->displayPath,
+                line:        $variable->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Modernisation,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Pass request/session data through a boundary abstraction instead of reading superglobals in domain code; gruff-php reports only.',
-                metadata: [
+                metadata:    [
                     'global' => $variable->name,
                 ],
             );

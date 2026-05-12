@@ -35,17 +35,20 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Mixed type overuse',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Mixed type overuse',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find parameters and returns that overuse explicit mixed types.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mixed type overuse.
      */
@@ -55,7 +58,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Stmt\ClassMethod || $node instanceof Stmt\Function_) as $functionLike) {
@@ -73,17 +76,17 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('Public API uses mixed type in %s.', implode(', ', $locations)),
-                filePath: $unit->file->displayPath,
-                line: $functionLike->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $functionLike->name->toString() . '()',
+                ruleId:      self::ID,
+                message:     sprintf('Public API uses mixed type in %s.', implode(', ', $locations)),
+                filePath:    $unit->file->displayPath,
+                line:        $functionLike->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::Modernisation,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $functionLike->name->toString() . '()',
                 remediation: 'Prefer narrower value objects, unions, or documented generics when the accepted shape is known; gruff-php reports only.',
-                metadata: [
+                metadata:    [
                     'requiresPhp' => 8.0,
                     'locations' => $locations,
                 ],

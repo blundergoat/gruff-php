@@ -15,6 +15,7 @@ final readonly class GithubAnnotationsReporter
     /**
      * Render findings as GitHub Actions workflow commands.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string GitHub annotation output.
      */
     public function render(AnalysisReport $report): string

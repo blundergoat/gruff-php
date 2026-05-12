@@ -32,12 +32,12 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Trivial snapshot',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            id:                self::ID,
+            name:              'Trivial snapshot',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Medium,
             defaultThresholds: ['maxLiteralLength' => 5],
         );
     }
@@ -45,13 +45,16 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Find snapshot assertions that lack supporting behavioral assertions.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for trivial snapshot tests.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $maxLength = (int) $context->settingsFor($definition)->numericThreshold('maxLiteralLength');
-        $findings = [];
+        $maxLength  = (int) $context->settingsFor($definition)->numericThreshold('maxLiteralLength');
+        $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
@@ -70,17 +73,17 @@ final readonly class TrivialSnapshotRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s snapshots a tiny literal; a direct assertion is clearer.', $scope->symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Medium,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s snapshots a tiny literal; a direct assertion is clearer.', $scope->symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::Medium,
+                    symbol:      $scope->symbol,
                     remediation: 'Use snapshots for rich structured output, not short scalar values.',
-                    metadata: ['length' => strlen($literal)],
+                    metadata:    ['length' => strlen($literal)],
                 );
             }
         }

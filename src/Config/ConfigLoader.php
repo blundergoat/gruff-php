@@ -21,14 +21,13 @@ final readonly class ConfigLoader
     /**
      * Create a loader for a project root with an optional package config fallback.
      *
-     * @param string $projectRoot Project root used for primary config discovery.
+     * @param string      $projectRoot        Project root used for primary config discovery.
      * @param string|null $fallbackConfigRoot Root used for fallback `.gruff.yaml` discovery.
      */
     public function __construct(
         private string $projectRoot,
         private ?string $fallbackConfigRoot = null,
-    )
-    {
+    ) {
     }
 
     /**
@@ -44,13 +43,13 @@ final readonly class ConfigLoader
     /**
      * Load analysis config from an explicit, project, or fallback YAML file.
      *
-     * @param string|null $configPath Explicit config path supplied by the CLI.
-     * @param RuleRegistry $registry Rule registry used to seed default config.
+     * @param string|null  $configPath Explicit config path supplied by the CLI.
+     * @param RuleRegistry $registry   Rule registry used to seed default config.
      * @return AnalysisConfig Loaded config merged onto registry defaults.
      */
     public function load(?string $configPath, RuleRegistry $registry): AnalysisConfig
     {
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config       = AnalysisConfig::fromRegistry($registry);
         $resolvedPath = $this->resolveConfigPath($configPath);
 
         if ($resolvedPath === null) {

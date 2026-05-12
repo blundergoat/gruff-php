@@ -38,32 +38,35 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing @throws tag',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing @throws tag',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find documented public functions that throw without an @throws tag.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for missing @throws documentation.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             if ($node instanceof ClassMethod && !$node->isPublic()) {
                 continue;
             }
@@ -91,15 +94,15 @@ final readonly class MissingThrowsTagRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s throws but has no @throws tag.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('%s throws but has no @throws tag.', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $node->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $symbol,
                 remediation: 'Add @throws tag documenting the exception type.',
             );
         }

@@ -33,24 +33,27 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Commented-out code',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Commented-out code',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find comment tokens that appear to contain disabled executable code.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for suspicious comment blocks.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $findings = [];
+        $findings   = [];
 
         foreach ($unit->tokens as $token) {
             if (!$this->isCommentToken($token)) {
@@ -68,14 +71,14 @@ final readonly class CommentedOutCodeRule implements RuleInterface
 
             if ($this->looksLikeCode($content)) {
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: 'Comment appears to contain commented-out code.',
-                    filePath: $unit->file->displayPath,
-                    line: $line,
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
+                    ruleId:      $definition->id,
+                    message:     'Comment appears to contain commented-out code.',
+                    filePath:    $unit->file->displayPath,
+                    line:        $line,
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
                     remediation: 'Remove commented-out code or restore it if still needed.',
                 );
             }

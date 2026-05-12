@@ -31,17 +31,20 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Private key material',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Private key material',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find string literals that appear to contain private key material.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
      */
@@ -52,14 +55,14 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
         $findings = [];
         foreach ($matches[0] as $match) {
             [$header, $offset] = $match;
-            $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: 'Private key block header detected; key body is redacted.',
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::High,
-                detector: 'private-key-header',
-                preview: $header,
+            $findings[]        = SecretScannerHelper::finding(
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     'Private key block header detected; key body is redacted.',
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::High,
+                detector:    'private-key-header',
+                preview:     $header,
                 remediation: 'Remove private keys from source and rotate the key if it was real.',
             );
         }

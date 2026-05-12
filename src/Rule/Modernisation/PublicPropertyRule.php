@@ -34,23 +34,26 @@ final readonly class PublicPropertyRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Public mutable property',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Public mutable property',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find mutable public properties that expose object state directly.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for public property declarations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
@@ -64,18 +67,18 @@ final readonly class PublicPropertyRule implements RuleInterface
                 }
 
                 foreach ($property->props as $propertyProperty) {
-                    $name = $propertyProperty->name->toString();
+                    $name       = $propertyProperty->name->toString();
                     $findings[] = new Finding(
-                        ruleId: self::ID,
-                        message: sprintf('Public mutable property $%s exposes state directly.', $name),
-                        filePath: $unit->file->displayPath,
-                        line: $propertyProperty->getStartLine(),
-                        severity: Severity::Warning,
-                        pillar: Pillar::Modernisation,
-                        tier: RuleTier::V01,
-                        confidence: Confidence::High,
+                        ruleId:      self::ID,
+                        message:     sprintf('Public mutable property $%s exposes state directly.', $name),
+                        filePath:    $unit->file->displayPath,
+                        line:        $propertyProperty->getStartLine(),
+                        severity:    Severity::Warning,
+                        pillar:      Pillar::Modernisation,
+                        tier:        RuleTier::V01,
+                        confidence:  Confidence::High,
                         remediation: 'Prefer constructor-initialized readonly properties or methods that preserve invariants; DTO-style classes are exempt and gruff-php reports only.',
-                        metadata: [
+                        metadata:    [
                             'property' => $name,
                         ],
                     );

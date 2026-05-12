@@ -14,9 +14,9 @@ use GruffPhp\Source\SourceDiscoveryResult;
 final readonly class AnalysisSourceSet
 {
     /**
-     * @param SourceDiscoveryResult $discovery Discovery result for the requested paths.
-     * @param list<AnalysisUnit> $analysisUnits Parsed analysis units.
-     * @param list<RunDiagnostic> $diagnostics Diagnostics emitted while loading sources.
+     * @param SourceDiscoveryResult $discovery     Discovery result for the requested paths.
+     * @param list<AnalysisUnit>    $analysisUnits Parsed analysis units.
+     * @param list<RunDiagnostic>   $diagnostics   Diagnostics emitted while loading sources.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,

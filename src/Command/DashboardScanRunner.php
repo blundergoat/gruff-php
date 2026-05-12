@@ -16,9 +16,9 @@ final readonly class DashboardScanRunner
     /**
      * Capture collaborators used to execute dashboard scans and render results.
      *
-     * @param string $gruffBinary Absolute gruff binary path used for scan requests.
+     * @param string                $gruffBinary  Absolute gruff binary path used for scan requests.
      * @param DashboardStateFactory $stateFactory Factory used to resolve dashboard state.
-     * @param DashboardPageRenderer $renderer Renderer used for scan output and errors.
+     * @param DashboardPageRenderer $renderer     Renderer used for scan output and errors.
      */
     public function __construct(
         private string $gruffBinary,
@@ -31,15 +31,15 @@ final readonly class DashboardScanRunner
      * Run a dashboard scan request and return HTML for the iframe.
      *
      * @param DashboardRequestContext $context Dashboard request context.
-     * @param array<string, string> $query Request query values from the dashboard form.
+     * @param array<string, string>   $query   Request query values from the dashboard form.
      * @return string Dashboard HTML for either scan results or an error panel.
      */
     public function scanHtml(DashboardRequestContext $context, array $query): string
     {
-        $state = $this->stateFactory->state($context->input, $context->projectRoot, $query);
-        $renderer = $this->renderer;
+        $state          = $this->stateFactory->state($context->input, $context->projectRoot, $query);
+        $renderer       = $this->renderer;
         $commandBuilder = new DashboardScanCommandBuilder($this->gruffBinary);
-        $scanRoot = $this->stateFactory->resolveProjectRoot($state['project'], $context->launchRoot);
+        $scanRoot       = $this->stateFactory->resolveProjectRoot($state['project'], $context->launchRoot);
 
         if ($scanRoot === null) {
             return $renderer->errorHtml(
@@ -50,25 +50,25 @@ final readonly class DashboardScanRunner
             );
         }
 
-        $paths = $commandBuilder->parsePaths($state['paths']);
-        $command = $commandBuilder->analyseCommand($paths, $state);
+        $paths     = $commandBuilder->parsePaths($state['paths']);
+        $command   = $commandBuilder->analyseCommand($paths, $state);
         $startedAt = microtime(true);
-        $process = new Process($command, $scanRoot);
+        $process   = new Process($command, $scanRoot);
         $process->setTimeout($context->scanTimeout);
-        $stderr = '';
+        $stderr   = '';
         $exitCode = Command::SUCCESS;
 
         try {
             $process->run();
-            $stderr = $process->getErrorOutput();
+            $stderr   = $process->getErrorOutput();
             $exitCode = $process->getExitCode() ?? Command::FAILURE;
         } catch (ProcessTimedOutException $exception) {
-            $stderr = $exception->getMessage();
+            $stderr   = $exception->getMessage();
             $exitCode = Command::FAILURE;
         }
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $html = $process->getOutput();
+        $html       = $process->getOutput();
 
         if ($html === '') {
             return $renderer->errorHtml('The scan did not produce HTML output.', $stderr === '' ? 'No stderr output.' : $stderr, $exitCode, $durationMs);

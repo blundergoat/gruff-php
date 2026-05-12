@@ -34,23 +34,26 @@ final class UnsafeUnserializeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Unsafe unserialize usage',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Unsafe unserialize usage',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find unserialize calls that can deserialize untrusted data.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for unsafe unserialize calls.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
@@ -64,14 +67,14 @@ final class UnsafeUnserializeRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Heuristic unsafe unserialize() input detected.',
-                filePath: $unit->file->displayPath,
-                line: $call->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     'Heuristic unsafe unserialize() input detected.',
+                filePath:    $unit->file->displayPath,
+                line:        $call->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Avoid unserialize() on untrusted data, or pass allowed_classes with strict input provenance.',
             );
         }

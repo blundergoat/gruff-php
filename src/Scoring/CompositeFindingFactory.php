@@ -21,7 +21,7 @@ final readonly class CompositeFindingFactory
      */
     public function build(array $findings): array
     {
-        /** @var array<string, list<Finding>> $bySymbol */
+        /** @var array<string, list<Finding>> $bySymbol Accumulator shape is built from nullable finding symbols before composite findings are emitted. */
         $bySymbol = [];
 
         foreach ($findings as $finding) {
@@ -78,19 +78,19 @@ final readonly class CompositeFindingFactory
             sort($componentRuleIds, SORT_STRING);
 
             $composites[] = new Finding(
-                ruleId: 'design.god-method',
-                message: sprintf('%s combines size and complexity findings; split it before adding more behavior.', $first->symbol),
-                filePath: $first->filePath,
-                line: min($lines),
-                severity: Severity::Warning,
-                pillar: Pillar::Design,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                endLine: $endLines === [] ? $first->endLine : max($endLines),
-                symbol: $first->symbol,
-                remediation: 'Extract branches or responsibilities until size and complexity findings no longer overlap on the same method.',
+                ruleId:           'design.god-method',
+                message:          sprintf('%s combines size and complexity findings; split it before adding more behavior.', $first->symbol),
+                filePath:         $first->filePath,
+                line:             min($lines),
+                severity:         Severity::Warning,
+                pillar:           Pillar::Design,
+                tier:             RuleTier::V01,
+                confidence:       Confidence::High,
+                endLine:          $endLines === [] ? $first->endLine : max($endLines),
+                symbol:           $first->symbol,
+                remediation:      'Extract branches or responsibilities until size and complexity findings no longer overlap on the same method.',
                 secondaryPillars: [Pillar::Complexity, Pillar::Size],
-                metadata: [
+                metadata:         [
                     'componentRules' => $componentRuleIds,
                 ],
             );

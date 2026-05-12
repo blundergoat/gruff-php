@@ -19,8 +19,8 @@ final readonly class HtmlReporter
      * Build the HTML reporter with the project root and editor-link preferences.
      *
      * @param string $projectRoot Project root used to build editor links.
-     * @param string $editorLink Editor-link mode used in finding rows.
-     * @param bool $interactive Whether interactive filtering controls should be included.
+     * @param string $editorLink  Editor-link mode used in finding rows.
+     * @param bool   $interactive Whether interactive filtering controls should be included.
      */
     public function __construct(
         private string $projectRoot = '',
@@ -37,12 +37,12 @@ final readonly class HtmlReporter
      */
     public function render(AnalysisReport $report): string
     {
-        $score = $report->score;
-        $grade = $score?->composite->letter ?? 'n/a';
+        $score        = $report->score;
+        $grade        = $score?->composite->letter ?? 'n/a';
         $numericScore = $score === null ? 'n/a' : sprintf('%.2f / 100', $score->composite->score);
-        $counts = $report->findingCounts();
-        $title = sprintf('gruff-php inspection report - %s', $grade);
-        $script = $this->interactive
+        $counts       = $report->findingCounts();
+        $title        = sprintf('gruff-php inspection report - %s', $grade);
+        $script       = $this->interactive
             ? '<script type="module">' . $this->interactiveScript() . '</script>' . PHP_EOL
             : '';
 
@@ -77,7 +77,7 @@ final readonly class HtmlReporter
      */
     private function masthead(AnalysisReport $report): string
     {
-        $paths = $report->requestedPaths === [] ? ['.'] : $report->requestedPaths;
+        $paths     = $report->requestedPaths === [] ? ['.'] : $report->requestedPaths;
         $diffLabel = $report->diff !== null && $report->diff->active
             ? sprintf('%s · %d changed files', $report->diff->mode, count($report->diff->changedFiles))
             : 'full project';
@@ -144,7 +144,7 @@ final readonly class HtmlReporter
     private function pillars(AnalysisReport $report): string
     {
         $items = $report->score === null ? [] : $report->score->pillars;
-        $html = '<section class="pillars"><h2 class="section-head">pillar grades <span class="aside">weighted composite</span></h2><div class="pillar-grid">';
+        $html  = '<section class="pillars"><h2 class="section-head">pillar grades <span class="aside">weighted composite</span></h2><div class="pillar-grid">';
 
         foreach ($items as $pillar) {
             if (strtolower($pillar->pillar) === 'mutation') {
@@ -165,7 +165,7 @@ final readonly class HtmlReporter
     private function offenders(AnalysisReport $report): string
     {
         $items = $report->score === null ? [] : $report->score->topOffenders;
-        $html = '<section class="offenders"><h2 class="section-head">top offenders <span class="aside">sorted by score</span></h2>'
+        $html  = '<section class="offenders"><h2 class="section-head">top offenders <span class="aside">sorted by score</span></h2>'
             . '<table class="offender-list"><thead><tr><th scope="col">file</th><th scope="col" class="num">cyclo</th><th scope="col" class="num">cognit.</th><th scope="col" class="num">LOC</th><th scope="col" class="num">findings</th><th scope="col" class="num">grade</th></tr></thead><tbody>';
 
         if ($items === []) {
@@ -187,13 +187,13 @@ final readonly class HtmlReporter
     private function distribution(AnalysisReport $report): string
     {
         $distribution = $report->score === null ? [] : $report->score->complexityDistribution;
-        $max = max(1, ...array_values($distribution === [] ? [0] : $distribution));
-        $bars = '';
-        $axis = '';
+        $max          = max(1, ...array_values($distribution === [] ? [0] : $distribution));
+        $bars         = '';
+        $axis         = '';
 
         foreach ($distribution as $label => $count) {
             $height = max(4, (int) round(($count / $max) * 100));
-            $class = in_array($label, ['16-20', '21+'], true) ? ' fail' : (in_array($label, ['11-15'], true) ? ' warn' : '');
+            $class  = in_array($label, ['16-20', '21+'], true) ? ' fail' : (in_array($label, ['11-15'], true) ? ' warn' : '');
             $bars .= sprintf('<div class="bar%s" style="height:%d%%;"><span class="count">%d</span></div>', $class, $height, $count);
             $axis .= sprintf('<span>%s</span>', $this->escape($label));
         }
@@ -212,7 +212,7 @@ final readonly class HtmlReporter
     private function findings(AnalysisReport $report): string
     {
         $listAttributes = $this->interactive ? ' data-findings-list' : '';
-        $html = sprintf(
+        $html           = sprintf(
             '<section class="findings"><h2 class="section-head">flagged findings <span class="aside">%d shown</span></h2>%s<div class="findings-list"%s>',
             count($report->findings),
             $this->interactive ? $this->findingFilters($report) : '',
@@ -251,9 +251,9 @@ final readonly class HtmlReporter
      */
     private function pillarCard(PillarScore $pillar): string
     {
-        $grade = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
+        $grade      = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
         $gradeClass = strtolower($grade[0] ?? 'n');
-        $score = $pillar->grade === null ? 'not applicable' : sprintf('%.2f', $pillar->grade->score);
+        $score      = $pillar->grade === null ? 'not applicable' : sprintf('%.2f', $pillar->grade->score);
 
         return '<div class="pillar">'
             . sprintf('<div class="name">%s</div>', $this->escape($pillar->pillar))
@@ -392,9 +392,9 @@ final readonly class HtmlReporter
     private function cyclomaticSummary(array $distribution): string
     {
         $moderate = $distribution['11-15'] ?? 0;
-        $high = $distribution['16-20'] ?? 0;
-        $severe = $distribution['21+'] ?? 0;
-        $exceeds = $moderate + $high + $severe;
+        $high     = $distribution['16-20'] ?? 0;
+        $severe   = $distribution['21+'] ?? 0;
+        $exceeds  = $moderate + $high + $severe;
 
         return sprintf(
             '%d %s %s CC 10 (%d in 11-15, %d in 16-20, %d at 21+).',
@@ -463,7 +463,7 @@ final readonly class HtmlReporter
 
         $projectRoot = $this->projectRoot;
         if ($projectRoot === '') {
-            $cwd = getcwd();
+            $cwd         = getcwd();
             $projectRoot = is_string($cwd) ? $cwd : '';
         }
 

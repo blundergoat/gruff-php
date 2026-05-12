@@ -39,12 +39,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Cyclomatic complexity',
-            pillar: Pillar::Complexity,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Cyclomatic complexity',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 10,
                 'error' => 20,
@@ -55,17 +55,17 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context carrying thresholds.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context carrying thresholds.
      * @return list<Finding> Findings for complex function-like declarations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -74,7 +74,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $ccn = self::compute($node);
+            $ccn            = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
             if ($thresholdMatch === null) {
@@ -84,7 +84,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             $symbol = self::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has a cyclomatic complexity of %d, above the %s threshold of %s.',
                     $symbol,
@@ -92,17 +92,17 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Reduce branching by extracting conditions or splitting the method.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Reduce branching by extracting conditions or splitting the method.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'complexity' => $ccn,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,
@@ -123,7 +123,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         $ccn = 1;
 
         $finder = new NodeFinder();
-        $body = $node->stmts ?? [];
+        $body   = $node->stmts ?? [];
 
         $all = $finder->find($body, static function (Node $child): bool {
             if ($child instanceof Stmt\If_
@@ -183,7 +183,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
         if ($node instanceof ClassMethod) {
-            $parent = $node->getAttribute('parent');
+            $parent    = $node->getAttribute('parent');
             $className = $parent instanceof Stmt\Class_
                 || $parent instanceof Stmt\Trait_
                 || $parent instanceof Stmt\Enum_

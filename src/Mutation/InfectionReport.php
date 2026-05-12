@@ -10,9 +10,9 @@ namespace GruffPhp\Mutation;
 final readonly class InfectionReport
 {
     /**
-     * @param string $reportPath Display path for the Infection report.
-     * @param array<string, int|float> $stats Numeric report stats keyed by Infection field.
-     * @param list<InfectionMutant> $mutants Mutant rows parsed from the report.
+     * @param string                   $reportPath Display path for the Infection report.
+     * @param array<string, int|float> $stats      Numeric report stats keyed by Infection field.
+     * @param list<InfectionMutant>    $mutants    Mutant rows parsed from the report.
      */
     public function __construct(
         public string $reportPath,
@@ -101,20 +101,20 @@ final readonly class InfectionReport
         $summaries = [];
 
         foreach ($byFile as $file => $counts) {
-            $tested = $counts['killed'] + $counts['survived'];
-            $covered = $tested;
+            $tested         = $counts['killed'] + $counts['survived'];
+            $covered        = $tested;
             $msiDenominator = $tested + $counts['notCovered'];
-            $msi = $msiDenominator === 0 ? 0.0 : round(($counts['killed'] / $msiDenominator) * 100, 2);
-            $coveredMsi = $covered === 0 ? 0.0 : round(($counts['killed'] / $covered) * 100, 2);
+            $msi            = $msiDenominator === 0 ? 0.0 : round(($counts['killed'] / $msiDenominator) * 100, 2);
+            $coveredMsi     = $covered === 0 ? 0.0 : round(($counts['killed'] / $covered) * 100, 2);
 
             $summaries[] = new MutationFileSummary(
-                filePath: $file,
-                totalMutants: $counts['total'],
-                killedMutants: $counts['killed'],
-                survivedMutants: $counts['survived'],
+                filePath:          $file,
+                totalMutants:      $counts['total'],
+                killedMutants:     $counts['killed'],
+                survivedMutants:   $counts['survived'],
                 notCoveredMutants: $counts['notCovered'],
-                msi: $msi,
-                coveredMsi: $coveredMsi,
+                msi:               $msi,
+                coveredMsi:        $coveredMsi,
             );
         }
 

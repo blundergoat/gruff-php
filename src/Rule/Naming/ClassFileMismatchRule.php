@@ -38,24 +38,27 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Class/file name mismatch',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Class/file name mismatch',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find primary class names that do not match their file names.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for class and file name mismatches.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
+        $finder     = new NodeFinder();
         $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
             return ($node instanceof Class_ && !$node->isAnonymous())
                 || $node instanceof Interface_
@@ -67,7 +70,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
             return [];
         }
 
-        /** @var Class_|Interface_|Trait_|Enum_ $classLike */
+        /** @var Class_|Interface_|Trait_|Enum_ $classLike Finder predicate restricts results to named class-like declarations. */
         $classLike = $classLikes[0];
         $className = $classLike->name?->toString();
 
@@ -84,15 +87,15 @@ final readonly class ClassFileMismatchRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: $definition->id,
-                message: sprintf('Class %s does not match file name %s.php.', $className, $fileName),
-                filePath: $filePath,
-                line: $classLike->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $className,
+                ruleId:      $definition->id,
+                message:     sprintf('Class %s does not match file name %s.php.', $className, $fileName),
+                filePath:    $filePath,
+                line:        $classLike->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $className,
                 remediation: sprintf('Rename the file to %s.php or the class to %s.', $className, $fileName),
             ),
         ];

@@ -14,6 +14,8 @@ final readonly class DirectLineComment
     /**
      * Check whether a standalone one-line comment exists directly above a line.
      *
+     * @param AnalysisUnit $unit Parsed unit whose source should be inspected.
+     * @param int          $line Source line that needs a preceding comment.
      * @return bool True when the previous line is a direct one-line comment token.
      */
     public static function existsAbove(AnalysisUnit $unit, int $line): bool
@@ -23,7 +25,7 @@ final readonly class DirectLineComment
         }
 
         $commentLine = $line - 1;
-        $lineText = self::sourceLine($unit, $commentLine);
+        $lineText    = self::sourceLine($unit, $commentLine);
 
         if (!self::looksLikeStandaloneOneLineComment($lineText)) {
             return false;

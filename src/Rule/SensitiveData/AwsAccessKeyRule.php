@@ -31,17 +31,20 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'AWS access key',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'AWS access key',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find string literals that resemble AWS access key IDs.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for AWS key-like literals.
      */
@@ -57,13 +60,13 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             }
 
             $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($value)),
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::High,
-                detector: 'aws-access-key',
-                preview: SecretScannerHelper::redactedPreview($value),
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($value)),
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::High,
+                detector:    'aws-access-key',
+                preview:     SecretScannerHelper::redactedPreview($value),
                 remediation: 'Remove the key from source and rotate it if it was real.',
             );
         }

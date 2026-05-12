@@ -33,12 +33,12 @@ final readonly class TodoDensityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'TODO/FIXME density',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'TODO/FIXME density',
+            pillar:            Pillar::Documentation,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 5,
                 'error' => 10,
@@ -49,14 +49,17 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Count TODO-style markers in comments and report files above threshold.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for excessive TODO density.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
-        $count = 0;
+        $count     = 0;
         $firstLine = null;
 
         foreach ($unit->tokens as $token) {
@@ -81,16 +84,16 @@ final readonly class TodoDensityRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: $definition->id,
-                message: sprintf('File has %d TODO/FIXME markers, above the %s threshold of %s.', $count, $thresholdMatch->severity->value, (string) (int) $thresholdMatch->threshold),
-                filePath: $unit->file->displayPath,
-                line: $firstLine,
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
+                ruleId:      $definition->id,
+                message:     sprintf('File has %d TODO/FIXME markers, above the %s threshold of %s.', $count, $thresholdMatch->severity->value, (string) (int) $thresholdMatch->threshold),
+                filePath:    $unit->file->displayPath,
+                line:        $firstLine,
+                severity:    $thresholdMatch->severity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
                 remediation: 'Resolve outstanding TODOs or track them as issues.',
-                metadata: ['count' => $count, 'threshold' => $thresholdMatch->threshold, 'thresholdType' => $thresholdMatch->severity->value],
+                metadata:    ['count' => $count, 'threshold' => $thresholdMatch->threshold, 'thresholdType' => $thresholdMatch->severity->value],
             ),
         ];
     }

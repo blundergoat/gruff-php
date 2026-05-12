@@ -14,8 +14,10 @@ use GruffPhp\Source\SourceDiscovery;
 final readonly class AnalysisSourceLoader
 {
     /**
-     * @param list<string> $paths
-     * @param list<string> $ignoredPathPatterns
+     * @param string       $projectRoot         Root used for source discovery and parsing.
+     * @param list<string> $paths               Project-relative paths requested by the CLI.
+     * @param bool         $includeIgnored      Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns Configured path patterns to skip unless ignored files are included.
      * @return AnalysisSourceSet Discovered files, parsed units, and load diagnostics.
      */
     public function load(
@@ -25,28 +27,28 @@ final readonly class AnalysisSourceLoader
         array $ignoredPathPatterns,
     ): AnalysisSourceSet {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $includeIgnored, $ignoredPathPatterns);
-        $parser = new PhpFileParser();
-        $diagnostics = [];
-        $analysisUnits = [];
+        $parser          = new PhpFileParser();
+        $diagnostics     = [];
+        $analysisUnits   = [];
 
         foreach ($discoveryResult->missingPaths as $missingPath) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'missing-path',
+                type:    'missing-path',
                 message: 'Input path does not exist.',
-                path: $missingPath,
+                path:    $missingPath,
             );
         }
 
         foreach ($discoveryResult->files as $file) {
-            $unit = $parser->parse($file);
+            $unit            = $parser->parse($file);
             $analysisUnits[] = $unit;
 
             foreach ($unit->diagnostics as $diagnostic) {
                 $diagnostics[] = new RunDiagnostic(
-                    type: 'parse-error',
-                    message: $diagnostic->message,
+                    type:     'parse-error',
+                    message:  $diagnostic->message,
                     filePath: $file->displayPath,
-                    line: $diagnostic->line,
+                    line:     $diagnostic->line,
                 );
             }
         }

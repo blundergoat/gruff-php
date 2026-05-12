@@ -51,20 +51,20 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PHPUnit deprecations not fatal',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PHPUnit deprecations not fatal',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Report a project once when PHPUnit deprecations do not fail the run.
      *
-     * @param AnalysisUnit $unit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext $context Rule context carrying project root.
+     * @param AnalysisUnit $unit    Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $context Rule context carrying project root.
      * @return list<Finding> Findings for non-fatal PHPUnit deprecations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -86,7 +86,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
         $this->emittedRoots[$root] = true;
 
         $attributes = $config->root->attributes();
-        $value = $attributes !== null ? $attributes->failOnDeprecation : null;
+        $value      = $attributes !== null ? $attributes->failOnDeprecation : null;
 
         if ($value !== null && strtolower($value->__toString()) !== 'false' && $value->__toString() !== '') {
             return [];
@@ -94,18 +94,18 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s does not enable failOnDeprecation, so deprecated calls will not fail the test run.',
                     $config->displayPath,
                 ),
-                filePath: $config->displayPath,
-                line: 1,
-                severity: Severity::Warning,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $config->displayPath,
+                filePath:    $config->displayPath,
+                line:        1,
+                severity:    Severity::Warning,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $config->displayPath,
                 remediation: 'Add failOnDeprecation="true" to the <phpunit> root so deprecation notices fail the build instead of accumulating silently.',
             ),
         ];

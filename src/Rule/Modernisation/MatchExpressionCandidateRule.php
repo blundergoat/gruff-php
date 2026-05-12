@@ -34,17 +34,20 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Match expression candidate',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Match expression candidate',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find switch statements whose direct-return branches may become match expressions.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8 match-expression candidates.
      */
@@ -54,7 +57,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Switch_::class) as $switch) {
@@ -63,16 +66,16 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Switch with direct return branches may be a PHP 8 match expression candidate.',
-                filePath: $unit->file->displayPath,
-                line: $switch->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     'Switch with direct return branches may be a PHP 8 match expression candidate.',
+                filePath:    $unit->file->displayPath,
+                line:        $switch->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::Modernisation,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Consider match only when strict comparison semantics and exhaustiveness are safe for this switch; gruff-php reports only.',
-                metadata: [
+                metadata:    [
                     'requiresPhp' => 8.0,
                     'cases' => count($switch->cases),
                 ],

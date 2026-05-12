@@ -41,25 +41,28 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing property PHPDoc',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing property PHPDoc',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find declared and promoted properties that lack local documentation.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for undocumented properties.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
             if (!$classLike instanceof Class_
@@ -82,20 +85,20 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
 
                 foreach ($property->props as $propertyProperty) {
                     $propertyName = $propertyProperty->name->toString();
-                    $symbol = sprintf('%s::$%s', $className, $propertyName);
+                    $symbol       = sprintf('%s::$%s', $className, $propertyName);
 
                     $findings[] = new Finding(
-                        ruleId: $definition->id,
-                        message: sprintf('Property %s has no PHPDoc.', $symbol),
-                        filePath: $unit->file->displayPath,
-                        line: $property->getStartLine(),
-                        severity: $definition->defaultSeverity,
-                        pillar: $definition->pillar,
-                        tier: $definition->tier,
-                        confidence: $definition->confidence,
-                        symbol: $symbol,
+                        ruleId:      $definition->id,
+                        message:     sprintf('Property %s has no PHPDoc.', $symbol),
+                        filePath:    $unit->file->displayPath,
+                        line:        $property->getStartLine(),
+                        severity:    $definition->defaultSeverity,
+                        pillar:      $definition->pillar,
+                        tier:        $definition->tier,
+                        confidence:  $definition->confidence,
+                        symbol:      $symbol,
                         remediation: 'Add a docblock describing the property\'s purpose or shape.',
-                        metadata: [
+                        metadata:    [
                             'propertyName' => $propertyName,
                             'kind' => 'declared',
                             'className' => $className,
@@ -128,17 +131,17 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                 $symbol = sprintf('%s::__construct($%s)', $className, $propertyName);
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $param->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $param->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: sprintf('Add an @param tag for $%s to the constructor\'s docblock.', $propertyName),
-                    metadata: [
+                    metadata:    [
                         'propertyName' => $propertyName,
                         'kind' => 'promoted',
                         'className' => $className,

@@ -35,28 +35,31 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing method PHPDoc',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing method PHPDoc',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find method declarations that do not have a local PHPDoc block.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for undocumented methods.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
-            /** @var ClassMethod $method */
+            /** @var ClassMethod $method Finder predicate restricts results to method declarations. */
             if ($method->getDocComment() !== null) {
                 continue;
             }
@@ -77,15 +80,15 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $symbol = CyclomaticComplexityRule::resolveSymbol($method);
 
         return new Finding(
-            ruleId: $definition->id,
-            message: sprintf('Method %s has no PHPDoc.', $symbol),
-            filePath: $unit->file->displayPath,
-            line: $method->getStartLine(),
-            severity: $definition->defaultSeverity,
-            pillar: $definition->pillar,
-            tier: $definition->tier,
-            confidence: $definition->confidence,
-            symbol: $symbol,
+            ruleId:      $definition->id,
+            message:     sprintf('Method %s has no PHPDoc.', $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $method->getStartLine(),
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
             remediation: 'Add a docblock describing the method\'s purpose.',
         );
     }

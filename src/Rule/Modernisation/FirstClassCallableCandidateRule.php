@@ -37,17 +37,20 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'First-class callable candidate',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'First-class callable candidate',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find array-callable expressions that may use first-class callable syntax.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8.1 callable syntax candidates.
      */
@@ -57,7 +60,7 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\Array_::class) as $array) {
@@ -66,16 +69,16 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Array callable syntax may be replaceable with PHP 8.1 first-class callable syntax.',
-                filePath: $unit->file->displayPath,
-                line: $array->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     'Array callable syntax may be replaceable with PHP 8.1 first-class callable syntax.',
+                filePath:    $unit->file->displayPath,
+                line:        $array->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::Modernisation,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Consider first-class callable syntax only when callable binding semantics remain equivalent; gruff-php reports only.',
-                metadata: [
+                metadata:    [
                     'requiresPhp' => 8.1,
                 ],
             );

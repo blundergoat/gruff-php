@@ -32,17 +32,20 @@ final readonly class TrivialAssertionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Trivial assertion',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Trivial assertion',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find assertions that can pass without checking meaningful behavior.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for trivial assertions.
      */
@@ -57,15 +60,15 @@ final readonly class TrivialAssertionRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s contains an assertion that passes by construction.', $scope->symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Warning,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::High,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s contains an assertion that passes by construction.', $scope->symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Warning,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::High,
+                    symbol:      $scope->symbol,
                     remediation: 'Assert behavior from the system under test instead of comparing known literals.',
                 );
             }

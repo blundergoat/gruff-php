@@ -42,18 +42,21 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Var annotation description',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Var annotation description',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
-            description: 'Requires local @var type assertions to explain why the asserted type is needed.',
+            confidence:      Confidence::High,
+            description:     'Requires local @var type assertions to explain why the asserted type is needed.',
         );
     }
 
     /**
      * Find local @var assertions that do not explain why the assertion is needed.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for bare local @var annotations.
      */
@@ -67,8 +70,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         // by counting brackets, which is the "Heuristic rules overmatch nested syntax shapes"
         // footgun documented at `.goat-flow/footguns/rules.md`.
         $definition = $this->definition();
-        $findings = [];
-        $finder = new NodeFinder();
+        $findings   = [];
+        $finder     = new NodeFinder();
 
         $candidates = $finder->find(
             $unit->statements,
@@ -92,17 +95,17 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 
             foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('@var assertion for $%s must explain why the asserted type is needed.', $variable),
-                    filePath: $unit->file->displayPath,
-                    line: $doc->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: '$' . $variable,
+                    ruleId:      $definition->id,
+                    message:     sprintf('@var assertion for $%s must explain why the asserted type is needed.', $variable),
+                    filePath:    $unit->file->displayPath,
+                    line:        $doc->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      '$' . $variable,
                     remediation: sprintf('Add a short reason after $%s in the @var annotation.', $variable),
-                    metadata: ['variable' => $variable],
+                    metadata:    ['variable' => $variable],
                 );
             }
         }
@@ -132,7 +135,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     private function bareVarAnnotations(string $docText): array
     {
         $descriptiveLines = [];
-        $bareVariables = [];
+        $bareVariables    = [];
 
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
             $line = trim($line, " \t\n\r\0\x0B/*");

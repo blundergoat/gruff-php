@@ -18,7 +18,9 @@ use PhpParser\NodeFinder;
 final readonly class DocsInheritanceHelper
 {
     /**
-     * @param list<Node\Stmt> $statements
+     * @param ClassMethod     $method     Method node whose inherited contract should be inspected.
+     * @param list<Node\Stmt> $statements Parsed statements used to find ancestor declarations.
+     * @param NodeFinder      $finder     Node finder used to search inherited method candidates.
      *
      * @return bool True when inheritance or override metadata provides the contract docs.
      */

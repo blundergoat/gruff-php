@@ -38,29 +38,29 @@ final readonly class RedundantVariableRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Redundant variable',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Redundant variable',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
-            description: 'Flags variables that only store a value immediately returned by the next statement, when the assignment and the return are the only two statements in their block.',
+            confidence:      Confidence::High,
+            description:     'Flags variables that only store a value immediately returned by the next statement, when the assignment and the return are the only two statements in their block.',
         );
     }
 
     /**
      * Find temporary variables that are immediately returned.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for redundant return variables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
-        $functions = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $findings   = [];
+        $functions  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Stmt\ClassMethod
                 || $node instanceof Stmt\Function_
                 || $node instanceof Closure;
@@ -75,7 +75,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * @param array<Stmt> $statements
+     * @param array<Stmt>   $statements
      * @param list<Finding> &$findings
      * @return void
      */
@@ -117,18 +117,18 @@ final readonly class RedundantVariableRule implements RuleInterface
         }
 
         $findings[] = new Finding(
-            ruleId: $definition->id,
-            message: sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
-            filePath: $unit->file->displayPath,
-            line: $assignment->getStartLine(),
-            severity: $definition->defaultSeverity,
-            pillar: $definition->pillar,
-            tier: $definition->tier,
-            confidence: $definition->confidence,
-            endLine: $return->getStartLine(),
-            symbol: '$' . $assignedVariable->name,
+            ruleId:      $definition->id,
+            message:     sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
+            filePath:    $unit->file->displayPath,
+            line:        $assignment->getStartLine(),
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            endLine:     $return->getStartLine(),
+            symbol:      '$' . $assignedVariable->name,
             remediation: sprintf('Return the assigned expression directly instead of storing it in $%s.', $assignedVariable->name),
-            metadata: ['variable' => $assignedVariable->name],
+            metadata:    ['variable' => $assignedVariable->name],
         );
     }
 

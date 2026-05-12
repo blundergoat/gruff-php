@@ -20,7 +20,7 @@ final class ModernisationNodeHelper
      * Determine whether the configured target PHP version supports a syntax feature.
      *
      * @param RuleContext $context Rule context carrying effective config.
-     * @param float $version PHP version required by the syntax feature.
+     * @param float       $version PHP version required by the syntax feature.
      * @return bool True when the project target is at least the requested version.
      */
     public static function supportsPhp(RuleContext $context, float $version): bool
@@ -46,7 +46,7 @@ final class ModernisationNodeHelper
     /**
      * Check whether an expression fetches a property from `$this`.
      *
-     * @param Expr $expr Expression to inspect.
+     * @param Expr        $expr         Expression to inspect.
      * @param string|null $propertyName Optional property name to match.
      * @return bool True when the expression matches the requested `$this` property.
      */

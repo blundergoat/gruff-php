@@ -13,10 +13,6 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleDefinition;
-use GruffPhp\Rule\RuleInterface;
-use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
@@ -35,15 +31,10 @@ use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
-use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
-use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
-use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
-use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
-use GruffPhp\Rule\SensitiveData\JwtTokenRule;
-use GruffPhp\Rule\SensitiveData\PhiPatternRule;
-use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
-use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
@@ -55,6 +46,22 @@ use GruffPhp\Rule\Security\SqlConcatenationRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
+use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
+use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
+use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
+use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
+use GruffPhp\Rule\SensitiveData\JwtTokenRule;
+use GruffPhp\Rule\SensitiveData\PhiPatternRule;
+use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
+use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\Size\AverageMethodLengthRule;
+use GruffPhp\Rule\Size\ClassLengthRule;
+use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\Size\MethodLengthRule;
+use GruffPhp\Rule\Size\ParameterCountRule;
+use GruffPhp\Rule\Size\PropertyCountRule;
+use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
@@ -80,13 +87,6 @@ use GruffPhp\Rule\Waste\OneLineMethodRule;
 use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
-use GruffPhp\Rule\Size\AverageMethodLengthRule;
-use GruffPhp\Rule\Size\ClassLengthRule;
-use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Rule\Size\MethodLengthRule;
-use GruffPhp\Rule\Size\ParameterCountRule;
-use GruffPhp\Rule\Size\PropertyCountRule;
-use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Source\SourceFile;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -255,7 +255,7 @@ final class RuleRegistryTest extends TestCase
 
     private function fakeRule(string $id): RuleInterface
     {
-        return new readonly class($id) implements RuleInterface {
+        return new readonly class ($id) implements RuleInterface {
             public function __construct(private string $id)
             {
             }
@@ -292,7 +292,7 @@ final class RuleRegistryTest extends TestCase
 
     private function duplicateProjectRule(): RuleInterface
     {
-        return new readonly class implements RuleInterface {
+        return new readonly class () implements RuleInterface {
             public function definition(): RuleDefinition
             {
                 return new RuleDefinition(

@@ -38,23 +38,26 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Assertion in loop without message',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Assertion in loop without message',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find assertions inside loops that lack a context-bearing message.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for loop assertions without messages.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -93,21 +96,21 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                     $name = TestQualityNodeHelper::callName($assertion) ?? 'assertion';
 
                     $findings[] = new Finding(
-                        ruleId: self::ID,
+                        ruleId:  self::ID,
                         message: sprintf(
                             '%s contains a %s() inside a loop without a context-bearing message.',
                             $scope->symbol,
                             $name,
                         ),
-                        filePath: $unit->file->displayPath,
-                        line: $assertion->getStartLine(),
-                        severity: Severity::Advisory,
-                        pillar: Pillar::TestQuality,
-                        tier: RuleTier::V01,
-                        confidence: Confidence::Medium,
-                        symbol: $scope->symbol,
+                        filePath:    $unit->file->displayPath,
+                        line:        $assertion->getStartLine(),
+                        severity:    Severity::Advisory,
+                        pillar:      Pillar::TestQuality,
+                        tier:        RuleTier::V01,
+                        confidence:  Confidence::Medium,
+                        symbol:      $scope->symbol,
                         remediation: 'Pass a message argument that names the iteration (e.g. "row $i") so failures point at the offending row.',
-                        metadata: ['assertion' => $name],
+                        metadata:    ['assertion' => $name],
                     );
                 }
             }
@@ -128,7 +131,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         }
 
         $lastIndex = count($call->args) - 1;
-        $lastArg = $call->args[$lastIndex] ?? null;
+        $lastArg   = $call->args[$lastIndex] ?? null;
         if (!$lastArg instanceof Arg) {
             return false;
         }

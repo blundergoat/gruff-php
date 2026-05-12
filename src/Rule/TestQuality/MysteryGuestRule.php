@@ -36,23 +36,26 @@ final readonly class MysteryGuestRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Mystery guest',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Mystery guest',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find tests that reach external files or databases from inside the test body.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for hidden external test dependencies.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -63,17 +66,17 @@ final readonly class MysteryGuestRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s reaches out to %s from inside the test body.', $scope->symbol, $guest),
-                    filePath: $unit->file->displayPath,
-                    line: $node->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Medium,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s reaches out to %s from inside the test body.', $scope->symbol, $guest),
+                    filePath:    $unit->file->displayPath,
+                    line:        $node->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::Medium,
+                    symbol:      $scope->symbol,
                     remediation: 'Make external files or database fixtures explicit in setup, or replace them with inline test data.',
-                    metadata: ['guest' => $guest],
+                    metadata:    ['guest' => $guest],
                 );
             }
         }

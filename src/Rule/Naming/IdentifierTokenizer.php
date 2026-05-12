@@ -10,6 +10,7 @@ namespace GruffPhp\Rule\Naming;
 final readonly class IdentifierTokenizer
 {
     /**
+     * @param string $identifier Identifier text to split into words.
      * @return list<string>
      */
     public function tokenize(string $identifier): array

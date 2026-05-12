@@ -52,24 +52,27 @@ final readonly class SleepInTestRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Sleep or wall-clock read in test',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Sleep or wall-clock read in test',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             array_push(
@@ -188,17 +191,17 @@ final readonly class SleepInTestRule implements RuleInterface
     private function sleepFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
-            ruleId: self::ID,
-            message: sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
-            filePath: $unit->file->displayPath,
-            line: $call->getStartLine(),
-            severity: Severity::Warning,
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            confidence: Confidence::High,
-            symbol: $scope->symbol,
+            ruleId:      self::ID,
+            message:     sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $call->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::TestQuality,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
+            symbol:      $scope->symbol,
             remediation: 'Replace sleeps with explicit clocks, retries with deadlines, or observable synchronization points.',
-            metadata: ['variant' => 'sleep', 'function' => $name],
+            metadata:    ['variant' => 'sleep', 'function' => $name],
         );
     }
 
@@ -210,17 +213,17 @@ final readonly class SleepInTestRule implements RuleInterface
     private function wallClockFunctionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
-            ruleId: self::ID,
-            message: sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
-            filePath: $unit->file->displayPath,
-            line: $call->getStartLine(),
-            severity: Severity::Warning,
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            confidence: Confidence::High,
-            symbol: $scope->symbol,
+            ruleId:      self::ID,
+            message:     sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
+            filePath:    $unit->file->displayPath,
+            line:        $call->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::TestQuality,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
+            symbol:      $scope->symbol,
             remediation: 'Inject a fake clock or fixed timestamp instead of calling time()/microtime() directly.',
-            metadata: ['variant' => 'wall-clock', 'function' => $name],
+            metadata:    ['variant' => 'wall-clock', 'function' => $name],
         );
     }
 
@@ -238,17 +241,17 @@ final readonly class SleepInTestRule implements RuleInterface
         $className = $new->class;
 
         return new Finding(
-            ruleId: self::ID,
-            message: sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),
-            filePath: $unit->file->displayPath,
-            line: $new->getStartLine(),
-            severity: Severity::Warning,
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            confidence: Confidence::High,
-            symbol: $scope->symbol,
+            ruleId:      self::ID,
+            message:     sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),
+            filePath:    $unit->file->displayPath,
+            line:        $new->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::TestQuality,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::High,
+            symbol:      $scope->symbol,
             remediation: 'Pass a fixed timestamp to the DateTime constructor or inject a fake clock.',
-            metadata: ['variant' => 'datetime', 'class' => $className->toString()],
+            metadata:    ['variant' => 'datetime', 'class' => $className->toString()],
         );
     }
 }

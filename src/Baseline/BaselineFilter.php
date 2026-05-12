@@ -12,19 +12,21 @@ use GruffPhp\Finding\Finding;
 final readonly class BaselineFilter
 {
     /**
-     * @param list<Finding> $findings
+     * @param BaselineData  $baseline  Loaded baseline data to apply.
+     * @param list<Finding> $findings  Findings to compare against the baseline.
+     * @param bool          $diffScope Whether diff filtering is active for this baseline pass.
      * @return array{findings: list<Finding>, report: BaselineReport}
      */
     public function apply(BaselineData $baseline, array $findings, bool $diffScope): array
     {
         $entriesByFingerprint = $baseline->byFingerprint();
-        $matchedFingerprints = [];
-        $filtered = [];
-        $suppressed = 0;
+        $matchedFingerprints  = [];
+        $filtered             = [];
+        $suppressed           = 0;
 
         foreach ($findings as $finding) {
             $fingerprint = $finding->fingerprint();
-            $entry = $entriesByFingerprint[$fingerprint] ?? null;
+            $entry       = $entriesByFingerprint[$fingerprint] ?? null;
 
             if ($entry instanceof BaselineEntry
                 && $entry->ruleId === $finding->ruleId
@@ -38,7 +40,7 @@ final readonly class BaselineFilter
             $filtered[] = $finding;
         }
 
-        $staleEntries = [];
+        $staleEntries    = [];
         $staleEvaluation = 'full-project';
 
         if ($diffScope) {
@@ -54,12 +56,12 @@ final readonly class BaselineFilter
         return [
             'findings' => $filtered,
             'report' => new BaselineReport(
-                path: $baseline->path,
-                generated: false,
-                totalEntries: count($baseline->entries),
+                path:               $baseline->path,
+                generated:          false,
+                totalEntries:       count($baseline->entries),
                 suppressedFindings: $suppressed,
-                staleEvaluation: $staleEvaluation,
-                staleEntries: $staleEntries,
+                staleEvaluation:    $staleEvaluation,
+                staleEntries:       $staleEntries,
             ),
         ];
     }

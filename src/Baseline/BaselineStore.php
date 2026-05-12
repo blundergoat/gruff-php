@@ -39,7 +39,7 @@ final readonly class BaselineStore
      */
     public function read(string $path): BaselineData
     {
-        $decoded = $this->readBaselineObject($path);
+        $decoded  = $this->readBaselineObject($path);
         $findings = $this->readFindingsList($decoded);
 
         return new BaselineData($path, $this->entriesFromFindings($findings));
@@ -111,7 +111,7 @@ final readonly class BaselineStore
     }
 
     /**
-     * @param string $path Baseline path to write, relative to the project root when needed.
+     * @param string        $path     Baseline path to write, relative to the project root when needed.
      * @param list<Finding> $findings Findings to persist in the baseline.
      * @throws BaselineException When the baseline file cannot be encoded or written.
      *
@@ -123,9 +123,9 @@ final readonly class BaselineStore
             static fn (Finding $finding): BaselineEntry => BaselineEntry::fromFinding($finding),
             $findings,
         );
-        $data = new BaselineData($path, $entries);
+        $data         = new BaselineData($path, $entries);
         $absolutePath = $this->absolutePath($path);
-        $directory = dirname($absolutePath);
+        $directory    = dirname($absolutePath);
 
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new BaselineException(sprintf('Unable to create baseline directory: %s', $directory));
@@ -159,7 +159,7 @@ final readonly class BaselineStore
     private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
     {
         $directory = dirname($absolutePath);
-        $tempPath = tempnam($directory, 'gruff-baseline-');
+        $tempPath  = tempnam($directory, 'gruff-baseline-');
 
         if (!is_string($tempPath)) {
             throw new BaselineException(sprintf('Unable to create temporary baseline file: %s', $displayPath));

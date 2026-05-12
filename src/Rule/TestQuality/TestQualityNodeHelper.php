@@ -68,19 +68,19 @@ final class TestQualityNodeHelper
                 continue;
             }
 
-            $class = self::parentClass($method);
-            $className = $class?->name?->toString();
+            $class      = self::parentClass($method);
+            $className  = $class?->name?->toString();
             $methodName = $method->name->toString();
 
             $scopes[] = new TestQualityScope(
-                symbol: ($className === null ? 'anonymous' : $className) . '::' . $methodName . '()',
-                name: $methodName,
-                line: $method->getStartLine(),
-                endLine: $method->getEndLine(),
+                symbol:     ($className === null ? 'anonymous' : $className) . '::' . $methodName . '()',
+                name:       $methodName,
+                line:       $method->getStartLine(),
+                endLine:    $method->getEndLine(),
                 statements: array_values($method->stmts ?? []),
-                node: $method,
-                isPest: false,
-                className: $className,
+                node:       $method,
+                isPest:     false,
+                className:  $className,
             );
         }
 
@@ -95,19 +95,19 @@ final class TestQualityNodeHelper
             }
 
             $description = self::argString($call->args[0]) ?? $name;
-            $closure = $call->args[1]->value;
+            $closure     = $call->args[1]->value;
             if (!$closure instanceof Expr\Closure) {
                 continue;
             }
 
             $scopes[] = new TestQualityScope(
-                symbol: sprintf('pest:%s', $description),
-                name: $description,
-                line: $call->getStartLine(),
-                endLine: $call->getEndLine(),
+                symbol:     sprintf('pest:%s', $description),
+                name:       $description,
+                line:       $call->getStartLine(),
+                endLine:    $call->getEndLine(),
                 statements: array_values($closure->stmts),
-                node: $call,
-                isPest: true,
+                node:       $call,
+                isPest:     true,
             );
         }
 
@@ -387,8 +387,8 @@ final class TestQualityNodeHelper
     /**
      * Value of the call's argument at the given index, or null when missing or spread.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
-     * @param int $index Zero-based argument index.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  Call node to inspect.
+     * @param int                                           $index Zero-based argument index.
      * @return Expr|null
      */
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
@@ -461,8 +461,8 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the method carries an attribute matching the given short name (case-insensitive).
      *
-     * @param Stmt\ClassMethod $node Method node whose attributes should be inspected.
-     * @param string $shortName Attribute short name to match case-insensitively.
+     * @param Stmt\ClassMethod $node      Method node whose attributes should be inspected.
+     * @param string           $shortName Attribute short name to match case-insensitively.
      * @return bool True when at least one #[...] attribute group has an attribute whose last name segment matches.
      */
     public static function hasAttribute(Stmt\ClassMethod $node, string $shortName): bool

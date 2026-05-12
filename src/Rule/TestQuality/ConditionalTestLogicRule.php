@@ -34,37 +34,40 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Conditional test logic',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Conditional test logic',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find test cases that hide behavior behind conditionals.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for conditional logic inside tests.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach ($finder->findInstanceOf($scope->statements, Stmt\If_::class) as $conditional) {
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s contains conditional logic; tests should usually be linear.', $scope->symbol),
-                    filePath: $unit->file->displayPath,
-                    line: $conditional->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::High,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s contains conditional logic; tests should usually be linear.', $scope->symbol),
+                    filePath:    $unit->file->displayPath,
+                    line:        $conditional->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::High,
+                    symbol:      $scope->symbol,
                     remediation: 'Split branches into separate test cases with explicit setup and expectations.',
                 );
             }

@@ -37,12 +37,12 @@ final readonly class ClassLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Class length',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'Class length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 300,
                 'error' => 500,
@@ -53,15 +53,18 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose physical line length exceeds thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for oversized classes, traits, or enums.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
                 || $node instanceof Enum_;
@@ -71,13 +74,13 @@ final readonly class ClassLengthRule implements RuleInterface
 
         foreach ($nodes as $node) {
             $startLine = $node->getStartLine();
-            $endLine = $node->getEndLine();
+            $endLine   = $node->getEndLine();
 
             if ($startLine < 0 || $endLine < 0) {
                 continue;
             }
 
-            $length = $endLine - $startLine + 1;
+            $length         = $endLine - $startLine + 1;
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
             if ($thresholdMatch === null) {
@@ -87,7 +90,7 @@ final readonly class ClassLengthRule implements RuleInterface
             $symbol = $this->resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s is %d lines, above the %s threshold of %s.',
                     $symbol,
@@ -95,17 +98,17 @@ final readonly class ClassLengthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $startLine,
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $endLine,
-                symbol: $symbol,
-                remediation: 'Split large classes into smaller, focused units.',
+                filePath:         $unit->file->displayPath,
+                line:             $startLine,
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $endLine,
+                symbol:           $symbol,
+                remediation:      'Split large classes into smaller, focused units.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'lines' => $length,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,

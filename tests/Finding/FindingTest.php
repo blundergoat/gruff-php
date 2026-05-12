@@ -16,20 +16,20 @@ final class FindingTest extends TestCase
     public function testSerializesStableFindingShape(): void
     {
         $finding = new Finding(
-            ruleId: 'size.file-length',
-            message: 'File is too long.',
-            filePath: 'src/Example.php',
-            line: 10,
-            severity: Severity::Warning,
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            confidence: Confidence::High,
-            endLine: 20,
-            column: 4,
-            symbol: 'Example',
-            remediation: 'Split the file.',
+            ruleId:           'size.file-length',
+            message:          'File is too long.',
+            filePath:         'src/Example.php',
+            line:             10,
+            severity:         Severity::Warning,
+            pillar:           Pillar::Size,
+            tier:             RuleTier::V01,
+            confidence:       Confidence::High,
+            endLine:          20,
+            column:           4,
+            symbol:           'Example',
+            remediation:      'Split the file.',
             secondaryPillars: [Pillar::Maintainability],
-            metadata: ['lines' => 401, 'threshold' => 400],
+            metadata:         ['lines' => 401, 'threshold' => 400],
         );
 
         self::assertSame([

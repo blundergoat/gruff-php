@@ -34,23 +34,26 @@ final class HeaderInjectionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Header injection risk',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Header injection risk',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find header calls that may receive unsanitized user input.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for possible header injection.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
@@ -64,14 +67,14 @@ final class HeaderInjectionRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Heuristic header() call with request-controlled data detected.',
-                filePath: $unit->file->displayPath,
-                line: $call->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     'Heuristic header() call with request-controlled data detected.',
+                filePath:    $unit->file->displayPath,
+                line:        $call->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Validate and normalize redirect/header values, and reject CR/LF characters before calling header().',
             );
         }

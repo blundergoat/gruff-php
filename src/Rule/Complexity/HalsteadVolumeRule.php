@@ -39,12 +39,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Halstead volume',
-            pillar: Pillar::Complexity,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            id:                self::ID,
+            name:              'Halstead volume',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::Medium,
             defaultThresholds: [
                 'warning' => 1000,
                 'error' => 2000,
@@ -55,15 +55,18 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Detect functions and methods whose Halstead volume exceeds configured thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Halstead-volume findings for the analysed unit.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
+        $settings   = $context->settingsFor($definition);
 
         $finder = new NodeFinder();
-        $nodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -71,9 +74,9 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
-            $metrics = self::compute($node);
-            $volume = $metrics['volume'];
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            $metrics        = self::compute($node);
+            $volume         = $metrics['volume'];
             $thresholdMatch = $settings->highValueThresholdMatch($volume);
 
             if ($thresholdMatch === null) {
@@ -83,7 +86,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     '%s has a Halstead volume of %.1f, above the %s threshold of %s.',
                     $symbol,
@@ -91,17 +94,17 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $node->getEndLine() > 0 ? $node->getEndLine() : null,
-                symbol: $symbol,
-                remediation: 'Simplify logic or extract sub-expressions to reduce information content.',
+                filePath:         $unit->file->displayPath,
+                line:             $node->getStartLine(),
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                symbol:           $symbol,
+                remediation:      'Simplify logic or extract sub-expressions to reduce information content.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'volume' => round($volume, 1),
                     'difficulty' => round($metrics['difficulty'], 1),
                     'effort' => round($metrics['effort'], 1),
@@ -122,13 +125,13 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     public static function compute(Node $node): array
     {
-        $operators = [];
-        $operands = [];
+        $operators      = [];
+        $operands       = [];
         $totalOperators = 0;
-        $totalOperands = 0;
+        $totalOperands  = 0;
 
         $finder = new NodeFinder();
-        $all = $finder->find($node->stmts ?? [], static fn (): bool => true);
+        $all    = $finder->find($node->stmts ?? [], static fn (): bool => true);
 
         foreach ($all as $childNode) {
             $operatorKey = self::operatorKey($childNode);
@@ -214,14 +217,14 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     private static function metricsForCounts(int $uniqueOperators, int $uniqueOperands, int $totalOperators, int $totalOperands): array
     {
-        $length = $totalOperators + $totalOperands;
+        $length     = $totalOperators + $totalOperands;
         $vocabulary = $uniqueOperators + $uniqueOperands;
 
         if ($vocabulary === 0 || $uniqueOperands === 0 || $totalOperands === 0) {
             return ['volume' => 0.0, 'difficulty' => 0.0, 'effort' => 0.0, 'vocabulary' => 0, 'length' => 0];
         }
 
-        $volume = $length * log($vocabulary, 2);
+        $volume     = $length * log($vocabulary, 2);
         $difficulty = ($uniqueOperators / 2) * ($totalOperands / $uniqueOperands);
 
         return [

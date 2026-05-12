@@ -16,9 +16,9 @@ final readonly class InfectionRunner
     /**
      * Run Infection and capture its process result.
      *
-     * @param string $projectRoot Project root where Infection should run.
-     * @param string $binary Infection binary path or command name.
-     * @param string|null $configPath Infection config path, when supplied.
+     * @param string      $projectRoot          Project root where Infection should run.
+     * @param string      $binary               Infection binary path or command name.
+     * @param string|null $configPath           Infection config path, when supplied.
      * @param string|null $testFrameworkOptions Extra test-framework options passed to Infection.
      * @return InfectionRunResult Process result and optional diagnostic.
      */
@@ -27,25 +27,24 @@ final readonly class InfectionRunner
         string $binary,
         ?string $configPath,
         ?string $testFrameworkOptions = null,
-    ): InfectionRunResult
-    {
+    ): InfectionRunResult {
         $resolvedBinary = $this->resolveBinary($projectRoot, $binary);
 
         if ($resolvedBinary === null) {
             return new InfectionRunResult(
-                exitCode: 2,
-                output: '',
+                exitCode:    2,
+                output:      '',
                 errorOutput: '',
-                diagnostic: new RunDiagnostic(
-                    type: 'mutation-tool-error',
-                    message: sprintf('Infection executable not found: %s', $binary),
-                    path: $binary,
+                diagnostic:  new RunDiagnostic(
+                    type:        'mutation-tool-error',
+                    message:     sprintf('Infection executable not found: %s', $binary),
+                    path:        $binary,
                 ),
             );
         }
 
         $effectiveConfigPath = $configPath ?? $this->defaultConfigPath($projectRoot);
-        $command = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
+        $command             = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
 
         if ($effectiveConfigPath !== null) {
             $command[] = '--configuration';
@@ -61,8 +60,8 @@ final readonly class InfectionRunner
         $process->run();
 
         return new InfectionRunResult(
-            exitCode: $process->getExitCode() ?? 2,
-            output: $process->getOutput(),
+            exitCode:    $process->getExitCode() ?? 2,
+            output:      $process->getOutput(),
             errorOutput: $process->getErrorOutput(),
         );
     }

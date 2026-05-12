@@ -42,24 +42,27 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Magic number assertion',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Magic number assertion',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
-            defaultOptions: ['allowedLiterals' => self::DEFAULT_ALLOWED_LITERALS],
+            confidence:      Confidence::Low,
+            defaultOptions:  ['allowedLiterals' => self::DEFAULT_ALLOWED_LITERALS],
         );
     }
 
     /**
      * Find assertions that compare against unexplained numeric literals.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for magic numbers in assertions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $allowed = $this->loadAllowedLiterals($context);
+        $allowed  = $this->loadAllowedLiterals($context);
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -70,17 +73,17 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
-                    message: sprintf('%s asserts the unexplained literal %d.', $scope->symbol, $number),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Low,
-                    symbol: $scope->symbol,
+                    ruleId:      self::ID,
+                    message:     sprintf('%s asserts the unexplained literal %d.', $scope->symbol, $number),
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::Low,
+                    symbol:      $scope->symbol,
                     remediation: 'Name important constants or derive expected values from arranged data when that improves readability.',
-                    metadata: ['number' => $number],
+                    metadata:    ['number' => $number],
                 );
             }
         }

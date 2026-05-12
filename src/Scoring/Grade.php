@@ -12,7 +12,7 @@ final readonly class Grade
     /**
      * Create a grade from a numeric score and display letter.
      *
-     * @param float $score Rounded numeric score.
+     * @param float  $score  Rounded numeric score.
      * @param string $letter Display letter for the score.
      */
     public function __construct(

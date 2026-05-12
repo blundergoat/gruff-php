@@ -22,6 +22,7 @@ final class PhpUnitConfigDiscovery
     /**
      * Find and parse the first supported PHPUnit config file under a project root.
      *
+     * @param string $projectRoot Project root where PHPUnit config files are searched.
      * @return PhpUnitConfig|null Parsed config when discovery succeeds.
      */
     public function discover(string $projectRoot): ?PhpUnitConfig
@@ -38,7 +39,7 @@ final class PhpUnitConfigDiscovery
             }
 
             $previous = libxml_use_internal_errors(true);
-            $loaded = simplexml_load_file($absolute, SimpleXMLElement::class, LIBXML_NONET);
+            $loaded   = simplexml_load_file($absolute, SimpleXMLElement::class, LIBXML_NONET);
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
 

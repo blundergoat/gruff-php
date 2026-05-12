@@ -32,12 +32,12 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Excessive mocking',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            id:                self::ID,
+            name:              'Excessive mocking',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Medium,
             defaultThresholds: ['maxMocks' => 3],
         );
     }
@@ -45,13 +45,16 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     /**
      * Find tests that create more mocks than the configured threshold.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for heavily mocked tests.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $maxMocks = (int) $context->settingsFor($definition)->numericThreshold('maxMocks');
-        $findings = [];
+        $maxMocks   = (int) $context->settingsFor($definition)->numericThreshold('maxMocks');
+        $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             $mockCount = 0;
@@ -66,17 +69,17 @@ final readonly class ExcessiveMockingRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s creates %d mocks; more than %d usually signals over-specified collaborators.', $scope->symbol, $mockCount, $maxMocks),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s creates %d mocks; more than %d usually signals over-specified collaborators.', $scope->symbol, $mockCount, $maxMocks),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $scope->symbol,
                 remediation: 'Prefer fewer collaborators, a higher-level test, or a purpose-built fake.',
-                metadata: ['mockCount' => $mockCount, 'maxMocks' => $maxMocks],
+                metadata:    ['mockCount' => $mockCount, 'maxMocks' => $maxMocks],
             );
         }
 

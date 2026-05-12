@@ -14,6 +14,7 @@ final readonly class JsonReporter
     /**
      * Render the full analysis report as JSON.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string Pretty-printed analysis JSON document.
      */
     public function render(AnalysisReport $report): string

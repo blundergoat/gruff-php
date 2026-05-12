@@ -34,25 +34,28 @@ final readonly class EmptyClassRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Empty class',
-            pillar: Pillar::DeadCode,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Empty class',
+            pillar:          Pillar::DeadCode,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find concrete classes that declare no members and are not exception markers.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for empty classes.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $classes = $finder->findInstanceOf($unit->statements, Class_::class);
+        $finder     = new NodeFinder();
+        $classes    = $finder->findInstanceOf($unit->statements, Class_::class);
 
         $findings = [];
 
@@ -72,16 +75,16 @@ final readonly class EmptyClassRule implements RuleInterface
             $symbol = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s is an empty class with no members.', $symbol),
-                filePath: $unit->file->displayPath,
-                line: $class->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $class->getEndLine() > 0 ? $class->getEndLine() : null,
-                symbol: $symbol,
+                ruleId:      $definition->id,
+                message:     sprintf('%s is an empty class with no members.', $symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $class->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                endLine:     $class->getEndLine() > 0 ? $class->getEndLine() : null,
+                symbol:      $symbol,
                 remediation: 'Add members or remove the class if it serves no purpose.',
             );
         }

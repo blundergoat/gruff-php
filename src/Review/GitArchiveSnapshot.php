@@ -14,9 +14,9 @@ use Symfony\Component\Process\Process;
 final readonly class GitArchiveSnapshot
 {
     /**
-     * @param string $projectRoot Git working tree root.
-     * @param string $ref Git ref to archive.
-     * @param list<string> $paths Optional path filters to include in the archive.
+     * @param string       $projectRoot Git working tree root.
+     * @param string       $ref         Git ref to archive.
+     * @param list<string> $paths       Optional path filters to include in the archive.
      * @throws DiffException When the ref is unsafe or git/tar cannot produce the snapshot.
      * @throws RuntimeException When the temporary snapshot directory cannot be created.
      *
@@ -24,7 +24,7 @@ final readonly class GitArchiveSnapshot
      */
     public function create(string $projectRoot, string $ref, array $paths = []): string
     {
-        $ref = $this->validatedRef($ref);
+        $ref      = $this->validatedRef($ref);
         $tempRoot = rtrim(sys_get_temp_dir(), '/') . '/gruff-review-' . bin2hex(random_bytes(6));
         if (!mkdir($tempRoot, 0700, true) && !is_dir($tempRoot)) {
             throw new RuntimeException(sprintf('Unable to create review snapshot directory "%s".', $tempRoot));
@@ -34,7 +34,7 @@ final readonly class GitArchiveSnapshot
 
         try {
             $hasPathFilter = $paths !== [];
-            $archivePaths = $hasPathFilter ? $this->existingPathsInRef($projectRoot, $ref, $paths) : [];
+            $archivePaths  = $hasPathFilter ? $this->existingPathsInRef($projectRoot, $ref, $paths) : [];
 
             if ($hasPathFilter && $archivePaths === []) {
                 return $tempRoot;
@@ -153,7 +153,7 @@ final readonly class GitArchiveSnapshot
      */
     private function normaliseArchivePaths(string $projectRoot, array $paths): array
     {
-        $root = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
+        $root       = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
         $normalised = [];
 
         foreach ($paths as $path) {
@@ -176,7 +176,7 @@ final readonly class GitArchiveSnapshot
                 $candidate = substr($candidate, 2);
             }
 
-            $candidate = rtrim($candidate, '/');
+            $candidate                                        = rtrim($candidate, '/');
             $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
         }
 

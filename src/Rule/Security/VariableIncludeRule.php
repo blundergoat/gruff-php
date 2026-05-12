@@ -34,23 +34,26 @@ final class VariableIncludeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Variable include or require path',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Variable include or require path',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find include and require expressions using dynamic paths.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for variable include paths.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\Include_::class) as $include) {
@@ -59,14 +62,14 @@ final class VariableIncludeRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Variable include/require path detected.',
-                filePath: $unit->file->displayPath,
-                line: $include->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
+                ruleId:      self::ID,
+                message:     'Variable include/require path detected.',
+                filePath:    $unit->file->displayPath,
+                line:        $include->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
                 remediation: 'Use fixed include paths or map request values through an allow-list before loading files.',
             );
         }

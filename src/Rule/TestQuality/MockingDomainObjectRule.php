@@ -37,19 +37,22 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Mocking a domain object',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Mocking a domain object',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
-            defaultEnabled: false,
-            defaultOptions: ['domainNamespaces' => []],
+            confidence:      Confidence::Low,
+            defaultEnabled:  false,
+            defaultOptions:  ['domainNamespaces' => []],
         );
     }
 
     /**
      * Find mock creations for classes that match configured domain-object patterns.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mocked domain objects.
      */
@@ -60,8 +63,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
-        $useMap = $this->collectUseMap($unit, $finder);
+        $finder   = new NodeFinder();
+        $useMap   = $this->collectUseMap($unit, $finder);
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
@@ -76,29 +79,29 @@ final readonly class MockingDomainObjectRule implements RuleInterface
                 }
 
                 $resolved = $this->resolveClassName($className, $useMap);
-                $matched = $this->matchesAnyPattern($resolved, $patterns);
+                $matched  = $this->matchesAnyPattern($resolved, $patterns);
 
                 if ($matched === null) {
                     continue;
                 }
 
                 $findings[] = new Finding(
-                    ruleId: self::ID,
+                    ruleId:  self::ID,
                     message: sprintf(
                         '%s mocks %s, which matches the configured domain-object pattern "%s".',
                         $scope->symbol,
                         $resolved,
                         $matched,
                     ),
-                    filePath: $unit->file->displayPath,
-                    line: $call->getStartLine(),
-                    severity: Severity::Advisory,
-                    pillar: Pillar::TestQuality,
-                    tier: RuleTier::V01,
-                    confidence: Confidence::Low,
-                    symbol: $scope->symbol,
+                    filePath:    $unit->file->displayPath,
+                    line:        $call->getStartLine(),
+                    severity:    Severity::Advisory,
+                    pillar:      Pillar::TestQuality,
+                    tier:        RuleTier::V01,
+                    confidence:  Confidence::Low,
+                    symbol:      $scope->symbol,
                     remediation: 'Domain objects usually carry behaviour worth exercising directly. Construct the real instance, or move the boundary so this collaborator becomes a service interface that is safe to mock.',
-                    metadata: ['class' => $resolved, 'pattern' => $matched],
+                    metadata:    ['class' => $resolved, 'pattern' => $matched],
                 );
             }
         }
@@ -115,7 +118,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Use_::class) as $use) {
             foreach ($use->uses as $useUse) {
-                $alias = $useUse->getAlias()->toString();
+                $alias       = $useUse->getAlias()->toString();
                 $map[$alias] = $useUse->name->toString();
             }
         }
@@ -123,7 +126,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
         foreach ($finder->findInstanceOf($unit->statements, Stmt\GroupUse::class) as $group) {
             $prefix = $group->prefix->toString();
             foreach ($group->uses as $useUse) {
-                $alias = $useUse->getAlias()->toString();
+                $alias       = $useUse->getAlias()->toString();
                 $map[$alias] = $prefix . '\\' . $useUse->name->toString();
             }
         }

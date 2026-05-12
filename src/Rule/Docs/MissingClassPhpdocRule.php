@@ -39,25 +39,28 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Missing class PHPDoc',
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Missing class PHPDoc',
+            pillar:          Pillar::Documentation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find class-like declarations that do not have a PHPDoc block.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for undocumented class-like declarations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder     = new NodeFinder();
+        $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $node) {
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
@@ -76,17 +79,17 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
             $name = $node->name->toString();
 
             $findings[] = new Finding(
-                ruleId: $definition->id,
-                message: sprintf('%s %s has no PHPDoc.', ucfirst($kind), $name),
-                filePath: $unit->file->displayPath,
-                line: $node->getStartLine(),
-                severity: $definition->defaultSeverity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                symbol: $name,
+                ruleId:      $definition->id,
+                message:     sprintf('%s %s has no PHPDoc.', ucfirst($kind), $name),
+                filePath:    $unit->file->displayPath,
+                line:        $node->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $name,
                 remediation: 'Add a docblock describing the type\'s purpose.',
-                metadata: [
+                metadata:    [
                     'classKind' => $kind,
                     'name' => $name,
                 ],

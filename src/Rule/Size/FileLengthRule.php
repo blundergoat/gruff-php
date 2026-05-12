@@ -32,12 +32,12 @@ final readonly class FileLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'File length',
-            pillar: Pillar::Size,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            id:                self::ID,
+            name:              'File length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Warning,
+            confidence:        Confidence::High,
             defaultThresholds: [
                 'warning' => 400,
                 'error' => 800,
@@ -48,13 +48,16 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Find files whose line count exceeds configured thresholds.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for oversized files.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
-        $settings = $context->settingsFor($definition);
-        $lineCount = $unit->lineCount();
+        $definition     = $this->definition();
+        $settings       = $context->settingsFor($definition);
+        $lineCount      = $unit->lineCount();
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
         if ($thresholdMatch === null) {
@@ -63,23 +66,23 @@ final readonly class FileLengthRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: $definition->id,
+                ruleId:  $definition->id,
                 message: sprintf(
                     'File has %d lines, above the %s threshold of %s.',
                     $lineCount,
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath: $unit->file->displayPath,
-                line: 1,
-                severity: $thresholdMatch->severity,
-                pillar: $definition->pillar,
-                tier: $definition->tier,
-                confidence: $definition->confidence,
-                endLine: $lineCount,
-                remediation: 'Split oversized files or move responsibilities into smaller units.',
+                filePath:         $unit->file->displayPath,
+                line:             1,
+                severity:         $thresholdMatch->severity,
+                pillar:           $definition->pillar,
+                tier:             $definition->tier,
+                confidence:       $definition->confidence,
+                endLine:          $lineCount,
+                remediation:      'Split oversized files or move responsibilities into smaller units.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata: [
+                metadata:         [
                     'lines' => $lineCount,
                     'threshold' => $thresholdMatch->threshold,
                     'thresholdType' => $thresholdMatch->severity->value,

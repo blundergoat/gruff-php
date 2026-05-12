@@ -34,23 +34,26 @@ final class SilentCatchRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Silent catch block',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Silent catch block',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find catch blocks that only contain no-op statements.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for swallowed exceptions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Catch_::class) as $catch) {
@@ -59,14 +62,14 @@ final class SilentCatchRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: 'Catch block swallows exceptions without handling or reporting them.',
-                filePath: $unit->file->displayPath,
-                line: $catch->getStartLine(),
-                severity: Severity::Warning,
-                pillar: Pillar::Security,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
+                ruleId:      self::ID,
+                message:     'Catch block swallows exceptions without handling or reporting them.',
+                filePath:    $unit->file->displayPath,
+                line:        $catch->getStartLine(),
+                severity:    Severity::Warning,
+                pillar:      Pillar::Security,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
                 remediation: 'Log, rethrow, convert, or otherwise handle caught exceptions explicitly.',
             );
         }

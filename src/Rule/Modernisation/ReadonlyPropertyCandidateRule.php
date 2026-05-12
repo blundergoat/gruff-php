@@ -35,17 +35,20 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Readonly property candidate',
-            pillar: Pillar::Modernisation,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Readonly property candidate',
+            pillar:          Pillar::Modernisation,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find constructor-assigned properties that could be readonly.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for readonly property candidates.
      */
@@ -55,7 +58,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
@@ -68,7 +71,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             }
 
             $constructorAssignments = $this->constructorAssignments($class);
-            $lateAssignments = $this->lateAssignments($class);
+            $lateAssignments        = $this->lateAssignments($class);
 
             foreach ($class->getProperties() as $property) {
                 if ($property->isStatic() || $property->isReadonly() || $property->type === null) {
@@ -82,16 +85,16 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
                     }
 
                     $findings[] = new Finding(
-                        ruleId: self::ID,
-                        message: sprintf('Property $%s is only assigned in a final class constructor and may be a readonly candidate.', $name),
-                        filePath: $unit->file->displayPath,
-                        line: $propertyProperty->getStartLine(),
-                        severity: Severity::Advisory,
-                        pillar: Pillar::Modernisation,
-                        tier: RuleTier::V01,
-                        confidence: Confidence::Medium,
+                        ruleId:      self::ID,
+                        message:     sprintf('Property $%s is only assigned in a final class constructor and may be a readonly candidate.', $name),
+                        filePath:    $unit->file->displayPath,
+                        line:        $propertyProperty->getStartLine(),
+                        severity:    Severity::Advisory,
+                        pillar:      Pillar::Modernisation,
+                        tier:        RuleTier::V01,
+                        confidence:  Confidence::Medium,
                         remediation: 'Consider readonly only after confirming no reflection, hydration, or late assignment contract depends on mutability; gruff-php reports only.',
-                        metadata: [
+                        metadata:    [
                             'property' => $name,
                             'requiresPhp' => 8.1,
                         ],
@@ -138,7 +141,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     private function lateAssignments(Stmt\Class_ $class): array
     {
         $assignments = [];
-        $finder = new NodeFinder();
+        $finder      = new NodeFinder();
 
         foreach ($class->getMethods() as $method) {
             if (strtolower($method->name->toString()) === '__construct') {

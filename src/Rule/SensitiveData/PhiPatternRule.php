@@ -45,17 +45,20 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PHI identifier pattern',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PHI identifier pattern',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find health identifier patterns when nearby text gives PHI context.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for contextual PHI-like identifiers.
      */
@@ -68,20 +71,20 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
 
             foreach ($matches[0] as $match) {
                 [$value, $offset] = $match;
-                $line = $this->lineText($unit->source, SecretScannerHelper::lineNumberForOffset($unit->source, $offset));
+                $line             = $this->lineText($unit->source, SecretScannerHelper::lineNumberForOffset($unit->source, $offset));
                 if (!$this->hasPhiContext($line, $definition['name'])) {
                     continue;
                 }
 
-                $preview = SecretScannerHelper::redactedPreview($value);
+                $preview    = SecretScannerHelper::redactedPreview($value);
                 $findings[] = SecretScannerHelper::finding(
-                    unit: $unit,
-                    ruleId: self::ID,
-                    message: sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
-                    line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                    confidence: Confidence::Medium,
-                    detector: $definition['name'],
-                    preview: $preview,
+                    unit:        $unit,
+                    ruleId:      self::ID,
+                    message:     sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
+                    line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                    confidence:  Confidence::Medium,
+                    detector:    $definition['name'],
+                    preview:     $preview,
                     remediation: 'Use synthetic health identifiers in fixtures and keep real PHI out of source.',
                 );
             }

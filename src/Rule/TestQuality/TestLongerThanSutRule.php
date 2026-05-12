@@ -32,12 +32,12 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test longer than apparent SUT',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
+            id:                self::ID,
+            name:              'Test longer than apparent SUT',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Low,
             defaultThresholds: ['minTestLines' => 12],
         );
     }
@@ -45,13 +45,16 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Find long tests that appear to exercise only one SUT call.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for tests with disproportionate setup/assertion size.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
+        $definition   = $this->definition();
         $minTestLines = (int) $context->settingsFor($definition)->numericThreshold('minTestLines');
-        $findings = [];
+        $findings     = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             $sutCalls = $this->sutCallCount($scope);
@@ -60,17 +63,17 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, $sutCalls),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Low,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, $sutCalls),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Low,
+                symbol:      $scope->symbol,
                 remediation: 'Review whether setup and assertions can be simplified or split; this static rule cannot measure the SUT directly.',
-                metadata: ['testLines' => $scope->lineCount(), 'sutCalls' => $sutCalls],
+                metadata:    ['testLines' => $scope->lineCount(), 'sutCalls' => $sutCalls],
             );
         }
 

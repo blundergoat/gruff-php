@@ -31,17 +31,20 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'JWT token literal',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'JWT token literal',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find string literals that resemble embedded JWT tokens.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for JWT-like literals.
      */
@@ -56,15 +59,15 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $preview = SecretScannerHelper::redactedPreview($value);
+            $preview    = SecretScannerHelper::redactedPreview($value);
             $findings[] = SecretScannerHelper::finding(
-                unit: $unit,
-                ruleId: self::ID,
-                message: sprintf('JWT-like token literal detected: %s.', $preview),
-                line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                confidence: Confidence::Medium,
-                detector: 'jwt-token',
-                preview: $preview,
+                unit:        $unit,
+                ruleId:      self::ID,
+                message:     sprintf('JWT-like token literal detected: %s.', $preview),
+                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                confidence:  Confidence::Medium,
+                detector:    'jwt-token',
+                preview:     $preview,
                 remediation: 'Move tokens out of source fixtures/config and generate them at runtime.',
             );
         }

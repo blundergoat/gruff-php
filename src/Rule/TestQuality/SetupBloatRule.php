@@ -34,12 +34,12 @@ final readonly class SetupBloatRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Setup bloat',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            id:                self::ID,
+            name:              'Setup bloat',
+            pillar:            Pillar::TestQuality,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Advisory,
+            confidence:        Confidence::Medium,
             defaultThresholds: ['minSetupLines' => 8],
         );
     }
@@ -47,17 +47,20 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Find setup methods that exceed the configured size threshold.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for oversized setup methods.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition = $this->definition();
+        $definition    = $this->definition();
         $minSetupLines = (int) $context->settingsFor($definition)->numericThreshold('minSetupLines');
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder        = new NodeFinder();
+        $findings      = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
-            $setup = null;
+            $setup          = null;
             $testLineCounts = [];
 
             foreach ($class->getMethods() as $method) {
@@ -75,25 +78,25 @@ final readonly class SetupBloatRule implements RuleInterface
                 continue;
             }
 
-            $setupLines = max(1, $setup->getEndLine() - $setup->getStartLine() + 1);
+            $setupLines       = max(1, $setup->getEndLine() - $setup->getStartLine() + 1);
             $averageTestLines = array_sum($testLineCounts) / count($testLineCounts);
             if ($setupLines < $minSetupLines || $setupLines <= $averageTestLines) {
                 continue;
             }
 
-            $className = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
+            $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s::setUp() is longer than the average test method.', $className),
-                filePath: $unit->file->displayPath,
-                line: $setup->getStartLine(),
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $className . '::setUp()',
+                ruleId:      self::ID,
+                message:     sprintf('%s::setUp() is longer than the average test method.', $className),
+                filePath:    $unit->file->displayPath,
+                line:        $setup->getStartLine(),
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $className . '::setUp()',
                 remediation: 'Inline scenario-specific setup or extract named builders when shared setup hides test intent.',
-                metadata: ['setupLines' => $setupLines, 'averageTestLines' => round($averageTestLines, 2)],
+                metadata:    ['setupLines' => $setupLines, 'averageTestLines' => round($averageTestLines, 2)],
             );
         }
 

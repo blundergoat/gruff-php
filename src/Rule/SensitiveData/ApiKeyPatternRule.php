@@ -45,17 +45,20 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Common API key pattern',
-            pillar: Pillar::SensitiveData,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Common API key pattern',
+            pillar:          Pillar::SensitiveData,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find string literals that resemble hardcoded API keys.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for API key-like literals.
      */
@@ -72,15 +75,15 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $preview = SecretScannerHelper::redactedPreview($value);
+                $preview    = SecretScannerHelper::redactedPreview($value);
                 $findings[] = SecretScannerHelper::finding(
-                    unit: $unit,
-                    ruleId: self::ID,
-                    message: sprintf('Potential %s API key detected: %s.', $definition['name'], $preview),
-                    line: SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
-                    confidence: Confidence::High,
-                    detector: $definition['name'],
-                    preview: $preview,
+                    unit:        $unit,
+                    ruleId:      self::ID,
+                    message:     sprintf('Potential %s API key detected: %s.', $definition['name'], $preview),
+                    line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                    confidence:  Confidence::High,
+                    detector:    $definition['name'],
+                    preview:     $preview,
                     remediation: 'Remove committed API keys and rotate the credential if it was real.',
                 );
             }

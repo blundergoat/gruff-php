@@ -53,24 +53,27 @@ final class DangerousFunctionCallRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Dangerous function calls',
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Dangerous function calls',
+            pillar:          Pillar::Security,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find dynamic execution, eval, assert-string, and dangerous shell calls.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for dangerous execution patterns.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
-        $findings = [];
+        $finder             = new NodeFinder();
+        $findings           = [];
         $callableParameters = $this->callableParameterNames($unit->statements, $finder);
         $callableProperties = $this->callablePropertyNames($unit->statements, $finder);
 
@@ -107,7 +110,7 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     private function callableParameterNames(array $statements, NodeFinder $finder): array
     {
-        $names = [];
+        $names     = [];
         $functions = $finder->find($statements, static fn (Node $node): bool => $node instanceof Function_ || $node instanceof ClassMethod);
 
         foreach ($functions as $function) {
@@ -220,16 +223,16 @@ final class DangerousFunctionCallRule implements RuleInterface
     private function finding(AnalysisUnit $unit, Node $node, string $function): Finding
     {
         return new Finding(
-            ruleId: self::ID,
-            message: sprintf('Dangerous PHP execution pattern detected: %s.', $function),
-            filePath: $unit->file->displayPath,
-            line: $node->getStartLine(),
-            severity: Severity::Warning,
-            pillar: Pillar::Security,
-            tier: RuleTier::V01,
-            confidence: Confidence::Medium,
+            ruleId:      self::ID,
+            message:     sprintf('Dangerous PHP execution pattern detected: %s.', $function),
+            filePath:    $unit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    Severity::Warning,
+            pillar:      Pillar::Security,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
             remediation: 'Replace direct execution with a constrained wrapper, strict allow-lists, or a non-shell API.',
-            metadata: [
+            metadata:    [
                 'function' => $function,
             ],
         );

@@ -43,27 +43,27 @@ final readonly class HungarianNotationRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Hungarian notation',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Hungarian notation',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find local variables that use type-prefix naming.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect.
-     * @param RuleContext $context Rule context for this analysis pass.
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      * @return list<Finding> Findings for Hungarian notation variables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder = new NodeFinder();
-        $functions = $finder->find($unit->statements, static function (Node $node): bool {
+        $finder     = new NodeFinder();
+        $functions  = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
@@ -72,7 +72,7 @@ final readonly class HungarianNotationRule implements RuleInterface
 
         foreach ($functions as $fn) {
             /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
-            $vars = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
+            $vars   = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
             $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
 
             foreach ($vars as $var) {
@@ -81,7 +81,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                     continue;
                 }
 
-                $name = $var->name;
+                $name   = $var->name;
                 $prefix = $this->detectPrefix($name);
 
                 if ($prefix === null) {
@@ -97,17 +97,17 @@ final readonly class HungarianNotationRule implements RuleInterface
                 $reported[$key] = true;
 
                 $findings[] = new Finding(
-                    ruleId: $definition->id,
-                    message: sprintf('Variable $%s in %s uses Hungarian notation prefix "%s".', $name, $symbol, $prefix),
-                    filePath: $unit->file->displayPath,
-                    line: $var->getStartLine(),
-                    severity: $definition->defaultSeverity,
-                    pillar: $definition->pillar,
-                    tier: $definition->tier,
-                    confidence: $definition->confidence,
-                    symbol: $symbol,
+                    ruleId:      $definition->id,
+                    message:     sprintf('Variable $%s in %s uses Hungarian notation prefix "%s".', $name, $symbol, $prefix),
+                    filePath:    $unit->file->displayPath,
+                    line:        $var->getStartLine(),
+                    severity:    $definition->defaultSeverity,
+                    pillar:      $definition->pillar,
+                    tier:        $definition->tier,
+                    confidence:  $definition->confidence,
+                    symbol:      $symbol,
                     remediation: sprintf('Remove the type prefix. Use $%s instead.', lcfirst(substr($name, strlen($prefix)))),
-                    metadata: ['variable' => $name, 'prefix' => $prefix],
+                    metadata:    ['variable' => $name, 'prefix' => $prefix],
                 );
             }
         }

@@ -32,17 +32,20 @@ final readonly class MockOnlyTestRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Mock-only test',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Mock-only test',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::Medium,
+            confidence:      Confidence::Medium,
         );
     }
 
     /**
      * Find tests that exercise only mocks without a concrete subject.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mock-only tests.
      */
@@ -51,11 +54,11 @@ final readonly class MockOnlyTestRule implements RuleInterface
         $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $hasMock = false;
+            $hasMock         = false;
             $hasVerification = false;
 
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
-                $hasMock = $hasMock || TestQualityNodeHelper::isMockCreationCall($call);
+                $hasMock         = $hasMock || TestQualityNodeHelper::isMockCreationCall($call);
                 $hasVerification = $hasVerification || TestQualityNodeHelper::isMockVerificationCall($call);
             }
 
@@ -64,15 +67,15 @@ final readonly class MockOnlyTestRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Warning,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::Medium,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Warning,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::Medium,
+                symbol:      $scope->symbol,
                 remediation: 'Assert the externally visible effect of the behavior, not only collaborator choreography.',
             );
         }

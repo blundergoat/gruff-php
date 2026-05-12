@@ -33,17 +33,20 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Data provider annotation',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Data provider annotation',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find legacy data provider annotations in PHPUnit tests.
+     *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for data provider annotation usage.
      */
@@ -62,15 +65,15 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
-                message: sprintf('%s uses @dataProvider instead of the PHPUnit attribute form.', $scope->symbol),
-                filePath: $unit->file->displayPath,
-                line: $scope->line,
-                severity: Severity::Advisory,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $scope->symbol,
+                ruleId:      self::ID,
+                message:     sprintf('%s uses @dataProvider instead of the PHPUnit attribute form.', $scope->symbol),
+                filePath:    $unit->file->displayPath,
+                line:        $scope->line,
+                severity:    Severity::Advisory,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $scope->symbol,
                 remediation: 'Prefer #[DataProvider] for PHPUnit 10+ codebases when the project supports attributes.',
             );
         }

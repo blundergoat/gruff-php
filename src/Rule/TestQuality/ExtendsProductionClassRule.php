@@ -34,23 +34,26 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Test extends production class',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Test extends production class',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find test classes that inherit directly from production classes.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for tests extending production types.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
@@ -63,7 +66,7 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
                 continue;
             }
 
-            $parent = $class->extends;
+            $parent      = $class->extends;
             $parentShort = strtolower($parent->getLast());
 
             if (str_ends_with($parentShort, 'testcase')) {
@@ -71,21 +74,21 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s extends %s, which is not a recognised test base class.',
                     $className,
                     $parent->toString(),
                 ),
-                filePath: $unit->file->displayPath,
-                line: $class->getStartLine(),
-                severity: Severity::Error,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $className,
+                filePath:    $unit->file->displayPath,
+                line:        $class->getStartLine(),
+                severity:    Severity::Error,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $className,
                 remediation: 'Test classes should extend a *TestCase base. If you need to reach private members, compose the production class as a collaborator and exercise it through its public surface.',
-                metadata: ['parent' => $parent->toString()],
+                metadata:    ['parent' => $parent->toString()],
             );
         }
 

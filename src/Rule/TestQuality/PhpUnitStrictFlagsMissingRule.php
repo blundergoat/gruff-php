@@ -63,20 +63,20 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'PHPUnit strict flags missing',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'PHPUnit strict flags missing',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Warning,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Report a project once when PHPUnit strict-mode attributes are missing.
      *
-     * @param AnalysisUnit $unit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext $context Rule context carrying project root.
+     * @param AnalysisUnit $unit    Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $context Rule context carrying project root.
      * @return list<Finding> Findings for missing strict PHPUnit flags.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -105,21 +105,21 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
 
         return [
             new Finding(
-                ruleId: self::ID,
+                ruleId:  self::ID,
                 message: sprintf(
                     '%s is missing strict-mode attribute(s): %s.',
                     $config->displayPath,
                     implode(', ', $missing),
                 ),
-                filePath: $config->displayPath,
-                line: 1,
-                severity: Severity::Warning,
-                pillar: Pillar::TestQuality,
-                tier: RuleTier::V01,
-                confidence: Confidence::High,
-                symbol: $config->displayPath,
+                filePath:    $config->displayPath,
+                line:        1,
+                severity:    Severity::Warning,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      $config->displayPath,
                 remediation: 'Add the missing attributes to the <phpunit> root so risky, warning, no-assertion, output, and global-state test smells fail the build.',
-                metadata: ['missing' => $missing],
+                metadata:    ['missing' => $missing],
             ),
         ];
     }
@@ -130,7 +130,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     private function missingFlags(PhpUnitConfig $config): array
     {
         $attributes = $config->root->attributes();
-        $missing = [];
+        $missing    = [];
 
         foreach (self::STRICT_FLAGS as $flag) {
             $value = $attributes !== null ? $attributes->{$flag} : null;

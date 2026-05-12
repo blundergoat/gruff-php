@@ -38,23 +38,26 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Empty data provider',
-            pillar: Pillar::TestQuality,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Empty data provider',
+            pillar:          Pillar::TestQuality,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Error,
-            confidence: Confidence::High,
+            confidence:      Confidence::High,
         );
     }
 
     /**
      * Find tests linked to data providers that cannot yield any rows.
      *
+     * @param AnalysisUnit $unit    Parsed unit to inspect.
+     * @param RuleContext  $context Rule context for this analysis pass.
+     *
      * @return list<Finding> Findings for empty data providers.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $finder = new NodeFinder();
+        $finder   = new NodeFinder();
         $findings = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
@@ -84,22 +87,22 @@ final readonly class EmptyDataProviderRule implements RuleInterface
                     }
 
                     $findings[] = new Finding(
-                        ruleId: self::ID,
+                        ruleId:  self::ID,
                         message: sprintf(
                             '%s::%s() uses data provider %s() that yields no rows.',
                             $className,
                             $testMethod->name->toString(),
                             $providerName,
                         ),
-                        filePath: $unit->file->displayPath,
-                        line: $testMethod->getStartLine(),
-                        severity: Severity::Error,
-                        pillar: Pillar::TestQuality,
-                        tier: RuleTier::V01,
-                        confidence: Confidence::High,
-                        symbol: sprintf('%s::%s()', $className, $testMethod->name->toString()),
+                        filePath:    $unit->file->displayPath,
+                        line:        $testMethod->getStartLine(),
+                        severity:    Severity::Error,
+                        pillar:      Pillar::TestQuality,
+                        tier:        RuleTier::V01,
+                        confidence:  Confidence::High,
+                        symbol:      sprintf('%s::%s()', $className, $testMethod->name->toString()),
                         remediation: 'Add at least one data row to the provider, or remove the unused #[DataProvider] / @dataProvider link.',
-                        metadata: ['provider' => $providerName],
+                        metadata:    ['provider' => $providerName],
                     );
                 }
             }
