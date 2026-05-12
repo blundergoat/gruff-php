@@ -20,6 +20,11 @@ final class HeaderInjectionRule implements RuleInterface
 {
     public const ID = 'security.header-injection';
 
+    /**
+     * Describe the header injection security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final class HeaderInjectionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find header calls that may receive unsanitized user input.
+     *
+     * @return list<Finding> Findings for possible header injection.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

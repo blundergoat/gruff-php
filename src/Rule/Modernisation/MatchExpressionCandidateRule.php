@@ -20,6 +20,11 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
 {
     public const ID = 'modernisation.match-expression-candidate';
 
+    /**
+     * Describe the match-expression candidate rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
         );
     }
 
+    /**
+     * Find switch statements whose direct-return branches may become match expressions.
+     *
+     * @return list<Finding> Findings for PHP 8 match-expression candidates.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
@@ -66,6 +76,11 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether every switch case consists of exactly one return statement.
+     *
+     * @return bool True when all cases return directly.
+     */
     private function allCasesReturnDirectly(Stmt\Switch_ $switch): bool
     {
         foreach ($switch->cases as $case) {

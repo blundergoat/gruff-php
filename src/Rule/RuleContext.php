@@ -9,12 +9,20 @@ use GruffPhp\Config\RuleSettings;
 
 final readonly class RuleContext
 {
+    /**
+     * Capture project-level context and effective rule configuration.
+     */
     public function __construct(
         public string $projectRoot,
         public AnalysisConfig $config,
     ) {
     }
 
+    /**
+     * Look up effective settings for a rule definition.
+     *
+     * @return RuleSettings Enabled flag, thresholds, and options for the rule.
+     */
     public function settingsFor(RuleDefinition $definition): RuleSettings
     {
         return $this->config->ruleSettings($definition->id);

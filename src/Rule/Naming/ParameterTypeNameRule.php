@@ -48,6 +48,11 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         'void',
     ];
 
+    /**
+     * Describe the parameter type name rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -65,6 +70,11 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class-typed parameters whose names do not match their type names.
+     *
+     * @return list<Finding> Findings for mismatched parameter/type names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -127,6 +137,11 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Extract a short type name from nullable, named, identifier, or simple union types.
+     *
+     * @return string|null Short type name, or null when the type is unsupported.
+     */
     private function shortTypeName(?Node $type): ?string
     {
         if ($type instanceof NullableType) {
@@ -166,6 +181,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
     /**
      * @param list<string> $typeSuffixesToTrim
+     *
+     * @return string|null Expected lower-camel parameter name, or null for builtin types.
      */
     private function expectedParameterName(string $typeName, IdentifierTokenizer $tokenizer, array $typeSuffixesToTrim): ?string
     {

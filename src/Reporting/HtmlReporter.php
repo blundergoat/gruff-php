@@ -107,6 +107,7 @@ final readonly class HtmlReporter
 
     /**
      * @param array{advisory: int, warning: int, error: int, total: int} $counts
+     * @return string HTML verdict section.
      */
     private function verdict(string $grade, string $numericScore, array $counts, AnalysisReport $report): string
     {
@@ -348,6 +349,7 @@ final readonly class HtmlReporter
 
     /**
      * @param array{advisory: int, warning: int, error: int, total: int} $counts
+     * @return string Human-readable verdict summary sentence.
      */
     private function verdictSummary(AnalysisReport $report, array $counts): string
     {
@@ -377,6 +379,7 @@ final readonly class HtmlReporter
 
     /**
      * @param array<string, int> $distribution
+     * @return string Human-readable cyclomatic complexity summary.
      */
     private function cyclomaticSummary(array $distribution): string
     {

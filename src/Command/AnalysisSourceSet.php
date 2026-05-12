@@ -21,6 +21,11 @@ final readonly class AnalysisSourceSet
     ) {
     }
 
+    /**
+     * Count successfully parsed analysis units in the loaded source set.
+     *
+     * @return int Number of units without parse diagnostics.
+     */
     public function parsedFileCount(): int
     {
         return count(array_filter(

@@ -20,6 +20,11 @@ final readonly class EmptyClassRule implements RuleInterface
 {
     public const ID = 'waste.empty-class';
 
+    /**
+     * Describe the empty class rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class EmptyClassRule implements RuleInterface
         );
     }
 
+    /**
+     * Find concrete classes that declare no members and are not exception markers.
+     *
+     * @return list<Finding> Findings for empty classes.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -73,6 +83,11 @@ final readonly class EmptyClassRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Allow empty classes that exist as exception marker types.
+     *
+     * @return bool True when the class extends an exception/throwable type.
+     */
     private function isEmptyExceptionMarker(Class_ $class): bool
     {
         if ($class->extends === null) {

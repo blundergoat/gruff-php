@@ -20,6 +20,11 @@ final readonly class ContinueCommentRule implements RuleInterface
 {
     public const ID = 'docs.continue-comment';
 
+    /**
+     * Describe the continue-comment documentation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class ContinueCommentRule implements RuleInterface
         );
     }
 
+    /**
+     * Find continue statements without a direct explanatory comment.
+     *
+     * @return list<Finding> Findings for undocumented continue statements.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

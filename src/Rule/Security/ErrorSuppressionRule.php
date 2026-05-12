@@ -20,6 +20,11 @@ final class ErrorSuppressionRule implements RuleInterface
 {
     public const ID = 'security.error-suppression';
 
+    /**
+     * Describe the error suppression security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final class ErrorSuppressionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find uses of PHP error suppression that can hide failures.
+     *
+     * @return list<Finding> Findings for suppressed expressions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

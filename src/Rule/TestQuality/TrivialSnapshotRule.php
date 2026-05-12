@@ -18,6 +18,11 @@ final readonly class TrivialSnapshotRule implements RuleInterface
 {
     public const ID = 'test-quality.trivial-snapshot';
 
+    /**
+     * Describe the trivial snapshot rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class TrivialSnapshotRule implements RuleInterface
         );
     }
 
+    /**
+     * Find snapshot assertions that lack supporting behavioral assertions.
+     *
+     * @return list<Finding> Findings for trivial snapshot tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

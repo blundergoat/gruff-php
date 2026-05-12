@@ -24,6 +24,11 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 {
     public const ID = 'docs.missing-throws-tag';
 
+    /**
+     * Describe the missing @throws tag rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class MissingThrowsTagRule implements RuleInterface
         );
     }
 
+    /**
+     * Find documented public functions that throw without an @throws tag.
+     *
+     * @return list<Finding> Findings for missing @throws documentation.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

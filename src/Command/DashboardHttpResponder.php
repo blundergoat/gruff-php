@@ -8,6 +8,7 @@ final class DashboardHttpResponder
 {
     /**
      * @param resource $client
+     * @return void
      */
     public function write($client, DashboardHttpResponse $response, bool $headOnly): void
     {

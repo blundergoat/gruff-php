@@ -21,6 +21,11 @@ final readonly class UnusedMockRule implements RuleInterface
 {
     public const ID = 'test-quality.unused-mock';
 
+    /**
+     * Describe the unused mock rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class UnusedMockRule implements RuleInterface
         );
     }
 
+    /**
+     * Find mock variables that are assigned but never read.
+     *
+     * @return list<Finding> Findings for unused mock assignments.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -154,6 +164,11 @@ final readonly class UnusedMockRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect whether an expression contains a recognised mock creation call.
+     *
+     * @return bool True when the expression creates a mock.
+     */
     private function isMockCreationExpression(Expr $expr): bool
     {
         $finder = new NodeFinder();

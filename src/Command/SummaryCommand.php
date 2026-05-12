@@ -27,6 +27,11 @@ final class SummaryCommand extends Command
 
     private const DEFAULT_TOP = 10;
 
+    /**
+     * Register summary CLI arguments, options, and command metadata.
+     *
+     * @return void
+     */
     protected function configure(): void
     {
         $this
@@ -40,6 +45,11 @@ final class SummaryCommand extends Command
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.');
     }
 
+    /**
+     * Run analysis once and render a compact project summary.
+     *
+     * @return int Symfony command exit code.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = getcwd();
@@ -216,6 +226,7 @@ final class SummaryCommand extends Command
 
     /**
      * @param list<\GruffPhp\Analysis\RunDiagnostic> $diagnostics
+     * @return int Number of parse-error diagnostics in the source set.
      */
     private function parseErrorCount(array $diagnostics): int
     {
@@ -234,6 +245,7 @@ final class SummaryCommand extends Command
      * @param array{advisory: int, warning: int, error: int, total: int} $totals
      * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
      * @param list<\GruffPhp\Scoring\FileScore> $topOffenders
+     * @return string Human-readable summary report.
      */
     private function renderText(
         array $paths,
@@ -334,6 +346,7 @@ final class SummaryCommand extends Command
      * @param array{advisory: int, warning: int, error: int, total: int} $totals
      * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
      * @param list<\GruffPhp\Scoring\FileScore> $topOffenders
+     * @return string JSON-encoded summary report.
      * @throws JsonException
      */
     private function renderJson(
@@ -374,6 +387,7 @@ final class SummaryCommand extends Command
 
     /**
      * @param list<string> $values
+     * @return int Width needed for aligned summary columns.
      */
     private function columnWidth(array $values, int $minimum): int
     {

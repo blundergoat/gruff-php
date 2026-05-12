@@ -8,6 +8,9 @@ use GruffPhp\Config\ConfigLoader;
 
 final readonly class DashboardScanCommandBuilder
 {
+    /**
+     * Build dashboard-triggered analyse commands for the given gruff binary.
+     */
     public function __construct(private string $gruffBinary)
     {
     }

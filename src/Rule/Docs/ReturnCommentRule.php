@@ -20,6 +20,11 @@ final readonly class ReturnCommentRule implements RuleInterface
 {
     public const ID = 'docs.return-comment';
 
+    /**
+     * Describe the return-comment documentation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class ReturnCommentRule implements RuleInterface
         );
     }
 
+    /**
+     * Find return statements without a direct explanatory comment.
+     *
+     * @return list<Finding> Findings for undocumented return statements.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

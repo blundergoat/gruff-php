@@ -147,6 +147,11 @@ final class RuleRegistry
         $this->rules = $indexedRules;
     }
 
+    /**
+     * Build the default registry containing every built-in rule.
+     *
+     * @return self Registry indexed by rule id.
+     */
     public static function defaults(): self
     {
         return new self([
@@ -273,11 +278,21 @@ final class RuleRegistry
         return array_values($this->rules);
     }
 
+    /**
+     * Check whether a rule id is registered.
+     *
+     * @return bool True when the rule exists in the registry.
+     */
     public function has(string $ruleId): bool
     {
         return isset($this->rules[$ruleId]);
     }
 
+    /**
+     * Return a registered rule by id.
+     *
+     * @return RuleInterface|ProjectRuleInterface Matching rule instance.
+     */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
         return $this->rules[$ruleId]

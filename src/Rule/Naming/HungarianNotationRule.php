@@ -26,6 +26,11 @@ final readonly class HungarianNotationRule implements RuleInterface
 
     private const PREFIXES = ['str', 'int', 'float', 'bool', 'arr', 'obj', 'fn', 'cls'];
 
+    /**
+     * Describe the Hungarian notation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -38,6 +43,11 @@ final readonly class HungarianNotationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find local variables that use type-prefix naming.
+     *
+     * @return list<Finding> Findings for Hungarian notation variables.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -94,6 +104,11 @@ final readonly class HungarianNotationRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect a configured type prefix followed by an uppercase boundary.
+     *
+     * @return string|null Matched prefix, or null when the name is acceptable.
+     */
     private function detectPrefix(string $name): ?string
     {
         foreach (self::PREFIXES as $prefix) {

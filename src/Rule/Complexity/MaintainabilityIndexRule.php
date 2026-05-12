@@ -24,6 +24,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 {
     public const ID = 'complexity.maintainability-index';
 
+    /**
+     * Describe the maintainability index rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -40,6 +45,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         );
     }
 
+    /**
+     * Find function-like declarations whose maintainability index falls below thresholds.
+     *
+     * @return list<Finding> Findings for low maintainability index scores.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -96,6 +106,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     *
+     * @return float Maintainability index score.
      */
     public static function compute(Node $node, AnalysisUnit $unit): float
     {
@@ -118,6 +130,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     *
+     * @return int Logical statement line count.
      */
     private static function logicalLineCount(Node $node): int
     {
@@ -135,6 +149,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         return count($lines);
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

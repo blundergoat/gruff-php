@@ -21,6 +21,11 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
 {
     public const ID = 'test-quality.multiple-aaa-cycles';
 
+    /**
+     * Describe the multiple arrange-act-assert cycles rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that appear to repeat act/assert cycles in one method.
+     *
+     * @return list<Finding> Findings for repeated AAA cycles.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minCycles');
@@ -69,6 +79,11 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Count apparent act-then-assert cycles across top-level test statements.
+     *
+     * @return int Number of detected cycles.
+     */
     private function countActAssertCycles(TestQualityScope $scope): int
     {
         $cycles = 0;

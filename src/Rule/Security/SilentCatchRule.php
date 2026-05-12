@@ -20,6 +20,11 @@ final class SilentCatchRule implements RuleInterface
 {
     public const ID = 'security.silent-catch';
 
+    /**
+     * Describe the silent catch rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final class SilentCatchRule implements RuleInterface
         );
     }
 
+    /**
+     * Find catch blocks that only contain no-op statements.
+     *
+     * @return list<Finding> Findings for swallowed exceptions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -58,6 +68,11 @@ final class SilentCatchRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a catch block has no executable handling statements.
+     *
+     * @return bool True when the catch body is silent.
+     */
     private function isSilent(Stmt\Catch_ $catch): bool
     {
         foreach ($catch->stmts as $statement) {

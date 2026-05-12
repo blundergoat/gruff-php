@@ -10,12 +10,16 @@ use GruffPhp\Rule\RuleRegistry;
 
 final readonly class SelectionConfigParser
 {
+    /**
+     * Use the supplied string-list parser when decoding rule selection config.
+     */
     public function __construct(private StringListConfigParser $strings = new StringListConfigParser())
     {
     }
 
     /**
      * @param array<array-key, mixed>|bool|float|int|object|string|null $value
+     * @return RuleSelection Parsed rule selection filters.
      * @throws ConfigException
      */
     public function parse(object|array|string|int|float|bool|null $value, RuleRegistry $registry): RuleSelection
@@ -34,6 +38,7 @@ final readonly class SelectionConfigParser
 
     /**
      * @param array<string, mixed> $selection
+     * @return void
      */
     private function assertKnownKeys(array $selection): void
     {

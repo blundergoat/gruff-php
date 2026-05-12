@@ -18,6 +18,11 @@ final readonly class FileLengthRule implements RuleInterface
 {
     public const ID = 'size.file-length';
 
+    /**
+     * Describe the file length rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class FileLengthRule implements RuleInterface
         );
     }
 
+    /**
+     * Find files whose line count exceeds configured thresholds.
+     *
+     * @return list<Finding> Findings for oversized files.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -72,6 +82,11 @@ final readonly class FileLengthRule implements RuleInterface
         ];
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

@@ -17,6 +17,11 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.aws-access-key';
 
+    /**
+     * Describe the AWS access key sensitive-data rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,11 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find string literals that resemble AWS access key IDs.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for AWS key-like literals.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $unit->source, $matches, PREG_OFFSET_CAPTURE);

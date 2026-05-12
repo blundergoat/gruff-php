@@ -34,6 +34,11 @@ final readonly class FindingDisplayFilter
         return array_values(array_filter($findings, fn (Finding $finding): bool => $this->allows($finding)));
     }
 
+    /**
+     * Check whether any display filter is configured.
+     *
+     * @return bool True when at least one filter is active.
+     */
     public function active(): bool
     {
         return $this->minSeverity !== null
@@ -65,6 +70,11 @@ final readonly class FindingDisplayFilter
         ];
     }
 
+    /**
+     * Determine whether one finding passes all configured filters.
+     *
+     * @return bool True when the finding should be displayed.
+     */
     private function allows(Finding $finding): bool
     {
         if ($this->minSeverity !== null && $this->severityRank($finding->severity) < $this->severityRank($this->minSeverity)) {
@@ -86,6 +96,11 @@ final readonly class FindingDisplayFilter
         return !in_array($finding->ruleId, $this->excludeRules, true);
     }
 
+    /**
+     * Convert severity to a comparable rank.
+     *
+     * @return int Severity rank where larger is more severe.
+     */
     private function severityRank(Severity $severity): int
     {
         return match ($severity) {

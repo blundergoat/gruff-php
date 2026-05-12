@@ -6,6 +6,9 @@ namespace GruffPhp\Baseline;
 
 final readonly class BaselineApplicationOptions
 {
+    /**
+     * Capture the effective baseline flags selected for an analysis run.
+     */
     public function __construct(
         public ?string $baselinePath,
         public bool $baselineExplicit,

@@ -6,6 +6,9 @@ namespace GruffPhp\Mutation;
 
 final readonly class MutationFileSummary
 {
+    /**
+     * Capture per-file mutation testing totals and MSI percentages.
+     */
     public function __construct(
         public string $filePath,
         public int $totalMutants,

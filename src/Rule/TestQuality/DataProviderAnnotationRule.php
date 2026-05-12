@@ -19,6 +19,11 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
 {
     public const ID = 'test-quality.data-provider-annotation';
 
+    /**
+     * Describe the data provider annotation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find legacy data provider annotations in PHPUnit tests.
+     *
+     * @return list<Finding> Findings for data provider annotation usage.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];

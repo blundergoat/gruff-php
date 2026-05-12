@@ -22,6 +22,11 @@ final readonly class MysteryGuestRule implements RuleInterface
 {
     public const ID = 'test-quality.mystery-guest';
 
+    /**
+     * Describe the mystery guest test rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class MysteryGuestRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that reach external files or databases from inside the test body.
+     *
+     * @return list<Finding> Findings for hidden external test dependencies.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -65,6 +75,11 @@ final readonly class MysteryGuestRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Identify external file/database access in a call or constructor node.
+     *
+     * @return string|null Guest dependency name, or null when none is detected.
+     */
     private function mysteryGuest(Node $node): ?string
     {
         if ($node instanceof Expr\FuncCall) {

@@ -11,6 +11,9 @@ use GruffPhp\Rule\RuleRegistry;
 
 final readonly class AnalyseCommandSetup
 {
+    /**
+     * Capture resolved dependencies and options needed to execute analyse.
+     */
     public function __construct(
         public string $projectRoot,
         public AnalyseCommandOptions $options,

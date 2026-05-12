@@ -21,6 +21,11 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
 {
     public const ID = 'modernisation.mixed-type-overuse';
 
+    /**
+     * Describe the mixed type overuse rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
         );
     }
 
+    /**
+     * Find parameters and returns that overuse explicit mixed types.
+     *
+     * @return list<Finding> Findings for mixed type overuse.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {

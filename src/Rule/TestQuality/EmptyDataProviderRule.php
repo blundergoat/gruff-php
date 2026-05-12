@@ -24,6 +24,11 @@ final readonly class EmptyDataProviderRule implements RuleInterface
 {
     public const ID = 'test-quality.empty-data-provider';
 
+    /**
+     * Describe the empty data provider rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests linked to data providers that cannot yield any rows.
+     *
+     * @return list<Finding> Findings for empty data providers.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -122,6 +132,11 @@ final readonly class EmptyDataProviderRule implements RuleInterface
         return array_values(array_unique($names));
     }
 
+    /**
+     * Determine whether a provider method is statically guaranteed to produce no rows.
+     *
+     * @return bool True when the provider is empty by simple AST inspection.
+     */
     private function isProvablyEmpty(Stmt\ClassMethod $method): bool
     {
         $stmts = $method->stmts ?? [];

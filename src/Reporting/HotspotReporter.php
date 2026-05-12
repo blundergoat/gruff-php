@@ -9,6 +9,11 @@ use GruffPhp\Scoring\FileScore;
 
 final readonly class HotspotReporter
 {
+    /**
+     * Render top file offenders as a hotspot JSON payload.
+     *
+     * @return string Pretty-printed hotspot JSON document.
+     */
     public function render(AnalysisReport $report): string
     {
         $score = $report->score;

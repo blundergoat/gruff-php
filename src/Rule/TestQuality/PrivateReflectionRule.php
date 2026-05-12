@@ -24,6 +24,11 @@ final readonly class PrivateReflectionRule implements RuleInterface
 
     private const REFLECTION_CLASSES = ['reflectionmethod', 'reflectionclass', 'reflectionproperty'];
 
+    /**
+     * Describe the private reflection test rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class PrivateReflectionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that use reflection or binding to reach private implementation details.
+     *
+     * @return list<Finding> Findings for private-reflection test access.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -76,6 +86,11 @@ final readonly class PrivateReflectionRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect reflection or closure binding nodes that expose private members.
+     *
+     * @return bool True when the node performs private reflection access.
+     */
     private function isPrivateReflectionNode(Node $node): bool
     {
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {

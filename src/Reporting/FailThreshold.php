@@ -13,6 +13,11 @@ enum FailThreshold: string
     case Warning = 'warning';
     case Error = 'error';
 
+    /**
+     * Convert a CLI fail threshold string into the matching enum case.
+     *
+     * @return self|null Matching threshold, or null for unsupported input.
+     */
     public static function fromInput(string $value): ?self
     {
         return match ($value) {
@@ -24,6 +29,11 @@ enum FailThreshold: string
         };
     }
 
+    /**
+     * Decide whether a finding severity should fail for this threshold.
+     *
+     * @return bool True when the severity meets or exceeds the threshold.
+     */
     public function isTriggeredBy(Severity $severity): bool
     {
         return match ($this) {

@@ -11,6 +11,11 @@ use JsonException;
 
 final readonly class SarifReporter
 {
+    /**
+     * Render findings as a SARIF 2.1.0 JSON document.
+     *
+     * @return string SARIF JSON document or encoded error payload.
+     */
     public function render(AnalysisReport $report): string
     {
         $rules = [];
@@ -90,6 +95,11 @@ final readonly class SarifReporter
         ];
     }
 
+    /**
+     * Map gruff severities onto SARIF result levels.
+     *
+     * @return string SARIF level name.
+     */
     private function level(Severity $severity): string
     {
         return match ($severity) {

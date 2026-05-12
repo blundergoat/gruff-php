@@ -23,6 +23,11 @@ final class MissingReadmeRule implements RuleInterface
 
     private bool $emitted = false;
 
+    /**
+     * Describe the missing README rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final class MissingReadmeRule implements RuleInterface
         );
     }
 
+    /**
+     * Emit one finding when the project root has no README.md file.
+     *
+     * @return list<Finding> Missing README finding, or an empty list.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if ($this->emitted) {

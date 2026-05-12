@@ -8,6 +8,11 @@ use GruffPhp\Parser\AnalysisUnit;
 
 final readonly class DirectLineComment
 {
+    /**
+     * Check whether a standalone one-line comment exists directly above a line.
+     *
+     * @return bool True when the previous line is a direct one-line comment token.
+     */
     public static function existsAbove(AnalysisUnit $unit, int $line): bool
     {
         if ($line <= 1) {
@@ -32,6 +37,11 @@ final readonly class DirectLineComment
         return false;
     }
 
+    /**
+     * Read one source line by 1-based line number.
+     *
+     * @return string Source line text, or an empty string when unavailable.
+     */
     private static function sourceLine(AnalysisUnit $unit, int $line): string
     {
         $lines = preg_split('/\R/', $unit->source);
@@ -43,6 +53,11 @@ final readonly class DirectLineComment
         return $lines[$line - 1] ?? '';
     }
 
+    /**
+     * Detect standalone `//`, `#`, or single-line block comments.
+     *
+     * @return bool True when the line looks like a standalone comment.
+     */
     private static function looksLikeStandaloneOneLineComment(string $line): bool
     {
         $trimmed = trim($line);

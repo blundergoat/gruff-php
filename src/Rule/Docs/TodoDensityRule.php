@@ -19,6 +19,11 @@ final readonly class TodoDensityRule implements RuleInterface
 {
     public const ID = 'docs.todo-density';
 
+    /**
+     * Describe the TODO density rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final readonly class TodoDensityRule implements RuleInterface
         );
     }
 
+    /**
+     * Count TODO-style markers in comments and report files above threshold.
+     *
+     * @return list<Finding> Findings for excessive TODO density.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -79,6 +89,11 @@ final readonly class TodoDensityRule implements RuleInterface
         ];
     }
 
+    /**
+     * Check whether a token is a normal comment or docblock.
+     *
+     * @return bool True when the token can contain TODO markers.
+     */
     private function isCommentToken(Token $token): bool
     {
         return $token->id === T_COMMENT || $token->id === T_DOC_COMMENT;

@@ -31,6 +31,11 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         ];
     }
 
+    /**
+     * Describe the API key pattern sensitive-data rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -43,6 +48,11 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find string literals that resemble hardcoded API keys.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for API key-like literals.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];

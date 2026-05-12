@@ -16,11 +16,19 @@ final readonly class PhpFileParser
 {
     private Parser $parser;
 
+    /**
+     * Create a parser using the supplied nikic/php-parser instance or default.
+     */
     public function __construct(?Parser $parser = null)
     {
         $this->parser = $parser ?? (new ParserFactory())->createForNewestSupportedVersion();
     }
 
+    /**
+     * Parse a source file into statements, tokens, and diagnostics for rules.
+     *
+     * @return AnalysisUnit Parsed source representation consumed by rules.
+     */
     public function parse(SourceFile $file): AnalysisUnit
     {
         $source = file_get_contents($file->absolutePath);

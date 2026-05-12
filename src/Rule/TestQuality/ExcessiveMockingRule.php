@@ -18,6 +18,11 @@ final readonly class ExcessiveMockingRule implements RuleInterface
 {
     public const ID = 'test-quality.excessive-mocking';
 
+    /**
+     * Describe the excessive mocking rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class ExcessiveMockingRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that create more mocks than the configured threshold.
+     *
+     * @return list<Finding> Findings for heavily mocked tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

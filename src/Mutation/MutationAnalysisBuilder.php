@@ -11,6 +11,7 @@ final readonly class MutationAnalysisBuilder
 {
     /**
      * @param list<RunDiagnostic> $diagnostics
+     * @return MutationAnalysisResult|null Mutation report result when one can be built.
      */
     public function build(
         string $projectRoot,
@@ -49,6 +50,7 @@ final readonly class MutationAnalysisBuilder
 
     /**
      * @param list<RunDiagnostic> $diagnostics
+     * @return bool True when Infection output is available for parsing.
      */
     private function runInfection(
         string $projectRoot,
@@ -90,6 +92,7 @@ final readonly class MutationAnalysisBuilder
 
     /**
      * @param list<RunDiagnostic> $diagnostics
+     * @return void
      */
     private function addOptionDiagnostics(MutationAnalysisOptions $options, array &$diagnostics): void
     {
@@ -131,6 +134,11 @@ final readonly class MutationAnalysisBuilder
         }
     }
 
+    /**
+     * Resolve a configured mutation path against the analysed project root.
+     *
+     * @return string Absolute path for the supplied mutation-related file.
+     */
     private function absolutePath(string $projectRoot, string $path): string
     {
         if ($path !== '' && $path[0] === '/') {

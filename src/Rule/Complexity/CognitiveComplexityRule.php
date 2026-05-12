@@ -108,6 +108,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     * @return int Cognitive complexity score for the function-like node.
      */
     public static function compute(Node $node): int
     {
@@ -118,6 +119,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     /**
      * @param array<Node> $stmts
+     * @return int Cognitive complexity score for the statement list.
      */
     private static function walkStatements(array $stmts, int $nesting): int
     {
@@ -216,6 +218,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     /**
      * @param array<Node> $statements
+     * @return int Cognitive complexity score for the loop body and condition.
      */
     private static function walkLoop(array $statements, ?Expr $condition, int $nesting): int
     {
@@ -355,6 +358,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
     /**
      * @param list<class-string> $result
+     * @return void
      */
     private static function flattenBooleanChain(Expr $expr, array &$result): void
     {

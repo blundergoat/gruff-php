@@ -20,6 +20,11 @@ final readonly class SetupBloatRule implements RuleInterface
 {
     public const ID = 'test-quality.setup-bloat';
 
+    /**
+     * Describe the setup bloat rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class SetupBloatRule implements RuleInterface
         );
     }
 
+    /**
+     * Find setup methods that exceed the configured size threshold.
+     *
+     * @return list<Finding> Findings for oversized setup methods.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

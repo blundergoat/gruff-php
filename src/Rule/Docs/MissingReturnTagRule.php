@@ -23,6 +23,11 @@ final readonly class MissingReturnTagRule implements RuleInterface
 {
     public const ID = 'docs.missing-return-tag';
 
+    /**
+     * Describe the missing @return tag rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class MissingReturnTagRule implements RuleInterface
         );
     }
 
+    /**
+     * Find documented function-like declarations that lack an @return tag.
+     *
+     * @return list<Finding> Findings for missing return tags.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -83,6 +93,11 @@ final readonly class MissingReturnTagRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Exempt constructors and destructors from return tag requirements.
+     *
+     * @return bool True when the method has no return contract.
+     */
     private function isReturnlessMagicMethod(ClassMethod $method): bool
     {
         return in_array($method->name->toString(), ['__construct', '__destruct'], true);

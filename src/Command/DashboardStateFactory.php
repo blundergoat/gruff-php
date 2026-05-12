@@ -36,6 +36,8 @@ final class DashboardStateFactory
 
     /**
      * Resolves the startup project option against the shell directory.
+     *
+     * @return string|null Existing project root, or null when the option is invalid.
      */
     public function initialProjectRoot(InputInterface $input, string $launchRoot): ?string
     {
@@ -67,6 +69,8 @@ final class DashboardStateFactory
 
     /**
      * Returns an existing absolute project directory, or null when invalid.
+     *
+     * @return string|null Existing absolute project directory.
      */
     public function resolveProjectRoot(string $project, string $baseRoot): ?string
     {
@@ -78,6 +82,8 @@ final class DashboardStateFactory
 
     /**
      * Reads a non-empty string option from console input.
+     *
+     * @return string|null Option value, or null when missing or empty.
      */
     public function optionalStringOption(InputInterface $input, string $name): ?string
     {

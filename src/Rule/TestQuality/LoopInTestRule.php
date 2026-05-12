@@ -21,6 +21,11 @@ final readonly class LoopInTestRule implements RuleInterface
 {
     public const ID = 'test-quality.loop-in-test';
 
+    /**
+     * Describe the loop in test rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class LoopInTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests with loops that can obscure individual cases.
+     *
+     * @return list<Finding> Findings for loop constructs in tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

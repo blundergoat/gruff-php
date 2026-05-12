@@ -13,6 +13,7 @@ final readonly class BaselineApplication
     /**
      * @param list<Finding> $findings
      * @param list<RunDiagnostic> $diagnostics
+     * @return BaselineReport|null Baseline report when a baseline was generated or applied.
      */
     public function apply(
         string $projectRoot,
@@ -37,6 +38,7 @@ final readonly class BaselineApplication
     /**
      * @param list<Finding> $findings
      * @param list<RunDiagnostic> $diagnostics
+     * @return BaselineReport|null Generated baseline report, or null when writing fails.
      */
     private function generate(
         BaselineStore $store,
@@ -71,6 +73,7 @@ final readonly class BaselineApplication
     /**
      * @param list<Finding> $findings
      * @param list<RunDiagnostic> $diagnostics
+     * @return BaselineReport|null Applied baseline report, or null when reading fails.
      */
     private function applyExistingBaseline(
         BaselineStore $store,

@@ -8,6 +8,11 @@ use GruffPhp\Analysis\AnalysisReport;
 
 final readonly class JsonReporter
 {
+    /**
+     * Render the full analysis report as JSON.
+     *
+     * @return string Pretty-printed analysis JSON document.
+     */
     public function render(AnalysisReport $report): string
     {
         return json_encode(

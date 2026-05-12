@@ -24,6 +24,11 @@ final readonly class TestQualityScope
     ) {
     }
 
+    /**
+     * Count the source lines covered by this test scope.
+     *
+     * @return int Inclusive line count for the test scope.
+     */
     public function lineCount(): int
     {
         return $this->endLine === null ? 1 : max(1, $this->endLine - $this->line + 1);

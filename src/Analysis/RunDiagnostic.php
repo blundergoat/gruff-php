@@ -6,6 +6,9 @@ namespace GruffPhp\Analysis;
 
 final readonly class RunDiagnostic
 {
+    /**
+     * Capture a non-finding diagnostic emitted during a gruff run.
+     */
     public function __construct(
         public string $type,
         public string $message,

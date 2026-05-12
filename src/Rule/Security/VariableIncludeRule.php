@@ -20,6 +20,11 @@ final class VariableIncludeRule implements RuleInterface
 {
     public const ID = 'security.variable-include';
 
+    /**
+     * Describe the variable include security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final class VariableIncludeRule implements RuleInterface
         );
     }
 
+    /**
+     * Find include and require expressions using dynamic paths.
+     *
+     * @return list<Finding> Findings for variable include paths.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

@@ -6,12 +6,20 @@ namespace GruffPhp\Diff;
 
 final readonly class ChangedLineRange
 {
+    /**
+     * Create an inclusive changed-line range.
+     */
     public function __construct(
         public int $startLine,
         public int $endLine,
     ) {
     }
 
+    /**
+     * Create an inclusive range from a start line and line count.
+     *
+     * @return self Changed line range.
+     */
     public static function fromStartAndLength(int $startLine, int $length): self
     {
         $safeLength = max(1, $length);
@@ -19,6 +27,11 @@ final readonly class ChangedLineRange
         return new self($startLine, $startLine + $safeLength - 1);
     }
 
+    /**
+     * Check whether this range overlaps another inclusive line span.
+     *
+     * @return bool True when the ranges overlap.
+     */
     public function touches(int $startLine, int $endLine): bool
     {
         return $this->startLine <= $endLine && $this->endLine >= $startLine;

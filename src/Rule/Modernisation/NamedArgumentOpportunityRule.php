@@ -21,6 +21,11 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 {
     public const ID = 'modernisation.named-argument-opportunity';
 
+    /**
+     * Describe the named argument opportunity rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         );
     }
 
+    /**
+     * Find calls with many positional arguments that would read better named.
+     *
+     * @return list<Finding> Findings for named argument opportunities.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
@@ -77,6 +87,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
     /**
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
+     * @return string|null Explanation when the call should use named arguments.
      */
     private function reason(array $args, int $minPositionalArguments): ?string
     {

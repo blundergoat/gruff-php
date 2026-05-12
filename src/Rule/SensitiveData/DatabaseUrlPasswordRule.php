@@ -17,6 +17,11 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.database-url-password';
 
+    /**
+     * Describe the database URL password sensitive-data rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,11 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find database connection URLs that embed passwords.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for credential-bearing database URLs.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         preg_match_all(

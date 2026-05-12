@@ -9,6 +9,11 @@ use GruffPhp\Parser\AnalysisUnit;
 
 interface ProjectRuleInterface
 {
+    /**
+     * Describe this project-level rule for configuration and reporting.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition;
 
     /**

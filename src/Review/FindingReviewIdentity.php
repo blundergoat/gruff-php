@@ -8,6 +8,11 @@ use GruffPhp\Finding\Finding;
 
 final readonly class FindingReviewIdentity
 {
+    /**
+     * Build the comparison key used to match findings across branch reviews.
+     *
+     * @return string Null-delimited finding identity key.
+     */
     public function key(Finding $finding): string
     {
         return implode("\0", [

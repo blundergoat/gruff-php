@@ -25,6 +25,11 @@ final readonly class ConfusingNameRule implements RuleInterface
         'Service', 'Processor', 'Base', 'Common', 'Misc',
     ];
 
+    /**
+     * Describe the confusing name rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class ConfusingNameRule implements RuleInterface
         );
     }
 
+    /**
+     * Find identifiers whose names are ambiguous or visually confusing.
+     *
+     * @return list<Finding> Findings for confusing identifiers.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

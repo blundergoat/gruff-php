@@ -17,6 +17,11 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.private-key';
 
+    /**
+     * Describe the private key sensitive-data rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,11 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find string literals that appear to contain private key material.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $unit->source, $matches, PREG_OFFSET_CAPTURE);

@@ -6,12 +6,20 @@ namespace GruffPhp\Scoring;
 
 final readonly class Grade
 {
+    /**
+     * Create a grade from a numeric score and display letter.
+     */
     public function __construct(
         public float $score,
         public string $letter,
     ) {
     }
 
+    /**
+     * Build a grade after clamping and rounding a score.
+     *
+     * @return self Grade for the normalised score.
+     */
     public static function fromScore(float $score): self
     {
         $normalisedScore = max(0.0, min(100.0, round($score, 2)));
@@ -19,6 +27,11 @@ final readonly class Grade
         return new self($normalisedScore, self::letterFor($normalisedScore));
     }
 
+    /**
+     * Resolve the letter grade for a numeric score.
+     *
+     * @return string Letter grade.
+     */
     public static function letterFor(float $score): string
     {
         if ($score >= 90.0) {

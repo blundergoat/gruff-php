@@ -27,6 +27,11 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
 {
     public const ID = 'docs.missing-property-phpdoc';
 
+    /**
+     * Describe the missing property PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -39,6 +44,11 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find declared and promoted properties that lack local documentation.
+     *
+     * @return list<Finding> Findings for undocumented properties.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -134,6 +144,11 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Return the constructor method for a class-like declaration.
+     *
+     * @return ClassMethod|null Constructor, or null when absent.
+     */
     private function findConstructor(ClassLike $classLike): ?ClassMethod
     {
         foreach ($classLike->getMethods() as $method) {

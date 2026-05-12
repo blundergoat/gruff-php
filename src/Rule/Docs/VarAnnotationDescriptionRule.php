@@ -28,6 +28,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
     public const ID = 'docs.var-annotation-description';
 
+    /**
+     * Describe the local @var annotation description rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find local @var assertions that do not explain why the assertion is needed.
+     *
+     * @return list<Finding> Findings for bare local @var annotations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         // AST-driven detection: PhpParser attaches each docblock to the immediately following
@@ -94,6 +104,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Distinguish declaration docblocks from local variable assertion docblocks.
+     *
+     * @return bool True when the docblock belongs to a declaration node.
+     */
     private function isDeclarationNode(Node $node): bool
     {
         return $node instanceof Property

@@ -24,11 +24,21 @@ final readonly class AnalysisUnit
     ) {
     }
 
+    /**
+     * Report whether parsing produced diagnostics for the source file.
+     *
+     * @return bool True when the unit has at least one parse diagnostic.
+     */
     public function hasParseErrors(): bool
     {
         return $this->diagnostics !== [];
     }
 
+    /**
+     * Count source lines in the raw file contents.
+     *
+     * @return int Number of lines, or zero for an empty source string.
+     */
     public function lineCount(): int
     {
         if ($this->source === '') {

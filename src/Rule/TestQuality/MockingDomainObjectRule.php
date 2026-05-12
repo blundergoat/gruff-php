@@ -23,6 +23,11 @@ final readonly class MockingDomainObjectRule implements RuleInterface
 {
     public const ID = 'test-quality.mocking-domain-object';
 
+    /**
+     * Describe the mocking-domain-object rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class MockingDomainObjectRule implements RuleInterface
         );
     }
 
+    /**
+     * Find mock creations for classes that match configured domain-object patterns.
+     *
+     * @return list<Finding> Findings for mocked domain objects.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $patterns = $context->settingsFor($this->definition())->stringListOption('domainNamespaces');
@@ -115,6 +125,11 @@ final readonly class MockingDomainObjectRule implements RuleInterface
         return $map;
     }
 
+    /**
+     * Extract a `ClassName::class` argument from a mock creation call.
+     *
+     * @return string|null Class name string, or null when absent.
+     */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
         $value = TestQualityNodeHelper::argValue($call, $index);
@@ -132,6 +147,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
 
     /**
      * @param array<string, string> $useMap
+     *
+     * @return string Resolved class name.
      */
     private function resolveClassName(string $className, array $useMap): string
     {
@@ -152,6 +169,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
 
     /**
      * @param list<string> $patterns
+     *
+     * @return string|null Matching pattern, or null when none match.
      */
     private function matchesAnyPattern(string $className, array $patterns): ?string
     {

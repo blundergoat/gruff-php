@@ -25,6 +25,11 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
      */
     private const FORBIDDEN_GLOBALS = ['_GET', '_POST', '_SESSION'];
 
+    /**
+     * Describe the forbidden global access rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
         );
     }
 
+    /**
+     * Find direct superglobal access outside controller boundaries.
+     *
+     * @return list<Finding> Findings for forbidden global reads.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if ($this->isControllerPath($unit->file->displayPath)) {
@@ -77,6 +87,11 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a file path is treated as a controller boundary.
+     *
+     * @return bool True when direct request/session access is allowed.
+     */
     private function isControllerPath(string $displayPath): bool
     {
         $normalized = '/' . str_replace('\\', '/', $displayPath);

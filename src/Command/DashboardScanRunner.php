@@ -10,6 +10,9 @@ use Symfony\Component\Process\Process;
 
 final readonly class DashboardScanRunner
 {
+    /**
+     * Capture collaborators used to execute dashboard scans and render results.
+     */
     public function __construct(
         private string $gruffBinary,
         private DashboardStateFactory $stateFactory,
@@ -19,6 +22,7 @@ final readonly class DashboardScanRunner
 
     /**
      * @param array<string, string> $query
+     * @return string Dashboard HTML for either scan results or an error panel.
      */
     public function scanHtml(DashboardRequestContext $context, array $query): string
     {

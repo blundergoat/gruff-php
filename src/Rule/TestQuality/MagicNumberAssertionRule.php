@@ -25,6 +25,11 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         500, 502, 503, 504,
     ];
 
+    /**
+     * Describe the magic number assertion rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -38,6 +43,11 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find assertions that compare against unexplained numeric literals.
+     *
+     * @return list<Finding> Findings for magic numbers in assertions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $allowed = $this->loadAllowedLiterals($context);

@@ -20,6 +20,11 @@ final class UnsafeUnserializeRule implements RuleInterface
 {
     public const ID = 'security.unsafe-unserialize';
 
+    /**
+     * Describe the unsafe unserialize security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final class UnsafeUnserializeRule implements RuleInterface
         );
     }
 
+    /**
+     * Find unserialize calls that can deserialize untrusted data.
+     *
+     * @return list<Finding> Findings for unsafe unserialize calls.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

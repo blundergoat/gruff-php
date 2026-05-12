@@ -18,6 +18,11 @@ final readonly class TestLongerThanSutRule implements RuleInterface
 {
     public const ID = 'test-quality.test-longer-than-sut';
 
+    /**
+     * Describe the long-test-versus-SUT rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         );
     }
 
+    /**
+     * Find long tests that appear to exercise only one SUT call.
+     *
+     * @return list<Finding> Findings for tests with disproportionate setup/assertion size.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -61,6 +71,11 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Count apparent non-assertion SUT calls in a test scope.
+     *
+     * @return int Number of apparent SUT calls.
+     */
     private function sutCallCount(TestQualityScope $scope): int
     {
         $count = 0;

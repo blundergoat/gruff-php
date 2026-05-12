@@ -112,6 +112,7 @@ final readonly class NpathComplexityRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     * @return int NPath complexity score for the function-like node.
      */
     public static function compute(Node $node): int
     {
@@ -120,6 +121,7 @@ final readonly class NpathComplexityRule implements RuleInterface
 
     /**
      * @param array<Node> $stmts
+     * @return int NPath complexity score for the statement list.
      */
     private static function walkBlock(array $stmts): int
     {

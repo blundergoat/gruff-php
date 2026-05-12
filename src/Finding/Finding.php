@@ -71,6 +71,11 @@ final readonly class Finding
         ];
     }
 
+    /**
+     * Build the stable short hash used to identify equivalent findings.
+     *
+     * @return string Sixteen-character SHA-256 prefix for the finding identity.
+     */
     public function fingerprint(): string
     {
         $encoded = json_encode([

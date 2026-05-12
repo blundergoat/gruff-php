@@ -19,6 +19,11 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
 {
     public const ID = 'test-quality.testdox-readability';
 
+    /**
+     * Describe the TestDox readability rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
         );
     }
 
+    /**
+     * Find test names that produce hard-to-read TestDox output.
+     *
+     * @return list<Finding> Findings for unreadable TestDox names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minWords');
@@ -88,6 +98,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
 
     /**
      * @param list<string> $words
+     * @return string Rendered TestDox phrase.
      */
     private function renderTestdox(array $words): string
     {

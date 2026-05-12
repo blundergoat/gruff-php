@@ -6,6 +6,9 @@ namespace GruffPhp\Scoring;
 
 final readonly class PillarScore
 {
+    /**
+     * Capture score and finding totals for one quality pillar.
+     */
     public function __construct(
         public string $pillar,
         public bool $applicable,

@@ -11,6 +11,7 @@ final readonly class BranchReviewComparator
     /**
      * @param list<Finding> $current
      * @param list<Finding> $base
+     * @return BranchReviewResult Introduced, removed, and unchanged finding sets.
      */
     public function compare(
         array $current,

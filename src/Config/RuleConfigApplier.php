@@ -11,6 +11,7 @@ final readonly class RuleConfigApplier
 {
     /**
      * @param array<string, mixed> $rootConfig
+     * @return AnalysisConfig Config with rule-specific overrides applied.
      */
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig
     {
@@ -38,6 +39,7 @@ final readonly class RuleConfigApplier
 
     /**
      * @param array<string, mixed> $ruleConfig
+     * @return AnalysisConfig Config with one rule's overrides applied.
      */
     private function applyRuleConfig(
         AnalysisConfig $config,
@@ -62,6 +64,7 @@ final readonly class RuleConfigApplier
 
     /**
      * @param array<string, mixed> $ruleConfig
+     * @return void
      */
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
     {
@@ -74,6 +77,7 @@ final readonly class RuleConfigApplier
 
     /**
      * @param array<string, mixed> $ruleConfig
+     * @return bool Effective enabled flag for the rule.
      */
     private function enabled(string $ruleId, array $ruleConfig, bool $default): bool
     {
@@ -128,6 +132,7 @@ final readonly class RuleConfigApplier
 
     /**
      * @param array<string, mixed> $ruleConfig
+     * @return SeverityThreshold|null Single threshold override when configured.
      */
     private function severityThreshold(
         string $ruleId,
@@ -163,6 +168,7 @@ final readonly class RuleConfigApplier
 
     /**
      * @param array<string, int|float> $allowedThresholds
+     * @return int|float Validated threshold value.
      */
     private function thresholdValue(
         string $ruleId,
@@ -214,6 +220,11 @@ final readonly class RuleConfigApplier
         return $options;
     }
 
+    /**
+     * Validate and normalize a configured rule option against its default type.
+     *
+     * @return mixed Option value after type-specific validation.
+     */
     private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): mixed
     {
         if (is_int($defaultValue)) {

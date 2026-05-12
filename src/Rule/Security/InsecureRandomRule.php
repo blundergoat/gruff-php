@@ -25,6 +25,11 @@ final class InsecureRandomRule implements RuleInterface
      */
     private const INSECURE_RANDOM_FUNCTIONS = ['lcg_value', 'mt_rand', 'rand'];
 
+    /**
+     * Describe the insecure random security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final class InsecureRandomRule implements RuleInterface
         );
     }
 
+    /**
+     * Find random APIs that are unsuitable for security-sensitive values.
+     *
+     * @return list<Finding> Findings for insecure random usage.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

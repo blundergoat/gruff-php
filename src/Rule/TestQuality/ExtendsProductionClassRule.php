@@ -20,6 +20,11 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
 {
     public const ID = 'test-quality.extends-production-class';
 
+    /**
+     * Describe the test extends production class rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
         );
     }
 
+    /**
+     * Find test classes that inherit directly from production classes.
+     *
+     * @return list<Finding> Findings for tests extending production types.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

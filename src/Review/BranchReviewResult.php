@@ -25,6 +25,7 @@ final readonly class BranchReviewResult
 
     /**
      * @param callable(list<Finding>): list<Finding> $filter
+     * @return self Review result with the same metadata and filtered finding groups.
      */
     public function filtered(callable $filter): self
     {

@@ -22,6 +22,11 @@ final readonly class UnreachableCodeRule implements RuleInterface
 {
     public const ID = 'waste.unreachable-code';
 
+    /**
+     * Describe the unreachable code rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class UnreachableCodeRule implements RuleInterface
         );
     }
 
+    /**
+     * Find statements that appear after a terminating statement in function-like bodies.
+     *
+     * @return list<Finding> Findings for unreachable statements.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -56,6 +66,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * @param array<Node\Stmt> $stmts
      * @param list<Finding> &$findings
+     *
+     * @return void No return value.
      */
     private function checkBlock(array $stmts, AnalysisUnit $unit, array &$findings): void
     {
@@ -90,6 +102,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
 
     /**
      * @param list<Finding> &$findings
+     *
+     * @return void No return value.
      */
     private function walkChildren(Node\Stmt $node, AnalysisUnit $unit, array &$findings): void
     {
@@ -138,6 +152,11 @@ final readonly class UnreachableCodeRule implements RuleInterface
         }
     }
 
+    /**
+     * Detect statements that terminate control flow for the enclosing block.
+     *
+     * @return bool True when no following sibling statement can execute.
+     */
     private function isTerminating(Node $stmt): bool
     {
         if ($stmt instanceof Stmt\Return_) {

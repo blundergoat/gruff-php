@@ -26,6 +26,11 @@ final readonly class StringListConfigParser
         return array_values(array_unique($strings));
     }
 
+    /**
+     * Normalize one configured string and validate optional path-pattern rules.
+     *
+     * @return string Trimmed string with directory separators normalized.
+     */
     private function normalizedString(
         mixed $item,
         string $path,
@@ -46,6 +51,11 @@ final readonly class StringListConfigParser
         return $normalized;
     }
 
+    /**
+     * Reject path patterns that can escape the project or use disallowed globs.
+     *
+     * @return void
+     */
     private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowGlobs): void
     {
         if (str_starts_with($normalized, '/') || str_contains($normalized, '../') || $normalized === '..') {

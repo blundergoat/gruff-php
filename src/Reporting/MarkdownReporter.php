@@ -9,6 +9,11 @@ use GruffPhp\Finding\Finding;
 
 final readonly class MarkdownReporter
 {
+    /**
+     * Render an analysis report as Markdown.
+     *
+     * @return string Markdown report output.
+     */
     public function render(AnalysisReport $report): string
     {
         $score = $report->score;
@@ -80,6 +85,11 @@ final readonly class MarkdownReporter
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
+    /**
+     * Render one finding as a Markdown list item.
+     *
+     * @return string Markdown finding line.
+     */
     private function findingLine(Finding $finding): string
     {
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
@@ -98,6 +108,8 @@ final readonly class MarkdownReporter
     /**
      * @param list<string> $lines
      * @param list<Finding> $findings
+     *
+     * @return void No return value.
      */
     private function appendFindingGroups(array &$lines, string $title, array $findings, bool $includeHeading = true): void
     {
@@ -145,12 +157,19 @@ final readonly class MarkdownReporter
 
     /**
      * @param array<string, mixed> $value
+     *
+     * @return string Inline JSON string.
      */
     private function inlineJson(array $value): string
     {
         return json_encode($value, JSON_UNESCAPED_SLASHES) ?: '{}';
     }
 
+    /**
+     * Escape Markdown table separator characters.
+     *
+     * @return string Escaped table cell value.
+     */
     private function escapeTable(string $value): string
     {
         return str_replace('|', '\\|', $value);

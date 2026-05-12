@@ -12,6 +12,8 @@ final readonly class GitArchiveSnapshot
 {
     /**
      * @param list<string> $paths
+     *
+     * @return string Temporary snapshot root path.
      */
     public function create(string $projectRoot, string $ref, array $paths = []): string
     {
@@ -70,6 +72,11 @@ final readonly class GitArchiveSnapshot
         }
     }
 
+    /**
+     * Recursively remove a snapshot directory.
+     *
+     * @return void No return value.
+     */
     public function remove(string $path): void
     {
         if (!is_dir($path)) {
@@ -171,6 +178,11 @@ final readonly class GitArchiveSnapshot
         return $paths;
     }
 
+    /**
+     * Normalise path separators and duplicate slashes for Git path comparisons.
+     *
+     * @return string Normalised path.
+     */
     private function normalisePath(string $path): string
     {
         $path = str_replace('\\', '/', trim($path));
@@ -182,6 +194,11 @@ final readonly class GitArchiveSnapshot
         return $path;
     }
 
+    /**
+     * Validate a Git ref before passing it to archive commands.
+     *
+     * @return string Safe Git ref name.
+     */
     private function validatedRef(string $ref): string
     {
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {

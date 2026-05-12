@@ -10,6 +10,11 @@ use RuntimeException;
 
 final readonly class TrendRecorder
 {
+    /**
+     * Append a score snapshot to the bounded history file.
+     *
+     * @return TrendReport Report describing the current score and prior delta.
+     */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
         $resolvedPath = $this->absolutePath($projectRoot, $path);
@@ -88,6 +93,8 @@ final readonly class TrendRecorder
 
     /**
      * @param array<string, mixed>|null $entry
+     *
+     * @return float|null Score value from the entry, or null when absent.
      */
     private function scoreFromEntry(?array $entry): ?float
     {
@@ -96,6 +103,11 @@ final readonly class TrendRecorder
         return is_int($score) || is_float($score) ? (float) $score : null;
     }
 
+    /**
+     * Resolve a history path relative to the project root when needed.
+     *
+     * @return string Absolute history file path.
+     */
     private function absolutePath(string $projectRoot, string $path): string
     {
         if ($path !== '' && $path[0] === '/') {
@@ -105,6 +117,11 @@ final readonly class TrendRecorder
         return rtrim($projectRoot, '/') . '/' . $path;
     }
 
+    /**
+     * Convert a history path to a project-relative display path when possible.
+     *
+     * @return string Display path for report output.
+     */
     private function displayPath(string $projectRoot, string $path): string
     {
         $root = rtrim(str_replace('\\', '/', realpath($projectRoot) ?: $projectRoot), '/');

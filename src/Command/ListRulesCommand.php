@@ -15,6 +15,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class ListRulesCommand extends Command
 {
+    /**
+     * Register list-rules CLI options and metadata.
+     *
+     * @return void
+     */
     protected function configure(): void
     {
         $this
@@ -23,6 +28,11 @@ final class ListRulesCommand extends Command
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: table or json.', 'table');
     }
 
+    /**
+     * Render rule metadata as either a table or JSON document.
+     *
+     * @return int Symfony command exit code.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');

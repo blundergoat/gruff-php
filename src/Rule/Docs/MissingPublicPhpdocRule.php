@@ -21,6 +21,11 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
 {
     public const ID = 'docs.missing-public-phpdoc';
 
+    /**
+     * Describe the missing method PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find method declarations that do not have a local PHPDoc block.
+     *
+     * @return list<Finding> Findings for undocumented methods.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -51,6 +61,11 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Build the missing PHPDoc finding for one method.
+     *
+     * @return Finding Documentation finding.
+     */
     private function findingForMethod(AnalysisUnit $unit, RuleDefinition $definition, ClassMethod $method): Finding
     {
         $symbol = CyclomaticComplexityRule::resolveSymbol($method);

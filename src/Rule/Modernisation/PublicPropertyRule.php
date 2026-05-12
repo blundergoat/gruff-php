@@ -20,6 +20,11 @@ final readonly class PublicPropertyRule implements RuleInterface
 {
     public const ID = 'modernisation.public-property';
 
+    /**
+     * Describe the public property modernisation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class PublicPropertyRule implements RuleInterface
         );
     }
 
+    /**
+     * Find mutable public properties that expose object state directly.
+     *
+     * @return list<Finding> Findings for public property declarations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

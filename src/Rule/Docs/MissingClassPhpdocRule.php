@@ -25,6 +25,11 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
 {
     public const ID = 'docs.missing-class-phpdoc';
 
+    /**
+     * Describe the missing class PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class-like declarations that do not have a PHPDoc block.
+     *
+     * @return list<Finding> Findings for undocumented class-like declarations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -80,6 +90,11 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Return the declaration kind for a class-like node.
+     *
+     * @return string One of class, interface, trait, or enum.
+     */
     private function classKind(Node $node): string
     {
         return match (true) {

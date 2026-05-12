@@ -18,6 +18,11 @@ final readonly class SourceDiscoveryResult
     ) {
     }
 
+    /**
+     * Report whether any requested source path could not be resolved.
+     *
+     * @return bool True when discovery recorded missing input paths.
+     */
     public function hasInputErrors(): bool
     {
         return $this->missingPaths !== [];

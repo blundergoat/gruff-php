@@ -18,6 +18,11 @@ final readonly class TrivialAssertionRule implements RuleInterface
 {
     public const ID = 'test-quality.trivial-assertion';
 
+    /**
+     * Describe the trivial assertion rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -30,6 +35,11 @@ final readonly class TrivialAssertionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find assertions that can pass without checking meaningful behavior.
+     *
+     * @return list<Finding> Findings for trivial assertions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];

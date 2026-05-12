@@ -29,6 +29,7 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding> $findings
+     * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
     public function calculate(array $findings, ?MutationAnalysisResult $mutation, ?DiffResult $diff): ScoreReport
     {
@@ -221,12 +222,18 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding> $findings
+     * @return float Total weighted penalty for the supplied findings.
      */
     private function findingPenalty(array $findings): float
     {
         return array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $findings));
     }
 
+    /**
+     * Convert one finding severity and confidence into a score penalty.
+     *
+     * @return float Weighted penalty contribution for the finding.
+     */
     private function penaltyFor(Finding $finding): float
     {
         $severityWeight = match ($finding->severity) {
@@ -261,6 +268,7 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding> $findings
+     * @return int|null Maximum integer metadata value for the selected rule and key.
      */
     private function maxMetadataInt(array $findings, string $ruleId, string $key): ?int
     {
@@ -284,6 +292,7 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding> $findings
+     * @return int|null Maximum line metric found in size-rule metadata.
      */
     private function maxLineMetric(array $findings): ?int
     {

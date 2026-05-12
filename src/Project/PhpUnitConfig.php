@@ -8,6 +8,9 @@ use SimpleXMLElement;
 
 final readonly class PhpUnitConfig
 {
+    /**
+     * Capture a discovered PHPUnit configuration file and loaded XML root.
+     */
     public function __construct(
         public string $absolutePath,
         public string $displayPath,

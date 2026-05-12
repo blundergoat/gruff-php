@@ -24,6 +24,11 @@ final readonly class RuleSelection
     ) {
     }
 
+    /**
+     * Decide whether a rule definition passes the include and exclude filters.
+     *
+     * @return bool True when the rule should remain enabled for the selection.
+     */
     public function allows(RuleDefinition $definition): bool
     {
         $included = $this->tiers === [] && $this->pillars === [] && $this->rules === [];

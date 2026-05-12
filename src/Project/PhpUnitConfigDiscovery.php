@@ -13,6 +13,11 @@ final class PhpUnitConfigDiscovery
     /** @var array<string, ?PhpUnitConfig> */
     private array $cache = [];
 
+    /**
+     * Find and parse the first supported PHPUnit config file under a project root.
+     *
+     * @return PhpUnitConfig|null Parsed config when discovery succeeds.
+     */
     public function discover(string $projectRoot): ?PhpUnitConfig
     {
         $key = rtrim($projectRoot, '/');

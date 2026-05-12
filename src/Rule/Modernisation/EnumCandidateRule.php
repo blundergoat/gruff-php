@@ -21,6 +21,11 @@ final readonly class EnumCandidateRule implements RuleInterface
 {
     public const ID = 'modernisation.enum-candidate';
 
+    /**
+     * Describe the enum candidate modernisation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class EnumCandidateRule implements RuleInterface
         );
     }
 
+    /**
+     * Find string or integer constant groups that could become enums.
+     *
+     * @return list<Finding> Findings for enum candidate classes.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
@@ -75,6 +85,7 @@ final readonly class EnumCandidateRule implements RuleInterface
 
     /**
      * @param list<Stmt\ClassConst> $constants
+     * @return bool True when every constant value is a string or integer scalar.
      */
     private function allScalarConstants(array $constants): bool
     {

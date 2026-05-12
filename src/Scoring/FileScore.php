@@ -6,6 +6,9 @@ namespace GruffPhp\Scoring;
 
 final readonly class FileScore
 {
+    /**
+     * Capture score, finding totals, and optional metrics for one file.
+     */
     public function __construct(
         public string $filePath,
         public Grade $grade,

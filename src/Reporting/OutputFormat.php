@@ -14,6 +14,11 @@ enum OutputFormat: string
     case Hotspot = 'hotspot';
     case Sarif = 'sarif';
 
+    /**
+     * Convert a CLI format string into the matching output format.
+     *
+     * @return self|null Matching format, or null for unsupported input.
+     */
     public static function fromInput(string $value): ?self
     {
         return match ($value) {

@@ -33,11 +33,19 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /** @var array<string, true> */
     private array $emittedRoots = [];
 
+    /**
+     * Create the rule with injectable PHPUnit config discovery for tests.
+     */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
         $this->discovery = $discovery ?? new PhpUnitConfigDiscovery();
     }
 
+    /**
+     * Describe the PHPUnit strict flags rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -50,6 +58,11 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         );
     }
 
+    /**
+     * Report a project once when PHPUnit strict-mode attributes are missing.
+     *
+     * @return list<Finding> Findings for missing strict PHPUnit flags.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $root = $context->projectRoot;

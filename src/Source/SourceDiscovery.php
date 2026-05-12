@@ -70,6 +70,7 @@ final readonly class SourceDiscovery
     /**
      * @param list<string> $paths
      * @param list<string> $configuredIgnorePatterns
+     * @return SourceDiscoveryResult Files, missing inputs, and ignored paths.
      */
     public function discover(array $paths, bool $includeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
     {
@@ -289,6 +290,7 @@ final readonly class SourceDiscovery
 
     /**
      * @param list<string> $patterns
+     * @return bool True when the path matches a configured ignore pattern.
      */
     private function isConfiguredIgnoredPath(string $path, array $patterns): bool
     {

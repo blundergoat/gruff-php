@@ -13,6 +13,7 @@ final readonly class AnalysisSourceLoader
     /**
      * @param list<string> $paths
      * @param list<string> $ignoredPathPatterns
+     * @return AnalysisSourceSet Discovered files, parsed units, and load diagnostics.
      */
     public function load(
         string $projectRoot,

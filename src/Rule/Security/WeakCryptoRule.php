@@ -20,6 +20,11 @@ final class WeakCryptoRule implements RuleInterface
 {
     public const ID = 'security.weak-crypto';
 
+    /**
+     * Describe the weak cryptography security rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final class WeakCryptoRule implements RuleInterface
         );
     }
 
+    /**
+     * Find weak hashing and cryptography primitives in source code.
+     *
+     * @return list<Finding> Findings for weak cryptography usage.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

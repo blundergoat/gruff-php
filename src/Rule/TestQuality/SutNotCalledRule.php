@@ -24,6 +24,11 @@ final readonly class SutNotCalledRule implements RuleInterface
 
     private const SUBPROCESS_FUNCTIONS = ['shell_exec', 'proc_open', 'popen', 'passthru', 'system', 'exec'];
 
+    /**
+     * Describe the SUT-not-called test rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class SutNotCalledRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests whose name implies a SUT call that is absent from the body.
+     *
+     * @return list<Finding> Findings for mismatched test names and calls.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];
@@ -74,6 +84,8 @@ final readonly class SutNotCalledRule implements RuleInterface
 
     /**
      * @param list<string> $candidates
+     *
+     * @return bool True when a non-assertion call matches a candidate SUT name.
      */
     private function hasNamedSutCall(TestQualityScope $scope, array $candidates): bool
     {
@@ -93,6 +105,11 @@ final readonly class SutNotCalledRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect subprocess-based tests that may invoke the SUT outside the AST call graph.
+     *
+     * @return bool True when the test launches a subprocess.
+     */
     private function invokesSubprocess(TestQualityScope $scope): bool
     {
         $finder = new NodeFinder();

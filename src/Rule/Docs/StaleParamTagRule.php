@@ -24,6 +24,11 @@ final readonly class StaleParamTagRule implements RuleInterface
 {
     public const ID = 'docs.stale-param-tag';
 
+    /**
+     * Describe the stale @param tag rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class StaleParamTagRule implements RuleInterface
         );
     }
 
+    /**
+     * Find @param tags that no longer match function parameters.
+     *
+     * @return list<Finding> Findings for stale @param tags.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

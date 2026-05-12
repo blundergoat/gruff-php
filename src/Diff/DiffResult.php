@@ -20,11 +20,21 @@ final readonly class DiffResult
     ) {
     }
 
+    /**
+     * Create a result object representing a full-project run without diff mode.
+     *
+     * @return self Inactive diff result with empty changed-file data.
+     */
     public static function inactive(): self
     {
         return new self(false, 'full-project', null, [], [], 'Diff mode is disabled.');
     }
 
+    /**
+     * Check whether a display path is part of the changed-file set.
+     *
+     * @return bool True when the file was marked as changed.
+     */
     public function hasFile(string $filePath): bool
     {
         return in_array($filePath, $this->changedFiles, true);

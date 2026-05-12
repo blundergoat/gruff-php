@@ -24,6 +24,11 @@ final readonly class MissingParamTagRule implements RuleInterface
 {
     public const ID = 'docs.missing-param-tag';
 
+    /**
+     * Describe the missing @param tag rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class MissingParamTagRule implements RuleInterface
         );
     }
 
+    /**
+     * Find documented public function-like declarations with undocumented parameters.
+     *
+     * @return list<Finding> Findings for missing parameter tags.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -114,6 +124,11 @@ final readonly class MissingParamTagRule implements RuleInterface
         return $result;
     }
 
+    /**
+     * Check whether a docblock carries enough contract text to require @param tags.
+     *
+     * @return bool True when parameter tags should be enforced.
+     */
     private function hasContractDoc(string $docText): bool
     {
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {

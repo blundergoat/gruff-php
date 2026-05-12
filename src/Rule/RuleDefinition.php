@@ -47,6 +47,11 @@ final readonly class RuleDefinition
         }
     }
 
+    /**
+     * Return the configured description or fall back to the rule name.
+     *
+     * @return string Display text for rule listings and reports.
+     */
     public function description(): string
     {
         return $this->description !== '' ? $this->description : $this->name;

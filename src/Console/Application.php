@@ -15,6 +15,9 @@ final class Application extends SymfonyApplication
 {
     public const VERSION = '0.1.0-dev';
 
+    /**
+     * Register the gruff CLI command surface with Symfony Console.
+     */
     public function __construct()
     {
         parent::__construct('gruff', self::VERSION);

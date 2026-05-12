@@ -21,6 +21,11 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 {
     public const ID = 'modernisation.readonly-property-candidate';
 
+    /**
+     * Describe the readonly property candidate rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         );
     }
 
+    /**
+     * Find constructor-assigned properties that could be readonly.
+     *
+     * @return list<Finding> Findings for readonly property candidates.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {

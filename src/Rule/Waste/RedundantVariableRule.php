@@ -24,6 +24,11 @@ final readonly class RedundantVariableRule implements RuleInterface
 {
     public const ID = 'waste.redundant-variable';
 
+    /**
+     * Describe the redundant variable waste rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class RedundantVariableRule implements RuleInterface
         );
     }
 
+    /**
+     * Find temporary variables that are immediately returned.
+     *
+     * @return list<Finding> Findings for redundant return variables.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -59,6 +69,7 @@ final readonly class RedundantVariableRule implements RuleInterface
     /**
      * @param array<Stmt> $statements
      * @param list<Finding> &$findings
+     * @return void
      */
     private function checkBlock(array $statements, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
     {
@@ -75,6 +86,7 @@ final readonly class RedundantVariableRule implements RuleInterface
 
     /**
      * @param list<Finding> &$findings
+     * @return void
      */
     private function flagRedundantPair(Stmt $assignment, Stmt $return, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
     {
@@ -114,6 +126,7 @@ final readonly class RedundantVariableRule implements RuleInterface
 
     /**
      * @param list<Finding> &$findings
+     * @return void
      */
     private function checkChildBlocks(Stmt $statement, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
     {

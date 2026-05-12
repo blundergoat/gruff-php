@@ -23,6 +23,11 @@ final readonly class EmptyMethodRule implements RuleInterface
 {
     public const ID = 'waste.empty-method';
 
+    /**
+     * Describe the empty method rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final readonly class EmptyMethodRule implements RuleInterface
         );
     }
 
+    /**
+     * Find function-like declarations with empty bodies.
+     *
+     * @return list<Finding> Findings for empty methods or functions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -79,6 +89,11 @@ final readonly class EmptyMethodRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Allow empty constructors that only define promoted properties.
+     *
+     * @return bool True when the constructor exists solely for property promotion.
+     */
     private function isPromotedConstructor(ClassMethod $method): bool
     {
         if ($method->name->toString() !== '__construct') {

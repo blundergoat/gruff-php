@@ -21,6 +21,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 {
     public const ID = 'naming.test-naming-consistency';
 
+    /**
+     * Describe the test naming consistency rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         );
     }
 
+    /**
+     * Find test method names that do not follow the configured convention.
+     *
+     * @return list<Finding> Findings for inconsistent test names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

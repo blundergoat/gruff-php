@@ -17,6 +17,11 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.jwt-token';
 
+    /**
+     * Describe the JWT token sensitive-data rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,11 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find string literals that resemble embedded JWT tokens.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for JWT-like literals.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         preg_match_all('/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $unit->source, $matches, PREG_OFFSET_CAPTURE);

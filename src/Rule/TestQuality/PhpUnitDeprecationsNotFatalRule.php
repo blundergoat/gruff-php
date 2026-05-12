@@ -24,11 +24,19 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /** @var array<string, true> */
     private array $emittedRoots = [];
 
+    /**
+     * Create the rule with injectable PHPUnit config discovery for tests.
+     */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
         $this->discovery = $discovery ?? new PhpUnitConfigDiscovery();
     }
 
+    /**
+     * Describe the PHPUnit deprecations-not-fatal rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +49,11 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
         );
     }
 
+    /**
+     * Report a project once when PHPUnit deprecations do not fail the run.
+     *
+     * @return list<Finding> Findings for non-fatal PHPUnit deprecations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $root = $context->projectRoot;

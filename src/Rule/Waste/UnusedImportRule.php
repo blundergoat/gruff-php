@@ -20,6 +20,11 @@ final readonly class UnusedImportRule implements RuleInterface
 {
     public const ID = 'waste.unused-import';
 
+    /**
+     * Describe the unused import rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class UnusedImportRule implements RuleInterface
         );
     }
 
+    /**
+     * Find imported names that are not referenced after import declarations are removed.
+     *
+     * @return list<Finding> Findings for unused import statements.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -77,6 +87,8 @@ final readonly class UnusedImportRule implements RuleInterface
 
     /**
      * @param list<Use_> $uses
+     *
+     * @return string Source text with use-statement lines blanked out.
      */
     private function removeUseStatements(string $source, array $uses): string
     {
@@ -98,6 +110,11 @@ final readonly class UnusedImportRule implements RuleInterface
         return implode("\n", $lines);
     }
 
+    /**
+     * Check whether an import alias appears in non-import source text.
+     *
+     * @return bool True when the alias is referenced.
+     */
     private function isNameUsed(string $alias, string $source): bool
     {
         return preg_match('/\b' . preg_quote($alias, '/') . '\b/', $source) === 1;

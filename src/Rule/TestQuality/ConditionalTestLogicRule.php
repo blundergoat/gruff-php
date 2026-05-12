@@ -20,6 +20,11 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 {
     public const ID = 'test-quality.conditional-logic';
 
+    /**
+     * Describe the conditional test logic rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -32,6 +37,11 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
         );
     }
 
+    /**
+     * Find test cases that hide behavior behind conditionals.
+     *
+     * @return list<Finding> Findings for conditional logic inside tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();

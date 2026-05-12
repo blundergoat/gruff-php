@@ -18,6 +18,11 @@ final readonly class TestMethodTooLongRule implements RuleInterface
 {
     public const ID = 'test-quality.test-method-too-long';
 
+    /**
+     * Describe the test method too long rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class TestMethodTooLongRule implements RuleInterface
         );
     }
 
+    /**
+     * Find test methods whose line count exceeds configured thresholds.
+     *
+     * @return list<Finding> Findings for oversized test methods.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -75,6 +85,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
 
     /**
      * @param list<string> $sourceLines
+     * @return int Count of non-empty, non-comment lines in the method range.
      */
     private function countMeaningfulLines(array $sourceLines, int $startLine, int $endLine): int
     {

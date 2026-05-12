@@ -8,6 +8,9 @@ use GruffPhp\Finding\Finding;
 
 final readonly class BaselineEntry
 {
+    /**
+     * Capture the stable fields used to match a finding against a baseline.
+     */
     public function __construct(
         public string $fingerprint,
         public string $ruleId,
@@ -18,6 +21,11 @@ final readonly class BaselineEntry
     ) {
     }
 
+    /**
+     * Create a baseline entry from a live analysis finding.
+     *
+     * @return self Baseline entry carrying the finding fingerprint and identity.
+     */
     public static function fromFinding(Finding $finding): self
     {
         return new self(
@@ -32,6 +40,7 @@ final readonly class BaselineEntry
 
     /**
      * @param array<string, mixed> $data
+     * @return self Baseline entry decoded from serialized baseline data.
      */
     public static function fromArray(array $data, int $index): self
     {

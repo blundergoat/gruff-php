@@ -6,6 +6,9 @@ namespace GruffPhp\Mutation;
 
 final readonly class InfectionMutant
 {
+    /**
+     * Capture a mutant entry parsed from Infection output.
+     */
     public function __construct(
         public string $status,
         public string $filePath,

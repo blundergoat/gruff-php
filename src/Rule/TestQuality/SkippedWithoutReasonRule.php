@@ -18,6 +18,11 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
 {
     public const ID = 'test-quality.skipped-without-reason';
 
+    /**
+     * Describe the skipped test without reason rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -30,6 +35,11 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
         );
     }
 
+    /**
+     * Find skipped or incomplete tests without an explanatory reason.
+     *
+     * @return list<Finding> Findings for unexplained skipped tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];

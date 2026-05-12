@@ -11,6 +11,11 @@ use GruffPhp\Mutation\MutationAnalysisResult;
 
 final readonly class TextReporter
 {
+    /**
+     * Render an analysis report as the default human-readable text output.
+     *
+     * @return string Text report with summary, diagnostics, and findings.
+     */
     public function render(AnalysisReport $report): string
     {
         $counts = $report->findingCounts();
@@ -52,6 +57,7 @@ final readonly class TextReporter
 
     /**
      * @param list<string> $lines
+     * @return void
      */
     private function appendReview(array &$lines, AnalysisReport $report): void
     {
@@ -92,6 +98,7 @@ final readonly class TextReporter
 
     /**
      * @param list<string> $lines
+     * @return void
      */
     private function appendScore(array &$lines, AnalysisReport $report): void
     {
@@ -132,6 +139,7 @@ final readonly class TextReporter
 
     /**
      * @param list<string> $lines
+     * @return void
      */
     private function appendBaseline(array &$lines, AnalysisReport $report): void
     {
@@ -170,6 +178,7 @@ final readonly class TextReporter
 
     /**
      * @param list<string> $lines
+     * @return void
      */
     private function appendMutation(array &$lines, ?MutationAnalysisResult $mutation): void
     {
@@ -227,6 +236,7 @@ final readonly class TextReporter
     /**
      * @param list<string> $lines
      * @param list<string> $paths
+     * @return void
      */
     private function appendPathSection(array &$lines, string $title, array $paths): void
     {
@@ -245,6 +255,7 @@ final readonly class TextReporter
     /**
      * @param list<string> $lines
      * @param list<RunDiagnostic> $diagnostics
+     * @return void
      */
     private function appendDiagnostics(array &$lines, array $diagnostics): void
     {
@@ -276,6 +287,7 @@ final readonly class TextReporter
     /**
      * @param list<string> $lines
      * @param list<Finding> $findings
+     * @return void
      */
     private function appendFindings(array &$lines, array $findings): void
     {

@@ -23,6 +23,11 @@ final readonly class PublicMethodCountRule implements RuleInterface
 {
     public const ID = 'size.public-method-count';
 
+    /**
+     * Describe the public method count rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -39,6 +44,11 @@ final readonly class PublicMethodCountRule implements RuleInterface
         );
     }
 
+    /**
+     * Find classes and enums with too many public methods.
+     *
+     * @return list<Finding> Findings for oversized public APIs.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -100,6 +110,11 @@ final readonly class PublicMethodCountRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

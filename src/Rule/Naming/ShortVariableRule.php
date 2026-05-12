@@ -30,6 +30,11 @@ final readonly class ShortVariableRule implements RuleInterface
     private const LOOP_COUNTER_ALLOWLIST = ['i', 'j', 'k', 'n', 'x', 'y', 'z'];
     private const CATCH_ALLOWLIST = ['e'];
 
+    /**
+     * Describe the short variable naming rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -42,6 +47,11 @@ final readonly class ShortVariableRule implements RuleInterface
         );
     }
 
+    /**
+     * Find short variable names outside accepted local conventions.
+     *
+     * @return list<Finding> Findings for overly short variable names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

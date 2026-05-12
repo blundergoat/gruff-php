@@ -21,6 +21,11 @@ final readonly class EagerTestRule implements RuleInterface
 {
     public const ID = 'test-quality.eager-test';
 
+    /**
+     * Describe the eager test rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class EagerTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that assert many times across multiple apparent SUT calls.
+     *
+     * @return list<Finding> Findings for eager tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -119,6 +129,11 @@ final readonly class EagerTestRule implements RuleInterface
         return $variables;
     }
 
+    /**
+     * Detect call-chain expressions whose assigned variables represent result values.
+     *
+     * @return bool True when the expression is a call result.
+     */
     private function expressionIsCallChain(Expr $expr): bool
     {
         // Method/static/function call results are "result variables" whose subsequent method
@@ -132,6 +147,8 @@ final readonly class EagerTestRule implements RuleInterface
 
     /**
      * @param array<string, true> $resultVariables
+     *
+     * @return bool True when the receiver roots at a known result variable.
      */
     private function receiverIsResultVariable(Expr $receiver, array $resultVariables): bool
     {

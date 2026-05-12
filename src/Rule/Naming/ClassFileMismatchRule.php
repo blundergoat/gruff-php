@@ -24,6 +24,11 @@ final readonly class ClassFileMismatchRule implements RuleInterface
 {
     public const ID = 'naming.class-file-mismatch';
 
+    /**
+     * Describe the class-file mismatch naming rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         );
     }
 
+    /**
+     * Find primary class names that do not match their file names.
+     *
+     * @return list<Finding> Findings for class and file name mismatches.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();

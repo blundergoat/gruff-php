@@ -31,6 +31,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
         'supports', 'touches', 'uses',
     ];
 
+    /**
+     * Describe the boolean method prefix rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -43,6 +48,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
         );
     }
 
+    /**
+     * Find bool-returning functions and methods without a boolean-style prefix.
+     *
+     * @return list<Finding> Findings for poorly named boolean callables.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -95,6 +105,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a function-like declaration has an explicit bool return type.
+     *
+     * @return bool True when the declared return type is bool.
+     */
     private function returnsBool(ClassMethod|Function_ $node): bool
     {
         $returnType = $node->getReturnType();

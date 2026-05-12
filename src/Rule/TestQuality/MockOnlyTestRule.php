@@ -18,6 +18,11 @@ final readonly class MockOnlyTestRule implements RuleInterface
 {
     public const ID = 'test-quality.mock-only-test';
 
+    /**
+     * Describe the mock-only test rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -30,6 +35,11 @@ final readonly class MockOnlyTestRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that exercise only mocks without a concrete subject.
+     *
+     * @return list<Finding> Findings for mock-only tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];

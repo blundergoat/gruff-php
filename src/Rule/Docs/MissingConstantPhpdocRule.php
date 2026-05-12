@@ -26,6 +26,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
 {
     public const ID = 'docs.missing-constant-phpdoc';
 
+    /**
+     * Describe the missing constant PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -38,6 +43,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class constants and enum cases without PHPDoc.
+     *
+     * @return list<Finding> Findings for undocumented constants.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
