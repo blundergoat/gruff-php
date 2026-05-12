@@ -100,7 +100,7 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline finding %d must be a JSON object.', $index));
             }
 
-            /** @var array<string, mixed> $finding */
+            /** @var array<string, mixed> $finding The preceding guards prove each decoded list item is a JSON object. */
             $entries[] = BaselineEntry::fromArray($finding, $index);
         }
 

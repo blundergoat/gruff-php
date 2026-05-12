@@ -13,8 +13,10 @@ use LogicException;
 final readonly class RuleSettings
 {
     /**
-     * @param array<string, int|float> $thresholds
-     * @param array<string, mixed> $options
+     * @param bool $enabled Whether the rule should run for this config.
+     * @param array<string, int|float> $thresholds Named numeric thresholds available to the rule.
+     * @param array<string, mixed> $options Rule-specific option values from config.
+     * @param SeverityThreshold|null $severityThreshold Optional single threshold/severity override.
      */
     public function __construct(
         public bool $enabled,
@@ -27,6 +29,8 @@ final readonly class RuleSettings
     /**
      * Return a configured numeric threshold by name.
      *
+     * @param string $name Threshold key to read.
+     * @throws LogicException When the configured value is missing or non-numeric.
      * @return int|float Threshold value.
      */
     public function numericThreshold(string $name): int|float
@@ -43,6 +47,7 @@ final readonly class RuleSettings
     /**
      * Match a value where higher numbers are worse against configured thresholds.
      *
+     * @param int|float $value Measured rule value to compare.
      * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
      */
     public function highValueThresholdMatch(int|float $value): ?ThresholdMatch
@@ -70,6 +75,7 @@ final readonly class RuleSettings
     /**
      * Match a value where lower numbers are worse against configured thresholds.
      *
+     * @param int|float $value Measured rule value to compare.
      * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
      */
     public function lowValueThresholdMatch(int|float $value): ?ThresholdMatch
@@ -97,6 +103,7 @@ final readonly class RuleSettings
     /**
      * Check whether an option was configured.
      *
+     * @param string $name Option key to check.
      * @return bool True when the option key exists.
      */
     public function hasOption(string $name): bool
@@ -107,6 +114,8 @@ final readonly class RuleSettings
     /**
      * Return a configured option by name.
      *
+     * @param string $name Option key to read.
+     * @throws LogicException When the option key is missing.
      * @return mixed Option value.
      */
     public function option(string $name): mixed
@@ -119,7 +128,11 @@ final readonly class RuleSettings
     }
 
     /**
-     * @return list<string>
+     * Return a configured option as a string list.
+     *
+     * @param string $name Option key to read.
+     * @throws LogicException When the option value is not a list of strings.
+     * @return list<string> String option values.
      */
     public function stringListOption(string $name): array
     {

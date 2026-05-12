@@ -13,6 +13,13 @@ final readonly class BaselineEntry
 {
     /**
      * Capture the stable fields used to match a finding against a baseline.
+     *
+     * @param string $fingerprint Stable finding fingerprint used for baseline matching.
+     * @param string $ruleId Rule identifier that produced the finding.
+     * @param string $filePath Display path recorded for the finding.
+     * @param int|null $line Source line recorded for the finding, when known.
+     * @param string|null $symbol Symbol recorded for the finding, when available.
+     * @param string $message Finding message preserved for stale-entry reporting.
      */
     public function __construct(
         public string $fingerprint,
@@ -27,6 +34,7 @@ final readonly class BaselineEntry
     /**
      * Create a baseline entry from a live analysis finding.
      *
+     * @param Finding $finding Live analysis finding to persist in the baseline.
      * @return self Baseline entry carrying the finding fingerprint and identity.
      */
     public static function fromFinding(Finding $finding): self
@@ -42,7 +50,9 @@ final readonly class BaselineEntry
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param array<string, mixed> $data Serialized baseline row decoded from JSON.
+     * @param int $index Zero-based baseline entry position for error messages.
+     * @throws BaselineException When required fields are missing or malformed.
      * @return self Baseline entry decoded from serialized baseline data.
      */
     public static function fromArray(array $data, int $index): self

@@ -76,7 +76,7 @@ final readonly class InfectionReport
      */
     public function fileSummaries(): array
     {
-        /** @var array<string, array{total: int, killed: int, survived: int, notCovered: int}> $byFile */
+        /** @var array<string, array{total: int, killed: int, survived: int, notCovered: int}> $byFile Accumulator shape is built incrementally per mutant file path. */
         $byFile = [];
 
         foreach ($this->mutants as $mutant) {

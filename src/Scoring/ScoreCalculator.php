@@ -139,7 +139,7 @@ final readonly class ScoreCalculator
      */
     private function fileScores(array $findings, ?MutationAnalysisResult $mutation): array
     {
-        /** @var array<string, list<Finding>> $byFile */
+        /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
 
         foreach ($findings as $finding) {
