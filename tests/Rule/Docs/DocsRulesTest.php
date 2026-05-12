@@ -206,10 +206,10 @@ final class DocsRulesTest extends TestCase
 
     public function testAnyDocumentedMethodRequiresReturnTag(): void
     {
-        $paramFindings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
+        $paramFindings  = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
         $returnFindings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $paramSymbols = array_map(static fn ($f) => $f->symbol, $paramFindings);
+        $paramSymbols  = array_map(static fn ($f) => $f->symbol, $paramFindings);
         $returnSymbols = array_map(static fn ($f) => $f->symbol, $returnFindings);
 
         self::assertNotContains('PhpdocTagsFixture::apiMarkerOnly()', $paramSymbols);
@@ -250,8 +250,8 @@ final class DocsRulesTest extends TestCase
 
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
-        $missingPhpdoc = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
-        $missingThrows = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
+        $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
+        $missingThrows        = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
         $missingPhpdocSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingPhpdoc);
         $missingThrowsSymbols = array_map(static fn ($finding): ?string => $finding->symbol, $missingThrows);
 
@@ -295,7 +295,7 @@ final class DocsRulesTest extends TestCase
     public function testContinueRequiresDirectOneLineComment(): void
     {
         $findings = $this->analyseRule('control-flow-comments.php', ContinueCommentRule::ID);
-        $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
+        $lines    = array_map(static fn ($finding): ?int => $finding->line, $findings);
 
         self::assertSame([19, 30], $lines);
 
@@ -307,7 +307,7 @@ final class DocsRulesTest extends TestCase
     public function testReturnRequiresDirectOneLineComment(): void
     {
         $findings = $this->analyseRule('control-flow-comments.php', ReturnCommentRule::ID);
-        $lines = array_map(static fn ($finding): ?int => $finding->line, $findings);
+        $lines    = array_map(static fn ($finding): ?int => $finding->line, $findings);
 
         self::assertSame([35, 46], $lines);
 
@@ -347,9 +347,9 @@ final class DocsRulesTest extends TestCase
 
     public function testCleanFixtureHasNoDocFindings(): void
     {
-        $unit = $this->parseFixture('clean.php');
+        $unit     = $this->parseFixture('clean.php');
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         $docFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'docs.'));
@@ -497,9 +497,9 @@ final class DocsRulesTest extends TestCase
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));

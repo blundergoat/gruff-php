@@ -81,10 +81,10 @@ final class NamingRulesTest extends TestCase
 
     public function testAcceptedAbbreviationsCanSuppressShortVariableFindings(): void
     {
-        $unit = $this->parseFixture('short-variable.php');
-        $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations(['a']);
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $unit                  = $this->parseFixture('short-variable.php');
+        $registry              = RuleRegistry::defaults();
+        $config                = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations(['a']);
+        $findings              = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $shortVariableFindings = array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === ShortVariableRule::ID,
@@ -238,7 +238,7 @@ final class NamingRulesTest extends TestCase
     public function testIdentifierQualityExemptsCommonNoiseSources(): void
     {
         $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
-        $names = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
 
         self::assertNotContains('provideThings', $names);
         self::assertNotContains('userName', $names);
@@ -252,7 +252,7 @@ final class NamingRulesTest extends TestCase
 
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
-        $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
+        $findings    = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
         $itemFinding = null;
 
         foreach ($findings as $finding) {
@@ -333,19 +333,19 @@ final class NamingRulesTest extends TestCase
         // ignoredParameterNames are skipped regardless of type. Gruff's own
         // .gruff.yaml uses this for AST-walker conventions ($node, $context, etc.);
         // downstream projects can pick their own list.
-        $unit = $this->parseFixture('parameter-type-name.php');
+        $unit     = $this->parseFixture('parameter-type-name.php');
         $registry = RuleRegistry::defaults();
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ParameterTypeNameRule::ID);
-        $config = AnalysisConfig::fromRegistry($registry)
+        $config   = AnalysisConfig::fromRegistry($registry)
             ->withRuleSettings(ParameterTypeNameRule::ID, new \GruffPhp\Config\RuleSettings(
-                enabled: true,
+                enabled:    true,
                 thresholds: $settings->thresholds,
-                options: array_merge($settings->options, [
+                options:    array_merge($settings->options, [
                     'ignoredParameterNames' => ['session', 'thing'],
                 ]),
             ));
 
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings          = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $parameterFindings = array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === ParameterTypeNameRule::ID,
@@ -360,21 +360,21 @@ final class NamingRulesTest extends TestCase
 
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
-        $unit = $this->parseFixture('identifier-quality.php');
+        $unit     = $this->parseFixture('identifier-quality.php');
         $registry = RuleRegistry::defaults();
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(IdentifierQualityRule::ID);
-        $config = AnalysisConfig::fromRegistry($registry)
+        $config   = AnalysisConfig::fromRegistry($registry)
             ->withAcceptedAbbreviations(['api'])
             ->withRuleSettings(IdentifierQualityRule::ID, new \GruffPhp\Config\RuleSettings(
-                enabled: true,
+                enabled:    true,
                 thresholds: $settings->thresholds,
-                options: array_merge($settings->options, [
+                options:    array_merge($settings->options, [
                     'placeholderNames' => ['foo', 'bar', 'baz', 'tmp', 'temp'],
                     'ignoredNames' => ['thing', 'data', 'helperthing'],
                 ]),
             ));
 
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings           = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $identifierFindings = array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
@@ -392,9 +392,9 @@ final class NamingRulesTest extends TestCase
 
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void
     {
-        $unit = $this->parseFixture('clean.php');
+        $unit     = $this->parseFixture('clean.php');
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         $namingFindings = array_filter(
@@ -409,9 +409,9 @@ final class NamingRulesTest extends TestCase
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));

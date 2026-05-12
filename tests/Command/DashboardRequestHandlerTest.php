@@ -88,7 +88,7 @@ final class DashboardRequestHandlerTest extends TestCase
     private function handler(): DashboardRequestHandler
     {
         $stateFactory = new DashboardStateFactory();
-        $renderer = new DashboardPageRenderer();
+        $renderer     = new DashboardPageRenderer();
 
         return new DashboardRequestHandler(
             new DashboardRequestContext(

@@ -103,7 +103,7 @@ final readonly class EagerTestRule implements RuleInterface
                 continue;
             }
 
-            if ($call instanceof Expr\MethodCall && $this->receiverIsResultVariable($call->var, $resultVariables)) {
+            if ($call instanceof Expr\MethodCall && $this->isResultVariableReceiver($call->var, $resultVariables)) {
                 continue;
             }
 
@@ -130,7 +130,7 @@ final readonly class EagerTestRule implements RuleInterface
                 continue;
             }
 
-            if ($this->expressionIsCallChain($assign->expr)) {
+            if ($this->isCallChainExpression($assign->expr)) {
                 $variables[$assign->var->name] = true;
             }
         }
@@ -143,7 +143,7 @@ final readonly class EagerTestRule implements RuleInterface
      *
      * @return bool True when the expression is a call result.
      */
-    private function expressionIsCallChain(Expr $expr): bool
+    private function isCallChainExpression(Expr $expr): bool
     {
         // Method/static/function call results are "result variables" whose subsequent method
         // calls are getters on the result, not fresh SUT calls. `new X()` is intentionally
@@ -159,7 +159,7 @@ final readonly class EagerTestRule implements RuleInterface
      *
      * @return bool True when the receiver roots at a known result variable.
      */
-    private function receiverIsResultVariable(Expr $receiver, array $resultVariables): bool
+    private function isResultVariableReceiver(Expr $receiver, array $resultVariables): bool
     {
         while ($receiver instanceof Expr\MethodCall) {
             $receiver = $receiver->var;

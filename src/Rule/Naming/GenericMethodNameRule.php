@@ -135,8 +135,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
         $first  = $method->params[0]->type ?? null;
         $second = $method->params[1]->type ?? null;
 
-        return $this->parameterTypeShortNameMatches($first, 'InputInterface')
-            && $this->parameterTypeShortNameMatches($second, 'OutputInterface');
+        return $this->hasParameterTypeShortName($first, 'InputInterface')
+            && $this->hasParameterTypeShortName($second, 'OutputInterface');
     }
 
     /**
@@ -144,7 +144,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
      *
      * @return bool True when the type short name matches.
      */
-    private function parameterTypeShortNameMatches(?Node $type, string $shortName): bool
+    private function hasParameterTypeShortName(?Node $type, string $shortName): bool
     {
         if ($type instanceof Name) {
             $parts = $type->getParts();

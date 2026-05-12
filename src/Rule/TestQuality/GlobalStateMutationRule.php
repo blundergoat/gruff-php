@@ -71,7 +71,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $classesByName = $this->classesByName($unit, $finder);
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            if (!$this->scopeNeedsCleanupCheck($scope, $cleanupCache, $classesByName)) {
+            if (!$this->shouldCheckScopeCleanup($scope, $cleanupCache, $classesByName)) {
                 continue;
             }
 
@@ -91,7 +91,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      *
      * @return bool True when the scope should be scanned for cleanup-sensitive mutations.
      */
-    private function scopeNeedsCleanupCheck(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
+    private function shouldCheckScopeCleanup(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
         if ($scope->isPest) {
             return false;
@@ -104,7 +104,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
         $classKey = spl_object_id($class);
         if (!array_key_exists($classKey, $cleanupCache)) {
-            $cleanupCache[$classKey] = $this->classHasCleanup($class, $classesByName);
+            $cleanupCache[$classKey] = $this->hasCleanupInClass($class, $classesByName);
         }
 
         return !$cleanupCache[$classKey];
@@ -128,11 +128,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                $unit,
-                $scope,
-                $assign->getStartLine(),
-                sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
-                ['variant' => 'superglobal', 'name' => $superglobal],
+                unit:     $unit,
+                scope:    $scope,
+                line:     $assign->getStartLine(),
+                message:  sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
+                metadata: ['variant' => 'superglobal', 'name' => $superglobal],
             );
         }
 
@@ -157,11 +157,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                $unit,
-                $scope,
-                $call->getStartLine(),
-                sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
-                ['variant' => 'function', 'name' => $name],
+                unit:     $unit,
+                scope:    $scope,
+                line:     $call->getStartLine(),
+                message:  sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
+                metadata: ['variant' => 'function', 'name' => $name],
             );
         }
 
@@ -197,7 +197,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      *
      * @return bool True when the class or an ancestor declares a cleanup hook.
      */
-    private function classHasCleanup(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
+    private function hasCleanupInClass(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
     {
         $classId = spl_object_id($class);
         if (isset($visited[$classId])) {
@@ -236,7 +236,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             return !in_array($this->shortName($parentName), ['TestCase'], true);
         }
 
-        return $this->classHasCleanup($parent, $classesByName, $visited);
+        return $this->hasCleanupInClass($parent, $classesByName, $visited);
     }
 
     /**

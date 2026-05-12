@@ -9,6 +9,10 @@ use JsonException;
 
 /**
  * Reads and writes gruff baseline files relative to a project root.
+ *
+ * @phpstan-type BaselineJsonValue bool|float|int|string|null
+ * @phpstan-type BaselineFindingRow array<string, BaselineJsonValue>
+ * @phpstan-type BaselineFileData array{schemaVersion: string, findings: list<BaselineFindingRow>}
  */
 final readonly class BaselineStore
 {
@@ -39,14 +43,13 @@ final readonly class BaselineStore
      */
     public function read(string $path): BaselineData
     {
-        $decoded  = $this->readBaselineObject($path);
-        $findings = $this->readFindingsList($decoded);
+        $decoded = $this->readBaselineObject($path);
 
-        return new BaselineData($path, $this->entriesFromFindings($findings));
+        return new BaselineData($path, $this->entriesFromFindings($decoded['findings']));
     }
 
     /**
-     * @return array<mixed>
+     * @return BaselineFileData
      */
     private function readBaselineObject(string $path): array
     {
@@ -74,36 +77,55 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
 
-        return $decoded;
+        return [
+            'schemaVersion' => self::SCHEMA_VERSION,
+            'findings' => $this->readFindingsList($decoded['findings'] ?? null),
+        ];
     }
 
     /**
-     * @param array<mixed> $decoded
-     * @return list<mixed>
+     * @return list<BaselineFindingRow>
      */
-    private function readFindingsList(array $decoded): array
+    private function readFindingsList(mixed $findings): array
     {
-        $findings = $decoded['findings'] ?? null;
         if (!is_array($findings) || !array_is_list($findings)) {
             throw new BaselineException('Baseline key "findings" must be a list.');
         }
 
-        return $findings;
+        $rows = [];
+
+        foreach ($findings as $index => $finding) {
+            if (!is_array($finding) || array_is_list($finding)) {
+                throw new BaselineException(sprintf('Baseline finding %d must be a JSON object.', $index));
+            }
+
+            $row = [];
+            foreach ($finding as $key => $value) {
+                if (!is_string($key)) {
+                    throw new BaselineException(sprintf('Baseline finding %d contains a non-string key.', $index));
+                }
+
+                if (!is_bool($value) && !is_float($value) && !is_int($value) && !is_string($value) && $value !== null) {
+                    throw new BaselineException(sprintf('Baseline finding %d field "%s" must be a scalar or null.', $index, $key));
+                }
+
+                $row[$key] = $value;
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
     }
 
     /**
-     * @param list<mixed> $findings
+     * @param list<BaselineFindingRow> $findings
      * @return list<BaselineEntry>
      */
     private function entriesFromFindings(array $findings): array
     {
         $entries = [];
         foreach ($findings as $index => $finding) {
-            if (!is_array($finding) || array_is_list($finding)) {
-                throw new BaselineException(sprintf('Baseline finding %d must be a JSON object.', $index));
-            }
-
-            /** @var array<string, mixed> $finding The preceding guards prove each decoded list item is a JSON object. */
             $entries[] = BaselineEntry::fromArray($finding, $index);
         }
 
@@ -123,7 +145,7 @@ final readonly class BaselineStore
             static fn (Finding $finding): BaselineEntry => BaselineEntry::fromFinding($finding),
             $findings,
         );
-        $data         = new BaselineData($path, $entries);
+        $baselineData = new BaselineData($path, $entries);
         $absolutePath = $this->absolutePath($path);
         $directory    = dirname($absolutePath);
 
@@ -148,7 +170,7 @@ final readonly class BaselineStore
 
         $this->writeAtomically($absolutePath, $json . PHP_EOL, $path);
 
-        return $data;
+        return $baselineData;
     }
 
     /**

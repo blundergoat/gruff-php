@@ -13,10 +13,10 @@ use LogicException;
 final readonly class RuleSettings
 {
     /**
-     * @param bool                     $enabled           Whether the rule should run for this config.
-     * @param array<string, int|float> $thresholds        Named numeric thresholds available to the rule.
-     * @param array<string, mixed>     $options           Rule-specific option values from config.
-     * @param SeverityThreshold|null   $severityThreshold Optional single threshold/severity override.
+     * @param bool                                                                         $enabled           Whether the rule should run for this config.
+     * @param array<string, int|float>                                                     $thresholds        Named numeric thresholds available to the rule.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options           Rule-specific option values from config.
+     * @param SeverityThreshold|null                                                       $severityThreshold Optional single threshold/severity override.
      */
     public function __construct(
         public bool $enabled,
@@ -116,9 +116,9 @@ final readonly class RuleSettings
      *
      * @param string $name Option key to read.
      * @throws LogicException When the option key is missing.
-     * @return mixed Option value.
+     * @return int|float|bool|string|array<array-key, int|float|bool|string> Option value.
      */
-    public function option(string $name): mixed
+    public function option(string $name): int|float|bool|string|array
     {
         if (!array_key_exists($name, $this->options)) {
             throw new LogicException(sprintf('Missing option "%s".', $name));

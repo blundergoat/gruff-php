@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 final class PhpDocMixedOveruseRuleTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
-    private const FIXTURE = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
+    private const FIXTURE      = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
 
     public function testFixtureProducesExpectedPhpdocMixedFindings(): void
     {
@@ -160,7 +160,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      */
     private function analyseFixture(): array
     {
-        $unit = $this->unitForPath(self::FIXTURE);
+        $unit     = $this->unitForPath(self::FIXTURE);
         $registry = RuleRegistry::defaults();
 
         return $registry->analyse(

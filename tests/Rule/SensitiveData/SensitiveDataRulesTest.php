@@ -53,7 +53,7 @@ final class SensitiveDataRulesTest extends TestCase
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
         $discovery = new SourceDiscovery(self::PROJECT_ROOT);
-        $result = $discovery->discover(['tests/Fixtures/SensitiveData/config-secrets.json']);
+        $result    = $discovery->discover(['tests/Fixtures/SensitiveData/config-secrets.json']);
 
         self::assertCount(1, $result->files);
         self::assertSame(SourceFile::TYPE_TEXT, $result->files[0]->type);
@@ -103,7 +103,7 @@ $secret = 'API_TOKEN=qR8vT3mK6pL9xS2nD4eG';
 PHP));
 
         try {
-            $unit = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
             $findings = array_values(array_filter(
                 $this->analyseUnits([$unit]),
                 static fn (Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
@@ -119,7 +119,7 @@ PHP));
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/disable-high-entropy.yaml',
             $registry,
         );
@@ -204,7 +204,7 @@ PHP));
     private function unitForPath(string $path): AnalysisUnit
     {
         $absolutePath = self::PROJECT_ROOT . '/' . $path;
-        $type = str_ends_with($path, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
+        $type         = str_ends_with($path, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
 
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $path, $type));
     }

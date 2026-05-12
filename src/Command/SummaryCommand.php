@@ -84,7 +84,13 @@ final class SummaryCommand extends Command
 
         $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
-        $config       = $this->analysisConfig($noConfig, $configPath, $registry, $configLoader, $output);
+        $config       = $this->analysisConfig(
+            noConfig:     $noConfig,
+            configPath:   $configPath,
+            registry:     $registry,
+            configLoader: $configLoader,
+            output:       $output,
+        );
         if (!$config instanceof AnalysisConfig) {
             return Command::INVALID;
         }

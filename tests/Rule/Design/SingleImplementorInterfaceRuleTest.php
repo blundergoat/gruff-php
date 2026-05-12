@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
 final class SingleImplementorInterfaceRuleTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
-    private const FIXTURE_DIR = 'tests/Fixtures/Design/single-implementor-interface';
+    private const FIXTURE_DIR  = 'tests/Fixtures/Design/single-implementor-interface';
 
     public function testInternalOneImplFlagsExactlyOneInterface(): void
     {
@@ -130,7 +130,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $registry = RuleRegistry::defaults();
         $config ??= AnalysisConfig::fromRegistry($registry);
 
-        $units = $this->fixtureUnits();
+        $units       = $this->fixtureUnits();
         $allFindings = $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config),
@@ -148,7 +148,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     private function fixtureUnits(): array
     {
         $parser = new PhpFileParser();
-        $paths = [
+        $paths  = [
             'psr/AuditPsrLogger.php',
             'symfony-tagged/SymfonyTaggedListener.php',
             'internal-one-impl/BookingOtpGateway.php',
@@ -160,7 +160,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $units = [];
         foreach ($paths as $relative) {
             $absolute = self::PROJECT_ROOT . '/' . self::FIXTURE_DIR . '/' . $relative;
-            $units[] = $parser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
+            $units[]  = $parser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
         }
 
         return $units;

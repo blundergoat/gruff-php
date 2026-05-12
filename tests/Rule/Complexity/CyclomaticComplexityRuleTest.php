@@ -24,7 +24,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new CyclomaticComplexityRule();
+        $this->rule   = new CyclomaticComplexityRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -47,8 +47,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
     #[DataProvider('methodCcnProvider')]
     public function testCyclomaticCountMatchesExpected(string $methodName, int $expectedCcn): void
     {
-        $unit = $this->parseFixture('cyclomatic.php');
-        $finder = new NodeFinder();
+        $unit    = $this->parseFixture('cyclomatic.php');
+        $finder  = new NodeFinder();
         $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
@@ -100,9 +100,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             CyclomaticComplexityRule::ID,
             new RuleSettings(true, $thresholds),
         );

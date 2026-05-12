@@ -89,7 +89,13 @@ final readonly class AnalyseCommandSetupBuilder
         $options      = $options->withDefaultBaseline($projectRoot);
         $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
-        $configResult = $this->config($options, $registry, $formatResult, $failThreshold, $configLoader);
+        $configResult = $this->config(
+            options:       $options,
+            registry:      $registry,
+            format:        $formatResult,
+            failThreshold: $failThreshold,
+            configLoader:  $configLoader,
+        );
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
@@ -164,7 +170,13 @@ final readonly class AnalyseCommandSetupBuilder
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
         } catch (ConfigException $exception) {
-            return $this->usageReport($options, $format, $failThreshold->value, $exception->getMessage(), 'config-error');
+            return $this->usageReport(
+                options: $options,
+                format:  $format,
+                failOn:  $failThreshold->value,
+                message: $exception->getMessage(),
+                type:    'config-error',
+            );
         }
     }
 

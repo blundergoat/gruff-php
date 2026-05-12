@@ -264,8 +264,8 @@ final class TestQualityNodeHelper
                 && self::literalValue(self::pestExpectationValue($call)) === true,
             'tobefalse' => $call instanceof Expr\MethodCall
                 && self::literalValue(self::pestExpectationValue($call)) === false,
-            'assertequals', 'assertsame' => self::sameLiteralArguments($call),
-            'tobe', 'toequal' => $call instanceof Expr\MethodCall && self::samePestLiteralArguments($call),
+            'assertequals', 'assertsame' => self::hasSameLiteralArguments($call),
+            'tobe', 'toequal' => $call instanceof Expr\MethodCall && self::hasSamePestLiteralArguments($call),
             default => false,
         };
     }
@@ -275,7 +275,7 @@ final class TestQualityNodeHelper
      *
      * @return bool True when both arguments resolve to the same scalar literal.
      */
-    private static function sameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    private static function hasSameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         $expected = self::literalValue(self::firstArgValue($call));
 
@@ -287,7 +287,7 @@ final class TestQualityNodeHelper
      *
      * @return bool True when expect($x)->toBe($x) has equal literal arguments.
      */
-    private static function samePestLiteralArguments(Expr\MethodCall $call): bool
+    private static function hasSamePestLiteralArguments(Expr\MethodCall $call): bool
     {
         $expected = self::literalValue(self::firstArgValue($call));
 

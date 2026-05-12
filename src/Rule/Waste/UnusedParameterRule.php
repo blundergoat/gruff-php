@@ -194,7 +194,13 @@ final readonly class UnusedParameterRule implements RuleInterface
 
         foreach ($this->parameterNames($node) as $name => $param) {
             if (!isset($usedNames[$name])) {
-                $findings[] = $this->findingForParameter($unit, $definition, $node, $name, $param);
+                $findings[] = $this->findingForParameter(
+                    unit:       $unit,
+                    definition: $definition,
+                    node:       $node,
+                    name:       $name,
+                    param:      $param,
+                );
             }
         }
 

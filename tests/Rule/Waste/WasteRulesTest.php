@@ -180,7 +180,7 @@ final class WasteRulesTest extends TestCase
     public function testOneLineCallWrapperMethodsAreDetected(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
         self::assertSame(Severity::Advisory, $findings[0]->severity);
@@ -190,7 +190,7 @@ final class WasteRulesTest extends TestCase
     public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
         self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
@@ -199,7 +199,7 @@ final class WasteRulesTest extends TestCase
 
     public function testRedundantVariableBeforeReturnDetected(): void
     {
-        $findings = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
+        $findings  = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
         $variables = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
 
         self::assertSame(['result', 'branchResult'], $variables);
@@ -207,9 +207,9 @@ final class WasteRulesTest extends TestCase
 
     public function testCleanFileHasNoWasteFindings(): void
     {
-        $unit = $this->parseFixture('clean.php');
+        $unit     = $this->parseFixture('clean.php');
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         $wasteFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'waste.') || str_starts_with($f->ruleId, 'dead-code.'));
@@ -221,9 +221,9 @@ final class WasteRulesTest extends TestCase
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));

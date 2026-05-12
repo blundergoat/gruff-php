@@ -29,7 +29,7 @@ final readonly class MutationAnalysisBuilder
             return null;
         }
 
-        if (!$this->runInfection($projectRoot, $options, $diagnostics)) {
+        if (!$this->canRunInfection($projectRoot, $options, $diagnostics)) {
             return null;
         }
 
@@ -57,7 +57,7 @@ final readonly class MutationAnalysisBuilder
      * @param list<RunDiagnostic> $diagnostics
      * @return bool True when Infection output is available for parsing.
      */
-    private function runInfection(
+    private function canRunInfection(
         string $projectRoot,
         MutationAnalysisOptions $options,
         array &$diagnostics,

@@ -179,10 +179,10 @@ final readonly class ScoreCalculator
             );
         }
 
-        usort($scores, static function (FileScore $a, FileScore $b): int {
-            return $a->grade->score <=> $b->grade->score
-                ?: $b->findings <=> $a->findings
-                ?: strcmp($a->filePath, $b->filePath);
+        usort($scores, static function (FileScore $left, FileScore $right): int {
+            return $left->grade->score <=> $right->grade->score
+                ?: $right->findings <=> $left->findings
+                ?: strcmp($left->filePath, $right->filePath);
         });
 
         return array_slice($scores, 0, 10);

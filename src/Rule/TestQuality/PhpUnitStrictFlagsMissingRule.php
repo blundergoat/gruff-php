@@ -40,7 +40,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Config discovery collaborator cached for repeated project scans.
      */
-    private PhpUnitConfigDiscovery $discovery;
+    private readonly PhpUnitConfigDiscovery $discovery;
 
     /** @var array<string, true> */
     private array $emittedRoots = [];

@@ -89,7 +89,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             $calledNames = $this->calledPrivateMethodNames($finder, $classLike);
             $findings    = array_merge(
                 $findings,
-                $this->findingsForUnusedMethods($unit, $definition, $classLike, $privateMethods, $calledNames),
+                $this->findingsForUnusedMethods(
+                    unit:           $unit,
+                    definition:     $definition,
+                    classLike:      $classLike,
+                    privateMethods: $privateMethods,
+                    calledNames:    $calledNames,
+                ),
             );
         }
 

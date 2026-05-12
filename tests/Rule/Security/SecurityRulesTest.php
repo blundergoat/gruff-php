@@ -57,7 +57,7 @@ final class SecurityRulesTest extends TestCase
 
     public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
     {
-        $findings = $this->findingsForRule($this->typedCallableUnit(), DangerousFunctionCallRule::ID);
+        $findings  = $this->findingsForRule($this->typedCallableUnit(), DangerousFunctionCallRule::ID);
         $functions = array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
 
         self::assertNotContains('dynamic function call', $functions);
@@ -105,7 +105,7 @@ final class SecurityRulesTest extends TestCase
             static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
         ));
 
-        $ruleIds = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
+        $ruleIds         = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
         $expectedRuleIds = [
             DangerousFunctionCallRule::ID,
             UnsafeUnserializeRule::ID,
@@ -131,7 +131,7 @@ final class SecurityRulesTest extends TestCase
     public function testSecurityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(__DIR__ . '/../../..'))->load(
+        $config   = (new ConfigLoader(__DIR__ . '/../../..'))->load(
             'tests/Fixtures/Config/security-disable-dangerous.yaml',
             $registry,
         );
@@ -162,7 +162,7 @@ final class SecurityRulesTest extends TestCase
     private function findingsForRule(AnalysisUnit $unit, string $ruleId): array
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
@@ -177,7 +177,7 @@ final class SecurityRulesTest extends TestCase
     private function analyse(string $fixture): array
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
 
         return $registry->analyse(
             [$this->parseFixture($fixture)],

@@ -21,7 +21,7 @@ final class MethodLengthRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new MethodLengthRule();
+        $this->rule   = new MethodLengthRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -73,14 +73,14 @@ final class MethodLengthRuleTest extends TestCase
 
     public function testDisabledRuleProducesNoFindings(): void
     {
-        $unit = $this->parseFixture('long-method.php');
+        $unit     = $this->parseFixture('long-method.php');
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             MethodLengthRule::ID,
             new RuleSettings(false, ['warning' => 3, 'error' => 10]),
         );
 
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings       = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $methodFindings = array_filter($findings, static fn ($f) => $f->ruleId === MethodLengthRule::ID);
 
         self::assertSame([], array_values($methodFindings));
@@ -92,9 +92,9 @@ final class MethodLengthRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             MethodLengthRule::ID,
             new RuleSettings(true, $thresholds),
         );

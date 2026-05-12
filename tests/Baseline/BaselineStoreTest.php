@@ -20,7 +20,7 @@ final class BaselineStoreTest extends TestCase
 
         try {
             $store = new BaselineStore($root);
-            $data = $store->write('baselines/gruff-baseline.json', [$this->finding()]);
+            $data  = $store->write('baselines/gruff-baseline.json', [$this->finding()]);
 
             self::assertCount(1, $data->entries);
             self::assertFileExists($root . '/baselines/gruff-baseline.json');
@@ -33,13 +33,13 @@ final class BaselineStoreTest extends TestCase
     private function finding(): Finding
     {
         return new Finding(
-            ruleId: 'docs.example',
-            message: 'Example finding.',
-            filePath: 'src/Example.php',
-            line: 12,
-            severity: Severity::Advisory,
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            ruleId:     'docs.example',
+            message:    'Example finding.',
+            filePath:   'src/Example.php',
+            line:       12,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
             confidence: Confidence::High,
         );
     }

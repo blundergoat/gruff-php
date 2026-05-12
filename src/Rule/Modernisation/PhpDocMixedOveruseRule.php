@@ -125,7 +125,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     ? $this->extractParamName($block['body'])
                     : null;
 
-                if ($analysis['isStandalone'] && $this->signatureAlreadyCoversMixed($node, $tagKind, $paramName)) {
+                if ($analysis['isStandalone'] && $this->hasSignatureBroadTypeCoverage($node, $tagKind, $paramName)) {
                     continue;
                 }
 
@@ -293,9 +293,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     /**
      * Detect whether the signature's typed declaration already says `mixed`, in which case the PHPDoc tag is not adding noise.
      *
-     * @return bool True when the docblock's standalone `mixed` mirrors a `mixed` in the signature.
+     * @return bool True when the docblock's standalone broad type mirrors the signature.
      */
-    private function signatureAlreadyCoversMixed(Node $node, string $tagKind, ?string $paramName): bool
+    private function hasSignatureBroadTypeCoverage(Node $node, string $tagKind, ?string $paramName): bool
     {
         if (in_array($tagKind, self::PARAM_TAGS, true)) {
             if ($paramName === null) {

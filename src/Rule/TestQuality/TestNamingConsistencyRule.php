@@ -135,7 +135,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     private function matchPoorNamePattern(string $methodName, array $patterns): ?string
     {
         foreach ($patterns as $pattern) {
-            if ($this->patternMatches($pattern, $methodName)) {
+            if ($this->isPatternMatch($pattern, $methodName)) {
                 return $pattern;
             }
         }
@@ -148,7 +148,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      *
      * @return bool True when the pattern matches.
      */
-    private function patternMatches(string $pattern, string $methodName): bool
+    private function isPatternMatch(string $pattern, string $methodName): bool
     {
         set_error_handler(static fn (): bool => true);
 

@@ -21,13 +21,13 @@ final class AgentWorkflowCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $payload = $this->decodeJson($process);
+        $payload  = $this->decodeJson($process);
         $ruleRows = $this->listValue($payload, 'rules');
         /** @var array<string, array<string, mixed>> $rules */
         $rules = [];
 
         foreach ($ruleRows as $ruleRow) {
-            $rule = $this->stringKeyedArray($ruleRow);
+            $rule                                   = $this->stringKeyedArray($ruleRow);
             $rules[$this->stringValue($rule, 'id')] = $rule;
         }
 
@@ -57,12 +57,12 @@ final class AgentWorkflowCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $report = $this->decodeJson($process);
-        $summary = $this->arrayValue($report, 'summary');
-        $findings = $this->arrayValue($summary, 'findings');
-        $run = $this->arrayValue($report, 'run');
-        $filters = $this->arrayValue($run, 'filters');
-        $score = $this->arrayValue($report, 'score');
+        $report    = $this->decodeJson($process);
+        $summary   = $this->arrayValue($report, 'summary');
+        $findings  = $this->arrayValue($summary, 'findings');
+        $run       = $this->arrayValue($report, 'run');
+        $filters   = $this->arrayValue($run, 'filters');
+        $score     = $this->arrayValue($report, 'score');
         $composite = $this->arrayValue($score, 'composite');
 
         self::assertSame(0, $this->intValue($findings, 'total'));
@@ -91,8 +91,8 @@ final class AgentWorkflowCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $sarif = $this->decodeJson($process);
-        $runs = $this->listValue($sarif, 'runs');
+        $sarif    = $this->decodeJson($process);
+        $runs     = $this->listValue($sarif, 'runs');
         $firstRun = $this->stringKeyedArray($runs[0] ?? null);
 
         self::assertSame('2.1.0', $this->stringValue($sarif, 'version'));
@@ -170,7 +170,7 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertGreaterThanOrEqual(1, $this->intValue($counts, 'unchanged'));
 
             $introducedSymbols = $this->symbolsFromFindings($review['introduced'] ?? null);
-            $unchangedSymbols = $this->symbolsFromFindings($review['unchanged'] ?? null);
+            $unchangedSymbols  = $this->symbolsFromFindings($review['unchanged'] ?? null);
 
             self::assertContains('Example::newRisk()', $introducedSymbols);
             self::assertContains('Example::calculate()', $unchangedSymbols);
@@ -546,7 +546,7 @@ final class AgentWorkflowCliTest extends TestCase
 
         foreach ($this->listValue($payload, 'diagnostics') as $diagnosticValue) {
             $diagnostic = $this->stringKeyedArray($diagnosticValue);
-            $types[] = $this->stringValue($diagnostic, 'type');
+            $types[]    = $this->stringValue($diagnostic, 'type');
         }
 
         return $types;
@@ -560,7 +560,7 @@ final class AgentWorkflowCliTest extends TestCase
         $symbols = [];
 
         foreach ($this->mixedList($findings) as $findingValue) {
-            $finding = $this->stringKeyedArray($findingValue);
+            $finding   = $this->stringKeyedArray($findingValue);
             $symbols[] = $finding['symbol'] ?? null;
         }
 

@@ -36,7 +36,7 @@ final class ListRulesCliTest extends CliTestCase
         self::assertIsString($composerPath);
         self::assertNotSame('', trim($composerPath));
 
-        $tempDir = $this->tempDir();
+        $tempDir  = $this->tempDir();
         $checkout = $tempDir . '/gruff-php';
 
         try {

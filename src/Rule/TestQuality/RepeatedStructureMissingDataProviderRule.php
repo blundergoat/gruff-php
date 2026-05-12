@@ -96,7 +96,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                     continue;
                 }
 
-                $names = array_map(static fn (Stmt\ClassMethod $m): string => $m->name->toString(), $methods);
+                $names = array_map(static fn (Stmt\ClassMethod $method): string => $method->name->toString(), $methods);
                 $first = $methods[0];
 
                 $findings[] = new Finding(

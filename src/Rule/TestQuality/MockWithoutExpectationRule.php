@@ -90,7 +90,14 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         $findings = [];
 
         foreach ($mockAssignments as $varName => $assignment) {
-            $finding = $this->findingForMock($unit, $scope, $finder, $varName, $assignment, $reads);
+            $finding = $this->findingForMock(
+                unit:       $unit,
+                scope:      $scope,
+                finder:     $finder,
+                varName:    $varName,
+                assignment: $assignment,
+                reads:      $reads,
+            );
 
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
@@ -180,11 +187,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         }
 
         $methodNames = $this->methodNamesCalledOnVariable($scope, $finder, $varName);
-        if ($this->intersectsAny($methodNames, self::VERIFICATION_METHODS)) {
+        if ($this->hasAnyIntersection($methodNames, self::VERIFICATION_METHODS)) {
             return null;
         }
 
-        $hasStub = $this->intersectsAny($methodNames, self::STUB_METHODS);
+        $hasStub = $this->hasAnyIntersection($methodNames, self::STUB_METHODS);
         $variant = $hasStub ? 'stub-only' : 'dead-mock';
 
         return new Finding(
@@ -231,7 +238,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             return false;
         }
 
-        return $this->methodCallChainCreatesMock($expr);
+        return $this->isMockCreationCallChain($expr);
     }
 
     /**
@@ -239,7 +246,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      *
      * @return bool True when any chain receiver creates a mock.
      */
-    private function methodCallChainCreatesMock(Expr\MethodCall $call): bool
+    private function isMockCreationCallChain(Expr\MethodCall $call): bool
     {
         if (TestQualityNodeHelper::isMockCreationCall($call)) {
             return true;
@@ -270,7 +277,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
                 continue;
             }
 
-            if (!$this->chainRootsAtVariable($call, $varName)) {
+            if (!$this->isChainRootedAtVariable($call, $varName)) {
                 continue;
             }
 
@@ -288,7 +295,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      *
      * @return bool True when the chain root is the named variable.
      */
-    private function chainRootsAtVariable(Expr\MethodCall $call, string $varName): bool
+    private function isChainRootedAtVariable(Expr\MethodCall $call, string $varName): bool
     {
         $receiver = $call->var;
 
@@ -309,7 +316,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      *
      * @return bool True when any name appears in the needle list.
      */
-    private function intersectsAny(array $names, array $needles): bool
+    private function hasAnyIntersection(array $names, array $needles): bool
     {
         foreach ($names as $name) {
             if (in_array($name, $needles, true)) {

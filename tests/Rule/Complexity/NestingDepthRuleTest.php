@@ -24,7 +24,7 @@ final class NestingDepthRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new NestingDepthRule();
+        $this->rule   = new NestingDepthRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -44,8 +44,8 @@ final class NestingDepthRuleTest extends TestCase
     #[DataProvider('methodDepthProvider')]
     public function testNestingDepthMatchesExpected(string $methodName, int $expectedDepth): void
     {
-        $unit = $this->parseFixture('nesting.php');
-        $finder = new NodeFinder();
+        $unit    = $this->parseFixture('nesting.php');
+        $finder  = new NodeFinder();
         $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
@@ -93,9 +93,9 @@ final class NestingDepthRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             NestingDepthRule::ID,
             new RuleSettings(true, $thresholds),
         );

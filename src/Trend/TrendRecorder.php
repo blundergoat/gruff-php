@@ -10,6 +10,8 @@ use RuntimeException;
 
 /**
  * Records score and finding-count snapshots for trend reporting.
+ *
+ * @phpstan-type TrendEntry array<string, bool|float|int|string|null>
  */
 final readonly class TrendRecorder
 {
@@ -61,7 +63,7 @@ final readonly class TrendRecorder
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return list<TrendEntry>
      */
     private function readEntries(string $path): array
     {
@@ -91,6 +93,10 @@ final readonly class TrendRecorder
                     throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
                 }
 
+                if (!is_bool($value) && !is_float($value) && !is_int($value) && !is_string($value) && $value !== null) {
+                    throw new RuntimeException(sprintf('History file contains a non-scalar entry value: %s', $path));
+                }
+
                 $normalisedEntry[$key] = $value;
             }
 
@@ -101,7 +107,7 @@ final readonly class TrendRecorder
     }
 
     /**
-     * @param array<string, mixed>|null $entry
+     * @param TrendEntry|null $entry
      *
      * @return float|null Score value from the entry, or null when absent.
      */

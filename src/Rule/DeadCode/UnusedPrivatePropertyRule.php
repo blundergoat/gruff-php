@@ -80,7 +80,13 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $usage    = $this->propertyUsage($finder, $classLike, $privateProps);
             $findings = array_merge(
                 $findings,
-                $this->findingsForProperties($unit, $definition, $classLike, $privateProps, $usage),
+                $this->findingsForProperties(
+                    unit:         $unit,
+                    definition:   $definition,
+                    classLike:    $classLike,
+                    privateProps: $privateProps,
+                    usage:        $usage,
+                ),
             );
         }
 

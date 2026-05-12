@@ -11,7 +11,7 @@ final class SourceDiscoveryTest extends TestCase
 {
     public function testDiscoversPhpFilesDeterministicallyAndIgnoresDefaultDirectories(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.']);
 
         self::assertSame([
@@ -28,7 +28,7 @@ final class SourceDiscoveryTest extends TestCase
 
     public function testCanIncludeIgnoredDirectoriesExplicitly(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.'], includeIgnored: true);
 
         self::assertSame([
@@ -44,7 +44,7 @@ final class SourceDiscoveryTest extends TestCase
 
     public function testDefaultIgnoresWellKnownLockfileNames(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.']);
 
         $paths = array_map(static fn ($file): string => $file->displayPath, $result->files);
@@ -54,7 +54,7 @@ final class SourceDiscoveryTest extends TestCase
 
     public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['package-lock.json']);
 
         self::assertSame([], $result->files);
@@ -63,10 +63,10 @@ final class SourceDiscoveryTest extends TestCase
 
     public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(
             ['.'],
-            includeIgnored: true,
+            includeIgnored:           true,
             configuredIgnorePatterns: ['nested/**', 'build'],
         );
 
@@ -83,7 +83,7 @@ final class SourceDiscoveryTest extends TestCase
 
     public function testReportsMissingPaths(): void
     {
-        $root = $this->fixtureRoot('mixed');
+        $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['missing.php']);
 
         self::assertSame(['missing.php'], $result->missingPaths);

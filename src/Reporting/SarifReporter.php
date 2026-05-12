@@ -40,7 +40,7 @@ final readonly class SarifReporter
         }
 
         ksort($rules, SORT_STRING);
-        $ruleIds = array_keys($rules);
+        $ruleIds     = array_keys($rules);
         $ruleIndexes = array_flip($ruleIds);
 
         $payload = [
@@ -67,7 +67,15 @@ final readonly class SarifReporter
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     ruleId: string,
+     *     ruleIndex: int,
+     *     level: string,
+     *     message: array{text: string},
+     *     locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int}}}>,
+     *     partialFingerprints: array{gruffFingerprint: string},
+     *     properties: array{symbol: string|null, pillar: string, metadata: array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>>}
+     * }
      */
     private function result(Finding $finding, int $ruleIndex): array
     {

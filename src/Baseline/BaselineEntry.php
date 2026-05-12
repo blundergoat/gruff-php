@@ -50,36 +50,36 @@ final readonly class BaselineEntry
     }
 
     /**
-     * @param array<string, mixed> $data  Serialized baseline row decoded from JSON.
-     * @param int                  $index Zero-based baseline entry position for error messages.
+     * @param array<string, bool|float|int|string|null> $baselineRow Serialized baseline row decoded from JSON.
+     * @param int                                       $index       Zero-based baseline entry position for error messages.
      * @throws BaselineException When required fields are missing or malformed.
      * @return self Baseline entry decoded from serialized baseline data.
      */
-    public static function fromArray(array $data, int $index): self
+    public static function fromArray(array $baselineRow, int $index): self
     {
         foreach (['fingerprint', 'ruleId', 'file', 'message'] as $key) {
-            if (!isset($data[$key]) || !is_string($data[$key]) || $data[$key] === '') {
+            if (!isset($baselineRow[$key]) || !is_string($baselineRow[$key]) || $baselineRow[$key] === '') {
                 throw new BaselineException(sprintf('Baseline finding %d must include non-empty "%s".', $index, $key));
             }
         }
 
-        $line = $data['line'] ?? null;
+        $line = $baselineRow['line'] ?? null;
         if ($line !== null && !is_int($line)) {
             throw new BaselineException(sprintf('Baseline finding %d field "line" must be an integer or null.', $index));
         }
 
-        $symbol = $data['symbol'] ?? null;
+        $symbol = $baselineRow['symbol'] ?? null;
         if ($symbol !== null && !is_string($symbol)) {
             throw new BaselineException(sprintf('Baseline finding %d field "symbol" must be a string or null.', $index));
         }
 
         return new self(
-            fingerprint: $data['fingerprint'],
-            ruleId:      $data['ruleId'],
-            filePath:    $data['file'],
+            fingerprint: $baselineRow['fingerprint'],
+            ruleId:      $baselineRow['ruleId'],
+            filePath:    $baselineRow['file'],
             line:        $line,
             symbol:      $symbol,
-            message:     $data['message'],
+            message:     $baselineRow['message'],
         );
     }
 

@@ -21,7 +21,7 @@ final class PropertyCountRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new PropertyCountRule();
+        $this->rule   = new PropertyCountRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -67,9 +67,9 @@ final class PropertyCountRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             PropertyCountRule::ID,
             new RuleSettings(true, $thresholds),
         );

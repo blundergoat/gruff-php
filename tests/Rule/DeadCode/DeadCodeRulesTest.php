@@ -134,9 +134,9 @@ final class DeadCodeRulesTest extends TestCase
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));

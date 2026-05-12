@@ -23,7 +23,7 @@ final class CognitiveComplexityRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new CognitiveComplexityRule();
+        $this->rule   = new CognitiveComplexityRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -46,8 +46,8 @@ final class CognitiveComplexityRuleTest extends TestCase
     #[DataProvider('methodCcProvider')]
     public function testCognitiveCountMatchesExpected(string $methodName, int $expectedCc): void
     {
-        $unit = $this->parseFixture('cognitive.php');
-        $finder = new NodeFinder();
+        $unit    = $this->parseFixture('cognitive.php');
+        $finder  = new NodeFinder();
         $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
@@ -83,11 +83,11 @@ final class CognitiveComplexityRuleTest extends TestCase
 
     public function testBooleanChainCollapsing(): void
     {
-        $unit = $this->parseFixture('cognitive.php');
-        $finder = new NodeFinder();
+        $unit    = $this->parseFixture('cognitive.php');
+        $finder  = new NodeFinder();
         $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
 
-        $sameChain = null;
+        $sameChain  = null;
         $mixedChain = null;
 
         foreach ($methods as $m) {
@@ -112,9 +112,9 @@ final class CognitiveComplexityRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             CognitiveComplexityRule::ID,
             new RuleSettings(true, $thresholds),
         );

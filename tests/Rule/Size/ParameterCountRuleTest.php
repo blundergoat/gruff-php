@@ -21,7 +21,7 @@ final class ParameterCountRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new ParameterCountRule();
+        $this->rule   = new ParameterCountRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -37,7 +37,7 @@ final class ParameterCountRuleTest extends TestCase
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
         $warnings = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Warning));
-        $errors = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
+        $errors   = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
 
         self::assertCount(2, $warnings);
         self::assertCount(1, $errors);
@@ -101,9 +101,9 @@ final class ParameterCountRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             ParameterCountRule::ID,
             new RuleSettings(true, $thresholds),
         );

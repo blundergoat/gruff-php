@@ -117,7 +117,7 @@ final readonly class DashboardRequestHandler
         $path = parse_url($target, PHP_URL_PATH);
         $path = is_string($path) ? $path : '/';
 
-        if ($path !== '/health' && !$this->hostAllowed($headers['host'] ?? null)) {
+        if ($path !== '/health' && !$this->isHostAllowed($headers['host'] ?? null)) {
             return new DashboardHttpResponse(421, 'Misdirected Request', 'Misdirected Request', 'text/plain; charset=UTF-8');
         }
 
@@ -212,7 +212,7 @@ final readonly class DashboardRequestHandler
      *
      * @return bool True when the request is allowed for this local dashboard.
      */
-    private function hostAllowed(?string $hostHeader): bool
+    private function isHostAllowed(?string $hostHeader): bool
     {
         if ($hostHeader === null || $hostHeader === '') {
             return false;
@@ -233,7 +233,7 @@ final readonly class DashboardRequestHandler
             return false;
         }
 
-        if ($this->bindHostIsLoopback()) {
+        if ($this->isBindHostLoopback()) {
             return in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true);
         }
 
@@ -245,7 +245,7 @@ final readonly class DashboardRequestHandler
      *
      * @return bool True for localhost loopback hosts.
      */
-    private function bindHostIsLoopback(): bool
+    private function isBindHostLoopback(): bool
     {
         return in_array(strtolower($this->context->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
     }

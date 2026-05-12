@@ -14,8 +14,8 @@ final class GitArchiveSnapshotTest extends TestCase
     public function testCreateArchivesOnlyRequestedBasePaths(): void
     {
         $this->skipWhenGitIsUnavailable();
-        $repo = $this->repoWithBaseFiles();
-        $snapshot = new GitArchiveSnapshot();
+        $repo         = $this->repoWithBaseFiles();
+        $snapshot     = new GitArchiveSnapshot();
         $snapshotRoot = null;
 
         try {
@@ -36,8 +36,8 @@ final class GitArchiveSnapshotTest extends TestCase
     public function testCreateReturnsEmptySnapshotWhenRequestedPathsDoNotExistInBase(): void
     {
         $this->skipWhenGitIsUnavailable();
-        $repo = $this->repoWithBaseFiles();
-        $snapshot = new GitArchiveSnapshot();
+        $repo         = $this->repoWithBaseFiles();
+        $snapshot     = new GitArchiveSnapshot();
         $snapshotRoot = null;
 
         try {
@@ -57,7 +57,7 @@ final class GitArchiveSnapshotTest extends TestCase
     public function testCreateRemovesTemporarySnapshotWhenBaseRefFails(): void
     {
         $this->skipWhenGitIsUnavailable();
-        $repo = $this->repoWithBaseFiles();
+        $repo   = $this->repoWithBaseFiles();
         $before = $this->reviewTempDirs();
 
         try {
@@ -132,7 +132,7 @@ final class GitArchiveSnapshotTest extends TestCase
      */
     private function filesBelow(string $path): array
     {
-        $files = [];
+        $files    = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
         );

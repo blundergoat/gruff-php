@@ -21,7 +21,7 @@ final class AverageMethodLengthRuleTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->rule = new AverageMethodLengthRule();
+        $this->rule   = new AverageMethodLengthRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -70,9 +70,9 @@ final class AverageMethodLengthRuleTest extends TestCase
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit = $this->parseFixture($fixture);
+        $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             AverageMethodLengthRule::ID,
             new RuleSettings(true, $thresholds),
         );

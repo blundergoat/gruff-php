@@ -190,7 +190,7 @@ final class TestQualityRulesTest extends TestCase
 
         self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
 
-        $variants = [];
+        $variants  = [];
         $variables = [];
         foreach ($findings as $finding) {
             if ($finding->ruleId !== MockWithoutExpectationRule::ID) {
@@ -223,7 +223,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
             $registry,
         );
@@ -239,7 +239,7 @@ final class TestQualityRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(MultipleAaaCyclesRule::ID);
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             MultipleAaaCyclesRule::ID,
             new RuleSettings(true, ['minCycles' => 1], $settings->options),
         );
@@ -259,7 +259,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
@@ -277,7 +277,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
             $registry,
         );
@@ -363,7 +363,7 @@ final class TestQualityRulesTest extends TestCase
     public function testTestQualityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/disable-no-assertions.yaml',
             $registry,
         );
@@ -470,7 +470,7 @@ final class TestQualityRulesTest extends TestCase
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        $units = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
         return $registry->analyse(
             $units,

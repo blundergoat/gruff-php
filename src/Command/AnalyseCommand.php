@@ -118,15 +118,15 @@ final class AnalyseCommand extends Command
             return $this->renderSetupFailure($setupResult, $output);
         }
 
-        $setup = $setupResult->setup;
-        $projectRoot = $setup->projectRoot;
-        $options = $setup->options;
-        $format = $setup->format;
+        $setup         = $setupResult->setup;
+        $projectRoot   = $setup->projectRoot;
+        $options       = $setup->options;
+        $format        = $setup->format;
         $failThreshold = $setup->failThreshold;
-        $config = $setup->config;
-        $registry = $setup->registry;
-        $diagnostics = [];
-        $reviewDiff = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
+        $config        = $setup->config;
+        $registry      = $setup->registry;
+        $diagnostics   = [];
+        $reviewDiff    = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
         $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
 
         $sources = $analysisPaths === null
@@ -142,7 +142,7 @@ final class AnalyseCommand extends Command
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
 
-        $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
+        $findings         = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
             $projectRoot,
             $options->mutation,
@@ -163,26 +163,26 @@ final class AnalyseCommand extends Command
             $findings = (new DiffFindingFilter())->filter($findings, $diff);
         }
 
-        $findings = $this->filterAllowedSecretPreviews($findings, $config);
+        $findings       = $this->filterAllowedSecretPreviews($findings, $config);
         $baselineReport = (new BaselineApplication())->apply(
-            $projectRoot,
-            $options->baseline,
-            $findings,
-            $diff,
-            $diagnostics,
+            projectRoot: $projectRoot,
+            options:     $options->baseline,
+            findings:    $findings,
+            diff:        $diff,
+            diagnostics: $diagnostics,
         );
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
-        $score = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $score  = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
         $review = $this->buildBranchReview(
-            $projectRoot,
-            $options,
-            $config,
-            $registry,
-            $findings,
-            $score->composite->score,
-            $reviewDiff,
-            $diagnostics,
+            projectRoot:     $projectRoot,
+            options:         $options,
+            config:          $config,
+            registry:        $registry,
+            currentFindings: $findings,
+            currentScore:    $score->composite->score,
+            reviewDiff:      $reviewDiff,
+            diagnostics:     $diagnostics,
         );
         $trend = null;
 
@@ -191,46 +191,46 @@ final class AnalyseCommand extends Command
                 $trend = (new TrendRecorder())->record($projectRoot, $options->historyFile, $score, count($findings));
             } catch (JsonException | RuntimeException $exception) {
                 $diagnostics[] = new RunDiagnostic(
-                    type: 'history-error',
+                    type:    'history-error',
                     message: $exception->getMessage(),
-                    path: $options->historyFile,
+                    path:    $options->historyFile,
                 );
             }
         }
 
-        $exitCode = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
-        $displayFilter = $options->displayFilter();
+        $exitCode        = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
+        $displayFilter   = $options->displayFilter();
         $displayFindings = $displayFilter->apply($findings);
-        $displayReview = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
-        $report = new AnalysisReport(
-            toolVersion: Application::VERSION,
-            requestedPaths: $options->paths,
-            format: $format->value,
-            failOn: $failThreshold->value,
+        $displayReview   = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
+        $report          = new AnalysisReport(
+            toolVersion:     Application::VERSION,
+            requestedPaths:  $options->paths,
+            format:          $format->value,
+            failOn:          $failThreshold->value,
             filesDiscovered: count($sources->discovery->files),
-            filesParsed: $sources->parsedFileCount(),
-            ignoredPaths: $sources->discovery->ignoredPaths,
-            missingPaths: $sources->discovery->missingPaths,
-            diagnostics: $diagnostics,
-            findings: $displayFindings,
-            exitCode: $exitCode,
-            configPath: $setup->configPath,
-            mutation: $mutationAnalysis,
-            score: $score,
-            diff: $diff,
-            trend: $trend,
-            baseline: $baselineReport,
-            review: $displayReview,
-            filters: $displayFilter,
+            filesParsed:     $sources->parsedFileCount(),
+            ignoredPaths:    $sources->discovery->ignoredPaths,
+            missingPaths:    $sources->discovery->missingPaths,
+            diagnostics:     $diagnostics,
+            findings:        $displayFindings,
+            exitCode:        $exitCode,
+            configPath:      $setup->configPath,
+            mutation:        $mutationAnalysis,
+            score:           $score,
+            diff:            $diff,
+            trend:           $trend,
+            baseline:        $baselineReport,
+            review:          $displayReview,
+            filters:         $displayFilter,
         );
 
         $this->renderReport(
-            $report,
-            $format,
-            $output,
-            $projectRoot,
-            $options->reportEditorLink,
-            $options->reportInteractive,
+            report:            $report,
+            format:            $format,
+            output:            $output,
+            projectRoot:       $projectRoot,
+            reportEditorLink:  $options->reportEditorLink,
+            reportInteractive: $options->reportInteractive,
         );
 
         return $exitCode;
@@ -294,7 +294,7 @@ final class AnalyseCommand extends Command
             return (new GitDiffProvider())->changedLines($projectRoot, $diffMode);
         } catch (DiffException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'diff-mode-error',
+                type:    'diff-mode-error',
                 message: $exception->getMessage(),
             );
 
@@ -352,7 +352,7 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * @param list<RunDiagnostic> $diagnostics
+     * @param list<RunDiagnostic>             $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
      *
      * @return int Symfony command exit code.
@@ -401,7 +401,7 @@ final class AnalyseCommand extends Command
 
     /**
      * @param list<Finding> $findings
-     * @param list<string> $changedFiles
+     * @param list<string>  $changedFiles
      * @return list<Finding>
      */
     private function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
@@ -419,7 +419,7 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * @param list<Finding> $currentFindings
+     * @param list<Finding>       $currentFindings
      * @param list<RunDiagnostic> $diagnostics
      *
      * @return BranchReviewResult|null Review comparison, or null when disabled/unavailable.
@@ -438,8 +438,8 @@ final class AnalyseCommand extends Command
             return null;
         }
 
-        $snapshot = new GitArchiveSnapshot();
-        $baseRoot = null;
+        $snapshot          = new GitArchiveSnapshot();
+        $baseRoot          = null;
         $baseSnapshotPaths = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff);
         $baseAnalysisPaths = $this->baseAnalysisPaths($projectRoot, $options);
 
@@ -447,17 +447,17 @@ final class AnalyseCommand extends Command
             $baseScore = (new ScoreCalculator())->calculate([], null, null);
 
             return (new BranchReviewComparator())->compare(
-                current: $currentFindings,
-                base: [],
-                baseRef: $options->diffVs,
+                current:     $currentFindings,
+                base:        [],
+                baseRef:     $options->diffVs,
                 changedOnly: true,
-                deltaScore: $currentScore - $baseScore->composite->score,
+                deltaScore:  $currentScore - $baseScore->composite->score,
             );
         }
 
         try {
-            $baseRoot = $snapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
-            $basePaths = $this->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
+            $baseRoot     = $snapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
+            $basePaths    = $this->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
 
             if ($basePaths !== []) {
@@ -477,18 +477,18 @@ final class AnalyseCommand extends Command
             }
 
             $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore = (new ScoreCalculator())->calculate($baseFindings, null, null);
+            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null);
 
             return (new BranchReviewComparator())->compare(
-                current: $currentFindings,
-                base: $baseFindings,
-                baseRef: $options->diffVs,
+                current:     $currentFindings,
+                base:        $baseFindings,
+                baseRef:     $options->diffVs,
                 changedOnly: $options->changedOnly,
-                deltaScore: $currentScore - $baseScore->composite->score,
+                deltaScore:  $currentScore - $baseScore->composite->score,
             );
         } catch (DiffException | RuntimeException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type: 'review-mode-error',
+                type:    'review-mode-error',
                 message: $exception->getMessage(),
             );
 
@@ -550,7 +550,7 @@ final class AnalyseCommand extends Command
     private function existingSnapshotPaths(string $baseRoot, array $paths): array
     {
         $requested = $paths === [] ? ['.'] : $paths;
-        $existing = [];
+        $existing  = [];
 
         foreach ($requested as $path) {
             $absolute = str_starts_with($path, '/') ? $path : rtrim($baseRoot, '/') . '/' . $path;
@@ -568,7 +568,7 @@ final class AnalyseCommand extends Command
      */
     private function normaliseRequestedPaths(string $projectRoot, array $paths): array
     {
-        $root = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
+        $root       = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
         $normalised = [];
 
         foreach ($paths as $path) {
@@ -591,7 +591,7 @@ final class AnalyseCommand extends Command
                 $candidate = substr($candidate, 2);
             }
 
-            $candidate = rtrim($candidate, '/');
+            $candidate                                        = rtrim($candidate, '/');
             $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
         }
 
@@ -654,7 +654,7 @@ final class AnalyseCommand extends Command
             return $findings;
         }
 
-        $root = rtrim(str_replace('\\', '/', $root), '/');
+        $root       = rtrim(str_replace('\\', '/', $root), '/');
         $normalized = [];
 
         foreach ($findings as $finding) {
@@ -664,22 +664,22 @@ final class AnalyseCommand extends Command
                 continue;
             }
 
-            $filePath = str_starts_with($path, $root . '/') ? substr($path, strlen($root) + 1) : $finding->filePath;
+            $filePath     = str_starts_with($path, $root . '/') ? substr($path, strlen($root) + 1) : $finding->filePath;
             $normalized[] = new Finding(
-                ruleId: $finding->ruleId,
-                message: $finding->message,
-                filePath: $filePath,
-                line: $finding->line,
-                severity: $finding->severity,
-                pillar: $finding->pillar,
-                tier: $finding->tier,
-                confidence: $finding->confidence,
-                endLine: $finding->endLine,
-                column: $finding->column,
-                symbol: $finding->symbol,
-                remediation: $finding->remediation,
+                ruleId:           $finding->ruleId,
+                message:          $finding->message,
+                filePath:         $filePath,
+                line:             $finding->line,
+                severity:         $finding->severity,
+                pillar:           $finding->pillar,
+                tier:             $finding->tier,
+                confidence:       $finding->confidence,
+                endLine:          $finding->endLine,
+                column:           $finding->column,
+                symbol:           $finding->symbol,
+                remediation:      $finding->remediation,
                 secondaryPillars: $finding->secondaryPillars,
-                metadata: $finding->metadata,
+                metadata:         $finding->metadata,
             );
         }
 

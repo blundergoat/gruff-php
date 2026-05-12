@@ -9,6 +9,7 @@ use GruffPhp\Rule\RuleRegistry;
 
 /**
  * Applies parsed rule configuration entries to the effective analysis config.
+ * @phpstan-type RuleOptionValue int|float|bool|string|array<array-key, int|float|bool|string>
  */
 final readonly class RuleConfigApplier
 {
@@ -59,7 +60,7 @@ final readonly class RuleConfigApplier
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry);
 
         return $config->withRuleSettings($ruleId, new RuleSettings(
-            enabled:    $this->enabled($ruleId, $ruleConfig, $settings->enabled),
+            enabled:    $this->isEnabled($ruleId, $ruleConfig, $settings->enabled),
             thresholds: $severityThreshold instanceof SeverityThreshold
                 ? $settings->thresholds
                 : $this->thresholds($ruleId, $ruleConfig, $registry, $settings->thresholds),
@@ -85,7 +86,7 @@ final readonly class RuleConfigApplier
      * @param array<string, mixed> $ruleConfig
      * @return bool Effective enabled flag for the rule.
      */
-    private function enabled(string $ruleId, array $ruleConfig, bool $default): bool
+    private function isEnabled(string $ruleId, array $ruleConfig, bool $default): bool
     {
         if (!array_key_exists('enabled', $ruleConfig)) {
             return $default;
@@ -194,9 +195,9 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
-     * @param array<string, mixed> $defaultOptions
-     * @return array<string, mixed>
+     * @param array<string, mixed>           $ruleConfig
+     * @param array<string, RuleOptionValue> $defaultOptions
+     * @return array<string, RuleOptionValue>
      */
     private function options(
         string $ruleId,
@@ -229,9 +230,10 @@ final readonly class RuleConfigApplier
     /**
      * Validate and normalize a configured rule option against its default type.
      *
-     * @return mixed Option value after type-specific validation.
+     * @param RuleOptionValue $defaultValue Default option value used as the type contract.
+     * @return RuleOptionValue Option value after type-specific validation.
      */
-    private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): mixed
+    private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): int|float|bool|string|array
     {
         if (is_int($defaultValue)) {
             return $this->integerOptionValue($ruleId, $optionName, $optionValue);
@@ -242,18 +244,18 @@ final readonly class RuleConfigApplier
         }
 
         if (is_bool($defaultValue)) {
-            return $this->booleanOptionValue($ruleId, $optionName, $optionValue);
+            return $this->isBooleanOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_string($defaultValue)) {
             return $this->stringOptionValue($ruleId, $optionName, $optionValue);
         }
 
-        if (is_array($defaultValue) && array_is_list($defaultValue)) {
+        if (array_is_list($defaultValue)) {
             return $this->listOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
         }
 
-        return $optionValue;
+        throw new ConfigException(sprintf('Option "rules.%s.options.%s" has an unsupported default value type.', $ruleId, $optionName));
     }
 
     /**
@@ -289,7 +291,7 @@ final readonly class RuleConfigApplier
      *
      * @return bool Validated option value.
      */
-    private function booleanOptionValue(string $ruleId, string $optionName, mixed $optionValue): bool
+    private function isBooleanOptionValue(string $ruleId, string $optionName, mixed $optionValue): bool
     {
         if (!is_bool($optionValue)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
@@ -315,8 +317,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate a list option value and its item type when the default list is typed.
      *
-     * @param list<mixed> $defaultValue Default option list used as an item-type sample.
-     * @return list<mixed> Validated option list.
+     * @param list<int|float|bool|string> $defaultValue Default option list used as an item-type sample.
+     * @return list<int|float|bool|string> Validated option list.
      */
     private function listOptionValue(string $ruleId, string $optionName, mixed $optionValue, array $defaultValue): array
     {
@@ -324,16 +326,27 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a list.', $ruleId, $optionName));
         }
 
-        if ($defaultValue === []) {
-            return $optionValue;
-        }
-
-        $sample = $defaultValue[0];
+        $result = [];
+        $sample = $defaultValue[0] ?? null;
         foreach ($optionValue as $index => $item) {
-            $this->assertListItemType($ruleId, $optionName, $index, $item, $sample);
+            if (!is_int($item) && !is_float($item) && !is_bool($item) && !is_string($item)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a scalar value.', $ruleId, $optionName, $index));
+            }
+
+            if ($sample !== null) {
+                $this->assertListItemType(
+                    ruleId:     $ruleId,
+                    optionName: $optionName,
+                    index:      $index,
+                    item:       $item,
+                    sample:     $sample,
+                );
+            }
+
+            $result[] = $item;
         }
 
-        return $optionValue;
+        return $result;
     }
 
     /**

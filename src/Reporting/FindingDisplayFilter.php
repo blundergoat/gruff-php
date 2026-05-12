@@ -14,11 +14,11 @@ use GruffPhp\Finding\Severity;
 final readonly class FindingDisplayFilter
 {
     /**
-     * @param Severity|null $minSeverity Minimum severity that should be displayed.
-     * @param list<Pillar> $includePillars Pillars explicitly included in output.
-     * @param list<Pillar> $excludePillars Pillars explicitly excluded from output.
-     * @param list<string> $includeRules Rule ids explicitly included in output.
-     * @param list<string> $excludeRules Rule ids explicitly excluded from output.
+     * @param Severity|null $minSeverity    Minimum severity that should be displayed.
+     * @param list<Pillar>  $includePillars Pillars explicitly included in output.
+     * @param list<Pillar>  $excludePillars Pillars explicitly excluded from output.
+     * @param list<string>  $includeRules   Rule ids explicitly included in output.
+     * @param list<string>  $excludeRules   Rule ids explicitly excluded from output.
      */
     public function __construct(
         public ?Severity $minSeverity = null,

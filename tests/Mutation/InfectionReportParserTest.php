@@ -49,7 +49,7 @@ final class InfectionReportParserTest extends TestCase
     public function testInfectionRunnerPrefersProjectVendorBinary(): void
     {
         $projectRoot = $this->tempDir();
-        $binaryPath = $projectRoot . '/vendor/bin/infection';
+        $binaryPath  = $projectRoot . '/vendor/bin/infection';
 
         try {
             self::assertTrue(mkdir(dirname($binaryPath), 0777, true));
@@ -69,7 +69,7 @@ final class InfectionReportParserTest extends TestCase
     public function testInfectionRunnerUsesProjectInfectionConfigByDefault(): void
     {
         $projectRoot = $this->tempDir();
-        $binaryPath = $projectRoot . '/vendor/bin/infection';
+        $binaryPath  = $projectRoot . '/vendor/bin/infection';
 
         try {
             self::assertTrue(mkdir(dirname($binaryPath), 0777, true));
@@ -93,7 +93,7 @@ final class InfectionReportParserTest extends TestCase
     public function testInfectionRunnerPassesTestFrameworkOptions(): void
     {
         $projectRoot = $this->tempDir();
-        $binaryPath = $projectRoot . '/vendor/bin/infection';
+        $binaryPath  = $projectRoot . '/vendor/bin/infection';
 
         try {
             self::assertTrue(mkdir(dirname($binaryPath), 0777, true));

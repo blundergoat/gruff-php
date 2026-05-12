@@ -23,13 +23,13 @@ final class ComplexityIntegrationTest extends TestCase
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
         $parser = new PhpFileParser();
-        $unit = $parser->parse(new SourceFile(
+        $unit   = $parser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
             'tests/Fixtures/Complexity/cyclomatic.php',
         ));
 
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)
+        $config   = AnalysisConfig::fromRegistry($registry)
             ->withRuleSettings(CyclomaticComplexityRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 20]))
             ->withRuleSettings(CognitiveComplexityRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 30]))
             ->withRuleSettings(NestingDepthRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 6]))
@@ -57,13 +57,13 @@ final class ComplexityIntegrationTest extends TestCase
     public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
         $parser = new PhpFileParser();
-        $unit = $parser->parse(new SourceFile(
+        $unit   = $parser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/simple.php',
             'tests/Fixtures/Complexity/simple.php',
         ));
 
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         $complexityFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'complexity.'));
@@ -73,14 +73,14 @@ final class ComplexityIntegrationTest extends TestCase
     public function testConfigOverrideChangesComplexityFindings(): void
     {
         $parser = new PhpFileParser();
-        $unit = $parser->parse(new SourceFile(
+        $unit   = $parser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
             'tests/Fixtures/Complexity/cyclomatic.php',
         ));
 
         $registry = RuleRegistry::defaults();
 
-        $defaultConfig = AnalysisConfig::fromRegistry($registry);
+        $defaultConfig   = AnalysisConfig::fromRegistry($registry);
         $defaultFindings = array_filter(
             $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $defaultConfig)),
             static fn ($f) => str_starts_with($f->ruleId, 'complexity.'),
@@ -105,12 +105,12 @@ final class ComplexityIntegrationTest extends TestCase
     public function testNpathCapIsExplicitInMetadataAndMessage(): void
     {
         $parser = new PhpFileParser();
-        $unit = $parser->parse(new SourceFile(
+        $unit   = $parser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/npath-cap.php',
             'tests/Fixtures/Complexity/npath-cap.php',
         ));
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)
+        $config   = AnalysisConfig::fromRegistry($registry)
             ->withRuleSettings(NpathComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 2]));
 
         $findings = array_values(array_filter(

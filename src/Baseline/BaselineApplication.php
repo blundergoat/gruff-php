@@ -38,7 +38,13 @@ final readonly class BaselineApplication
             return null;
         }
 
-        return $this->applyExistingBaseline($store, $options, $findings, $diff, $diagnostics);
+        return $this->applyExistingBaseline(
+            store:       $store,
+            options:     $options,
+            findings:    $findings,
+            diff:        $diff,
+            diagnostics: $diagnostics,
+        );
     }
 
     /**

@@ -27,7 +27,7 @@ final readonly class DirectLineComment
         $commentLine = $line - 1;
         $lineText    = self::sourceLine($unit, $commentLine);
 
-        if (!self::looksLikeStandaloneOneLineComment($lineText)) {
+        if (!self::isStandaloneOneLineComment($lineText)) {
             return false;
         }
 
@@ -63,7 +63,7 @@ final readonly class DirectLineComment
      *
      * @return bool True when the line looks like a standalone comment.
      */
-    private static function looksLikeStandaloneOneLineComment(string $line): bool
+    private static function isStandaloneOneLineComment(string $line): bool
     {
         $trimmed = trim($line);
 

@@ -67,7 +67,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            if ($this->skipKnownSecretPattern($value) || $this->isPathLikeLiteral($value) || SecretScannerHelper::isLikelyDummyValue($value)) {
+            if ($this->shouldSkipKnownSecretPattern($value) || $this->isPathLikeLiteral($value) || SecretScannerHelper::isLikelyDummyValue($value)) {
                 continue;
             }
 
@@ -97,7 +97,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      *
      * @return bool True when another rule should handle the literal.
      */
-    private function skipKnownSecretPattern(string $value): bool
+    private function shouldSkipKnownSecretPattern(string $value): bool
     {
         return str_starts_with($value, 'AKIA')
             || str_starts_with($value, 'ASIA')

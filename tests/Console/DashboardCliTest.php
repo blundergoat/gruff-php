@@ -10,7 +10,7 @@ final class DashboardCliTest extends CliTestCase
 {
     public function testDashboardCommandServesRefreshableHtmlReport(): void
     {
-        $port = $this->unusedPort();
+        $port    = $this->unusedPort();
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
@@ -69,7 +69,7 @@ final class DashboardCliTest extends CliTestCase
 
     public function testDashboardScanOmitsMutationUi(): void
     {
-        $port = $this->unusedPort();
+        $port    = $this->unusedPort();
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff',
@@ -101,7 +101,7 @@ final class DashboardCliTest extends CliTestCase
     public function testDashboardCommandCanScanAnotherProjectFromBrowserQuery(): void
     {
         $tempDir = $this->tempDir();
-        $port = $this->unusedPort();
+        $port    = $this->unusedPort();
         file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
 
         $process = new Process([

@@ -20,8 +20,8 @@ final class DashboardScanCommandBuilderTest extends TestCase
 
     public function testAnalyseCommandSeparatesOwnedOptionsFromUserPaths(): void
     {
-        $builder = new DashboardScanCommandBuilder('/tmp/gruff');
-        $command = $builder->analyseCommand(['src', 'tests'], $this->state());
+        $builder        = new DashboardScanCommandBuilder('/tmp/gruff');
+        $command        = $builder->analyseCommand(['src', 'tests'], $this->state());
         $separatorIndex = array_search('--', $command, true);
 
         self::assertIsInt($separatorIndex);
@@ -33,7 +33,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     public function testOptionLikePathCannotReachProducedArgumentVector(): void
     {
         $builder = new DashboardScanCommandBuilder('/tmp/gruff');
-        $paths = $builder->parsePaths('--generate-baseline /tmp/leak.json --config evil.yaml');
+        $paths   = $builder->parsePaths('--generate-baseline /tmp/leak.json --config evil.yaml');
         $command = $builder->analyseCommand($paths, $this->state());
 
         self::assertSame(['/tmp/leak.json', 'evil.yaml'], $paths);

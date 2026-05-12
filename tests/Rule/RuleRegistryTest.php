@@ -172,7 +172,7 @@ final class RuleRegistryTest extends TestCase
     public function testRunsEnabledRulesOverParsedFiles(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             FileLengthRule::ID,
             new RuleSettings(true, ['warning' => 3, 'error' => 999]),
         );
@@ -194,7 +194,7 @@ final class RuleRegistryTest extends TestCase
     public function testSkipsDisabledRules(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             FileLengthRule::ID,
             new RuleSettings(false, ['warning' => 3, 'error' => 999]),
         );
@@ -211,7 +211,7 @@ final class RuleRegistryTest extends TestCase
     public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
     {
         $registry = new RuleRegistry([$this->duplicateProjectRule()]);
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
 
         $findings = $registry->analyse(
             [
@@ -263,12 +263,12 @@ final class RuleRegistryTest extends TestCase
             public function definition(): RuleDefinition
             {
                 return new RuleDefinition(
-                    id: $this->id,
-                    name: 'Fake rule',
-                    pillar: Pillar::Maintainability,
-                    tier: RuleTier::V01,
+                    id:              $this->id,
+                    name:            'Fake rule',
+                    pillar:          Pillar::Maintainability,
+                    tier:            RuleTier::V01,
                     defaultSeverity: Severity::Advisory,
-                    confidence: Confidence::Low,
+                    confidence:      Confidence::Low,
                 );
             }
 
@@ -276,13 +276,13 @@ final class RuleRegistryTest extends TestCase
             {
                 return [
                     new Finding(
-                        ruleId: $this->id,
-                        message: 'Fake finding.',
-                        filePath: $unit->file->displayPath,
-                        line: 1,
-                        severity: Severity::Advisory,
-                        pillar: Pillar::Maintainability,
-                        tier: RuleTier::V01,
+                        ruleId:     $this->id,
+                        message:    'Fake finding.',
+                        filePath:   $unit->file->displayPath,
+                        line:       1,
+                        severity:   Severity::Advisory,
+                        pillar:     Pillar::Maintainability,
+                        tier:       RuleTier::V01,
                         confidence: Confidence::Low,
                     ),
                 ];
@@ -296,12 +296,12 @@ final class RuleRegistryTest extends TestCase
             public function definition(): RuleDefinition
             {
                 return new RuleDefinition(
-                    id: 'test.project-level',
-                    name: 'Project-level fixture',
-                    pillar: Pillar::Documentation,
-                    tier: RuleTier::V01,
+                    id:              'test.project-level',
+                    name:            'Project-level fixture',
+                    pillar:          Pillar::Documentation,
+                    tier:            RuleTier::V01,
                     defaultSeverity: Severity::Warning,
-                    confidence: Confidence::High,
+                    confidence:      Confidence::High,
                 );
             }
 
@@ -309,13 +309,13 @@ final class RuleRegistryTest extends TestCase
             {
                 return [
                     new Finding(
-                        ruleId: 'test.project-level',
-                        message: 'Project has no README.md.',
-                        filePath: 'README.md',
-                        line: null,
-                        severity: Severity::Warning,
-                        pillar: Pillar::Documentation,
-                        tier: RuleTier::V01,
+                        ruleId:     'test.project-level',
+                        message:    'Project has no README.md.',
+                        filePath:   'README.md',
+                        line:       null,
+                        severity:   Severity::Warning,
+                        pillar:     Pillar::Documentation,
+                        tier:       RuleTier::V01,
                         confidence: Confidence::High,
                     ),
                 ];

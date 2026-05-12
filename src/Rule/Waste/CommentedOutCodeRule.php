@@ -69,7 +69,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
 
             $content = $this->stripCommentMarkers($text);
 
-            if ($this->looksLikeCode($content)) {
+            if ($this->isCodeLike($content)) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     'Comment appears to contain commented-out code.',
@@ -116,13 +116,13 @@ final readonly class CommentedOutCodeRule implements RuleInterface
      *
      * @return bool True when the content looks like disabled code.
      */
-    private function looksLikeCode(string $content): bool
+    private function isCodeLike(string $content): bool
     {
         if (strlen($content) < 5) {
             return false;
         }
 
-        $lines = array_filter(explode("\n", $content), static fn (string $l): bool => trim($l) !== '');
+        $lines = array_filter(explode("\n", $content), static fn (string $line): bool => trim($line) !== '');
 
         if ($lines === []) {
             return false;

@@ -78,7 +78,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
-            if ($this->classAllowsPromotion($class)) {
+            if ($this->canPromoteClass($class)) {
                 $classes[] = $class;
             }
         }
@@ -91,7 +91,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      *
      * @return bool True when the class shape is supported by this heuristic.
      */
-    private function classAllowsPromotion(Stmt\Class_ $class): bool
+    private function canPromoteClass(Stmt\Class_ $class): bool
     {
         return $class->extends === null
             && $class->getTraitUses() === []
@@ -165,7 +165,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return null;
         }
 
-        if (isset($lateAssignments[$property]) || !$this->constructorHasPlainParameter($constructor, $property)) {
+        if (isset($lateAssignments[$property]) || !$this->hasPlainConstructorParameter($constructor, $property)) {
             return null;
         }
 
@@ -236,7 +236,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      *
      * @return bool True when the matching parameter has no promotion flags.
      */
-    private function constructorHasPlainParameter(Stmt\ClassMethod $constructor, string $property): bool
+    private function hasPlainConstructorParameter(Stmt\ClassMethod $constructor, string $property): bool
     {
         foreach ($constructor->params as $parameter) {
             if ($parameter->var instanceof Expr\Variable && $parameter->var->name === $property && $parameter->flags === 0) {

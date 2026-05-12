@@ -69,7 +69,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             return [];
         }
 
-        if ($this->firstStatementHasDoc($topLevel[0])) {
+        if ($this->hasFirstStatementDoc($topLevel[0])) {
             return [];
         }
 
@@ -121,7 +121,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      *
      * @return bool True when a docblock is attached to the statement.
      */
-    private function firstStatementHasDoc(Node\Stmt $statement): bool
+    private function hasFirstStatementDoc(Node\Stmt $statement): bool
     {
         foreach ($statement->getComments() as $comment) {
             if ($comment instanceof Doc) {

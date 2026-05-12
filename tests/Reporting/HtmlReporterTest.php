@@ -22,31 +22,31 @@ final class HtmlReporterTest extends TestCase
     {
         $findings = [
             new Finding(
-                ruleId: 'docs.missing-public-phpdoc',
-                message: '<script>alert("x")</script>',
-                filePath: 'src/<bad>.php',
-                line: 4,
-                severity: Severity::Warning,
-                pillar: Pillar::Documentation,
-                tier: RuleTier::V01,
+                ruleId:     'docs.missing-public-phpdoc',
+                message:    '<script>alert("x")</script>',
+                filePath:   'src/<bad>.php',
+                line:       4,
+                severity:   Severity::Warning,
+                pillar:     Pillar::Documentation,
+                tier:       RuleTier::V01,
                 confidence: Confidence::High,
             ),
         ];
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score  = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
         $report = new AnalysisReport(
-            toolVersion: '0.1.0-test',
-            requestedPaths: ['src/<bad>.php'],
-            format: 'html',
-            failOn: 'none',
+            toolVersion:     '0.1.0-test',
+            requestedPaths:  ['src/<bad>.php'],
+            format:          'html',
+            failOn:          'none',
             filesDiscovered: 1,
-            filesParsed: 1,
-            ignoredPaths: [],
-            missingPaths: [],
-            diagnostics: [],
-            findings: $findings,
-            exitCode: 0,
-            score: $score,
-            diff: DiffResult::inactive(),
+            filesParsed:     1,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        $findings,
+            exitCode:        0,
+            score:           $score,
+            diff:            DiffResult::inactive(),
         );
 
         $html = (new HtmlReporter())->render($report);
@@ -65,21 +65,21 @@ final class HtmlReporterTest extends TestCase
 
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
-        $score = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
+        $score  = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
         $report = new AnalysisReport(
-            toolVersion: '0.1.0-test',
-            requestedPaths: ['src'],
-            format: 'html',
-            failOn: 'none',
+            toolVersion:     '0.1.0-test',
+            requestedPaths:  ['src'],
+            format:          'html',
+            failOn:          'none',
             filesDiscovered: 0,
-            filesParsed: 0,
-            ignoredPaths: [],
-            missingPaths: [],
-            diagnostics: [],
-            findings: [],
-            exitCode: 0,
-            score: $score,
-            diff: DiffResult::inactive(),
+            filesParsed:     0,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        [],
+            exitCode:        0,
+            score:           $score,
+            diff:            DiffResult::inactive(),
         );
 
         $html = (new HtmlReporter())->render($report);
@@ -118,9 +118,9 @@ final class HtmlReporterTest extends TestCase
     {
         $html = (new HtmlReporter())->render($this->report([], [
             new RunDiagnostic(
-                type: 'usage-error',
+                type:    'usage-error',
                 message: '--report-interactive must be true or false.',
-                path: 'tests/<bad>.php',
+                path:    'tests/<bad>.php',
             ),
         ]));
 
@@ -134,13 +134,13 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterUsesCelebrationSubtitleWhenNoWarningOrErrorFindingsExist(): void
     {
         $finding = new Finding(
-            ruleId: 'docs.missing-public-phpdoc',
-            message: 'Public method has no PHPDoc.',
-            filePath: 'src/Example.php',
-            line: 9,
-            severity: Severity::Advisory,
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            ruleId:     'docs.missing-public-phpdoc',
+            message:    'Public method has no PHPDoc.',
+            filePath:   'src/Example.php',
+            line:       9,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
             confidence: Confidence::High,
         );
 
@@ -176,7 +176,7 @@ final class HtmlReporterTest extends TestCase
 
     public function testHtmlReporterRendersInteractiveFindingsOnlyWhenEnabled(): void
     {
-        $static = (new HtmlReporter('/workspace/project'))->render($this->sampleReport());
+        $static      = (new HtmlReporter('/workspace/project'))->render($this->sampleReport());
         $interactive = (new HtmlReporter('/workspace/project', 'none', true))->render($this->sampleReport());
 
         self::assertStringNotContainsString('finding-filters', $static);
@@ -210,41 +210,41 @@ final class HtmlReporterTest extends TestCase
     {
         return $this->report([
             new Finding(
-                ruleId: 'docs.missing-public-phpdoc',
-                message: 'Public method has no PHPDoc.',
-                filePath: 'src/Example.php',
-                line: 9,
-                severity: Severity::Warning,
-                pillar: Pillar::Documentation,
-                tier: RuleTier::V01,
+                ruleId:     'docs.missing-public-phpdoc',
+                message:    'Public method has no PHPDoc.',
+                filePath:   'src/Example.php',
+                line:       9,
+                severity:   Severity::Warning,
+                pillar:     Pillar::Documentation,
+                tier:       RuleTier::V01,
                 confidence: Confidence::High,
             ),
             new Finding(
-                ruleId: 'complexity.cyclomatic',
-                message: 'Method run() has cyclomatic complexity 12.',
-                filePath: 'src/Complex.php',
-                line: 12,
-                severity: Severity::Error,
-                pillar: Pillar::Complexity,
-                tier: RuleTier::V01,
+                ruleId:     'complexity.cyclomatic',
+                message:    'Method run() has cyclomatic complexity 12.',
+                filePath:   'src/Complex.php',
+                line:       12,
+                severity:   Severity::Error,
+                pillar:     Pillar::Complexity,
+                tier:       RuleTier::V01,
                 confidence: Confidence::High,
-                metadata: ['complexity' => 12],
+                metadata:   ['complexity' => 12],
             ),
             new Finding(
-                ruleId: 'modernisation.named-argument-opportunity',
-                message: 'Call could use named arguments.',
-                filePath: 'src/Example.php',
-                line: 20,
-                severity: Severity::Advisory,
-                pillar: Pillar::Modernisation,
-                tier: RuleTier::V01,
+                ruleId:     'modernisation.named-argument-opportunity',
+                message:    'Call could use named arguments.',
+                filePath:   'src/Example.php',
+                line:       20,
+                severity:   Severity::Advisory,
+                pillar:     Pillar::Modernisation,
+                tier:       RuleTier::V01,
                 confidence: Confidence::Medium,
             ),
         ]);
     }
 
     /**
-     * @param list<Finding> $findings
+     * @param list<Finding>       $findings
      * @param list<RunDiagnostic> $diagnostics
      */
     private function report(array $findings, array $diagnostics = []): AnalysisReport
@@ -252,19 +252,19 @@ final class HtmlReporterTest extends TestCase
         $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
         return new AnalysisReport(
-            toolVersion: '0.1.0-test',
-            requestedPaths: ['src'],
-            format: 'html',
-            failOn: 'none',
+            toolVersion:     '0.1.0-test',
+            requestedPaths:  ['src'],
+            format:          'html',
+            failOn:          'none',
             filesDiscovered: 2,
-            filesParsed: 2,
-            ignoredPaths: [],
-            missingPaths: [],
-            diagnostics: $diagnostics,
-            findings: $findings,
-            exitCode: 0,
-            score: $score,
-            diff: DiffResult::inactive(),
+            filesParsed:     2,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     $diagnostics,
+            findings:        $findings,
+            exitCode:        0,
+            score:           $score,
+            diff:            DiffResult::inactive(),
         );
     }
 

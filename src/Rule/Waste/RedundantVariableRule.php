@@ -84,7 +84,13 @@ final readonly class RedundantVariableRule implements RuleInterface
         $statements = array_values($statements);
 
         if (count($statements) === 2) {
-            $this->flagRedundantPair($statements[0], $statements[1], $unit, $definition, $findings);
+            $this->flagRedundantPair(
+                assignment:      $statements[0],
+                returnStatement: $statements[1],
+                unit:            $unit,
+                definition:      $definition,
+                findings:        $findings,
+            );
         }
 
         foreach ($statements as $statement) {
@@ -96,7 +102,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      * @param list<Finding> &$findings
      * @return void
      */
-    private function flagRedundantPair(Stmt $assignment, Stmt $return, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
+    private function flagRedundantPair(Stmt $assignment, Stmt $returnStatement, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
     {
         if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
             return;
@@ -107,11 +113,11 @@ final readonly class RedundantVariableRule implements RuleInterface
             return;
         }
 
-        if (!$return instanceof Stmt\Return_ || !$return->expr instanceof Variable) {
+        if (!$returnStatement instanceof Stmt\Return_ || !$returnStatement->expr instanceof Variable) {
             return;
         }
 
-        $returnedVariable = $return->expr;
+        $returnedVariable = $returnStatement->expr;
         if (!is_string($returnedVariable->name) || $returnedVariable->name !== $assignedVariable->name) {
             return;
         }
@@ -125,7 +131,7 @@ final readonly class RedundantVariableRule implements RuleInterface
             pillar:      $definition->pillar,
             tier:        $definition->tier,
             confidence:  $definition->confidence,
-            endLine:     $return->getStartLine(),
+            endLine:     $returnStatement->getStartLine(),
             symbol:      '$' . $assignedVariable->name,
             remediation: sprintf('Return the assigned expression directly instead of storing it in $%s.', $assignedVariable->name),
             metadata:    ['variable' => $assignedVariable->name],

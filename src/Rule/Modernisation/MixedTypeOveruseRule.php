@@ -50,7 +50,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
      * @param AnalysisUnit $unit    Parsed unit to inspect.
      * @param RuleContext  $context Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for mixed type overuse.
+     * @return list<Finding> Findings for broad type usage.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {

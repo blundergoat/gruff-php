@@ -24,11 +24,11 @@ final class SizeIntegrationTest extends TestCase
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
+        $path   = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
+        $unit   = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
 
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
 
         $config = $config
             ->withRuleSettings(FileLengthRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 800]))
@@ -66,12 +66,12 @@ final class SizeIntegrationTest extends TestCase
     public function testConfigOverrideChangesFindings(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
+        $path   = __DIR__ . '/../../Fixtures/Size/cumulative-violations.php';
+        $unit   = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/cumulative-violations.php'));
 
         $registry = RuleRegistry::defaults();
 
-        $defaultConfig = AnalysisConfig::fromRegistry($registry);
+        $defaultConfig   = AnalysisConfig::fromRegistry($registry);
         $defaultFindings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $defaultConfig));
 
         $tightConfig = AnalysisConfig::fromRegistry($registry);
@@ -92,11 +92,11 @@ final class SizeIntegrationTest extends TestCase
     public function testCleanFixtureProducesNoSizeFindings(): void
     {
         $parser = new PhpFileParser();
-        $path = __DIR__ . '/../../Fixtures/Size/short-method.php';
-        $unit = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/short-method.php'));
+        $path   = __DIR__ . '/../../Fixtures/Size/short-method.php';
+        $unit   = $parser->parse(new SourceFile($path, 'tests/Fixtures/Size/short-method.php'));
 
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
+        $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         $sizeFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'size.'));

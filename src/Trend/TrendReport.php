@@ -6,15 +6,17 @@ namespace GruffPhp\Trend;
 
 /**
  * Carries score and finding-count deltas for a trend snapshot.
+ *
+ * @phpstan-type TrendEntry array<string, bool|float|int|string|null>
  */
 final readonly class TrendReport
 {
     /**
-     * @param string                     $path          Trend history file path.
-     * @param float                      $currentScore  Current composite score.
-     * @param float|null                 $previousScore Previous composite score, when available.
-     * @param float|null                 $delta         Score delta from the previous snapshot.
-     * @param list<array<string, mixed>> $entries       Historical trend entries.
+     * @param string           $path          Trend history file path.
+     * @param float            $currentScore  Current composite score.
+     * @param float|null       $previousScore Previous composite score, when available.
+     * @param float|null       $delta         Score delta from the previous snapshot.
+     * @param list<TrendEntry> $entries       Historical trend entries.
      */
     public function __construct(
         public string $path,
@@ -31,7 +33,7 @@ final readonly class TrendReport
      *     currentScore: float,
      *     previousScore: float|null,
      *     delta: float|null,
-     *     entries: list<array<string, mixed>>
+     *     entries: list<TrendEntry>
      * }
      */
     public function toArray(): array

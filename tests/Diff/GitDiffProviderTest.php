@@ -22,12 +22,12 @@ final class GitDiffProviderTest extends TestCase
     public function testDiffFindingFilterKeepsOnlyTouchedChangedLineFindings(): void
     {
         $diff = new DiffResult(
-            active: true,
-            mode: 'unstaged',
-            base: null,
+            active:       true,
+            mode:         'unstaged',
+            base:         null,
             changedLines: ['src/Example.php' => [new ChangedLineRange(10, 12)]],
             changedFiles: ['src/Example.php'],
-            message: 'test',
+            message:      'test',
         );
         $findings = [
             $this->finding('src/Example.php', 11),
@@ -114,13 +114,13 @@ final class GitDiffProviderTest extends TestCase
     private function finding(string $filePath, int $line): Finding
     {
         return new Finding(
-            ruleId: 'docs.missing-public-phpdoc',
-            message: 'Example finding.',
-            filePath: $filePath,
-            line: $line,
-            severity: Severity::Advisory,
-            pillar: Pillar::Documentation,
-            tier: RuleTier::V01,
+            ruleId:     'docs.missing-public-phpdoc',
+            message:    'Example finding.',
+            filePath:   $filePath,
+            line:       $line,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
             confidence: Confidence::High,
         );
     }

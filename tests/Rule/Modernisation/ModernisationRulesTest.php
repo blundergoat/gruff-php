@@ -102,7 +102,7 @@ final class ModernisationRulesTest extends TestCase
 
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/Modernisation/cumulative-modernisation.php');
+        $findings            = $this->analysePath('tests/Fixtures/Modernisation/cumulative-modernisation.php');
         $suppressionFindings = array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => $finding->ruleId === ErrorSuppressionRule::ID,
@@ -144,7 +144,7 @@ final class ModernisationRulesTest extends TestCase
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
-        $units = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
         $registry = RuleRegistry::defaults();
 
         return $registry->analyse(

@@ -69,15 +69,15 @@ final class ScoreCalculatorTest extends TestCase
         ?string $symbol = null,
     ): Finding {
         return new Finding(
-            ruleId: $ruleId,
-            message: 'Example finding.',
-            filePath: $filePath,
-            line: $line,
-            severity: $severity,
-            pillar: $pillar,
-            tier: RuleTier::V01,
+            ruleId:     $ruleId,
+            message:    'Example finding.',
+            filePath:   $filePath,
+            line:       $line,
+            severity:   $severity,
+            pillar:     $pillar,
+            tier:       RuleTier::V01,
             confidence: Confidence::High,
-            symbol: $symbol,
+            symbol:     $symbol,
         );
     }
 }

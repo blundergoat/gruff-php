@@ -389,7 +389,13 @@ final readonly class IdentifierQualityRule implements RuleInterface
         } elseif ($this->allTokensMatch($tokens, $context->genericTokens)) {
             $variant      = 'generic';
             $matchedToken = implode(' ', $tokens);
-        } elseif ($this->isNumberedIdentifier($name, $tokens, $context->genericTokens, $context->placeholderNames, $context->acceptedAbbreviations)) {
+        } elseif ($this->isNumberedIdentifier(
+            name:                  $name,
+            tokens:                $tokens,
+            genericTokens:         $context->genericTokens,
+            placeholderNames:      $context->placeholderNames,
+            acceptedAbbreviations: $context->acceptedAbbreviations,
+        )) {
             $variant      = 'numbered';
             $matchedToken = $tokens[array_key_last($tokens)];
         }

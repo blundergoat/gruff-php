@@ -154,9 +154,9 @@ final readonly class ShortVariableRule implements RuleInterface
                 foreach ($loop->init as $init) {
                     $initVars = $finder->findInstanceOf([$init], Variable::class);
 
-                    foreach ($initVars as $v) {
-                        if (is_string($v->name)) {
-                            $vars[$v->name] = true;
+                    foreach ($initVars as $variable) {
+                        if (is_string($variable->name)) {
+                            $vars[$variable->name] = true;
                         }
                     }
                 }

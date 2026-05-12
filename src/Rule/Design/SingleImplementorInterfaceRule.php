@@ -180,12 +180,12 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         }
 
         return $this->buildFindings(
-            $interfaces,
-            $implementations,
-            $typeReferences,
-            $extendedInterfaces,
-            $externalPrefixes,
-            $frameworkAttributePrefixes,
+            interfaces:                 $interfaces,
+            implementations:            $implementations,
+            typeReferences:             $typeReferences,
+            extendedInterfaces:         $extendedInterfaces,
+            externalPrefixes:           $externalPrefixes,
+            frameworkAttributePrefixes: $frameworkAttributePrefixes,
         );
     }
 
