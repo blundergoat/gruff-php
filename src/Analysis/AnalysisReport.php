@@ -67,6 +67,11 @@ final readonly class AnalysisReport
         return $counts;
     }
 
+    /**
+     * Count parse diagnostics emitted while loading analysed files.
+     *
+     * @return int Number of parse-error diagnostics in the report.
+     */
     public function parseErrorCount(): int
     {
         return count(array_filter(
@@ -141,6 +146,11 @@ final readonly class AnalysisReport
         return $report;
     }
 
+    /**
+     * Check whether any finding in the report matches the requested severity.
+     *
+     * @return bool True when at least one finding has the requested severity.
+     */
     public function hasFindingsAtSeverity(Severity $severity): bool
     {
         foreach ($this->findings as $finding) {
