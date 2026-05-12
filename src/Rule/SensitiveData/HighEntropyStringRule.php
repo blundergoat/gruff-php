@@ -17,6 +17,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.high-entropy-string';
 
+    /**
+     * Describe the high entropy string rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find long high-entropy string literals that may be secrets.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious high-entropy literals.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $settings = $context->settingsFor($this->definition());
@@ -73,6 +83,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         return $findings;
     }
 
+    /**
+     * Defer known secret formats to more specific detectors.
+     *
+     * @return bool True when another rule should handle the literal.
+     */
     private function skipKnownSecretPattern(string $value): bool
     {
         return str_starts_with($value, 'AKIA')
@@ -86,6 +101,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || (strlen($value) <= 48 && ctype_alpha($value));
     }
 
+    /**
+     * Detect path-like literals that should not be treated as secrets.
+     *
+     * @return bool True when the literal looks like a file path.
+     */
     private function isPathLikeLiteral(string $value): bool
     {
         if (!str_contains($value, '/') && !str_contains($value, '\\')) {

@@ -24,6 +24,11 @@ final readonly class ParameterCountRule implements RuleInterface
 {
     public const ID = 'size.parameter-count';
 
+    /**
+     * Describe the parameter-count rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -40,6 +45,11 @@ final readonly class ParameterCountRule implements RuleInterface
         );
     }
 
+    /**
+     * Find functions, methods, and closures with too many parameters.
+     *
+     * @return list<Finding> Findings for callables above configured thresholds.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -100,6 +110,11 @@ final readonly class ParameterCountRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Exclude final readonly value-object constructors that use property promotion.
+     *
+     * @return bool True when the constructor shape is an accepted value object.
+     */
     private function isPromotedValueObjectConstructor(ClassMethod $node): bool
     {
         if ($node->name->toString() !== '__construct' || $node->params === []) {
@@ -120,6 +135,11 @@ final readonly class ParameterCountRule implements RuleInterface
         return true;
     }
 
+    /**
+     * Build a display symbol for a callable node.
+     *
+     * @return string Callable display symbol.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod) {
@@ -142,6 +162,11 @@ final readonly class ParameterCountRule implements RuleInterface
         return sprintf('Closure@%d', $node->getStartLine());
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

@@ -14,6 +14,11 @@ use Symfony\Component\Process\Process;
 
 final class ReportCommand extends Command
 {
+    /**
+     * Configure the report command arguments and options.
+     *
+     * @return void No return value.
+     */
     protected function configure(): void
     {
         $this
@@ -50,6 +55,11 @@ final class ReportCommand extends Command
             ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.');
     }
 
+    /**
+     * Run analysis through the analyse command and emit or write the report.
+     *
+     * @return int Symfony command exit code.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = getcwd();
@@ -184,6 +194,11 @@ final class ReportCommand extends Command
         return $command;
     }
 
+    /**
+     * Read a non-empty string option from console input.
+     *
+     * @return string|null Option value, or null when omitted/empty.
+     */
     private function optionalStringOption(InputInterface $input, string $name): ?string
     {
         $value = $input->getOption($name);
@@ -191,11 +206,21 @@ final class ReportCommand extends Command
         return is_string($value) && $value !== '' ? $value : null;
     }
 
+    /**
+     * Return the package-local gruff executable path.
+     *
+     * @return string Absolute gruff binary path.
+     */
     private function gruffBinary(): string
     {
         return dirname(__DIR__, 2) . '/bin/gruff';
     }
 
+    /**
+     * Resolve a path relative to the project root when needed.
+     *
+     * @return string Absolute path.
+     */
     private function absolutePath(string $path, string $projectRoot): string
     {
         if (str_starts_with($path, '/')) {
@@ -205,6 +230,11 @@ final class ReportCommand extends Command
         return $projectRoot . '/' . $path;
     }
 
+    /**
+     * Forward child process stderr to the most appropriate output stream.
+     *
+     * @return void No return value.
+     */
     private function writeStderr(OutputInterface $output, string $stderr): void
     {
         if ($stderr === '') {

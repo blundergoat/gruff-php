@@ -13,11 +13,21 @@ use PhpParser\Node\Stmt;
 
 final class ModernisationNodeHelper
 {
+    /**
+     * Determine whether the configured target PHP version supports a syntax feature.
+     *
+     * @return bool True when the project target is at least the requested version.
+     */
     public static function supportsPhp(RuleContext $context, float $version): bool
     {
         return $context->config->minimumPhpVersion() >= $version;
     }
 
+    /**
+     * Normalize simple PHP type nodes to lower-case names.
+     *
+     * @return string|null Type name, or null for complex/absent types.
+     */
     public static function typeName(null|Identifier|Name|Node\ComplexType $type): ?string
     {
         if ($type instanceof Identifier || $type instanceof Name) {
@@ -27,6 +37,11 @@ final class ModernisationNodeHelper
         return null;
     }
 
+    /**
+     * Check whether an expression fetches a property from `$this`.
+     *
+     * @return bool True when the expression matches the requested `$this` property.
+     */
     public static function isThisPropertyFetch(Expr $expr, ?string $propertyName = null): bool
     {
         if (!$expr instanceof Expr\PropertyFetch || !$expr->var instanceof Expr\Variable) {
@@ -40,6 +55,11 @@ final class ModernisationNodeHelper
         return $propertyName === null || $expr->name->toString() === $propertyName;
     }
 
+    /**
+     * Resolve the property name from a static property-fetch expression.
+     *
+     * @return string|null Property name, or null for dynamic property access.
+     */
     public static function propertyFetchName(Expr $expr): ?string
     {
         if (!$expr instanceof Expr\PropertyFetch || !$expr->name instanceof Identifier) {
@@ -49,11 +69,21 @@ final class ModernisationNodeHelper
         return $expr->name->toString();
     }
 
+    /**
+     * Resolve a class statement's declared name.
+     *
+     * @return string|null Class name, or null for anonymous classes.
+     */
     public static function className(Stmt\Class_ $class): ?string
     {
         return $class->name?->toString();
     }
 
+    /**
+     * Identify value-style classes by conventional suffixes.
+     *
+     * @return bool True when the class name looks like a DTO/value object.
+     */
     public static function isDtoClass(Stmt\Class_ $class): bool
     {
         $name = self::className($class);
@@ -70,6 +100,11 @@ final class ModernisationNodeHelper
         return false;
     }
 
+    /**
+     * Read the parent node connected by PhpParser's parent visitor.
+     *
+     * @return Node|null Parent node, or null when the attribute is absent.
+     */
     public static function parent(Node $node): ?Node
     {
         $parent = $node->getAttribute('parent');

@@ -21,6 +21,11 @@ final class DisabledSslVerificationRule implements RuleInterface
 {
     public const ID = 'security.disabled-ssl-verification';
 
+    /**
+     * Describe the disabled SSL verification rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -33,6 +38,11 @@ final class DisabledSslVerificationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find cURL calls that disable peer or hostname verification.
+     *
+     * @return list<Finding> Findings for disabled SSL verification.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -52,6 +62,11 @@ final class DisabledSslVerificationRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect disabled verification in a `curl_setopt` call.
+     *
+     * @return bool True when SSL verification is disabled.
+     */
     private function isDisabledCurlSetopt(Expr\FuncCall $call): bool
     {
         $optionArg = SecurityNodeHelper::argumentValue($call->args, 1);
@@ -73,6 +88,11 @@ final class DisabledSslVerificationRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect disabled verification in a `curl_setopt_array` option map.
+     *
+     * @return bool True when the option array disables SSL verification.
+     */
     private function isDisabledCurlSetoptArray(Expr\FuncCall $call): bool
     {
         $optionsArg = SecurityNodeHelper::argumentValue($call->args, 1);
@@ -102,6 +122,11 @@ final class DisabledSslVerificationRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Build the SSL verification finding for a cURL call.
+     *
+     * @return Finding Security finding.
+     */
     private function finding(AnalysisUnit $unit, Node $node): Finding
     {
         return new Finding(

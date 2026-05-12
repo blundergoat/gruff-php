@@ -8,6 +8,8 @@ final readonly class DashboardPageRenderer
 {
     /**
      * @param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     *
+     * @return string Complete dashboard shell HTML.
      */
     public function dashboardHtml(array $state): string
     {
@@ -55,6 +57,8 @@ final readonly class DashboardPageRenderer
 
     /**
      * @param list<string> $command
+     *
+     * @return string Report HTML with parent-frame scan metadata injected.
      */
     public function injectDashboardMetadata(
         string $html,
@@ -90,6 +94,8 @@ final readonly class DashboardPageRenderer
 
     /**
      * Renders an iframe-safe dashboard error document.
+     *
+     * @return string Complete dashboard error HTML.
      */
     public function errorHtml(string $message, string $detail, int $exitCode, int $durationMs): string
     {
@@ -102,6 +108,11 @@ final readonly class DashboardPageRenderer
             . '</main></body></html>';
     }
 
+    /**
+     * Render a labelled text input for the dashboard controls panel.
+     *
+     * @return string Escaped label and input HTML.
+     */
     private function field(string $label, string $name, string $value, string $placeholder = ''): string
     {
         return sprintf(
@@ -113,6 +124,11 @@ final readonly class DashboardPageRenderer
         );
     }
 
+    /**
+     * Render a select option and mark it selected when it matches the current value.
+     *
+     * @return string Escaped option HTML.
+     */
     private function option(string $value, string $selected, ?string $label = null): string
     {
         return sprintf(
@@ -123,6 +139,11 @@ final readonly class DashboardPageRenderer
         );
     }
 
+    /**
+     * Return the inline stylesheet used by the local dashboard shell.
+     *
+     * @return string Dashboard CSS.
+     */
     private function dashboardCss(): string
     {
         return <<<'CSS'
@@ -130,6 +151,11 @@ final readonly class DashboardPageRenderer
 CSS;
     }
 
+    /**
+     * Return the inline script that drives dashboard scans and controls.
+     *
+     * @return string Dashboard JavaScript.
+     */
     private function dashboardJs(): string
     {
         return <<<'JS'
@@ -137,6 +163,11 @@ const form=document.getElementById('scan-form');const frame=document.getElementB
 JS;
     }
 
+    /**
+     * Return the initial iframe document shown before the first scan completes.
+     *
+     * @return string Complete loading iframe HTML.
+     */
     private function loadingFrame(): string
     {
         return '<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><style>body{margin:0;background:#0d0c0a;color:#f3e9d2;font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;display:grid;place-items:center;min-height:100vh}</style></head><body>Ready to scan.</body></html>';
@@ -144,6 +175,8 @@ JS;
 
     /**
      * @param list<string> $command
+     *
+     * @return string Shell-safe display command for dashboard metadata.
      */
     private function displayCommand(array $command): string
     {
@@ -152,11 +185,21 @@ JS;
         return implode(' ', array_map($this->quoteArgument(...), $display));
     }
 
+    /**
+     * Quote one command argument when it contains shell-sensitive characters.
+     *
+     * @return string Argument safe for display as a shell command fragment.
+     */
     private function quoteArgument(string $argument): string
     {
         return preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument);
     }
 
+    /**
+     * Escape text for safe inclusion in HTML attributes and content.
+     *
+     * @return string HTML-escaped value.
+     */
     private function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

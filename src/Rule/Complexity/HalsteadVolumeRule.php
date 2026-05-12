@@ -25,6 +25,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
 {
     public const ID = 'complexity.halstead-volume';
 
+    /**
+     * Describe the Halstead-volume rule for the registry and reports.
+     *
+     * @return RuleDefinition Rule metadata and default thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         );
     }
 
+    /**
+     * Detect functions and methods whose Halstead volume exceeds configured thresholds.
+     *
+     * @return list<Finding> Halstead-volume findings for the analysed unit.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -131,6 +141,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         return self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
     }
 
+    /**
+     * Classify a node as a Halstead operator when it contributes executable structure.
+     *
+     * @return string|null Stable operator key, or null when the node is not an operator.
+     */
     private static function operatorKey(Node $node): ?string
     {
         return match (true) {
@@ -149,6 +164,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         };
     }
 
+    /**
+     * Classify a node as a Halstead operand when it contributes a value reference.
+     *
+     * @return string|null Stable operand key, or null when the node is not an operand.
+     */
     private static function operandKey(Node $node): ?string
     {
         return match (true) {
@@ -159,11 +179,21 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         };
     }
 
+    /**
+     * Build the operand key for a named variable reference.
+     *
+     * @return string|null Variable operand key, or null for dynamic variable names.
+     */
     private static function variableOperandKey(Expr\Variable $variable): ?string
     {
         return is_string($variable->name) ? '$' . $variable->name : null;
     }
 
+    /**
+     * Build the operand key for a function or method parameter.
+     *
+     * @return string|null Parameter operand key, or null for unsupported parameter shapes.
+     */
     private static function parameterOperandKey(Node\Param $parameter): ?string
     {
         if (!$parameter->var instanceof Expr\Variable) {
@@ -197,6 +227,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         ];
     }
 
+    /**
+     * Render a configured numeric threshold for finding messages.
+     *
+     * @return string The threshold without unnecessary decimal places.
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

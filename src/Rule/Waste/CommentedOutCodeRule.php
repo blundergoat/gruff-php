@@ -19,6 +19,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
 {
     public const ID = 'waste.commented-out-code';
 
+    /**
+     * Describe the commented-out code rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         );
     }
 
+    /**
+     * Find comment tokens that appear to contain disabled executable code.
+     *
+     * @return list<Finding> Findings for suspicious comment blocks.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -68,16 +78,31 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a parser token is a regular comment.
+     *
+     * @return bool True for non-docblock comment tokens.
+     */
     private function isCommentToken(Token $token): bool
     {
         return $token->id === T_COMMENT;
     }
 
+    /**
+     * Check whether comment text starts as a PHPDoc block.
+     *
+     * @return bool True when the comment is a docblock.
+     */
     private function isDocblock(string $text): bool
     {
         return str_starts_with(trim($text), '/**');
     }
 
+    /**
+     * Remove PHP comment delimiters before code-shape checks.
+     *
+     * @return string Trimmed comment body.
+     */
     private function stripCommentMarkers(string $text): string
     {
         $text = preg_replace('/^\/\*+\s*|\s*\*+\/$/', '', $text) ?? $text;
@@ -87,6 +112,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         return trim($text);
     }
 
+    /**
+     * Detect whether comment content has enough PHP-like syntax signals.
+     *
+     * @return bool True when the content looks like disabled code.
+     */
     private function looksLikeCode(string $content): bool
     {
         if (strlen($content) < 5) {

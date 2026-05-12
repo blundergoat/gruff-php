@@ -12,6 +12,11 @@ final readonly class ConfigLoader
 {
     public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
 
+    /**
+     * Create a loader for a project root with an optional package config fallback.
+     *
+     * @param string|null $fallbackConfigRoot Root used for fallback `.gruff.yaml` discovery.
+     */
     public function __construct(
         private string $projectRoot,
         private ?string $fallbackConfigRoot = null,
@@ -19,11 +24,21 @@ final readonly class ConfigLoader
     {
     }
 
+    /**
+     * Return the installed package root for fallback config discovery.
+     *
+     * @return string Absolute package root path.
+     */
     public static function packageRoot(): string
     {
         return dirname(__DIR__, 2);
     }
 
+    /**
+     * Load analysis config from an explicit, project, or fallback YAML file.
+     *
+     * @return AnalysisConfig Loaded config merged onto registry defaults.
+     */
     public function load(?string $configPath, RuleRegistry $registry): AnalysisConfig
     {
         $config = AnalysisConfig::fromRegistry($registry);
@@ -36,6 +51,11 @@ final readonly class ConfigLoader
         return $this->applyConfigFile($config, $registry, $resolvedPath);
     }
 
+    /**
+     * Resolve the config file path that should be used for this run.
+     *
+     * @return string|null Absolute config path, or null when none is available.
+     */
     public function resolveConfigPath(?string $configPath): ?string
     {
         if ($configPath !== null && $configPath !== '') {
@@ -62,11 +82,21 @@ final readonly class ConfigLoader
         return $fallbackPath !== $defaultPath && is_file($fallbackPath) ? $fallbackPath : null;
     }
 
+    /**
+     * Build the default gruff config path for a root directory.
+     *
+     * @return string Absolute or root-relative `.gruff.yaml` path.
+     */
     private function defaultConfigPath(string $root): string
     {
         return rtrim($root, '/') . '/' . self::DEFAULT_CONFIG_FILE;
     }
 
+    /**
+     * Apply a parsed config file to the registry-derived defaults.
+     *
+     * @return AnalysisConfig Config after file values have been applied.
+     */
     private function applyConfigFile(AnalysisConfig $config, RuleRegistry $registry, string $path): AnalysisConfig
     {
         $rootConfig = $this->readRootConfig($path);
@@ -97,7 +127,11 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Reject unsupported top-level config keys.
+     *
      * @param array<string, mixed> $rootConfig
+     *
+     * @return void No return value.
      */
     private function assertKnownRootKeys(array $rootConfig): void
     {
@@ -109,7 +143,11 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Apply the configured minimum PHP version when present.
+     *
      * @param array<string, mixed> $rootConfig
+     *
+     * @return AnalysisConfig Config with the PHP version floor applied.
      */
     private function applyMinimumPhpVersion(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -130,7 +168,11 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Apply configured path ignores when present.
+     *
      * @param array<string, mixed> $rootConfig
+     *
+     * @return AnalysisConfig Config with ignored path patterns applied.
      */
     private function applyPathConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -142,7 +184,11 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Apply configured allowlists when present.
+     *
      * @param array<string, mixed> $rootConfig
+     *
+     * @return AnalysisConfig Config with allowlist values applied.
      */
     private function applyAllowlistConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -158,7 +204,11 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Apply configured rule selection when present.
+     *
      * @param array<string, mixed> $rootConfig
+     *
+     * @return AnalysisConfig Config with include/exclude selection applied.
      */
     private function applySelectionConfig(
         AnalysisConfig $config,

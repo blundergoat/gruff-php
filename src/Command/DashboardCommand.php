@@ -15,6 +15,11 @@ final class DashboardCommand extends Command
     private const DEFAULT_HOST = '127.0.0.1';
     private const DEFAULT_PORT = 8765;
 
+    /**
+     * Configure the dashboard command arguments and options.
+     *
+     * @return void No return value.
+     */
     protected function configure(): void
     {
         $this
@@ -39,6 +44,11 @@ final class DashboardCommand extends Command
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.');
     }
 
+    /**
+     * Validate dashboard options and start the local dashboard server.
+     *
+     * @return int Symfony command exit code.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $cwd = getcwd();
@@ -77,6 +87,11 @@ final class DashboardCommand extends Command
         return $server->serve($output, $host, $port, $context);
     }
 
+    /**
+     * Parse and validate the dashboard port option.
+     *
+     * @return int|false Valid port, or false when input is invalid.
+     */
     private function port(InputInterface $input, OutputInterface $output): int|false
     {
         $rawPort = $input->getOption('port');
@@ -98,6 +113,11 @@ final class DashboardCommand extends Command
         return $port;
     }
 
+    /**
+     * Parse and validate the dashboard scan timeout option.
+     *
+     * @return float|false|null Timeout seconds, null for disabled timeout, or false for invalid input.
+     */
     private function scanTimeout(InputInterface $input, OutputInterface $output): float|false|null
     {
         $rawTimeout = $input->getOption('scan-timeout');
@@ -113,6 +133,11 @@ final class DashboardCommand extends Command
         return $timeout === 0 ? null : (float) $timeout;
     }
 
+    /**
+     * Return the package-local gruff executable path.
+     *
+     * @return string Absolute gruff binary path.
+     */
     private function gruffBinary(): string
     {
         return dirname(__DIR__, 2) . '/bin/gruff';

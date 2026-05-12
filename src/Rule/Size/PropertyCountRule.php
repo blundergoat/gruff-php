@@ -25,6 +25,11 @@ final readonly class PropertyCountRule implements RuleInterface
 {
     public const ID = 'size.property-count';
 
+    /**
+     * Describe the property-count rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class PropertyCountRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class-like scopes whose declared property count exceeds thresholds.
+     *
+     * @return list<Finding> Findings for classes, traits, or enums with too many properties.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -98,6 +108,8 @@ final readonly class PropertyCountRule implements RuleInterface
 
     /**
      * @param Class_|Trait_|Enum_ $classLike
+     *
+     * @return int Declared and promoted property count.
      */
     private function countProperties(Node $classLike): int
     {
@@ -120,6 +132,11 @@ final readonly class PropertyCountRule implements RuleInterface
         return $count;
     }
 
+    /**
+     * Build a display symbol for a class-like node.
+     *
+     * @return string Class-like display symbol.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
@@ -137,6 +154,11 @@ final readonly class PropertyCountRule implements RuleInterface
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

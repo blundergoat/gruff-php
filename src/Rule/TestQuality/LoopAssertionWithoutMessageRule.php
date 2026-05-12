@@ -24,6 +24,11 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
 {
     public const ID = 'test-quality.loop-assertion-without-message';
 
+    /**
+     * Describe the loop assertion message rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         );
     }
 
+    /**
+     * Find assertions inside loops that lack a context-bearing message.
+     *
+     * @return list<Finding> Findings for loop assertions without messages.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -100,6 +110,11 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether an assertion call appears to include a message argument.
+     *
+     * @return bool True when the final argument looks like message text.
+     */
     private function hasMessageArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         if ($call->args === []) {
@@ -115,6 +130,11 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
         return $this->isLikelyStringExpression($lastArg->value);
     }
 
+    /**
+     * Detect string-like expressions commonly used for assertion messages.
+     *
+     * @return bool True when the expression can produce message text.
+     */
     private function isLikelyStringExpression(Expr $expr): bool
     {
         if ($expr instanceof Scalar\String_) {

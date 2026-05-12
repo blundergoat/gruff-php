@@ -17,6 +17,11 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 {
     public const ID = 'sensitive-data.hardcoded-env-value';
 
+    /**
+     * Describe the hardcoded environment value rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -29,6 +34,11 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find env-style assignments that look like committed secrets.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious env-style values.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (SecretScannerHelper::isEnvFile($unit->file->displayPath)) {
@@ -67,6 +77,11 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a key/value pair has enough evidence to be treated as secret-like.
+     *
+     * @return bool True when the value shape is strong enough for the key.
+     */
     private function hasSecretValueEvidence(string $key, string $value): bool
     {
         $normalizedValue = trim($value, "\"' \t\r\n");
@@ -83,11 +98,21 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         return $this->hasStrongSecretShape($normalizedValue);
     }
 
+    /**
+     * Check length and entropy signals for a possible secret value.
+     *
+     * @return bool True when the value has a strong secret-like shape.
+     */
     private function hasStrongSecretShape(string $value): bool
     {
         return strlen($value) >= 20 && SecretScannerHelper::entropy($value) >= 3.5;
     }
 
+    /**
+     * Detect key suffixes that need stronger value evidence.
+     *
+     * @return bool True when the key suffix is commonly non-secret.
+     */
     private function isConservativeKeySuffix(string $key): bool
     {
         foreach (['_NAME', '_PREFIX', '_ID', '_MODE'] as $suffix) {
@@ -99,6 +124,11 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         return false;
     }
 
+    /**
+     * Detect short identifier-like values that are usually not secrets.
+     *
+     * @return bool True when the value looks like a common non-secret token.
+     */
     private function isCommonNonSecretValue(string $value): bool
     {
         if (preg_match('/^[a-z][a-z0-9-]{1,24}$/', $value) === 1) {

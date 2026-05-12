@@ -16,6 +16,8 @@ final readonly class DocsInheritanceHelper
 {
     /**
      * @param list<Node\Stmt> $statements
+     *
+     * @return bool True when inheritance or override metadata provides the contract docs.
      */
     public function hasInheritedContractDoc(ClassMethod $method, array $statements, NodeFinder $finder): bool
     {
@@ -63,6 +65,11 @@ final readonly class DocsInheritanceHelper
         return false;
     }
 
+    /**
+     * Check whether a method docblock declares inheritdoc.
+     *
+     * @return bool True when inheritdoc is present.
+     */
     private function hasInheritDoc(ClassMethod $method): bool
     {
         $doc = $method->getDocComment();
@@ -70,6 +77,11 @@ final readonly class DocsInheritanceHelper
         return $doc !== null && preg_match('/@inheritdoc|{@inheritdoc}/i', $doc->getText()) === 1;
     }
 
+    /**
+     * Check whether a method has an Override attribute.
+     *
+     * @return bool True when an Override attribute is present.
+     */
     private function hasOverrideAttribute(ClassMethod $method): bool
     {
         foreach ($method->attrGroups as $group) {
@@ -84,6 +96,11 @@ final readonly class DocsInheritanceHelper
         return false;
     }
 
+    /**
+     * Walk parent attributes to find the enclosing class.
+     *
+     * @return Class_|null Enclosing class node, or null outside a class.
+     */
     private function enclosingClass(ClassMethod $method): ?Class_
     {
         $parent = $method->getAttribute('parent');
@@ -99,6 +116,11 @@ final readonly class DocsInheritanceHelper
         return null;
     }
 
+    /**
+     * Return the final segment of a name node.
+     *
+     * @return string Unqualified name.
+     */
     private function shortName(Name $name): string
     {
         $parts = $name->getParts();

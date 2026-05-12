@@ -21,6 +21,11 @@ final readonly class RuleSettings
     ) {
     }
 
+    /**
+     * Return a configured numeric threshold by name.
+     *
+     * @return int|float Threshold value.
+     */
     public function numericThreshold(string $name): int|float
     {
         $value = $this->thresholds[$name] ?? null;
@@ -32,6 +37,11 @@ final readonly class RuleSettings
         return $value;
     }
 
+    /**
+     * Match a value where higher numbers are worse against configured thresholds.
+     *
+     * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
+     */
     public function highValueThresholdMatch(int|float $value): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
@@ -54,6 +64,11 @@ final readonly class RuleSettings
         );
     }
 
+    /**
+     * Match a value where lower numbers are worse against configured thresholds.
+     *
+     * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
+     */
     public function lowValueThresholdMatch(int|float $value): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
@@ -76,11 +91,21 @@ final readonly class RuleSettings
         );
     }
 
+    /**
+     * Check whether an option was configured.
+     *
+     * @return bool True when the option key exists.
+     */
     public function hasOption(string $name): bool
     {
         return array_key_exists($name, $this->options);
     }
 
+    /**
+     * Return a configured option by name.
+     *
+     * @return mixed Option value.
+     */
     public function option(string $name): mixed
     {
         if (!array_key_exists($name, $this->options)) {

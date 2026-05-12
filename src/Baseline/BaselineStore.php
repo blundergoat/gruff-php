@@ -12,10 +12,18 @@ final readonly class BaselineStore
     public const SCHEMA_VERSION = 'gruff.baseline.v1';
     public const DEFAULT_FILENAME = 'gruff-baseline.json';
 
+    /**
+     * Create a baseline store rooted at the current project.
+     */
     public function __construct(private string $projectRoot)
     {
     }
 
+    /**
+     * Read and validate a baseline file.
+     *
+     * @return BaselineData Parsed baseline data.
+     */
     public function read(string $path): BaselineData
     {
         $decoded = $this->readBaselineObject($path);
@@ -91,6 +99,8 @@ final readonly class BaselineStore
 
     /**
      * @param list<Finding> $findings
+     *
+     * @return BaselineData Data written to disk.
      */
     public function write(string $path, array $findings): BaselineData
     {
@@ -126,6 +136,11 @@ final readonly class BaselineStore
         return $data;
     }
 
+    /**
+     * Write a baseline payload via temporary file and atomic rename.
+     *
+     * @return void No return value.
+     */
     private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
     {
         $directory = dirname($absolutePath);
@@ -172,6 +187,11 @@ final readonly class BaselineStore
         }
     }
 
+    /**
+     * Resolve a path relative to the project root when needed.
+     *
+     * @return string Absolute path.
+     */
     private function absolutePath(string $path): string
     {
         if ($path !== '' && $path[0] === '/') {

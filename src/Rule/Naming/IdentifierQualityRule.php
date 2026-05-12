@@ -79,6 +79,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         'interact',
     ];
 
+    /**
+     * Describe the identifier quality rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -98,6 +103,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         );
     }
 
+    /**
+     * Find placeholder, generic, and numbered identifiers across declarations and locals.
+     *
+     * @return list<Finding> Findings for low-quality identifiers.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -242,6 +252,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @param list<string> $genericTokens
      * @param list<string> $ignoredNames
      * @param list<string> $acceptedAbbreviations
+     *
+     * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
         RuleDefinition $definition,
@@ -308,6 +320,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * @param list<string> $ignoredNames
      * @param list<string> $acceptedAbbreviations
+     *
+     * @return bool True when the name should be skipped by this rule.
      */
     private function isIgnored(string $name, array $ignoredNames, array $acceptedAbbreviations): bool
     {
@@ -327,6 +341,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * @param list<string> $tokens
      * @param list<string> $genericTokens
+     *
+     * @return bool True when every token is a configured generic token.
      */
     private function allTokensMatch(array $tokens, array $genericTokens): bool
     {
@@ -344,6 +360,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @param list<string> $genericTokens
      * @param list<string> $placeholderNames
      * @param list<string> $acceptedAbbreviations
+     *
+     * @return bool True when the identifier is a weak numbered variant.
      */
     private function isNumberedIdentifier(
         string $name,
@@ -370,6 +388,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return in_array($prefix, $placeholderNames, true) || $this->allTokensMatch($prefixTokens, $genericTokens);
     }
 
+    /**
+     * Skip framework lifecycle and test data-provider function-like declarations.
+     *
+     * @return bool True when the function-like node should not be checked.
+     */
     private function shouldSkipFunctionLike(ClassMethod|Function_ $node): bool
     {
         $name = $node->name->toString();
@@ -467,6 +490,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return $variables;
     }
 
+    /**
+     * Return the declaration kind for a class-like node.
+     *
+     * @return string One of class, interface, trait, or enum.
+     */
     private function classLikeKind(Class_|Interface_|Trait_|Enum_ $node): string
     {
         return match (true) {

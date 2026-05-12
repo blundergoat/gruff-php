@@ -30,6 +30,11 @@ final readonly class AnalysisConfig
         }
     }
 
+    /**
+     * Build default settings for every rule in the registry.
+     *
+     * @return self Config initialised with registry defaults.
+     */
     public static function fromRegistry(RuleRegistry $registry): self
     {
         $rules = [];
@@ -46,12 +51,22 @@ final readonly class AnalysisConfig
         return new self($rules);
     }
 
+    /**
+     * Return the configured settings for a known rule id.
+     *
+     * @return RuleSettings Settings for the requested rule.
+     */
     public function ruleSettings(string $ruleId): RuleSettings
     {
         return $this->rules[$ruleId]
             ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
+    /**
+     * Return a copy with one rule's settings replaced.
+     *
+     * @return self Config carrying the updated rule settings.
+     */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
     {
         if (!isset($this->rules[$ruleId])) {
@@ -71,11 +86,21 @@ final readonly class AnalysisConfig
         );
     }
 
+    /**
+     * Return the minimum PHP version used by version-sensitive rules.
+     *
+     * @return float Minimum supported PHP version.
+     */
     public function minimumPhpVersion(): float
     {
         return $this->minimumPhpVersion;
     }
 
+    /**
+     * Return a copy with a different minimum PHP version.
+     *
+     * @return self Config carrying the updated PHP version floor.
+     */
     public function withMinimumPhpVersion(float $minimumPhpVersion): self
     {
         return new self(
@@ -96,11 +121,21 @@ final readonly class AnalysisConfig
         return $this->rules;
     }
 
+    /**
+     * Return the rule include/exclude selection for this analysis run.
+     *
+     * @return RuleSelection Rule selection constraints.
+     */
     public function ruleSelection(): RuleSelection
     {
         return $this->ruleSelection;
     }
 
+    /**
+     * Return a copy with a different rule selection.
+     *
+     * @return self Config carrying the updated rule selection.
+     */
     public function withRuleSelection(RuleSelection $ruleSelection): self
     {
         return new self(
@@ -123,6 +158,8 @@ final readonly class AnalysisConfig
 
     /**
      * @param list<string> $ignoredPathPatterns
+     *
+     * @return self Config carrying the updated ignored path patterns.
      */
     public function withIgnoredPathPatterns(array $ignoredPathPatterns): self
     {
@@ -146,6 +183,8 @@ final readonly class AnalysisConfig
 
     /**
      * @param list<string> $acceptedAbbreviations
+     *
+     * @return self Config carrying the updated accepted abbreviation list.
      */
     public function withAcceptedAbbreviations(array $acceptedAbbreviations): self
     {
@@ -169,6 +208,8 @@ final readonly class AnalysisConfig
 
     /**
      * @param list<string> $allowedSecretPreviews
+     *
+     * @return self Config carrying the updated allowed secret preview list.
      */
     public function withAllowedSecretPreviews(array $allowedSecretPreviews): self
     {

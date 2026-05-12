@@ -24,6 +24,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     private const VERIFICATION_METHODS = ['expects', 'shouldreceive', 'shouldhavebeencalled', 'shouldnotreceive'];
     private const STUB_METHODS = ['willreturn', 'willreturnmap', 'willreturncallback', 'willreturnonconsecutivecalls', 'willreturnself', 'willthrowexception', 'andreturn'];
 
+    /**
+     * Describe the mock-without-expectation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -36,6 +41,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find mocks that are read without any verification call.
+     *
+     * @return list<Finding> Findings for mock variables that lack expectations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -138,6 +148,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @param array{line: int, name: string} $assignment
      * @param array<string, list<Expr\Variable>> $reads
+     *
+     * @return Finding|null Finding for the mock assignment, or null when verified.
      */
     private function findingForMock(
         AnalysisUnit $unit,
@@ -174,6 +186,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         );
     }
 
+    /**
+     * Build the finding message for a mock variable.
+     *
+     * @return string Human-readable finding message.
+     */
     private function mockMessage(string $symbol, string $varName, bool $hasStub): string
     {
         if ($hasStub) {
@@ -183,6 +200,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         return sprintf('%s passes mock $%s around without setting up an expectation or stub.', $symbol, $varName);
     }
 
+    /**
+     * Detect whether an expression creates a mock directly or through a method chain.
+     *
+     * @return bool True when the expression is recognised as mock creation.
+     */
     private function isMockCreationExpression(Expr $expr): bool
     {
         if ($expr instanceof Expr\FuncCall || $expr instanceof Expr\StaticCall) {
@@ -196,6 +218,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         return $this->methodCallChainCreatesMock($expr);
     }
 
+    /**
+     * Walk a method-call chain to see whether it originates at mock creation.
+     *
+     * @return bool True when any chain receiver creates a mock.
+     */
     private function methodCallChainCreatesMock(Expr\MethodCall $call): bool
     {
         if (TestQualityNodeHelper::isMockCreationCall($call)) {
@@ -240,6 +267,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         return $names;
     }
 
+    /**
+     * Check whether a method-call chain starts at the target variable.
+     *
+     * @return bool True when the chain root is the named variable.
+     */
     private function chainRootsAtVariable(Expr\MethodCall $call, string $varName): bool
     {
         $receiver = $call->var;
@@ -254,8 +286,12 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * Check whether two normalised method-name lists overlap.
+     *
      * @param list<string> $names
      * @param list<string> $needles
+     *
+     * @return bool True when any name appears in the needle list.
      */
     private function intersectsAny(array $names, array $needles): bool
     {

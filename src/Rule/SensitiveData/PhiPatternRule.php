@@ -31,6 +31,11 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         ];
     }
 
+    /**
+     * Describe the PHI identifier pattern rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -43,6 +48,11 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find health identifier patterns when nearby text gives PHI context.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for contextual PHI-like identifiers.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];
@@ -74,6 +84,11 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a matched identifier line contains health-data context.
+     *
+     * @return bool True when the line supports a PHI finding.
+     */
     private function hasPhiContext(string $line, string $detector): bool
     {
         $normalized = strtolower($line);
@@ -89,6 +104,11 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             || str_contains($normalized, 'tfn');
     }
 
+    /**
+     * Return source text for a 1-based line number.
+     *
+     * @return string Line text, or an empty string when unavailable.
+     */
     private function lineText(string $source, int $lineNumber): string
     {
         $lines = explode("\n", $source);

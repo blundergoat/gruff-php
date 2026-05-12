@@ -8,6 +8,11 @@ use Symfony\Component\Process\Process;
 
 final readonly class GitDiffProvider
 {
+    /**
+     * Read changed files and line ranges from git diff output.
+     *
+     * @return DiffResult Diff metadata and changed-line ranges for the requested mode.
+     */
     public function changedLines(string $projectRoot, string $mode): DiffResult
     {
         $this->ensureGitWorkTree($projectRoot);
@@ -33,6 +38,11 @@ final readonly class GitDiffProvider
         );
     }
 
+    /**
+     * Ensure diff mode only runs inside a git working tree.
+     *
+     * @return void No return value.
+     */
     private function ensureGitWorkTree(string $projectRoot): void
     {
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $projectRoot);
@@ -56,6 +66,11 @@ final readonly class GitDiffProvider
         };
     }
 
+    /**
+     * Reject unsafe refs before passing them to git.
+     *
+     * @return string The validated git ref name.
+     */
     private function validatedRef(string $ref): string
     {
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {
@@ -65,11 +80,21 @@ final readonly class GitDiffProvider
         return $ref;
     }
 
+    /**
+     * Convert supported literal modes into their report value.
+     *
+     * @return string The normalized diff mode.
+     */
     private function normaliseMode(string $mode): string
     {
         return in_array($mode, ['staged', 'unstaged', 'working-tree'], true) ? $mode : 'base-ref';
     }
 
+    /**
+     * Expose the base ref only when diffing against a named ref.
+     *
+     * @return string|null Base ref for report metadata, or null for local modes.
+     */
     private function baseForMode(string $mode): ?string
     {
         return in_array($mode, ['staged', 'unstaged', 'working-tree'], true) ? null : $mode;
@@ -121,6 +146,11 @@ final readonly class GitDiffProvider
         ];
     }
 
+    /**
+     * Parse the destination path from a unified diff header.
+     *
+     * @return string|null Current-file path, or null for deleted files.
+     */
     private function parseNewFilePath(string $line): ?string
     {
         $rawPath = substr($line, 4);
@@ -136,6 +166,11 @@ final readonly class GitDiffProvider
         return $rawPath;
     }
 
+    /**
+     * Parse the source path from a unified diff header.
+     *
+     * @return string|null Previous-file path, or null for new files.
+     */
     private function parseOldFilePath(string $line): ?string
     {
         $rawPath = substr($line, 4);

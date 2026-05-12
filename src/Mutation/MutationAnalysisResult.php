@@ -6,6 +6,9 @@ namespace GruffPhp\Mutation;
 
 final readonly class MutationAnalysisResult
 {
+    /**
+     * Create a mutation analysis result with optional baseline and budget context.
+     */
     public function __construct(
         public InfectionReport $report,
         public ?InfectionReport $baselineReport = null,
@@ -13,16 +16,31 @@ final readonly class MutationAnalysisResult
     ) {
     }
 
+    /**
+     * Count escaped and timed-out mutants in the current report.
+     *
+     * @return int Survived mutant count.
+     */
     public function survivedCount(): int
     {
         return count($this->report->survivedMutants());
     }
 
+    /**
+     * Check whether the survived mutant count exceeds the configured budget.
+     *
+     * @return bool True when the mutation budget is exceeded.
+     */
     public function budgetExceeded(): bool
     {
         return $this->mutationBudget !== null && $this->survivedCount() > $this->mutationBudget;
     }
 
+    /**
+     * Calculate the mutation score delta versus the baseline report.
+     *
+     * @return float|null MSI delta, or null when no baseline report exists.
+     */
     public function msiDelta(): ?float
     {
         if (!$this->baselineReport instanceof InfectionReport) {

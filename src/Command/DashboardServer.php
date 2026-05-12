@@ -9,12 +9,20 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final readonly class DashboardServer
 {
+    /**
+     * Create a dashboard server using the shared state factory and gruff binary path.
+     */
     public function __construct(
         private DashboardStateFactory $stateFactory,
         private string $gruffBinary,
     ) {
     }
 
+    /**
+     * Bind the dashboard socket and process HTTP clients until the socket closes.
+     *
+     * @return int Symfony command exit code.
+     */
     public function serve(OutputInterface $output, string $host, int $port, DashboardRequestContext $context): int
     {
         $server = $this->createServer($host, $port, $errorCode, $errorMessage);
@@ -47,6 +55,11 @@ final readonly class DashboardServer
         return Command::SUCCESS;
     }
 
+    /**
+     * Build the initial dashboard URL shown in console output.
+     *
+     * @return string Dashboard URL with default query state.
+     */
     private function url(string $host, int $port, DashboardRequestContext $context): string
     {
         return sprintf(
@@ -57,6 +70,11 @@ final readonly class DashboardServer
         );
     }
 
+    /**
+     * Build the per-request dashboard handler.
+     *
+     * @return DashboardRequestHandler HTTP request handler.
+     */
     private function handler(DashboardRequestContext $context): DashboardRequestHandler
     {
         $renderer = new DashboardPageRenderer();
@@ -67,6 +85,8 @@ final readonly class DashboardServer
 
     /**
      * @param resource $server
+     *
+     * @return bool True while the socket resource is still open.
      */
     private function isServerOpen($server): bool
     {

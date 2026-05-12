@@ -23,6 +23,11 @@ final readonly class ClassLengthRule implements RuleInterface
 {
     public const ID = 'size.class-length';
 
+    /**
+     * Describe the class-length rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -39,6 +44,11 @@ final readonly class ClassLengthRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class-like scopes whose physical line length exceeds thresholds.
+     *
+     * @return list<Finding> Findings for oversized classes, traits, or enums.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -100,6 +110,11 @@ final readonly class ClassLengthRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Build a display symbol for a class-like node.
+     *
+     * @return string Class-like display symbol.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
@@ -117,6 +132,11 @@ final readonly class ClassLengthRule implements RuleInterface
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

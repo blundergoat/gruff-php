@@ -25,6 +25,11 @@ final readonly class MethodLengthRule implements RuleInterface
 {
     public const ID = 'size.method-length';
 
+    /**
+     * Describe the method-length rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class MethodLengthRule implements RuleInterface
         );
     }
 
+    /**
+     * Find callables whose logical statement line count exceeds thresholds.
+     *
+     * @return list<Finding> Findings for long callables.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -106,6 +116,11 @@ final readonly class MethodLengthRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Count non-empty statement lines inside a callable body.
+     *
+     * @return int Logical statement line count.
+     */
     private function logicalLineCount(ClassMethod|Function_|Closure $node): int
     {
         $finder = new NodeFinder();
@@ -122,6 +137,11 @@ final readonly class MethodLengthRule implements RuleInterface
         return count($lines);
     }
 
+    /**
+     * Build a display symbol for a callable node.
+     *
+     * @return string Callable display symbol.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod) {
@@ -144,6 +164,11 @@ final readonly class MethodLengthRule implements RuleInterface
         return sprintf('Closure@%d', $node->getStartLine());
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

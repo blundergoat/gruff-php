@@ -46,6 +46,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class AnalyseCommand extends Command
 {
+    /**
+     * Configure the analyse command arguments and options.
+     *
+     * @return void No return value.
+     */
     protected function configure(): void
     {
         $this
@@ -97,6 +102,11 @@ final class AnalyseCommand extends Command
             ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.');
     }
 
+    /**
+     * Run source discovery, rule analysis, optional mutation ingestion, and reporting.
+     *
+     * @return int Symfony command exit code.
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input);
@@ -223,6 +233,11 @@ final class AnalyseCommand extends Command
         return $exitCode;
     }
 
+    /**
+     * Render setup errors using either plain console text or the requested report format.
+     *
+     * @return int Setup failure exit code.
+     */
     private function renderSetupFailure(AnalyseCommandSetupResult $result, OutputInterface $output): int
     {
         if ($result->plainError !== null) {
@@ -263,6 +278,8 @@ final class AnalyseCommand extends Command
 
     /**
      * @param list<RunDiagnostic> $diagnostics
+     *
+     * @return DiffResult|null Diff result, inactive result, or null when diff lookup fails.
      */
     private function buildDiffResult(string $projectRoot, ?string $diffMode, array &$diagnostics): ?DiffResult
     {
@@ -334,6 +351,8 @@ final class AnalyseCommand extends Command
     /**
      * @param list<RunDiagnostic> $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
+     *
+     * @return int Symfony command exit code.
      */
     private function resolveExitCode(array $diagnostics, array $findings, FailThreshold $failThreshold): int
     {
@@ -350,6 +369,11 @@ final class AnalyseCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * Render the report with the reporter selected by output format.
+     *
+     * @return void No return value.
+     */
     private function renderReport(
         AnalysisReport $report,
         OutputFormat $format,
@@ -395,6 +419,8 @@ final class AnalyseCommand extends Command
     /**
      * @param list<Finding> $currentFindings
      * @param list<RunDiagnostic> $diagnostics
+     *
+     * @return BranchReviewResult|null Review comparison, or null when disabled/unavailable.
      */
     private function buildBranchReview(
         string $projectRoot,
@@ -575,6 +601,8 @@ final class AnalyseCommand extends Command
 
     /**
      * @param list<string> $requestedPaths
+     *
+     * @return bool True when a changed file is inside the requested path set.
      */
     private function matchesRequestedPath(string $changedFile, array $requestedPaths): bool
     {
@@ -593,6 +621,11 @@ final class AnalyseCommand extends Command
         return false;
     }
 
+    /**
+     * Normalise path separators and duplicate slashes for path comparisons.
+     *
+     * @return string Normalised path.
+     */
     private function normalisePath(string $path): string
     {
         $path = str_replace('\\', '/', trim($path));

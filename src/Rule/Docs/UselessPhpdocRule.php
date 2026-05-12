@@ -23,6 +23,11 @@ final readonly class UselessPhpdocRule implements RuleInterface
 {
     public const ID = 'docs.useless-phpdoc';
 
+    /**
+     * Describe the useless PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final readonly class UselessPhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find docblocks that only restate native parameter or return types.
+     *
+     * @return list<Finding> Findings for redundant PHPDoc blocks.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -119,6 +129,11 @@ final readonly class UselessPhpdocRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether one PHPDoc tag only repeats a native signature type.
+     *
+     * @return bool True when the tag is a bare type restatement.
+     */
     private function isBareSignatureRestatement(string $line): bool
     {
         if (preg_match('/^@param\s+(\S+)\s+\$\w+\s*$/', $line, $matches) === 1) {
@@ -132,6 +147,11 @@ final readonly class UselessPhpdocRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Decide whether a PHPDoc type can be represented directly in a PHP signature.
+     *
+     * @return bool True when the type is simple enough to be redundant.
+     */
     private function isSimpleDocType(string $type): bool
     {
         if (preg_match('/[<>{}\\[\\]|&]/', $type) === 1) {
@@ -147,6 +167,11 @@ final readonly class UselessPhpdocRule implements RuleInterface
         return true;
     }
 
+    /**
+     * Detect PHPDoc type syntax that carries information unavailable in native types.
+     *
+     * @return bool True when the docblock contains load-bearing type details.
+     */
     private function containsLoadBearingTypeDoc(string $docText): bool
     {
         foreach (['array{', 'list<', 'non-empty-array', 'Collection<', 'class-string', '@phpstan-'] as $marker) {

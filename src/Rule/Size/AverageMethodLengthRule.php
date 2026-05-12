@@ -26,6 +26,11 @@ final readonly class AverageMethodLengthRule implements RuleInterface
 {
     public const ID = 'size.average-method-length';
 
+    /**
+     * Describe the average-method-length rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -42,6 +47,11 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         );
     }
 
+    /**
+     * Find class-like scopes whose average method length exceeds thresholds.
+     *
+     * @return list<Finding> Findings for large average method bodies.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -115,6 +125,11 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Count non-empty statement lines inside a class method.
+     *
+     * @return int Logical statement line count.
+     */
     private function logicalLineCount(ClassMethod $method): int
     {
         $finder = new NodeFinder();
@@ -131,6 +146,11 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         return count($lines);
     }
 
+    /**
+     * Build a display symbol for a class-like node.
+     *
+     * @return string Class-like display symbol.
+     */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
@@ -148,6 +168,11 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

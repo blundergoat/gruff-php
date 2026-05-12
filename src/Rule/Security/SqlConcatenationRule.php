@@ -27,6 +27,11 @@ final class SqlConcatenationRule implements RuleInterface
      */
     private const QUERY_METHODS = ['exec', 'query', 'raw', 'select'];
 
+    /**
+     * Describe the SQL concatenation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -39,6 +44,11 @@ final class SqlConcatenationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find query method calls whose first argument uses concatenation or interpolation.
+     *
+     * @return list<Finding> Findings for heuristic SQL concatenation.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -61,11 +71,21 @@ final class SqlConcatenationRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether a method name is one of the configured query entry points.
+     *
+     * @return bool True when the method is query-like.
+     */
     private function isQueryMethod(Node $name): bool
     {
         return $name instanceof Identifier && in_array(strtolower($name->toString()), self::QUERY_METHODS, true);
     }
 
+    /**
+     * Build the SQL concatenation finding for a call node.
+     *
+     * @return Finding Security finding.
+     */
     private function finding(AnalysisUnit $unit, Node $node): Finding
     {
         return new Finding(

@@ -30,6 +30,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
         'perform', 'make', 'compute',
     ];
 
+    /**
+     * Describe the generic method name rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -42,6 +47,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
         );
     }
 
+    /**
+     * Find functions and methods whose names are too generic to communicate intent.
+     *
+     * @return list<Finding> Findings for generic callable names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -83,6 +93,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Allow known framework-required generic method names.
+     *
+     * @return bool True when the method matches a supported framework override.
+     */
     private function matchesFrameworkOverride(ClassMethod $method): bool
     {
         $name = strtolower($method->name->toString());
@@ -94,6 +109,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect Symfony Console command `execute()` overrides.
+     *
+     * @return bool True when parameters match the Symfony command signature.
+     */
     private function matchesSymfonyConsoleExecute(ClassMethod $method): bool
     {
         if (count($method->params) !== 2) {
@@ -107,6 +127,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
             && $this->parameterTypeShortNameMatches($second, 'OutputInterface');
     }
 
+    /**
+     * Compare a parameter type node against an unqualified class/interface name.
+     *
+     * @return bool True when the type short name matches.
+     */
     private function parameterTypeShortNameMatches(?Node $type, string $shortName): bool
     {
         if ($type instanceof Name) {

@@ -25,6 +25,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         '/^test[A-Z][A-Za-z]*\d+$/',
     ];
 
+    /**
+     * Describe the test naming consistency rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -38,6 +43,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         );
     }
 
+    /**
+     * Find mixed test naming styles and weakly descriptive test names.
+     *
+     * @return list<Finding> Findings for inconsistent or poor test names.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -107,6 +117,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 
     /**
      * @param list<string> $patterns
+     *
+     * @return string|null Matching poor-name pattern, or null when none match.
      */
     private function matchPoorNamePattern(string $methodName, array $patterns): ?string
     {
@@ -119,6 +131,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Safely test a user-configured regex pattern against a method name.
+     *
+     * @return bool True when the pattern matches.
+     */
     private function patternMatches(string $pattern, string $methodName): bool
     {
         set_error_handler(static fn (): bool => true);
@@ -130,6 +147,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         }
     }
 
+    /**
+     * Return a stable display name for a test class.
+     *
+     * @return string Class name or anonymous-class fallback.
+     */
     private function className(Stmt\Class_ $class): string
     {
         return $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());

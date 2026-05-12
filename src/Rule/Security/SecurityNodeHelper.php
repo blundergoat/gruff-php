@@ -21,6 +21,11 @@ final class SecurityNodeHelper
         return ['_GET', '_POST', '_REQUEST', '_COOKIE', '_SERVER', '_FILES'];
     }
 
+    /**
+     * Resolve a non-namespaced function call to its lower-case name.
+     *
+     * @return string|null Function name, or null for dynamic or namespaced calls.
+     */
     public static function globalFunctionName(FuncCall $call): ?string
     {
         if (!$call->name instanceof Name) {
@@ -37,6 +42,7 @@ final class SecurityNodeHelper
 
     /**
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
+     * @return Expr|null Argument expression at the requested index, or null when absent.
      */
     public static function argumentValue(array $args, int $index): ?Expr
     {
@@ -48,6 +54,11 @@ final class SecurityNodeHelper
         return $arg->value;
     }
 
+    /**
+     * Resolve a constant fetch to its normalized constant name.
+     *
+     * @return string|null Constant name, or null for unsupported expressions.
+     */
     public static function constantName(Node $node): ?string
     {
         if (!$node instanceof Expr\ConstFetch) {
@@ -62,6 +73,11 @@ final class SecurityNodeHelper
         return strtoupper($parts[0]);
     }
 
+    /**
+     * Determine whether a node statically represents a false-like value.
+     *
+     * @return bool True when the node is literally false or integer zero.
+     */
     public static function isFalseLike(Node $node): bool
     {
         if ($node instanceof Expr\ConstFetch) {
@@ -75,6 +91,11 @@ final class SecurityNodeHelper
         return false;
     }
 
+    /**
+     * Detect whether an expression reads directly from user-input superglobals.
+     *
+     * @return bool True when the node tree contains request-sourced input.
+     */
     public static function containsUserInput(Node $node): bool
     {
         $finder = new NodeFinder();
@@ -86,6 +107,11 @@ final class SecurityNodeHelper
         }) instanceof Node;
     }
 
+    /**
+     * Detect string construction patterns that can hide unsafe concatenation.
+     *
+     * @return bool True when concatenation or interpolation appears in the node tree.
+     */
     public static function containsConcatOrInterpolation(Node $node): bool
     {
         $finder = new NodeFinder();
@@ -96,11 +122,21 @@ final class SecurityNodeHelper
         }) instanceof Node;
     }
 
+    /**
+     * Identify literal string nodes for security-rule exemptions.
+     *
+     * @return bool True when the node is a string scalar.
+     */
     public static function isStringLiteral(Node $node): bool
     {
         return $node instanceof Scalar\String_;
     }
 
+    /**
+     * Build the display name used when reporting a function call.
+     *
+     * @return string Function name or dynamic-call fallback label.
+     */
     public static function functionNameForMessage(FuncCall $call): string
     {
         $name = self::globalFunctionName($call);

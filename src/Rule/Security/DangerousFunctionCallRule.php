@@ -39,6 +39,11 @@ final class DangerousFunctionCallRule implements RuleInterface
         'system',
     ];
 
+    /**
+     * Describe the dangerous function call rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -51,6 +56,11 @@ final class DangerousFunctionCallRule implements RuleInterface
         );
     }
 
+    /**
+     * Find dynamic execution, eval, assert-string, and dangerous shell calls.
+     *
+     * @return list<Finding> Findings for dangerous execution patterns.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -152,6 +162,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * @param array<string, true> $callableParameters
      * @param array<string, true> $callableProperties
+     *
+     * @return bool True when a dynamic call targets a known callable slot.
      */
     private function isKnownCallableInvocation(Node $name, array $callableParameters, array $callableProperties): bool
     {
@@ -166,6 +178,11 @@ final class DangerousFunctionCallRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect callable-like parameter or property types.
+     *
+     * @return bool True when the type permits callable invocation.
+     */
     private function isCallableType(?Node $type): bool
     {
         if ($type instanceof Identifier) {
@@ -189,6 +206,11 @@ final class DangerousFunctionCallRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Build the security finding for a dangerous execution node.
+     *
+     * @return Finding Security finding.
+     */
     private function finding(AnalysisUnit $unit, Node $node, string $function): Finding
     {
         return new Finding(

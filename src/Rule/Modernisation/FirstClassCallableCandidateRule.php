@@ -23,6 +23,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
 {
     public const ID = 'modernisation.first-class-callable-candidate';
 
+    /**
+     * Describe the first-class callable candidate rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -35,6 +40,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
         );
     }
 
+    /**
+     * Find array-callable expressions that may use first-class callable syntax.
+     *
+     * @return list<Finding> Findings for PHP 8.1 callable syntax candidates.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
@@ -68,6 +78,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether an array expression has the two-part callable shape.
+     *
+     * @return bool True when the array looks like a callable pair.
+     */
     private function isCallableArray(Expr\Array_ $array): bool
     {
         if (count($array->items) !== 2) {
@@ -86,6 +101,11 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             || $target instanceof Expr\ClassConstFetch;
     }
 
+    /**
+     * Check whether the array callable appears in a callable-friendly context.
+     *
+     * @return bool True when the parent context can accept a callable.
+     */
     private function isCallableContext(Expr\Array_ $array): bool
     {
         $parent = ModernisationNodeHelper::parent($array);

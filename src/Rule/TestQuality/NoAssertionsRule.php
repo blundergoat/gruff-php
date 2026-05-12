@@ -19,6 +19,11 @@ final readonly class NoAssertionsRule implements RuleInterface
 {
     public const ID = 'test-quality.no-assertions';
 
+    /**
+     * Describe the no-assertions rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -31,6 +36,11 @@ final readonly class NoAssertionsRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that do not contain an observable assertion or expectation.
+     *
+     * @return list<Finding> Findings for assertion-free tests.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $findings = [];
@@ -58,6 +68,11 @@ final readonly class NoAssertionsRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Detect assertions, mock verifications, or explicit PHPUnit expectation markers.
+     *
+     * @return bool True when the test has an observable expectation.
+     */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
         if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
@@ -82,6 +97,11 @@ final readonly class NoAssertionsRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Detect legacy `@expectedException` annotations.
+     *
+     * @return bool True when the method docblock declares an expected exception.
+     */
     private function hasExpectedExceptionAnnotation(ClassMethod $method): bool
     {
         $docText = strtolower($method->getDocComment()?->getText() ?? '');

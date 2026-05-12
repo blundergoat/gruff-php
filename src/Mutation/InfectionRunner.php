@@ -10,6 +10,11 @@ use Symfony\Component\Process\Process;
 
 final readonly class InfectionRunner
 {
+    /**
+     * Run Infection and capture its process result.
+     *
+     * @return InfectionRunResult Process result and optional diagnostic.
+     */
     public function run(
         string $projectRoot,
         string $binary,
@@ -55,6 +60,11 @@ final readonly class InfectionRunner
         );
     }
 
+    /**
+     * Resolve an Infection executable from a path, vendor bin, or PATH lookup.
+     *
+     * @return string|null Executable path, or null when not found.
+     */
     private function resolveBinary(string $projectRoot, string $binary): ?string
     {
         if ($binary === '') {
@@ -78,11 +88,21 @@ final readonly class InfectionRunner
         return is_string($resolved) ? $resolved : null;
     }
 
+    /**
+     * Return the default Infection config path when it exists.
+     *
+     * @return string|null Project-relative config path, or null when absent.
+     */
     private function defaultConfigPath(string $projectRoot): ?string
     {
         return is_file(rtrim($projectRoot, '/') . '/infection.json5') ? 'infection.json5' : null;
     }
 
+    /**
+     * Resolve a path relative to the project root when needed.
+     *
+     * @return string Absolute path.
+     */
     private function absolutePath(string $projectRoot, string $path): string
     {
         if ($path !== '' && $path[0] === '/') {

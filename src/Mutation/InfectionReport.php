@@ -17,21 +17,41 @@ final readonly class InfectionReport
     ) {
     }
 
+    /**
+     * Return the total mutant count from stats or parsed mutant rows.
+     *
+     * @return int Total mutant count.
+     */
     public function totalMutants(): int
     {
         return (int) ($this->stats['totalMutantsCount'] ?? count($this->mutants));
     }
 
+    /**
+     * Return the mutation score indicator from the report stats.
+     *
+     * @return float MSI percentage.
+     */
     public function msi(): float
     {
         return (float) ($this->stats['msi'] ?? 0.0);
     }
 
+    /**
+     * Return the covered-code mutation score indicator from the report stats.
+     *
+     * @return float Covered-code MSI percentage.
+     */
     public function coveredMsi(): float
     {
         return (float) ($this->stats['coveredCodeMsi'] ?? 0.0);
     }
 
+    /**
+     * Return the mutation code coverage rate from the report stats.
+     *
+     * @return float Mutation code coverage percentage.
+     */
     public function coverageRate(): float
     {
         return (float) ($this->stats['mutationCodeCoverage'] ?? 0.0);

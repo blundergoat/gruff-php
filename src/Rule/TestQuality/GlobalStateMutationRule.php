@@ -25,6 +25,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     private const SUPERGLOBALS = ['_GET', '_POST', '_REQUEST', '_SERVER', '_ENV', '_COOKIE', '_FILES', 'GLOBALS'];
     private const STATE_FUNCTIONS = ['putenv', 'ini_set', 'error_reporting', 'date_default_timezone_set'];
 
+    /**
+     * Describe the global state mutation rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         );
     }
 
+    /**
+     * Find tests that mutate global state without detected cleanup hooks.
+     *
+     * @return list<Finding> Findings for unscoped global state mutation.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -62,6 +72,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @param array<int, bool> $cleanupCache
      * @param array<string, Stmt\Class_> $classesByName
+     *
+     * @return bool True when the scope should be scanned for cleanup-sensitive mutations.
      */
     private function scopeNeedsCleanupCheck(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
@@ -140,6 +152,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Extract the written superglobal name from an assignment target.
+     *
+     * @return string|null Superglobal name, or null when the assignment is not to a tracked superglobal.
+     */
     private function superglobalWriteName(Expr $target): ?string
     {
         if (!$target instanceof Expr\ArrayDimFetch) {
@@ -161,6 +178,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @param array<string, Stmt\Class_> $classesByName
      * @param array<int, true> $visited
+     *
+     * @return bool True when the class or an ancestor declares a cleanup hook.
      */
     private function classHasCleanup(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
     {
@@ -228,6 +247,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         return $classes;
     }
 
+    /**
+     * Return the final segment of a fully qualified class name.
+     *
+     * @return string Unqualified class name.
+     */
     private function shortName(string $name): string
     {
         $parts = explode('\\', $name);
@@ -237,6 +261,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
     /**
      * @param array<string, scalar> $metadata
+     *
+     * @return Finding Global state mutation finding.
      */
     private function finding(
         AnalysisUnit $unit,

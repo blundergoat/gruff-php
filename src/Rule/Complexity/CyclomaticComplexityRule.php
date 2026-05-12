@@ -25,6 +25,11 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 {
     public const ID = 'complexity.cyclomatic';
 
+    /**
+     * Describe the cyclomatic complexity rule.
+     *
+     * @return RuleDefinition Rule metadata and thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         );
     }
 
+    /**
+     * Find functions and methods whose cyclomatic complexity exceeds thresholds.
+     *
+     * @return list<Finding> Findings for complex function-like declarations.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -97,6 +107,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     *
+     * @return int Cyclomatic complexity number.
      */
     public static function compute(Node $node): int
     {
@@ -154,6 +166,11 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         return $ccn;
     }
 
+    /**
+     * Build a display symbol for a function-like node.
+     *
+     * @return string Function or method display symbol.
+     */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
         if ($node instanceof ClassMethod) {
@@ -172,6 +189,11 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         return $node->name->toString() . '()';
     }
 
+    /**
+     * Format threshold numbers without unnecessary decimal places.
+     *
+     * @return string Human-readable threshold value.
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

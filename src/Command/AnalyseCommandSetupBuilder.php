@@ -18,6 +18,11 @@ use Symfony\Component\Console\Input\InputInterface;
 
 final readonly class AnalyseCommandSetupBuilder
 {
+    /**
+     * Build the validated analysis setup from console input.
+     *
+     * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
+     */
     public function build(InputInterface $input): AnalyseCommandSetupResult
     {
         $projectRoot = getcwd();
@@ -96,6 +101,11 @@ final readonly class AnalyseCommandSetupBuilder
         ));
     }
 
+    /**
+     * Parse the requested output format.
+     *
+     * @return OutputFormat|string Parsed format, or a formatted usage error string.
+     */
     private function format(mixed $value): OutputFormat|string
     {
         $rawValue = is_string($value) ? $value : OutputFormat::Text->value;
@@ -107,6 +117,11 @@ final readonly class AnalyseCommandSetupBuilder
         );
     }
 
+    /**
+     * Parse the requested failure threshold.
+     *
+     * @return FailThreshold|string Parsed threshold, or the unsupported raw value.
+     */
     private function failThreshold(mixed $value): FailThreshold|string
     {
         $rawValue = is_string($value) ? $value : FailThreshold::Error->value;
@@ -114,6 +129,11 @@ final readonly class AnalyseCommandSetupBuilder
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
+    /**
+     * Parse the optional mutation finding budget.
+     *
+     * @return int|false|null Non-negative budget, false for invalid input, or null when omitted.
+     */
     private function mutationBudget(mixed $value): int|false|null
     {
         if ($value === null) {
@@ -123,6 +143,11 @@ final readonly class AnalyseCommandSetupBuilder
         return is_string($value) && preg_match('/^\d+$/', $value) === 1 ? (int) $value : false;
     }
 
+    /**
+     * Load analysis configuration or convert configuration failures to a report.
+     *
+     * @return AnalysisConfig|AnalysisReport Loaded config or a formatted config error report.
+     */
     private function config(
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
@@ -139,6 +164,11 @@ final readonly class AnalyseCommandSetupBuilder
         }
     }
 
+    /**
+     * Resolve the config path that should be reported for this run.
+     *
+     * @return string|null Resolved path, explicit path, or null when config loading is disabled.
+     */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
         if ($options->noConfig) {
@@ -148,6 +178,11 @@ final readonly class AnalyseCommandSetupBuilder
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
+    /**
+     * Build a zero-finding report for CLI usage and configuration errors.
+     *
+     * @return AnalysisReport Report carrying the diagnostic and invalid exit code.
+     */
     private function usageReport(
         AnalyseCommandOptions $options,
         OutputFormat $format,

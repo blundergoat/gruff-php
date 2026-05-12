@@ -61,6 +61,11 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         'Attribute\\AsEventSubscriber',
     ];
 
+    /**
+     * Describe the single-implementor interface rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -79,6 +84,13 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         );
     }
 
+    /**
+     * Analyse all project units for interfaces with exactly one concrete implementor.
+     *
+     * @param list<AnalysisUnit> $units
+     *
+     * @return list<Finding> Findings for interfaces that lack substitutability value.
+     */
     public function analyseProject(array $units, RuleContext $context): array
     {
         $settings = $context->settingsFor($this->definition());
@@ -292,6 +304,11 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         return $resolved;
     }
 
+    /**
+     * Resolve the fully qualified declaration name for a class or interface.
+     *
+     * @return string|null Fully qualified name, or null for anonymous declarations.
+     */
     private function declarationFqn(Class_|Interface_ $node): ?string
     {
         $resolved = $node->namespacedName ?? null;
@@ -321,6 +338,11 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         return $resolved;
     }
 
+    /**
+     * Resolve a name node to its fully qualified form when name resolution has run.
+     *
+     * @return string Fully qualified or original name without leading slash.
+     */
     private function resolveName(Name $name): string
     {
         $resolved = $name->getAttribute('resolvedName');
@@ -441,6 +463,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     /**
      * @param list<string> $extends
      * @param list<string> $externalPrefixes
+     *
+     * @return bool True when any parent interface matches an external prefix.
      */
     private function hasExternalParent(array $extends, array $externalPrefixes): bool
     {
@@ -459,6 +483,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     /**
      * @param list<string> $attributes
      * @param list<string> $frameworkAttributePrefixes
+     *
+     * @return bool True when any attribute matches a framework prefix.
      */
     private function hasFrameworkAttribute(array $attributes, array $frameworkAttributePrefixes): bool
     {

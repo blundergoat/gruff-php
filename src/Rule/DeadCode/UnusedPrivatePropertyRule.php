@@ -26,6 +26,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 {
     public const ID = 'dead-code.unused-private-property';
 
+    /**
+     * Describe the unused private property rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -38,6 +43,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         );
     }
 
+    /**
+     * Find private properties that are never read, never written, or unused entirely.
+     *
+     * @return list<Finding> Findings for unused private properties.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -139,8 +149,12 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
+     * Record read/write usage for a private property access node.
+     *
      * @param array<string, true> $reads
      * @param array<string, true> $writes
+     *
+     * @return void No return value.
      */
     private function recordPropertyUsage(Node $node, string $name, array &$reads, array &$writes): void
     {
@@ -205,6 +219,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Build the finding message for a private property usage state.
+     *
+     * @return string Human-readable finding message.
+     */
     private function propertyMessage(string $symbol, bool $isRead, bool $isWritten): string
     {
         if (!$isRead && !$isWritten) {
@@ -219,7 +238,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
+     * Resolve a display name for a class-like node.
+     *
      * @param Class_|Trait_|Enum_ $node
+     *
+     * @return string Class-like display name.
      */
     private function resolveClassName(Node $node): string
     {
@@ -230,6 +253,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 
+    /**
+     * Extract the private property name from `$this` or own-class static access.
+     *
+     * @return string|null Property name, or null when the node is not supported.
+     */
     private function propertyAccessName(Node $node, ?string $ownClassName): ?string
     {
         if ($node instanceof Expr\PropertyFetch
@@ -250,6 +278,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Check whether a static access target refers to the current class-like scope.
+     *
+     * @return bool True when the target is self/static or the own class name.
+     */
     private function refersToOwnClass(Node $class, ?string $ownClassName): bool
     {
         if (!$class instanceof Node\Name) {

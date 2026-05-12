@@ -24,11 +24,19 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /** @var array<string, true> */
     private array $emittedRoots = [];
 
+    /**
+     * Create the rule with injectable PHPUnit config discovery for tests.
+     */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
         $this->discovery = $discovery ?? new PhpUnitConfigDiscovery();
     }
 
+    /**
+     * Describe the PHPUnit coverage source rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +49,11 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         );
     }
 
+    /**
+     * Report a project once when its PHPUnit config lacks coverage source configuration.
+     *
+     * @return list<Finding> Findings for missing PHPUnit coverage source settings.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $root = $context->projectRoot;
@@ -82,6 +95,11 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         ];
     }
 
+    /**
+     * Check for PHPUnit 10 coverage source declarations.
+     *
+     * @return bool True when a supported coverage source/include block exists.
+     */
     private function hasCoverageSource(\SimpleXMLElement $root): bool
     {
         if (isset($root->source) && $root->source->count() > 0) {
@@ -99,6 +117,11 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Check for PHPUnit 9 legacy whitelist declarations.
+     *
+     * @return bool True when a legacy filter whitelist exists.
+     */
     private function hasLegacyWhitelist(\SimpleXMLElement $root): bool
     {
         return isset($root->filter->whitelist) && $root->filter->whitelist->count() > 0;

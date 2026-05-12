@@ -49,6 +49,11 @@ final readonly class OneLineMethodRule implements RuleInterface
         'tearDownAfterClass',
     ];
 
+    /**
+     * Describe the one-line method rule.
+     *
+     * @return RuleDefinition Rule metadata, defaults, and options.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -65,6 +70,11 @@ final readonly class OneLineMethodRule implements RuleInterface
         );
     }
 
+    /**
+     * Find trivial methods that only wrap a single call expression.
+     *
+     * @return list<Finding> Findings for one-line wrapper methods.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -118,6 +128,11 @@ final readonly class OneLineMethodRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Decide whether a method shape is exempt from one-line wrapper checks.
+     *
+     * @return bool True when the method should not be reported.
+     */
     private function shouldSkip(ClassMethod $method, int $minParameters): bool
     {
         $name = $method->name->toString();
@@ -133,6 +148,11 @@ final readonly class OneLineMethodRule implements RuleInterface
         return count($method->params) < $minParameters || $method->stmts === null || count($method->stmts) !== 1;
     }
 
+    /**
+     * Detect whether an expression contains any call or object creation.
+     *
+     * @return bool True when the expression contains callable work.
+     */
     private function containsCall(Expr $expression, NodeFinder $finder): bool
     {
         return $finder->findFirst([$expression], static function (Node $node): bool {

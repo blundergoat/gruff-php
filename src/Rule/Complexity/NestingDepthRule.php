@@ -25,6 +25,11 @@ final readonly class NestingDepthRule implements RuleInterface
 {
     public const ID = 'complexity.nesting-depth';
 
+    /**
+     * Describe the nesting-depth rule for the registry and reports.
+     *
+     * @return RuleDefinition Rule metadata and default thresholds.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class NestingDepthRule implements RuleInterface
         );
     }
 
+    /**
+     * Detect functions and methods whose control flow nests too deeply.
+     *
+     * @return list<Finding> Nesting-depth findings for the analysed unit.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -97,6 +107,7 @@ final readonly class NestingDepthRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node
+     * @return int The maximum nesting depth inside the function-like node.
      */
     public static function compute(Node $node): int
     {
@@ -105,6 +116,7 @@ final readonly class NestingDepthRule implements RuleInterface
 
     /**
      * @param array<Node> $stmts
+     * @return int The maximum nesting depth inside the statement list.
      */
     private static function walkStatements(array $stmts, int $depth): int
     {
@@ -117,6 +129,11 @@ final readonly class NestingDepthRule implements RuleInterface
         return $max;
     }
 
+    /**
+     * Measure nesting contribution for a statement node.
+     *
+     * @return int The maximum nested depth reached from this node.
+     */
     private static function walkNode(Node $node, int $depth): int
     {
         return match (true) {
@@ -132,6 +149,11 @@ final readonly class NestingDepthRule implements RuleInterface
         };
     }
 
+    /**
+     * Measure the deepest branch inside an if/elseif/else chain.
+     *
+     * @return int The maximum branch nesting depth.
+     */
     private static function walkIf(Stmt\If_ $node, int $depth): int
     {
         $inner = $depth + 1;
@@ -148,6 +170,11 @@ final readonly class NestingDepthRule implements RuleInterface
         return $max;
     }
 
+    /**
+     * Measure the deepest branch inside a switch statement.
+     *
+     * @return int The maximum switch-case nesting depth.
+     */
     private static function walkSwitch(Stmt\Switch_ $node, int $depth): int
     {
         $max = $depth + 1;
@@ -159,6 +186,11 @@ final readonly class NestingDepthRule implements RuleInterface
         return $max;
     }
 
+    /**
+     * Measure try/catch/finally nesting without penalising the try body itself.
+     *
+     * @return int The maximum exception-handling nesting depth.
+     */
     private static function walkTryCatch(Stmt\TryCatch $node, int $depth): int
     {
         $max = self::walkStatements($node->stmts, $depth);
@@ -174,6 +206,11 @@ final readonly class NestingDepthRule implements RuleInterface
         return $max;
     }
 
+    /**
+     * Measure nested closures inside expression statements.
+     *
+     * @return int The maximum expression nesting depth.
+     */
     private static function walkExprNesting(Expr $expr, int $depth): int
     {
         if ($expr instanceof Closure) {
@@ -193,6 +230,11 @@ final readonly class NestingDepthRule implements RuleInterface
         return $max;
     }
 
+    /**
+     * Render a configured numeric threshold for finding messages.
+     *
+     * @return string The threshold without unnecessary decimal places.
+     */
     private static function formatNumber(int|float $value): string
     {
         if (is_float($value) && floor($value) !== $value) {

@@ -9,6 +9,11 @@ use GruffPhp\Finding\Finding;
 
 final readonly class GithubAnnotationsReporter
 {
+    /**
+     * Render findings as GitHub Actions workflow commands.
+     *
+     * @return string GitHub annotation output.
+     */
     public function render(AnalysisReport $report): string
     {
         $lines = [];
@@ -20,6 +25,11 @@ final readonly class GithubAnnotationsReporter
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
 
+    /**
+     * Render one finding as a GitHub annotation command.
+     *
+     * @return string GitHub annotation line.
+     */
     private function annotation(Finding $finding): string
     {
         $level = match ($finding->severity->value) {
@@ -43,6 +53,11 @@ final readonly class GithubAnnotationsReporter
         return sprintf('::%s %s::%s', $level, implode(',', $properties), $this->escapeData($finding->message));
     }
 
+    /**
+     * Escape annotation property text according to GitHub command rules.
+     *
+     * @return string Escaped property value.
+     */
     private function escapeProperty(string $value): string
     {
         return str_replace(
@@ -52,6 +67,11 @@ final readonly class GithubAnnotationsReporter
         );
     }
 
+    /**
+     * Escape annotation message text according to GitHub command rules.
+     *
+     * @return string Escaped data value.
+     */
     private function escapeData(string $value): string
     {
         return str_replace(

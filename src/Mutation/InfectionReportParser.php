@@ -8,10 +8,18 @@ use JsonException;
 
 final readonly class InfectionReportParser
 {
+    /**
+     * Create a parser that resolves report paths relative to the project root.
+     */
     public function __construct(private string $projectRoot)
     {
     }
 
+    /**
+     * Parse an Infection JSON report from disk.
+     *
+     * @return InfectionReport Parsed mutation report.
+     */
     public function parse(string $path): InfectionReport
     {
         $resolvedPath = $this->resolvePath($path);
@@ -48,6 +56,11 @@ final readonly class InfectionReportParser
         return new InfectionReport($this->displayPath($resolvedPath), $stats, $mutants);
     }
 
+    /**
+     * Resolve and validate a report path.
+     *
+     * @return string Absolute report path when realpath is available.
+     */
     private function resolvePath(string $path): string
     {
         $candidate = $path[0] === '/' ? $path : $this->projectRoot . '/' . $path;
@@ -90,6 +103,11 @@ final readonly class InfectionReportParser
         return $stats;
     }
 
+    /**
+     * Parse one mutant row from an Infection status section.
+     *
+     * @return InfectionMutant Parsed mutant record.
+     */
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
         $row = $this->requireMutantRow($row, $location, $path);
@@ -133,6 +151,8 @@ final readonly class InfectionReportParser
 
     /**
      * @param array<mixed> $mutator
+     *
+     * @return string Required mutator field value.
      */
     private function requireMutatorString(array $mutator, string $field, string $location, string $path): string
     {
@@ -146,6 +166,8 @@ final readonly class InfectionReportParser
 
     /**
      * @param array<mixed> $mutator
+     *
+     * @return int|null Original start line, or null when absent.
      */
     private function optionalMutatorLine(array $mutator, string $location, string $path): ?int
     {
@@ -157,6 +179,11 @@ final readonly class InfectionReportParser
         return $line;
     }
 
+    /**
+     * Keep non-empty strings and discard empty or non-string values.
+     *
+     * @return string|null Non-empty string value, or null.
+     */
     private function optionalNonEmptyString(mixed $value): ?string
     {
         return is_string($value) && $value !== '' ? $value : null;
@@ -179,6 +206,11 @@ final readonly class InfectionReportParser
         ];
     }
 
+    /**
+     * Convert an absolute report path to a project-relative display path when possible.
+     *
+     * @return string Display path for report metadata.
+     */
     private function displayPath(string $path): string
     {
         $normalizedPath = str_replace('\\', '/', $path);

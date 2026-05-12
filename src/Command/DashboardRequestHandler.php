@@ -10,6 +10,9 @@ final readonly class DashboardRequestHandler
     private const MAX_HEADER_LINES = 100;
     private const MAX_HEADER_BYTES = 16384;
 
+    /**
+     * Create a request handler for one dashboard server context.
+     */
     public function __construct(
         private DashboardRequestContext $context,
         private DashboardStateFactory $stateFactory,
@@ -19,7 +22,11 @@ final readonly class DashboardRequestHandler
     }
 
     /**
+     * Read, route, and write one HTTP request from a socket client.
+     *
      * @param resource $client
+     *
+     * @return void No return value.
      */
     public function handleRequest($client): void
     {
@@ -79,6 +86,8 @@ final readonly class DashboardRequestHandler
 
     /**
      * @param array<string, string> $headers
+     *
+     * @return DashboardHttpResponse Response for the request target.
      */
     private function responseFor(string $method, string $target, array $headers): DashboardHttpResponse
     {
@@ -106,6 +115,8 @@ final readonly class DashboardRequestHandler
 
     /**
      * @param array<string, string> $query
+     *
+     * @return string Dashboard HTML shell.
      */
     private function dashboardHtml(array $query): string
     {
@@ -177,6 +188,11 @@ final readonly class DashboardRequestHandler
         return $headers;
     }
 
+    /**
+     * Validate the Host header against the dashboard bind host and port.
+     *
+     * @return bool True when the request is allowed for this local dashboard.
+     */
     private function hostAllowed(?string $hostHeader): bool
     {
         if ($hostHeader === null || $hostHeader === '') {
@@ -205,11 +221,21 @@ final readonly class DashboardRequestHandler
         return $host === strtolower($this->context->bindHost);
     }
 
+    /**
+     * Check whether the configured bind host is a loopback address.
+     *
+     * @return bool True for localhost loopback hosts.
+     */
     private function bindHostIsLoopback(): bool
     {
         return in_array(strtolower($this->context->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
     }
 
+    /**
+     * Build the response used when request headers exceed dashboard limits.
+     *
+     * @return DashboardHttpResponse 431 response.
+     */
     private function tooLargeResponse(): DashboardHttpResponse
     {
         return new DashboardHttpResponse(431, 'Request Header Fields Too Large', 'Request Header Fields Too Large', 'text/plain; charset=UTF-8');

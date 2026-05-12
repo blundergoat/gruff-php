@@ -25,6 +25,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
 
     private const MIN_GROUP_SIZE = 3;
 
+    /**
+     * Describe the repeated test structure rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -37,6 +42,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
         );
     }
 
+    /**
+     * Find repeated test bodies that look like data-provider candidates.
+     *
+     * @return list<Finding> Findings for repeated test structures.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -101,6 +111,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
         return $findings;
     }
 
+    /**
+     * Check whether a test method already declares a data provider.
+     *
+     * @return bool True when an attribute or docblock data provider is present.
+     */
     private function usesDataProvider(Stmt\ClassMethod $method): bool
     {
         foreach ($method->attrGroups as $group) {
@@ -116,6 +131,8 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
 
     /**
      * @param list<Node> $stmts
+     *
+     * @return string Structure fingerprint for comparison across tests.
      */
     private function fingerprint(array $stmts, NodeFinder $finder): string
     {
@@ -137,6 +154,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
         return implode('|', $tokens);
     }
 
+    /**
+     * Convert a structural AST node to a stable fingerprint token.
+     *
+     * @return string Fingerprint token.
+     */
     private function tokenFor(Node $node): string
     {
         if ($node instanceof Expr\New_) {

@@ -29,6 +29,11 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         ];
     }
 
+    /**
+     * Describe the PII test fixture rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -41,6 +46,11 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         );
     }
 
+    /**
+     * Find realistic PII-like values inside test fixture files.
+     *
+     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious fixture values.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!SecretScannerHelper::isTestPath($unit->file->displayPath)) {
@@ -79,6 +89,11 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         return $findings;
     }
 
+    /**
+     * Allow clearly synthetic example values.
+     *
+     * @return bool True when the matched value is an accepted example fixture.
+     */
     private function isAllowedExample(string $value): bool
     {
         $normalized = strtolower($value);
@@ -91,6 +106,11 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             || str_contains($normalized, '555 010');
     }
 
+    /**
+     * Ignore email addresses that appear in attribution or copyright lines.
+     *
+     * @return bool True when the email appears in attribution context.
+     */
     private function isAttributionEmail(string $source, int $offset): bool
     {
         $lineStart = strrpos(substr($source, 0, $offset), "\n");

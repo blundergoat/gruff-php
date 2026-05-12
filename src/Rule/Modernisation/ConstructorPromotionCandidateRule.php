@@ -22,6 +22,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 {
     public const ID = 'modernisation.constructor-promotion-candidate';
 
+    /**
+     * Describe the constructor-promotion candidate rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         );
     }
 
+    /**
+     * Find constructor assignments that can likely use property promotion.
+     *
+     * @return list<Finding> Findings for promotable constructor assignments.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
@@ -67,6 +77,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         return $classes;
     }
 
+    /**
+     * Check whether a class has a simple shape suitable for promotion suggestions.
+     *
+     * @return bool True when the class shape is supported by this heuristic.
+     */
     private function classAllowsPromotion(Stmt\Class_ $class): bool
     {
         return $class->extends === null
@@ -118,6 +133,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * @param array<string, true> $properties
      * @param array<string, true> $lateAssignments
+     *
+     * @return string|null Property name that can be promoted, or null when not eligible.
      */
     private function promotableProperty(
         Expr\Assign $assign,
@@ -146,6 +163,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         return $property;
     }
 
+    /**
+     * Return the class constructor when one is declared.
+     *
+     * @return Stmt\ClassMethod|null Constructor method, or null when absent.
+     */
     private function constructor(Stmt\Class_ $class): ?Stmt\ClassMethod
     {
         foreach ($class->getMethods() as $method) {
@@ -200,6 +222,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         return $assignments;
     }
 
+    /**
+     * Check whether the constructor has an unpromoted parameter matching the property.
+     *
+     * @return bool True when the matching parameter has no promotion flags.
+     */
     private function constructorHasPlainParameter(Stmt\ClassMethod $constructor, string $property): bool
     {
         foreach ($constructor->params as $parameter) {
@@ -211,6 +238,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Build the finding for a promotable property assignment.
+     *
+     * @return Finding Constructor promotion finding.
+     */
     private function finding(AnalysisUnit $unit, Node $node, string $property): Finding
     {
         return new Finding(

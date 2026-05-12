@@ -22,6 +22,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
 {
     public const ID = 'docs.missing-file-phpdoc';
 
+    /**
+     * Describe the missing file PHPDoc rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         );
     }
 
+    /**
+     * Find files that lack a file-level docblock or a documented sole class-like declaration.
+     *
+     * @return list<Finding> Findings for missing file-level documentation.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         if ($unit->statements === []) {
@@ -80,6 +90,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
 
     /**
      * @param list<Node\Stmt> $statements
+     *
+     * @return bool True when the file has one documented class-like declaration.
      */
     private function isSingleDocumentedClassLikeFile(array $statements): bool
     {
@@ -95,6 +107,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         return $classLikes[0]->getDocComment() !== null;
     }
 
+    /**
+     * Check whether the first effective statement carries a docblock comment.
+     *
+     * @return bool True when a docblock is attached to the statement.
+     */
     private function firstStatementHasDoc(Node\Stmt $statement): bool
     {
         foreach ($statement->getComments() as $comment) {
@@ -132,6 +149,11 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         ];
     }
 
+    /**
+     * Return a compact statement kind for finding metadata.
+     *
+     * @return string Lowercase parser statement kind.
+     */
     private function statementKind(Node\Stmt $node): string
     {
         $class = $node::class;

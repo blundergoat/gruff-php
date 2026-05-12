@@ -32,6 +32,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         '__set_state',
     ];
 
+    /**
+     * Describe the unused private method rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -44,6 +49,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         );
     }
 
+    /**
+     * Find private methods that are not referenced inside their class-like scope.
+     *
+     * @return list<Finding> Findings for unused private methods.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
@@ -116,6 +126,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         return $calledNames;
     }
 
+    /**
+     * Extract a private method name from `$this` or self/static calls.
+     *
+     * @return string|null Called method name, or null for unsupported calls.
+     */
     private function calledMethodName(Node $node): ?string
     {
         if ($node instanceof Expr\MethodCall
@@ -137,6 +152,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Extract a method name from callable-array syntax.
+     *
+     * @return string|null Callable method name, or null when the node is not supported.
+     */
     private function callableArrayName(Node $node): ?string
     {
         if (!$node instanceof Expr\Array_) {
@@ -192,6 +212,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         return $findings;
     }
 
+    /**
+     * Check whether an expression is a `$this` callable-array reference.
+     *
+     * @return bool True when the expression is a supported callable reference.
+     */
     private function isCallableReference(Expr $expr): bool
     {
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
@@ -205,6 +230,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             && $second instanceof Node\Scalar\String_;
     }
 
+    /**
+     * Extract the method name from a supported callable-array expression.
+     *
+     * @return string|null Callable method name, or null when not available.
+     */
     private function extractCallableName(Expr $expr): ?string
     {
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
@@ -217,7 +247,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
+     * Resolve a display name for a class-like node.
+     *
      * @param Class_|Trait_|Enum_ $node
+     *
+     * @return string Class-like display name.
      */
     private function resolveClassName(Node $node): string
     {

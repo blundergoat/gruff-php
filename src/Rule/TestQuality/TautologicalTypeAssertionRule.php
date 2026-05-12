@@ -22,6 +22,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
 {
     public const ID = 'test-quality.tautological-type-assertion';
 
+    /**
+     * Describe the tautological type assertion rule.
+     *
+     * @return RuleDefinition Rule metadata and defaults.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -34,6 +39,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
         );
     }
 
+    /**
+     * Find `assertInstanceOf` calls where the value type is already proven locally.
+     *
+     * @return list<Finding> Findings for redundant type assertions.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $finder = new NodeFinder();
@@ -110,6 +120,8 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
 
     /**
      * @param array<string, string> $localTypes
+     *
+     * @return string|null Proven class name, or null when it cannot be inferred.
      */
     private function provenClass(Expr $value, array $localTypes): ?string
     {
@@ -125,6 +137,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Extract the class name from a direct `new ClassName` expression.
+     *
+     * @return string|null Constructed class name, or null for dynamic/unsupported expressions.
+     */
     private function newClassName(Expr $expr): ?string
     {
         if ($expr instanceof Expr\New_ && $expr->class instanceof Name) {
@@ -134,6 +151,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Extract a `ClassName::class` argument from an assertion call.
+     *
+     * @return string|null Class name string, or null when the argument is not a class constant.
+     */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
         $value = TestQualityNodeHelper::argValue($call, $index);
@@ -149,6 +171,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
         return $value->class->toString();
     }
 
+    /**
+     * Describe the asserted value for the finding message.
+     *
+     * @return string Variable name or a generic value label.
+     */
     private function describeValue(Expr $value): string
     {
         if ($value instanceof Expr\Variable && is_string($value->name)) {
