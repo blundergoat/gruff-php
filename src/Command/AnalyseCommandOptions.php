@@ -225,35 +225,13 @@ final readonly class AnalyseCommandOptions
      */
     public function usageError(): ?string
     {
-        if ($this->optionError !== null) {
-            return $this->optionError;
-        }
-
-        if ($this->noConfig && $this->configPath !== null) {
-            return '--no-config cannot be combined with --config.';
-        }
-
-        if ($this->baseline->baselinePath !== null && $this->baseline->generateBaselinePath !== null) {
-            return '--baseline and --generate-baseline are mutually exclusive.';
-        }
-
-        if ($this->diffMode !== null && $this->diffVs !== null) {
-            return '--diff and --diff-vs are mutually exclusive.';
-        }
-
-        if ($this->changedOnly && $this->diffVs === null) {
-            return '--changed-only requires --diff-vs.';
-        }
-
-        if ($this->noBaseline && $this->baseline->baselinePath !== null) {
-            return '--no-baseline cannot be combined with --baseline.';
-        }
-
-        if ($this->displayFilterError() !== null) {
-            return $this->displayFilterError();
-        }
-
-        return null;
+        return $this->optionError
+            ?? $this->configUsageError()
+            ?? $this->baselineUsageError()
+            ?? $this->diffUsageError()
+            ?? $this->changedOnlyUsageError()
+            ?? $this->noBaselineUsageError()
+            ?? $this->displayFilterError();
     }
 
     /**
@@ -359,6 +337,76 @@ final readonly class AnalyseCommandOptions
         $value = $input->getOption('diff');
 
         return is_string($value) && $value !== '' ? $value : 'working-tree';
+    }
+
+    /**
+     * Return the usage error for mutually exclusive config flags.
+     *
+     * @return string|null Error message, or null when config flags are valid.
+     */
+    private function configUsageError(): ?string
+    {
+        if (!$this->noConfig || $this->configPath === null) {
+            return null;
+        }
+
+        return '--no-config cannot be combined with --config.';
+    }
+
+    /**
+     * Return the usage error for mutually exclusive baseline modes.
+     *
+     * @return string|null Error message, or null when baseline flags are valid.
+     */
+    private function baselineUsageError(): ?string
+    {
+        if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
+            return null;
+        }
+
+        return '--baseline and --generate-baseline are mutually exclusive.';
+    }
+
+    /**
+     * Return the usage error for mutually exclusive diff modes.
+     *
+     * @return string|null Error message, or null when diff flags are valid.
+     */
+    private function diffUsageError(): ?string
+    {
+        if ($this->diffMode === null || $this->diffVs === null) {
+            return null;
+        }
+
+        return '--diff and --diff-vs are mutually exclusive.';
+    }
+
+    /**
+     * Return the usage error for changed-only analysis without a comparison ref.
+     *
+     * @return string|null Error message, or null when changed-only flags are valid.
+     */
+    private function changedOnlyUsageError(): ?string
+    {
+        if (!$this->changedOnly || $this->diffVs !== null) {
+            return null;
+        }
+
+        return '--changed-only requires --diff-vs.';
+    }
+
+    /**
+     * Return the usage error for disabling and applying a baseline together.
+     *
+     * @return string|null Error message, or null when baseline application flags are valid.
+     */
+    private function noBaselineUsageError(): ?string
+    {
+        if (!$this->noBaseline || $this->baseline->baselinePath === null) {
+            return null;
+        }
+
+        return '--no-baseline cannot be combined with --baseline.';
     }
 
     /**

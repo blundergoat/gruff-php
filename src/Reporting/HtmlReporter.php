@@ -444,7 +444,7 @@ final readonly class HtmlReporter
         $absolutePath = $this->absolutePath($filePath);
 
         return match ($this->editorLink) {
-            'vscode' => 'vscode://file' . $this->urlPath($absolutePath) . ($line === null ? '' : ':' . $line),
+            'vscode' => 'vscode://file' . implode('/', array_map(rawurlencode(...), explode('/', $absolutePath))) . ($line === null ? '' : ':' . $line),
             'phpstorm' => 'phpstorm://open?file=' . rawurlencode($absolutePath) . ($line === null ? '' : '&line=' . $line),
             default => null,
         };
@@ -471,16 +471,6 @@ final readonly class HtmlReporter
     }
 
     /**
-     * URL-encode a filesystem path segment-by-segment for use in editor-protocol URLs.
-     *
-     * @return string The encoded path with forward-slash separators preserved.
-     */
-    private function urlPath(string $path): string
-    {
-        return implode('/', array_map(rawurlencode(...), explode('/', $path)));
-    }
-
-    /**
      * Render the interactive filter form for findings (severity, pillar, path, text, group-by).
      *
      * @return string HTML for the filter form.
@@ -488,6 +478,7 @@ final readonly class HtmlReporter
     private function findingFilters(AnalysisReport $report): string
     {
         $pillars = [];
+
         foreach ($report->findings as $finding) {
             $pillars[$finding->pillar->value] = true;
         }
@@ -496,15 +487,15 @@ final readonly class HtmlReporter
 
         $pillarOptions = '';
         foreach (array_keys($pillars) as $pillar) {
-            $pillarOptions .= $this->filterOption($pillar);
+            $pillarOptions .= sprintf('<option value="%s">%s</option>', $this->escape($pillar), $this->escape($pillar));
         }
 
         return '<form class="finding-filters" data-finding-filters aria-label="Filter flagged findings">'
             . '<div class="filter-grid">'
             . '<label>Severity<select name="severity" multiple size="3">'
-            . $this->filterOption('error')
-            . $this->filterOption('warning')
-            . $this->filterOption('advisory')
+            . sprintf('<option value="%s">%s</option>', $this->escape('error'), $this->escape('error'))
+            . sprintf('<option value="%s">%s</option>', $this->escape('warning'), $this->escape('warning'))
+            . sprintf('<option value="%s">%s</option>', $this->escape('advisory'), $this->escape('advisory'))
             . '</select></label>'
             . sprintf('<label>Pillar<select name="pillar" multiple size="%d">%s</select></label>', max(2, min(6, count($pillars))), $pillarOptions)
             . '<label>Path<input name="path" type="search" autocomplete="off"></label>'
@@ -518,16 +509,6 @@ final readonly class HtmlReporter
             . '<div class="filter-actions"><button type="button" data-clear-filters>Clear all</button>'
             . sprintf('<output class="filter-count" data-filter-count aria-live="polite">%d of %d findings shown.</output></div>', count($report->findings), count($report->findings))
             . '</form>';
-    }
-
-    /**
-     * Render a single <option> element for the interactive filters.
-     *
-     * @return string HTML for one option element.
-     */
-    private function filterOption(string $value): string
-    {
-        return sprintf('<option value="%s">%s</option>', $this->escape($value), $this->escape($value));
     }
 
     /**

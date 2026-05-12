@@ -18,6 +18,46 @@ use Symfony\Component\Process\Process;
 final class ReportCommand extends Command
 {
     /**
+     * Analyse options forwarded when their value is a non-empty string.
+     *
+     * @var list<string>
+     */
+    private const STRING_OPTIONS = [
+        'config',
+        'infection-report',
+        'mutation-baseline',
+        'mutation-budget',
+        'history-file',
+        'diff-vs',
+        'paths-relative-to',
+        'min-severity',
+    ];
+
+    /**
+     * Analyse flags forwarded when present and true.
+     *
+     * @var list<string>
+     */
+    private const BOOLEAN_OPTIONS = [
+        'no-baseline',
+        'no-config',
+        'include-ignored',
+        'changed-only',
+    ];
+
+    /**
+     * Analyse options forwarded once for each non-empty value.
+     *
+     * @var list<string>
+     */
+    private const REPEATED_OPTIONS = [
+        'include-pillar',
+        'exclude-pillar',
+        'include-rule',
+        'exclude-rule',
+    ];
+
+    /**
      * Configure the report command arguments and options.
      *
      * @return void No return value.
@@ -118,7 +158,27 @@ final class ReportCommand extends Command
         $command[] = '--fail-on';
         $command[] = $this->optionalStringOption($input, 'fail-on') ?? 'none';
 
-        foreach (['config', 'infection-report', 'mutation-baseline', 'mutation-budget', 'history-file', 'diff-vs', 'paths-relative-to', 'min-severity'] as $option) {
+        $this->appendStringOptions($command, $input);
+        $this->appendReportEditorLinkOption($command, $input);
+        $this->appendBaselineOption($command, $input);
+        $this->appendBooleanOptions($command, $input);
+        $this->appendRepeatedOptions($command, $input);
+        $this->appendReportInteractiveOption($command, $input);
+        $this->appendDiffOption($command, $input);
+
+        return $command;
+    }
+
+    /**
+     * Forward all configured string-valued options to the analyse command.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendStringOptions(array &$command, InputInterface $input): void
+    {
+        foreach (self::STRING_OPTIONS as $option) {
             $value = $this->optionalStringOption($input, $option);
 
             if ($value === null) {
@@ -128,13 +188,33 @@ final class ReportCommand extends Command
             $command[] = '--' . $option;
             $command[] = $value;
         }
+    }
 
+    /**
+     * Forward the report editor-link option unless it uses the default disabled value.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendReportEditorLinkOption(array &$command, InputInterface $input): void
+    {
         $reportEditorLink = $this->optionalStringOption($input, 'report-editor-link');
         if ($reportEditorLink !== null && $reportEditorLink !== 'none') {
             $command[] = '--report-editor-link';
             $command[] = $reportEditorLink;
         }
+    }
 
+    /**
+     * Forward the optional baseline flag with its optional path.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendBaselineOption(array &$command, InputInterface $input): void
+    {
         if ($input->hasParameterOption('--baseline', true)) {
             $value     = $this->optionalStringOption($input, 'baseline');
             $command[] = '--baseline';
@@ -143,24 +223,34 @@ final class ReportCommand extends Command
                 $command[] = $value;
             }
         }
+    }
 
-        if ((bool) $input->getOption('no-baseline')) {
-            $command[] = '--no-baseline';
+    /**
+     * Forward true boolean flags to the analyse command.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendBooleanOptions(array &$command, InputInterface $input): void
+    {
+        foreach (self::BOOLEAN_OPTIONS as $option) {
+            if ((bool) $input->getOption($option)) {
+                $command[] = '--' . $option;
+            }
         }
+    }
 
-        if ((bool) $input->getOption('no-config')) {
-            $command[] = '--no-config';
-        }
-
-        if ((bool) $input->getOption('include-ignored')) {
-            $command[] = '--include-ignored';
-        }
-
-        if ((bool) $input->getOption('changed-only')) {
-            $command[] = '--changed-only';
-        }
-
-        foreach (['include-pillar', 'exclude-pillar', 'include-rule', 'exclude-rule'] as $option) {
+    /**
+     * Forward repeated filter options to the analyse command.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendRepeatedOptions(array &$command, InputInterface $input): void
+    {
+        foreach (self::REPEATED_OPTIONS as $option) {
             $values = $input->getOption($option);
 
             if (!is_array($values)) {
@@ -174,7 +264,17 @@ final class ReportCommand extends Command
                 }
             }
         }
+    }
 
+    /**
+     * Forward the optional interactive report flag.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendReportInteractiveOption(array &$command, InputInterface $input): void
+    {
         if ($input->hasParameterOption('--report-interactive', true)) {
             $interactive = $input->getOption('report-interactive');
 
@@ -184,7 +284,17 @@ final class ReportCommand extends Command
                 $command[] = '--report-interactive';
             }
         }
+    }
 
+    /**
+     * Forward the optional diff flag with its optional mode value.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     *
+     * @return void No return value.
+     */
+    private function appendDiffOption(array &$command, InputInterface $input): void
+    {
         if ($input->hasParameterOption('--diff', true)) {
             $command[] = '--diff';
             $diff      = $input->getOption('diff');
@@ -193,8 +303,6 @@ final class ReportCommand extends Command
                 $command[] = $diff;
             }
         }
-
-        return $command;
     }
 
     /**

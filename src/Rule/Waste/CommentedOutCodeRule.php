@@ -63,7 +63,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             $text = $token->text;
             $line = $token->line;
 
-            if ($this->isDocblock($text)) {
+            if (str_starts_with(trim($text), '/**')) {
                 continue;
             }
 
@@ -95,16 +95,6 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     private function isCommentToken(Token $token): bool
     {
         return $token->id === T_COMMENT;
-    }
-
-    /**
-     * Check whether comment text starts as a PHPDoc block.
-     *
-     * @return bool True when the comment is a docblock.
-     */
-    private function isDocblock(string $text): bool
-    {
-        return str_starts_with(trim($text), '/**');
     }
 
     /**

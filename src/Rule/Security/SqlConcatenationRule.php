@@ -65,29 +65,27 @@ final class SqlConcatenationRule implements RuleInterface
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\MethodCall::class) as $call) {
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            if ($firstArg !== null && $this->isQueryMethod($call->name) && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)) {
+            if ($firstArg !== null
+                && $call->name instanceof Identifier
+                && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
+                && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)
+            ) {
                 $findings[] = $this->finding($unit, $call);
             }
         }
 
         foreach ($finder->findInstanceOf($unit->statements, Expr\StaticCall::class) as $call) {
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            if ($firstArg !== null && $this->isQueryMethod($call->name) && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)) {
+            if ($firstArg !== null
+                && $call->name instanceof Identifier
+                && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
+                && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)
+            ) {
                 $findings[] = $this->finding($unit, $call);
             }
         }
 
         return $findings;
-    }
-
-    /**
-     * Check whether a method name is one of the configured query entry points.
-     *
-     * @return bool True when the method is query-like.
-     */
-    private function isQueryMethod(Node $name): bool
-    {
-        return $name instanceof Identifier && in_array(strtolower($name->toString()), self::QUERY_METHODS, true);
     }
 
     /**

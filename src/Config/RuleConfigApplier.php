@@ -234,59 +234,127 @@ final readonly class RuleConfigApplier
     private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): mixed
     {
         if (is_int($defaultValue)) {
-            if (!is_int($optionValue)) {
-                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
-            }
-
-            return $optionValue;
+            return $this->integerOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_float($defaultValue)) {
-            if (!is_int($optionValue) && !is_float($optionValue)) {
-                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
-            }
-
-            return $optionValue;
+            return $this->numericOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_bool($defaultValue)) {
-            if (!is_bool($optionValue)) {
-                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
-            }
-
-            return $optionValue;
+            return $this->booleanOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_string($defaultValue)) {
-            if (!is_string($optionValue)) {
-                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
-            }
-
-            return $optionValue;
+            return $this->stringOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_array($defaultValue) && array_is_list($defaultValue)) {
-            if (!is_array($optionValue) || !array_is_list($optionValue)) {
-                throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a list.', $ruleId, $optionName));
-            }
-
-            if ($defaultValue === []) {
-                return $optionValue;
-            }
-
-            $sample = $defaultValue[0];
-            foreach ($optionValue as $index => $item) {
-                if (is_string($sample) && !is_string($item)) {
-                    throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
-                }
-
-                if (is_int($sample) && !is_int($item)) {
-                    throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
-                }
-            }
+            return $this->listOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
         }
 
         return $optionValue;
+    }
+
+    /**
+     * Validate an integer option value.
+     *
+     * @return int Validated option value.
+     */
+    private function integerOptionValue(string $ruleId, string $optionName, mixed $optionValue): int
+    {
+        if (!is_int($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
+        }
+
+        return $optionValue;
+    }
+
+    /**
+     * Validate a numeric option value.
+     *
+     * @return int|float Validated option value.
+     */
+    private function numericOptionValue(string $ruleId, string $optionName, mixed $optionValue): int|float
+    {
+        if (!is_int($optionValue) && !is_float($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
+        }
+
+        return $optionValue;
+    }
+
+    /**
+     * Validate a boolean option value.
+     *
+     * @return bool Validated option value.
+     */
+    private function booleanOptionValue(string $ruleId, string $optionName, mixed $optionValue): bool
+    {
+        if (!is_bool($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
+        }
+
+        return $optionValue;
+    }
+
+    /**
+     * Validate a string option value.
+     *
+     * @return string Validated option value.
+     */
+    private function stringOptionValue(string $ruleId, string $optionName, mixed $optionValue): string
+    {
+        if (!is_string($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
+        }
+
+        return $optionValue;
+    }
+
+    /**
+     * Validate a list option value and its item type when the default list is typed.
+     *
+     * @param list<mixed> $defaultValue Default option list used as an item-type sample.
+     * @return list<mixed> Validated option list.
+     */
+    private function listOptionValue(string $ruleId, string $optionName, mixed $optionValue, array $defaultValue): array
+    {
+        if (!is_array($optionValue) || !array_is_list($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a list.', $ruleId, $optionName));
+        }
+
+        if ($defaultValue === []) {
+            return $optionValue;
+        }
+
+        $sample = $defaultValue[0];
+        foreach ($optionValue as $index => $item) {
+            $this->assertListItemType($ruleId, $optionName, $index, $item, $sample);
+        }
+
+        return $optionValue;
+    }
+
+    /**
+     * Validate one configured list item against the default list sample type.
+     *
+     * @return void No return value.
+     */
+    private function assertListItemType(
+        string $ruleId,
+        string $optionName,
+        int $index,
+        mixed $item,
+        mixed $sample,
+    ): void {
+        if (is_string($sample) && !is_string($item)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
+        }
+
+        if (is_int($sample) && !is_int($item)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
+        }
     }
 
     /**

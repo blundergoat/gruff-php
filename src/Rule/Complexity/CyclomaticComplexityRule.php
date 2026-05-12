@@ -27,6 +27,36 @@ use PhpParser\NodeFinder;
 final readonly class CyclomaticComplexityRule implements RuleInterface
 {
     /**
+     * Statement node classes that increase cyclomatic complexity by one.
+     *
+     * @var list<class-string<Node>>
+     */
+    private const BRANCH_STATEMENT_TYPES = [
+        Stmt\If_::class,
+        Stmt\ElseIf_::class,
+        Stmt\For_::class,
+        Stmt\Foreach_::class,
+        Stmt\While_::class,
+        Stmt\Do_::class,
+        Stmt\Catch_::class,
+    ];
+
+    /**
+     * Expression node classes that increase cyclomatic complexity by one.
+     *
+     * @var list<class-string<Node>>
+     */
+    private const BRANCH_EXPRESSION_TYPES = [
+        BinaryOp\BooleanAnd::class,
+        BinaryOp\BooleanOr::class,
+        BinaryOp\LogicalAnd::class,
+        BinaryOp\LogicalOr::class,
+        BinaryOp\LogicalXor::class,
+        Expr\Ternary::class,
+        BinaryOp\Coalesce::class,
+    ];
+
+    /**
      * Stable rule identifier for cyclomatic complexity findings.
      */
     public const ID = 'complexity.cyclomatic';
@@ -125,41 +155,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         $finder = new NodeFinder();
         $body   = $node->stmts ?? [];
 
-        $all = $finder->find($body, static function (Node $child): bool {
-            if ($child instanceof Stmt\If_
-                || $child instanceof Stmt\ElseIf_
-                || $child instanceof Stmt\For_
-                || $child instanceof Stmt\Foreach_
-                || $child instanceof Stmt\While_
-                || $child instanceof Stmt\Do_
-                || $child instanceof Stmt\Catch_
-            ) {
-                return true;
-            }
-
-            if ($child instanceof Stmt\Case_ && $child->cond !== null) {
-                return true;
-            }
-
-            if ($child instanceof BinaryOp\BooleanAnd
-                || $child instanceof BinaryOp\BooleanOr
-                || $child instanceof BinaryOp\LogicalAnd
-                || $child instanceof BinaryOp\LogicalOr
-                || $child instanceof BinaryOp\LogicalXor
-            ) {
-                return true;
-            }
-
-            if ($child instanceof Expr\Ternary) {
-                return true;
-            }
-
-            if ($child instanceof BinaryOp\Coalesce) {
-                return true;
-            }
-
-            return false;
-        });
+        $all = $finder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
 
         $ccn += count($all);
 
@@ -172,6 +168,36 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         }
 
         return $ccn;
+    }
+
+    /**
+     * Check whether a node contributes one cyclomatic complexity point.
+     *
+     * @return bool True when the node is counted as a decision point.
+     */
+    private static function isDecisionNode(Node $child): bool
+    {
+        return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
+            || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
+            || ($child instanceof Stmt\Case_ && $child->cond !== null);
+    }
+
+    /**
+     * Check whether a node is an instance of any configured class.
+     *
+     * @param list<class-string<Node>> $classes Candidate node classes.
+     *
+     * @return bool True when the node matches one candidate class.
+     */
+    private static function isInstanceOfAny(Node $node, array $classes): bool
+    {
+        foreach ($classes as $class) {
+            if ($node instanceof $class) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

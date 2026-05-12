@@ -46,7 +46,7 @@ final readonly class DashboardServer
         $output->writeln(sprintf('<info>Serving gruff dashboard at %s</info>', $this->url($host, $port, $context)));
         $output->writeln('<comment>Use the form to refresh the scan or point gruff at another project. Press Ctrl+C to stop.</comment>');
 
-        while ($this->isServerOpen($server)) {
+        while (is_resource($server)) {
             $client = $this->acceptClient($server);
 
             if ($client === false) {
@@ -91,16 +91,6 @@ final readonly class DashboardServer
         $scanRunner = new DashboardScanRunner($this->gruffBinary, $this->stateFactory, $renderer);
 
         return new DashboardRequestHandler($context, $this->stateFactory, $scanRunner, new DashboardHttpResponder());
-    }
-
-    /**
-     * @param resource $server
-     *
-     * @return bool True while the socket resource is still open.
-     */
-    private function isServerOpen($server): bool
-    {
-        return is_resource($server);
     }
 
     /**

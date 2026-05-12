@@ -69,6 +69,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
             $camelCount = 0;
             $snakeCount = 0;
+            $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
 
             foreach ($class->getMethods() as $method) {
                 if (!TestQualityNodeHelper::isTestMethod($method)) {
@@ -90,14 +91,14 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 if ($matchedPattern !== null) {
                     $findings[] = new Finding(
                         ruleId:      self::ID,
-                        message:     sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $this->className($class), $methodName, $matchedPattern),
+                        message:     sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $className, $methodName, $matchedPattern),
                         filePath:    $unit->file->displayPath,
                         line:        $method->getStartLine(),
                         severity:    Severity::Advisory,
                         pillar:      Pillar::TestQuality,
                         tier:        RuleTier::V01,
                         confidence:  Confidence::High,
-                        symbol:      sprintf('%s::%s()', $this->className($class), $methodName),
+                        symbol:      sprintf('%s::%s()', $className, $methodName),
                         remediation: 'Rename the test to describe the scenario and expected behaviour rather than a generic suffix or numeric counter.',
                         metadata:    ['variant' => 'poor-name', 'pattern' => $matchedPattern],
                     );
@@ -108,7 +109,6 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                 continue;
             }
 
-            $className  = $this->className($class);
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s mixes camelCase (%d) and snake_case (%d) test method naming.', $className, $camelCount, $snakeCount),
@@ -159,13 +159,4 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         }
     }
 
-    /**
-     * Return a stable display name for a test class.
-     *
-     * @return string Class name or anonymous-class fallback.
-     */
-    private function className(Stmt\Class_ $class): string
-    {
-        return $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
-    }
 }

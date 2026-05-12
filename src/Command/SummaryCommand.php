@@ -61,100 +61,219 @@ final class SummaryCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $projectRoot = $this->projectRoot($output);
+        if ($projectRoot === null) {
+            return Command::FAILURE;
+        }
+
+        $format = $this->summaryFormat($input, $output);
+        if ($format === null) {
+            return Command::INVALID;
+        }
+
+        $top = $this->topLimit($input, $output);
+        if ($top === null) {
+            return Command::INVALID;
+        }
+
+        $configPath = $this->configPath($input);
+        $noConfig   = (bool) $input->getOption('no-config');
+        if ($this->hasConfigConflict($noConfig, $configPath, $output)) {
+            return Command::INVALID;
+        }
+
+        $registry     = RuleRegistry::defaults();
+        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        $config       = $this->analysisConfig($noConfig, $configPath, $registry, $configLoader, $output);
+        if (!$config instanceof AnalysisConfig) {
+            return Command::INVALID;
+        }
+
+        return $this->writeSummary(
+            output:              $output,
+            format:              $format,
+            data:                $this->summaryData(
+                projectRoot:         $projectRoot,
+                paths:               $this->paths($input),
+                includeIgnored:      (bool) $input->getOption('include-ignored'),
+                effectiveConfigPath: $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
+                config:              $config,
+                registry:            $registry,
+                top:                 $top,
+            ),
+        );
+    }
+
+    /**
+     * Resolve the current project root or emit an error when it cannot be read.
+     *
+     * @return string|null Project root path, or null when unavailable.
+     */
+    private function projectRoot(OutputInterface $output): ?string
+    {
         $projectRoot = getcwd();
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
-            return Command::FAILURE;
+            return null;
         }
 
+        return $projectRoot;
+    }
+
+    /**
+     * Parse and validate the requested summary output format.
+     *
+     * @return string|null Summary format, or null after emitting a usage error.
+     */
+    private function summaryFormat(InputInterface $input, OutputInterface $output): ?string
+    {
         $format = $input->getOption('format');
-        if (!is_string($format) || !in_array($format, ['text', 'json'], true)) {
-            $output->writeln(sprintf(
-                '<error>USAGE-ERROR Unsupported summary format "%s". Use text or json.</error>',
-                is_string($format) ? $format : '',
-            ));
-
-            return Command::INVALID;
+        if (is_string($format) && in_array($format, ['text', 'json'], true)) {
+            return $format;
         }
 
+        $output->writeln(sprintf(
+            '<error>USAGE-ERROR Unsupported summary format "%s". Use text or json.</error>',
+            is_string($format) ? $format : '',
+        ));
+
+        return null;
+    }
+
+    /**
+     * Parse and validate the top-N summary limit.
+     *
+     * @return int|null Top limit, or null after emitting a usage error.
+     */
+    private function topLimit(InputInterface $input, OutputInterface $output): ?int
+    {
         $topRaw = $input->getOption('top');
-        if (!is_string($topRaw) || preg_match('/^\d+$/', $topRaw) !== 1) {
-            $output->writeln('<error>USAGE-ERROR --top must be a non-negative integer.</error>');
-
-            return Command::INVALID;
+        if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
+            return (int) $topRaw;
         }
-        $top = (int) $topRaw;
 
+        $output->writeln('<error>USAGE-ERROR --top must be a non-negative integer.</error>');
+
+        return null;
+    }
+
+    /**
+     * Read the optional config path from console input.
+     *
+     * @return string|null Config path, or null when omitted.
+     */
+    private function configPath(InputInterface $input): ?string
+    {
         $configPath = $input->getOption('config');
-        $configPath = is_string($configPath) ? $configPath : null;
-        $noConfig   = (bool) $input->getOption('no-config');
-        if ($noConfig && $configPath !== null) {
-            $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
-            return Command::INVALID;
+        return is_string($configPath) ? $configPath : null;
+    }
+
+    /**
+     * Emit and report whether mutually exclusive config flags were supplied.
+     *
+     * @return bool True when the options are invalid.
+     */
+    private function hasConfigConflict(bool $noConfig, ?string $configPath, OutputInterface $output): bool
+    {
+        if (!$noConfig || $configPath === null) {
+            return false;
         }
 
+        $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
+
+        return true;
+    }
+
+    /**
+     * Return normalized path arguments from console input.
+     *
+     * @return list<string> Project-relative paths requested by the summary command.
+     */
+    private function paths(InputInterface $input): array
+    {
         $paths = $input->getArgument('paths');
         if (!is_array($paths)) {
-            $paths = [];
+            return [];
         }
-        /** @var list<string> $paths Symfony exposes the variadic paths argument as a mixed console value. */
-        $paths = array_values(array_filter($paths, 'is_string'));
 
-        $registry     = RuleRegistry::defaults();
-        $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
+        return array_values(array_filter($paths, 'is_string'));
+    }
 
+    /**
+     * Load analysis configuration or emit a config error.
+     *
+     * @return AnalysisConfig|null Loaded config, or null when config loading fails.
+     */
+    private function analysisConfig(
+        bool $noConfig,
+        ?string $configPath,
+        RuleRegistry $registry,
+        ConfigLoader $configLoader,
+        OutputInterface $output,
+    ): ?AnalysisConfig {
         try {
-            $config = $noConfig
+            return $noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($configPath, $registry);
         } catch (ConfigException $exception) {
             $output->writeln(sprintf('<error>[CONFIG-ERROR] %s</error>', $exception->getMessage()));
-
-            return Command::INVALID;
         }
 
-        $effectiveConfigPath = $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null));
-        $includeIgnored      = (bool) $input->getOption('include-ignored');
-        $sources             = (new AnalysisSourceLoader())->load(
+        return null;
+    }
+
+    /**
+     * Build summary render data from one analysis pass.
+     *
+     * @param list<string> $paths Project-relative paths requested by the summary command.
+     * @return SummaryReportData Source, score, and aggregate finding data.
+     */
+    private function summaryData(
+        string $projectRoot,
+        array $paths,
+        bool $includeIgnored,
+        ?string $effectiveConfigPath,
+        AnalysisConfig $config,
+        RuleRegistry $registry,
+        int $top,
+    ): SummaryReportData {
+        $sources = (new AnalysisSourceLoader())->load(
             $projectRoot,
             $paths,
             $includeIgnored,
             $config->ignoredPathPatterns(),
         );
-
         $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
-        $pillarLookup = [];
-        foreach ($registry->all() as $rule) {
-            $definition                    = $rule->definition();
-            $pillarLookup[$definition->id] = $definition->pillar->value;
-        }
+        return new SummaryReportData(
+            paths:             $paths,
+            configPath:        $effectiveConfigPath,
+            sourcesDiscovered: count($sources->discovery->files),
+            sourcesParsed:     $sources->parsedFileCount(),
+            ignoredPaths:      count($sources->discovery->ignoredPaths),
+            missingPaths:      count($sources->discovery->missingPaths),
+            parseErrors:       $this->parseErrorCount($sources->diagnostics),
+            score:             $score,
+            totals:            $this->severityTotals($findings),
+            topRules:          array_slice($this->aggregateByRule($findings, $this->pillarLookup($registry)), 0, $top),
+            topOffenders:      array_slice($score->topOffenders, 0, $top),
+        );
+    }
 
-        $ruleAggregates = $this->aggregateByRule($findings, $pillarLookup);
-        $totals         = $this->severityTotals($findings);
-        $parseErrors    = $this->parseErrorCount($sources->diagnostics);
-        $topRules       = array_slice($ruleAggregates, 0, $top);
-        $topOffenders   = array_slice($score->topOffenders, 0, $top);
-
+    /**
+     * Write text or JSON summary output.
+     *
+     * @return int Symfony command exit code.
+     */
+    private function writeSummary(OutputInterface $output, string $format, SummaryReportData $data): int
+    {
         if ($format === 'json') {
             try {
-                $output->write($this->renderJson(
-                    paths:             $paths,
-                    configPath:        $effectiveConfigPath,
-                    sourcesDiscovered: count($sources->discovery->files),
-                    sourcesParsed:     $sources->parsedFileCount(),
-                    ignoredPaths:      count($sources->discovery->ignoredPaths),
-                    missingPaths:      count($sources->discovery->missingPaths),
-                    parseErrors:       $parseErrors,
-                    score:             $score,
-                    totals:            $totals,
-                    topRules:          $topRules,
-                    topOffenders:      $topOffenders,
-                ) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
+                $output->write($this->renderJson($data) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode summary: %s</error>', $exception->getMessage()));
 
@@ -164,21 +283,25 @@ final class SummaryCommand extends Command
             return Command::SUCCESS;
         }
 
-        $output->write($this->renderText(
-            paths:             $paths,
-            configPath:        $effectiveConfigPath,
-            sourcesDiscovered: count($sources->discovery->files),
-            sourcesParsed:     $sources->parsedFileCount(),
-            ignoredPaths:      count($sources->discovery->ignoredPaths),
-            missingPaths:      count($sources->discovery->missingPaths),
-            parseErrors:       $parseErrors,
-            score:             $score,
-            totals:            $totals,
-            topRules:          $topRules,
-            topOffenders:      $topOffenders,
-        ));
+        $output->write($this->renderText($data));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Build a lookup table from rule ID to pillar value.
+     *
+     * @return array<string, string> Pillar values keyed by rule ID.
+     */
+    private function pillarLookup(RuleRegistry $registry): array
+    {
+        $pillarLookup = [];
+        foreach ($registry->all() as $rule) {
+            $definition                    = $rule->definition();
+            $pillarLookup[$definition->id] = $definition->pillar->value;
+        }
+
+        return $pillarLookup;
     }
 
     /**
@@ -250,45 +373,32 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * @param list<string>                                                                                     $paths
-     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals
-     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
-     * @param list<\GruffPhp\Scoring\FileScore>                                                                $topOffenders
+     * Render a human-readable summary report.
+     *
      * @return string Human-readable summary report.
      */
-    private function renderText(
-        array $paths,
-        ?string $configPath,
-        int $sourcesDiscovered,
-        int $sourcesParsed,
-        int $ignoredPaths,
-        int $missingPaths,
-        int $parseErrors,
-        \GruffPhp\Scoring\ScoreReport $score,
-        array $totals,
-        array $topRules,
-        array $topOffenders,
-    ): string {
+    private function renderText(SummaryReportData $data): string
+    {
         $lines   = [];
         $lines[] = sprintf('gruff %s — summary', Application::VERSION);
         $lines[] = '';
-        $lines[] = sprintf('Paths     %s', $paths === [] ? '(none)' : implode(', ', $paths));
-        $lines[] = sprintf('Config    %s', $configPath ?? '(none)');
+        $lines[] = sprintf('Paths     %s', $data->paths === [] ? '(none)' : implode(', ', $data->paths));
+        $lines[] = sprintf('Config    %s', $data->configPath ?? '(none)');
         $lines[] = sprintf(
             'Files     %d discovered, %d parsed, %d ignored, %d missing, %d parse errors',
-            $sourcesDiscovered,
-            $sourcesParsed,
-            $ignoredPaths,
-            $missingPaths,
-            $parseErrors
+            $data->sourcesDiscovered,
+            $data->sourcesParsed,
+            $data->ignoredPaths,
+            $data->missingPaths,
+            $data->parseErrors
         );
         $lines[] = '';
-        $lines[] = sprintf('Composite %s (%.2f / 100)', $score->composite->letter, $score->composite->score);
-        $lines[] = sprintf('Scope     %s', $score->scope);
+        $lines[] = sprintf('Composite %s (%.2f / 100)', $data->score->composite->letter, $data->score->composite->score);
+        $lines[] = sprintf('Scope     %s', $data->score->scope);
         $lines[] = '';
         $lines[] = 'Pillars';
 
-        $sortedPillars = $score->pillars;
+        $sortedPillars = $data->score->pillars;
         usort($sortedPillars, static function ($left, $right): int {
             return $right->findings <=> $left->findings;
         });
@@ -309,11 +419,11 @@ final class SummaryCommand extends Command
             );
         }
 
-        if ($topRules !== []) {
+        if ($data->topRules !== []) {
             $lines[] = '';
-            $lines[] = sprintf('Top %d rules by finding count', count($topRules));
-            $idWidth = $this->columnWidth(array_map(static fn (array $row): string => $row['ruleId'], $topRules), 30);
-            foreach ($topRules as $row) {
+            $lines[] = sprintf('Top %d rules by finding count', count($data->topRules));
+            $idWidth = $this->columnWidth(array_map(static fn (array $row): string => $row['ruleId'], $data->topRules), 30);
+            foreach ($data->topRules as $row) {
                 $lines[] = sprintf(
                     '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
                     $row['count'],
@@ -326,11 +436,11 @@ final class SummaryCommand extends Command
             }
         }
 
-        if ($topOffenders !== []) {
+        if ($data->topOffenders !== []) {
             $lines[]   = '';
-            $lines[]   = sprintf('Top %d file offenders', count($topOffenders));
-            $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $topOffenders), 30);
-            foreach ($topOffenders as $file) {
+            $lines[]   = sprintf('Top %d file offenders', count($data->topOffenders));
+            $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $data->topOffenders), 30);
+            foreach ($data->topOffenders as $file) {
                 $lines[] = sprintf(
                     '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
                     $file->grade->letter,
@@ -347,54 +457,41 @@ final class SummaryCommand extends Command
         $lines[] = '';
         $lines[] = sprintf(
             'Totals    %d findings (advisory=%d, warning=%d, error=%d)',
-            $totals['total'],
-            $totals['advisory'],
-            $totals['warning'],
-            $totals['error'],
+            $data->totals['total'],
+            $data->totals['advisory'],
+            $data->totals['warning'],
+            $data->totals['error'],
         );
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
     /**
-     * @param list<string>                                                                                     $paths
-     * @param array{advisory: int, warning: int, error: int, total: int}                                       $totals
-     * @param list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> $topRules
-     * @param list<\GruffPhp\Scoring\FileScore>                                                                $topOffenders
+     * Render a JSON-encoded summary report.
+     *
      * @return string JSON-encoded summary report.
      * @throws JsonException When the summary payload cannot be encoded.
      */
-    private function renderJson(
-        array $paths,
-        ?string $configPath,
-        int $sourcesDiscovered,
-        int $sourcesParsed,
-        int $ignoredPaths,
-        int $missingPaths,
-        int $parseErrors,
-        \GruffPhp\Scoring\ScoreReport $score,
-        array $totals,
-        array $topRules,
-        array $topOffenders,
-    ): string {
+    private function renderJson(SummaryReportData $data): string
+    {
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
             'tool' => ['name' => 'gruff', 'version' => Application::VERSION],
             'scope' => [
-                'paths' => $paths,
-                'configPath' => $configPath,
-                'filesDiscovered' => $sourcesDiscovered,
-                'filesParsed' => $sourcesParsed,
-                'ignoredPaths' => $ignoredPaths,
-                'missingPaths' => $missingPaths,
-                'parseErrors' => $parseErrors,
-                'scope' => $score->scope,
+                'paths' => $data->paths,
+                'configPath' => $data->configPath,
+                'filesDiscovered' => $data->sourcesDiscovered,
+                'filesParsed' => $data->sourcesParsed,
+                'ignoredPaths' => $data->ignoredPaths,
+                'missingPaths' => $data->missingPaths,
+                'parseErrors' => $data->parseErrors,
+                'scope' => $data->score->scope,
             ],
-            'composite' => $score->composite->toArray(),
-            'findings' => $totals,
-            'pillars' => array_map(static fn ($pillar): array => $pillar->toArray(), $score->pillars),
-            'topRules' => $topRules,
-            'topOffenders' => array_map(static fn ($file): array => $file->toArray(), $topOffenders),
+            'composite' => $data->score->composite->toArray(),
+            'findings' => $data->totals,
+            'pillars' => array_map(static fn ($pillar): array => $pillar->toArray(), $data->score->pillars),
+            'topRules' => $data->topRules,
+            'topOffenders' => array_map(static fn ($file): array => $file->toArray(), $data->topOffenders),
         ];
 
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);

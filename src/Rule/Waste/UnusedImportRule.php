@@ -69,7 +69,7 @@ final readonly class UnusedImportRule implements RuleInterface
             foreach ($use->uses as $useUse) {
                 $alias = $useUse->getAlias()->toString();
 
-                if ($this->isNameUsed($alias, $sourceWithoutUses)) {
+                if (preg_match('/\b' . preg_quote($alias, '/') . '\b/', $sourceWithoutUses) === 1) {
                     continue;
                 }
 
@@ -118,13 +118,4 @@ final readonly class UnusedImportRule implements RuleInterface
         return implode("\n", $lines);
     }
 
-    /**
-     * Check whether an import alias appears in non-import source text.
-     *
-     * @return bool True when the alias is referenced.
-     */
-    private function isNameUsed(string $alias, string $source): bool
-    {
-        return preg_match('/\b' . preg_quote($alias, '/') . '\b/', $source) === 1;
-    }
 }

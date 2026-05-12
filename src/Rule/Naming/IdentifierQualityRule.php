@@ -16,7 +16,6 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
@@ -138,19 +137,66 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
-        $definition            = $this->definition();
-        $settings              = $context->settingsFor($definition);
-        $tokenizer             = new IdentifierTokenizer();
-        $finder                = new NodeFinder();
-        $placeholderNames      = $this->lowercaseList($settings->stringListOption('placeholderNames'));
-        $genericTokens         = $this->lowercaseList($settings->stringListOption('genericTokens'));
-        $ignoredNames          = $this->lowercaseList($settings->stringListOption('ignoredNames'));
-        $acceptedAbbreviations = $this->lowercaseList($context->config->acceptedAbbreviations());
-        $minScopeOption        = $settings->option('minScopeReferences');
-        $minScopeReferences    = is_int($minScopeOption) ? max(1, $minScopeOption) : 1;
-        $findings              = [];
+        $definition     = $this->definition();
+        $finder         = new NodeFinder();
+        $findingContext = $this->findingContext($unit, $context, $definition);
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $node) {
+        return [
+            ...$this->classLikeFindings($findingContext, $finder),
+            ...$this->functionLikeFindings(
+                findingContext:     $findingContext,
+                finder:             $finder,
+                minScopeReferences: $this->minScopeReferences($context, $definition),
+            ),
+            ...$this->propertyFindings($findingContext, $finder),
+        ];
+    }
+
+    /**
+     * Build shared finding inputs from rule settings.
+     *
+     * @return IdentifierFindingContext Shared context for identifier finding checks.
+     */
+    private function findingContext(
+        AnalysisUnit $unit,
+        RuleContext $context,
+        RuleDefinition $definition,
+    ): IdentifierFindingContext {
+        $settings = $context->settingsFor($definition);
+
+        return new IdentifierFindingContext(
+            definition:            $definition,
+            unit:                  $unit,
+            tokenizer:             new IdentifierTokenizer(),
+            placeholderNames:      $this->lowercaseList($settings->stringListOption('placeholderNames')),
+            genericTokens:         $this->lowercaseList($settings->stringListOption('genericTokens')),
+            ignoredNames:          $this->lowercaseList($settings->stringListOption('ignoredNames')),
+            acceptedAbbreviations: $this->lowercaseList($context->config->acceptedAbbreviations()),
+        );
+    }
+
+    /**
+     * Resolve the minimum local-variable reference count needed before reporting.
+     *
+     * @return int Minimum number of local variable reads.
+     */
+    private function minScopeReferences(RuleContext $context, RuleDefinition $definition): int
+    {
+        $minScopeOption = $context->settingsFor($definition)->option('minScopeReferences');
+
+        return is_int($minScopeOption) ? max(1, $minScopeOption) : 1;
+    }
+
+    /**
+     * Find low-quality class, interface, trait, and enum names.
+     *
+     * @return list<Finding> Findings for class-like identifiers.
+     */
+    private function classLikeFindings(IdentifierFindingContext $findingContext, NodeFinder $finder): array
+    {
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($findingContext->unit->statements, ClassLike::class) as $node) {
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
@@ -161,17 +207,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                definition:            $definition,
-                unit:                  $unit,
-                node:                  $node,
-                kind:                  $this->classLikeKind($node),
-                name:                  $name,
-                symbol:                $name,
-                tokenizer:             $tokenizer,
-                placeholderNames:      $placeholderNames,
-                genericTokens:         $genericTokens,
-                ignoredNames:          $ignoredNames,
-                acceptedAbbreviations: $acceptedAbbreviations,
+                context: $findingContext,
+                node:    $node,
+                kind:    $this->classLikeKind($node),
+                name:    $name,
+                symbol:  $name,
             );
 
             if ($finding instanceof Finding) {
@@ -179,91 +219,136 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
-        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof ClassMethod || $node instanceof Function_) as $function) {
+        return $findings;
+    }
+
+    /**
+     * Find low-quality function-like names, parameters, and local variables.
+     *
+     * @return list<Finding> Findings for function-like identifier scopes.
+     */
+    private function functionLikeFindings(
+        IdentifierFindingContext $findingContext,
+        NodeFinder $finder,
+        int $minScopeReferences,
+    ): array {
+        $findings = [];
+
+        foreach ($finder->find($findingContext->unit->statements, static fn (Node $node): bool => $node instanceof ClassMethod || $node instanceof Function_) as $function) {
             /** @var ClassMethod|Function_ $function Finder predicate restricts results to function-like nodes. */
-            $symbol = CyclomaticComplexityRule::resolveSymbol($function);
+            array_push(
+                $findings,
+                ...$this->functionNameFindings($findingContext, $function),
+                ...$this->parameterFindings($findingContext, $function),
+                ...$this->localVariableFindings($findingContext, $function, $finder, $minScopeReferences),
+            );
+        }
 
-            if (!$this->shouldSkipFunctionLike($function)) {
-                $finding = $this->finding(
-                    definition:            $definition,
-                    unit:                  $unit,
-                    node:                  $function,
-                    kind:                  $function instanceof ClassMethod ? 'method' : 'function',
-                    name:                  $function->name->toString(),
-                    symbol:                $symbol,
-                    tokenizer:             $tokenizer,
-                    placeholderNames:      $placeholderNames,
-                    genericTokens:         $genericTokens,
-                    ignoredNames:          $ignoredNames,
-                    acceptedAbbreviations: $acceptedAbbreviations,
-                );
+        return $findings;
+    }
 
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
+    /**
+     * Find a low-quality method or function name.
+     *
+     * @return list<Finding> Empty when the function-like name is exempt or acceptable.
+     */
+    private function functionNameFindings(IdentifierFindingContext $findingContext, ClassMethod|Function_ $function): array
+    {
+        if ($this->shouldSkipFunctionLike($function)) {
+            return [];
+        }
+
+        $finding = $this->finding(
+            context: $findingContext,
+            node:    $function,
+            kind:    $function instanceof ClassMethod ? 'method' : 'function',
+            name:    $function->name->toString(),
+            symbol:  CyclomaticComplexityRule::resolveSymbol($function),
+        );
+
+        return $finding instanceof Finding ? [$finding] : [];
+    }
+
+    /**
+     * Find low-quality parameter and promoted-property names in one function-like scope.
+     *
+     * @return list<Finding> Findings for parameters and promoted properties.
+     */
+    private function parameterFindings(IdentifierFindingContext $findingContext, ClassMethod|Function_ $function): array
+    {
+        $findings = [];
+        $symbol   = CyclomaticComplexityRule::resolveSymbol($function);
+
+        foreach ($function->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
             }
 
-            foreach ($function->params as $param) {
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
+            $finding = $this->finding(
+                context: $findingContext,
+                node:    $param,
+                kind:    $param->flags === 0 ? 'parameter' : 'property',
+                name:    $param->var->name,
+                symbol:  $symbol,
+            );
 
-                $paramKind = $param->flags === 0 ? 'parameter' : 'property';
-                $finding   = $this->finding(
-                    definition:            $definition,
-                    unit:                  $unit,
-                    node:                  $param,
-                    kind:                  $paramKind,
-                    name:                  $param->var->name,
-                    symbol:                $symbol,
-                    tokenizer:             $tokenizer,
-                    placeholderNames:      $placeholderNames,
-                    genericTokens:         $genericTokens,
-                    ignoredNames:          $ignoredNames,
-                    acceptedAbbreviations: $acceptedAbbreviations,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
-
-            foreach ($this->localVariableNames($function, $finder, $minScopeReferences) as $name => $variable) {
-                $finding = $this->finding(
-                    definition:            $definition,
-                    unit:                  $unit,
-                    node:                  $variable,
-                    kind:                  'variable',
-                    name:                  $name,
-                    symbol:                $symbol,
-                    tokenizer:             $tokenizer,
-                    placeholderNames:      $placeholderNames,
-                    genericTokens:         $genericTokens,
-                    ignoredNames:          $ignoredNames,
-                    acceptedAbbreviations: $acceptedAbbreviations,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
             }
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
+        return $findings;
+    }
+
+    /**
+     * Find low-quality local variable names in one function-like scope.
+     *
+     * @return list<Finding> Findings for local variables.
+     */
+    private function localVariableFindings(
+        IdentifierFindingContext $findingContext,
+        ClassMethod|Function_ $function,
+        NodeFinder $finder,
+        int $minScopeReferences,
+    ): array {
+        $findings = [];
+        $symbol   = CyclomaticComplexityRule::resolveSymbol($function);
+
+        foreach ($this->localVariableNames($function, $finder, $minScopeReferences) as $name => $variable) {
+            $finding = $this->finding(
+                context: $findingContext,
+                node:    $variable,
+                kind:    'variable',
+                name:    $name,
+                symbol:  $symbol,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Find low-quality declared property names.
+     *
+     * @return list<Finding> Findings for property identifiers.
+     */
+    private function propertyFindings(IdentifierFindingContext $findingContext, NodeFinder $finder): array
+    {
+        $findings = [];
+
+        foreach ($finder->findInstanceOf($findingContext->unit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $name    = $prop->name->toString();
                 $finding = $this->finding(
-                    definition:            $definition,
-                    unit:                  $unit,
-                    node:                  $prop,
-                    kind:                  'property',
-                    name:                  $name,
-                    symbol:                '$' . $name,
-                    tokenizer:             $tokenizer,
-                    placeholderNames:      $placeholderNames,
-                    genericTokens:         $genericTokens,
-                    ignoredNames:          $ignoredNames,
-                    acceptedAbbreviations: $acceptedAbbreviations,
+                    context: $findingContext,
+                    node:    $prop,
+                    kind:    'property',
+                    name:    $name,
+                    symbol:  '$' . $name,
                 );
 
                 if ($finding instanceof Finding) {
@@ -276,31 +361,20 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $placeholderNames
-     * @param list<string> $genericTokens
-     * @param list<string> $ignoredNames
-     * @param list<string> $acceptedAbbreviations
-     *
      * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
-        RuleDefinition $definition,
-        AnalysisUnit $unit,
+        IdentifierFindingContext $context,
         Node $node,
         string $kind,
         string $name,
         ?string $symbol,
-        IdentifierTokenizer $tokenizer,
-        array $placeholderNames,
-        array $genericTokens,
-        array $ignoredNames,
-        array $acceptedAbbreviations,
     ): ?Finding {
-        if ($this->isIgnored($name, $ignoredNames, $acceptedAbbreviations)) {
+        if ($this->isIgnored($name, $context->ignoredNames, $context->acceptedAbbreviations)) {
             return null;
         }
 
-        $tokens = $tokenizer->tokenize($name);
+        $tokens = $context->tokenizer->tokenize($name);
         if ($tokens === []) {
             return null;
         }
@@ -309,13 +383,13 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $matchedToken = null;
         $lowerName    = strtolower(ltrim($name, '$'));
 
-        if (in_array($lowerName, $placeholderNames, true)) {
+        if (in_array($lowerName, $context->placeholderNames, true)) {
             $variant      = 'placeholder';
             $matchedToken = $lowerName;
-        } elseif ($this->allTokensMatch($tokens, $genericTokens)) {
+        } elseif ($this->allTokensMatch($tokens, $context->genericTokens)) {
             $variant      = 'generic';
             $matchedToken = implode(' ', $tokens);
-        } elseif ($this->isNumberedIdentifier($name, $tokens, $genericTokens, $placeholderNames, $acceptedAbbreviations)) {
+        } elseif ($this->isNumberedIdentifier($name, $tokens, $context->genericTokens, $context->placeholderNames, $context->acceptedAbbreviations)) {
             $variant      = 'numbered';
             $matchedToken = $tokens[array_key_last($tokens)];
         }
@@ -325,14 +399,14 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         return new Finding(
-            ruleId:      $definition->id,
+            ruleId:      $context->definition->id,
             message:     sprintf('%s name "%s" is %s and does not communicate clear intent.', ucfirst($kind), $name, $variant),
-            filePath:    $unit->file->displayPath,
+            filePath:    $context->unit->file->displayPath,
             line:        $node->getStartLine(),
-            severity:    $definition->defaultSeverity,
-            pillar:      $definition->pillar,
-            tier:        $definition->tier,
-            confidence:  $definition->confidence,
+            severity:    $context->definition->defaultSeverity,
+            pillar:      $context->definition->pillar,
+            tier:        $context->definition->tier,
+            confidence:  $context->definition->confidence,
             symbol:      $symbol,
             remediation: 'Rename the identifier to describe its domain role or action.',
             metadata:    [

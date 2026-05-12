@@ -16,7 +16,6 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Comment\Doc;
 use PhpParser\Node;
-use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\ClassConst;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
@@ -122,7 +121,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     continue;
                 }
 
-                $paramName = $this->isParamTag($tagKind)
+                $paramName = in_array($tagKind, self::PARAM_TAGS, true)
                     ? $this->extractParamName($block['body'])
                     : null;
 
@@ -169,36 +168,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             || in_array($tag, self::VAR_TAGS, true)
             || in_array($tag, self::PROPERTY_TAGS, true)
             || in_array($tag, self::TYPE_ALIAS_TAGS, true);
-    }
-
-    /**
-     * Detect whether the tag is a @param variant (including phpstan- and psalm- prefixes).
-     *
-     * @return bool
-     */
-    private function isParamTag(string $tag): bool
-    {
-        return in_array($tag, self::PARAM_TAGS, true);
-    }
-
-    /**
-     * Detect whether the tag is a @return variant.
-     *
-     * @return bool
-     */
-    private function isReturnTag(string $tag): bool
-    {
-        return in_array($tag, self::RETURN_TAGS, true);
-    }
-
-    /**
-     * Detect whether the tag is a @var variant.
-     *
-     * @return bool
-     */
-    private function isVarTag(string $tag): bool
-    {
-        return in_array($tag, self::VAR_TAGS, true);
     }
 
     /**
@@ -328,7 +297,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function signatureAlreadyCoversMixed(Node $node, string $tagKind, ?string $paramName): bool
     {
-        if ($this->isParamTag($tagKind)) {
+        if (in_array($tagKind, self::PARAM_TAGS, true)) {
             if ($paramName === null) {
                 return false;
             }
@@ -339,7 +308,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                         continue;
                     }
                     if ($param->var->name === $paramName) {
-                        return $this->isMixedType($param);
+                        return ModernisationNodeHelper::typeName($param->type) === 'mixed';
                     }
                 }
             }
@@ -347,7 +316,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return false;
         }
 
-        if ($this->isReturnTag($tagKind)) {
+        if (in_array($tagKind, self::RETURN_TAGS, true)) {
             if ($node instanceof ClassMethod || $node instanceof Function_) {
                 return ModernisationNodeHelper::typeName($node->returnType) === 'mixed';
             }
@@ -355,7 +324,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return false;
         }
 
-        if ($this->isVarTag($tagKind)) {
+        if (in_array($tagKind, self::VAR_TAGS, true)) {
             if ($node instanceof Property) {
                 return ModernisationNodeHelper::typeName($node->type) === 'mixed';
             }
@@ -364,16 +333,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         }
 
         return false;
-    }
-
-    /**
-     * Detect whether the parameter's declared type is `mixed`.
-     *
-     * @return bool
-     */
-    private function isMixedType(Param $param): bool
-    {
-        return ModernisationNodeHelper::typeName($param->type) === 'mixed';
     }
 
     /**

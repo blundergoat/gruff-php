@@ -85,7 +85,9 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 
         $this->emittedRoots[$root] = true;
 
-        if ($this->hasCoverageSource($config->root) || $this->hasLegacyWhitelist($config->root)) {
+        if ($this->hasCoverageSource($config->root)
+            || isset($config->root->filter->whitelist) && $config->root->filter->whitelist->count() > 0
+        ) {
             return [];
         }
 
@@ -130,13 +132,4 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         return false;
     }
 
-    /**
-     * Check for PHPUnit 9 legacy whitelist declarations.
-     *
-     * @return bool True when a legacy filter whitelist exists.
-     */
-    private function hasLegacyWhitelist(\SimpleXMLElement $root): bool
-    {
-        return isset($root->filter->whitelist) && $root->filter->whitelist->count() > 0;
-    }
 }

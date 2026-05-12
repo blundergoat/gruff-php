@@ -18,6 +18,7 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigLoaderTest extends TestCase
@@ -25,7 +26,7 @@ final class ConfigLoaderTest extends TestCase
     public function testLoadsDefaultRuleSettingsWhenNoConfigExists(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(__DIR__ . '/../Fixtures/Source/empty'))->load(null, $registry);
+        $config   = (new ConfigLoader(__DIR__ . '/../Fixtures/Source/empty'))->load(null, $registry);
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
         self::assertTrue($settings->enabled);
@@ -36,7 +37,7 @@ final class ConfigLoaderTest extends TestCase
     public function testLoadsExplicitThresholdOverrides(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
+        $config   = (new ConfigLoader(__DIR__ . '/../..'))->load(
             'tests/Fixtures/Config/file-length-warning.yaml',
             $registry,
         );
@@ -57,7 +58,7 @@ final class ConfigLoaderTest extends TestCase
         ));
 
         try {
-            $config = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
+            $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings(FileLengthRule::ID);
 
             self::assertSame(7, $settings->numericThreshold('warning'));
@@ -70,7 +71,7 @@ final class ConfigLoaderTest extends TestCase
 
     public function testFallsBackToPackageDefaultYamlConfigFile(): void
     {
-        $projectDirectory = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
+        $projectDirectory  = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
         $fallbackDirectory = sys_get_temp_dir() . '/gruff-config-fallback-' . bin2hex(random_bytes(6));
         self::assertTrue(mkdir($projectDirectory));
         self::assertTrue(mkdir($fallbackDirectory));
@@ -80,7 +81,7 @@ final class ConfigLoaderTest extends TestCase
         ));
 
         try {
-            $config = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
+            $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings(FileLengthRule::ID);
 
             self::assertSame(11, $settings->numericThreshold('warning'));
@@ -99,7 +100,7 @@ final class ConfigLoaderTest extends TestCase
             '.yaml',
         );
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
         self::assertSame(9, $settings->numericThreshold('warning'));
@@ -113,7 +114,7 @@ final class ConfigLoaderTest extends TestCase
             '.yaml',
         );
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
         self::assertSame(400, $settings->numericThreshold('warning'));
@@ -135,7 +136,7 @@ final class ConfigLoaderTest extends TestCase
             '.yaml',
         );
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings(FileLengthRule::ID);
 
         self::assertSame(400, $settings->numericThreshold('warning'));
@@ -157,7 +158,7 @@ final class ConfigLoaderTest extends TestCase
             '.yaml',
         );
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings('complexity.maintainability-index');
 
         self::assertSame(55, $settings->numericThreshold('warning'));
@@ -215,7 +216,7 @@ final class ConfigLoaderTest extends TestCase
     public function testCanDisableARule(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = (new ConfigLoader(__DIR__ . '/../..'))->load(
+        $config   = (new ConfigLoader(__DIR__ . '/../..'))->load(
             'tests/Fixtures/Config/disabled-file-length.yaml',
             $registry,
         );
@@ -342,7 +343,7 @@ final class ConfigLoaderTest extends TestCase
     public function testCanEnableDefaultDisabledRuleViaConfig(): void
     {
         $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
-        $path = $this->writeTempConfig(sprintf(
+        $path     = $this->writeTempConfig(sprintf(
             '{"rules":{"%s":{"enabled":true}}}',
             FixtureDefaultDisabledRule::ID,
         ));
@@ -355,21 +356,26 @@ final class ConfigLoaderTest extends TestCase
     public function testLoadsRuleOptions(): void
     {
         $registry = new RuleRegistry([new FixtureOptionsRule()]);
-        $path = $this->writeTempConfig(sprintf(
-            '{"rules":{"%s":{"options":{"patterns":["foo","bar"]}}}}',
+        $path     = $this->writeTempConfig(sprintf(
+            '{"rules":{"%s":{"options":{"patterns":["foo","bar"],"ratio":0.75,"flag":false,"label":"custom","names":["alpha"],"levels":[1,2]}}}}',
             FixtureOptionsRule::ID,
         ));
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
         $settings = $config->ruleSettings(FixtureOptionsRule::ID);
 
         self::assertSame(['foo', 'bar'], $settings->stringListOption('patterns'));
+        self::assertSame(0.75, $settings->option('ratio'));
+        self::assertFalse($settings->option('flag'));
+        self::assertSame('custom', $settings->option('label'));
+        self::assertSame(['alpha'], $settings->option('names'));
+        self::assertSame([1, 2], $settings->option('levels'));
     }
 
     public function testRejectsUnknownRuleOptionKey(): void
     {
         $registry = new RuleRegistry([new FixtureOptionsRule()]);
-        $path = $this->writeTempConfig(sprintf(
+        $path     = $this->writeTempConfig(sprintf(
             '{"rules":{"%s":{"options":{"unknown":[]}}}}',
             FixtureOptionsRule::ID,
         ));
@@ -391,6 +397,51 @@ final class ConfigLoaderTest extends TestCase
         $this->expectExceptionMessage(sprintf('Option "rules.%s.options.minScopeReferences" must be an integer.', IdentifierQualityRule::ID));
 
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function invalidRuleOptionTypeProvider(): array
+    {
+        return [
+            'float option' => [
+                '{"rules":{"%s":{"options":{"ratio":"high"}}}}',
+                'Option "rules.%s.options.ratio" must be numeric.',
+            ],
+            'boolean option' => [
+                '{"rules":{"%s":{"options":{"flag":"yes"}}}}',
+                'Option "rules.%s.options.flag" must be boolean.',
+            ],
+            'string option' => [
+                '{"rules":{"%s":{"options":{"label":false}}}}',
+                'Option "rules.%s.options.label" must be a string.',
+            ],
+            'list option' => [
+                '{"rules":{"%s":{"options":{"patterns":"foo"}}}}',
+                'Option "rules.%s.options.patterns" must be a list.',
+            ],
+            'string list item' => [
+                '{"rules":{"%s":{"options":{"names":["alpha",2]}}}}',
+                'Option "rules.%s.options.names.1" must be a string.',
+            ],
+            'integer list item' => [
+                '{"rules":{"%s":{"options":{"levels":[1,"two"]}}}}',
+                'Option "rules.%s.options.levels.1" must be an integer.',
+            ],
+        ];
+    }
+
+    #[DataProvider('invalidRuleOptionTypeProvider')]
+    public function testRejectsInvalidRuleOptionTypeVariants(string $configTemplate, string $messageTemplate): void
+    {
+        $registry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path     = $this->writeTempConfig(sprintf($configTemplate, FixtureOptionsRule::ID));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(sprintf($messageTemplate, FixtureOptionsRule::ID));
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
     }
 
     private function writeTempConfig(string $contents, string $suffix = '.yaml'): string
@@ -417,13 +468,13 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Fixture default-disabled rule',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Fixture default-disabled rule',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
-            defaultEnabled: false,
+            confidence:      Confidence::Low,
+            defaultEnabled:  false,
         );
     }
 
@@ -440,13 +491,20 @@ final readonly class FixtureOptionsRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id: self::ID,
-            name: 'Fixture options rule',
-            pillar: Pillar::Naming,
-            tier: RuleTier::V01,
+            id:              self::ID,
+            name:            'Fixture options rule',
+            pillar:          Pillar::Naming,
+            tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
-            confidence: Confidence::Low,
-            defaultOptions: ['patterns' => []],
+            confidence:      Confidence::Low,
+            defaultOptions:  [
+                'patterns' => [],
+                'ratio' => 0.5,
+                'flag' => true,
+                'label' => 'default',
+                'names' => ['default'],
+                'levels' => [1],
+            ],
         );
     }
 

@@ -34,14 +34,14 @@ final readonly class ScoreCalculator
     ];
 
     /**
-     * @param list<Finding> $findings Findings included in the score calculation.
+     * @param list<Finding>               $findings Findings included in the score calculation.
      * @param MutationAnalysisResult|null $mutation Optional mutation result included in scoring.
-     * @param DiffResult|null $diff Optional diff result limiting the scoring scope label.
+     * @param DiffResult|null             $diff     Optional diff result limiting the scoring scope label.
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
     public function calculate(array $findings, ?MutationAnalysisResult $mutation, ?DiffResult $diff): ScoreReport
     {
-        $pillars = $this->pillarScores($findings, $mutation);
+        $pillars    = $this->pillarScores($findings, $mutation);
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
@@ -59,12 +59,12 @@ final readonly class ScoreCalculator
         $scope = $diff instanceof DiffResult && $diff->active ? 'diff' : 'full-project';
 
         return new ScoreReport(
-            composite: Grade::fromScore($averageScore),
-            pillars: $pillars,
-            topOffenders: $this->fileScores($findings, $mutation),
+            composite:              Grade::fromScore($averageScore),
+            pillars:                $pillars,
+            topOffenders:           $this->fileScores($findings, $mutation),
             complexityDistribution: $this->complexityDistribution($findings),
-            scope: $scope,
-            explanation: 'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.',
+            scope:                  $scope,
+            explanation:            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.',
         );
     }
 
@@ -99,16 +99,16 @@ final readonly class ScoreCalculator
                     $findings,
                     static fn (Finding $finding): bool => $finding->pillar === Pillar::Mutation,
                 ));
-                $counts = $this->severityCounts($mutationFindings);
+                $counts   = $this->severityCounts($mutationFindings);
                 $scores[] = new PillarScore(
-                    pillar: $pillarName,
+                    pillar:     $pillarName,
                     applicable: true,
-                    grade: Grade::fromScore($mutation->report->msi()),
-                    findings: count($mutationFindings),
+                    grade:      Grade::fromScore($mutation->report->msi()),
+                    findings:   count($mutationFindings),
                     advisories: $counts['advisory'],
-                    warnings: $counts['warning'],
-                    errors: $counts['error'],
-                    penalty: max(0.0, 100.0 - $mutation->report->msi()),
+                    warnings:   $counts['warning'],
+                    errors:     $counts['error'],
+                    penalty:    max(0.0, 100.0 - $mutation->report->msi()),
                 );
                 continue;
             }
@@ -117,18 +117,18 @@ final readonly class ScoreCalculator
                 $findings,
                 static fn (Finding $finding): bool => $finding->pillar->value === $pillarName,
             ));
-            $penalty = $this->findingPenalty($pillarFindings) * 4.0;
-            $counts = $this->severityCounts($pillarFindings);
+            $penalty = array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $pillarFindings)) * 4.0;
+            $counts  = $this->severityCounts($pillarFindings);
 
             $scores[] = new PillarScore(
-                pillar: $pillarName,
+                pillar:     $pillarName,
                 applicable: true,
-                grade: Grade::fromScore(100.0 - $penalty),
-                findings: count($pillarFindings),
+                grade:      Grade::fromScore(100.0 - $penalty),
+                findings:   count($pillarFindings),
                 advisories: $counts['advisory'],
-                warnings: $counts['warning'],
-                errors: $counts['error'],
-                penalty: $penalty,
+                warnings:   $counts['warning'],
+                errors:     $counts['error'],
+                penalty:    $penalty,
             );
         }
 
@@ -160,21 +160,21 @@ final readonly class ScoreCalculator
         $scores = [];
 
         foreach ($byFile as $filePath => $fileFindings) {
-            $counts = $this->severityCounts($fileFindings);
-            $penalty = $this->findingPenalty($fileFindings) * 5.0;
+            $counts          = $this->severityCounts($fileFindings);
+            $penalty         = array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $fileFindings)) * 5.0;
             $mutationSummary = $mutationByFile[$filePath] ?? null;
 
             $scores[] = new FileScore(
-                filePath: $filePath,
-                grade: Grade::fromScore(100.0 - $penalty),
-                findings: count($fileFindings),
-                advisories: $counts['advisory'],
-                warnings: $counts['warning'],
-                errors: $counts['error'],
-                penalty: $penalty,
+                filePath:      $filePath,
+                grade:         Grade::fromScore(100.0 - $penalty),
+                findings:      count($fileFindings),
+                advisories:    $counts['advisory'],
+                warnings:      $counts['warning'],
+                errors:        $counts['error'],
+                penalty:       $penalty,
                 maxCyclomatic: $this->maxMetadataInt($fileFindings, 'complexity.cyclomatic', 'complexity'),
-                maxCognitive: $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),
-                maxLines: $this->maxLineMetric($fileFindings),
+                maxCognitive:  $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),
+                maxLines:      $this->maxLineMetric($fileFindings),
                 mutationScore: $mutationSummary instanceof MutationFileSummary ? $mutationSummary->msi : null,
             );
         }
@@ -226,15 +226,6 @@ final readonly class ScoreCalculator
         }
 
         return $buckets;
-    }
-
-    /**
-     * @param list<Finding> $findings
-     * @return float Total weighted penalty for the supplied findings.
-     */
-    private function findingPenalty(array $findings): float
-    {
-        return array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $findings));
     }
 
     /**

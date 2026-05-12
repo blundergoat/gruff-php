@@ -117,16 +117,18 @@ final readonly class InfectionReportParser
      */
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
-        $row     = $this->requireMutantRow($row, $location, $path);
-        $mutator = $this->requireMutatorObject($row, $location, $path);
+        $row           = $this->requireMutantRow($row, $location, $path);
+        $mutator       = $this->requireMutatorObject($row, $location, $path);
+        $diff          = $row['diff'] ?? null;
+        $processOutput = $row['processOutput'] ?? null;
 
         return new InfectionMutant(
             status:        $status,
             filePath:      $this->displayPath($this->requireMutatorString($mutator, 'originalFilePath', $location, $path)),
             line:          $this->optionalMutatorLine($mutator, $location, $path),
             mutator:       $this->requireMutatorString($mutator, 'mutatorName', $location, $path),
-            diff:          $this->optionalNonEmptyString($row['diff'] ?? null),
-            processOutput: $this->optionalNonEmptyString($row['processOutput'] ?? null),
+            diff:          is_string($diff) && $diff !== '' ? $diff : null,
+            processOutput: is_string($processOutput) && $processOutput !== '' ? $processOutput : null,
         );
     }
 
@@ -184,16 +186,6 @@ final readonly class InfectionReportParser
         }
 
         return $line;
-    }
-
-    /**
-     * Keep non-empty strings and discard empty or non-string values.
-     *
-     * @return string|null Non-empty string value, or null.
-     */
-    private function optionalNonEmptyString(mixed $value): ?string
-    {
-        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

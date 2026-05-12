@@ -67,7 +67,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            if ($node instanceof ClassMethod && $this->isReturnlessMagicMethod($node)) {
+            if ($node instanceof ClassMethod && in_array($node->name->toString(), ['__construct', '__destruct'], true)) {
                 continue;
             }
 
@@ -102,13 +102,4 @@ final readonly class MissingReturnTagRule implements RuleInterface
         return $findings;
     }
 
-    /**
-     * Exempt constructors and destructors from return tag requirements.
-     *
-     * @return bool True when the method has no return contract.
-     */
-    private function isReturnlessMagicMethod(ClassMethod $method): bool
-    {
-        return in_array($method->name->toString(), ['__construct', '__destruct'], true);
-    }
 }

@@ -43,8 +43,10 @@ final readonly class InfectionRunner
             );
         }
 
-        $effectiveConfigPath = $configPath ?? $this->defaultConfigPath($projectRoot);
-        $command             = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
+        $defaultConfigPath   = 'infection.json5';
+        $effectiveConfigPath = $configPath
+            ?? (is_file(rtrim($projectRoot, '/') . '/' . $defaultConfigPath) ? $defaultConfigPath : null);
+        $command = [$resolvedBinary, 'run', '--no-progress', '--log-verbosity=none'];
 
         if ($effectiveConfigPath !== null) {
             $command[] = '--configuration';
@@ -92,16 +94,6 @@ final readonly class InfectionRunner
         $resolved = (new ExecutableFinder())->find($binary);
 
         return is_string($resolved) ? $resolved : null;
-    }
-
-    /**
-     * Return the default Infection config path when it exists.
-     *
-     * @return string|null Project-relative config path, or null when absent.
-     */
-    private function defaultConfigPath(string $projectRoot): ?string
-    {
-        return is_file(rtrim($projectRoot, '/') . '/infection.json5') ? 'infection.json5' : null;
     }
 
     /**

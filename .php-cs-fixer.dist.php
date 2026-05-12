@@ -43,7 +43,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 
     protected function applyFix(SplFileInfo $file, Tokens $tokens): void
     {
-        $code = $tokens->generateCode();
+        $code  = $tokens->generateCode();
         $fixed = $this->alignNamedArgumentGroups($code);
 
         if ($fixed !== $code) {
@@ -61,7 +61,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 
         $lines = [];
         for ($index = 0; $index < count($parts); $index += 2) {
-            $line = $parts[$index];
+            $line       = $parts[$index];
             $lineEnding = $parts[$index + 1] ?? '';
 
             if ($line === '' && $lineEnding === '') {
@@ -89,12 +89,12 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 
     private function isNamedArgumentLine(string $line): bool
     {
-        return preg_match('/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:\s*\S.*(?:,)?\R?$/', $line) === 1;
+        return preg_match('/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:(?!:)\s*\S.*(?:,)?\R?$/', $line) === 1;
     }
 
     /**
      * @param list<string> $lines
-     * @param list<int> $group
+     * @param list<int>    $group
      */
     private function alignGroup(array &$lines, array $group): void
     {
@@ -102,20 +102,20 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
             return;
         }
 
-        $rows = [];
+        $rows          = [];
         $maxNameLength = 0;
 
         foreach ($group as $index) {
-            if (preg_match('/^(?<indent>[ \t]+)(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?<value>\S.*?)(?<eol>\R?)$/', $lines[$index], $matches) !== 1) {
+            if (preg_match('/^(?<indent>[ \t]+)(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)\s*(?<value>\S.*?)(?<eol>\R?)$/', $lines[$index], $matches) !== 1) {
                 return;
             }
 
-            $rows[$index] = $matches;
+            $rows[$index]  = $matches;
             $maxNameLength = max($maxNameLength, strlen($matches['name']));
         }
 
         foreach ($rows as $index => $row) {
-            $spaces = str_repeat(' ', $maxNameLength - strlen($row['name']) + 1);
+            $spaces        = str_repeat(' ', $maxNameLength - strlen($row['name']) + 1);
             $lines[$index] = $row['indent'] . $row['name'] . ':' . $spaces . rtrim($row['value']) . $row['eol'];
         }
     }

@@ -124,8 +124,8 @@ final class AnalyseCliTest extends CliTestCase
         self::assertIsString($expected);
         self::assertSame($expected, $process->getOutput());
 
-        $report = $this->decodeJsonOutput($process);
-        $summary = $report['summary'] ?? null;
+        $report   = $this->decodeJsonOutput($process);
+        $summary  = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
 
         self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
@@ -164,8 +164,8 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(2, $process->getExitCode());
 
-        $report = $this->decodeJsonOutput($process);
-        $summary = $report['summary'] ?? null;
+        $report      = $this->decodeJsonOutput($process);
+        $summary     = $report['summary'] ?? null;
         $diagnostics = $report['diagnostics'] ?? null;
 
         self::assertIsArray($summary);
@@ -215,7 +215,7 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $report = $this->decodeJsonOutput($process);
+        $report  = $this->decodeJsonOutput($process);
         $summary = $report['summary'] ?? null;
         self::assertIsArray($summary);
         $findingCounts = $summary['findings'] ?? null;
@@ -278,7 +278,7 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $report = $this->decodeJsonOutput($process);
+        $report   = $this->decodeJsonOutput($process);
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
         $ruleIds = array_map(
@@ -311,7 +311,7 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $report = $this->decodeJsonOutput($process);
+        $report   = $this->decodeJsonOutput($process);
         $mutation = $report['mutation'] ?? null;
         $findings = $report['findings'] ?? null;
 
@@ -388,13 +388,13 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $report = $this->decodeJsonOutput($process);
+        $report   = $this->decodeJsonOutput($process);
         $mutation = $report['mutation'] ?? null;
         $findings = $report['findings'] ?? null;
 
         self::assertIsArray($mutation);
         $baseline = $mutation['baseline'] ?? null;
-        $budget = $mutation['budget'] ?? null;
+        $budget   = $mutation['budget'] ?? null;
         self::assertIsArray($baseline);
         self::assertIsArray($budget);
         self::assertEquals(-30.0, $baseline['delta'] ?? null);
@@ -452,8 +452,8 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report = $this->decodeJsonOutput($process);
-        $score = $report['score'] ?? null;
-        $diff = $report['diff'] ?? null;
+        $score  = $report['score'] ?? null;
+        $diff   = $report['diff'] ?? null;
 
         self::assertIsArray($score);
         self::assertIsArray($diff);
@@ -660,7 +660,7 @@ final class AnalyseCliTest extends CliTestCase
      */
     public function testAnalyseCommandWritesTrendHistoryFile(): void
     {
-        $tempDir = $this->tempDir();
+        $tempDir     = $this->tempDir();
         $historyPath = $tempDir . '/history/gruff-history.json';
 
         try {
@@ -698,7 +698,7 @@ final class AnalyseCliTest extends CliTestCase
      */
     public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
     {
-        $tempDir = $this->tempDir();
+        $tempDir      = $this->tempDir();
         $baselinePath = $tempDir . '/gruff-baseline.json';
 
         try {
@@ -720,7 +720,7 @@ final class AnalyseCliTest extends CliTestCase
             self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
             self::assertFileExists($baselinePath);
 
-            $generatedReport = $this->decodeJsonOutput($generate);
+            $generatedReport   = $this->decodeJsonOutput($generate);
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame(true, $generatedBaseline['generated'] ?? null);
@@ -742,9 +742,9 @@ final class AnalyseCliTest extends CliTestCase
             $apply->run();
 
             self::assertSame(0, $apply->getExitCode(), $apply->getErrorOutput());
-            $appliedReport = $this->decodeJsonOutput($apply);
+            $appliedReport   = $this->decodeJsonOutput($apply);
             $appliedBaseline = $appliedReport['baseline'] ?? null;
-            $summary = $appliedReport['summary'] ?? null;
+            $summary         = $appliedReport['summary'] ?? null;
             self::assertIsArray($appliedBaseline);
             self::assertIsArray($summary);
             self::assertSame(1, $appliedBaseline['suppressedFindings'] ?? null);
@@ -758,7 +758,7 @@ final class AnalyseCliTest extends CliTestCase
 
     public function testAnalyseCommandRejectsInvalidBaselineJson(): void
     {
-        $tempDir = $this->tempDir();
+        $tempDir      = $this->tempDir();
         $baselinePath = $tempDir . '/broken-baseline.json';
 
         try {
@@ -808,7 +808,7 @@ final class AnalyseCliTest extends CliTestCase
             self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
             self::assertFileExists($project . '/gruff-baseline.json');
 
-            $generatedReport = $this->decodeJsonOutput($generate);
+            $generatedReport   = $this->decodeJsonOutput($generate);
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame('gruff-baseline.json', $generatedBaseline['path'] ?? null);
@@ -829,7 +829,7 @@ final class AnalyseCliTest extends CliTestCase
             $autoApply->run();
 
             self::assertSame(0, $autoApply->getExitCode(), $autoApply->getErrorOutput());
-            $autoReport = $this->decodeJsonOutput($autoApply);
+            $autoReport   = $this->decodeJsonOutput($autoApply);
             $autoBaseline = $autoReport['baseline'] ?? null;
             self::assertIsArray($autoBaseline);
             self::assertSame('gruff-baseline.json', $autoBaseline['path'] ?? null);
@@ -934,7 +934,7 @@ final class AnalyseCliTest extends CliTestCase
             $rerun->run();
 
             self::assertSame(0, $rerun->getExitCode(), $rerun->getErrorOutput());
-            $report = $this->decodeJsonOutput($rerun);
+            $report   = $this->decodeJsonOutput($rerun);
             $baseline = $report['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame(1, $baseline['suppressedFindings'] ?? null);
@@ -992,7 +992,7 @@ final class AnalyseCliTest extends CliTestCase
             $rerun->run();
 
             self::assertSame(0, $rerun->getExitCode(), $rerun->getErrorOutput());
-            $report = $this->decodeJsonOutput($rerun);
+            $report   = $this->decodeJsonOutput($rerun);
             $baseline = $report['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame('full-project', $baseline['staleEvaluation'] ?? null);
@@ -1023,6 +1023,32 @@ final class AnalyseCliTest extends CliTestCase
 
             self::assertSame(2, $process->getExitCode());
             self::assertStringContainsString('--no-baseline cannot be combined with --baseline.', $process->getOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    public function testAnalyseCommandRejectsBaselineCombinedWithGenerateBaseline(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                __DIR__ . '/../../bin/gruff',
+                'analyse',
+                'src',
+                '--format',
+                'text',
+                '--fail-on',
+                'none',
+                '--baseline=gruff-baseline.json',
+                '--generate-baseline',
+            ], $project);
+            $process->run();
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertStringContainsString('--baseline and --generate-baseline are mutually exclusive.', $process->getOutput());
         } finally {
             $this->removeDir($project);
         }

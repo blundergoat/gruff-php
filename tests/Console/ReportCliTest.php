@@ -82,9 +82,40 @@ final class ReportCliTest extends CliTestCase
         self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
     }
 
+    /**
+     * @throws JsonException
+     */
+    public function testReportCommandForwardsRepeatedRuleFilters(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff',
+            'report',
+            'tests/Fixtures/Source/Code',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+            '--no-config',
+            '--include-rule',
+            'docs.missing-public-phpdoc',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report   = $this->decodeJsonOutput($process);
+        $findings = $report['findings'] ?? null;
+        self::assertIsArray($findings);
+        self::assertCount(1, $findings);
+        $firstFinding = $findings[0] ?? null;
+        self::assertIsArray($firstFinding);
+        self::assertSame('docs.missing-public-phpdoc', $firstFinding['ruleId'] ?? null);
+    }
+
     public function testReportCommandWritesStaticHtmlReport(): void
     {
-        $tempDir = $this->tempDir();
+        $tempDir    = $this->tempDir();
         $reportPath = $tempDir . '/gruff-report.html';
 
         try {
@@ -146,7 +177,7 @@ final class ReportCliTest extends CliTestCase
             $report->run();
 
             self::assertSame(0, $report->getExitCode(), $report->getErrorOutput());
-            $decoded = $this->decodeJsonOutput($report);
+            $decoded  = $this->decodeJsonOutput($report);
             $baseline = $decoded['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame(1, $baseline['suppressedFindings'] ?? null);

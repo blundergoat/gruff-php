@@ -32,7 +32,7 @@ final readonly class MarkdownReporter
         ];
 
         if ($report->filters !== null && $report->filters->active()) {
-            $lines[] = sprintf('**Filters:** `%s`', $this->inlineJson($report->filters->toArray()));
+            $lines[] = sprintf('**Filters:** `%s`', json_encode($report->filters->toArray(), JSON_UNESCAPED_SLASHES) ?: '{}');
         }
 
         if ($report->review !== null) {
@@ -69,9 +69,9 @@ final readonly class MarkdownReporter
         foreach ($pillars as $pillar) {
             $lines[] = sprintf(
                 '| %s | %s | %s | %d |',
-                $this->escapeTable($pillar->pillar),
-                $this->escapeTable($pillar->grade === null ? 'n/a' : $pillar->grade->letter),
-                $this->escapeTable($pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score)),
+                str_replace('|', '\\|', $pillar->pillar),
+                str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : $pillar->grade->letter),
+                str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score)),
                 $pillar->findings,
             );
         }
@@ -159,23 +159,4 @@ final readonly class MarkdownReporter
         }
     }
 
-    /**
-     * @param array<string, mixed> $value
-     *
-     * @return string Inline JSON string.
-     */
-    private function inlineJson(array $value): string
-    {
-        return json_encode($value, JSON_UNESCAPED_SLASHES) ?: '{}';
-    }
-
-    /**
-     * Escape Markdown table separator characters.
-     *
-     * @return string Escaped table cell value.
-     */
-    private function escapeTable(string $value): string
-    {
-        return str_replace('|', '\\|', $value);
-    }
 }

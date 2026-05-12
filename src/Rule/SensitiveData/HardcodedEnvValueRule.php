@@ -95,8 +95,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     {
         $normalizedValue = trim($value, "\"' \t\r\n");
         $upperKey        = strtoupper($key);
+        $strongShape     = strlen($normalizedValue) >= 20 && SecretScannerHelper::entropy($normalizedValue) >= 3.5;
 
-        if ($this->isConservativeKeySuffix($upperKey) && !$this->hasStrongSecretShape($normalizedValue)) {
+        if ($this->isConservativeKeySuffix($upperKey) && !$strongShape) {
             return false;
         }
 
@@ -104,17 +105,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             return false;
         }
 
-        return $this->hasStrongSecretShape($normalizedValue);
-    }
-
-    /**
-     * Check length and entropy signals for a possible secret value.
-     *
-     * @return bool True when the value has a strong secret-like shape.
-     */
-    private function hasStrongSecretShape(string $value): bool
-    {
-        return strlen($value) >= 20 && SecretScannerHelper::entropy($value) >= 3.5;
+        return $strongShape;
     }
 
     /**

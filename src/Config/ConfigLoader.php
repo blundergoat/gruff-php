@@ -78,7 +78,7 @@ final readonly class ConfigLoader
             return $path;
         }
 
-        $defaultPath = $this->defaultConfigPath($this->projectRoot);
+        $defaultPath = rtrim($this->projectRoot, '/') . '/' . self::DEFAULT_CONFIG_FILE;
         if (is_file($defaultPath)) {
             return $defaultPath;
         }
@@ -87,19 +87,9 @@ final readonly class ConfigLoader
             return null;
         }
 
-        $fallbackPath = $this->defaultConfigPath($this->fallbackConfigRoot);
+        $fallbackPath = rtrim($this->fallbackConfigRoot, '/') . '/' . self::DEFAULT_CONFIG_FILE;
 
         return $fallbackPath !== $defaultPath && is_file($fallbackPath) ? $fallbackPath : null;
-    }
-
-    /**
-     * Build the default gruff config path for a root directory.
-     *
-     * @return string Absolute or root-relative `.gruff.yaml` path.
-     */
-    private function defaultConfigPath(string $root): string
-    {
-        return rtrim($root, '/') . '/' . self::DEFAULT_CONFIG_FILE;
     }
 
     /**

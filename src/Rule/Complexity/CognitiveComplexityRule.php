@@ -159,7 +159,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             $node instanceof Stmt\Continue_ => self::walkJump($node),
             $node instanceof Stmt\Goto_ => 1,
             $node instanceof Stmt\Expression => self::walkExprCognitive($node->expr, $nesting),
-            $node instanceof Stmt\Return_ => self::walkReturn($node, $nesting),
+            $node instanceof Stmt\Return_ => $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0,
             default => self::walkChildNodes($node, $nesting),
         };
     }
@@ -172,16 +172,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     private static function walkJump(Stmt\Break_|Stmt\Continue_ $node): int
     {
         return $node->num !== null ? 1 : 0;
-    }
-
-    /**
-     * Score a return statement by descending into its expression for nested complexity.
-     *
-     * @return int
-     */
-    private static function walkReturn(Stmt\Return_ $node, int $nesting): int
-    {
-        return $node->expr instanceof Expr ? self::walkExprCognitive($node->expr, $nesting) : 0;
     }
 
     /**

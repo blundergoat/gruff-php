@@ -107,8 +107,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     public function analyseProject(array $units, RuleContext $context): array
     {
         $settings                   = $context->settingsFor($this->definition());
-        $externalPrefixes           = $this->lowercaseList($settings->stringListOption('externalNamespacePrefixes'));
-        $frameworkAttributePrefixes = $this->lowercaseList($settings->stringListOption('frameworkAttributePrefixes'));
+        $externalPrefixes           = array_map(static fn (string $item): string => strtolower($item), $settings->stringListOption('externalNamespacePrefixes'));
+        $frameworkAttributePrefixes = array_map(static fn (string $item): string => strtolower($item), $settings->stringListOption('frameworkAttributePrefixes'));
         $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
 
         $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);
@@ -513,12 +513,4 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         return false;
     }
 
-    /**
-     * @param list<string> $items
-     * @return list<string>
-     */
-    private function lowercaseList(array $items): array
-    {
-        return array_map(static fn (string $item): string => strtolower($item), $items);
-    }
 }

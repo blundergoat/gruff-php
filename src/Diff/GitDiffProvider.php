@@ -32,12 +32,13 @@ final readonly class GitDiffProvider
                 : sprintf('Unable to compute git diff for mode "%s".', $mode));
         }
 
-        $parsed = $this->parseUnifiedDiff($process->getOutput());
+        $parsed      = $this->parseUnifiedDiff($process->getOutput());
+        $isLocalMode = in_array($mode, ['staged', 'unstaged', 'working-tree'], true);
 
         return new DiffResult(
             active:       true,
-            mode:         $this->normaliseMode($mode),
-            base:         $this->baseForMode($mode),
+            mode:         $isLocalMode ? $mode : 'base-ref',
+            base:         $isLocalMode ? null : $mode,
             changedLines: $parsed['lines'],
             changedFiles: $parsed['files'],
             message:      'Diff mode filters findings to changed lines when line ranges are available, otherwise to changed files.',
@@ -84,26 +85,6 @@ final readonly class GitDiffProvider
         }
 
         return $ref;
-    }
-
-    /**
-     * Convert supported literal modes into their report value.
-     *
-     * @return string The normalized diff mode.
-     */
-    private function normaliseMode(string $mode): string
-    {
-        return in_array($mode, ['staged', 'unstaged', 'working-tree'], true) ? $mode : 'base-ref';
-    }
-
-    /**
-     * Expose the base ref only when diffing against a named ref.
-     *
-     * @return string|null Base ref for report metadata, or null for local modes.
-     */
-    private function baseForMode(string $mode): ?string
-    {
-        return in_array($mode, ['staged', 'unstaged', 'working-tree'], true) ? null : $mode;
     }
 
     /**

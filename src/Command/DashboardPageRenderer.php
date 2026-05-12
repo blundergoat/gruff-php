@@ -193,17 +193,10 @@ JS;
     {
         $display = ['php', 'bin/gruff', ...array_slice($command, 2)];
 
-        return implode(' ', array_map($this->quoteArgument(...), $display));
-    }
-
-    /**
-     * Quote one command argument when it contains shell-sensitive characters.
-     *
-     * @return string Argument safe for display as a shell command fragment.
-     */
-    private function quoteArgument(string $argument): string
-    {
-        return preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument);
+        return implode(' ', array_map(
+            static fn (string $argument): string => preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument),
+            $display,
+        ));
     }
 
     /**

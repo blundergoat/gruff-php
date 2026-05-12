@@ -140,7 +140,7 @@ final readonly class NpathComplexityRule implements RuleInterface
         $npath = 1;
 
         foreach ($stmts as $stmt) {
-            $npath = self::clamp($npath * self::walkStatement($stmt));
+            $npath = min($npath * self::walkStatement($stmt), self::MAX_NPATH);
         }
 
         return $npath;
@@ -242,16 +242,6 @@ final readonly class NpathComplexityRule implements RuleInterface
         }
 
         return 0;
-    }
-
-    /**
-     * Cap the NPath score at the configured maximum so wildly branching methods do not overflow.
-     *
-     * @return int
-     */
-    private static function clamp(int $value): int
-    {
-        return min($value, self::MAX_NPATH);
     }
 
     /**

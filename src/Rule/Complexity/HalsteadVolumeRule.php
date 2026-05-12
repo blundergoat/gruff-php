@@ -181,21 +181,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     private static function operandKey(Node $node): ?string
     {
         return match (true) {
-            $node instanceof Expr\Variable => self::variableOperandKey($node),
+            $node instanceof Expr\Variable => is_string($node->name) ? '$' . $node->name : null,
             $node instanceof Node\Scalar => 'scalar:' . $node::class,
             $node instanceof Node\Param => self::parameterOperandKey($node),
             default => null,
         };
-    }
-
-    /**
-     * Build the operand key for a named variable reference.
-     *
-     * @return string|null Variable operand key, or null for dynamic variable names.
-     */
-    private static function variableOperandKey(Expr\Variable $variable): ?string
-    {
-        return is_string($variable->name) ? '$' . $variable->name : null;
     }
 
     /**
@@ -209,7 +199,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             return null;
         }
 
-        return self::variableOperandKey($parameter->var);
+        return is_string($parameter->var->name) ? '$' . $parameter->var->name : null;
     }
 
     /**

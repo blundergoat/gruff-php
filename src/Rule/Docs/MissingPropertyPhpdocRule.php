@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node\Param;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
@@ -65,92 +66,180 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
-            if (!$classLike instanceof Class_
-                && !$classLike instanceof Trait_
-                && !$classLike instanceof Interface_
-                && !$classLike instanceof Enum_) {
+            if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
 
-            if ($classLike->name === null) {
+            array_push(
+                $findings,
+                ...$this->declaredPropertyFindings($classLike, $classLike->name->toString(), $definition, $unit),
+                ...$this->promotedPropertyFindings($classLike, $classLike->name->toString(), $definition, $unit),
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Check whether a class-like node can own declared or promoted properties.
+     *
+     * @return bool True when the node should be inspected.
+     */
+    private function isSupportedClassLike(ClassLike $classLike): bool
+    {
+        return $classLike instanceof Class_
+            || $classLike instanceof Trait_
+            || $classLike instanceof Interface_
+            || $classLike instanceof Enum_;
+    }
+
+    /**
+     * Find declared properties without PHPDoc.
+     *
+     * @return list<Finding> Findings for undocumented declared properties.
+     */
+    private function declaredPropertyFindings(
+        ClassLike $classLike,
+        string $className,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): array {
+        $findings = [];
+
+        foreach ($classLike->getProperties() as $property) {
+            if ($property->getDocComment() !== null) {
                 continue;
             }
 
-            $className = $classLike->name->toString();
-
-            foreach ($classLike->getProperties() as $property) {
-                if ($property->getDocComment() !== null) {
-                    continue;
-                }
-
-                foreach ($property->props as $propertyProperty) {
-                    $propertyName = $propertyProperty->name->toString();
-                    $symbol       = sprintf('%s::$%s', $className, $propertyName);
-
-                    $findings[] = new Finding(
-                        ruleId:      $definition->id,
-                        message:     sprintf('Property %s has no PHPDoc.', $symbol),
-                        filePath:    $unit->file->displayPath,
-                        line:        $property->getStartLine(),
-                        severity:    $definition->defaultSeverity,
-                        pillar:      $definition->pillar,
-                        tier:        $definition->tier,
-                        confidence:  $definition->confidence,
-                        symbol:      $symbol,
-                        remediation: 'Add a docblock describing the property\'s purpose or shape.',
-                        metadata:    [
-                            'propertyName' => $propertyName,
-                            'kind' => 'declared',
-                            'className' => $className,
-                        ],
-                    );
-                }
-            }
-
-            $constructor = $this->findConstructor($classLike);
-            if ($constructor === null) {
-                continue;
-            }
-
-            $documentedParams = $this->documentedConstructorParams($constructor);
-
-            foreach ($constructor->params as $param) {
-                if ($param->flags === 0) {
-                    continue;
-                }
-
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
-
-                $propertyName = $param->var->name;
-                if (in_array($propertyName, $documentedParams, true)) {
-                    continue;
-                }
-
-                $symbol = sprintf('%s::__construct($%s)', $className, $propertyName);
-
-                $findings[] = new Finding(
-                    ruleId:      $definition->id,
-                    message:     sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
-                    filePath:    $unit->file->displayPath,
-                    line:        $param->getStartLine(),
-                    severity:    $definition->defaultSeverity,
-                    pillar:      $definition->pillar,
-                    tier:        $definition->tier,
-                    confidence:  $definition->confidence,
-                    symbol:      $symbol,
-                    remediation: sprintf('Add an @param tag for $%s to the constructor\'s docblock.', $propertyName),
-                    metadata:    [
-                        'propertyName' => $propertyName,
-                        'kind' => 'promoted',
-                        'className' => $className,
-                    ],
+            foreach ($property->props as $propertyProperty) {
+                $findings[] = $this->declaredPropertyFinding(
+                    propertyName: $propertyProperty->name->toString(),
+                    className:    $className,
+                    line:         $property->getStartLine(),
+                    definition:   $definition,
+                    unit:         $unit,
                 );
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Build one declared-property PHPDoc finding.
+     *
+     * @return Finding Finding for an undocumented declared property.
+     */
+    private function declaredPropertyFinding(
+        string $propertyName,
+        string $className,
+        int $line,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): Finding {
+        $symbol = sprintf('%s::$%s', $className, $propertyName);
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('Property %s has no PHPDoc.', $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: 'Add a docblock describing the property\'s purpose or shape.',
+            metadata:    [
+                'propertyName' => $propertyName,
+                'kind' => 'declared',
+                'className' => $className,
+            ],
+        );
+    }
+
+    /**
+     * Find promoted constructor properties without matching constructor `@param` docs.
+     *
+     * @return list<Finding> Findings for undocumented promoted properties.
+     */
+    private function promotedPropertyFindings(
+        ClassLike $classLike,
+        string $className,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): array {
+        $constructor = $this->findConstructor($classLike);
+        if ($constructor === null) {
+            return [];
+        }
+
+        $documentedParams = $this->documentedConstructorParams($constructor);
+        $findings         = [];
+
+        foreach ($constructor->params as $param) {
+            $propertyName = $this->promotedPropertyName($param);
+            if ($propertyName === null || in_array($propertyName, $documentedParams, true)) {
+                continue;
+            }
+
+            $findings[] = $this->promotedPropertyFinding(
+                propertyName: $propertyName,
+                className:    $className,
+                line:         $param->getStartLine(),
+                definition:   $definition,
+                unit:         $unit,
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Return the property name for a promoted constructor parameter.
+     *
+     * @return string|null Property name, or null when the parameter is not promoted.
+     */
+    private function promotedPropertyName(Param $param): ?string
+    {
+        if ($param->flags === 0 || !$param->var instanceof Variable || !is_string($param->var->name)) {
+            return null;
+        }
+
+        return $param->var->name;
+    }
+
+    /**
+     * Build one promoted-property PHPDoc finding.
+     *
+     * @return Finding Finding for an undocumented promoted property.
+     */
+    private function promotedPropertyFinding(
+        string $propertyName,
+        string $className,
+        int $line,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): Finding {
+        $symbol = sprintf('%s::__construct($%s)', $className, $propertyName);
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: sprintf('Add an @param tag for $%s to the constructor\'s docblock.', $propertyName),
+            metadata:    [
+                'propertyName' => $propertyName,
+                'kind' => 'promoted',
+                'className' => $className,
+            ],
+        );
     }
 
     /**

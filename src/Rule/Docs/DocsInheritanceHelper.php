@@ -35,6 +35,23 @@ final readonly class DocsInheritanceHelper
             return false;
         }
 
+        $ancestorNames = $this->ancestorNames($class);
+
+        return $ancestorNames !== [] && $this->hasDocumentedAncestorMethod(
+            ancestorNames: $ancestorNames,
+            methodName:    strtolower($method->name->toString()),
+            statements:    $statements,
+            finder:        $finder,
+        );
+    }
+
+    /**
+     * Return short parent and implemented interface names for a class.
+     *
+     * @return list<string> Ancestor names declared directly on the class.
+     */
+    private function ancestorNames(Class_ $class): array
+    {
         $ancestorNames = [];
         if ($class->extends instanceof Name) {
             $ancestorNames[] = $this->shortName($class->extends);
@@ -44,30 +61,67 @@ final readonly class DocsInheritanceHelper
             $ancestorNames[] = $this->shortName($interface);
         }
 
-        if ($ancestorNames === []) {
-            return false;
-        }
+        return $ancestorNames;
+    }
 
-        $methodName = strtolower($method->name->toString());
-
+    /**
+     * Check direct ancestors in the same parsed unit for a documented method contract.
+     *
+     * @param list<string>    $ancestorNames Short names of direct ancestors.
+     * @param string          $methodName    Lowercase method name to find.
+     * @param list<Node\Stmt> $statements    Parsed statements used to find ancestor declarations.
+     * @param NodeFinder      $finder        Node finder used to search inherited method candidates.
+     *
+     * @return bool True when a same-file ancestor method has a docblock.
+     */
+    private function hasDocumentedAncestorMethod(
+        array $ancestorNames,
+        string $methodName,
+        array $statements,
+        NodeFinder $finder,
+    ): bool {
         foreach ($finder->findInstanceOf($statements, ClassLike::class) as $candidate) {
-            if (!$candidate instanceof Class_ && !$candidate instanceof Interface_) {
-                continue;
-            }
-
-            $candidateName = $candidate->name?->toString();
-            if ($candidateName === null || !in_array($candidateName, $ancestorNames, true)) {
+            if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
 
             foreach ($candidate->getMethods() as $ancestorMethod) {
-                if (strtolower($ancestorMethod->name->toString()) === $methodName && $ancestorMethod->getDocComment() !== null) {
+                if ($this->isDocumentedMethod($ancestorMethod, $methodName)) {
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    /**
+     * Check whether a class-like node is a named direct ancestor candidate.
+     *
+     * @param list<string> $ancestorNames Short names of direct ancestors.
+     *
+     * @return bool True when the candidate should be searched for methods.
+     */
+    private function isNamedAncestorCandidate(ClassLike $candidate, array $ancestorNames): bool
+    {
+        if (!$candidate instanceof Class_ && !$candidate instanceof Interface_) {
+            return false;
+        }
+
+        $candidateName = $candidate->name?->toString();
+
+        return $candidateName !== null && in_array($candidateName, $ancestorNames, true);
+    }
+
+    /**
+     * Check whether an ancestor method matches the target name and has PHPDoc.
+     *
+     * @return bool True when the method supplies inherited contract docs.
+     */
+    private function isDocumentedMethod(ClassMethod $ancestorMethod, string $methodName): bool
+    {
+        return strtolower($ancestorMethod->name->toString()) === $methodName
+            && $ancestorMethod->getDocComment() !== null;
     }
 
     /**

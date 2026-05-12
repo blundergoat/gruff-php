@@ -64,90 +64,161 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         $findings   = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
-            if (!$classLike instanceof Class_
-                && !$classLike instanceof Trait_
-                && !$classLike instanceof Interface_
-                && !$classLike instanceof Enum_) {
+            if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
 
-            if ($classLike->name === null) {
+            array_push(
+                $findings,
+                ...$this->classConstantFindings($classLike, $classLike->name->toString(), $definition, $unit),
+                ...$this->enumCaseFindings($classLike, $classLike->name->toString(), $definition, $unit),
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Check whether a class-like node can own constants or enum cases.
+     *
+     * @return bool True when the node should be inspected.
+     */
+    private function isSupportedClassLike(ClassLike $classLike): bool
+    {
+        return $classLike instanceof Class_
+            || $classLike instanceof Trait_
+            || $classLike instanceof Interface_
+            || $classLike instanceof Enum_;
+    }
+
+    /**
+     * Find undocumented class constants in one class-like node.
+     *
+     * @return list<Finding> Findings for undocumented class constants.
+     */
+    private function classConstantFindings(
+        ClassLike $classLike,
+        string $className,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): array {
+        $findings = [];
+
+        foreach ($classLike->stmts as $statement) {
+            if (!$statement instanceof ClassConst || $statement->getDocComment() !== null) {
                 continue;
             }
 
-            $className = $classLike->name->toString();
-
-            foreach ($classLike->stmts as $statement) {
-                if ($statement instanceof ClassConst) {
-                    if ($statement->getDocComment() !== null) {
-                        continue;
-                    }
-
-                    foreach ($statement->consts as $const) {
-                        $constantName = $const->name->toString();
-                        $symbol       = sprintf('%s::%s', $className, $constantName);
-
-                        $findings[] = new Finding(
-                            ruleId:      $definition->id,
-                            message:     sprintf('Constant %s has no PHPDoc.', $symbol),
-                            filePath:    $unit->file->displayPath,
-                            line:        $statement->getStartLine(),
-                            severity:    $definition->defaultSeverity,
-                            pillar:      $definition->pillar,
-                            tier:        $definition->tier,
-                            confidence:  $definition->confidence,
-                            symbol:      $symbol,
-                            remediation: 'Add a one-line docblock above the constant.',
-                            metadata:    [
-                                'constantName' => $constantName,
-                                'kind' => 'class-constant',
-                                'className' => $className,
-                            ],
-                        );
-                    }
-                }
-            }
-
-            if (!$classLike instanceof Enum_) {
-                continue;
-            }
-
-            if ($classLike->getDocComment() !== null) {
-                continue;
-            }
-
-            foreach ($classLike->stmts as $statement) {
-                if (!$statement instanceof EnumCase) {
-                    continue;
-                }
-
-                if ($statement->getDocComment() !== null) {
-                    continue;
-                }
-
-                $caseName = $statement->name->toString();
-                $symbol   = sprintf('%s::%s', $className, $caseName);
-
-                $findings[] = new Finding(
-                    ruleId:      $definition->id,
-                    message:     sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
-                    filePath:    $unit->file->displayPath,
-                    line:        $statement->getStartLine(),
-                    severity:    $definition->defaultSeverity,
-                    pillar:      $definition->pillar,
-                    tier:        $definition->tier,
-                    confidence:  $definition->confidence,
-                    symbol:      $symbol,
-                    remediation: 'Document either each case or add a class-level docblock to the enum.',
-                    metadata:    [
-                        'constantName' => $caseName,
-                        'kind' => 'enum-case',
-                        'className' => $className,
-                    ],
+            foreach ($statement->consts as $const) {
+                $findings[] = $this->classConstantFinding(
+                    constantName: $const->name->toString(),
+                    className:    $className,
+                    line:         $statement->getStartLine(),
+                    definition:   $definition,
+                    unit:         $unit,
                 );
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Build one class-constant PHPDoc finding.
+     *
+     * @return Finding Finding for an undocumented class constant.
+     */
+    private function classConstantFinding(
+        string $constantName,
+        string $className,
+        int $line,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): Finding {
+        $symbol = sprintf('%s::%s', $className, $constantName);
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('Constant %s has no PHPDoc.', $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: 'Add a one-line docblock above the constant.',
+            metadata:    [
+                'constantName' => $constantName,
+                'kind' => 'class-constant',
+                'className' => $className,
+            ],
+        );
+    }
+
+    /**
+     * Find undocumented enum cases when the enum itself is undocumented.
+     *
+     * @return list<Finding> Findings for undocumented enum cases.
+     */
+    private function enumCaseFindings(
+        ClassLike $classLike,
+        string $className,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): array {
+        if (!$classLike instanceof Enum_ || $classLike->getDocComment() !== null) {
+            return [];
+        }
+
+        $findings = [];
+        foreach ($classLike->stmts as $statement) {
+            if (!$statement instanceof EnumCase || $statement->getDocComment() !== null) {
+                continue;
+            }
+
+            $findings[] = $this->enumCaseFinding(
+                caseName:   $statement->name->toString(),
+                className:  $className,
+                line:       $statement->getStartLine(),
+                definition: $definition,
+                unit:       $unit,
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build one enum-case PHPDoc finding.
+     *
+     * @return Finding Finding for an undocumented enum case.
+     */
+    private function enumCaseFinding(
+        string $caseName,
+        string $className,
+        int $line,
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+    ): Finding {
+        $symbol = sprintf('%s::%s', $className, $caseName);
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $line,
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: 'Document either each case or add a class-level docblock to the enum.',
+            metadata:    [
+                'constantName' => $caseName,
+                'kind' => 'enum-case',
+                'className' => $className,
+            ],
+        );
     }
 }

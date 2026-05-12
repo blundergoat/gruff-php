@@ -54,10 +54,7 @@ final class TestQualityNodeHelper
         $cache = self::$scopeCache ??= new \WeakMap();
 
         if ($cache->offsetExists($unit)) {
-            /** @var list<TestQualityScope> $scopes WeakMap stores only test-scope lists keyed by AnalysisUnit. */
-            $scopes = $cache->offsetGet($unit);
-
-            return $scopes;
+            return $cache->offsetGet($unit);
         }
 
         $finder = new NodeFinder();
