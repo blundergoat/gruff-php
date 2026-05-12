@@ -45,22 +45,6 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Prevention:** When the rule emits zero findings under `--changed-only`, do not treat that as "the diff is clean of this rule." Run a full-project scan (without `--changed-only`) to confirm. For agent review workflows that surface single-implementor-interface findings, the workflow should run the rule against the full project (or at least the project's `src/` tree) and intersect the findings with the diff's changed files afterwards, rather than relying on `--changed-only` to do the intersection. The same caveat applies to any future `ProjectRuleInterface`.
 
-## Footgun: Project-config rules fire on single-file scans of production code
-
-**Status:** fixed 2026-05-11 | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-Rules that inspect project-level config files (`test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-coverage-source-missing`) walk `$context->projectRoot` to discover `phpunit.xml.dist`, dedup per root, and emit a finding once per project. The unit being scanned was previously ignored - so `gruff analyse src/App/Foo.php` (a single production file with no test file in scope) still produced two `phpunit.xml.dist:1` warnings. Targeting a production file should not surface test-config quality opinions.
-
-**Prevention:** Project-config rules now gate their first emission on "at least one unit in this run looks like a PHPUnit test file" (via `TestQualityNodeHelper::looksLikePhpUnitTestFile()` - matches `/tests/`, `/Tests/`, basename ending `Test.php` or `TestCase.php`). When extending a `RuleInterface` rule to inspect project-level state, the rule must look at the unit being analysed (or aggregate per-unit data through a `ProjectRuleInterface` instead) before emitting at the project level - otherwise the rule emits regardless of scope and adds noise to narrow scans. Reuse `TestQualityNodeHelper::looksLikePhpUnitTestFile()` for any future PHPUnit-config rule; do not duplicate the path heuristic.
-
-## Footgun: Lockfiles tripped sensitive-data rules with 100% false-positive rate
-
-**Status:** fixed 2026-05-11 | **Created:** 2026-05-11 | **Evidence:** OBSERVED
-
-Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with `.json` or `.yaml` extensions (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`) were classified as text units and scanned by every rule implementing `SourceTextRuleInterface`. On healthkit's `feat/64272_voice-olb` branch diff this produced 1441 `sensitive-data.high-entropy-string` findings on npm integrity hashes (`sha512-aBc...` base64 SHA-512 digests), with literally zero true positives. The rule had no way to distinguish machine-generated lockfile metadata from a real secret in a JSON config.
-
-**Prevention:** Lockfile filenames are now hard-coded in `SourceDiscovery::IGNORED_FILENAMES` and treated like the `vendor/` directory: skipped during traversal, skipped when passed as an explicit path, and overridable only with `--include-ignored`. When adding a new `SourceTextRuleInterface` rule in the future, audit which file types it will match against the project state of a realistic open-source PHP project (Symfony, Laravel) and confirm that lockfiles, `.po`/`.mo` translation files, dist bundles, and similar machine-generated text artefacts either fall outside the rule's regex or are already filtered by source discovery. If a new false-positive class surfaces on a class of file, prefer extending `IGNORED_FILENAMES` over carving file-type exceptions into individual rules.
-
 ## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
@@ -68,3 +52,21 @@ Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with 
 `design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in the healthkit dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings on healthkit were these vendored copies (43% false-positive rate before configuration).
 
 **Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. Mention the option in the rule's remediation text when the false-positive class surfaces in another project.
+
+## Resolved Entries
+
+## Footgun: Project-config rules fire on single-file scans of production code
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-05-11 | **Evidence:** OBSERVED
+
+Rules that inspect project-level config files (`test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-coverage-source-missing`) walk `$context->projectRoot` to discover `phpunit.xml.dist`, dedup per root, and emit a finding once per project. The unit being scanned was previously ignored - so `gruff analyse src/App/Foo.php` (a single production file with no test file in scope) still produced two warnings against `phpunit.xml.dist`. Targeting a production file should not surface test-config quality opinions.
+
+**Prevention:** Project-config rules now gate their first emission on "at least one unit in this run looks like a PHPUnit test file" (via `TestQualityNodeHelper::looksLikePhpUnitTestFile()` - matches `/tests/`, `/Tests/`, basename ending `Test.php` or `TestCase.php`). When extending a `RuleInterface` rule to inspect project-level state, the rule must look at the unit being analysed (or aggregate per-unit data through a `ProjectRuleInterface` instead) before emitting at the project level - otherwise the rule emits regardless of scope and adds noise to narrow scans. Reuse `TestQualityNodeHelper::looksLikePhpUnitTestFile()` for any future PHPUnit-config rule; do not duplicate the path heuristic.
+
+## Footgun: Lockfiles tripped sensitive-data rules with 100% false-positive rate
+
+**Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-05-11 | **Evidence:** OBSERVED
+
+Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with `.json` or `.yaml` extensions (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`) were classified as text units and scanned by every rule implementing `SourceTextRuleInterface`. On healthkit's `feat/64272_voice-olb` branch diff this produced 1441 `sensitive-data.high-entropy-string` findings on npm integrity hashes (`sha512-aBc...` base64 SHA-512 digests), with literally zero true positives. The rule had no way to distinguish machine-generated lockfile metadata from a real secret in a JSON config.
+
+**Prevention:** Lockfile filenames are now hard-coded in `SourceDiscovery::IGNORED_FILENAMES` and treated like the `vendor/` directory: skipped during traversal, skipped when passed as an explicit path, and overridable only with `--include-ignored`. When adding a new `SourceTextRuleInterface` rule in the future, audit which file types it will match against the project state of a realistic open-source PHP project (Symfony, Laravel) and confirm that lockfiles, `.po`/`.mo` translation files, dist bundles, and similar machine-generated text artefacts either fall outside the rule's regex or are already filtered by source discovery. If a new false-positive class surfaces on a class of file, prefer extending `IGNORED_FILENAMES` over carving file-type exceptions into individual rules.

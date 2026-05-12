@@ -46,6 +46,8 @@ final readonly class DashboardServer
         $output->writeln(sprintf('<info>Serving gruff dashboard at %s</info>', $this->url($host, $port, $context)));
         $output->writeln('<comment>Use the form to refresh the scan or point gruff at another project. Press Ctrl+C to stop.</comment>');
 
+        $handler = $this->handler($context);
+
         while (is_resource($server)) {
             $client = $this->acceptClient($server);
 
@@ -54,7 +56,7 @@ final readonly class DashboardServer
             }
 
             try {
-                $this->handler($context)->handleRequest($client);
+                $handler->handleRequest($client);
             } finally {
                 fclose($client);
             }

@@ -4,15 +4,57 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use GruffPhp\Config\ConfigLoader;
+use RecursiveCallbackFilterIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use SplFileInfo;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
+use UnexpectedValueException;
 
 /**
  * Runs dashboard scans and converts scan output into HTML.
  */
-final readonly class DashboardScanRunner
+final class DashboardScanRunner
 {
+    /**
+     * Default ignored directory names skipped by dashboard cache invalidation.
+     */
+    private const CACHE_IGNORED_DIRECTORIES = [
+        '.fleet',
+        '.git',
+        '.hg',
+        '.idea',
+        '.phpunit.cache',
+        '.svn',
+        '.vscode',
+        'build',
+        'cache',
+        'coverage',
+        'dist',
+        'generated',
+        'node_modules',
+        'tmp',
+        'vendor',
+    ];
+
+    /**
+     * Default ignored project-relative directory roots skipped by dashboard cache invalidation.
+     */
+    private const CACHE_IGNORED_ROOTS = [
+        '.goat-flow/logs',
+        '.goat-flow/scratchpad',
+        '.goat-flow/tasks',
+        'var/cache',
+    ];
+
+    /**
+     * @var array<string, array{fingerprint: string, html: string, exitCode: int}>
+     */
+    private array $cache = [];
+
     /**
      * Capture collaborators used to execute dashboard scans and render results.
      *
@@ -21,9 +63,9 @@ final readonly class DashboardScanRunner
      * @param DashboardPageRenderer $renderer     Renderer used for scan output and errors.
      */
     public function __construct(
-        private string $gruffBinary,
-        private DashboardStateFactory $stateFactory,
-        private DashboardPageRenderer $renderer,
+        private readonly string $gruffBinary,
+        private readonly DashboardStateFactory $stateFactory,
+        private readonly DashboardPageRenderer $renderer,
     ) {
     }
 
@@ -53,6 +95,26 @@ final readonly class DashboardScanRunner
         $paths     = $commandBuilder->parsePaths($state['paths']);
         $command   = $commandBuilder->analyseCommand($paths, $state);
         $startedAt = microtime(true);
+
+        if ($state['scanScope'] !== 'diff' && $state['includeIgnored'] !== '1') {
+            $cacheKey     = $this->cacheKey($scanRoot, $command);
+            $fingerprint  = $this->cacheFingerprint($scanRoot, $paths, $state);
+            $cachedResult = $this->cache[$cacheKey] ?? null;
+
+            if ($cachedResult !== null && $cachedResult['fingerprint'] === $fingerprint) {
+                return $renderer->injectDashboardMetadata(
+                    html: $cachedResult['html'],
+                    projectRoot: $scanRoot,
+                    command: $command,
+                    exitCode: $cachedResult['exitCode'],
+                    durationMs: (int) round((microtime(true) - $startedAt) * 1000),
+                );
+            }
+        } else {
+            $cacheKey    = null;
+            $fingerprint = null;
+        }
+
         $process   = new Process($command, $scanRoot);
         $process->setTimeout($context->scanTimeout);
         $stderr   = '';
@@ -74,6 +136,143 @@ final readonly class DashboardScanRunner
             return $renderer->errorHtml('The scan did not produce HTML output.', $stderr === '' ? 'No stderr output.' : $stderr, $exitCode, $durationMs);
         }
 
+        if (isset($cacheKey, $fingerprint)) {
+            $this->cache[$cacheKey] = [
+                'fingerprint' => $fingerprint,
+                'html' => $html,
+                'exitCode' => $exitCode,
+            ];
+        }
+
         return $renderer->injectDashboardMetadata(html: $html, projectRoot: $scanRoot, command: $command, exitCode: $exitCode, durationMs: $durationMs);
+    }
+
+    /**
+     * Build a stable cache key for a dashboard scan command.
+     *
+     * @param list<string> $command Analyse command argv.
+     * @return string Cache key for the project root and command options.
+     */
+    private function cacheKey(string $scanRoot, array $command): string
+    {
+        return hash('sha256', $scanRoot . "\0" . implode("\0", $command));
+    }
+
+    /**
+     * Build an invalidation fingerprint for the requested scan inputs.
+     *
+     * @param list<string>          $paths Requested scan paths.
+     * @param array<string, string> $state Dashboard query state.
+     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     * @return string Fingerprint covering source paths plus config and baseline inputs.
+     */
+    private function cacheFingerprint(string $scanRoot, array $paths, array $state): string
+    {
+        $parts = [$scanRoot, $state['includeIgnored']];
+
+        foreach ($paths as $path) {
+            $this->appendPathFingerprint($parts, $scanRoot, $path);
+        }
+
+        if ($state['noConfig'] !== '1') {
+            $this->appendPathFingerprint($parts, $scanRoot, $state['config'] === '' ? ConfigLoader::DEFAULT_CONFIG_FILE : $state['config']);
+        }
+
+        if ($state['noBaseline'] !== '1') {
+            $this->appendPathFingerprint($parts, $scanRoot, $state['baseline'] === '' ? 'gruff-baseline.json' : $state['baseline']);
+        }
+
+        sort($parts, SORT_STRING);
+
+        return hash('sha256', implode("\n", $parts));
+    }
+
+    /**
+     * Add a file, directory, or missing-path marker to a cache fingerprint.
+     *
+     * @param list<string> $parts Fingerprint parts collected so far.
+     * @return void No return value.
+     */
+    private function appendPathFingerprint(array &$parts, string $scanRoot, string $path): void
+    {
+        $absolutePath = str_starts_with($path, '/') ? $path : $scanRoot . '/' . $path;
+        $realPath     = realpath($absolutePath);
+
+        if (!is_string($realPath)) {
+            $parts[] = 'missing:' . $absolutePath;
+
+            return;
+        }
+
+        if (is_file($realPath)) {
+            $parts[] = $this->fileFingerprint($realPath);
+
+            return;
+        }
+
+        if (is_dir($realPath)) {
+            $this->appendDirectoryFingerprint($parts, $scanRoot, $realPath);
+        }
+    }
+
+    /**
+     * Add recursive file metadata for a directory to a cache fingerprint.
+     *
+     * @param list<string> $parts Fingerprint parts collected so far.
+     * @return void No return value.
+     */
+    private function appendDirectoryFingerprint(array &$parts, string $scanRoot, string $directory): void
+    {
+        $entries = [];
+
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveCallbackFilterIterator(
+                    new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
+                    fn (SplFileInfo $file): bool => !$file->isDir() || !$this->isIgnoredDirectory($scanRoot, $file->getPathname()),
+                ),
+            );
+
+            foreach ($iterator as $file) {
+                if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                    continue;
+                }
+
+                $entries[] = $this->fileFingerprint($file->getPathname());
+            }
+        } catch (UnexpectedValueException $exception) {
+            $entries[] = 'unreadable:' . $directory . ':' . $exception->getMessage();
+        }
+
+        sort($entries, SORT_STRING);
+        array_push($parts, ...$entries);
+    }
+
+    /**
+     * Check whether a directory is outside the dashboard cache invalidation surface.
+     *
+     * @return bool True when the directory should not invalidate cached scans.
+     */
+    private function isIgnoredDirectory(string $scanRoot, string $directory): bool
+    {
+        $name = basename($directory);
+
+        if (in_array($name, self::CACHE_IGNORED_DIRECTORIES, true)) {
+            return true;
+        }
+
+        $relative = str_replace('\\', '/', ltrim(substr($directory, strlen($scanRoot)), '/'));
+
+        return in_array($relative, self::CACHE_IGNORED_ROOTS, true);
+    }
+
+    /**
+     * Return file metadata used for dashboard cache invalidation.
+     *
+     * @return string File path, modification time, and size.
+     */
+    private function fileFingerprint(string $path): string
+    {
+        return sprintf('file:%s:%d:%d', $path, filemtime($path) ?: 0, filesize($path) ?: 0);
     }
 }

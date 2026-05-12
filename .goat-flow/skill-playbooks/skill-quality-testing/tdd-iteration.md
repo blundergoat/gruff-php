@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.6.0"
+goat-flow-reference-version: "1.6.4"
 ---
 # Skill TDD Iteration
 
@@ -337,11 +337,9 @@ Treat this as the rough budget for any nontrivial discipline skill.
 
 The `description:` frontmatter field decides when an agent loads the skill. It must describe **triggering conditions** ("Use when X happens"), never the skill's internal workflow ("Use when X — dispatches subagent then runs review between tasks").
 
-**Empirical evidence (sourced verbatim from `.goat-flow/scratchpad/skills-example-prime/writing-skills/SKILL.md`, search: `Testing revealed that when a description summarizes`):**
+**Empirical observation:** when a skill's `description:` summarises the workflow, the loading agent may follow the description instead of reading the full skill body. A description that says "code review between tasks" can cause the agent to do one review even when the skill's flowchart shows two stages (spec compliance then code quality). Trimming the description to triggering conditions only ("Use when executing implementation plans with independent tasks") restores correct skill-body following.
 
-> Testing revealed that when a description summarizes the skill's workflow, Claude may follow the description instead of reading the full skill content. A description saying "code review between tasks" caused Claude to do ONE review, even though the skill's flowchart clearly showed TWO reviews (spec compliance then code quality). When the description was changed to just "Use when executing implementation plans with independent tasks" (no workflow summary), Claude correctly read the flowchart and followed the two-stage review process.
-
-This is not a style preference — it is a measurable failure mode where the description short-circuits the body. Apply when authoring or editing any skill.
+This is not a style preference — it is a measurable failure mode where the description short-circuits the body. Apply when authoring or editing any skill. The deterministic scorer's `descriptionSummarizesWorkflow` check (see `src/cli/quality/skill-quality.ts`) is the in-repo signal; the rule is enforced by the scorer + the BAD/GOOD examples below.
 
 ```yaml
 # BAD — workflow summary in description; agent will follow this instead of the body

@@ -1,13 +1,13 @@
 ---
 name: goat-qa
 description: "Use when evaluating test coverage gaps, planning test strategy, or assessing testing risk for code changes."
-goat-flow-skill-version: "1.6.0"
+goat-flow-skill-version: "1.6.4"
 ---
 # /goat-qa
 
 ## Shared Conventions
 
-Read `.goat-flow/skill-reference/skill-preamble.md` for shared conventions.
+Read `.goat-flow/skill-reference/skill-preamble.md` before starting.
 On full-depth, also read `.goat-flow/skill-reference/skill-conventions.md`.
 
 ## When to Use

@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.6.0"
+goat-flow-reference-version: "1.6.4"
 ---
 # Skill Quality Testing
 
@@ -25,7 +25,7 @@ This applies to NEW skills AND to EDITS of existing skills. Writing a skill befo
 
 ## Verification claim evidence
 
-Use this table when a skill or agent needs to substantiate a generic verification claim (tests, build, fix, regression). It is the concrete-example companion to the Proof Gate in `skill-preamble.md`. Sourced from goat-flow's verification lessons + the prime corpus's verification-before-completion checklist; do not add a row without a verbatim source.
+Use this table when a skill or agent needs to substantiate a generic verification claim (tests, build, fix, regression). It is the concrete-example companion to the Proof Gate in `skill-preamble.md`. Sourced from goat-flow's own verification lessons (`.goat-flow/lessons/verification.md`); do not add a row without a verbatim source committed to this repo.
 
 | Claim | Requires | Not Sufficient |
 |---|---|---|
@@ -41,24 +41,24 @@ The Excuse / Reality rationalisation table in `skill-preamble.md` covers HOW the
 
 ## Pattern: consumer-project domain skill (small-root + scoped-references)
 
-When a consumer project authors a domain-specific skill (database guidance, framework conventions, payments-API procedures, etc.), prefer a compact root SKILL.md that routes to subdomain reference files instead of one monolithic skill body. Pattern observed in the prime corpus's MySQL skill (search: `Workflow` in `.goat-flow/scratchpad/skills-example-prime/mysql/SKILL.md`); generalise it provider-neutrally.
+When a consumer project authors a domain-specific skill (database guidance, framework conventions, payments-API procedures, etc.), prefer a compact root SKILL.md that routes to subdomain reference files instead of one monolithic skill body. Generic, provider-neutral guidance:
 
 Outline:
 
 - **Root trigger + Step 0** — frontmatter `description: "Use when working with <domain>"`, then a short workflow (define constraints, propose smallest change, validate with evidence). Include version-specific caveats and destructive-action approval rules at the top.
-- **Subdomain sections** — one `##` per area (e.g. Schema, Indexing, Query, Transactions). Each section: 3-6 imperative bullets that capture the local rules.
+- **Subdomain sections** — one `##` per area (for example Schema, Indexing, Query, Transactions for a database skill). Each section: 3-6 imperative bullets that capture the local rules.
 - **Per-section references** — each section ends with a `References:` list pointing to scoped sub-files. Mark these as "read only the relevant references" so agents do not pre-load the whole pack.
-- **Evidence commands** — name the production-safe commands that prove a change works (`EXPLAIN`, `EXPLAIN ANALYZE`, `SHOW INDEX FROM …`, lock metrics, rollout checklist).
+- **Evidence commands** — name the production-safe commands that prove a change works (read-only inspection commands, observability metrics, rollout checklist). Pick commands the target stack actually exposes.
 - **Production rollback** — for any destructive or schema change, require a rollback step and post-deploy verification.
 
-This is a pattern for consumer-project skills only — goat-flow core does not ship a MySQL skill. When advising a consumer project, share the outline and the principle ("small root, route to references, evidence-and-rollback before declaring done") rather than copying the prime SKILL.md wholesale.
+This is a pattern for consumer-project skills only — goat-flow core does not ship domain skills. When advising a consumer project, share the outline and the principle ("small root, route to references, evidence-and-rollback before declaring done") rather than copying any specific domain skill wholesale.
 
 ## Pattern: API-backed skill guardrails
 
-When a skill orchestrates a third-party API (search providers, payment gateways, model APIs, observability backends), the authoring rules tighten beyond the generic skill checklist. Pattern observed in the prime corpus's Valyu skill (search: `Use Official Valyu SDK Libraries` in `.goat-flow/scratchpad/skills-example-prime/valyu/SKILL.md`); generalise it provider-neutrally:
+When a skill orchestrates a third-party API (search providers, payment gateways, model APIs, observability backends), the authoring rules tighten beyond the generic skill checklist. Generic, provider-neutral guidance:
 
 - **Prefer the official SDK over raw HTTP.** If the vendor ships an SDK in the project's language, use it. Raw `fetch`/`curl` snippets become quickly obsolete and miss SDK-side retries, pagination, error mapping, and observability hooks. The skill should default to the SDK and only fall back to HTTP when the API has no supported SDK or the user has explicitly opted into a custom client.
-- **Authentication: name the env var explicitly.** The skill body must say which env var carries the API key (`VALYU_API_KEY`, `STRIPE_SECRET_KEY`, etc.) and refuse to run if it is missing. Never paste secret values into prompts, logs, or examples. Cite `.goat-flow/skill-reference/skill-preamble.md`'s Evidence Standard for redaction rules.
+- **Authentication: name the env var explicitly.** The skill body must name the env var that carries the API key (e.g. `<VENDOR>_API_KEY`) and refuse to run if it is missing. Never paste secret values into prompts, logs, or examples. Cite `.goat-flow/skill-reference/skill-preamble.md`'s Evidence Standard for redaction rules.
 - **Surface citation / source requirements.** When the API returns search results, model outputs, or research data that the user will incorporate into their own work, the skill must require source URLs or IDs in the output so claims remain traceable.
 - **Version-pin the API surface.** Mention the API version the skill was authored against (e.g. `v2`, `2024-10-01`). When a vendor ships a breaking change, this is the anchor that tells the next agent the body needs review before it is trusted.
 - **Cost / rate-limit reality check.** If the API has non-trivial per-call cost or strict rate limits, surface the budget up front (calls per task, dollars per call) so the agent can ask before fanning out.

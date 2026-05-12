@@ -7,7 +7,7 @@ gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and 
 2. This instruction file
 3. `.goat-flow/architecture.md`
 4. `.goat-flow/code-map.md`
-5. Skills and `.goat-flow/skill-reference/` on demand
+5. Skills and `.goat-flow/skill-playbooks/` on demand
 
 ## Autonomy Tiers
 
@@ -29,7 +29,7 @@ gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and 
 ## Key Resources
 
 - Learning loop: `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/`
-- Tool playbooks: `.goat-flow/skill-reference/browser-use.md`, `.goat-flow/skill-reference/page-capture.md`
+- Tool playbooks: `.goat-flow/skill-playbooks/browser-use.md`, `.goat-flow/skill-playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
 
 ## Essential Commands
@@ -51,7 +51,7 @@ node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agen
 When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
 
 ### READ
-Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-reference/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
 
 ### SCOPE
 Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
@@ -81,7 +81,7 @@ Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lesso
 | Codex instruction file | `AGENTS.md` |
 | Claude peer instruction file | `CLAUDE.md` |
 | Learning loop | `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/` |
-| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-* references) | `.goat-flow/skill-reference/` - read BEFORE declaring a tool unavailable |
+| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
