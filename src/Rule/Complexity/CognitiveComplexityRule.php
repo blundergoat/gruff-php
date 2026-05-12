@@ -75,7 +75,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $cc             = self::compute($node);
+            $cc             = self::computeCognitiveComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($cc);
 
             if ($thresholdMatch === null) {
@@ -118,7 +118,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      * @param ClassMethod|Function_ $node
      * @return int Cognitive complexity score for the function-like node.
      */
-    public static function compute(Node $node): int
+    public static function computeCognitiveComplexity(Node $node): int
     {
         $body = $node->stmts ?? [];
 

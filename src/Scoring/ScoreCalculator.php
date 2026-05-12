@@ -35,13 +35,13 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding>               $findings Findings included in the score calculation.
-     * @param MutationAnalysisResult|null $mutation Optional mutation result included in scoring.
-     * @param DiffResult|null             $diff     Optional diff result limiting the scoring scope label.
+     * @param MutationAnalysisResult|null $mutationAnalysisResult Optional mutation result included in scoring.
+     * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
-    public function calculate(array $findings, ?MutationAnalysisResult $mutation, ?DiffResult $diff): ScoreReport
+    public function calculate(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?DiffResult $diffResult): ScoreReport
     {
-        $pillars    = $this->pillarScores($findings, $mutation);
+        $pillars    = $this->pillarScores($findings, $mutationAnalysisResult);
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
@@ -56,12 +56,12 @@ final readonly class ScoreCalculator
 
         $averageScore = $scoreCount === 0 ? 100.0 : $scoreTotal / $scoreCount;
 
-        $scope = $diff instanceof DiffResult && $diff->active ? 'diff' : 'full-project';
+        $scope = $diffResult instanceof DiffResult && $diffResult->active ? 'diff' : 'full-project';
 
         return new ScoreReport(
             composite:              Grade::fromScore($averageScore),
             pillars:                $pillars,
-            topOffenders:           $this->fileScores($findings, $mutation),
+            topOffenders:           $this->fileScores($findings, $mutationAnalysisResult),
             complexityDistribution: $this->complexityDistribution($findings),
             scope:                  $scope,
             explanation:            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.',
@@ -72,7 +72,7 @@ final readonly class ScoreCalculator
      * @param list<Finding> $findings
      * @return list<PillarScore>
      */
-    private function pillarScores(array $findings, ?MutationAnalysisResult $mutation): array
+    private function pillarScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult): array
     {
         $pillarNames = self::STATIC_PILLARS;
 
@@ -82,19 +82,19 @@ final readonly class ScoreCalculator
             }
         }
 
-        if ($mutation instanceof MutationAnalysisResult && !in_array(Pillar::Mutation->value, $pillarNames, true)) {
+        if ($mutationAnalysisResult instanceof MutationAnalysisResult && !in_array(Pillar::Mutation->value, $pillarNames, true)) {
             $pillarNames[] = Pillar::Mutation->value;
         }
 
         $scores = [];
 
         foreach ($pillarNames as $pillarName) {
-            if ($pillarName === Pillar::Mutation->value && !$mutation instanceof MutationAnalysisResult) {
+            if ($pillarName === Pillar::Mutation->value && !$mutationAnalysisResult instanceof MutationAnalysisResult) {
                 $scores[] = new PillarScore($pillarName, false, null, 0, 0, 0, 0, 0.0);
                 continue;
             }
 
-            if ($pillarName === Pillar::Mutation->value && $mutation instanceof MutationAnalysisResult) {
+            if ($pillarName === Pillar::Mutation->value && $mutationAnalysisResult instanceof MutationAnalysisResult) {
                 $mutationFindings = array_values(array_filter(
                     $findings,
                     static fn (Finding $finding): bool => $finding->pillar === Pillar::Mutation,
@@ -103,12 +103,12 @@ final readonly class ScoreCalculator
                 $scores[] = new PillarScore(
                     pillar:     $pillarName,
                     applicable: true,
-                    grade:      Grade::fromScore($mutation->report->msi()),
+                    grade:      Grade::fromScore($mutationAnalysisResult->report->msi()),
                     findings:   count($mutationFindings),
                     advisories: $counts['advisory'],
                     warnings:   $counts['warning'],
                     errors:     $counts['error'],
-                    penalty:    max(0.0, 100.0 - $mutation->report->msi()),
+                    penalty:    max(0.0, 100.0 - $mutationAnalysisResult->report->msi()),
                 );
                 continue;
             }
@@ -139,7 +139,7 @@ final readonly class ScoreCalculator
      * @param list<Finding> $findings
      * @return list<FileScore>
      */
-    private function fileScores(array $findings, ?MutationAnalysisResult $mutation): array
+    private function fileScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult): array
     {
         /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
@@ -150,8 +150,8 @@ final readonly class ScoreCalculator
         }
 
         $mutationByFile = [];
-        if ($mutation instanceof MutationAnalysisResult) {
-            foreach ($mutation->report->fileSummaries() as $summary) {
+        if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
+            foreach ($mutationAnalysisResult->report->fileSummaries() as $summary) {
                 $mutationByFile[$summary->filePath] = $summary;
                 $byFile[$summary->filePath] ??= [];
             }

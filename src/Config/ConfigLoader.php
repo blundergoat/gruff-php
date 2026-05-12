@@ -10,6 +10,10 @@ use Symfony\Component\Yaml\Yaml;
 
 /**
  * Resolves and applies gruff YAML configuration files.
+ *
+ * @phpstan-type ConfigScalar bool|float|int|object|string|null
+ * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+ * @phpstan-type ConfigObject array<string, ConfigValue>
  */
 final readonly class ConfigLoader
 {
@@ -111,7 +115,7 @@ final readonly class ConfigLoader
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConfigObject
      */
     private function readRootConfig(string $path): array
     {
@@ -129,7 +133,7 @@ final readonly class ConfigLoader
     /**
      * Reject unsupported top-level config keys.
      *
-     * @param array<string, mixed> $rootConfig
+     * @param ConfigObject $rootConfig
      *
      * @return void No return value.
      */
@@ -145,7 +149,7 @@ final readonly class ConfigLoader
     /**
      * Apply the configured minimum PHP version when present.
      *
-     * @param array<string, mixed> $rootConfig
+     * @param ConfigObject $rootConfig
      *
      * @return AnalysisConfig Config with the PHP version floor applied.
      */
@@ -170,7 +174,7 @@ final readonly class ConfigLoader
     /**
      * Apply configured path ignores when present.
      *
-     * @param array<string, mixed> $rootConfig
+     * @param ConfigObject $rootConfig
      *
      * @return AnalysisConfig Config with ignored path patterns applied.
      */
@@ -186,7 +190,7 @@ final readonly class ConfigLoader
     /**
      * Apply configured allowlists when present.
      *
-     * @param array<string, mixed> $rootConfig
+     * @param ConfigObject $rootConfig
      *
      * @return AnalysisConfig Config with allowlist values applied.
      */
@@ -206,7 +210,7 @@ final readonly class ConfigLoader
     /**
      * Apply configured rule selection when present.
      *
-     * @param array<string, mixed> $rootConfig
+     * @param ConfigObject $rootConfig
      *
      * @return AnalysisConfig Config with include/exclude selection applied.
      */
@@ -278,7 +282,7 @@ final readonly class ConfigLoader
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConfigObject
      */
     private function decodeConfig(string $contents, string $path): array
     {
@@ -301,7 +305,7 @@ final readonly class ConfigLoader
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConfigObject
      */
     private function requireObject(mixed $value, string $message): array
     {
@@ -316,21 +320,97 @@ final readonly class ConfigLoader
                 throw new ConfigException($message);
             }
 
-            $result[$key] = $item;
+            $result[$key] = $this->configValue($item);
         }
 
         return $result;
     }
 
     /**
-     * @return array<array-key, mixed>|bool|float|int|object|string|null
+     * @return ConfigValue
      */
     private function configValue(mixed $value): array|bool|float|int|object|string|null
     {
-        if (is_array($value) || is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
+        if (is_array($value)) {
+            return $this->configArray($value);
+        }
+
+        return $this->configScalar($value);
+    }
+
+    /**
+     * @return ConfigScalar
+     */
+    private function configScalar(mixed $value): bool|float|int|object|string|null
+    {
+        if (is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
             return $value;
         }
 
         throw new ConfigException('Config value must be YAML/JSON-compatible.');
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+     */
+    private function configArray(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
+     */
+    private function configArrayDepth2(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
+     */
+    private function configArrayDepth3(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar>
+     */
+    private function configArrayDepth4(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            if (is_array($item)) {
+                throw new ConfigException('Config value nesting is deeper than supported.');
+            }
+
+            $result[$key] = $this->configScalar($item);
+        }
+
+        return $result;
     }
 }

@@ -6,7 +6,6 @@ namespace GruffPhp\Tests\Rule\Docs;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Parser\PhpFileParser;
-use GruffPhp\Rule\Docs\ContinueCommentRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
@@ -15,7 +14,6 @@ use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
-use GruffPhp\Rule\Docs\ReturnCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
@@ -290,30 +288,6 @@ final class DocsRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame(6, $findings[0]->metadata['count']);
-    }
-
-    public function testContinueRequiresDirectOneLineComment(): void
-    {
-        $findings = $this->analyseRule('control-flow-comments.php', ContinueCommentRule::ID);
-        $lines    = array_map(static fn ($finding): ?int => $finding->line, $findings);
-
-        self::assertSame([19, 30], $lines);
-
-        foreach ($findings as $finding) {
-            self::assertSame(\GruffPhp\Finding\Severity::Advisory, $finding->severity);
-        }
-    }
-
-    public function testReturnRequiresDirectOneLineComment(): void
-    {
-        $findings = $this->analyseRule('control-flow-comments.php', ReturnCommentRule::ID);
-        $lines    = array_map(static fn ($finding): ?int => $finding->line, $findings);
-
-        self::assertSame([35, 46], $lines);
-
-        foreach ($findings as $finding) {
-            self::assertSame(\GruffPhp\Finding\Severity::Advisory, $finding->severity);
-        }
     }
 
     public function testVarAnnotationsRequireDescription(): void

@@ -56,7 +56,7 @@ final class InfectionReportParserTest extends TestCase
             self::assertNotFalse(file_put_contents($binaryPath, "#!/usr/bin/env sh\nprintf 'local-infection %s' \"$*\"\n"));
             self::assertTrue(chmod($binaryPath, 0755));
 
-            $result = (new InfectionRunner())->run($projectRoot, 'infection', null);
+            $result = (new InfectionRunner())->runInfection($projectRoot, 'infection', null);
 
             self::assertSame(0, $result->exitCode);
             self::assertStringContainsString('local-infection run --no-progress --log-verbosity=none', $result->output);
@@ -77,7 +77,7 @@ final class InfectionReportParserTest extends TestCase
             self::assertTrue(chmod($binaryPath, 0755));
             self::assertNotFalse(file_put_contents($projectRoot . '/infection.json5', "{}\n"));
 
-            $result = (new InfectionRunner())->run($projectRoot, 'infection', null);
+            $result = (new InfectionRunner())->runInfection($projectRoot, 'infection', null);
 
             self::assertSame(0, $result->exitCode);
             self::assertStringContainsString(
@@ -100,7 +100,7 @@ final class InfectionReportParserTest extends TestCase
             self::assertNotFalse(file_put_contents($binaryPath, "#!/usr/bin/env sh\nprintf 'local-infection %s' \"$*\"\n"));
             self::assertTrue(chmod($binaryPath, 0755));
 
-            $result = (new InfectionRunner())->run(
+            $result = (new InfectionRunner())->runInfection(
                 $projectRoot,
                 'infection',
                 null,

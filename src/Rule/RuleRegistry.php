@@ -16,7 +16,6 @@ use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
-use GruffPhp\Rule\Docs\ContinueCommentRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
@@ -26,7 +25,6 @@ use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
-use GruffPhp\Rule\Docs\ReturnCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
@@ -248,7 +246,6 @@ final class RuleRegistry
             new TrivialAssertionRule(),
             new TrivialSnapshotRule(),
             new UnusedMockRule(),
-            new ContinueCommentRule(),
             new MissingClassPhpdocRule(),
             new MissingConstantPhpdocRule(),
             new MissingFilePhpdocRule(),
@@ -258,7 +255,6 @@ final class RuleRegistry
             new MissingReadmeRule(),
             new MissingReturnTagRule(),
             new MissingThrowsTagRule(),
-            new ReturnCommentRule(),
             new StaleParamTagRule(),
             new TodoDensityRule(),
             new UselessPhpdocRule(),

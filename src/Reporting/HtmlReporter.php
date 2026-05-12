@@ -414,20 +414,20 @@ final readonly class HtmlReporter
      */
     private function locationMarkup(string $filePath, ?int $line): string
     {
-        $text = $line === null ? $filePath : sprintf('%s:%d', $filePath, $line);
-        $data = sprintf(' data-path="%s"', $this->escape($text));
-        $href = $this->editorHref($filePath, $line);
+        $text              = $line === null ? $filePath : sprintf('%s:%d', $filePath, $line);
+        $locationAttribute = sprintf(' data-path="%s"', $this->escape($text));
+        $href              = $this->editorHref($filePath, $line);
 
         if ($href !== null) {
             return sprintf(
                 '<a class="loc-link" href="%s"%s>%s</a>',
                 $this->escape($href),
-                $data,
+                $locationAttribute,
                 $this->escape($text),
             );
         }
 
-        return sprintf('<span class="loc-link" tabindex="0"%s>%s</span>', $data, $this->escape($text));
+        return sprintf('<span class="loc-link" tabindex="0"%s>%s</span>', $locationAttribute, $this->escape($text));
     }
 
     /**

@@ -104,7 +104,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $ccn            = self::compute($node);
+            $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
             if ($thresholdMatch === null) {
@@ -148,7 +148,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      *
      * @return int Cyclomatic complexity number.
      */
-    public static function compute(Node $node): int
+    public static function computeCyclomaticComplexity(Node $node): int
     {
         $ccn = 1;
 

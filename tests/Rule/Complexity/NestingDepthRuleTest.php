@@ -59,7 +59,7 @@ final class NestingDepthRuleTest extends TestCase
         }
 
         self::assertNotNull($method, sprintf('Method %s not found in fixture.', $methodName));
-        self::assertSame($expectedDepth, NestingDepthRule::compute($method));
+        self::assertSame($expectedDepth, NestingDepthRule::computeMaximumNestingDepth($method));
     }
 
     public function testNoFindingsForShallowMethods(): void

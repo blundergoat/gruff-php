@@ -62,7 +62,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
         }
 
         self::assertNotNull($method, sprintf('Method %s not found in fixture.', $methodName));
-        self::assertSame($expectedCcn, CyclomaticComplexityRule::compute($method));
+        self::assertSame($expectedCcn, CyclomaticComplexityRule::computeCyclomaticComplexity($method));
     }
 
     public function testNoFindingsForSimpleMethods(): void

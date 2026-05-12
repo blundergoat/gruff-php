@@ -10,21 +10,25 @@ use GruffPhp\Rule\RuleRegistry;
 
 /**
  * Parses rule selection configuration into include and exclude filters.
+ *
+ * @phpstan-type ConfigScalar bool|float|int|object|string|null
+ * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+ * @phpstan-type ConfigObject array<string, ConfigValue>
  */
 final readonly class SelectionConfigParser
 {
     /**
      * Use the supplied string-list parser when decoding rule selection config.
      *
-     * @param StringListConfigParser $strings Parser used for scalar/list selection values.
+     * @param StringListConfigParser $stringListConfigParser Parser used for scalar/list selection values.
      */
-    public function __construct(private StringListConfigParser $strings = new StringListConfigParser())
+    public function __construct(private StringListConfigParser $stringListConfigParser = new StringListConfigParser())
     {
     }
 
     /**
-     * @param array<array-key, mixed>|bool|float|int|object|string|null $value    Raw selection config value.
-     * @param RuleRegistry                                              $registry Registry used to validate selected rule ids.
+     * @param ConfigValue  $value    Raw selection config value.
+     * @param RuleRegistry $registry Registry used to validate selected rule ids.
      * @return RuleSelection Parsed rule selection filters.
      * @throws ConfigException When the selection config has unknown keys or invalid values.
      */
@@ -43,7 +47,7 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<string, mixed> $selection
+     * @param ConfigObject $selection
      * @return void
      */
     private function assertKnownKeys(array $selection): void
@@ -56,7 +60,7 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<string, mixed> $selection
+     * @param ConfigObject $selection
      * @return list<string>
      */
     private function tiers(array $selection): array
@@ -65,7 +69,7 @@ final readonly class SelectionConfigParser
             return [];
         }
 
-        $tiers = $this->strings->parse($this->configValue($selection['tiers']), 'selection.tiers', false, false);
+        $tiers = $this->stringListConfigParser->parse($this->configValue($selection['tiers']), 'selection.tiers', false, false);
 
         foreach ($tiers as $tier) {
             if (RuleTier::tryFrom($tier) === null) {
@@ -77,7 +81,7 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<string, mixed> $selection
+     * @param ConfigObject $selection
      * @return list<string>
      */
     private function pillars(array $selection, string $key): array
@@ -86,7 +90,7 @@ final readonly class SelectionConfigParser
             return [];
         }
 
-        $pillars = $this->strings->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
+        $pillars = $this->stringListConfigParser->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
 
         foreach ($pillars as $pillar) {
             if (Pillar::tryFrom($pillar) === null) {
@@ -98,7 +102,7 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<string, mixed> $selection
+     * @param ConfigObject $selection
      * @return list<string>
      */
     private function ruleIds(array $selection, string $key, RuleRegistry $registry): array
@@ -107,7 +111,7 @@ final readonly class SelectionConfigParser
             return [];
         }
 
-        $ruleIds = $this->strings->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
+        $ruleIds = $this->stringListConfigParser->parse($this->configValue($selection[$key]), 'selection.' . $key, false, false);
 
         foreach ($ruleIds as $ruleId) {
             if (!$registry->has($ruleId)) {
@@ -119,8 +123,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<array-key, mixed>|bool|float|int|object|string|null $value
-     * @return array<string, mixed>
+     * @param ConfigValue $value
+     * @return ConfigObject
      */
     private function requireObject(object|array|string|int|float|bool|null $value): array
     {
@@ -135,21 +139,97 @@ final readonly class SelectionConfigParser
                 throw new ConfigException('Config key "selection" must be an object.');
             }
 
-            $result[$key] = $item;
+            $result[$key] = $this->configValue($item);
         }
 
         return $result;
     }
 
     /**
-     * @return array<array-key, mixed>|bool|float|int|object|string|null
+     * @return ConfigValue
      */
     private function configValue(mixed $value): array|bool|float|int|object|string|null
     {
-        if (is_array($value) || is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
+        if (is_array($value)) {
+            return $this->configArray($value);
+        }
+
+        return $this->configScalar($value);
+    }
+
+    /**
+     * @return ConfigScalar
+     */
+    private function configScalar(mixed $value): bool|float|int|object|string|null
+    {
+        if (is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
             return $value;
         }
 
         throw new ConfigException('Config value must be YAML/JSON-compatible.');
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+     */
+    private function configArray(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
+     */
+    private function configArrayDepth2(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
+     */
+    private function configArrayDepth3(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar>
+     */
+    private function configArrayDepth4(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            if (is_array($item)) {
+                throw new ConfigException('Config value nesting is deeper than supported.');
+            }
+
+            $result[$key] = $this->configScalar($item);
+        }
+
+        return $result;
     }
 }

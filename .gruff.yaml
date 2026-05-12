@@ -51,11 +51,6 @@ rules:
     # Single-implementor interfaces add abstraction overhead without polymorphism payoff.
     design.single-implementor-interface:
         enabled: true
-    # Loop skips need local context at the exact branch that exits early.
-    # Advisory by default (gruff v0.2/M02); teams that want strict comment
-    # discipline can override with `severity: warning` here.
-    docs.continue-comment:
-        enabled: true
     # Classes, interfaces, traits, and enums need a docblock explaining their purpose.
     docs.missing-class-phpdoc:
         enabled: true
@@ -79,11 +74,6 @@ rules:
         enabled: true
     # Return docs clarify nullable, collection, and domain meanings.
     docs.missing-return-tag:
-        enabled: true
-    # Return paths need local context at the exact branch that exits.
-    # Advisory by default (gruff v0.2/M02); teams that want strict comment
-    # discipline can override with `severity: warning` here.
-    docs.return-comment:
         enabled: true
     # Throws docs make failure modes visible to callers.
     docs.missing-throws-tag:
@@ -207,6 +197,62 @@ rules:
                 - scope
                 - report
                 - options
+                # Report, CLI, baseline, mutation, and diff objects use short
+                # domain role names at call sites; repeating the full class
+                # suffix makes signatures noisier without clarifying intent.
+                - baseline
+                - baselineReport
+                - composite
+                - defaultSeverity
+                - diagnostic
+                - diff
+                - file
+                - filters
+                - format
+                - identity
+                - minSeverity
+                - mutation
+                - pillar
+                - result
+                - review
+                - reviewDiff
+                - score
+                - settings
+                - setup
+                - store
+                - tier
+                - trend
+                # AST visitors and node classifiers intentionally name the
+                # semantic role of the node/expression/statement being checked.
+                - ancestorMethod
+                - assignment
+                - candidate
+                - child
+                - class
+                - classLike
+                - condition
+                - constructor
+                - expression
+                - first
+                - name
+                - parameter
+                - receiver
+                - returnStatement
+                - statement
+                - target
+                - type
+                - value
+                # Dashboard and identifier-analysis collaborators read better
+                # as service roles than as duplicated concrete class names.
+                - discovery
+                - findingContext
+                - renderer
+                - responder
+                - response
+                - root
+                - scanRunner
+                - stateFactory
+                - tokenizer
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true

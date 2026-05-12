@@ -80,7 +80,7 @@ final readonly class NpathComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $npath          = self::compute($node);
+            $npath          = self::computeNpathComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($npath);
 
             if ($thresholdMatch === null) {
@@ -126,7 +126,7 @@ final readonly class NpathComplexityRule implements RuleInterface
      * @param ClassMethod|Function_ $node
      * @return int NPath complexity score for the function-like node.
      */
-    public static function compute(Node $node): int
+    public static function computeNpathComplexity(Node $node): int
     {
         return self::walkBlock($node->stmts ?? []);
     }

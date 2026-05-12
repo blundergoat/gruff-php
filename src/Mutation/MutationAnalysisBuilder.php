@@ -66,7 +66,7 @@ final readonly class MutationAnalysisBuilder
             return true;
         }
 
-        $runResult = (new InfectionRunner())->run(
+        $runResult = (new InfectionRunner())->runInfection(
             $projectRoot,
             $options->infectionBin,
             $options->infectionConfigPath,

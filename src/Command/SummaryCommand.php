@@ -98,7 +98,7 @@ final class SummaryCommand extends Command
         return $this->writeSummary(
             output:              $output,
             format:              $format,
-            data:                $this->summaryData(
+            summaryReportData:   $this->summaryData(
                 projectRoot:         $projectRoot,
                 paths:               $this->paths($input),
                 includeIgnored:      (bool) $input->getOption('include-ignored'),
@@ -275,11 +275,11 @@ final class SummaryCommand extends Command
      *
      * @return int Symfony command exit code.
      */
-    private function writeSummary(OutputInterface $output, string $format, SummaryReportData $data): int
+    private function writeSummary(OutputInterface $output, string $format, SummaryReportData $summaryReportData): int
     {
         if ($format === 'json') {
             try {
-                $output->write($this->renderJson($data) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
+                $output->write($this->renderJson($summaryReportData) . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode summary: %s</error>', $exception->getMessage()));
 
@@ -289,7 +289,7 @@ final class SummaryCommand extends Command
             return Command::SUCCESS;
         }
 
-        $output->write($this->renderText($data));
+        $output->write($this->renderText($summaryReportData));
 
         return Command::SUCCESS;
     }
@@ -383,28 +383,28 @@ final class SummaryCommand extends Command
      *
      * @return string Human-readable summary report.
      */
-    private function renderText(SummaryReportData $data): string
+    private function renderText(SummaryReportData $summaryReportData): string
     {
         $lines   = [];
         $lines[] = sprintf('gruff %s — summary', Application::VERSION);
         $lines[] = '';
-        $lines[] = sprintf('Paths     %s', $data->paths === [] ? '(none)' : implode(', ', $data->paths));
-        $lines[] = sprintf('Config    %s', $data->configPath ?? '(none)');
+        $lines[] = sprintf('Paths     %s', $summaryReportData->paths === [] ? '(none)' : implode(', ', $summaryReportData->paths));
+        $lines[] = sprintf('Config    %s', $summaryReportData->configPath ?? '(none)');
         $lines[] = sprintf(
             'Files     %d discovered, %d parsed, %d ignored, %d missing, %d parse errors',
-            $data->sourcesDiscovered,
-            $data->sourcesParsed,
-            $data->ignoredPaths,
-            $data->missingPaths,
-            $data->parseErrors
+            $summaryReportData->sourcesDiscovered,
+            $summaryReportData->sourcesParsed,
+            $summaryReportData->ignoredPaths,
+            $summaryReportData->missingPaths,
+            $summaryReportData->parseErrors
         );
         $lines[] = '';
-        $lines[] = sprintf('Composite %s (%.2f / 100)', $data->score->composite->letter, $data->score->composite->score);
-        $lines[] = sprintf('Scope     %s', $data->score->scope);
+        $lines[] = sprintf('Composite %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
+        $lines[] = sprintf('Scope     %s', $summaryReportData->score->scope);
         $lines[] = '';
         $lines[] = 'Pillars';
 
-        $sortedPillars = $data->score->pillars;
+        $sortedPillars = $summaryReportData->score->pillars;
         usort($sortedPillars, static function ($left, $right): int {
             return $right->findings <=> $left->findings;
         });
@@ -425,11 +425,11 @@ final class SummaryCommand extends Command
             );
         }
 
-        if ($data->topRules !== []) {
+        if ($summaryReportData->topRules !== []) {
             $lines[] = '';
-            $lines[] = sprintf('Top %d rules by finding count', count($data->topRules));
-            $idWidth = $this->columnWidth(array_map(static fn (array $row): string => $row['ruleId'], $data->topRules), 30);
-            foreach ($data->topRules as $row) {
+            $lines[] = sprintf('Top %d rules by finding count', count($summaryReportData->topRules));
+            $idWidth = $this->columnWidth(array_map(static fn (array $row): string => $row['ruleId'], $summaryReportData->topRules), 30);
+            foreach ($summaryReportData->topRules as $row) {
                 $lines[] = sprintf(
                     '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
                     $row['count'],
@@ -442,11 +442,11 @@ final class SummaryCommand extends Command
             }
         }
 
-        if ($data->topOffenders !== []) {
+        if ($summaryReportData->topOffenders !== []) {
             $lines[]   = '';
-            $lines[]   = sprintf('Top %d file offenders', count($data->topOffenders));
-            $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $data->topOffenders), 30);
-            foreach ($data->topOffenders as $file) {
+            $lines[]   = sprintf('Top %d file offenders', count($summaryReportData->topOffenders));
+            $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
+            foreach ($summaryReportData->topOffenders as $file) {
                 $lines[] = sprintf(
                     '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
                     $file->grade->letter,
@@ -463,10 +463,10 @@ final class SummaryCommand extends Command
         $lines[] = '';
         $lines[] = sprintf(
             'Totals    %d findings (advisory=%d, warning=%d, error=%d)',
-            $data->totals['total'],
-            $data->totals['advisory'],
-            $data->totals['warning'],
-            $data->totals['error'],
+            $summaryReportData->totals['total'],
+            $summaryReportData->totals['advisory'],
+            $summaryReportData->totals['warning'],
+            $summaryReportData->totals['error'],
         );
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
@@ -478,26 +478,26 @@ final class SummaryCommand extends Command
      * @return string JSON-encoded summary report.
      * @throws JsonException When the summary payload cannot be encoded.
      */
-    private function renderJson(SummaryReportData $data): string
+    private function renderJson(SummaryReportData $summaryReportData): string
     {
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
             'tool' => ['name' => 'gruff', 'version' => Application::VERSION],
             'scope' => [
-                'paths' => $data->paths,
-                'configPath' => $data->configPath,
-                'filesDiscovered' => $data->sourcesDiscovered,
-                'filesParsed' => $data->sourcesParsed,
-                'ignoredPaths' => $data->ignoredPaths,
-                'missingPaths' => $data->missingPaths,
-                'parseErrors' => $data->parseErrors,
-                'scope' => $data->score->scope,
+                'paths' => $summaryReportData->paths,
+                'configPath' => $summaryReportData->configPath,
+                'filesDiscovered' => $summaryReportData->sourcesDiscovered,
+                'filesParsed' => $summaryReportData->sourcesParsed,
+                'ignoredPaths' => $summaryReportData->ignoredPaths,
+                'missingPaths' => $summaryReportData->missingPaths,
+                'parseErrors' => $summaryReportData->parseErrors,
+                'scope' => $summaryReportData->score->scope,
             ],
-            'composite' => $data->score->composite->toArray(),
-            'findings' => $data->totals,
-            'pillars' => array_map(static fn ($pillar): array => $pillar->toArray(), $data->score->pillars),
-            'topRules' => $data->topRules,
-            'topOffenders' => array_map(static fn ($file): array => $file->toArray(), $data->topOffenders),
+            'composite' => $summaryReportData->score->composite->toArray(),
+            'findings' => $summaryReportData->totals,
+            'pillars' => array_map(static fn ($pillar): array => $pillar->toArray(), $summaryReportData->score->pillars),
+            'topRules' => $summaryReportData->topRules,
+            'topOffenders' => array_map(static fn ($file): array => $file->toArray(), $summaryReportData->topOffenders),
         ];
 
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);

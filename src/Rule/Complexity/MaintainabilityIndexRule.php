@@ -73,7 +73,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $mi             = self::compute($node, $unit);
+            $mi             = self::computeMaintainabilityIndex($node, $unit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
             if ($thresholdMatch === null) {
@@ -118,7 +118,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      *
      * @return float Maintainability index score.
      */
-    public static function compute(Node $node, AnalysisUnit $unit): float
+    public static function computeMaintainabilityIndex(Node $node, AnalysisUnit $unit): float
     {
         $startLine = $node->getStartLine();
         $endLine   = $node->getEndLine();
@@ -128,8 +128,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         }
 
         $lloc     = max(1, self::logicalLineCount($node));
-        $ccn      = CyclomaticComplexityRule::compute($node);
-        $halstead = HalsteadVolumeRule::compute($node);
+        $ccn      = CyclomaticComplexityRule::computeCyclomaticComplexity($node);
+        $halstead = HalsteadVolumeRule::computeHalsteadMetrics($node);
         $volume   = max(1.0, $halstead['volume']);
 
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;

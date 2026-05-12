@@ -133,8 +133,6 @@ src/
 |   |-- Design/
 |   |   `-- SingleImplementorInterfaceRule.php = `design.single-implementor-interface` (ProjectRuleInterface; flags internal interfaces with exactly one implementor and no external type-hint usage; configurable external prefixes, framework attributes, mock-as-implementor toggle, and additional excluded paths)
 |   |-- Docs/
-|   |   |-- ContinueCommentRule.php           = `docs.continue-comment` (flags `continue` unless a standalone one-line comment is on the immediately previous line)
-|   |   |-- DirectLineComment.php             = shared one-line comment detector for control-flow documentation rules
 |   |   |-- MissingClassPhpdocRule.php        = `docs.missing-class-phpdoc` (flags class/interface/trait/enum declarations without a docblock; skips anonymous classes)
 |   |   |-- MissingConstantPhpdocRule.php     = `docs.missing-constant-phpdoc` (flags class constants without a docblock; enum cases exempt when the enclosing enum is documented)
 |   |   |-- MissingFilePhpdocRule.php         = `docs.missing-file-phpdoc` (flags files without a file-level docblock; single-class-per-file with class docblock acts as exemption)
@@ -144,7 +142,6 @@ src/
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag` (flags any documented method/function without `@return`, excluding constructors/destructors)
 |   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
-|   |   |-- ReturnCommentRule.php             = `docs.return-comment` (flags `return` unless a standalone one-line comment is on the immediately previous line)
 |   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
 |   |   |-- TodoDensityRule.php               = `docs.todo-density`
 |   |   |-- UselessPhpdocRule.php             = `docs.useless-phpdoc`

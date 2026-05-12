@@ -107,8 +107,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     public function analyseProject(array $units, RuleContext $context): array
     {
         $settings                   = $context->settingsFor($this->definition());
-        $externalPrefixes           = array_map(static fn (string $item): string => strtolower($item), $settings->stringListOption('externalNamespacePrefixes'));
-        $frameworkAttributePrefixes = array_map(static fn (string $item): string => strtolower($item), $settings->stringListOption('frameworkAttributePrefixes'));
+        $externalPrefixes           = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('externalNamespacePrefixes'));
+        $frameworkAttributePrefixes = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('frameworkAttributePrefixes'));
         $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
 
         $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);

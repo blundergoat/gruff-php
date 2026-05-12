@@ -10,13 +10,16 @@ use GruffPhp\Rule\RuleRegistry;
 /**
  * Applies parsed rule configuration entries to the effective analysis config.
  * @phpstan-type RuleOptionValue int|float|bool|string|array<array-key, int|float|bool|string>
+ * @phpstan-type ConfigScalar bool|float|int|object|string|null
+ * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+ * @phpstan-type ConfigObject array<string, ConfigValue>
  */
 final readonly class RuleConfigApplier
 {
     /**
      * @param AnalysisConfig       $config     Config to update.
      * @param RuleRegistry         $registry   Rule registry used to validate rule ids.
-     * @param array<string, mixed> $rootConfig Parsed root config object.
+     * @param ConfigObject         $rootConfig Parsed root config object.
      * @throws ConfigException When rule config references unknown ids or invalid values.
      * @return AnalysisConfig Config with rule-specific overrides applied.
      */
@@ -45,7 +48,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
+     * @param ConfigObject $ruleConfig
      * @return AnalysisConfig Config with one rule's overrides applied.
      */
     private function applyRuleConfig(
@@ -70,7 +73,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
+     * @param ConfigObject $ruleConfig
      * @return void
      */
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
@@ -83,7 +86,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
+     * @param ConfigObject $ruleConfig
      * @return bool Effective enabled flag for the rule.
      */
     private function isEnabled(string $ruleId, array $ruleConfig, bool $default): bool
@@ -100,7 +103,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed>     $ruleConfig
+     * @param ConfigObject             $ruleConfig
      * @param array<string, int|float> $defaultThresholds
      * @return array<string, int|float>
      */
@@ -138,7 +141,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed> $ruleConfig
+     * @param ConfigObject $ruleConfig
      * @return SeverityThreshold|null Single threshold override when configured.
      */
     private function severityThreshold(
@@ -195,7 +198,7 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<string, mixed>           $ruleConfig
+     * @param ConfigObject                   $ruleConfig
      * @param array<string, RuleOptionValue> $defaultOptions
      * @return array<string, RuleOptionValue>
      */
@@ -328,8 +331,8 @@ final readonly class RuleConfigApplier
 
         $result = [];
         $sample = $defaultValue[0] ?? null;
-        foreach ($optionValue as $index => $item) {
-            if (!is_int($item) && !is_float($item) && !is_bool($item) && !is_string($item)) {
+        foreach ($optionValue as $index => $optionItem) {
+            if (!is_int($optionItem) && !is_float($optionItem) && !is_bool($optionItem) && !is_string($optionItem)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a scalar value.', $ruleId, $optionName, $index));
             }
 
@@ -338,12 +341,12 @@ final readonly class RuleConfigApplier
                     ruleId:     $ruleId,
                     optionName: $optionName,
                     index:      $index,
-                    item:       $item,
+                    optionItem: $optionItem,
                     sample:     $sample,
                 );
             }
 
-            $result[] = $item;
+            $result[] = $optionItem;
         }
 
         return $result;
@@ -358,20 +361,20 @@ final readonly class RuleConfigApplier
         string $ruleId,
         string $optionName,
         int $index,
-        mixed $item,
+        mixed $optionItem,
         mixed $sample,
     ): void {
-        if (is_string($sample) && !is_string($item)) {
+        if (is_string($sample) && !is_string($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
         }
 
-        if (is_int($sample) && !is_int($item)) {
+        if (is_int($sample) && !is_int($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
         }
     }
 
     /**
-     * @return array<string, mixed>
+     * @return ConfigObject
      */
     private function requireObject(mixed $value, string $message): array
     {
@@ -386,7 +389,95 @@ final readonly class RuleConfigApplier
                 throw new ConfigException($message);
             }
 
-            $result[$key] = $item;
+            $result[$key] = $this->configValue($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return ConfigValue
+     */
+    private function configValue(mixed $value): array|bool|float|int|object|string|null
+    {
+        if (is_array($value)) {
+            return $this->configArray($value);
+        }
+
+        return $this->configScalar($value);
+    }
+
+    /**
+     * @return ConfigScalar
+     */
+    private function configScalar(mixed $value): bool|float|int|object|string|null
+    {
+        if (is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
+            return $value;
+        }
+
+        throw new ConfigException('Config value must be YAML/JSON-compatible.');
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+     */
+    private function configArray(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
+     */
+    private function configArrayDepth2(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
+     */
+    private function configArrayDepth3(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, ConfigScalar>
+     */
+    private function configArrayDepth4(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            if (is_array($item)) {
+                throw new ConfigException('Config value nesting is deeper than supported.');
+            }
+
+            $result[$key] = $this->configScalar($item);
         }
 
         return $result;

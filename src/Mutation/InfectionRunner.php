@@ -14,7 +14,7 @@ use Symfony\Component\Process\Process;
 final readonly class InfectionRunner
 {
     /**
-     * Run Infection and capture its process result.
+     * Execute Infection and capture its process result.
      *
      * @param string      $projectRoot          Project root where Infection should run.
      * @param string      $binary               Infection binary path or command name.
@@ -22,7 +22,7 @@ final readonly class InfectionRunner
      * @param string|null $testFrameworkOptions Extra test-framework options passed to Infection.
      * @return InfectionRunResult Process result and optional diagnostic.
      */
-    public function run(
+    public function runInfection(
         string $projectRoot,
         string $binary,
         ?string $configPath,

@@ -75,7 +75,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $metrics        = self::compute($node);
+            $metrics        = self::computeHalsteadMetrics($node);
             $volume         = $metrics['volume'];
             $thresholdMatch = $settings->highValueThresholdMatch($volume);
 
@@ -123,7 +123,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      * @param ClassMethod|Function_ $node
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
      */
-    public static function compute(Node $node): array
+    public static function computeHalsteadMetrics(Node $node): array
     {
         $operators      = [];
         $operands       = [];

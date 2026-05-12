@@ -75,7 +75,7 @@ final readonly class NestingDepthRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $maxDepth       = self::compute($node);
+            $maxDepth       = self::computeMaximumNestingDepth($node);
             $thresholdMatch = $settings->highValueThresholdMatch($maxDepth);
 
             if ($thresholdMatch === null) {
@@ -118,7 +118,7 @@ final readonly class NestingDepthRule implements RuleInterface
      * @param ClassMethod|Function_ $node
      * @return int The maximum nesting depth inside the function-like node.
      */
-    public static function compute(Node $node): int
+    public static function computeMaximumNestingDepth(Node $node): int
     {
         return self::walkStatements($node->stmts ?? [], 0);
     }

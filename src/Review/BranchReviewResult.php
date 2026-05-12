@@ -8,6 +8,9 @@ use GruffPhp\Finding\Finding;
 
 /**
  * Carries introduced, resolved, and existing findings for branch review.
+ *
+ * @phpstan-type ReviewScalar bool|float|int|object|string|null
+ * @phpstan-type ReviewValue ReviewScalar|array<array-key, ReviewScalar|array<array-key, ReviewScalar|array<array-key, ReviewScalar|array<array-key, ReviewScalar>>>>
  */
 final readonly class BranchReviewResult
 {
@@ -46,7 +49,7 @@ final readonly class BranchReviewResult
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, ReviewValue>
      */
     public function toArray(): array
     {

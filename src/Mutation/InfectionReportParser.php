@@ -8,6 +8,10 @@ use JsonException;
 
 /**
  * Parses Infection JSON reports into gruff mutation report objects.
+ *
+ * @phpstan-type JsonScalar bool|float|int|string|null
+ * @phpstan-type JsonValue JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>>
+ * @phpstan-type JsonObject array<string, JsonValue>
  */
 final readonly class InfectionReportParser
 {
@@ -42,9 +46,7 @@ final readonly class InfectionReportParser
             throw new MutationReportException(sprintf('Invalid Infection JSON report "%s": %s', $path, $exception->getMessage()), 0, $exception);
         }
 
-        if (!is_array($decoded) || array_is_list($decoded)) {
-            throw new MutationReportException(sprintf('Infection report "%s" must be a JSON object.', $path));
-        }
+        $decoded = $this->requireJsonObject($decoded, sprintf('Infection report "%s" must be a JSON object.', $path));
 
         $stats   = $this->parseStats($decoded, $path);
         $mutants = [];
@@ -82,7 +84,7 @@ final readonly class InfectionReportParser
     }
 
     /**
-     * @param array<mixed> $decoded
+     * @param JsonObject $decoded
      * @return array<string, int|float>
      */
     private function parseStats(array $decoded, string $path): array
@@ -133,33 +135,134 @@ final readonly class InfectionReportParser
     }
 
     /**
-     * @return array<mixed>
+     * @return JsonObject
      */
     private function requireMutantRow(mixed $row, string $location, string $path): array
     {
-        if (!is_array($row) || array_is_list($row)) {
-            throw new MutationReportException(sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
-        }
-
-        return $row;
+        return $this->requireJsonObject($row, sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
     }
 
     /**
-     * @param array<mixed> $row
-     * @return array<mixed>
+     * @param JsonObject $row
+     * @return JsonObject
      */
     private function requireMutatorObject(array $row, string $location, string $path): array
     {
         $mutator = $row['mutator'] ?? null;
-        if (!is_array($mutator) || array_is_list($mutator)) {
-            throw new MutationReportException(sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
-        }
-
-        return $mutator;
+        return $this->requireJsonObject($mutator, sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
     }
 
     /**
-     * @param array<mixed> $mutator
+     * @return JsonObject
+     */
+    private function requireJsonObject(mixed $value, string $message): array
+    {
+        if (!is_array($value) || array_is_list($value)) {
+            throw new MutationReportException($message);
+        }
+
+        $result = [];
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                throw new MutationReportException($message);
+            }
+
+            $result[$key] = $this->jsonValue($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return JsonValue
+     */
+    private function jsonValue(mixed $value): array|bool|float|int|string|null
+    {
+        if (is_array($value)) {
+            return $this->jsonArray($value);
+        }
+
+        return $this->jsonScalar($value);
+    }
+
+    /**
+     * @return JsonScalar
+     */
+    private function jsonScalar(mixed $value): bool|float|int|string|null
+    {
+        if (is_bool($value) || is_float($value) || is_int($value) || is_string($value) || $value === null) {
+            return $value;
+        }
+
+        throw new MutationReportException('Infection report contains a non-JSON value.');
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>>
+     */
+    private function jsonArray(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->jsonArrayDepth2($item) : $this->jsonScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>
+     */
+    private function jsonArrayDepth2(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->jsonArrayDepth3($item) : $this->jsonScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar>>
+     */
+    private function jsonArrayDepth3(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            $result[$key] = is_array($item) ? $this->jsonArrayDepth4($item) : $this->jsonScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array-key, mixed> $values
+     * @return array<array-key, JsonScalar>
+     */
+    private function jsonArrayDepth4(array $values): array
+    {
+        $result = [];
+
+        foreach ($values as $key => $item) {
+            if (is_array($item)) {
+                throw new MutationReportException('Infection report nesting is deeper than supported.');
+            }
+
+            $result[$key] = $this->jsonScalar($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param JsonObject $mutator
      *
      * @return string Required mutator field value.
      */
@@ -174,7 +277,7 @@ final readonly class InfectionReportParser
     }
 
     /**
-     * @param array<mixed> $mutator
+     * @param JsonObject $mutator
      *
      * @return int|null Original start line, or null when absent.
      */

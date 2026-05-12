@@ -16,6 +16,9 @@ use GruffPhp\Trend\TrendReport;
 
 /**
  * Carries the full analysis result used by every reporter format.
+ *
+ * @phpstan-type ReportScalar bool|float|int|object|string|null
+ * @phpstan-type ReportValue ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar|array<array-key, ReportScalar>>>>>
  */
 final readonly class AnalysisReport
 {
@@ -101,7 +104,7 @@ final readonly class AnalysisReport
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, ReportValue>
      */
     public function toArray(): array
     {

@@ -61,7 +61,7 @@ final class CognitiveComplexityRuleTest extends TestCase
         }
 
         self::assertNotNull($method, sprintf('Method %s not found in fixture.', $methodName));
-        self::assertSame($expectedCc, CognitiveComplexityRule::compute($method));
+        self::assertSame($expectedCc, CognitiveComplexityRule::computeCognitiveComplexity($method));
     }
 
     public function testNoFindingsForSimpleMethods(): void
@@ -102,8 +102,8 @@ final class CognitiveComplexityRuleTest extends TestCase
 
         self::assertNotNull($sameChain);
         self::assertNotNull($mixedChain);
-        self::assertSame(2, CognitiveComplexityRule::compute($sameChain));
-        self::assertSame(3, CognitiveComplexityRule::compute($mixedChain));
+        self::assertSame(2, CognitiveComplexityRule::computeCognitiveComplexity($sameChain));
+        self::assertSame(3, CognitiveComplexityRule::computeCognitiveComplexity($mixedChain));
     }
 
     /**
