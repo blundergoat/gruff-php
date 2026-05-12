@@ -17,9 +17,9 @@ use GruffPhp\Rule\RuleRegistry;
 final readonly class RuleConfigApplier
 {
     /**
-     * @param AnalysisConfig       $config     Config to update.
-     * @param RuleRegistry         $registry   Rule registry used to validate rule ids.
-     * @param ConfigObject         $rootConfig Parsed root config object.
+     * @param AnalysisConfig $config     Config to update.
+     * @param RuleRegistry   $registry   Rule registry used to validate rule ids.
+     * @param ConfigObject   $rootConfig Parsed root config object.
      * @throws ConfigException When rule config references unknown ids or invalid values.
      * @return AnalysisConfig Config with rule-specific overrides applied.
      */
