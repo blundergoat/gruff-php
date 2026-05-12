@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects assertions whose expected and actual values make the check tautological.
+ */
 final readonly class TrivialAssertionRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for trivial assertion findings.
+     */
     public const ID = 'test-quality.trivial-assertion';
 
     /**

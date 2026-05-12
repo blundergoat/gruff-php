@@ -19,8 +19,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects classes with public APIs large enough to dilute their responsibility.
+ */
 final readonly class PublicMethodCountRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for public method count findings.
+     */
     public const ID = 'size.public-method-count';
 
     /**

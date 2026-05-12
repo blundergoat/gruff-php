@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects include and require paths built from variables.
+ */
 final class VariableIncludeRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for variable include findings.
+     */
     public const ID = 'security.variable-include';
 
     /**

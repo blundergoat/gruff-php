@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects branches in tests that make outcomes depend on local control flow.
+ */
 final readonly class ConditionalTestLogicRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for conditional test logic findings.
+     */
     public const ID = 'test-quality.conditional-logic';
 
     /**

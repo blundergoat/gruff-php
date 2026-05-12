@@ -21,10 +21,19 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects private methods that are never called within their class-like scope.
+ */
 final readonly class UnusedPrivateMethodRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unused private method findings.
+     */
     public const ID = 'dead-code.unused-private-method';
 
+    /**
+     * Magic methods excluded because PHP calls them through language hooks.
+     */
     private const MAGIC_METHODS = [
         '__construct', '__destruct', '__clone', '__toString', '__debugInfo',
         '__get', '__set', '__isset', '__unset', '__call', '__callStatic',

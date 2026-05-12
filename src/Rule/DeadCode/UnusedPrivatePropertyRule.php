@@ -22,8 +22,14 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects private properties that are never meaningfully read or written.
+ */
 final readonly class UnusedPrivatePropertyRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unused private property findings.
+     */
     public const ID = 'dead-code.unused-private-property';
 
     /**

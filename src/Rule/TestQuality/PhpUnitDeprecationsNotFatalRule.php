@@ -15,10 +15,19 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects PHPUnit configs where deprecations do not fail the suite.
+ */
 final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the PHPUnit deprecation-fail rule.
+     */
     public const ID = 'test-quality.phpunit-deprecations-not-fatal';
 
+    /**
+     * Config discovery collaborator cached for repeated project scans.
+     */
     private PhpUnitConfigDiscovery $discovery;
 
     /** @var array<string, true> */

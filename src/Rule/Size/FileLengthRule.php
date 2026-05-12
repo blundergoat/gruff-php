@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects source files that exceed the configured line threshold.
+ */
 final readonly class FileLengthRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for file length findings.
+     */
     public const ID = 'size.file-length';
 
     /**

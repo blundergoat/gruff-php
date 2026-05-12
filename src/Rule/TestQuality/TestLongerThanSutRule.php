@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects tests whose body outweighs the apparent production code under test.
+ */
 final readonly class TestLongerThanSutRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for test-to-SUT size imbalance findings.
+     */
     public const ID = 'test-quality.test-longer-than-sut';
 
     /**

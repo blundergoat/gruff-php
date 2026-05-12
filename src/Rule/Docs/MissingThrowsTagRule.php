@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects documented methods that throw without declaring an @throws contract.
+ */
 final readonly class MissingThrowsTagRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing @throws tag findings.
+     */
     public const ID = 'docs.missing-throws-tag';
 
     /**

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Mutation;
 
+/**
+ * Carries aggregate mutation metrics and mutant details from Infection.
+ */
 final readonly class InfectionReport
 {
     /**

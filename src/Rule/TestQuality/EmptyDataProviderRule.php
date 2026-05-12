@@ -20,8 +20,14 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects data providers that return no test cases.
+ */
 final readonly class EmptyDataProviderRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for empty data provider findings.
+     */
     public const ID = 'test-quality.empty-data-provider';
 
     /**

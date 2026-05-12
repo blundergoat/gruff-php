@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects return statements that lack an immediately preceding explanatory comment.
+ */
 final readonly class ReturnCommentRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing return comment findings.
+     */
     public const ID = 'docs.return-comment';
 
     /**

@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects function and method parameters that are never read from executable code.
+ */
 final readonly class UnusedParameterRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unused parameter findings.
+     */
     public const ID = 'waste.unused-parameter';
 
     /**

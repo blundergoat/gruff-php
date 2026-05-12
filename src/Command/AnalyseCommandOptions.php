@@ -12,6 +12,9 @@ use GruffPhp\Mutation\MutationAnalysisOptions;
 use GruffPhp\Reporting\FindingDisplayFilter;
 use Symfony\Component\Console\Input\InputInterface;
 
+/**
+ * Captures validated CLI options for an analyse run.
+ */
 final readonly class AnalyseCommandOptions
 {
     /**

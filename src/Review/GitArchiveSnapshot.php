@@ -8,6 +8,9 @@ use GruffPhp\Diff\DiffException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+/**
+ * Creates temporary git archive snapshots for branch review comparisons.
+ */
 final readonly class GitArchiveSnapshot
 {
     /**

@@ -24,10 +24,19 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\UnionType;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects class-typed parameters whose names do not match their type.
+ */
 final readonly class ParameterTypeNameRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the parameter type-name rule.
+     */
     public const ID = 'naming.parameter-type-name';
 
+    /**
+     * Native PHP type names excluded from class-name matching.
+     */
     private const BUILTIN_TYPES = [
         'array',
         'bool',

@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects weak cryptography primitives that should be replaced with modern alternatives.
+ */
 final class WeakCryptoRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for weak cryptography findings.
+     */
     public const ID = 'security.weak-crypto';
 
     /**

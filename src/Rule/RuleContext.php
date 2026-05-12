@@ -7,6 +7,9 @@ namespace GruffPhp\Rule;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\RuleSettings;
 
+/**
+ * Supplies project configuration and root path to rule execution.
+ */
 final readonly class RuleContext
 {
     /**

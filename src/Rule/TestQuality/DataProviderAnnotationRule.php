@@ -15,8 +15,14 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 
+/**
+ * Detects legacy data provider annotations that should use PHPUnit attributes.
+ */
 final readonly class DataProviderAnnotationRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for data provider annotation findings.
+     */
     public const ID = 'test-quality.data-provider-annotation';
 
     /**

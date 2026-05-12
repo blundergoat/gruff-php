@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Diff;
 
+/**
+ * Carries changed-line ranges grouped by display path.
+ */
 final readonly class DiffResult
 {
     /**

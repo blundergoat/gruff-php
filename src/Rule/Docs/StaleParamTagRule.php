@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects @param tags whose names no longer match the callable signature.
+ */
 final readonly class StaleParamTagRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for stale @param tag findings.
+     */
     public const ID = 'docs.stale-param-tag';
 
     /**

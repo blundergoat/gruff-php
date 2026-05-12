@@ -7,6 +7,9 @@ namespace GruffPhp\Reporting;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Finding\Finding;
 
+/**
+ * Renders findings as GitHub Actions annotation commands.
+ */
 final readonly class GithubAnnotationsReporter
 {
     /**

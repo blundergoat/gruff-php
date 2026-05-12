@@ -6,6 +6,9 @@ namespace GruffPhp\Mutation;
 
 use GruffPhp\Analysis\RunDiagnostic;
 
+/**
+ * Captures the process result and report path from an Infection run.
+ */
 final readonly class InfectionRunResult
 {
     /**

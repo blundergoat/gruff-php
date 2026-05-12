@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects unserialize calls that can hydrate attacker-controlled payloads.
+ */
 final class UnsafeUnserializeRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unsafe unserialize findings.
+     */
     public const ID = 'security.unsafe-unserialize';
 
     /**

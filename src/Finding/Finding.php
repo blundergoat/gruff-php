@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Finding;
 
+/**
+ * Represents one analyzer finding with reporting and fingerprint metadata.
+ */
 final readonly class Finding
 {
     /**

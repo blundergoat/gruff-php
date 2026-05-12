@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects tests with enough mocks to hide the behavior under test.
+ */
 final readonly class ExcessiveMockingRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for excessive mocking findings.
+     */
     public const ID = 'test-quality.excessive-mocking';
 
     /**

@@ -17,8 +17,14 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects constant-only classes that could be represented as enums.
+ */
 final readonly class EnumCandidateRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for enum candidate findings.
+     */
     public const ID = 'modernisation.enum-candidate';
 
     /**

@@ -8,6 +8,9 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Source\SourceDiscoveryResult;
 
+/**
+ * Carries parsed analysis units, diagnostics, and discovery metadata.
+ */
 final readonly class AnalysisSourceSet
 {
     /**

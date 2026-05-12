@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects import statements whose alias is not referenced outside the import list.
+ */
 final readonly class UnusedImportRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unused import findings.
+     */
     public const ID = 'waste.unused-import';
 
     /**

@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects high-entropy string literals that may be embedded secrets.
+ */
 final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for high-entropy string findings.
+     */
     public const ID = 'sensitive-data.high-entropy-string';
 
     /**

@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects single-type files whose class-like name does not match the file name.
+ */
 final readonly class ClassFileMismatchRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for class/file mismatch findings.
+     */
     public const ID = 'naming.class-file-mismatch';
 
     /**

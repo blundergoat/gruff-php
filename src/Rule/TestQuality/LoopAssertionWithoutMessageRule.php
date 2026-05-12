@@ -20,8 +20,14 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects assertions inside loops that lack a failing-case message.
+ */
 final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for loop assertion message findings.
+     */
     public const ID = 'test-quality.loop-assertion-without-message';
 
     /**

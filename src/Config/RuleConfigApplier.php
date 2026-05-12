@@ -7,6 +7,9 @@ namespace GruffPhp\Config;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\RuleRegistry;
 
+/**
+ * Applies parsed rule configuration entries to the effective analysis config.
+ */
 final readonly class RuleConfigApplier
 {
     /**

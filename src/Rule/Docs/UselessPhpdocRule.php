@@ -19,8 +19,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects PHPDoc blocks that add tags without useful descriptive context.
+ */
 final readonly class UselessPhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for useless PHPDoc findings.
+     */
     public const ID = 'docs.useless-phpdoc';
 
     /**

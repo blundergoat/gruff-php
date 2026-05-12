@@ -22,8 +22,14 @@ use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects types whose methods are long on average, even if no single method dominates.
+ */
 final readonly class AverageMethodLengthRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for average method length findings.
+     */
     public const ID = 'size.average-method-length';
 
     /**

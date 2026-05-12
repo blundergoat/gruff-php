@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects string literals that match JWT token structure.
+ */
 final readonly class JwtTokenRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for JWT token findings.
+     */
     public const ID = 'sensitive-data.jwt-token';
 
     /**

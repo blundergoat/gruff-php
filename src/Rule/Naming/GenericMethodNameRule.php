@@ -21,10 +21,19 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects function and method names that are too generic.
+ */
 final readonly class GenericMethodNameRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the generic method name rule.
+     */
     public const ID = 'naming.generic-method';
 
+    /**
+     * Callable names that usually need stronger domain context.
+     */
     private const GENERIC_NAMES = [
         'process', 'handle', 'execute', 'run', 'manage', 'doIt', 'do',
         'perform', 'make', 'compute',

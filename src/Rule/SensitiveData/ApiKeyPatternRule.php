@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects common API key assignment patterns in source text.
+ */
 final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for API key pattern findings.
+     */
     public const ID = 'sensitive-data.api-key-pattern';
 
     /**

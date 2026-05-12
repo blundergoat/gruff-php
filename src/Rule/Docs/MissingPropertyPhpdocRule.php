@@ -23,8 +23,14 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects declared and promoted properties that lack usable documentation.
+ */
 final readonly class MissingPropertyPhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing property PHPDoc findings.
+     */
     public const ID = 'docs.missing-property-phpdoc';
 
     /**

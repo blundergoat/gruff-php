@@ -15,8 +15,14 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Token;
 
+/**
+ * Detects regular comments that look like disabled PHP code.
+ */
 final readonly class CommentedOutCodeRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for commented-out code findings.
+     */
     public const ID = 'waste.commented-out-code';
 
     /**

@@ -11,8 +11,14 @@ use GruffPhp\Command\ReportCommand;
 use GruffPhp\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
+/**
+ * Registers the gruff CLI commands with Symfony Console.
+ */
 final class Application extends SymfonyApplication
 {
+    /**
+     * Development version displayed by the CLI.
+     */
     public const VERSION = '0.1.0-dev';
 
     /**

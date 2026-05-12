@@ -8,6 +8,9 @@ use GruffPhp\Source\SourceFile;
 use PhpParser\Node\Stmt;
 use PhpParser\Token;
 
+/**
+ * Carries a parsed source file, AST statements, tokens, and parse diagnostics.
+ */
 final readonly class AnalysisUnit
 {
     /**

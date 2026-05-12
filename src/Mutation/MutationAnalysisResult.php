@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Mutation;
 
+/**
+ * Carries mutation metrics attached to an analysis report.
+ */
 final readonly class MutationAnalysisResult
 {
     /**

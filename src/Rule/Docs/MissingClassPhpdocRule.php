@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects class-like declarations that are missing structural PHPDoc.
+ */
 final readonly class MissingClassPhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing class PHPDoc findings.
+     */
     public const ID = 'docs.missing-class-phpdoc';
 
     /**

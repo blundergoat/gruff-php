@@ -15,6 +15,9 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Provides shared AST helpers for test-quality rules.
+ */
 final class TestQualityNodeHelper
 {
     /** @var \WeakMap<AnalysisUnit, list<TestQualityScope>>|null */

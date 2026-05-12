@@ -21,10 +21,19 @@ use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects trivial wrapper methods that only delegate a one-line call.
+ */
 final readonly class OneLineMethodRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the one-line method rule.
+     */
     public const ID = 'waste.one-line-method';
 
+    /**
+     * Magic and lifecycle methods ignored even when they are one-line wrappers.
+     */
     private const SKIPPED_METHODS = [
         '__construct',
         '__destruct',

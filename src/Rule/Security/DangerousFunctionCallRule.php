@@ -23,8 +23,14 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects calls to execution and evaluation functions with high security risk.
+ */
 final class DangerousFunctionCallRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for dangerous function call findings.
+     */
     public const ID = 'security.dangerous-function-call';
 
     /**

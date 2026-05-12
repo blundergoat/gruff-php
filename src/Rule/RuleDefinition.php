@@ -10,6 +10,9 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use InvalidArgumentException;
 
+/**
+ * Describes rule metadata, defaults, thresholds, and reporting text.
+ */
 final readonly class RuleDefinition
 {
     /**

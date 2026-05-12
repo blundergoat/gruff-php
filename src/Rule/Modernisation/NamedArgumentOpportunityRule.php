@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects calls whose repeated scalar arguments would be clearer as named arguments.
+ */
 final readonly class NamedArgumentOpportunityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for named argument opportunity findings.
+     */
     public const ID = 'modernisation.named-argument-opportunity';
 
     /**

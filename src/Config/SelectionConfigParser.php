@@ -8,6 +8,9 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Rule\RuleRegistry;
 
+/**
+ * Parses rule selection configuration into include and exclude filters.
+ */
 final readonly class SelectionConfigParser
 {
     /**

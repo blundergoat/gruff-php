@@ -6,6 +6,9 @@ namespace GruffPhp\Rule\Docs;
 
 use GruffPhp\Parser\AnalysisUnit;
 
+/**
+ * Checks whether a regular line comment appears directly above a statement.
+ */
 final readonly class DirectLineComment
 {
     /**

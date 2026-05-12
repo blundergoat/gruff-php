@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+/**
+ * Normalises scalar and list configuration values into validated string lists.
+ */
 final readonly class StringListConfigParser
 {
     /**

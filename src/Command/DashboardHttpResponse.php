@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+/**
+ * Carries status, headers, and body for dashboard HTTP replies.
+ */
 final readonly class DashboardHttpResponse
 {
     /**

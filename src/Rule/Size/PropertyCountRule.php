@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects types with enough properties to suggest broad state ownership.
+ */
 final readonly class PropertyCountRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for property count findings.
+     */
     public const ID = 'size.property-count';
 
     /**

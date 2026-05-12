@@ -9,6 +9,9 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
 use JsonException;
 
+/**
+ * Renders analysis reports in SARIF format.
+ */
 final readonly class SarifReporter
 {
     /**

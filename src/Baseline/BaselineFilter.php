@@ -6,6 +6,9 @@ namespace GruffPhp\Baseline;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Filters live findings against baseline entries and optional diff scope.
+ */
 final readonly class BaselineFilter
 {
     /**

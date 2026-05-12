@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+/**
+ * Carries score and finding totals for one source file.
+ */
 final readonly class FileScore
 {
     /**

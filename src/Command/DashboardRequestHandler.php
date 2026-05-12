@@ -4,10 +4,24 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+/**
+ * Parses and routes one dashboard HTTP request.
+ */
 final readonly class DashboardRequestHandler
 {
+    /**
+     * Maximum bytes allowed in the HTTP request line.
+     */
     private const MAX_REQUEST_LINE_BYTES = 8192;
+
+    /**
+     * Maximum number of HTTP header lines accepted per request.
+     */
     private const MAX_HEADER_LINES = 100;
+
+    /**
+     * Maximum total header bytes accepted per request.
+     */
     private const MAX_HEADER_BYTES = 16384;
 
     /**

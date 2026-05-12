@@ -15,8 +15,14 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Token;
 
+/**
+ * Detects files where TODO and FIXME comments exceed the configured density.
+ */
 final readonly class TodoDensityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for TODO density findings.
+     */
     public const ID = 'docs.todo-density';
 
     /**

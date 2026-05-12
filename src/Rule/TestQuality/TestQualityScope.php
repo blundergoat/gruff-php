@@ -7,6 +7,9 @@ namespace GruffPhp\Rule\TestQuality;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
+/**
+ * Represents one test method scope discovered in an analysis unit.
+ */
 final readonly class TestQualityScope
 {
     /**

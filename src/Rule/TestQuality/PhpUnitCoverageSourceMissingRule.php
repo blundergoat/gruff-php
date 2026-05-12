@@ -15,10 +15,19 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects PHPUnit configs without explicit coverage source paths.
+ */
 final class PhpUnitCoverageSourceMissingRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the PHPUnit coverage-source rule.
+     */
     public const ID = 'test-quality.phpunit-coverage-source-missing';
 
+    /**
+     * Config discovery collaborator cached for repeated project scans.
+     */
     private PhpUnitConfigDiscovery $discovery;
 
     /** @var array<string, true> */

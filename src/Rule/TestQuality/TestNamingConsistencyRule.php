@@ -16,10 +16,19 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects inconsistent or weakly descriptive PHPUnit test names.
+ */
 final readonly class TestNamingConsistencyRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the test naming consistency rule.
+     */
     public const ID = 'test-quality.naming-consistency';
 
+    /**
+     * Default patterns that identify low-signal test names.
+     */
     private const DEFAULT_POOR_NAME_PATTERNS = [
         '/^test[A-Z][A-Za-z]*(?:Works|Basic|Simple|Test)$/',
         '/^test[A-Z][A-Za-z]*\d+$/',

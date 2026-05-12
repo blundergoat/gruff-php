@@ -17,8 +17,14 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects test classes that mix camelCase and snake_case test method names.
+ */
 final readonly class TestNamingConsistencyRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for inconsistent test naming findings.
+     */
     public const ID = 'naming.test-naming-consistency';
 
     /**

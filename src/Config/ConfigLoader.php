@@ -8,8 +8,14 @@ use GruffPhp\Rule\RuleRegistry;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Resolves and applies gruff YAML configuration files.
+ */
 final readonly class ConfigLoader
 {
+    /**
+     * Default config file name discovered from project roots.
+     */
     public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
 
     /**

@@ -14,8 +14,14 @@ use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Trend\TrendReport;
 
+/**
+ * Carries the full analysis result used by every reporter format.
+ */
 final readonly class AnalysisReport
 {
+    /**
+     * Stable schema identifier emitted in machine-readable reports.
+     */
     public const SCHEMA_VERSION = 'gruff.analysis.v1';
 
     /**

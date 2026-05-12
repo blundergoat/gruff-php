@@ -14,10 +14,19 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects assertions that compare against unexplained numeric literals.
+ */
 final readonly class MagicNumberAssertionRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the magic number assertion rule.
+     */
     public const ID = 'test-quality.magic-number-assertion';
 
+    /**
+     * Numeric literals considered self-explanatory in common assertions.
+     */
     private const DEFAULT_ALLOWED_LITERALS = [
         // HTTP status codes (commonly asserted in CLI/API tests, well-understood by readers).
         200, 201, 202, 204, 301, 302, 303, 304, 307, 308,

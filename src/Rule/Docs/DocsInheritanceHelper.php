@@ -12,6 +12,9 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\NodeFinder;
 
+/**
+ * Resolves inherited method documentation contracts for docs rules.
+ */
 final readonly class DocsInheritanceHelper
 {
     /**

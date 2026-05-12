@@ -19,8 +19,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects documented methods that omit an explicit @return contract.
+ */
 final readonly class MissingReturnTagRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing @return tag findings.
+     */
     public const ID = 'docs.missing-return-tag';
 
     /**

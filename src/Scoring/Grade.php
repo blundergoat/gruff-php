@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+/**
+ * Converts numeric scores into letter grades for reports.
+ */
 final readonly class Grade
 {
     /**

@@ -7,6 +7,9 @@ namespace GruffPhp\Config;
 use GruffPhp\Finding\Severity;
 use LogicException;
 
+/**
+ * Holds per-rule enablement, thresholds, and option values.
+ */
 final readonly class RuleSettings
 {
     /**

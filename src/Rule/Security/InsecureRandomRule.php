@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects random sources that are unsuitable for security-sensitive decisions.
+ */
 final class InsecureRandomRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for insecure random findings.
+     */
     public const ID = 'security.insecure-random';
 
     /**

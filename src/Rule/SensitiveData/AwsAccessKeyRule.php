@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects string literals shaped like AWS access keys.
+ */
 final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for AWS access key findings.
+     */
     public const ID = 'sensitive-data.aws-access-key';
 
     /**

@@ -6,6 +6,9 @@ namespace GruffPhp\Config;
 
 use GruffPhp\Rule\RuleDefinition;
 
+/**
+ * Represents include and exclude filters for rule execution.
+ */
 final readonly class RuleSelection
 {
     /**

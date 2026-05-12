@@ -7,6 +7,9 @@ namespace GruffPhp\Reporting;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Finding\Finding;
 
+/**
+ * Renders analysis reports as Markdown.
+ */
 final readonly class MarkdownReporter
 {
     /**

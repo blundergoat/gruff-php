@@ -44,6 +44,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Implements the primary gruff analyse CLI command.
+ */
 final class AnalyseCommand extends Command
 {
     /**

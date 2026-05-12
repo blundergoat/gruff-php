@@ -18,10 +18,19 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects test names that imply a subject call absent from the body.
+ */
 final readonly class SutNotCalledRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the SUT-not-called rule.
+     */
     public const ID = 'test-quality.sut-not-called';
 
+    /**
+     * Subprocess APIs that can hide subject execution from static call matching.
+     */
     private const SUBPROCESS_FUNCTIONS = ['shell_exec', 'proc_open', 'popen', 'passthru', 'system', 'exec'];
 
     /**

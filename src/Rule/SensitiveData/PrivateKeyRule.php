@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects source text that appears to contain private key material.
+ */
 final readonly class PrivateKeyRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for private key findings.
+     */
     public const ID = 'sensitive-data.private-key';
 
     /**

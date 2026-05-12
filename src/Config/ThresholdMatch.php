@@ -6,6 +6,9 @@ namespace GruffPhp\Config;
 
 use GruffPhp\Finding\Severity;
 
+/**
+ * Records the severity threshold matched by a measured rule value.
+ */
 final readonly class ThresholdMatch
 {
     /**

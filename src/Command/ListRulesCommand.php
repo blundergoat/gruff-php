@@ -13,6 +13,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Prints configured rule metadata for humans or tooling.
+ */
 final class ListRulesCommand extends Command
 {
     /**

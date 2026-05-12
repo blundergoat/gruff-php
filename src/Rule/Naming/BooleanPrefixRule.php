@@ -21,10 +21,19 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects bool-returning callables without boolean-style names.
+ */
 final readonly class BooleanPrefixRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the boolean prefix rule.
+     */
     public const ID = 'naming.boolean-prefix';
 
+    /**
+     * Prefixes that make boolean-returning callables read as predicates.
+     */
     private const GOOD_PREFIXES = [
         'is', 'has', 'can', 'should', 'will', 'was', 'does', 'allows',
         'all', 'contains', 'extends', 'invokes', 'matches', 'refers', 'returns',

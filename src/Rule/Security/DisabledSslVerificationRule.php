@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects HTTP client options that disable SSL certificate verification.
+ */
 final class DisabledSslVerificationRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for disabled SSL verification findings.
+     */
     public const ID = 'security.disabled-ssl-verification';
 
     /**

@@ -17,8 +17,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects method declarations that are missing local PHPDoc.
+ */
 final readonly class MissingPublicPhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing method PHPDoc findings.
+     */
     public const ID = 'docs.missing-public-phpdoc';
 
     /**

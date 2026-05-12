@@ -15,8 +15,14 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
+/**
+ * Detects TestDox names that are too hard to read as behavior descriptions.
+ */
 final readonly class TestdoxReadabilityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for TestDox readability findings.
+     */
     public const ID = 'test-quality.testdox-readability';
 
     /**

@@ -15,11 +15,24 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 
+/**
+ * Detects tests that assert exception type without checking its details.
+ */
 final readonly class ExceptionTypeOnlyRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the exception type-only rule.
+     */
     public const ID = 'test-quality.exception-type-only';
 
+    /**
+     * Expectation methods that assert only the exception type.
+     */
     private const TYPE_ONLY_METHODS = ['expectexception', 'expectexceptiontype'];
+
+    /**
+     * Expectation methods that add message, code, or object checks.
+     */
     private const SUPPLEMENTARY_METHODS = [
         'expectexceptionmessage',
         'expectexceptionmessagematches',

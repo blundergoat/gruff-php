@@ -20,10 +20,19 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects variable names that encode type prefixes.
+ */
 final readonly class HungarianNotationRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the Hungarian notation rule.
+     */
     public const ID = 'naming.hungarian-notation';
 
+    /**
+     * Type prefixes considered Hungarian notation in variable names.
+     */
     private const PREFIXES = ['str', 'int', 'float', 'bool', 'arr', 'obj', 'fn', 'cls'];
 
     /**

@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects loop constructs in tests that obscure individual cases.
+ */
 final readonly class LoopInTestRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for loop-in-test findings.
+     */
     public const ID = 'test-quality.loop-in-test';
 
     /**

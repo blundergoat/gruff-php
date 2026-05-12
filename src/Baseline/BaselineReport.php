@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 namespace GruffPhp\Baseline;
 
+/**
+ * Summarizes how a baseline affected an analysis run.
+ */
 final readonly class BaselineReport
 {
+    /**
+     * Baseline source selected explicitly by the user.
+     */
     public const SOURCE_EXPLICIT = 'explicit';
+
+    /**
+     * Baseline source discovered from the default project location.
+     */
     public const SOURCE_DEFAULT = 'default';
 
     /**

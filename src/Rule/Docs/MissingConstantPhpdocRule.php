@@ -22,8 +22,14 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects class constants and enum cases that lack local PHPDoc.
+ */
 final readonly class MissingConstantPhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing constant PHPDoc findings.
+     */
     public const ID = 'docs.missing-constant-phpdoc';
 
     /**

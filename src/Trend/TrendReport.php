@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Trend;
 
+/**
+ * Carries score and finding-count deltas for a trend snapshot.
+ */
 final readonly class TrendReport
 {
     /**

@@ -8,6 +8,9 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
+/**
+ * Runs dashboard scans and converts scan output into HTML.
+ */
 final readonly class DashboardScanRunner
 {
     /**

@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects callables whose parameter lists exceed the configured size threshold.
+ */
 final readonly class ParameterCountRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for parameter count findings.
+     */
     public const ID = 'size.parameter-count';
 
     /**

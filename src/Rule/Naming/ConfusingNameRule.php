@@ -16,10 +16,19 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects standalone class names that hide responsibility.
+ */
 final readonly class ConfusingNameRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the confusing name rule.
+     */
     public const ID = 'naming.confusing-name';
 
+    /**
+     * Class names that are too vague when used alone.
+     */
     private const CONFUSING_STANDALONE = [
         'Data', 'Info', 'Manager', 'Handler', 'Helper', 'Util', 'Utils',
         'Service', 'Processor', 'Base', 'Common', 'Misc',

@@ -18,10 +18,19 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that access private members through reflection.
+ */
 final readonly class PrivateReflectionRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the private reflection rule.
+     */
     public const ID = 'test-quality.private-reflection';
 
+    /**
+     * Reflection classes that can expose private implementation details.
+     */
     private const REFLECTION_CLASSES = ['reflectionmethod', 'reflectionclass', 'reflectionproperty'];
 
     /**

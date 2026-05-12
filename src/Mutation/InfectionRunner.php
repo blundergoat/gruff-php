@@ -8,6 +8,9 @@ use GruffPhp\Analysis\RunDiagnostic;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
+/**
+ * Runs Infection with gruff's configured mutation-analysis arguments.
+ */
 final readonly class InfectionRunner
 {
     /**

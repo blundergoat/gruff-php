@@ -6,6 +6,9 @@ namespace GruffPhp\Config;
 
 use RuntimeException;
 
+/**
+ * Signals invalid analyzer configuration data.
+ */
 final class ConfigException extends RuntimeException
 {
 }

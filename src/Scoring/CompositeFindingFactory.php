@@ -10,6 +10,9 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 
+/**
+ * Builds composite findings from scoring signals.
+ */
 final readonly class CompositeFindingFactory
 {
     /**

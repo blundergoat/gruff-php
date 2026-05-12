@@ -7,6 +7,9 @@ namespace GruffPhp\Mutation;
 use GruffPhp\Analysis\RunDiagnostic;
 use Symfony\Component\Console\Command\Command;
 
+/**
+ * Builds mutation analysis results from Infection execution and reports.
+ */
 final readonly class MutationAnalysisBuilder
 {
     /**

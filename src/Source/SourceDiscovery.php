@@ -10,8 +10,14 @@ use RecursiveIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
+/**
+ * Discovers project files for analysis while applying built-in and configured ignores.
+ */
 final readonly class SourceDiscovery
 {
+    /**
+     * File extension treated as PHP source.
+     */
     private const PHP_EXTENSION = 'php';
 
     /** @var list<string> */

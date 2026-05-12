@@ -20,8 +20,14 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects temporary variables that only hold a value immediately returned by the same block.
+ */
 final readonly class RedundantVariableRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for redundant variable findings.
+     */
     public const ID = 'waste.redundant-variable';
 
     /**

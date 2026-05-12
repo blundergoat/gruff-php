@@ -6,6 +6,9 @@ namespace GruffPhp\Diff;
 
 use RuntimeException;
 
+/**
+ * Signals git diff lookup failures.
+ */
 final class DiffException extends RuntimeException
 {
 }

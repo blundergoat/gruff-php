@@ -9,6 +9,9 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Mutation\MutationAnalysisResult;
 
+/**
+ * Renders human-readable analysis output for the terminal.
+ */
 final readonly class TextReporter
 {
     /**

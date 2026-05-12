@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects public mutable properties that expose object state directly.
+ */
 final readonly class PublicPropertyRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for public property findings.
+     */
     public const ID = 'modernisation.public-property';
 
     /**

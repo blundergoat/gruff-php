@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Mutation;
 
+/**
+ * Carries command-line and configuration options for mutation analysis.
+ */
 final readonly class MutationAnalysisOptions
 {
     /**

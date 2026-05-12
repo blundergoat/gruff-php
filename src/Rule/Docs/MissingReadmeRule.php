@@ -14,13 +14,22 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects projects without a root README file.
+ */
 final class MissingReadmeRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the missing README rule.
+     */
     public const ID = 'docs.missing-readme';
 
     /** @var array<string, bool> */
     private array $readmePresenceByRoot = [];
 
+    /**
+     * Tracks whether the project-level finding has already been emitted.
+     */
     private bool $emitted = false;
 
     /**

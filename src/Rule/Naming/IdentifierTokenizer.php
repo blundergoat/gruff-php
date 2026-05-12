@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Naming;
 
+/**
+ * Splits identifiers into normalised word tokens for naming rules.
+ */
 final readonly class IdentifierTokenizer
 {
     /**

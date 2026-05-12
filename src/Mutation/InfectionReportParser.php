@@ -6,6 +6,9 @@ namespace GruffPhp\Mutation;
 
 use JsonException;
 
+/**
+ * Parses Infection JSON reports into gruff mutation report objects.
+ */
 final readonly class InfectionReportParser
 {
     /**

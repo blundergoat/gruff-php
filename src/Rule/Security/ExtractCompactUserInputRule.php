@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects extract and compact calls on request-shaped input data.
+ */
 final class ExtractCompactUserInputRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for request variable-table findings.
+     */
     public const ID = 'security.extract-compact-user-input';
 
     /**

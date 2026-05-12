@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+/**
+ * Renders dashboard HTML and embeds scan metadata.
+ */
 final readonly class DashboardPageRenderer
 {
     /**

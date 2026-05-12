@@ -10,6 +10,9 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 
+/**
+ * Converts mutation-analysis results into gruff findings.
+ */
 final readonly class MutationFindingFactory
 {
     /**

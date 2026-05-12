@@ -6,6 +6,9 @@ namespace GruffPhp\Project;
 
 use SimpleXMLElement;
 
+/**
+ * Carries the parsed PHPUnit configuration file and its source path.
+ */
 final readonly class PhpUnitConfig
 {
     /**

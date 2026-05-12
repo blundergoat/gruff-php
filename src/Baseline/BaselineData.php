@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Baseline;
 
+/**
+ * Stores baseline entries and lookup indexes loaded from disk.
+ */
 final readonly class BaselineData
 {
     /**

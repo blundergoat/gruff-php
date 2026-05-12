@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that repeat arrange-act-assert cycles in one method.
+ */
 final readonly class MultipleAaaCyclesRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for repeated AAA cycle findings.
+     */
     public const ID = 'test-quality.multiple-aaa-cycles';
 
     /**

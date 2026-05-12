@@ -8,6 +8,9 @@ use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Scoring\ScoreReport;
 use RuntimeException;
 
+/**
+ * Records score and finding-count snapshots for trend reporting.
+ */
 final readonly class TrendRecorder
 {
     /**

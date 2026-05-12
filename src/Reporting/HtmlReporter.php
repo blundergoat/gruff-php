@@ -10,6 +10,9 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Scoring\FileScore;
 use GruffPhp\Scoring\PillarScore;
 
+/**
+ * Builds the interactive HTML inspection report.
+ */
 final readonly class HtmlReporter
 {
     /**

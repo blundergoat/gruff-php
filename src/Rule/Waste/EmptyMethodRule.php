@@ -19,8 +19,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects empty method and function bodies that do not communicate useful intent.
+ */
 final readonly class EmptyMethodRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for empty method findings.
+     */
     public const ID = 'waste.empty-method';
 
     /**

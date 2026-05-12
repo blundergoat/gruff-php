@@ -6,6 +6,9 @@ namespace GruffPhp\Diff;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Filters findings to those that overlap changed lines.
+ */
 final readonly class DiffFindingFilter
 {
     /**

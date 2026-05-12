@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects error suppression operators that hide runtime failures.
+ */
 final class ErrorSuppressionRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for error suppression findings.
+     */
     public const ID = 'security.error-suppression';
 
     /**

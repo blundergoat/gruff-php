@@ -7,6 +7,9 @@ namespace GruffPhp\Reporting;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Scoring\FileScore;
 
+/**
+ * Renders file and rule hotspots from an analysis report.
+ */
 final readonly class HotspotReporter
 {
     /**

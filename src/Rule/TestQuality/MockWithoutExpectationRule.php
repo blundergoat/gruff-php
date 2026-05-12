@@ -17,11 +17,24 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects mock objects that are used without verification expectations.
+ */
 final readonly class MockWithoutExpectationRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the mock-without-expectation rule.
+     */
     public const ID = 'test-quality.mock-without-expectation';
 
+    /**
+     * Method names that prove a mock has an explicit expectation.
+     */
     private const VERIFICATION_METHODS = ['expects', 'shouldreceive', 'shouldhavebeencalled', 'shouldnotreceive'];
+
+    /**
+     * Stub-only method names that do not prove behavior was verified.
+     */
     private const STUB_METHODS = ['willreturn', 'willreturnmap', 'willreturncallback', 'willreturnonconsecutivecalls', 'willreturnself', 'willthrowexception', 'andreturn'];
 
     /**

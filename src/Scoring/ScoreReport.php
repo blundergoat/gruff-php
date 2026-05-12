@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+/**
+ * Carries composite, pillar, file, and distribution scoring output.
+ */
 final readonly class ScoreReport
 {
     /**

@@ -6,8 +6,14 @@ namespace GruffPhp\Project;
 
 use SimpleXMLElement;
 
+/**
+ * Locates and parses PHPUnit configuration files for test-quality rules.
+ */
 final class PhpUnitConfigDiscovery
 {
+    /**
+     * Supported PHPUnit configuration file names in discovery order.
+     */
     private const CANDIDATES = ['phpunit.xml', 'phpunit.xml.dist', 'phpunit.dist.xml'];
 
     /** @var array<string, ?PhpUnitConfig> */

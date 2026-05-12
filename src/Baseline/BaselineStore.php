@@ -7,9 +7,19 @@ namespace GruffPhp\Baseline;
 use GruffPhp\Finding\Finding;
 use JsonException;
 
+/**
+ * Reads and writes gruff baseline files relative to a project root.
+ */
 final readonly class BaselineStore
 {
+    /**
+     * Schema identifier required in persisted baseline files.
+     */
     public const SCHEMA_VERSION = 'gruff.baseline.v1';
+
+    /**
+     * Conventional baseline file name discovered in project roots.
+     */
     public const DEFAULT_FILENAME = 'gruff-baseline.json';
 
     /**

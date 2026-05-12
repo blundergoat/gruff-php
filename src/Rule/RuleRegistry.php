@@ -121,6 +121,9 @@ use GruffPhp\Rule\Size\PropertyCountRule;
 use GruffPhp\Rule\Size\PublicMethodCountRule;
 use InvalidArgumentException;
 
+/**
+ * Stores available rules and dispatches enabled rule analysis.
+ */
 final class RuleRegistry
 {
     /** @var array<string, RuleInterface|ProjectRuleInterface> */

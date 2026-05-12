@@ -6,6 +6,9 @@ namespace GruffPhp\Review;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Compares current findings against a base-branch analysis snapshot.
+ */
 final readonly class BranchReviewComparator
 {
     /**

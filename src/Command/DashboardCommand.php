@@ -10,9 +10,19 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Serves the local browser dashboard for interactive analysis.
+ */
 final class DashboardCommand extends Command
 {
+    /**
+     * Default dashboard bind host for local-only access.
+     */
     private const DEFAULT_HOST = '127.0.0.1';
+
+    /**
+     * Default dashboard port used when no port option is supplied.
+     */
     private const DEFAULT_PORT = 8765;
 
     /**

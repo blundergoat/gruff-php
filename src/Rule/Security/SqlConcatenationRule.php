@@ -18,8 +18,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Identifier;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects SQL-like strings assembled through concatenation.
+ */
 final class SqlConcatenationRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for SQL concatenation findings.
+     */
     public const ID = 'security.sql-concatenation';
 
     /**

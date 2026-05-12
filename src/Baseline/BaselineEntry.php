@@ -6,6 +6,9 @@ namespace GruffPhp\Baseline;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Represents one persisted baseline fingerprint and its source metadata.
+ */
 final readonly class BaselineEntry
 {
     /**

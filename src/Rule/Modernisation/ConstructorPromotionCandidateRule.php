@@ -18,8 +18,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects constructor assignments that could use property promotion.
+ */
 final readonly class ConstructorPromotionCandidateRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for constructor promotion candidate findings.
+     */
     public const ID = 'modernisation.constructor-promotion-candidate';
 
     /**

@@ -6,6 +6,9 @@ namespace GruffPhp\Config;
 
 use GruffPhp\Finding\Severity;
 
+/**
+ * Couples a severity with the numeric threshold that activates it.
+ */
 final readonly class SeverityThreshold
 {
     /**

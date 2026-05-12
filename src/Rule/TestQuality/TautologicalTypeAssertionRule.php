@@ -18,8 +18,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects type assertions that restate guarantees already made by the subject.
+ */
 final readonly class TautologicalTypeAssertionRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for tautological type assertion findings.
+     */
     public const ID = 'test-quality.tautological-type-assertion';
 
     /**

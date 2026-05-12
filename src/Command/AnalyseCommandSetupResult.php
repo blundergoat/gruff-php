@@ -8,6 +8,9 @@ use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Reporting\OutputFormat;
 use Symfony\Component\Console\Command\Command;
 
+/**
+ * Represents either ready analysis setup or an early command error.
+ */
 final readonly class AnalyseCommandSetupResult
 {
     /**

@@ -8,6 +8,9 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Finding;
 
+/**
+ * Applies baseline suppression to findings and returns the filtered report data.
+ */
 final readonly class BaselineApplication
 {
     /**

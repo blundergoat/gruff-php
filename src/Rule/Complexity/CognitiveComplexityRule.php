@@ -22,8 +22,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures how hard function-like control flow is to understand.
+ */
 final readonly class CognitiveComplexityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for cognitive complexity findings.
+     */
     public const ID = 'complexity.cognitive';
 
     /**

@@ -6,6 +6,9 @@ namespace GruffPhp\Diff;
 
 use Symfony\Component\Process\Process;
 
+/**
+ * Reads git diff output and converts it into changed-line ranges.
+ */
 final readonly class GitDiffProvider
 {
     /**

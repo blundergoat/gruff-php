@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Analysis;
 
+/**
+ * Represents a diagnostic emitted while preparing or parsing an analysis run.
+ */
 final readonly class RunDiagnostic
 {
     /**

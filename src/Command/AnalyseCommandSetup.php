@@ -9,6 +9,9 @@ use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Rule\RuleRegistry;
 
+/**
+ * Carries resolved dependencies and options needed to execute analysis.
+ */
 final readonly class AnalyseCommandSetup
 {
     /**

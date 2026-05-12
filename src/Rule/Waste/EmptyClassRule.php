@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects concrete classes that declare no members and are not marker exceptions.
+ */
 final readonly class EmptyClassRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for empty class findings.
+     */
     public const ID = 'waste.empty-class';
 
     /**

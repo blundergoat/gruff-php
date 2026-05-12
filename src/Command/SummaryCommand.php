@@ -21,10 +21,19 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Renders a compact project quality summary from one analysis run.
+ */
 final class SummaryCommand extends Command
 {
+    /**
+     * Schema identifier for machine-readable summary output.
+     */
     public const SCHEMA_VERSION = 'gruff.summary.v1';
 
+    /**
+     * Default number of top rules and offenders shown in summaries.
+     */
     private const DEFAULT_TOP = 10;
 
     /**

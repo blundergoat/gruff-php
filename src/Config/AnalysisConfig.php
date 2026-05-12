@@ -7,8 +7,14 @@ namespace GruffPhp\Config;
 use GruffPhp\Rule\RuleRegistry;
 use InvalidArgumentException;
 
+/**
+ * Holds the effective analyzer configuration after defaults and file settings are merged.
+ */
 final readonly class AnalysisConfig
 {
+    /**
+     * Default PHP version floor for version-sensitive rules.
+     */
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
     /**

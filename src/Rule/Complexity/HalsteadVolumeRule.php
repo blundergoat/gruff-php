@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures function-like information density with Halstead metrics.
+ */
 final readonly class HalsteadVolumeRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for Halstead volume findings.
+     */
     public const ID = 'complexity.halstead-volume';
 
     /**

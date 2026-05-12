@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects dynamic header values that may allow response splitting.
+ */
 final class HeaderInjectionRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for header injection findings.
+     */
     public const ID = 'security.header-injection';
 
     /**

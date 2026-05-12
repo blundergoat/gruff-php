@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects tests that exercise mock configuration instead of production behavior.
+ */
 final readonly class MockOnlyTestRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for mock-only test findings.
+     */
     public const ID = 'test-quality.mock-only-test';
 
     /**

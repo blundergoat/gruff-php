@@ -11,6 +11,9 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 
+/**
+ * Provides shared string and finding helpers for sensitive-data scanners.
+ */
 final class SecretScannerHelper
 {
     /**

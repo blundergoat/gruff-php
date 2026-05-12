@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects signatures that rely on mixed where narrower types would improve contracts.
+ */
 final readonly class MixedTypeOveruseRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for mixed type overuse findings.
+     */
     public const ID = 'modernisation.mixed-type-overuse';
 
     /**

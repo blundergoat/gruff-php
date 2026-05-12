@@ -6,6 +6,9 @@ namespace GruffPhp\Command;
 
 use Symfony\Component\Console\Input\InputInterface;
 
+/**
+ * Carries immutable dashboard server paths and command helpers for a request.
+ */
 final readonly class DashboardRequestContext
 {
     /**

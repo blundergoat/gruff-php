@@ -6,6 +6,9 @@ namespace GruffPhp\Review;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Carries introduced, resolved, and existing findings for branch review.
+ */
 final readonly class BranchReviewResult
 {
     /**

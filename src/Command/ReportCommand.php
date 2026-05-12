@@ -12,6 +12,9 @@ use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
 
+/**
+ * Implements the gruff report CLI command for saved analysis output.
+ */
 final class ReportCommand extends Command
 {
     /**

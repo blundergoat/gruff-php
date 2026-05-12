@@ -7,6 +7,9 @@ namespace GruffPhp\Rule;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 
+/**
+ * Defines the contract for rules that analyse one parsed file at a time.
+ */
 interface RuleInterface
 {
     /**

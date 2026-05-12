@@ -7,6 +7,9 @@ namespace GruffPhp\Command;
 use GruffPhp\Config\ConfigLoader;
 use Symfony\Component\Console\Input\InputInterface;
 
+/**
+ * Builds dashboard query state from console input and request parameters.
+ */
 final class DashboardStateFactory
 {
     /**

@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects method and function bodies that exceed the configured line threshold.
+ */
 final readonly class MethodLengthRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for method length findings.
+     */
     public const ID = 'size.method-length';
 
     /**

@@ -6,6 +6,9 @@ namespace GruffPhp\Reporting;
 
 use GruffPhp\Analysis\AnalysisReport;
 
+/**
+ * Renders analysis reports as JSON.
+ */
 final readonly class JsonReporter
 {
     /**

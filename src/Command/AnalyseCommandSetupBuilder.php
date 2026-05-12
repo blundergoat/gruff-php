@@ -16,6 +16,9 @@ use GruffPhp\Rule\RuleRegistry;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 
+/**
+ * Builds validated analyse command setup from console input.
+ */
 final readonly class AnalyseCommandSetupBuilder
 {
     /**

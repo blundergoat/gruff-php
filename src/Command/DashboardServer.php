@@ -7,6 +7,9 @@ namespace GruffPhp\Command;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Serves the dashboard HTTP loop for local browser usage.
+ */
 final readonly class DashboardServer
 {
     /**

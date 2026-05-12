@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects database URLs that embed password credentials.
+ */
 final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for database URL password findings.
+     */
     public const ID = 'sensitive-data.database-url-password';
 
     /**

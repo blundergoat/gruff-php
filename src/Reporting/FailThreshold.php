@@ -6,11 +6,29 @@ namespace GruffPhp\Reporting;
 
 use GruffPhp\Finding\Severity;
 
+/**
+ * Defines the lowest finding severity that should fail a run.
+ */
 enum FailThreshold: string
 {
+    /**
+     * Never fail from finding severities.
+     */
     case None = 'none';
+
+    /**
+     * Fail on any finding, including advisory findings.
+     */
     case Advisory = 'advisory';
+
+    /**
+     * Fail on warning and error findings.
+     */
     case Warning = 'warning';
+
+    /**
+     * Fail only on error findings.
+     */
     case Error = 'error';
 
     /**

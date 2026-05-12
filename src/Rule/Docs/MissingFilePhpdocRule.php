@@ -18,8 +18,14 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\Namespace_;
 
+/**
+ * Detects files that lack file-level or single-type structural documentation.
+ */
 final readonly class MissingFilePhpdocRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing file PHPDoc findings.
+     */
     public const ID = 'docs.missing-file-phpdoc';
 
     /**

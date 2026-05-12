@@ -24,8 +24,14 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects local @var assertions that omit the reason the assertion is needed.
+ */
 final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for bare @var annotation findings.
+     */
     public const ID = 'docs.var-annotation-description';
 
     /**

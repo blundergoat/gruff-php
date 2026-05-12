@@ -6,6 +6,9 @@ namespace GruffPhp\Review;
 
 use GruffPhp\Finding\Finding;
 
+/**
+ * Builds stable comparison keys for review findings.
+ */
 final readonly class FindingReviewIdentity
 {
     /**

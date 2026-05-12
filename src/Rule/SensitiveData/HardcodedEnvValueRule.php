@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects hardcoded values assigned to environment-style keys.
+ */
 final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for hardcoded environment value findings.
+     */
     public const ID = 'sensitive-data.hardcoded-env-value';
 
     /**

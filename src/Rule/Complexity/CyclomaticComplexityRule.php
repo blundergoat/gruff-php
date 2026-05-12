@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures function-like branch count using cyclomatic complexity.
+ */
 final readonly class CyclomaticComplexityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for cyclomatic complexity findings.
+     */
     public const ID = 'complexity.cyclomatic';
 
     /**

@@ -19,8 +19,14 @@ use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects callable arrays that can use first-class callable syntax.
+ */
 final readonly class FirstClassCallableCandidateRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for first-class callable candidate findings.
+     */
     public const ID = 'modernisation.first-class-callable-candidate';
 
     /**

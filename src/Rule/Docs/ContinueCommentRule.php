@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Continue_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects continue statements that lack an immediately preceding explanatory comment.
+ */
 final readonly class ContinueCommentRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing continue comment findings.
+     */
     public const ID = 'docs.continue-comment';
 
     /**

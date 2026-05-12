@@ -18,8 +18,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects statements that cannot run after a terminating control-flow statement.
+ */
 final readonly class UnreachableCodeRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unreachable code findings.
+     */
     public const ID = 'waste.unreachable-code';
 
     /**

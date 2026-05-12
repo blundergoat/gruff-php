@@ -21,8 +21,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures the deepest nested control-flow level inside function-like bodies.
+ */
 final readonly class NestingDepthRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for nesting depth findings.
+     */
     public const ID = 'complexity.nesting-depth';
 
     /**

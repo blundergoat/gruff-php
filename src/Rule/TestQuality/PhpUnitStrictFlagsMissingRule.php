@@ -16,10 +16,19 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects PHPUnit configs that omit strict feedback flags.
+ */
 final class PhpUnitStrictFlagsMissingRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the PHPUnit strict flags rule.
+     */
     public const ID = 'test-quality.phpunit-strict-flags-missing';
 
+    /**
+     * PHPUnit attributes that make risky or noisy tests fail visibly.
+     */
     private const STRICT_FLAGS = [
         'failOnRisky',
         'failOnWarning',
@@ -28,6 +37,9 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         'beStrictAboutChangesToGlobalState',
     ];
 
+    /**
+     * Config discovery collaborator cached for repeated project scans.
+     */
     private PhpUnitConfigDiscovery $discovery;
 
     /** @var array<string, true> */

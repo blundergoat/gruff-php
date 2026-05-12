@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects catch blocks that swallow exceptions without handling or reporting them.
+ */
 final class SilentCatchRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for silent catch findings.
+     */
     public const ID = 'security.silent-catch';
 
     /**

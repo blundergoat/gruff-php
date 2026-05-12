@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Diff;
 
+/**
+ * Represents an inclusive changed-line range from a git diff.
+ */
 final readonly class ChangedLineRange
 {
     /**

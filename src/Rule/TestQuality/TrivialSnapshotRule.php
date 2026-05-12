@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects snapshot assertions that only lock down trivial values.
+ */
 final readonly class TrivialSnapshotRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for trivial snapshot findings.
+     */
     public const ID = 'test-quality.trivial-snapshot';
 
     /**

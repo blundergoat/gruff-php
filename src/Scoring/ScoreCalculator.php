@@ -12,8 +12,14 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Mutation\MutationFileSummary;
 
+/**
+ * Calculates composite, pillar, and file scores from findings and optional mutation data.
+ */
 final readonly class ScoreCalculator
 {
+    /**
+     * Built-in static-analysis pillars included even when a run has no findings.
+     */
     private const STATIC_PILLARS = [
         'size',
         'complexity',

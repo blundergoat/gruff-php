@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects direct reads from global request and environment arrays.
+ */
 final readonly class ForbiddenGlobalAccessRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for forbidden global access findings.
+     */
     public const ID = 'modernisation.forbidden-global-access';
 
     /**

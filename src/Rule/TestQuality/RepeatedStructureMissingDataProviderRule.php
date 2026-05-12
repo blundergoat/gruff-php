@@ -19,10 +19,19 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects repeated test bodies that should likely use a data provider.
+ */
 final readonly class RepeatedStructureMissingDataProviderRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the repeated-structure rule.
+     */
     public const ID = 'test-quality.repeated-structure-missing-data-provider';
 
+    /**
+     * Minimum identical-shape group size before recommending a data provider.
+     */
     private const MIN_GROUP_SIZE = 3;
 
     /**

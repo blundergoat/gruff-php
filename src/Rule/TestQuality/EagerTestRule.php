@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that cover multiple behaviors in one method.
+ */
 final readonly class EagerTestRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for eager test findings.
+     */
     public const ID = 'test-quality.eager-test';
 
     /**

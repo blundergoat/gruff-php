@@ -19,8 +19,14 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects class-like declarations that exceed the configured line threshold.
+ */
 final readonly class ClassLengthRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for class length findings.
+     */
     public const ID = 'size.class-length';
 
     /**

@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects switch statements that can be expressed more directly as match expressions.
+ */
 final readonly class MatchExpressionCandidateRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for match expression candidate findings.
+     */
     public const ID = 'modernisation.match-expression-candidate';
 
     /**

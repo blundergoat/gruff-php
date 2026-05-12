@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects skipped tests that do not include an explicit reason.
+ */
 final readonly class SkippedWithoutReasonRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unexplained skipped test findings.
+     */
     public const ID = 'test-quality.skipped-without-reason';
 
     /**

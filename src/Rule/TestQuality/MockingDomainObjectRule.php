@@ -19,8 +19,14 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects mocks for domain objects where real values keep tests clearer.
+ */
 final readonly class MockingDomainObjectRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for mocked domain object findings.
+     */
     public const ID = 'test-quality.mocking-domain-object';
 
     /**

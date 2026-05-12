@@ -23,11 +23,24 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects one-character variables outside narrow local conventions.
+ */
 final readonly class ShortVariableRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the short variable rule.
+     */
     public const ID = 'naming.short-variable';
 
+    /**
+     * One-character names accepted for local loop counters.
+     */
     private const LOOP_COUNTER_ALLOWLIST = ['i', 'j', 'k', 'n', 'x', 'y', 'z'];
+
+    /**
+     * One-character names accepted for caught exceptions.
+     */
     private const CATCH_ALLOWLIST = ['e'];
 
     /**

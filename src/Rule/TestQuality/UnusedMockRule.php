@@ -17,8 +17,14 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects mock variables that are created but never used by the test.
+ */
 final readonly class UnusedMockRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for unused mock findings.
+     */
     public const ID = 'test-quality.unused-mock';
 
     /**

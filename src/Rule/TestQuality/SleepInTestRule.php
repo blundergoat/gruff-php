@@ -19,12 +19,29 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that depend on sleeps or wall-clock reads.
+ */
 final readonly class SleepInTestRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the sleep-in-test rule.
+     */
     public const ID = 'test-quality.sleep-in-test';
 
+    /**
+     * Functions that pause execution and slow test feedback.
+     */
     private const SLEEP_FUNCTIONS = ['sleep', 'usleep', 'time_nanosleep', 'time_sleep_until'];
+
+    /**
+     * Functions that read global wall-clock state in tests.
+     */
     private const WALL_CLOCK_FUNCTIONS = ['time', 'microtime'];
+
+    /**
+     * Date/time classes that bind tests to the current wall clock.
+     */
     private const WALL_CLOCK_DATETIME_CLASSES = ['datetime', 'datetimeimmutable'];
 
     /**

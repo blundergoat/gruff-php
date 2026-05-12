@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects oversized setup methods that make individual tests depend on shared state.
+ */
 final readonly class SetupBloatRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for setup bloat findings.
+     */
     public const ID = 'test-quality.setup-bloat';
 
     /**

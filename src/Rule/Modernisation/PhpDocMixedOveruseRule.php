@@ -23,13 +23,34 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects PHPDoc `mixed` usage that should be narrowed.
+ */
 final readonly class PhpDocMixedOveruseRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the PHPDoc mixed-overuse rule.
+     */
     public const ID = 'modernisation.phpdoc-mixed-overuse';
 
+    /**
+     * Parameter tag names scanned for standalone `mixed` usage.
+     */
     private const PARAM_TAGS = ['param', 'phpstan-param', 'psalm-param'];
+
+    /**
+     * Return tag names scanned for standalone `mixed` usage.
+     */
     private const RETURN_TAGS = ['return', 'phpstan-return', 'psalm-return'];
+
+    /**
+     * Variable tag names scanned for standalone `mixed` usage.
+     */
     private const VAR_TAGS = ['var', 'phpstan-var', 'psalm-var'];
+
+    /**
+     * Property tag names scanned for standalone `mixed` usage.
+     */
     private const PROPERTY_TAGS = [
         'property',
         'property-read',
@@ -37,6 +58,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         'phpstan-property',
         'psalm-property',
     ];
+
+    /**
+     * Type alias tag names scanned for standalone `mixed` usage.
+     */
     private const TYPE_ALIAS_TAGS = ['phpstan-type', 'phpstan-import-type'];
 
     /**

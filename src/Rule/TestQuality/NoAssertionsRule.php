@@ -15,8 +15,14 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
 
+/**
+ * Detects tests that execute without making a verifiable assertion.
+ */
 final readonly class NoAssertionsRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for assertion-free test findings.
+     */
     public const ID = 'test-quality.no-assertions';
 
     /**

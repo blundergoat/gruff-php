@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects contextual identifiers that look like protected health information.
+ */
 final readonly class PhiPatternRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for PHI pattern findings.
+     */
     public const ID = 'sensitive-data.phi-pattern';
 
     /**

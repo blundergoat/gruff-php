@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+/**
+ * Writes dashboard HTTP responses to an accepted socket client.
+ */
 final class DashboardHttpResponder
 {
     /**

@@ -4,9 +4,19 @@ declare(strict_types=1);
 
 namespace GruffPhp\Source;
 
+/**
+ * Describes one source file discovered for analysis.
+ */
 final readonly class SourceFile
 {
+    /**
+     * Source type parsed through the PHP parser.
+     */
     public const TYPE_PHP = 'php';
+
+    /**
+     * Source type scanned as plain text by source-text rules.
+     */
     public const TYPE_TEXT = 'text';
 
     /**

@@ -21,10 +21,19 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures the number of independent execution paths through function-like bodies.
+ */
 final readonly class NpathComplexityRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for NPath complexity findings.
+     */
     public const ID = 'complexity.npath';
 
+    /**
+     * Upper bound used to keep path-count multiplication finite.
+     */
     private const MAX_NPATH = 100_000;
 
     /**

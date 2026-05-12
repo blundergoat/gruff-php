@@ -17,8 +17,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects constructor-initialized properties that can be declared readonly.
+ */
 final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for readonly property candidate findings.
+     */
     public const ID = 'modernisation.readonly-property-candidate';
 
     /**

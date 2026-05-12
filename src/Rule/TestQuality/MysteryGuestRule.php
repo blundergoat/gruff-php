@@ -18,8 +18,14 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that reach hidden external fixtures or global state.
+ */
 final readonly class MysteryGuestRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for mystery guest findings.
+     */
     public const ID = 'test-quality.mystery-guest';
 
     /**

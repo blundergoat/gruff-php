@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+/**
+ * Carries score, grade, and finding totals for one quality pillar.
+ */
 final readonly class PillarScore
 {
     /**

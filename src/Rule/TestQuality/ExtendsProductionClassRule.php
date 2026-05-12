@@ -16,8 +16,14 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects test classes that inherit from production classes instead of exercising them.
+ */
 final readonly class ExtendsProductionClassRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for production inheritance findings.
+     */
     public const ID = 'test-quality.extends-production-class';
 
     /**

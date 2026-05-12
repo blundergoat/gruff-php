@@ -14,8 +14,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 
+/**
+ * Detects oversized test methods that hide intent behind setup and assertions.
+ */
 final readonly class TestMethodTooLongRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for long test method findings.
+     */
     public const ID = 'test-quality.test-method-too-long';
 
     /**

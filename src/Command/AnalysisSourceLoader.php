@@ -8,6 +8,9 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Source\SourceDiscovery;
 
+/**
+ * Discovers and parses analysis source files for CLI execution.
+ */
 final readonly class AnalysisSourceLoader
 {
     /**

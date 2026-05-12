@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Mutation;
 
+/**
+ * Represents one mutant entry parsed from an Infection report.
+ */
 final readonly class InfectionMutant
 {
     /**

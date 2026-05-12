@@ -18,11 +18,24 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects tests that mutate shared process state without cleanup.
+ */
 final readonly class GlobalStateMutationRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the global-state mutation rule.
+     */
     public const ID = 'test-quality.global-state-mutation';
 
+    /**
+     * Superglobal names that represent mutable process-wide state.
+     */
     private const SUPERGLOBALS = ['_GET', '_POST', '_REQUEST', '_SERVER', '_ENV', '_COOKIE', '_FILES', 'GLOBALS'];
+
+    /**
+     * Functions that mutate PHP process or environment state.
+     */
     private const STATE_FUNCTIONS = ['putenv', 'ini_set', 'error_reporting', 'date_default_timezone_set'];
 
     /**

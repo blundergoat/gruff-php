@@ -12,8 +12,14 @@ use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use Throwable;
 
+/**
+ * Converts source files into parser statements, tokens, and diagnostics.
+ */
 final readonly class PhpFileParser
 {
+    /**
+     * Parser instance reused across files in a parsing pass.
+     */
     private Parser $parser;
 
     /**

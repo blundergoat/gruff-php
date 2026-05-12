@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects documented public methods whose parameters lack matching @param tags.
+ */
 final readonly class MissingParamTagRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for missing @param tag findings.
+     */
     public const ID = 'docs.missing-param-tag';
 
     /**

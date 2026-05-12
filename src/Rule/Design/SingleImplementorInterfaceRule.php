@@ -30,10 +30,19 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 
+/**
+ * Detects project interfaces that have only one concrete implementation.
+ */
 final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterface
 {
+    /**
+     * Stable identifier for the single-implementor interface rule.
+     */
     public const ID = 'design.single-implementor-interface';
 
+    /**
+     * Namespace prefixes treated as external contracts.
+     */
     private const DEFAULT_EXTERNAL_PREFIXES = [
         'Psr\\',
         'Symfony\\',
@@ -52,6 +61,9 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         'Traversable',
     ];
 
+    /**
+     * Attribute prefixes that mark framework extension points.
+     */
     private const DEFAULT_FRAMEWORK_ATTRIBUTE_PREFIXES = [
         'Symfony\\',
         'Doctrine\\',

@@ -30,12 +30,29 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
+/**
+ * Detects placeholder, generic, and numbered identifiers that obscure intent.
+ */
 final readonly class IdentifierQualityRule implements RuleInterface
 {
+    /**
+     * Stable identifier for the identifier quality rule.
+     */
     public const ID = 'naming.identifier-quality';
 
+    /**
+     * Placeholder names that rarely communicate domain intent.
+     */
     private const DEFAULT_PLACEHOLDER_NAMES = ['foo', 'bar', 'baz', 'tmp', 'temp', 'obj', 'arr'];
+
+    /**
+     * Generic tokens that need enough scope usage to be acceptable.
+     */
     private const DEFAULT_GENERIC_TOKENS = ['data', 'info', 'item', 'thing', 'stuff', 'helper', 'util'];
+
+    /**
+     * Short conventional names ignored by the identifier quality rule.
+     */
     private const DEFAULT_IGNORED_NAMES = [
         '_',
         'e',
@@ -49,6 +66,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
         'key',
         'value',
     ];
+
+    /**
+     * PHP magic methods exempt from generic method-name checks.
+     */
     private const MAGIC_METHODS = [
         '__construct',
         '__destruct',
@@ -68,6 +89,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
         '__unserialize',
         '__set_state',
     ];
+
+    /**
+     * Framework and lifecycle hooks exempt from generic method-name checks.
+     */
     private const LIFECYCLE_METHODS = [
         'setUp',
         'tearDown',

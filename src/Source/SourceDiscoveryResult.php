@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Source;
 
+/**
+ * Carries discovered files plus missing and ignored input paths.
+ */
 final readonly class SourceDiscoveryResult
 {
     /**

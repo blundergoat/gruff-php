@@ -8,6 +8,9 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
 
+/**
+ * Applies display filters before findings are rendered.
+ */
 final readonly class FindingDisplayFilter
 {
     /**

@@ -11,6 +11,9 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 
+/**
+ * Provides shared AST helpers for modernisation rules.
+ */
 final class ModernisationNodeHelper
 {
     /**

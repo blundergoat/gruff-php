@@ -20,8 +20,14 @@ use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
+/**
+ * Measures maintainability by combining complexity, volume, and length signals.
+ */
 final readonly class MaintainabilityIndexRule implements RuleInterface
 {
+    /**
+     * Stable rule identifier for maintainability index findings.
+     */
     public const ID = 'complexity.maintainability-index';
 
     /**

@@ -13,8 +13,14 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\SourceTextRuleInterface;
 
+/**
+ * Detects test fixtures that appear to contain personally identifiable data.
+ */
 final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 {
+    /**
+     * Stable rule identifier for PII fixture findings.
+     */
     public const ID = 'sensitive-data.pii-test-fixture';
 
     /**

@@ -6,6 +6,9 @@ namespace GruffPhp\Command;
 
 use GruffPhp\Config\ConfigLoader;
 
+/**
+ * Builds command arguments for dashboard-triggered scans.
+ */
 final readonly class DashboardScanCommandBuilder
 {
     /**

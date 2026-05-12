@@ -11,6 +11,9 @@ use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
 use PhpParser\NodeFinder;
 
+/**
+ * Provides shared AST helpers for security rules.
+ */
 final class SecurityNodeHelper
 {
     /**
