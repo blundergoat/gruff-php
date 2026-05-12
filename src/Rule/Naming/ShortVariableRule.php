@@ -63,6 +63,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Find short variable names outside accepted local conventions.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for overly short variable names.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -81,12 +83,12 @@ final readonly class ShortVariableRule implements RuleInterface
         $reported = [];
 
         foreach ($functions as $fn) {
-            /** @var ClassMethod|Function_ $fn */
+            /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
             $vars = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
             $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
 
             foreach ($vars as $var) {
-                /** @var Variable $var */
+                /** @var Variable $var NodeFinder narrows the function body walk to variable nodes. */
                 if (!is_string($var->name) || strlen($var->name) > 1) {
                     continue;
                 }

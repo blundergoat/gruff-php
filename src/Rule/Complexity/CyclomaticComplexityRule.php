@@ -55,6 +55,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context carrying thresholds.
      * @return list<Finding> Findings for complex function-like declarations.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -71,7 +73,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $ccn = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
@@ -175,6 +177,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Build a display symbol for a function-like node.
      *
+     * @param ClassMethod|Function_ $node Function-like node to describe.
      * @return string Function or method display symbol.
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string

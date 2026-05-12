@@ -48,6 +48,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * Find statements that appear after a terminating statement in function-like bodies.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for unreachable statements.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -62,7 +64,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
         $findings = [];
 
         foreach ($functions as $fn) {
-            /** @var Stmt\ClassMethod|Stmt\Function_|Expr\Closure $fn */
+            /** @var Stmt\ClassMethod|Stmt\Function_|Expr\Closure $fn Finder predicate restricts results to executable function-like nodes. */
             $this->checkBlock($fn->stmts ?? [], $unit, $findings);
         }
 

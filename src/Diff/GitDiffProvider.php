@@ -14,6 +14,9 @@ final readonly class GitDiffProvider
     /**
      * Read changed files and line ranges from git diff output.
      *
+     * @param string $projectRoot Git working tree root.
+     * @param string $mode Diff mode or base ref.
+     * @throws DiffException When git diff cannot run or the base ref is unsafe.
      * @return DiffResult Diff metadata and changed-line ranges for the requested mode.
      */
     public function changedLines(string $projectRoot, string $mode): DiffResult

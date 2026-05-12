@@ -13,12 +13,17 @@ final readonly class DashboardScanCommandBuilder
 {
     /**
      * Build dashboard-triggered analyse commands for the given gruff binary.
+     *
+     * @param string $gruffBinary Absolute gruff binary path used in dashboard scans.
      */
     public function __construct(private string $gruffBinary)
     {
     }
 
     /**
+     * Parse a dashboard paths string into command arguments.
+     *
+     * @param string $paths Space-separated paths from the dashboard form.
      * @return list<string>
      */
     public function parsePaths(string $paths): array

@@ -55,6 +55,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find local variables that use type-prefix naming.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for Hungarian notation variables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -69,12 +71,12 @@ final readonly class HungarianNotationRule implements RuleInterface
         $reported = [];
 
         foreach ($functions as $fn) {
-            /** @var ClassMethod|Function_ $fn */
+            /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
             $vars = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
             $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
 
             foreach ($vars as $var) {
-                /** @var Variable $var */
+                /** @var Variable $var NodeFinder narrows the function body walk to variable nodes. */
                 if (!is_string($var->name)) {
                     continue;
                 }

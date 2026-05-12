@@ -11,6 +11,10 @@ final readonly class BaselineApplicationOptions
 {
     /**
      * Capture the effective baseline flags selected for an analysis run.
+     *
+     * @param string|null $baselinePath Baseline file path to apply, when enabled.
+     * @param bool $baselineExplicit Whether the baseline path came from an explicit flag.
+     * @param string|null $generateBaselinePath Baseline file path to write, when generation is enabled.
      */
     public function __construct(
         public ?string $baselinePath,

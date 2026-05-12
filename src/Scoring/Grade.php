@@ -11,6 +11,9 @@ final readonly class Grade
 {
     /**
      * Create a grade from a numeric score and display letter.
+     *
+     * @param float $score Rounded numeric score.
+     * @param string $letter Display letter for the score.
      */
     public function __construct(
         public float $score,
@@ -21,6 +24,7 @@ final readonly class Grade
     /**
      * Build a grade after clamping and rounding a score.
      *
+     * @param float $score Raw score to clamp into the 0-100 range.
      * @return self Grade for the normalised score.
      */
     public static function fromScore(float $score): self
@@ -33,6 +37,7 @@ final readonly class Grade
     /**
      * Resolve the letter grade for a numeric score.
      *
+     * @param float $score Normalized score to classify.
      * @return string Letter grade.
      */
     public static function letterFor(float $score): string

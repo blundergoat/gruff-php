@@ -50,6 +50,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Flag function and method parameters that are declared but never read in the body.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -234,7 +236,7 @@ final readonly class UnusedParameterRule implements RuleInterface
         });
 
         foreach ($usedVars as $var) {
-            /** @var Variable $var */
+            /** @var Variable $var Finder predicate restricts results to variable nodes. */
             if (is_string($var->name)) {
                 $usedNames[$var->name] = true;
             }

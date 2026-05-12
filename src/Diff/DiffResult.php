@@ -10,8 +10,12 @@ namespace GruffPhp\Diff;
 final readonly class DiffResult
 {
     /**
-     * @param array<string, list<ChangedLineRange>> $changedLines
-     * @param list<string> $changedFiles
+     * @param bool $active Whether diff filtering is active.
+     * @param string $mode Diff mode used to produce the result.
+     * @param string|null $base Base ref or description for the diff, when active.
+     * @param array<string, list<ChangedLineRange>> $changedLines Changed line ranges keyed by display path.
+     * @param list<string> $changedFiles Display paths marked as changed.
+     * @param string $message Human-readable diff status message.
      */
     public function __construct(
         public bool $active,
@@ -36,6 +40,7 @@ final readonly class DiffResult
     /**
      * Check whether a display path is part of the changed-file set.
      *
+     * @param string $filePath Display path to test.
      * @return bool True when the file was marked as changed.
      */
     public function hasFile(string $filePath): bool
@@ -44,7 +49,10 @@ final readonly class DiffResult
     }
 
     /**
-     * @return list<ChangedLineRange>
+     * Return changed line ranges for a display path.
+     *
+     * @param string $filePath Display path to look up.
+     * @return list<ChangedLineRange> Changed line ranges for the file.
      */
     public function rangesFor(string $filePath): array
     {

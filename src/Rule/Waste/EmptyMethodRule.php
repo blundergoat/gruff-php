@@ -49,6 +49,8 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Find function-like declarations with empty bodies.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for empty methods or functions.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -62,7 +64,7 @@ final readonly class EmptyMethodRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             if ($node instanceof ClassMethod && $node->isAbstract()) {
                 continue;
             }

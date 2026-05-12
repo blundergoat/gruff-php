@@ -46,6 +46,8 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for unused import statements.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -58,7 +60,7 @@ final readonly class UnusedImportRule implements RuleInterface
             return [];
         }
 
-        /** @var list<Use_> $useStatements */
+        /** @var list<Use_> $useStatements NodeFinder returns only use statement nodes for this query. */
         $useStatements = $uses;
         $sourceWithoutUses = $this->removeUseStatements($unit->source, $useStatements);
         $findings = [];

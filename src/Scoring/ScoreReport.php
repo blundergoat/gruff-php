@@ -10,9 +10,12 @@ namespace GruffPhp\Scoring;
 final readonly class ScoreReport
 {
     /**
-     * @param list<PillarScore> $pillars
-     * @param list<FileScore> $topOffenders
-     * @param array<string, int> $complexityDistribution
+     * @param Grade $composite Overall grade for the analysis run.
+     * @param list<PillarScore> $pillars Pillar scores included in the report.
+     * @param list<FileScore> $topOffenders Lowest-scoring files shown in reports.
+     * @param array<string, int> $complexityDistribution Cyclomatic complexity buckets.
+     * @param string $scope Score scope description.
+     * @param string $explanation Human-readable scoring explanation.
      */
     public function __construct(
         public Grade $composite,

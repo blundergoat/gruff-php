@@ -10,8 +10,9 @@ namespace GruffPhp\Mutation;
 final readonly class InfectionReport
 {
     /**
-     * @param array<string, int|float> $stats
-     * @param list<InfectionMutant> $mutants
+     * @param string $reportPath Display path for the Infection report.
+     * @param array<string, int|float> $stats Numeric report stats keyed by Infection field.
+     * @param list<InfectionMutant> $mutants Mutant rows parsed from the report.
      */
     public function __construct(
         public string $reportPath,

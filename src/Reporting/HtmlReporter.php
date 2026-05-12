@@ -17,6 +17,10 @@ final readonly class HtmlReporter
 {
     /**
      * Build the HTML reporter with the project root and editor-link preferences.
+     *
+     * @param string $projectRoot Project root used to build editor links.
+     * @param string $editorLink Editor-link mode used in finding rows.
+     * @param bool $interactive Whether interactive filtering controls should be included.
      */
     public function __construct(
         private string $projectRoot = '',
@@ -28,6 +32,7 @@ final readonly class HtmlReporter
     /**
      * Render the full inspection report as a single HTML document.
      *
+     * @param AnalysisReport $report Analysis report to render.
      * @return string The rendered HTML document.
      */
     public function render(AnalysisReport $report): string

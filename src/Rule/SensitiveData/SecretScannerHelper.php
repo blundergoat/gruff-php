@@ -27,6 +27,8 @@ final class SecretScannerHelper
     /**
      * Compute the 1-based line number for a byte offset within a source string.
      *
+     * @param string $source Source text being scanned.
+     * @param int $offset Zero-based byte offset inside the source text.
      * @return int
      */
     public static function lineNumberForOffset(string $source, int $offset): int
@@ -37,6 +39,7 @@ final class SecretScannerHelper
     /**
      * Build a redacted preview of a sensitive value (first 4 + last 4 chars for values longer than 8 chars).
      *
+     * @param string $value Sensitive value to redact for reporting.
      * @return string The redacted preview safe for inclusion in findings and reports.
      */
     public static function redactedPreview(string $value): string
@@ -52,6 +55,8 @@ final class SecretScannerHelper
     /**
      * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
+     * @param string $key Environment-style key name.
+     * @param string $value Sensitive value associated with the key.
      * @return string
      */
     public static function redactedKeyValue(string $key, string $value): string
@@ -62,6 +67,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the value looks like a placeholder rather than a real secret (changeme / dummy / example / etc.).
      *
+     * @param string $value Candidate sensitive value.
      * @return bool True when the value is empty, low-cardinality, or matches a known placeholder marker.
      */
     public static function isLikelyDummyValue(string $value): bool
@@ -83,6 +89,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
+     * @param string $displayPath Project-relative path being scanned.
      * @return bool
      */
     public static function isEnvFile(string $displayPath): bool
@@ -95,6 +102,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
      *
+     * @param string $displayPath Project-relative path being scanned.
      * @return bool
      */
     public static function isTestPath(string $displayPath): bool
@@ -110,6 +118,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the line contains an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
      *
+     * @param string $line Source line being scanned.
      * @return bool
      */
     public static function hasSensitiveContext(string $line): bool
@@ -128,6 +137,7 @@ final class SecretScannerHelper
     /**
      * Compute the Shannon entropy of a string in bits-per-character.
      *
+     * @param string $value Candidate secret value.
      * @return float The entropy; higher values indicate more random / secret-shaped content.
      */
     public static function entropy(string $value): float
@@ -151,6 +161,14 @@ final class SecretScannerHelper
     /**
      * Build a sensitive-data Finding with redacted preview / detector metadata.
      *
+     * @param AnalysisUnit $unit Parsed unit that owns the finding.
+     * @param string $ruleId Sensitive-data rule identifier.
+     * @param string $message Human-readable finding message.
+     * @param int $line Source line for the detected secret.
+     * @param Confidence $confidence Confidence level assigned by the detector.
+     * @param string $detector Detector name written to finding metadata.
+     * @param string $preview Redacted preview written to finding metadata.
+     * @param string $remediation Suggested remediation text for the finding.
      * @return Finding
      */
     public static function finding(

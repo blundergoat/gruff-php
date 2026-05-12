@@ -15,13 +15,16 @@ final readonly class SelectionConfigParser
 {
     /**
      * Use the supplied string-list parser when decoding rule selection config.
+     *
+     * @param StringListConfigParser $strings Parser used for scalar/list selection values.
      */
     public function __construct(private StringListConfigParser $strings = new StringListConfigParser())
     {
     }
 
     /**
-     * @param array<array-key, mixed>|bool|float|int|object|string|null $value
+     * @param array<array-key, mixed>|bool|float|int|object|string|null $value Raw selection config value.
+     * @param RuleRegistry $registry Registry used to validate selected rule ids.
      * @return RuleSelection Parsed rule selection filters.
      * @throws ConfigException
      */

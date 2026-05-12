@@ -68,14 +68,17 @@ final readonly class SourceDiscovery
 
     /**
      * Build the source-discovery scanner for the given project root.
+     *
+     * @param string $projectRoot Project root used to resolve requested paths.
      */
     public function __construct(private string $projectRoot)
     {
     }
 
     /**
-     * @param list<string> $paths
-     * @param list<string> $configuredIgnorePatterns
+     * @param list<string> $paths Requested paths to discover.
+     * @param bool $includeIgnored Whether built-in ignored paths should still be included.
+     * @param list<string> $configuredIgnorePatterns Additional ignore patterns from config.
      * @return SourceDiscoveryResult Files, missing inputs, and ignored paths.
      */
     public function discover(array $paths, bool $includeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult

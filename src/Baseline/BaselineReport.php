@@ -20,7 +20,13 @@ final readonly class BaselineReport
     public const SOURCE_DEFAULT = 'default';
 
     /**
-     * @param list<BaselineEntry> $staleEntries
+     * @param string $path Baseline file path used for the run.
+     * @param bool $generated Whether the run generated a baseline file.
+     * @param int $totalEntries Total entries loaded from the baseline.
+     * @param int $suppressedFindings Findings suppressed by the baseline.
+     * @param string $staleEvaluation Stale-entry evaluation mode or summary.
+     * @param list<BaselineEntry> $staleEntries Baseline entries that no longer match findings.
+     * @param string $source Baseline source classification.
      */
     public function __construct(
         public string $path,

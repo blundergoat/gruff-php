@@ -10,8 +10,20 @@ namespace GruffPhp\Finding;
 final readonly class Finding
 {
     /**
-     * @param list<Pillar> $secondaryPillars
-     * @param array<string, mixed> $metadata
+     * @param string $ruleId Stable rule identifier that produced the finding.
+     * @param string $message Human-readable finding message.
+     * @param string $filePath Display path for the affected file.
+     * @param int|null $line Start line for the finding, when known.
+     * @param Severity $severity Severity used for reporting and exit gates.
+     * @param Pillar $pillar Primary quality pillar for the finding.
+     * @param RuleTier $tier Rule catalogue tier that owns the finding.
+     * @param Confidence $confidence Confidence level assigned by the rule.
+     * @param int|null $endLine End line for multi-line findings, when known.
+     * @param int|null $column Start column for the finding, when known.
+     * @param string|null $symbol Symbol associated with the finding, when available.
+     * @param string|null $remediation Suggested remediation text, when available.
+     * @param list<Pillar> $secondaryPillars Additional quality pillars touched by the finding.
+     * @param array<string, mixed> $metadata Machine-readable rule metadata for reporters.
      */
     public function __construct(
         public string $ruleId,

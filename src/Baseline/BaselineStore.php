@@ -24,6 +24,8 @@ final readonly class BaselineStore
 
     /**
      * Create a baseline store rooted at the current project.
+     *
+     * @param string $projectRoot Project root used to resolve relative baseline paths.
      */
     public function __construct(private string $projectRoot)
     {
@@ -32,6 +34,7 @@ final readonly class BaselineStore
     /**
      * Read and validate a baseline file.
      *
+     * @param string $path Baseline path to read, relative to the project root when needed.
      * @return BaselineData Parsed baseline data.
      */
     public function read(string $path): BaselineData
@@ -108,7 +111,9 @@ final readonly class BaselineStore
     }
 
     /**
-     * @param list<Finding> $findings
+     * @param string $path Baseline path to write, relative to the project root when needed.
+     * @param list<Finding> $findings Findings to persist in the baseline.
+     * @throws BaselineException When the baseline file cannot be encoded or written.
      *
      * @return BaselineData Data written to disk.
      */

@@ -99,7 +99,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     /**
      * Analyse all project units for interfaces with exactly one concrete implementor.
      *
-     * @param list<AnalysisUnit> $units
+     * @param list<AnalysisUnit> $units Parsed project units to analyse together.
+     * @param RuleContext $context Rule context carrying config and settings.
      *
      * @return list<Finding> Findings for interfaces that lack substitutability value.
      */
@@ -123,7 +124,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             $statements = $resolved['statements'];
             $finder = new NodeFinder();
 
-            /** @var list<Interface_> $interfaceNodes */
+            /** @var list<Interface_> $interfaceNodes NodeFinder narrows the statement walk to interface declarations. */
             $interfaceNodes = $finder->findInstanceOf($statements, Interface_::class);
             foreach ($interfaceNodes as $interface) {
                 if ($interface->name === null) {
@@ -148,7 +149,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 }
             }
 
-            /** @var list<Class_> $classNodes */
+            /** @var list<Class_> $classNodes NodeFinder narrows the statement walk to class declarations. */
             $classNodes = $finder->findInstanceOf($statements, Class_::class);
             foreach ($classNodes as $class) {
                 if ($class->name === null) {
@@ -308,7 +309,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         foreach ($units as $unit) {
             $traverser = new NodeTraverser();
             $traverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
-            /** @var list<Node\Stmt> $resolvedStatements */
+            /** @var list<Node\Stmt> $resolvedStatements NameResolver preserves the statement list shape. */
             $resolvedStatements = $traverser->traverse($unit->statements);
             $resolved[] = ['unit' => $unit, 'statements' => $resolvedStatements];
         }
@@ -389,7 +390,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     {
         $references = [];
 
-        /** @var list<Class_> $classNodes */
+        /** @var list<Class_> $classNodes NodeFinder narrows the statement walk to class declarations. */
         $classNodes = $finder->findInstanceOf($statements, Class_::class);
         foreach ($classNodes as $class) {
             $classFqn = $this->declarationFqn($class);
@@ -397,7 +398,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 continue;
             }
 
-            /** @var list<Param> $params */
+            /** @var list<Param> $params NodeFinder narrows the class subtree to parameter nodes. */
             $params = $finder->findInstanceOf([$class], Param::class);
             foreach ($params as $param) {
                 foreach ($this->namesFromType($param->type) as $name) {
@@ -409,7 +410,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 }
             }
 
-            /** @var list<ClassMethod> $methods */
+            /** @var list<ClassMethod> $methods NodeFinder narrows the class subtree to method declarations. */
             $methods = $finder->findInstanceOf([$class], ClassMethod::class);
             foreach ($methods as $method) {
                 foreach ($this->namesFromType($method->returnType) as $name) {
@@ -421,7 +422,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 }
             }
 
-            /** @var list<Property> $properties */
+            /** @var list<Property> $properties NodeFinder narrows the class subtree to property declarations. */
             $properties = $finder->findInstanceOf([$class], Property::class);
             foreach ($properties as $property) {
                 foreach ($this->namesFromType($property->type) as $name) {

@@ -15,6 +15,10 @@ final readonly class DashboardScanRunner
 {
     /**
      * Capture collaborators used to execute dashboard scans and render results.
+     *
+     * @param string $gruffBinary Absolute gruff binary path used for scan requests.
+     * @param DashboardStateFactory $stateFactory Factory used to resolve dashboard state.
+     * @param DashboardPageRenderer $renderer Renderer used for scan output and errors.
      */
     public function __construct(
         private string $gruffBinary,
@@ -24,7 +28,10 @@ final readonly class DashboardScanRunner
     }
 
     /**
-     * @param array<string, string> $query
+     * Run a dashboard scan request and return HTML for the iframe.
+     *
+     * @param DashboardRequestContext $context Dashboard request context.
+     * @param array<string, string> $query Request query values from the dashboard form.
      * @return string Dashboard HTML for either scan results or an error panel.
      */
     public function scanHtml(DashboardRequestContext $context, array $query): string

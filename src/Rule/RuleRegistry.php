@@ -130,7 +130,8 @@ final class RuleRegistry
     private readonly array $rules;
 
     /**
-     * @param list<RuleInterface|ProjectRuleInterface> $rules
+     * @param list<RuleInterface|ProjectRuleInterface> $rules Rule instances to index by id.
+     * @throws InvalidArgumentException When two rules declare the same id.
      */
     public function __construct(array $rules)
     {
@@ -284,6 +285,7 @@ final class RuleRegistry
     /**
      * Check whether a rule id is registered.
      *
+     * @param string $ruleId Rule identifier to check.
      * @return bool True when the rule exists in the registry.
      */
     public function has(string $ruleId): bool
@@ -294,6 +296,8 @@ final class RuleRegistry
     /**
      * Return a registered rule by id.
      *
+     * @param string $ruleId Rule identifier to look up.
+     * @throws InvalidArgumentException When the rule id is unknown.
      * @return RuleInterface|ProjectRuleInterface Matching rule instance.
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
@@ -303,7 +307,10 @@ final class RuleRegistry
     }
 
     /**
-     * @return list<RuleInterface|ProjectRuleInterface>
+     * Return rules enabled by the effective analysis config.
+     *
+     * @param AnalysisConfig $config Config used to filter registered rules.
+     * @return list<RuleInterface|ProjectRuleInterface> Enabled rule instances.
      */
     public function enabledRules(AnalysisConfig $config): array
     {
@@ -319,8 +326,11 @@ final class RuleRegistry
     }
 
     /**
-     * @param list<AnalysisUnit> $units
-     * @return list<Finding>
+     * Run all enabled file and project rules against parsed units.
+     *
+     * @param list<AnalysisUnit> $units Parsed units to analyse.
+     * @param RuleContext $context Rule execution context.
+     * @return list<Finding> Findings produced by enabled rules.
      */
     public function analyse(array $units, RuleContext $context): array
     {

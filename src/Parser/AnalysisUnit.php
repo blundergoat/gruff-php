@@ -14,9 +14,11 @@ use PhpParser\Token;
 final readonly class AnalysisUnit
 {
     /**
-     * @param list<Stmt> $statements
-     * @param list<Token> $tokens
-     * @param list<ParseDiagnostic> $diagnostics
+     * @param SourceFile $file Source file that produced this analysis unit.
+     * @param string $source Raw source text.
+     * @param list<Stmt> $statements Parsed top-level statements.
+     * @param list<Token> $tokens Tokens emitted by the parser.
+     * @param list<ParseDiagnostic> $diagnostics Parse diagnostics collected for the file.
      */
     public function __construct(
         public SourceFile $file,

@@ -54,6 +54,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Find function-like declarations whose maintainability index falls below thresholds.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context carrying thresholds.
      * @return list<Finding> Findings for low maintainability index scores.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -70,7 +72,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $mi = self::compute($node, $unit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
@@ -111,7 +113,8 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node
+     * @param ClassMethod|Function_ $node Function-like node to score.
+     * @param AnalysisUnit $unit Parsed unit that owns the node.
      *
      * @return float Maintainability index score.
      */

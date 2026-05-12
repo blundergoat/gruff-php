@@ -16,6 +16,10 @@ final readonly class InfectionRunner
     /**
      * Run Infection and capture its process result.
      *
+     * @param string $projectRoot Project root where Infection should run.
+     * @param string $binary Infection binary path or command name.
+     * @param string|null $configPath Infection config path, when supplied.
+     * @param string|null $testFrameworkOptions Extra test-framework options passed to Infection.
      * @return InfectionRunResult Process result and optional diagnostic.
      */
     public function run(

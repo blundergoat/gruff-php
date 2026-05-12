@@ -18,10 +18,13 @@ final readonly class AnalysisConfig
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
     /**
-     * @param array<string, RuleSettings> $rules
-     * @param list<string> $ignoredPathPatterns
-     * @param list<string> $acceptedAbbreviations
-     * @param list<string> $allowedSecretPreviews
+     * @param array<string, RuleSettings> $rules Effective settings keyed by rule id.
+     * @param float $minimumPhpVersion Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection $ruleSelection Include/exclude rule selection for the run.
+     * @param list<string> $ignoredPathPatterns Path patterns skipped during discovery.
+     * @param list<string> $acceptedAbbreviations Abbreviations accepted by naming rules.
+     * @param list<string> $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
     public function __construct(
         private array $rules,
@@ -39,6 +42,7 @@ final readonly class AnalysisConfig
     /**
      * Build default settings for every rule in the registry.
      *
+     * @param RuleRegistry $registry Rule registry supplying default rule definitions.
      * @return self Config initialised with registry defaults.
      */
     public static function fromRegistry(RuleRegistry $registry): self
@@ -60,6 +64,8 @@ final readonly class AnalysisConfig
     /**
      * Return the configured settings for a known rule id.
      *
+     * @param string $ruleId Rule identifier to read.
+     * @throws InvalidArgumentException When the rule id is unknown.
      * @return RuleSettings Settings for the requested rule.
      */
     public function ruleSettings(string $ruleId): RuleSettings
@@ -71,6 +77,9 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with one rule's settings replaced.
      *
+     * @param string $ruleId Rule identifier to replace.
+     * @param RuleSettings $settings New settings for the rule.
+     * @throws InvalidArgumentException When the rule id is unknown.
      * @return self Config carrying the updated rule settings.
      */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
@@ -105,6 +114,7 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different minimum PHP version.
      *
+     * @param float $minimumPhpVersion New minimum PHP version floor.
      * @return self Config carrying the updated PHP version floor.
      */
     public function withMinimumPhpVersion(float $minimumPhpVersion): self
@@ -140,6 +150,7 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different rule selection.
      *
+     * @param RuleSelection $ruleSelection Rule include/exclude selection to apply.
      * @return self Config carrying the updated rule selection.
      */
     public function withRuleSelection(RuleSelection $ruleSelection): self
@@ -163,7 +174,7 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $ignoredPathPatterns
+     * @param list<string> $ignoredPathPatterns Path patterns skipped during discovery.
      *
      * @return self Config carrying the updated ignored path patterns.
      */
@@ -188,7 +199,7 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $acceptedAbbreviations
+     * @param list<string> $acceptedAbbreviations Abbreviations accepted by naming rules.
      *
      * @return self Config carrying the updated accepted abbreviation list.
      */
@@ -213,7 +224,7 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $allowedSecretPreviews
+     * @param list<string> $allowedSecretPreviews Secret previews explicitly allowed by config.
      *
      * @return self Config carrying the updated allowed secret preview list.
      */

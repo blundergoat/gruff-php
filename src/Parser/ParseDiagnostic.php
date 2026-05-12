@@ -11,6 +11,9 @@ final readonly class ParseDiagnostic
 {
     /**
      * Capture a parser diagnostic message and its best-known source line.
+     *
+     * @param string $message Parser diagnostic message.
+     * @param int $line Best-known source line for the diagnostic.
      */
     public function __construct(
         public string $message,

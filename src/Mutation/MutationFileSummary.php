@@ -11,6 +11,14 @@ final readonly class MutationFileSummary
 {
     /**
      * Capture per-file mutation testing totals and MSI percentages.
+     *
+     * @param string $filePath Display path for the mutated source file.
+     * @param int $totalMutants Total mutants reported for the file.
+     * @param int $killedMutants Mutants killed by the test suite.
+     * @param int $survivedMutants Mutants that survived the test suite.
+     * @param int $notCoveredMutants Mutants not covered by tests.
+     * @param float $msi Mutation score indicator percentage.
+     * @param float $coveredMsi Covered-code mutation score indicator percentage.
      */
     public function __construct(
         public string $filePath,

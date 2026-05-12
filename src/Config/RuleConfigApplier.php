@@ -13,7 +13,10 @@ use GruffPhp\Rule\RuleRegistry;
 final readonly class RuleConfigApplier
 {
     /**
-     * @param array<string, mixed> $rootConfig
+     * @param AnalysisConfig $config Config to update.
+     * @param RuleRegistry $registry Rule registry used to validate rule ids.
+     * @param array<string, mixed> $rootConfig Parsed root config object.
+     * @throws ConfigException When rule config references unknown ids or invalid values.
      * @return AnalysisConfig Config with rule-specific overrides applied.
      */
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig

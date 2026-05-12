@@ -16,6 +16,12 @@ final readonly class TrendRecorder
     /**
      * Append a score snapshot to the bounded history file.
      *
+     * @param string $projectRoot Project root used to resolve the history path.
+     * @param string $path History file path to write.
+     * @param ScoreReport $score Score report to snapshot.
+     * @param int $findingCount Total finding count for the snapshot.
+     * @throws RuntimeException When the history file cannot be read, validated, or written.
+     * @throws \JsonException When history JSON cannot be decoded or encoded.
      * @return TrendReport Report describing the current score and prior delta.
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport

@@ -18,7 +18,26 @@ use Symfony\Component\Console\Input\InputInterface;
 final readonly class AnalyseCommandOptions
 {
     /**
-     * @param list<string> $paths
+     * @param list<string> $paths Paths requested for analysis.
+     * @param bool $includeIgnored Whether ignored files should be included.
+     * @param string|null $configPath Explicit config path supplied by the CLI.
+     * @param bool $noConfig Whether config loading is disabled.
+     * @param MutationAnalysisOptions $mutation Parsed mutation-analysis options.
+     * @param string|null $diffMode Requested diff mode, when diff analysis is enabled.
+     * @param string|null $diffVs Comparison ref used for diff and changed-only analysis.
+     * @param bool $changedOnly Whether analysis should be restricted to changed files.
+     * @param string|null $historyFile Trend history file path, when configured.
+     * @param bool $noBaseline Whether baseline loading and application are disabled.
+     * @param BaselineApplicationOptions $baseline Parsed baseline application options.
+     * @param string $reportEditorLink Editor-link style requested for reports.
+     * @param bool $reportInteractive Whether interactive report behavior is enabled.
+     * @param string|null $pathsRelativeTo Base path used to normalize reported paths.
+     * @param string|null $minSeverity Minimum severity filter requested for output.
+     * @param list<string> $includePillars Pillars explicitly included in report output.
+     * @param list<string> $excludePillars Pillars explicitly excluded from report output.
+     * @param list<string> $includeRules Rule IDs explicitly included in report output.
+     * @param list<string> $excludeRules Rule IDs explicitly excluded from report output.
+     * @param string|null $optionError First usage error discovered while parsing options.
      */
     public function __construct(
         public array $paths,
@@ -51,11 +70,12 @@ final readonly class AnalyseCommandOptions
     /**
      * Build an options object from the Symfony Console InputInterface, recording any usage errors found.
      *
+     * @param InputInterface $input Console input to normalize into analyse options.
      * @return self
      */
     public static function fromInput(InputInterface $input): self
     {
-        /** @var list<string> $paths */
+        /** @var list<string> $paths The command definition declares a variadic paths argument. */
         $paths = $input->getArgument('paths');
         $configPath = $input->getOption('config');
         $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
@@ -116,6 +136,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy with the mutation budget set (used after parsing the `--mutation-budget` value).
      *
+     * @param int|null $mutationBudget Mutation score budget, or null when unset.
      * @return self
      */
     public function withMutationBudget(?int $mutationBudget): self
@@ -155,6 +176,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy that auto-applies the project's default baseline when one exists and no other baseline flag is set.
      *
+     * @param string $projectRoot Project root used to look for the default baseline file.
      * @return self
      */
     public function withDefaultBaseline(string $projectRoot): self

@@ -16,9 +16,18 @@ use InvalidArgumentException;
 final readonly class RuleDefinition
 {
     /**
-     * @param array<string, int|float> $defaultThresholds
-     * @param list<Pillar> $secondaryPillars
-     * @param array<string, mixed> $defaultOptions
+     * @param string $id Stable rule identifier used in findings and config.
+     * @param string $name Human-readable rule name.
+     * @param Pillar $pillar Primary quality pillar for the rule.
+     * @param RuleTier $tier Rule catalogue tier.
+     * @param Severity $defaultSeverity Severity used when config does not override it.
+     * @param Confidence $confidence Default confidence assigned to rule findings.
+     * @param array<string, int|float> $defaultThresholds Named numeric thresholds for rule settings.
+     * @param list<Pillar> $secondaryPillars Additional pillars affected by the rule.
+     * @param bool $defaultEnabled Whether the rule runs unless disabled by config.
+     * @param array<string, mixed> $defaultOptions Rule-specific default option values.
+     * @param string $description Longer display description for rule listings.
+     * @throws InvalidArgumentException When the rule id, threshold names, or option names are invalid.
      */
     public function __construct(
         public string $id,

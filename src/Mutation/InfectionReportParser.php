@@ -13,6 +13,8 @@ final readonly class InfectionReportParser
 {
     /**
      * Create a parser that resolves report paths relative to the project root.
+     *
+     * @param string $projectRoot Project root used to resolve report paths.
      */
     public function __construct(private string $projectRoot)
     {
@@ -21,6 +23,8 @@ final readonly class InfectionReportParser
     /**
      * Parse an Infection JSON report from disk.
      *
+     * @param string $path Infection report path to read.
+     * @throws MutationReportException When the report is missing, unreadable, invalid JSON, or structurally invalid.
      * @return InfectionReport Parsed mutation report.
      */
     public function parse(string $path): InfectionReport

@@ -14,7 +14,11 @@ use Symfony\Component\Process\Process;
 final readonly class GitArchiveSnapshot
 {
     /**
-     * @param list<string> $paths
+     * @param string $projectRoot Git working tree root.
+     * @param string $ref Git ref to archive.
+     * @param list<string> $paths Optional path filters to include in the archive.
+     * @throws DiffException When the ref is unsafe or git/tar cannot produce the snapshot.
+     * @throws RuntimeException When the temporary snapshot directory cannot be created.
      *
      * @return string Temporary snapshot root path.
      */
@@ -78,6 +82,7 @@ final readonly class GitArchiveSnapshot
     /**
      * Recursively remove a snapshot directory.
      *
+     * @param string $path Snapshot directory path to remove.
      * @return void No return value.
      */
     public function remove(string $path): void

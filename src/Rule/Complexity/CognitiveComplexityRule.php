@@ -56,6 +56,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Flag methods whose cognitive complexity exceeds the configured threshold.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context carrying thresholds.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -72,7 +74,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             $cc = self::compute($node);
             $thresholdMatch = $settings->highValueThresholdMatch($cc);
 
@@ -377,7 +379,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             return;
         }
 
-        /** @var BinaryOp $expr */
+        /** @var BinaryOp $expr The boolean-operator guard narrows the expression before recursion. */
         self::flattenBooleanChain($expr->left, $result);
         $result[] = $expr::class;
         self::flattenBooleanChain($expr->right, $result);

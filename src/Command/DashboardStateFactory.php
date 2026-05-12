@@ -13,11 +13,15 @@ use Symfony\Component\Console\Input\InputInterface;
 final class DashboardStateFactory
 {
     /**
+     * Build the default dashboard query values from console input.
+     *
+     * @param InputInterface $input Console input used to seed dashboard controls.
+     * @param string $projectRoot Active project root for the dashboard.
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string}
      */
     public function defaultQuery(InputInterface $input, string $projectRoot): array
     {
-        /** @var list<string> $paths */
+        /** @var list<string> $paths The command definition declares a variadic paths argument. */
         $paths = $input->getArgument('paths');
         $baseline = $input->hasParameterOption('--baseline', true)
             ? ($this->optionalStringOption($input, 'baseline') ?? '')
@@ -40,6 +44,8 @@ final class DashboardStateFactory
     /**
      * Resolves the startup project option against the shell directory.
      *
+     * @param InputInterface $input Console input containing the optional project override.
+     * @param string $launchRoot Shell working directory that launched the dashboard.
      * @return string|null Existing project root, or null when the option is invalid.
      */
     public function initialProjectRoot(InputInterface $input, string $launchRoot): ?string
@@ -48,7 +54,11 @@ final class DashboardStateFactory
     }
 
     /**
-     * @param array<string, string> $query
+     * Merge dashboard request query values with console-input defaults.
+     *
+     * @param InputInterface $input Console input used to seed dashboard defaults.
+     * @param string $projectRoot Active project root for the dashboard.
+     * @param array<string, string> $query Request query values from the dashboard form.
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string}
      */
     public function state(InputInterface $input, string $projectRoot, array $query): array
@@ -73,6 +83,8 @@ final class DashboardStateFactory
     /**
      * Returns an existing absolute project directory, or null when invalid.
      *
+     * @param string $project Project path from the request or command input.
+     * @param string $baseRoot Base directory used for relative project paths.
      * @return string|null Existing absolute project directory.
      */
     public function resolveProjectRoot(string $project, string $baseRoot): ?string
@@ -86,6 +98,8 @@ final class DashboardStateFactory
     /**
      * Reads a non-empty string option from console input.
      *
+     * @param InputInterface $input Console input to read.
+     * @param string $name Option name without leading dashes.
      * @return string|null Option value, or null when missing or empty.
      */
     public function optionalStringOption(InputInterface $input, string $name): ?string

@@ -51,6 +51,8 @@ final readonly class RedundantVariableRule implements RuleInterface
     /**
      * Find temporary variables that are immediately returned.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for redundant return variables.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -65,7 +67,7 @@ final readonly class RedundantVariableRule implements RuleInterface
         });
 
         foreach ($functions as $function) {
-            /** @var Stmt\ClassMethod|Stmt\Function_|Closure $function */
+            /** @var Stmt\ClassMethod|Stmt\Function_|Closure $function Finder predicate restricts results to function-like nodes. */
             $this->checkBlock($function->stmts ?? [], $unit, $definition, $findings);
         }
 

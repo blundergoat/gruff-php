@@ -26,6 +26,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the unit looks like a PHPUnit test file by path or filename.
      *
+     * @param AnalysisUnit $unit Parsed unit whose path should be classified.
      * @return bool True when the file lives under tests/ or has a Test/TestCase basename suffix.
      */
     public static function looksLikePhpUnitTestFile(AnalysisUnit $unit): bool
@@ -42,7 +43,10 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * @return list<TestQualityScope>
+     * Discover PHPUnit and Pest test scopes in an analysis unit.
+     *
+     * @param AnalysisUnit $unit Parsed unit to inspect for test scopes.
+     * @return list<TestQualityScope> Test scopes discovered in source order.
      */
     public static function testScopes(AnalysisUnit $unit): array
     {
@@ -50,7 +54,7 @@ final class TestQualityNodeHelper
         $cache = self::$scopeCache ??= new \WeakMap();
 
         if ($cache->offsetExists($unit)) {
-            /** @var list<TestQualityScope> $scopes */
+            /** @var list<TestQualityScope> $scopes WeakMap stores only test-scope lists keyed by AnalysisUnit. */
             $scopes = $cache->offsetGet($unit);
 
             return $scopes;
@@ -115,6 +119,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
      *
+     * @param Stmt\ClassMethod $method Method node to classify.
      * @return bool True when the method should be analysed as a test body.
      */
     public static function isTestMethod(Stmt\ClassMethod $method): bool
@@ -142,6 +147,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the class extends a *TestCase base.
      *
+     * @param Stmt\Class_|null $class Class node to inspect, or null when the method is detached.
      * @return bool True when the parent name ends with `testcase` (case-insensitive).
      */
     public static function extendsTestCase(?Stmt\Class_ $class): bool
@@ -156,7 +162,10 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall>
+     * Collect function, method, and static calls from a test scope.
+     *
+     * @param TestQualityScope $scope Test scope whose statements should be walked.
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Calls found in the scope.
      */
     public static function calls(TestQualityScope $scope): array
     {
@@ -169,7 +178,10 @@ final class TestQualityNodeHelper
     }
 
     /**
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall>
+     * Collect assertion-like calls from a test scope.
+     *
+     * @param TestQualityScope $scope Test scope whose calls should be filtered.
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Assertion calls found in the scope.
      */
     public static function assertionCalls(TestQualityScope $scope): array
     {
@@ -182,6 +194,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the call is a PHPUnit assertion, Pest expectation, or other supported assertion shape.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
      * @return bool True when the call counts as an assertion for test-quality rules.
      */
     public static function isAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -237,6 +250,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the assertion is trivially-true (e.g. assertTrue(true), assertSame($x, $x)).
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call to inspect.
      * @return bool True when the assertion's literal arguments make it tautological.
      */
     public static function isTrivialAssertion(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -286,6 +300,7 @@ final class TestQualityNodeHelper
     /**
      * Lowercase short name of the call (method, function, or static), or null when the name is dynamic.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node whose name should be normalized.
      * @return string|null The lowercase identifier, or null when the call target is a variable / expression.
      */
     public static function callName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
@@ -304,6 +319,7 @@ final class TestQualityNodeHelper
     /**
      * Lowercase function name, or null when the call target is not a Name node.
      *
+     * @param Expr\FuncCall $call Function call node to inspect.
      * @return string|null
      */
     public static function functionName(Expr\FuncCall $call): ?string
@@ -318,6 +334,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the call creates a mock, stub, or spy via a recognised factory name.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
      * @return bool True when the call name is one of createMock / createStub / getMockBuilder / mock / partialMock / spy / prophesize.
      */
     public static function isMockCreationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -338,6 +355,7 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the call wires a mock expectation (expects, shouldReceive, once, etc.).
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
      * @return bool True when the call name matches a mock-verification idiom.
      */
     public static function isMockVerificationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -358,6 +376,7 @@ final class TestQualityNodeHelper
     /**
      * Value of the call's first argument, or null when the call has no first argument.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
      * @return Expr|null
      */
     public static function firstArgValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?Expr
@@ -368,6 +387,8 @@ final class TestQualityNodeHelper
     /**
      * Value of the call's argument at the given index, or null when missing or spread.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
+     * @param int $index Zero-based argument index.
      * @return Expr|null
      */
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
@@ -382,6 +403,7 @@ final class TestQualityNodeHelper
     /**
      * String literal value of the argument, or null when the argument is not a string literal.
      *
+     * @param Arg $arg Argument node to inspect.
      * @return string|null
      */
     public static function argString(Arg $arg): ?string
@@ -392,6 +414,7 @@ final class TestQualityNodeHelper
     /**
      * Resolve the literal value of an expression (scalar literal or const true/false/null), or null when not a literal.
      *
+     * @param Expr|null $expr Expression to resolve.
      * @return bool|int|float|string|null
      */
     public static function literalValue(?Expr $expr): bool|int|float|string|null
@@ -417,6 +440,7 @@ final class TestQualityNodeHelper
     /**
      * Walk a Pest expectation chain back to the expect()'d value.
      *
+     * @param Expr\MethodCall $call Pest expectation method call to unwind.
      * @return Expr|null The expression originally wrapped by expect(...), or null when the chain doesn't start with expect().
      */
     public static function pestExpectationValue(Expr\MethodCall $call): ?Expr
@@ -437,6 +461,8 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the method carries an attribute matching the given short name (case-insensitive).
      *
+     * @param Stmt\ClassMethod $node Method node whose attributes should be inspected.
+     * @param string $shortName Attribute short name to match case-insensitively.
      * @return bool True when at least one #[...] attribute group has an attribute whose last name segment matches.
      */
     public static function hasAttribute(Stmt\ClassMethod $node, string $shortName): bool
@@ -455,6 +481,7 @@ final class TestQualityNodeHelper
     /**
      * Get the enclosing Class_ node via the `parent` AST attribute, or null when unattached.
      *
+     * @param Node $node Node whose parent chain should be inspected.
      * @return Stmt\Class_|null
      */
     public static function parentClass(Node $node): ?Stmt\Class_
@@ -467,6 +494,7 @@ final class TestQualityNodeHelper
     /**
      * Strip the test* prefix and non-alphanumeric chars from a test method name; lowercase the result.
      *
+     * @param string $name Test method name to normalize.
      * @return string The normalised form used for cross-method comparisons.
      */
     public static function normalizedTestName(string $name): string
@@ -479,6 +507,7 @@ final class TestQualityNodeHelper
     /**
      * Detect a non-trivial integer literal used as the assertion's expected value, or null when none.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call to inspect.
      * @return int|null The literal expected value, ignoring -1 / 0 / 1 as not-magic.
      */
     public static function isAssertionMagicNumber(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int
@@ -500,6 +529,7 @@ final class TestQualityNodeHelper
     /**
      * Get the node's docComment, or null when absent.
      *
+     * @param Node $node Node whose doc comment should be returned.
      * @return Doc|null
      */
     public static function docComment(Node $node): ?Doc

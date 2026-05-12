@@ -50,6 +50,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Find documented public function-like declarations with undocumented parameters.
      *
+     * @param AnalysisUnit $unit Parsed unit to inspect.
+     * @param RuleContext $context Rule context for this analysis pass.
      * @return list<Finding> Findings for missing parameter tags.
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -63,7 +65,7 @@ final readonly class MissingParamTagRule implements RuleInterface
         $findings = [];
 
         foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node */
+            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
             if ($node instanceof ClassMethod && !$node->isPublic()) {
                 continue;
             }
@@ -114,7 +116,10 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * @return list<string>
+     * Extract parameter names documented by @param tags.
+     *
+     * @param string $docText Raw docblock text.
+     * @return list<string> Parameter names found in the docblock.
      */
     public static function extractParamNames(string $docText): array
     {
