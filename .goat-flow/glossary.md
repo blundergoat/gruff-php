@@ -1,6 +1,6 @@
 # Glossary - gruff-php
 
-Last reviewed 2026-05-11. Terms are grouped by domain. Each entry points at the file or files that own the concept; if you change behaviour, update the glossary entry too.
+Last reviewed 2026-05-14. Terms are grouped by domain. Each entry points at the file or files that own the concept; if you change behaviour, update the glossary entry too.
 
 ## Project shape
 
@@ -20,6 +20,10 @@ The AI-agent workflow layer under `.goat-flow/` (durable knowledge: architecture
 
 Files owned by one specific agent runtime. Claude Code uses `CLAUDE.md` and `.claude/**`. Codex uses `AGENTS.md`, `.codex/**`, and the shared `.agents/skills/**`. Cross-agent goat-flow rules in `CLAUDE.md` and `AGENTS.md` should stay consistent (see CLAUDE.md "Hard Rules").
 
+### Gruff naming conventions
+
+Shared naming policy for the gruff implementation family. See repo-root `docs/naming-conventions.md`. Public rule ids use `<namespace>.<rule-slug>` with lowercase kebab-case segments, documentation rule ids use `docs.*` while the emitted pillar remains `documentation`, and shared config keys prefer `.gruff.yaml`, `paths.ignore`, `allowlists.acceptedAbbreviations`, `allowlists.secretPreviews`, `selection`, and `rules`.
+
 ## CLI surface
 
 ### `bin/gruff`
@@ -28,7 +32,7 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 
 ### `Application`
 
-`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse`, `report`, `dashboard`, and `list-rules` commands.
+`src/Console/Application.php`. Symfony Console subclass named `gruff` with `VERSION = '0.1.0-dev'`. Registers the `analyse`, `summary`, `report`, `dashboard`, and `list-rules` commands.
 
 ### `analyse` command
 
@@ -37,6 +41,10 @@ Executable shim that requires `vendor/autoload.php` and runs `(new GruffPhp\Cons
 ### `list-rules` command
 
 `src/Command/ListRulesCommand.php`. Registry metadata command. Emits rule id, name, pillar, tier, default severity, confidence, default enabled state, thresholds, options, and description as a table or JSON (`--format=json`) so agents do not need to scrape source code.
+
+### `summary` command
+
+`src/Command/SummaryCommand.php` and `src/Command/SummaryReportData.php`. Compact analysis command that runs the same analyser pipeline as `analyse` and emits aggregate report data without the per-finding listing.
 
 ### `report` command
 
@@ -144,6 +152,10 @@ Project-root config file consumed by `ConfigLoader`. Default location is `<proje
 
 `src/Rule/RuleDefinition.php`. Stable rule metadata: `id` (validated against `^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`), `name`, `pillar`, `tier`, `defaultSeverity`, `confidence`, `defaultThresholds`, optional `secondaryPillars`, `defaultEnabled` (default-disabled heuristics opt in via config), and `defaultOptions` (non-numeric configuration like namespace globs, poor-name patterns, allowed literals). Constructing a rule with an invalid id or empty threshold/option name throws `InvalidArgumentException`.
 
+### Rule ID
+
+Stable public identifier for one rule, surfaced as `Finding.ruleId`, baseline `ruleId`, config `rules.<id>`, and `list-rules` metadata. gruff-php follows the gruff-family convention `<namespace>.<rule-slug>` with lowercase kebab-case segments. The rule-id namespace usually matches the quality area, but `docs.*` is intentionally used for documentation rules while findings still serialize the pillar as `documentation`.
+
 ### `RuleContext`
 
 `src/Rule/RuleContext.php`. Passed to every rule run: project root and the resolved `AnalysisConfig`. `settingsFor($definition)` returns the matching `RuleSettings`.
@@ -244,7 +256,7 @@ The 16-character hash returned by `Finding::fingerprint()`. Designed to be stabl
 
 ### `OutputFormat`
 
-`src/Reporting/OutputFormat.php`. `text` (default), `json`, `html`, `markdown`, `github`, or `hotspot`. `fromInput()` returns `null` for unknown values so the command can emit a `usage-error`.
+`src/Reporting/OutputFormat.php`. `text` (default), `json`, `html`, `markdown`, `github`, `hotspot`, or `sarif`. `fromInput()` returns `null` for unknown values so the command can emit a `usage-error`.
 
 ### `FailThreshold`
 
