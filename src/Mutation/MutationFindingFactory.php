@@ -47,7 +47,7 @@ final readonly class MutationFindingFactory
             );
         }
 
-        if ($result->budgetExceeded()) {
+        if ($result->isBudgetExceeded()) {
             $findings[] = new Finding(
                 ruleId:  'mutation.budget-exceeded',
                 message: sprintf(

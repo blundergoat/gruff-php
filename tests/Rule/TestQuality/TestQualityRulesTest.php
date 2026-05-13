@@ -49,8 +49,12 @@ use GruffPhp\Rule\TestQuality\UnusedMockRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers TestQualityRulesTest behavior.
+ */
 final class TestQualityRulesTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
@@ -119,6 +123,157 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(SutNotCalledRule::ID, 1, $findings);
         // 1 mixed-style class finding (MixedNamingQualityTest) + 2 poor-name method findings (PoorlyNamedTest::testProcessOrderWorks, ::testProcessOrder1)
         self::assertRuleCount(TestNamingConsistencyRule::ID, 3, $findings);
+    }
+
+    /**
+     * Verify eager test ignores result observation calls after a single act.
+     *
+     * @return void No return value.
+     */
+    public function testEagerTestIgnoresResultObservationCallsAfterSingleAct(): void
+    {
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/eager-test-observation-cases.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame('MultipleBehaviorQualityTest::testProcessesOrderAndSendsReceipt()', $findings[0]->symbol);
+    }
+
+    /**
+     * Verify eager-test reports real multi-act cases with stable metadata.
+     *
+     * @return void No return value.
+     */
+    public function testEagerTestReportsRealMultiActCasesWithStableMetadata(): void
+    {
+        $findings = $this->eagerMutationFindings();
+        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+
+        self::assertSame([
+            'EagerPositiveMutationCasesTest::testProcessesOrderAndSendsReceipt()',
+            'EagerPositiveMutationCasesTest::testStaticServiceHandlesTwoBehaviors()',
+            'EagerPositiveMutationCasesTest::testNewServiceHandlesTwoBehaviors()',
+            'EagerPositiveMutationCasesTest::testPropertyServiceHandlesTwoBehaviors()',
+            'EagerPositiveMutationCasesTest::testObservationNamedMethodsStillCountOnDomainReceiver()',
+            'EagerPositiveMutationCasesTest::testSkipsNoiseBeforeRealSutCalls()',
+            'EagerPositiveMutationCasesTest::testSkipsResultObservationBeforeRealSutCalls()',
+            'EagerPositiveMutationCasesTest::testDomainStartWaitStopMethodsAreSutCalls()',
+            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForVariables()',
+            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForStaticCalls()',
+            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForNewExpressions()',
+            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForProperties()',
+            'EagerPositiveMutationCasesTest::testKnownReceiverNonObservationMethodsStillCount()',
+            'EagerPositiveMutationCasesTest::testLargestReceiverTieKeepsFirstReceiver()',
+        ], $symbols);
+
+        self::assertSame(3, $findings[0]->metadata['assertions'] ?? null);
+        self::assertSame(['processorder', 'sendreceipt', 'audittrailwritten'], $findings[0]->metadata['sutCalls'] ?? null);
+        self::assertSame(['processorder', 'sendreceipt'], $findings[1]->metadata['sutCalls'] ?? null);
+        self::assertSame(['getstatus', 'hasreceipt'], $findings[4]->metadata['sutCalls'] ?? null);
+        self::assertSame(['processorder', 'sendreceipt'], $findings[13]->metadata['sutCalls'] ?? null);
+    }
+
+    /**
+     * Verify eager-test ignores assertion, harness, and observation noise.
+     *
+     * @return void No return value.
+     */
+    public function testEagerTestIgnoresAssertionHarnessAndObservationNoise(): void
+    {
+        $findings = $this->eagerMutationFindings();
+        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+
+        self::assertNotContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionHelperCallsDoNotBecomeSutCalls()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDirectThisHelpersDoNotBecomeSutCalls()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionNamedCollaboratorCallsDoNotBecomeSutCalls()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testNestedSutCallsInsideAssertionsAreObservations()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testMockExpectationCallsDoNotBecomeSutCalls()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testGenericSetTimeoutIsSetupNotSutExercise()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testProcessHarnessCallsDoNotBecomeSutExercise()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testUppercaseProcessHarnessReceiverIsStillRecognised()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testResultVariableObservationsDoNotBecomeSutExercise()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testKnownObservationReceiversDoNotBecomeSutExercise()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testCountObservationDoesNotPairWithNonObservationOnKnownReceiver()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctStaticReceiversDoNotCollapseTogether()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctVariableReceiversDoNotCollapseTogether()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctNewReceiversDoNotCollapseTogether()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctPropertyNamesDoNotCollapseTogether()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testDistinctPropertyOwnersDoNotCollapseTogether()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testSecondResultVariableObservationsRemainSkipped()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testResultVariablesAfterNonVariableAssignmentRemainSkipped()', $symbols);
+        self::assertNotContains('EagerNegativeMutationCasesTest::testChainedResultVariableObservationsRemainSkipped()', $symbols);
+    }
+
+    /**
+     * Verify eager-test treats fractional assertion thresholds as integer minima.
+     *
+     * @return void No return value.
+     */
+    public function testEagerTestCastsFractionalAssertionThreshold(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            EagerTestRule::ID,
+            new RuleSettings(true, ['minAssertions' => 2.5]),
+        );
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php', $config),
+            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+        ));
+        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+
+        self::assertContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
+    }
+
+    /**
+     * Verify SUT-not-called only flags leading method-style test names.
+     *
+     * @return void No return value.
+     */
+    public function testSutNotCalledOnlyFlagsLeadingMethodStyleTestNames(): void
+    {
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/sut-not-called-heuristic.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === SutNotCalledRule::ID,
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame('SutNotCalledHeuristicTest::testCalculateTotalReturnsExpectedValue()', $findings[0]->symbol);
+    }
+
+    /**
+     * Verify magic number assertion ignores contextual numeric contracts.
+     *
+     * @return void No return value.
+     */
+    public function testMagicNumberAssertionIgnoresContextualNumericContracts(): void
+    {
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/magic-number-assertion-heuristic.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === MagicNumberAssertionRule::ID,
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame('MagicNumberHeuristicTest::testOpaqueBusinessNumberIsFlagged()', $findings[0]->symbol);
+    }
+
+    /**
+     * Verify loop-in-test only flags loops that contain assertions.
+     *
+     * @return void No return value.
+     */
+    public function testLoopInTestOnlyFlagsLoopsContainingAssertions(): void
+    {
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/loop-in-test-heuristic.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === LoopInTestRule::ID,
+        ));
+
+        self::assertCount(1, $findings);
+        self::assertSame('LoopInTestHeuristicTest::testAssertionInsideLoopIsFlagged()', $findings[0]->symbol);
     }
 
     /**
@@ -197,7 +352,7 @@ final class TestQualityRulesTest extends TestCase
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/loop-assertion-without-message.php');
 
-        self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 2, $findings);
+        self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 3, $findings);
     }
 
     /**
@@ -260,21 +415,19 @@ final class TestQualityRulesTest extends TestCase
 
         self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
 
-        $variants  = [];
-        $variables = [];
-        foreach ($findings as $finding) {
-            if ($finding->ruleId !== MockWithoutExpectationRule::ID) {
-                continue;
-            }
+        $mockFindings = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => $finding->ruleId === MockWithoutExpectationRule::ID,
+        ));
+        $variants = array_values(array_filter(
+            array_map(static fn (Finding $finding): mixed => $finding->metadata['variant'] ?? null, $mockFindings),
+            'is_string',
+        ));
+        $variables = array_values(array_filter(
+            array_map(static fn (Finding $finding): mixed => $finding->metadata['variable'] ?? null, $mockFindings),
+            'is_string',
+        ));
 
-            $variant = $finding->metadata['variant'] ?? null;
-            self::assertIsString($variant);
-            $variants[] = $variant;
-
-            $variable = $finding->metadata['variable'] ?? null;
-            self::assertIsString($variable);
-            $variables[] = $variable;
-        }
         sort($variants);
         self::assertSame(['dead-mock', 'stub-only'], $variants);
         self::assertNotContains('fake', $variables);
@@ -287,9 +440,19 @@ final class TestQualityRulesTest extends TestCase
      */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php');
+        $findings = array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === RepeatedStructureMissingDataProviderRule::ID,
+        ));
 
-        self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 1, $findings);
+        self::assertCount(2, $findings);
+        self::assertSame('RepeatedShapesTest::testSumsAlpha()', $findings[0]->symbol);
+        self::assertSame(['testSumsAlpha', 'testSumsBeta', 'testSumsGamma'], $findings[0]->metadata['methods'] ?? null);
+        self::assertSame(3, $findings[0]->metadata['count'] ?? null);
+        self::assertStringContainsString('RepeatedShapesTest has 3 structurally identical test methods', $findings[0]->message);
+        self::assertSame('RepeatedControlFlowTest::testComplexAlpha()', $findings[1]->symbol);
+        self::assertSame(['testComplexAlpha', 'testComplexBeta', 'testComplexGamma'], $findings[1]->metadata['methods'] ?? null);
+        self::assertSame(3, $findings[1]->metadata['count'] ?? null);
     }
 
     /**
@@ -539,9 +702,9 @@ final class TestQualityRulesTest extends TestCase
         ));
 
         $ruleIds = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
-        foreach ($this->expectedRuleIds() as $ruleId) {
-            self::assertContains($ruleId, $ruleIds);
-        }
+        $missingRuleIds = array_values(array_diff($this->expectedRuleIds(), $ruleIds));
+
+        self::assertSame([], $missingRuleIds);
 
         $fingerprints = array_map(static fn (Finding $finding): string => $finding->fingerprint(), $findings);
         self::assertCount(count($fingerprints), array_unique($fingerprints));
@@ -549,6 +712,7 @@ final class TestQualityRulesTest extends TestCase
 
     /**
      * @param list<Finding> $findings
+     * @return void No return value.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -602,6 +766,17 @@ final class TestQualityRulesTest extends TestCase
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
         return $this->analysePaths([$path], $config);
+    }
+
+    /**
+     * @return list<Finding>
+     */
+    private function eagerMutationFindings(): array
+    {
+        return array_values(array_filter(
+            $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php'),
+            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+        ));
     }
 
     /**

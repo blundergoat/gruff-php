@@ -25,8 +25,12 @@ use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ModernisationRulesTest behavior.
+ */
 final class ModernisationRulesTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
@@ -150,6 +154,7 @@ final class ModernisationRulesTest extends TestCase
 
     /**
      * @param list<Finding> $findings
+     * @return void No return value.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {

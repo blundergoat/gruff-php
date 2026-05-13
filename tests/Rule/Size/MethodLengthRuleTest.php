@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\MethodLengthRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers MethodLengthRuleTest behavior.
+ */
 final class MethodLengthRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private MethodLengthRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -116,7 +121,7 @@ final class MethodLengthRuleTest extends TestCase
         );
 
         $findings       = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-        $methodFindings = array_filter($findings, static fn ($f) => $f->ruleId === MethodLengthRule::ID);
+        $methodFindings = array_filter($findings, static fn ($finding) => $finding->ruleId === MethodLengthRule::ID);
 
         self::assertSame([], array_values($methodFindings));
     }

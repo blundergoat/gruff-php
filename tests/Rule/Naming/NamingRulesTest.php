@@ -22,8 +22,12 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers NamingRulesTest behavior.
+ */
 final class NamingRulesTest extends TestCase
 {
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -47,7 +51,7 @@ final class NamingRulesTest extends TestCase
 
         self::assertCount(6, $findings);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('GenericMethodFixture::process()', $symbols);
         self::assertContains('GenericMethodFixture::handle()', $symbols);
         self::assertContains('GenericMethodFixture::execute()', $symbols);
@@ -62,7 +66,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('GenericMethodFixture::processPayment()', $symbols);
         self::assertNotContains('GenericMethodFixture::handleRequest()', $symbols);
         self::assertNotContains('GenericMethodFixture::calculateTotal()', $symbols);
@@ -77,7 +81,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('FrameworkOverrideFixture::execute()', $symbols);
     }
 
@@ -90,7 +94,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
 
-        $vars = array_map(static fn ($f) => $f->metadata['variable'] ?? null, $findings);
+        $vars = array_map(static fn ($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertContains('x', $vars);
         self::assertContains('a', $vars);
     }
@@ -104,7 +108,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
 
-        $vars = array_map(static fn ($f) => $f->metadata['variable'] ?? null, $findings);
+        $vars = array_map(static fn ($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertNotContains('i', $vars);
         self::assertNotContains('j', $vars);
     }
@@ -139,7 +143,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
 
-        $vars = array_map(static fn ($f) => $f->metadata['variable'] ?? null, $findings);
+        $vars = array_map(static fn ($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertNotContains('e', $vars);
     }
 
@@ -154,7 +158,7 @@ final class NamingRulesTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::check()', $symbols);
@@ -169,11 +173,12 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('BooleanPrefixFixture::isActive()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::hasPermission()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::canEdit()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::containsValue()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
     }
@@ -187,7 +192,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('BooleanPrefixFixture::getName()', $symbols);
     }
 
@@ -200,7 +205,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
 
-        $vars = array_map(static fn ($f) => $f->metadata['variable'] ?? null, $findings);
+        $vars = array_map(static fn ($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertContains('strName', $vars);
         self::assertContains('arrItems', $vars);
         self::assertContains('intCount', $vars);
@@ -217,7 +222,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
 
-        $vars = array_map(static fn ($f) => $f->metadata['variable'] ?? null, $findings);
+        $vars = array_map(static fn ($finding) => $finding->metadata['variable'] ?? null, $findings);
         self::assertNotContains('name', $vars);
         self::assertNotContains('items', $vars);
         self::assertNotContains('strategy', $vars);
@@ -232,7 +237,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('confusing-class.php', ConfusingNameRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('Helper', $symbols);
         self::assertContains('Util', $symbols);
     }
@@ -246,7 +251,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('confusing-class.php', ConfusingNameRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UserService', $symbols);
         self::assertNotContains('OrderRepository', $symbols);
     }
@@ -273,7 +278,7 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('test-naming.php', TestNamingConsistencyRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('ConsistentTestNamingFixture', $symbols);
     }
 
@@ -288,6 +293,30 @@ final class NamingRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
+    }
+
+    /**
+     * Verify class file mismatch skips non classlike config filenames.
+     *
+     * @return void No return value.
+     */
+    public function testClassFileMismatchSkipsNonClasslikeConfigFilenames(): void
+    {
+        $unit = $this->parser->parse(new SourceFile(
+            __DIR__ . '/../../../.php-cs-fixer.dist.php',
+            '.php-cs-fixer.dist.php',
+        ));
+        $registry = RuleRegistry::defaults();
+        $findings = $registry->analyse([$unit], new RuleContext(
+            __DIR__ . '/../../..',
+            AnalysisConfig::fromRegistry($registry),
+        ));
+        $mismatches = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === ClassFileMismatchRule::ID,
+        ));
+
+        self::assertSame([], $mismatches);
     }
 
     /**
@@ -313,13 +342,16 @@ final class NamingRulesTest extends TestCase
     {
         $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
         $reported = [];
-
         foreach ($findings as $finding) {
-            $identifierKind = $finding->metadata['identifierKind'] ?? null;
-            $identifierName = $finding->metadata['identifierName'] ?? null;
-            self::assertIsString($identifierKind);
-            self::assertIsString($identifierName);
-            $reported[$identifierKind . ':' . $identifierName] = $finding->metadata['variant'] ?? null;
+            $kind = $finding->metadata['identifierKind'] ?? null;
+            $name = $finding->metadata['identifierName'] ?? null;
+            $variant = $finding->metadata['variant'] ?? null;
+
+            self::assertIsString($kind);
+            self::assertIsString($name);
+            self::assertIsString($variant);
+
+            $reported[sprintf('%s:%s', $kind, $name)] = $variant;
         }
 
         self::assertSame('generic', $reported['class:Thing'] ?? null);
@@ -363,14 +395,10 @@ final class NamingRulesTest extends TestCase
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
         $findings    = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
-        $itemFinding = null;
-
-        foreach ($findings as $finding) {
-            if (($finding->metadata['identifierName'] ?? null) === 'item') {
-                $itemFinding = $finding;
-                break;
-            }
-        }
+        $itemFinding = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => ($finding->metadata['identifierName'] ?? null) === 'item',
+        ))[0] ?? null;
 
         self::assertNotNull($itemFinding);
         self::assertSame('variable', $itemFinding->metadata['identifierKind']);
@@ -388,12 +416,15 @@ final class NamingRulesTest extends TestCase
     public function testParameterNamesMatchObjectTypeNames(): void
     {
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
-
         $reported = [];
         foreach ($findings as $finding) {
-            $parameter = $finding->metadata['parameter'] ?? '';
+            $parameter = $finding->metadata['parameter'] ?? null;
+            $expectedName = $finding->metadata['expectedName'] ?? null;
+
             self::assertIsString($parameter);
-            $reported[$parameter] = $finding->metadata['expectedName'] ?? null;
+            self::assertIsString($expectedName);
+
+            $reported[$parameter] = $expectedName;
         }
 
         self::assertSame('bookingSession', $reported['session'] ?? null);
@@ -431,12 +462,15 @@ final class NamingRulesTest extends TestCase
         // through `UnionType` to `return null`. After M32 Phase 1 the rule unwraps any
         // union whose non-null arm count is exactly one and recurses, matching `?Foo`.
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
-
         $bySymbol = [];
         foreach ($findings as $finding) {
             $symbol = $finding->symbol;
+            $expectedName = $finding->metadata['expectedName'] ?? null;
+
             self::assertIsString($symbol);
-            $bySymbol[$symbol] = $finding->metadata['expectedName'] ?? null;
+            self::assertIsString($expectedName);
+
+            $bySymbol[$symbol] = $expectedName;
         }
 
         self::assertSame('bookingSession', $bySymbol['ParameterTypeNameFixture::unionNullableLeft()'] ?? null);
@@ -531,6 +565,89 @@ final class NamingRulesTest extends TestCase
     }
 
     /**
+     * Verify identifier quality mutation fixture reports stable kinds and messages.
+     *
+     * @return void No return value.
+     */
+    public function testIdentifierQualityMutationFixtureFindingsAreStable(): void
+    {
+        $findings = $this->analyseRule('identifier-quality-mutation-cases.php', IdentifierQualityRule::ID);
+        $tuples = array_map(
+            static fn ($finding): array => [
+                $finding->symbol,
+                $finding->metadata['identifierKind'] ?? null,
+                $finding->metadata['identifierName'] ?? null,
+                $finding->metadata['variant'] ?? null,
+                $finding->metadata['matchedToken'] ?? null,
+                $finding->message,
+            ],
+            $findings,
+        );
+
+        self::assertSame([
+            ['Temp', 'class', 'Temp', 'placeholder', 'temp', 'Class name "Temp" is placeholder and does not communicate clear intent.'],
+            ['$stuff', 'property', 'stuff', 'generic', 'stuff', 'Property name "stuff" is generic and does not communicate clear intent.'],
+            ['$Temp', 'property', 'Temp', 'placeholder', 'temp', 'Property name "Temp" is placeholder and does not communicate clear intent.'],
+            ['Temp::temp()', 'method', 'temp', 'placeholder', 'temp', 'Method name "temp" is placeholder and does not communicate clear intent.'],
+            ['Temp::temp()', 'parameter', 'foo', 'placeholder', 'foo', 'Parameter name "foo" is placeholder and does not communicate clear intent.'],
+            ['Temp::temp()', 'parameter', 'obj', 'placeholder', 'obj', 'Parameter name "obj" is placeholder and does not communicate clear intent.'],
+            ['Temp::temp()', 'variable', 'item', 'generic', 'item', 'Variable name "item" is generic and does not communicate clear intent.'],
+            ['Temp::temp()', 'variable', 'item2', 'numbered', '2', 'Variable name "item2" is numbered and does not communicate clear intent.'],
+            ['Temp::countedVariables()', 'variable', 'item', 'generic', 'item', 'Variable name "item" is generic and does not communicate clear intent.'],
+            ['Temp::countedVariables()', 'variable', 'thing', 'generic', 'thing', 'Variable name "thing" is generic and does not communicate clear intent.'],
+            ['Data', 'interface', 'Data', 'generic', 'data', 'Interface name "Data" is generic and does not communicate clear intent.'],
+            ['HelperThing', 'trait', 'HelperThing', 'generic', 'helper thing', 'Trait name "HelperThing" is generic and does not communicate clear intent.'],
+            ['Stuff', 'enum', 'Stuff', 'generic', 'stuff', 'Enum name "Stuff" is generic and does not communicate clear intent.'],
+            ['bar()', 'function', 'bar', 'placeholder', 'bar', 'Function name "bar" is placeholder and does not communicate clear intent.'],
+            ['bar()', 'parameter', 'obj', 'placeholder', 'obj', 'Parameter name "obj" is placeholder and does not communicate clear intent.'],
+            ['bar()', 'variable', 'tmp', 'placeholder', 'tmp', 'Variable name "tmp" is placeholder and does not communicate clear intent.'],
+        ], $tuples);
+    }
+
+    /**
+     * Verify identifier quality honours local-variable reference thresholds.
+     *
+     * @return void No return value.
+     */
+    public function testIdentifierQualityHonoursLocalVariableReferenceThreshold(): void
+    {
+        $unit     = $this->parseFixture('identifier-quality-mutation-cases.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(IdentifierQualityRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            IdentifierQualityRule::ID,
+            new \GruffPhp\Config\RuleSettings(
+                enabled:    true,
+                thresholds: $settings->thresholds,
+                options:    array_merge($settings->options, ['minScopeReferences' => 2]),
+            ),
+        );
+        $findings = array_values(array_filter(
+            $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config)),
+            static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
+        ));
+        $reported = [];
+        foreach ($findings as $finding) {
+            $symbol = $finding->symbol;
+            $name = $finding->metadata['identifierName'] ?? null;
+
+            self::assertIsString($symbol);
+            self::assertIsString($name);
+
+            $reported[] = sprintf('%s:%s', $symbol, $name);
+        }
+
+        self::assertContains('Temp::temp():item', $reported);
+        self::assertContains('Temp::temp():item2', $reported);
+        self::assertContains('Temp::countedVariables():item', $reported);
+        self::assertContains('bar():tmp', $reported);
+        self::assertNotContains('Temp::countedVariables():thing', $reported);
+        self::assertNotContains('Temp::loopAndCatchVariables():item', $reported);
+        self::assertNotContains('Temp::loopAndCatchVariables():thing', $reported);
+        self::assertNotContains('Temp::loopAndCatchVariables():tmp', $reported);
+    }
+
+    /**
      * Verify clean fixture has no naming findings except file mismatch.
      *
      * @return void No return value.
@@ -544,7 +661,7 @@ final class NamingRulesTest extends TestCase
 
         $namingFindings = array_filter(
             $findings,
-            static fn ($f) => str_starts_with($f->ruleId, 'naming.') && $f->ruleId !== ClassFileMismatchRule::ID,
+            static fn ($finding) => str_starts_with($finding->ruleId, 'naming.') && $finding->ruleId !== ClassFileMismatchRule::ID,
         );
         self::assertSame([], array_values($namingFindings));
     }
@@ -559,7 +676,7 @@ final class NamingRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
     }
 
     /**

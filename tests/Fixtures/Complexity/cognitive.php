@@ -95,4 +95,91 @@ class CognitiveFixture
 
         return $count;
     }
+
+    public function whileWithBooleanCondition(int $x): int
+    {
+        while ($x > 0 && $x < 10) {
+            $x--;
+        }
+
+        return $x;
+    }
+
+    public function doWhileWithBooleanCondition(int $x): int
+    {
+        do {
+            $x++;
+        } while ($x < 3 || $x > 20);
+
+        return $x;
+    }
+
+    public function tryCatchFinallyBranches(int $x): int
+    {
+        try {
+            if ($x > 0) {
+                return $x;
+            }
+        } catch (\RuntimeException) {
+            if ($x < 0) {
+                return -1;
+            }
+        } finally {
+            if ($x === 0) {
+                $x++;
+            }
+        }
+
+        return $x;
+    }
+
+    public function jumpsAndGoto(array $items): int
+    {
+        foreach ($items as $item) {
+            for ($i = 0; $i < $item; $i++) {
+                if ($i > 10) {
+                    break 2;
+                }
+
+                if ($i === 5) {
+                    continue 2;
+                }
+            }
+        }
+
+        goto done;
+
+        done:
+        return 0;
+    }
+
+    public function logicalKeywordChain(bool $first, bool $second, bool $third): bool
+    {
+        if ($first and $second or $third) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function expressionAndReturnTernaries(int $x): int
+    {
+        $value = $x > 10 ? 10 : ($x > 0 ? $x : 0);
+
+        return $value > 0 ? $value : 0;
+    }
+
+    public function closureAndArrowFunction(int $x): int
+    {
+        $closure = function () use ($x): int {
+            if ($x > 0) {
+                return $x;
+            }
+
+            return 0;
+        };
+        $arrow = fn (): int => $x > 0 ? $x : 0;
+
+        return $closure() + $arrow();
+    }
 }

@@ -43,7 +43,7 @@ final readonly class FindingDisplayFilter
      *
      * @return bool True when at least one filter is active.
      */
-    public function active(): bool
+    public function isActive(): bool
     {
         return $this->minSeverity !== null
             || $this->includePillars !== []
@@ -65,7 +65,7 @@ final readonly class FindingDisplayFilter
     public function toArray(): array
     {
         return [
-            'active' => $this->active(),
+            'active' => $this->isActive(),
             'minSeverity' => $this->minSeverity?->value,
             'includePillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $this->includePillars),
             'excludePillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $this->excludePillars),

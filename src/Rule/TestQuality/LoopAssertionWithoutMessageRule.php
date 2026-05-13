@@ -126,12 +126,79 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
      */
     private function hasMessageArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
-        if ($call->args === []) {
+        $name = TestQualityNodeHelper::callName($call);
+        if ($name === null) {
             return false;
         }
 
-        $lastIndex = count($call->args) - 1;
-        $lastArg   = $call->args[$lastIndex] ?? null;
+        $minimumArgumentCount = $this->minimumArgumentCountBeforeMessage($name);
+        if ($minimumArgumentCount === null) {
+            return $this->hasLegacyStringMessageArgument($call);
+        }
+
+        return count($call->args) > $minimumArgumentCount;
+    }
+
+    /**
+     * @return int|null Number of required non-message arguments, or null for unknown assertions.
+     */
+    private function minimumArgumentCountBeforeMessage(string $name): ?int
+    {
+        if (in_array($name, [
+            'fail',
+            'expectoutputstring',
+            'expectoutputregex',
+        ], true)) {
+            return 0;
+        }
+
+        if (in_array($name, [
+            'assertarrayhaskey',
+            'assertarraynothaskey',
+            'assertcontains',
+            'assertcontainsstring',
+            'assertcount',
+            'assertdirectoryexists',
+            'assertdirectorydoesnotexist',
+            'assertequals',
+            'assertfileexists',
+            'assertfiledoesnotexist',
+            'assertgreaterthan',
+            'assertgreaterthanorequal',
+            'assertinstanceof',
+            'assertlessthan',
+            'assertlessthanorequal',
+            'assertmatchesregularexpression',
+            'assertnotsame',
+            'assertsame',
+            'assertstringcontainsstring',
+            'assertstringendswith',
+            'assertstringnotcontainsstring',
+            'assertstringstartswith',
+            'assertthat',
+        ], true)) {
+            return 2;
+        }
+
+        if (str_starts_with($name, 'assert')) {
+            return 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * Keep a conservative fallback for custom assertion helpers with unknown arity.
+     *
+     * @return bool True when the final argument looks like message text.
+     */
+    private function hasLegacyStringMessageArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        if (count($call->args) < 3) {
+            return false;
+        }
+
+        $lastArg = $call->args[count($call->args) - 1] ?? null;
         if (!$lastArg instanceof Arg) {
             return false;
         }

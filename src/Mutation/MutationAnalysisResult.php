@@ -38,7 +38,7 @@ final readonly class MutationAnalysisResult
      *
      * @return bool True when the mutation budget is exceeded.
      */
-    public function budgetExceeded(): bool
+    public function isBudgetExceeded(): bool
     {
         return $this->mutationBudget !== null && $this->survivedCount() > $this->mutationBudget;
     }
@@ -108,7 +108,7 @@ final readonly class MutationAnalysisResult
                 : [
                     'limit' => $this->mutationBudget,
                     'survivedMutants' => $this->survivedCount(),
-                    'exceeded' => $this->budgetExceeded(),
+                    'exceeded' => $this->isBudgetExceeded(),
                 ],
         ];
     }

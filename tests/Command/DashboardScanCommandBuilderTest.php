@@ -7,6 +7,9 @@ namespace GruffPhp\Tests\Command;
 use GruffPhp\Command\DashboardScanCommandBuilder;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers DashboardScanCommandBuilderTest behavior.
+ */
 final class DashboardScanCommandBuilderTest extends TestCase
 {
     /**

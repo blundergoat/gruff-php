@@ -8,8 +8,12 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers GruffCliSummaryTest behavior.
+ */
 final class GruffCliSummaryTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**

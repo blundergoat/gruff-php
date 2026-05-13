@@ -11,6 +11,9 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers FindingTest behavior.
+ */
 final class FindingTest extends TestCase
 {
     /**

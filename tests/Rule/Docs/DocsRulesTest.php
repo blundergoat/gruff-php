@@ -23,8 +23,12 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers DocsRulesTest behavior.
+ */
 final class DocsRulesTest extends TestCase
 {
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -46,7 +50,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::undocumented()', $symbols);
         self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
         self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
@@ -54,9 +58,9 @@ final class DocsRulesTest extends TestCase
         self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
         self::assertContains('AbstractFixture::inheritedHook()', $symbols);
 
-        foreach ($findings as $finding) {
-            self::assertSame(\GruffPhp\Finding\Severity::Error, $finding->severity);
-        }
+        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+
+        self::assertSame([\GruffPhp\Finding\Severity::Error->value], $severityValues);
     }
 
     /**
@@ -68,7 +72,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
     }
 
@@ -81,7 +85,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::getTitle()', $symbols);
         self::assertContains('MissingPhpdocFixture::setTitle()', $symbols);
         self::assertContains('MissingPhpdocFixture::isActive()', $symbols);
@@ -96,7 +100,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::privateMethod()', $symbols);
         self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
     }
@@ -110,7 +114,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
     }
 
@@ -123,7 +127,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
     }
 
@@ -136,7 +140,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('RuleContractFixture::definition()', $symbols);
         self::assertContains('RuleContractFixture::analyse()', $symbols);
     }
@@ -150,7 +154,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('InternalHelper::complexUtility()', $symbols);
         self::assertContains('TextReporter::render()', $symbols);
     }
@@ -166,10 +170,10 @@ final class DocsRulesTest extends TestCase
 
         $arrayParamFindings = array_filter(
             $findings,
-            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingArrayParam()',
+            static fn ($finding): bool => ($finding->symbol ?? '') === 'PhpdocTagsFixture::missingArrayParam()',
         );
 
-        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $arrayParamFindings);
+        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $arrayParamFindings);
         self::assertContains('y', $params);
     }
 
@@ -185,10 +189,10 @@ final class DocsRulesTest extends TestCase
 
         $scalarParamFindings = array_filter(
             $findings,
-            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingParam()',
+            static fn ($finding): bool => ($finding->symbol ?? '') === 'PhpdocTagsFixture::missingParam()',
         );
 
-        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $scalarParamFindings);
+        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $scalarParamFindings);
         self::assertContains('y', $params);
     }
 
@@ -203,10 +207,10 @@ final class DocsRulesTest extends TestCase
 
         $scalarParamFindings = array_filter(
             $findings,
-            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingScalarParamWithThrows()',
+            static fn ($finding): bool => ($finding->symbol ?? '') === 'PhpdocTagsFixture::missingScalarParamWithThrows()',
         );
 
-        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $scalarParamFindings);
+        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $scalarParamFindings);
         self::assertContains('groupId', $params);
     }
 
@@ -221,10 +225,10 @@ final class DocsRulesTest extends TestCase
 
         $descriptiveDocFindings = array_filter(
             $findings,
-            static fn ($f): bool => ($f->symbol ?? '') === 'PhpdocTagsFixture::missingReturnForDescriptiveDocblock()',
+            static fn ($finding): bool => ($finding->symbol ?? '') === 'PhpdocTagsFixture::missingReturnForDescriptiveDocblock()',
         );
 
-        $params = array_map(static fn ($f) => $f->metadata['parameter'] ?? null, $descriptiveDocFindings);
+        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $descriptiveDocFindings);
         self::assertContains('groupId', $params);
     }
 
@@ -237,7 +241,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('PhpdocTagsFixture::complete()', $symbols);
     }
 
@@ -250,7 +254,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('PhpdocTagsFixture::genericParamDocWithSpaces()', $symbols);
     }
 
@@ -263,7 +267,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::missingArrayReturn()', $symbols);
     }
 
@@ -276,7 +280,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::missingReturn()', $symbols);
     }
 
@@ -289,7 +293,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::missingReturnForDescriptiveDocblock()', $symbols);
     }
 
@@ -303,8 +307,8 @@ final class DocsRulesTest extends TestCase
         $paramFindings  = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
         $returnFindings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $paramSymbols  = array_map(static fn ($f) => $f->symbol, $paramFindings);
-        $returnSymbols = array_map(static fn ($f) => $f->symbol, $returnFindings);
+        $paramSymbols  = array_map(static fn ($finding) => $finding->symbol, $paramFindings);
+        $returnSymbols = array_map(static fn ($finding) => $finding->symbol, $returnFindings);
 
         self::assertNotContains('PhpdocTagsFixture::apiMarkerOnly()', $paramSymbols);
         self::assertContains('PhpdocTagsFixture::apiMarkerOnly()', $returnSymbols);
@@ -326,7 +330,7 @@ final class DocsRulesTest extends TestCase
         // contract with explicit fixtures so a future agent cannot silently re-narrow it.
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::voidWithDocblock()', $symbols);
         self::assertContains('PhpdocTagsFixture::neverWithDocblock()', $symbols);
     }
@@ -353,7 +357,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::throwsWithoutTag()', $symbols);
     }
 
@@ -384,7 +388,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::uselessDoc()', $symbols);
     }
 
@@ -397,7 +401,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::arrayShapeDoc()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::describedTagDoc()', $symbols);
@@ -448,7 +452,7 @@ final class DocsRulesTest extends TestCase
         // declaration node (Stmt\Property here) regardless of attribute decoration.
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('$attributedProperty', $symbols);
     }
 
@@ -461,7 +465,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('$attributedMethodResult', $symbols);
     }
 
@@ -477,7 +481,7 @@ final class DocsRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        $docFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'docs.'));
+        $docFindings = array_filter($findings, static fn ($finding) => str_starts_with($finding->ruleId, 'docs.'));
         self::assertSame([], array_values($docFindings));
     }
 
@@ -490,7 +494,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         sort($symbols);
 
         self::assertSame(
@@ -503,7 +507,7 @@ final class DocsRulesTest extends TestCase
             $symbols,
         );
 
-        $kinds = array_map(static fn ($f) => $f->metadata['classKind'], $findings);
+        $kinds = array_map(static fn ($finding) => $finding->metadata['classKind'], $findings);
         sort($kinds);
         self::assertSame(['class', 'enum', 'interface', 'trait'], $kinds);
     }
@@ -517,7 +521,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('DocumentedClass', $symbols);
         self::assertNotContains('AnonymousFactory', $symbols);
     }
@@ -578,7 +582,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         sort($symbols);
 
         self::assertSame(
@@ -601,15 +605,16 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
 
-        $byKind = ['declared' => 0, 'promoted' => 0];
-        foreach ($findings as $finding) {
-            $kind = $finding->metadata['kind'] ?? null;
-            self::assertContains($kind, ['declared', 'promoted']);
-            self::assertIsString($kind);
-            $byKind[$kind]++;
-        }
+        $kinds = array_map(static fn ($finding): mixed => $finding->metadata['kind'] ?? null, $findings);
+        $invalidKinds = array_values(array_filter(
+            $kinds,
+            static fn (mixed $kind): bool => !is_string($kind) || !in_array($kind, ['declared', 'promoted'], true),
+        ));
+        $byKind = array_count_values(array_values(array_filter($kinds, 'is_string')));
 
-        self::assertSame(['declared' => 1, 'promoted' => 3], $byKind);
+        self::assertSame([], $invalidKinds);
+        self::assertSame(1, $byKind['declared'] ?? 0);
+        self::assertSame(3, $byKind['promoted'] ?? 0);
     }
 
     /**
@@ -621,10 +626,14 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
 
-        foreach ($findings as $finding) {
-            self::assertNotNull($finding->symbol);
-            self::assertStringNotContainsString('$exempt', $finding->symbol);
-        }
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $leakedSymbols = array_values(array_filter(
+            $symbols,
+            static fn (?string $symbol): bool => $symbol !== null && str_contains($symbol, '$exempt'),
+        ));
+
+        self::assertNotContains(null, $symbols, 'Finding symbol should be present.');
+        self::assertSame([], $leakedSymbols);
     }
 
     /**
@@ -636,7 +645,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         sort($symbols);
 
         self::assertSame(
@@ -648,7 +657,7 @@ final class DocsRulesTest extends TestCase
             $symbols,
         );
 
-        $kinds = array_map(static fn ($f) => $f->metadata['kind'], $findings);
+        $kinds = array_map(static fn ($finding) => $finding->metadata['kind'], $findings);
         sort($kinds);
         self::assertSame(['class-constant', 'enum-case', 'enum-case'], $kinds);
     }
@@ -662,7 +671,7 @@ final class DocsRulesTest extends TestCase
     {
         $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('DocumentedEnum::FIRST', $symbols);
         self::assertNotContains('DocumentedEnum::SECOND', $symbols);
     }
@@ -677,7 +686,7 @@ final class DocsRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
     }
 
     /**

@@ -10,6 +10,9 @@ use GruffPhp\Trend\TrendRecorder;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
+/**
+ * Covers TrendRecorderTest behavior.
+ */
 final class TrendRecorderTest extends TestCase
 {
     /**

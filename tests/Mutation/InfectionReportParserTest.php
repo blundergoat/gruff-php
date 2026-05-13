@@ -12,8 +12,12 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
+/**
+ * Covers InfectionReportParserTest behavior.
+ */
 final class InfectionReportParserTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**

@@ -26,8 +26,12 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers SensitiveDataRulesTest behavior.
+ */
 final class SensitiveDataRulesTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
@@ -47,12 +51,16 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(HighEntropyStringRule::ID, 3, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
-        foreach ($this->secretValues() as $secret) {
-            foreach ($findings as $finding) {
-                self::assertStringNotContainsString($secret, $finding->message);
-                self::assertStringNotContainsString($secret, json_encode($finding->metadata, JSON_THROW_ON_ERROR));
-            }
-        }
+        $messages = implode("\n", array_map(static fn (Finding $finding): string => $finding->message, $findings));
+        $metadata = implode("\n", array_map(
+            static fn (Finding $finding): string => json_encode($finding->metadata, JSON_THROW_ON_ERROR),
+            $findings,
+        ));
+        $messageLeaks = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($messages, $secret)));
+        $metadataLeaks = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($metadata, $secret)));
+
+        self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
+        self::assertSame([], $metadataLeaks, 'Finding metadata should not leak secret values.');
     }
 
     /**
@@ -170,31 +178,16 @@ PHP));
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {
-        $text = $this->runGruff([
-            'analyse',
-            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
-            'tests/Fixtures/SensitiveData/config-secrets.json',
-            '--fail-on',
-            'none',
-            '--no-config',
-        ]);
-        $json = $this->runGruff([
-            'analyse',
-            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
-            'tests/Fixtures/SensitiveData/config-secrets.json',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-            '--no-config',
-        ]);
+        [$text, $json] = $this->secretLeakReports();
 
         json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        foreach ($this->secretValues() as $secret) {
-            self::assertStringNotContainsString($secret, $text);
-            self::assertStringNotContainsString($secret, $json);
-        }
+        $reportLeaks = array_values(array_filter(
+            $this->secretValues(),
+            static fn (string $secret): bool => str_contains($text, $secret) || str_contains($json, $secret),
+        ));
+
+        self::assertSame([], $reportLeaks, 'Reports should not leak secret values.');
 
         self::assertStringContainsString('redacted', $text);
         self::assertStringContainsString('redacted', $json);
@@ -202,6 +195,7 @@ PHP));
 
     /**
      * @param list<Finding> $findings
+     * @return void No return value.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -249,7 +243,26 @@ PHP));
     }
 
     /**
+     * Run text and JSON reports over the secret fixtures.
+     *
+     * @return array{string, string} Text output followed by JSON output.
+     */
+    private function secretLeakReports(): array
+    {
+        $paths = [
+            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+            'tests/Fixtures/SensitiveData/config-secrets.json',
+        ];
+
+        return [
+            $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--no-config']),
+            $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--no-config']),
+        ];
+    }
+
+    /**
      * @param list<string> $arguments
+     * @return string CLI stdout.
      */
     private function runGruff(array $arguments): string
     {

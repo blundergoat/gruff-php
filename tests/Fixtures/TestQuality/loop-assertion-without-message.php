@@ -24,11 +24,29 @@ final class LoopAssertionWithoutMessageTest extends TestCase
         }
     }
 
+    // Positive: a string actual value is not a message argument.
+    public function testStringActualValueWithoutMessage(): void
+    {
+        foreach (['pending'] as $status) {
+            self::assertSame('paid', $status);
+        }
+    }
+
     // Negative: foreach with a sprintf message argument.
     public function testForeachAssertionWithMessage(): void
     {
         foreach ([1, 2, 3] as $index => $value) {
             self::assertSame($index + 1, $value, sprintf('row %d', $index));
+        }
+    }
+
+    // Negative: foreach with a dynamic message argument.
+    public function testForeachAssertionWithDynamicMessage(): void
+    {
+        foreach ([1, 2, 3] as $index => $value) {
+            $message = sprintf('row %d', $index);
+
+            self::assertSame($index + 1, $value, $message);
         }
     }
 

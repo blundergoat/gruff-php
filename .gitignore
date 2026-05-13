@@ -63,6 +63,12 @@ yarn-error.log*
 *.cache
 *.log
 
+### Gruff Trend History ###
+/history.json
+
+### Gruff Baseline Temp Files ###
+/baselines/gruff-baseline-*
+
 ### Infection (mutation testing) ###
 /infection-report.json
 /infection.log

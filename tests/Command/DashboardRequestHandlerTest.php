@@ -16,6 +16,9 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
+/**
+ * Covers DashboardRequestHandlerTest behavior.
+ */
 final class DashboardRequestHandlerTest extends TestCase
 {
     /**

@@ -9,8 +9,12 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers CliTestCase behavior.
+ */
 abstract class CliTestCase extends TestCase
 {
+    /** Project root used by CLI fixture helpers. */
     protected const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**

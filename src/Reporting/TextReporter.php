@@ -215,7 +215,7 @@ final readonly class TextReporter
         }
 
         if ($mutation->mutationBudget !== null) {
-            $status  = $mutation->budgetExceeded() ? 'exceeded' : 'within budget';
+            $status  = $mutation->isBudgetExceeded() ? 'exceeded' : 'within budget';
             $lines[] = sprintf('  Budget: %d survived mutants allowed (%s)', $mutation->mutationBudget, $status);
         }
 

@@ -6,6 +6,9 @@ namespace GruffPhp\Tests\Console;
 
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers DashboardCliTest behavior.
+ */
 final class DashboardCliTest extends CliTestCase
 {
     /**

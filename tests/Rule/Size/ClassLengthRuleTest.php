@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ClassLengthRuleTest behavior.
+ */
 final class ClassLengthRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private ClassLengthRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**

@@ -7,6 +7,9 @@ namespace GruffPhp\Tests\Source;
 use GruffPhp\Source\SourceDiscovery;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers SourceDiscoveryTest behavior.
+ */
 final class SourceDiscoveryTest extends TestCase
 {
     /**

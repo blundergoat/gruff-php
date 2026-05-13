@@ -18,6 +18,9 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ComplexityIntegrationTest behavior.
+ */
 final class ComplexityIntegrationTest extends TestCase
 {
     /**
@@ -44,19 +47,15 @@ final class ComplexityIntegrationTest extends TestCase
 
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        $ruleIds = array_unique(array_map(static fn ($f) => $f->ruleId, $findings));
+        $ruleIds = array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings));
 
         self::assertContains(CyclomaticComplexityRule::ID, $ruleIds);
         self::assertContains(CognitiveComplexityRule::ID, $ruleIds);
         self::assertContains(NestingDepthRule::ID, $ruleIds);
 
-        $duplicateFingerprints = [];
+        $fingerprints = array_map(static fn ($finding): string => $finding->fingerprint(), $findings);
 
-        foreach ($findings as $finding) {
-            $fp = $finding->fingerprint();
-            self::assertArrayNotHasKey($fp, $duplicateFingerprints, sprintf('Duplicate fingerprint for %s', $finding->ruleId));
-            $duplicateFingerprints[$fp] = true;
-        }
+        self::assertCount(count($fingerprints), array_unique($fingerprints), 'Complexity fixture should not produce duplicate fingerprints.');
     }
 
     /**
@@ -76,7 +75,7 @@ final class ComplexityIntegrationTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        $complexityFindings = array_filter($findings, static fn ($f) => str_starts_with($f->ruleId, 'complexity.'));
+        $complexityFindings = array_filter($findings, static fn ($finding) => str_starts_with($finding->ruleId, 'complexity.'));
         self::assertSame([], array_values($complexityFindings));
     }
 
@@ -98,7 +97,7 @@ final class ComplexityIntegrationTest extends TestCase
         $defaultConfig   = AnalysisConfig::fromRegistry($registry);
         $defaultFindings = array_filter(
             $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $defaultConfig)),
-            static fn ($f) => str_starts_with($f->ruleId, 'complexity.'),
+            static fn ($finding) => str_starts_with($finding->ruleId, 'complexity.'),
         );
 
         $tightConfig = AnalysisConfig::fromRegistry($registry)
@@ -111,7 +110,7 @@ final class ComplexityIntegrationTest extends TestCase
 
         $tightFindings = array_filter(
             $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $tightConfig)),
-            static fn ($f) => str_starts_with($f->ruleId, 'complexity.'),
+            static fn ($finding) => str_starts_with($finding->ruleId, 'complexity.'),
         );
 
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));

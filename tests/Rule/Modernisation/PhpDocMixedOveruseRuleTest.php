@@ -17,9 +17,14 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers PhpDocMixedOveruseRuleTest behavior.
+ */
 final class PhpDocMixedOveruseRuleTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
+    /** Fixture path used by this test case. */
     private const FIXTURE      = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
 
     /**
@@ -31,7 +36,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
-        self::assertCount(10, $findings, 'Expected 10 phpdoc-mixed findings on the fixture.');
+        self::assertCount(22, $findings, 'Expected 22 phpdoc-mixed findings on the fixture.');
 
         $methodsFlagged = array_values(array_unique(array_map(
             static fn (Finding $finding): string => $finding->symbol ?? '',
@@ -41,19 +46,55 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
 
         self::assertSame(
             [
-                '$listOfMixedVar',
-                'PhpDocMixedOveruseFixture::arrayShapeMixedParam()',
+                '$propertyUnionMixed',
+                '$uppercasePsalmVar',
+                'PhpDocMixedOveruseFixture::arrayBagSuffixIsNotAllowed()',
                 'PhpDocMixedOveruseFixture::arrayShapeMixedReturn()',
+                'PhpDocMixedOveruseFixture::listSuffixIsNotAllowed()',
+                'PhpDocMixedOveruseFixture::methodPropertyTag()',
+                'PhpDocMixedOveruseFixture::methodTypeAliasTag()',
+                'PhpDocMixedOveruseFixture::methodVarTag()',
+                'PhpDocMixedOveruseFixture::mixedAfterArrayBagTag()',
+                'PhpDocMixedOveruseFixture::mixedAfterCoveredStandaloneTag()',
+                'PhpDocMixedOveruseFixture::mixedAfterNonMixedTag()',
+                'PhpDocMixedOveruseFixture::mixedAfterUnscannedTag()',
                 'PhpDocMixedOveruseFixture::mixedInCollection()',
                 'PhpDocMixedOveruseFixture::mixedInIterable()',
-                'PhpDocMixedOveruseFixture::nestedArrayShapeMixed()',
-                'PhpDocMixedOveruseFixture::phpstanReturnMixed()',
-                'PhpDocMixedOveruseFixture::psalmParamMixed()',
+                'PhpDocMixedOveruseFixture::prefixedListIsNotAllowed()',
                 'PhpDocMixedOveruseFixture::unionWithMixed()',
                 'PhpDocMixedOveruseFixture::untypedSignatureMixedDoc()',
+                'PhpDocMixedOveruseFixture::uppercaseMixedReturnTag()',
+                'RAW_PAYLOAD',
+                'functionUnionMixedDocOnMixedSignature()',
+                'untypedFunctionMixedParam()',
+                'untypedFunctionMixedReturn()',
             ],
             $methodsFlagged,
         );
+    }
+
+    /**
+     * Verify unstructured array bags with mixed leaves are allowed.
+     *
+     * @return void No return value.
+     */
+    public function testUnstructuredArrayBagsWithMixedLeavesAreAllowed(): void
+    {
+        $findings = $this->phpdocMixedFindings($this->analyseFixture());
+        $allowedSymbols = [
+            '$listOfMixedVar',
+            'PhpDocMixedOveruseFixture::arrayShapeMixedParam()',
+            'PhpDocMixedOveruseFixture::nestedArrayShapeMixed()',
+            'PhpDocMixedOveruseFixture::phpstanReturnMixed()',
+            'PhpDocMixedOveruseFixture::psalmParamMixed()',
+        ];
+
+        $unexpectedFindings = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => in_array($finding->symbol, $allowedSymbols, true),
+        ));
+
+        self::assertSame([], $unexpectedFindings);
     }
 
     /**
@@ -147,12 +188,15 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         self::assertNotEmpty($findings);
-        foreach ($findings as $finding) {
-            self::assertSame(Severity::Advisory, $finding->severity);
-            self::assertSame(Pillar::Modernisation, $finding->pillar);
-            self::assertNotNull($finding->metadata['tagKind'] ?? null);
-            self::assertNotEmpty($finding->metadata['snippet'] ?? '');
-        }
+        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $pillarValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
+        $missingTagKinds = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['tagKind'] ?? null) === null));
+        $missingSnippets = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['snippet'] ?? '') === ''));
+
+        self::assertSame([Severity::Advisory->value], $severityValues);
+        self::assertSame([Pillar::Modernisation->value], $pillarValues);
+        self::assertSame([], $missingTagKinds);
+        self::assertSame([], $missingSnippets);
     }
 
     /**

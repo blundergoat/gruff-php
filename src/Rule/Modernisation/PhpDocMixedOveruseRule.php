@@ -121,6 +121,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     continue;
                 }
 
+                if ($this->isUnstructuredArrayBagType($block['body'])) {
+                    continue;
+                }
+
                 $paramName = in_array($tagKind, self::PARAM_TAGS, true)
                     ? $this->extractParamName($block['body'])
                     : null;
@@ -237,6 +241,51 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $standalone = $type !== null && strcasecmp($type, 'mixed') === 0;
 
         return ['hasMixed' => true, 'isStandalone' => $standalone];
+    }
+
+    /**
+     * Detect unstructured decoded/config payload bags where mixed is the honest boundary type.
+     *
+     * @return bool True for array/list bags whose leaves are unknown payload values.
+     */
+    private function isUnstructuredArrayBagType(string $body): bool
+    {
+        $type = $this->extractTypeExpression($body);
+        if ($type === null) {
+            return false;
+        }
+
+        $type = strtolower(preg_replace('/\s+/', '', $type) ?? $type);
+
+        return $this->isArrayBagType($type);
+    }
+
+    /**
+     * @return bool True when the normalized type is an array/list bag with mixed leaves.
+     */
+    private function isArrayBagType(string $type): bool
+    {
+        if (preg_match('/^array<(?:array-key|string|int),(.+)>$/', $type, $matches) === 1) {
+            return $this->isArrayBagValueType($matches[1]);
+        }
+
+        if (preg_match('/^list<(.+)>$/', $type, $matches) === 1) {
+            return $this->isArrayBagValueType($matches[1]);
+        }
+
+        return false;
+    }
+
+    /**
+     * @return bool True when an array/list bag value type ends in mixed payload leaves.
+     */
+    private function isArrayBagValueType(string $type): bool
+    {
+        if ($type === 'mixed') {
+            return true;
+        }
+
+        return $this->isArrayBagType($type);
     }
 
     /**

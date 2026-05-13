@@ -12,6 +12,9 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers BaselineStoreTest behavior.
+ */
 final class BaselineStoreTest extends TestCase
 {
     /**
@@ -25,9 +28,9 @@ final class BaselineStoreTest extends TestCase
 
         try {
             $store = new BaselineStore($root);
-            $data  = $store->write('baselines/gruff-baseline.json', [$this->finding()]);
+            $baselineData = $store->write('baselines/gruff-baseline.json', [$this->finding()]);
 
-            self::assertCount(1, $data->entries);
+            self::assertCount(1, $baselineData->entries);
             self::assertFileExists($root . '/baselines/gruff-baseline.json');
             self::assertSame([], glob($root . '/baselines/gruff-baseline-*') ?: []);
         } finally {

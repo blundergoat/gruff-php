@@ -37,7 +37,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
     private const GOOD_PREFIXES = [
         'is', 'has', 'can', 'should', 'will', 'was', 'does', 'allows',
         'all', 'contains', 'extends', 'invokes', 'matches', 'refers', 'returns',
-        'supports', 'touches', 'uses',
+        'looks', 'supports', 'touches', 'uses',
     ];
 
     /**

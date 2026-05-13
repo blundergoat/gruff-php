@@ -6,6 +6,9 @@ namespace GruffPhp\Tests\Console;
 
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers ListRulesCliTest behavior.
+ */
 final class ListRulesCliTest extends CliTestCase
 {
     /**

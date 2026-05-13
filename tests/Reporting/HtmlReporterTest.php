@@ -13,9 +13,16 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Reporting\HtmlReporter;
+use GruffPhp\Scoring\FileScore;
+use GruffPhp\Scoring\Grade;
+use GruffPhp\Scoring\PillarScore;
 use GruffPhp\Scoring\ScoreCalculator;
+use GruffPhp\Scoring\ScoreReport;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers HtmlReporterTest behavior.
+ */
 final class HtmlReporterTest extends TestCase
 {
     /**
@@ -257,6 +264,171 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
+     * Verify missing score default path and active diff labels render safely.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterHandlesMissingScoreDefaultPathAndActiveDiffScope(): void
+    {
+        $report = new AnalysisReport(
+            toolVersion:     '0.1.0-test',
+            requestedPaths:  [],
+            format:          'html',
+            failOn:          'warning',
+            filesDiscovered: 0,
+            filesParsed:     0,
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        [],
+            exitCode:        0,
+            score:           null,
+            diff:            new DiffResult(true, 'diff', 'main', [], ['src/A.php', 'src/B.php'], 'Diff active.'),
+        );
+
+        $html = (new HtmlReporter())->render($report);
+
+        self::assertStringContainsString('<title>gruff-php inspection report - n/a</title>', $html);
+        self::assertStringContainsString('<div class="grade-letter">n/a</div>', $html);
+        self::assertStringContainsString('<div class="grade-score">n/a</div>', $html);
+        self::assertStringContainsString('<span class="label">paths</span><span class="val">.</span>', $html);
+        self::assertStringContainsString('<span class="label">scope</span><span class="val">diff · 2 changed files</span>', $html);
+    }
+
+    /**
+     * Verify major sections keep their document order around diagnostics.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterKeepsMastheadDiagnosticsAndVerdictInOrder(): void
+    {
+        $html = (new HtmlReporter())->render($this->report([], [
+            new RunDiagnostic(type: 'parse-error', message: 'broken', filePath: 'src/Broken.php', line: 7),
+        ]));
+
+        $masthead = strpos($html, '<header class="masthead">');
+        $diagnostics = strpos($html, '<section class="diagnostics">');
+        $verdict = strpos($html, '<section class="verdict">');
+
+        self::assertIsInt($masthead);
+        self::assertIsInt($diagnostics);
+        self::assertIsInt($verdict);
+        self::assertLessThan($diagnostics, $masthead);
+        self::assertLessThan($verdict, $diagnostics);
+        self::assertStringContainsString('</div></section><section class="verdict">', $html);
+    }
+
+    /**
+     * Verify diagnostic locations prefer parsed file paths with lines over input paths.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterDiagnosticLocationsPreferFilePathLineThenPath(): void
+    {
+        $html = (new HtmlReporter())->render($this->report([], [
+            new RunDiagnostic(type: 'parse-error', message: 'bad php', filePath: 'src/File.php', line: 12, path: 'src'),
+            new RunDiagnostic(type: 'usage-error', message: 'bad path', path: 'src/Missing.php'),
+        ]));
+
+        self::assertStringContainsString('src/File.php:12', $html);
+        self::assertStringContainsString('src/Missing.php', $html);
+        self::assertStringNotContainsString('src/Missing.php:', $html);
+    }
+
+    /**
+     * Verify custom score reports render empty and distribution edge cases.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
+    {
+        $score = new ScoreReport(
+            composite:              new Grade(88.25, 'B'),
+            pillars:                [
+                new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
+                new PillarScore('documentation', true, null, 0, 0, 0, 0, 0.0),
+            ],
+            topOffenders:           [],
+            complexityDistribution: ['0-5' => 1, '11-15' => 2],
+            scope:                  'fixture',
+            explanation:            'custom score',
+        );
+        $report = $this->report([], [], $score);
+
+        $html = (new HtmlReporter())->render($report);
+
+        self::assertStringContainsString('No offenders found.', $html);
+        self::assertStringNotContainsString('<div class="name">Mutation</div>', $html);
+        self::assertStringContainsString('<div class="grade n">n/a</div>', $html);
+        self::assertStringContainsString('2 methods exceed CC 10 (2 in 11-15, 0 in 16-20, 0 at 21+).', $html);
+        self::assertStringContainsString('style="height:50%;"', $html);
+        self::assertStringContainsString('style="height:100%;"', $html);
+    }
+
+    /**
+     * Verify custom score reports render offender metrics in fixed column order.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
+    {
+        $score = new ScoreReport(
+            composite:              new Grade(72.0, 'C'),
+            pillars:                [],
+            topOffenders:           [
+                new FileScore('src/Metrics.php', new Grade(72.0, 'C'), 4, 1, 2, 1, 28.0, 3, 5, 8, null),
+            ],
+            complexityDistribution: ['0-5' => 1, '11-15' => 2, '16-20' => 3],
+            scope:                  'fixture',
+            explanation:            'custom score',
+        );
+
+        $html = (new HtmlReporter())->render($this->report([], [], $score));
+
+        self::assertStringContainsString(
+            '<td class="file-path"><span class="loc-link" tabindex="0" data-path="src/Metrics.php">src/Metrics.php</span></td><td class="num">3</td><td class="num">5</td><td class="num">8</td><td class="num">4</td>',
+            $html,
+        );
+        self::assertStringContainsString('5 methods exceed CC 10 (2 in 11-15, 3 in 16-20, 0 at 21+).', $html);
+        self::assertStringContainsString('style="height:33%;"', $html);
+        self::assertStringContainsString('style="height:67%;"', $html);
+    }
+
+    /**
+     * Verify interactive pillar select size is bounded.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
+    {
+        $singlePillar = new Finding(
+            ruleId:     'docs.missing-public-phpdoc',
+            message:    'Public method has no PHPDoc.',
+            filePath:   'src/Example.php',
+            line:       9,
+            severity:   Severity::Warning,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+        );
+        $manyPillars = [
+            $singlePillar,
+            new Finding('complexity.cyclomatic', 'Complex.', 'src/A.php', 1, Severity::Warning, Pillar::Complexity, RuleTier::V01, Confidence::High),
+            new Finding('security.eval', 'Security.', 'src/B.php', 1, Severity::Warning, Pillar::Security, RuleTier::V01, Confidence::High),
+            new Finding('naming.short-variable', 'Naming.', 'src/C.php', 1, Severity::Warning, Pillar::Naming, RuleTier::V01, Confidence::High),
+            new Finding('size.method-length', 'Size.', 'src/D.php', 1, Severity::Warning, Pillar::Size, RuleTier::V01, Confidence::High),
+            new Finding('dead-code.unused-private-method', 'Dead.', 'src/E.php', 1, Severity::Warning, Pillar::DeadCode, RuleTier::V01, Confidence::High),
+            new Finding('modernisation.final-class', 'Modern.', 'src/F.php', 1, Severity::Warning, Pillar::Modernisation, RuleTier::V01, Confidence::High),
+        ];
+
+        $singleHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report([$singlePillar]));
+        $manyHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report($manyPillars));
+
+        self::assertStringContainsString('<label>Pillar<select name="pillar" multiple size="2">', $singleHtml);
+        self::assertStringContainsString('<label>Pillar<select name="pillar" multiple size="6">', $manyHtml);
+    }
+
+    /**
      * Build a sample analysis report for renderer assertions.
      *
      * @return AnalysisReport Fixture value.
@@ -299,12 +471,14 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * @param list<Finding>       $findings
-     * @param list<RunDiagnostic> $diagnostics
+     * @param list<Finding>        $findings
+     * @param list<RunDiagnostic>  $diagnostics
+     * @param ScoreReport|null     $score
+     * @return AnalysisReport Report fixture.
      */
-    private function report(array $findings, array $diagnostics = []): AnalysisReport
+    private function report(array $findings, array $diagnostics = [], ?ScoreReport $score = null): AnalysisReport
     {
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',

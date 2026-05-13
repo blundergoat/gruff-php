@@ -16,9 +16,14 @@ use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers CognitiveComplexityRuleTest behavior.
+ */
 final class CognitiveComplexityRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private CognitiveComplexityRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -45,12 +50,21 @@ final class CognitiveComplexityRuleTest extends TestCase
             'same operator chain' => ['sameOperatorChain', 2],
             'switch only' => ['switchOnly', 1],
             'deeply nested' => ['deeplyNested', 11],
+            'while boolean condition' => ['whileWithBooleanCondition', 2],
+            'do while boolean condition' => ['doWhileWithBooleanCondition', 2],
+            'try catch finally branches' => ['tryCatchFinallyBranches', 5],
+            'jumps and goto' => ['jumpsAndGoto', 12],
+            'logical keyword chain' => ['logicalKeywordChain', 3],
+            'expression and return ternaries' => ['expressionAndReturnTernaries', 4],
+            'closure and arrow function' => ['closureAndArrowFunction', 4],
         ];
     }
 
     /**
      * Verify cognitive count matches expected.
      *
+     * @param string $methodName Fixture method name.
+     * @param int    $expectedCc Expected cognitive complexity.
      * @return void No return value.
      */
     #[DataProvider('methodCcProvider')]
@@ -62,9 +76,9 @@ final class CognitiveComplexityRuleTest extends TestCase
 
         $method = null;
 
-        foreach ($methods as $m) {
-            if ($m->name->toString() === $methodName) {
-                $method = $m;
+        foreach ($methods as $candidateMethod) {
+            if ($candidateMethod->name->toString() === $methodName) {
+                $method = $candidateMethod;
 
                 break;
             }
@@ -97,8 +111,31 @@ final class CognitiveComplexityRuleTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('CognitiveFixture::deeplyNested()', $symbols);
+
+        $deeplyNested = array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->symbol === 'CognitiveFixture::deeplyNested()',
+        ))[0] ?? null;
+
+        self::assertNotNull($deeplyNested);
+        self::assertSame(11, $deeplyNested->metadata['complexity'] ?? null);
+        self::assertSame(2, $deeplyNested->metadata['threshold'] ?? null);
+        self::assertSame('warning', $deeplyNested->metadata['thresholdType'] ?? null);
+        self::assertSame(97, $deeplyNested->endLine);
+    }
+
+    /**
+     * Verify default threshold metadata stays stable.
+     *
+     * @return void No return value.
+     */
+    public function testDefinitionThresholdsAreStable(): void
+    {
+        $thresholds = $this->rule->definition()->defaultThresholds;
+
+        self::assertSame(['warning' => 15, 'error' => 30], $thresholds);
     }
 
     /**
@@ -115,13 +152,13 @@ final class CognitiveComplexityRuleTest extends TestCase
         $sameChain  = null;
         $mixedChain = null;
 
-        foreach ($methods as $m) {
-            if ($m->name->toString() === 'sameOperatorChain') {
-                $sameChain = $m;
+        foreach ($methods as $candidateMethod) {
+            if ($candidateMethod->name->toString() === 'sameOperatorChain') {
+                $sameChain = $candidateMethod;
             }
 
-            if ($m->name->toString() === 'booleanChain') {
-                $mixedChain = $m;
+            if ($candidateMethod->name->toString() === 'booleanChain') {
+                $mixedChain = $candidateMethod;
             }
         }
 

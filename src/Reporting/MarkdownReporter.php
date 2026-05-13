@@ -31,7 +31,7 @@ final readonly class MarkdownReporter
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         ];
 
-        if ($report->filters !== null && $report->filters->active()) {
+        if ($report->filters !== null && $report->filters->isActive()) {
             $lines[] = sprintf('**Filters:** `%s`', json_encode($report->filters->toArray(), JSON_UNESCAPED_SLASHES) ?: '{}');
         }
 

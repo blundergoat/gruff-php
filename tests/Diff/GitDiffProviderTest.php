@@ -17,6 +17,9 @@ use GruffPhp\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers GitDiffProviderTest behavior.
+ */
 final class GitDiffProviderTest extends TestCase
 {
     /**
@@ -111,6 +114,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider rejects unsafe base refs.
      *
+     * @param string $mode Unsafe diff mode argument.
      * @return void No return value.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]

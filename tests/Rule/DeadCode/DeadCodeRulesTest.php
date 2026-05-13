@@ -13,8 +13,12 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers DeadCodeRulesTest behavior.
+ */
 final class DeadCodeRulesTest extends TestCase
 {
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -38,7 +42,7 @@ final class DeadCodeRulesTest extends TestCase
 
         self::assertCount(2, $findings);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('UnusedPrivateMethodFixture::unusedPrivate()', $symbols);
         self::assertContains('UnusedPrivateMethodFixture::alsoUnused()', $symbols);
     }
@@ -52,7 +56,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivateMethodFixture::usedPrivate()', $symbols);
     }
 
@@ -65,7 +69,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivateMethodFixture::__construct()', $symbols);
     }
 
@@ -78,7 +82,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivateMethodFixture::protectedMethod()', $symbols);
     }
 
@@ -93,7 +97,7 @@ final class DeadCodeRulesTest extends TestCase
 
         self::assertGreaterThanOrEqual(2, count($findings));
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('UnusedPrivatePropertyFixture::$totallyUnused', $symbols);
         self::assertContains('UnusedPrivatePropertyFixture::$neverRead', $symbols);
     }
@@ -107,7 +111,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivatePropertyFixture::$usedProp', $symbols);
     }
 
@@ -120,7 +124,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('UnusedPrivatePropertyFixture::$publicProp', $symbols);
     }
 
@@ -135,7 +139,7 @@ final class DeadCodeRulesTest extends TestCase
 
         $neverRead = array_values(array_filter(
             $findings,
-            static fn ($f) => $f->symbol === 'UnusedPrivatePropertyFixture::$neverRead',
+            static fn ($finding) => $finding->symbol === 'UnusedPrivatePropertyFixture::$neverRead',
         ));
 
         self::assertCount(1, $neverRead);
@@ -153,7 +157,7 @@ final class DeadCodeRulesTest extends TestCase
 
         $neverRead = array_values(array_filter(
             $findings,
-            static fn ($f) => $f->symbol === 'PromotedPrivatePropertyFixture::$neverReadPromoted',
+            static fn ($finding) => $finding->symbol === 'PromotedPrivatePropertyFixture::$neverReadPromoted',
         ));
 
         self::assertCount(1, $neverRead);
@@ -169,7 +173,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('PromotedPrivatePropertyFixture::$usedPromoted', $symbols);
         self::assertNotContains('PromotedPrivatePropertyFixture::$publicPromoted', $symbols);
     }
@@ -199,7 +203,7 @@ final class DeadCodeRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
     }
 
     /**

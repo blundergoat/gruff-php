@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * Covers config loader tests and inline fixture rules.
+ */
 declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
@@ -21,6 +24,9 @@ use GruffPhp\Rule\Size\FileLengthRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ConfigLoaderTest behavior.
+ */
 final class ConfigLoaderTest extends TestCase
 {
     /**
@@ -570,6 +576,8 @@ final class ConfigLoaderTest extends TestCase
     /**
      * Verify rejects invalid rule option type variants.
      *
+     * @param string $configTemplate Config JSON template.
+     * @param string $messageTemplate Expected exception message template.
      * @return void No return value.
      */
     #[DataProvider('invalidRuleOptionTypeProvider')]
@@ -608,8 +616,12 @@ final class ConfigLoaderTest extends TestCase
     }
 }
 
+/**
+ * Covers FixtureDefaultDisabledRule behavior.
+ */
 final readonly class FixtureDefaultDisabledRule implements RuleInterface
 {
+    /** Fixture rule identifier. */
     public const ID = 'fixture.default-disabled';
 
     /**
@@ -643,8 +655,12 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     }
 }
 
+/**
+ * Covers FixtureOptionsRule behavior.
+ */
 final readonly class FixtureOptionsRule implements RuleInterface
 {
+    /** Fixture rule identifier. */
     public const ID = 'fixture.options';
 
     /**

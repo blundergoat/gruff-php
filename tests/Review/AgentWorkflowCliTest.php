@@ -8,8 +8,12 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers AgentWorkflowCliTest behavior.
+ */
 final class AgentWorkflowCliTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
@@ -26,7 +30,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $payload  = $this->decodeJson($process);
         $ruleRows = $this->listValue($payload, 'rules');
-        /** @var array<string, array<string, mixed>> $rules */
+        /** @var array<string, array<string, mixed>> $rules Rules indexed by ID for direct assertions. */
         $rules = [];
 
         foreach ($ruleRows as $ruleRow) {
@@ -72,7 +76,7 @@ final class AgentWorkflowCliTest extends TestCase
         $composite = $this->arrayValue($score, 'composite');
 
         self::assertSame(0, $this->intValue($findings, 'total'));
-        self::assertTrue($this->boolValue($filters, 'active'));
+        self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
         self::assertSame('C', $this->stringValue($composite, 'grade'));
@@ -133,10 +137,16 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJson($process);
 
-        foreach ($this->listValue($report, 'findings') as $findingValue) {
-            $finding = $this->stringKeyedArray($findingValue);
-            self::assertStringStartsWith('tests/Fixtures/Naming/', $this->stringValue($finding, 'file'));
-        }
+        $files = array_map(
+            fn (mixed $findingValue): string => $this->stringValue($this->stringKeyedArray($findingValue), 'file'),
+            $this->listValue($report, 'findings'),
+        );
+        $unexpectedFiles = array_values(array_filter(
+            $files,
+            static fn (string $file): bool => !str_starts_with($file, 'tests/Fixtures/Naming/'),
+        ));
+
+        self::assertSame([], $unexpectedFiles, sprintf('Unexpected finding files: %s', implode(', ', $unexpectedFiles)));
     }
 
     /**
@@ -531,17 +541,7 @@ final class AgentWorkflowCliTest extends TestCase
 
     /**
      * @param array<string, mixed> $payload
-     */
-    private function boolValue(array $payload, string $key): bool
-    {
-        $value = $payload[$key] ?? null;
-        self::assertIsBool($value);
-
-        return $value;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
+     * @return int Integer payload value.
      */
     private function intValue(array $payload, string $key): int
     {
@@ -562,6 +562,7 @@ final class AgentWorkflowCliTest extends TestCase
 
     /**
      * @param array<string, mixed> $payload
+     * @return string String payload value.
      */
     private function stringValue(array $payload, string $key): string
     {
@@ -638,6 +639,9 @@ final class AgentWorkflowCliTest extends TestCase
         return <<<'PHP'
 <?php
 
+/**
+ * Covers Example behavior.
+ */
 final class Example
 {
     public function calculate(string $left, string $right): string
@@ -660,6 +664,9 @@ PHP;
 
 
 
+/**
+ * Covers Example behavior.
+ */
 final class Example
 {
     public function calculate(string $left, string $right): string
@@ -685,6 +692,9 @@ PHP;
         return <<<'PHP'
 <?php
 
+/**
+ * Covers Example behavior.
+ */
 final class Example
 {
     public function calculate(string $left, string $right): string
@@ -710,6 +720,9 @@ PHP;
         return <<<'PHP'
 <?php
 
+/**
+ * Covers NewRisk behavior.
+ */
 final class NewRisk
 {
     public function decode(string $payload): mixed

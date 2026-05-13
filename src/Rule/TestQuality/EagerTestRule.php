@@ -23,6 +23,50 @@ use PhpParser\NodeFinder;
 final readonly class EagerTestRule implements RuleInterface
 {
     /**
+     * @var list<string>
+     */
+    private const OBSERVATION_METHOD_PREFIXES = [
+        'get',
+        'has',
+        'is',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const OBSERVATION_RECEIVERS = [
+        'decoded',
+        'diagnostics',
+        'finding',
+        'findings',
+        'html',
+        'output',
+        'process',
+        'report',
+        'response',
+        'result',
+        'results',
+        'summary',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const PROCESS_HARNESS_METHODS = [
+        'settimeout',
+        'start',
+        'stop',
+        'wait',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const SETUP_METHODS = [
+        'settimeout',
+    ];
+
+    /**
      * Stable rule identifier for eager test findings.
      */
     public const ID = 'test-quality.eager-test';
@@ -91,7 +135,7 @@ final readonly class EagerTestRule implements RuleInterface
     private function distinctSutCalls(TestQualityScope $scope): array
     {
         $resultVariables = $this->collectResultVariables($scope);
-        $calls           = [];
+        $callsByReceiver = [];
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             $name = TestQualityNodeHelper::callName($call);
@@ -99,6 +143,9 @@ final readonly class EagerTestRule implements RuleInterface
                 || TestQualityNodeHelper::isAssertionCall($call)
                 || TestQualityNodeHelper::isMockCreationCall($call)
                 || TestQualityNodeHelper::isMockVerificationCall($call)
+                || $this->isNestedInAssertionCall($call)
+                || $this->isNestedInFinallyBlock($call)
+                || $this->isObservationCall($call, $name)
             ) {
                 continue;
             }
@@ -107,10 +154,203 @@ final readonly class EagerTestRule implements RuleInterface
                 continue;
             }
 
-            $calls[$name] = $name;
+            $receiver = $this->receiverKey($call);
+            if ($receiver === null) {
+                continue;
+            }
+
+            $callsByReceiver[$receiver][$name] = $name;
         }
 
-        return $calls;
+        return $this->largestReceiverCallSet($callsByReceiver);
+    }
+
+    /**
+     * @return bool True when the call is only part of an assertion expression.
+     */
+    private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $parent = $call->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
+                && TestQualityNodeHelper::isAssertionCall($parent)
+            ) {
+                return true;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * @return bool True when the call belongs to teardown rather than exercise.
+     */
+    private function isNestedInFinallyBlock(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $parent = $call->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if ($parent instanceof Node\Stmt\Finally_) {
+                return true;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * @return bool True when the call reads or shapes test output rather than exercising the SUT.
+     */
+    private function isObservationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
+    {
+        if (!$call instanceof Expr\MethodCall) {
+            return false;
+        }
+
+        if ($this->isDirectThisCall($call)) {
+            return true;
+        }
+
+        if (in_array($name, self::SETUP_METHODS, true)) {
+            return true;
+        }
+
+        $receiver = $this->receiverName($call->var);
+
+        if ($receiver === 'process' && in_array($name, self::PROCESS_HARNESS_METHODS, true)) {
+            return true;
+        }
+
+        return $receiver !== null
+            && in_array($receiver, self::OBSERVATION_RECEIVERS, true)
+            && $this->isObservationMethodName($name);
+    }
+
+    /**
+     * @return bool True when the call is a direct test-case helper call.
+     */
+    private function isDirectThisCall(Expr\MethodCall $call): bool
+    {
+        return $call->var instanceof Expr\Variable
+            && $call->var->name === 'this';
+    }
+
+    /**
+     * @return string|null Stable receiver identity for SUT call grouping.
+     */
+    private function receiverKey(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
+    {
+        if ($call instanceof Expr\FuncCall) {
+            return null;
+        }
+
+        if ($call instanceof Expr\StaticCall) {
+            if (!$call->class instanceof Node\Name) {
+                return null;
+            }
+
+            $class = strtolower($call->class->toString());
+            if (in_array($class, ['parent', 'self', 'static'], true)) {
+                return null;
+            }
+
+            return 'static:' . $class;
+        }
+
+        return $this->receiverExpressionKey($call->var);
+    }
+
+    /**
+     * @return string|null Receiver identity for method-call grouping.
+     */
+    private function receiverExpressionKey(Expr $receiver): ?string
+    {
+        while ($receiver instanceof Expr\MethodCall) {
+            $receiver = $receiver->var;
+        }
+
+        if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
+            return 'var:' . strtolower($receiver->name);
+        }
+
+        if ($receiver instanceof Expr\New_ && $receiver->class instanceof Node\Name) {
+            return 'new:' . strtolower($receiver->class->toString());
+        }
+
+        if ($receiver instanceof Expr\PropertyFetch) {
+            return $this->propertyReceiverKey($receiver);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string|null Receiver identity for property-held SUTs.
+     */
+    private function propertyReceiverKey(Expr\PropertyFetch $receiver): ?string
+    {
+        if (!$receiver->name instanceof Node\Identifier) {
+            return null;
+        }
+
+        $owner = $this->receiverExpressionKey($receiver->var);
+        if ($owner === null) {
+            return null;
+        }
+
+        return $owner . '->' . strtolower($receiver->name->toString());
+    }
+
+    /**
+     * @param array<string, array<string, string>> $callsByReceiver
+     * @return array<string, string>
+     */
+    private function largestReceiverCallSet(array $callsByReceiver): array
+    {
+        $largest = [];
+
+        foreach ($callsByReceiver as $calls) {
+            if (count($calls) > count($largest)) {
+                $largest = $calls;
+            }
+        }
+
+        return $largest;
+    }
+
+    /**
+     * @return string|null Receiver variable name, or null for dynamic/non-variable receivers.
+     */
+    private function receiverName(Expr $receiver): ?string
+    {
+        while ($receiver instanceof Expr\MethodCall) {
+            $receiver = $receiver->var;
+        }
+
+        if (!$receiver instanceof Expr\Variable || !is_string($receiver->name)) {
+            return null;
+        }
+
+        return strtolower($receiver->name);
+    }
+
+    /**
+     * @return bool True when the method name follows a result-observation convention.
+     */
+    private function isObservationMethodName(string $name): bool
+    {
+        foreach (self::OBSERVATION_METHOD_PREFIXES as $prefix) {
+            if (str_starts_with($name, $prefix)) {
+                return true;
+            }
+        }
+
+        return $name === 'count';
     }
 
     /**

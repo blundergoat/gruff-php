@@ -14,6 +14,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
 use PhpParser\NodeFinder;
 
@@ -59,6 +60,18 @@ final readonly class LoopInTestRule implements RuleInterface
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_ || $node instanceof Stmt\While_ || $node instanceof Stmt\Do_) as $loop) {
+                if (!$loop instanceof Stmt\For_
+                    && !$loop instanceof Stmt\Foreach_
+                    && !$loop instanceof Stmt\While_
+                    && !$loop instanceof Stmt\Do_
+                ) {
+                    continue;
+                }
+
+                if (!$this->hasLoopAssertion($finder, $loop)) {
+                    continue;
+                }
+
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains a loop; looping assertions often hide multiple scenarios.', $scope->symbol),
@@ -75,5 +88,19 @@ final readonly class LoopInTestRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Check whether a loop actually contains an assertion-like call.
+     *
+     * @return bool True when a PHPUnit/Pest assertion is inside the loop body.
+     */
+    private function hasLoopAssertion(NodeFinder $finder, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
+    {
+        return $finder->findFirst(
+            $loop->stmts,
+            static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
+                && TestQualityNodeHelper::isAssertionCall($node),
+        ) !== null;
     }
 }

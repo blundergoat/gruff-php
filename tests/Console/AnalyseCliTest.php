@@ -7,6 +7,9 @@ namespace GruffPhp\Tests\Console;
 use JsonException;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers AnalyseCliTest behavior.
+ */
 final class AnalyseCliTest extends CliTestCase
 {
     /**

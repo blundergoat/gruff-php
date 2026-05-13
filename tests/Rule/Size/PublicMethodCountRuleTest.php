@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers PublicMethodCountRuleTest behavior.
+ */
 final class PublicMethodCountRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private PublicMethodCountRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**

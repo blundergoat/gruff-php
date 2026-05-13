@@ -81,6 +81,10 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         $filePath = $unit->file->displayPath;
         $fileName = pathinfo($filePath, PATHINFO_FILENAME);
 
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileName) !== 1) {
+            return [];
+        }
+
         if ($fileName === $className) {
             return [];
         }

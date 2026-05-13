@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\PropertyCountRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers PropertyCountRuleTest behavior.
+ */
 final class PropertyCountRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private PropertyCountRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**

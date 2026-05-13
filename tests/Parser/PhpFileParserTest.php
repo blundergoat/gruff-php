@@ -8,6 +8,9 @@ use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers PhpFileParserTest behavior.
+ */
 final class PhpFileParserTest extends TestCase
 {
     /**

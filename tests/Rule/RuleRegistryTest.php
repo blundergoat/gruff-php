@@ -91,6 +91,9 @@ use GruffPhp\Source\SourceFile;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers RuleRegistryTest behavior.
+ */
 final class RuleRegistryTest extends TestCase
 {
     /**
@@ -192,7 +195,7 @@ final class RuleRegistryTest extends TestCase
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
-        $findings = array_values(array_filter($allFindings, static fn ($f) => $f->ruleId === FileLengthRule::ID));
+        $findings = array_values(array_filter($allFindings, static fn ($finding) => $finding->ruleId === FileLengthRule::ID));
 
         self::assertCount(1, $findings);
         self::assertSame(FileLengthRule::ID, $findings[0]->ruleId);
@@ -219,7 +222,7 @@ final class RuleRegistryTest extends TestCase
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
-        $fileLengthFindings = array_filter($allFindings, static fn ($f) => $f->ruleId === FileLengthRule::ID);
+        $fileLengthFindings = array_filter($allFindings, static fn ($finding) => $finding->ruleId === FileLengthRule::ID);
         self::assertSame([], array_values($fileLengthFindings));
     }
 
@@ -269,11 +272,15 @@ final class RuleRegistryTest extends TestCase
      */
     public function testDefaultRulesHaveListableDescriptions(): void
     {
-        foreach (RuleRegistry::defaults()->all() as $rule) {
-            $definition = $rule->definition();
+        $missingDescriptionIds = array_values(array_map(
+            static fn ($rule): string => $rule->definition()->id,
+            array_filter(
+                RuleRegistry::defaults()->all(),
+                static fn ($rule): bool => trim($rule->definition()->description()) === '',
+            ),
+        ));
 
-            self::assertNotSame('', trim($definition->description()), $definition->id);
-        }
+        self::assertSame([], $missingDescriptionIds);
     }
 
     /**

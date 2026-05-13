@@ -34,6 +34,90 @@ final readonly class SutNotCalledRule implements RuleInterface
     private const SUBPROCESS_FUNCTIONS = ['shell_exec', 'proc_open', 'popen', 'passthru', 'system', 'exec'];
 
     /**
+     * CamelCase tokens that separate a leading method-style phrase from expected outcome text.
+     *
+     * @var list<string>
+     */
+    private const OUTCOME_MARKERS = [
+        'And',
+        'Builds',
+        'Calls',
+        'Can',
+        'Creates',
+        'Handles',
+        'Processes',
+        'Renders',
+        'Returns',
+        'Sends',
+        'Should',
+        'Throws',
+        'When',
+        'With',
+    ];
+
+    /**
+     * Verbs that make the leading test-name phrase look like an actual method name.
+     *
+     * @var list<string>
+     */
+    private const METHOD_VERBS = [
+        'analyse',
+        'analyze',
+        'build',
+        'calculate',
+        'call',
+        'create',
+        'decode',
+        'detect',
+        'discover',
+        'encode',
+        'escape',
+        'find',
+        'format',
+        'handle',
+        'load',
+        'parse',
+        'process',
+        'read',
+        'record',
+        'render',
+        'resolve',
+        'send',
+        'write',
+    ];
+
+    /**
+     * Common third-person verb forms used in PHPUnit names.
+     *
+     * @var array<string, string>
+     */
+    private const VERB_ALIASES = [
+        'analyses' => 'analyse',
+        'analyzes' => 'analyze',
+        'builds' => 'build',
+        'calculates' => 'calculate',
+        'calls' => 'call',
+        'creates' => 'create',
+        'decodes' => 'decode',
+        'detects' => 'detect',
+        'discovers' => 'discover',
+        'encodes' => 'encode',
+        'escapes' => 'escape',
+        'finds' => 'find',
+        'formats' => 'format',
+        'handles' => 'handle',
+        'loads' => 'load',
+        'parses' => 'parse',
+        'processes' => 'process',
+        'reads' => 'read',
+        'records' => 'record',
+        'renders' => 'render',
+        'resolves' => 'resolve',
+        'sends' => 'send',
+        'writes' => 'write',
+    ];
+
+    /**
      * Describe the SUT-not-called test rule.
      *
      * @return RuleDefinition Rule metadata and defaults.
@@ -169,31 +253,67 @@ final readonly class SutNotCalledRule implements RuleInterface
             return [];
         }
 
-        if (preg_match('/(Returns|Throws|Builds|Creates|Processes|Renders|Sends|Handles|Calls|Can|Should|When|With|And)/', $afterTest, $match, PREG_OFFSET_CAPTURE) !== 1) {
+        $tokens = $this->camelCaseTokens($afterTest);
+        if ($tokens === []) {
             return [];
         }
 
-        $markerOffset = $match[0][1];
-        if ($markerOffset <= 0) {
+        $markerIndex = $this->firstOutcomeMarkerIndex($tokens);
+        if ($markerIndex === null || $markerIndex === 0) {
             return [];
         }
 
-        $beforeMarker = substr($afterTest, 0, $markerOffset);
-        if (strlen($beforeMarker) < 3) {
+        $methodTokens = array_slice($tokens, 0, $markerIndex);
+        $verb         = $this->methodVerb($methodTokens[0] ?? '');
+        if ($verb === null) {
             return [];
         }
 
-        $candidates = [TestQualityNodeHelper::normalizedTestName($beforeMarker)];
+        $candidates = [TestQualityNodeHelper::normalizedTestName(implode('', $methodTokens))];
 
-        if (preg_match('/^([A-Z][a-z]+)/', $beforeMarker, $verbMatch) === 1) {
-            $verb         = $verbMatch[1];
+        if (count($methodTokens) > 1) {
             $candidates[] = TestQualityNodeHelper::normalizedTestName($verb);
-
-            if (str_ends_with($verb, 's') && strlen($verb) >= 4) {
-                $candidates[] = TestQualityNodeHelper::normalizedTestName(substr($verb, 0, -1));
-            }
         }
 
         return array_values(array_unique($candidates));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function camelCaseTokens(string $value): array
+    {
+        if (preg_match_all('/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/', $value, $matches) < 1) {
+            return [];
+        }
+
+        return $matches[0];
+    }
+
+    /**
+     * @param list<string> $tokens
+     *
+     * @return int|null
+     */
+    private function firstOutcomeMarkerIndex(array $tokens): ?int
+    {
+        foreach ($tokens as $index => $token) {
+            if (in_array($token, self::OUTCOME_MARKERS, true)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string|null
+     */
+    private function methodVerb(string $token): ?string
+    {
+        $verb = strtolower($token);
+        $verb = self::VERB_ALIASES[$verb] ?? $verb;
+
+        return in_array($verb, self::METHOD_VERBS, true) ? $verb : null;
     }
 }

@@ -31,8 +31,12 @@ use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers SecurityRulesTest behavior.
+ */
 final class SecurityRulesTest extends TestCase
 {
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -155,9 +159,9 @@ final class SecurityRulesTest extends TestCase
             DisabledSslVerificationRule::ID,
         ];
 
-        foreach ($expectedRuleIds as $ruleId) {
-            self::assertContains($ruleId, $ruleIds);
-        }
+        $missingRuleIds = array_values(array_diff($expectedRuleIds, $ruleIds));
+
+        self::assertSame([], $missingRuleIds);
 
         $fingerprints = array_map(static fn (Finding $finding): string => $finding->fingerprint(), $findings);
         self::assertCount(count($fingerprints), array_unique($fingerprints));
@@ -186,6 +190,7 @@ final class SecurityRulesTest extends TestCase
 
     /**
      * @param list<Finding> $findings
+     * @return void No return value.
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -281,6 +286,9 @@ final class SecurityRulesTest extends TestCase
             <<<'PHP'
 <?php
 
+/**
+ * Covers CallableFixture behavior.
+ */
 final class CallableFixture
 {
     public function __construct(private \Closure $stored)
@@ -318,7 +326,7 @@ PHP,
 
         $traverser = new NodeTraverser();
         $traverser->addVisitor(new ParentConnectingVisitor());
-        /** @var list<Stmt> $traversed */
+        /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
         $traversed = $traverser->traverse($statements);
 
         return new AnalysisUnit(

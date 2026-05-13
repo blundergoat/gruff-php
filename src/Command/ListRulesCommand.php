@@ -28,7 +28,7 @@ final class ListRulesCommand extends Command
         $this
             ->setName('list-rules')
             ->setDescription('List gruff rule metadata.')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: table or json.', 'table');
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: table or json.', default: 'table');
     }
 
     /**

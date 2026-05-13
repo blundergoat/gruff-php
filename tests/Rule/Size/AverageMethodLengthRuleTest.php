@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\AverageMethodLengthRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers AverageMethodLengthRuleTest behavior.
+ */
 final class AverageMethodLengthRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private AverageMethodLengthRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -83,7 +88,7 @@ final class AverageMethodLengthRuleTest extends TestCase
 
         $avgFindings = array_values(array_filter(
             $findings,
-            static fn ($f) => $f->ruleId === AverageMethodLengthRule::ID,
+            static fn ($finding) => $finding->ruleId === AverageMethodLengthRule::ID,
         ));
 
         self::assertSame([], $avgFindings);

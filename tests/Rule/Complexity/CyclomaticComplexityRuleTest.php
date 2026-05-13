@@ -17,9 +17,14 @@ use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers CyclomaticComplexityRuleTest behavior.
+ */
 final class CyclomaticComplexityRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private CyclomaticComplexityRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -52,6 +57,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify cyclomatic count matches expected.
      *
+     * @param string $methodName Fixture method name.
+     * @param int    $expectedCcn Expected cyclomatic complexity.
      * @return void No return value.
      */
     #[DataProvider('methodCcnProvider')]
@@ -63,9 +70,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
 
         $method = null;
 
-        foreach ($methods as $m) {
-            if ($m->name->toString() === $methodName) {
-                $method = $m;
+        foreach ($methods as $candidateMethod) {
+            if ($candidateMethod->name->toString() === $methodName) {
+                $method = $candidateMethod;
 
                 break;
             }
@@ -98,11 +105,15 @@ final class CyclomaticComplexityRuleTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        foreach ($findings as $finding) {
-            self::assertSame(CyclomaticComplexityRule::ID, $finding->ruleId);
-            self::assertArrayHasKey('complexity', $finding->metadata);
-            self::assertGreaterThan(3, $finding->metadata['complexity']);
-        }
+        $ruleIds = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $complexities = array_map(static fn ($finding): mixed => $finding->metadata['complexity'] ?? null, $findings);
+        $invalidComplexities = array_values(array_filter(
+            $complexities,
+            static fn (mixed $complexity): bool => !is_int($complexity) || $complexity <= 3,
+        ));
+
+        self::assertSame([CyclomaticComplexityRule::ID], $ruleIds);
+        self::assertSame([], $invalidComplexities);
     }
 
     /**
@@ -114,7 +125,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     {
         $findings = $this->analyse('cyclomatic.php', ['warning' => 3, 'error' => 4]);
 
-        $errors = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
+        $errors = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
 
         self::assertNotSame([], $errors);
     }

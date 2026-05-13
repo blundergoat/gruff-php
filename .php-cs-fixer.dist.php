@@ -135,6 +135,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * @param list<string> $lines
      * @param list<int>    $group
+     * @return void No return value.
      */
     private function alignGroup(array &$lines, array $group): void
     {

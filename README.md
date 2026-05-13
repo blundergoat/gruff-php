@@ -86,6 +86,7 @@ php bin/gruff summary src/ --format=json --top=5
 | `markdown` | [`MarkdownReporter`](src/Reporting/MarkdownReporter.php) | PR-comment style summary |
 | `github` | [`GithubAnnotationsReporter`](src/Reporting/GithubAnnotationsReporter.php) | GitHub Actions inline annotations |
 | `hotspot` | [`HotspotReporter`](src/Reporting/HotspotReporter.php) | JSON hotspot map keyed on file scores |
+| `sarif` | [`SarifReporter`](src/Reporting/SarifReporter.php) | SARIF 2.1.0 for code-scanning ingestion (GitHub Code Scanning, Sonar, etc.) |
 
 ## Severity, fail thresholds, exit codes
 
@@ -226,6 +227,28 @@ php bin/gruff analyse --diff=origin/main
 
 Findings without a line number are kept when their file changed; findings with a line number are kept only when they touch a changed line range.
 
+### Compare against a base ref
+
+`--diff-vs=<ref>` re-runs the analyser against a base ref and reports each finding as introduced, removed, or unchanged relative to the working tree. Pair with `--changed-only` to restrict the comparison to files that differ from the base ref.
+
+```bash
+php bin/gruff analyse --diff-vs=origin/main
+php bin/gruff analyse --diff-vs=origin/main --changed-only
+```
+
+## Display filters
+
+Reduce report noise without changing what fails the run. These flags shape the output only and never disable rules ([`src/Reporting/FindingDisplayFilter.php`](src/Reporting/FindingDisplayFilter.php)):
+
+| Flag | Effect |
+|------|--------|
+| `--min-severity=advisory\|warning\|error` | Hide findings below the threshold |
+| `--include-pillar=<csv>` (repeatable) | Show only the named pillars |
+| `--exclude-pillar=<csv>` (repeatable) | Hide the named pillars |
+| `--include-rule=<csv>` (repeatable) | Show only the named rule ids |
+| `--exclude-rule=<csv>` (repeatable) | Hide the named rule ids |
+| `--paths-relative-to=<dir>` | Rewrite absolute finding paths relative to `<dir>` for clean reports |
+
 ## Trend history
 
 `--history-file=path.json` appends a bounded score-history entry per run ([`src/Trend/TrendRecorder.php`](src/Trend/TrendRecorder.php)). The file is created if it does not exist; each entry captures the composite score, grade, and finding count. Nothing is written by default.
@@ -265,6 +288,9 @@ php bin/gruff dashboard --project=/path/to/another/project
 
 # Start in diff-only scan mode
 php bin/gruff dashboard --diff
+
+# Cap each refresh scan (seconds; 0 disables the timeout, default 120)
+php bin/gruff dashboard --scan-timeout=300
 ```
 
 The dashboard renders the HTML report inside a control panel with project root, scope (whole project vs `--diff`), config path, baseline, fail threshold, include-ignored, and interactive-findings toggles. `GET /scan` re-runs the analyser; `GET /health` returns a smoke-test response. `scripts/start-dev.sh` is a convenience wrapper with environment-overridable host, port, project root, and scan timeout.

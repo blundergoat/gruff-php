@@ -9,6 +9,9 @@ use GruffPhp\Review\GitArchiveSnapshot;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
+/**
+ * Covers GitArchiveSnapshotTest behavior.
+ */
 final class GitArchiveSnapshotTest extends TestCase
 {
     /**
@@ -109,6 +112,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify create rejects unsafe refs before archiving.
      *
+     * @param string $ref Unsafe git ref input.
      * @return void No return value.
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
@@ -146,7 +150,7 @@ final class GitArchiveSnapshotTest extends TestCase
         file_put_contents($repo . '/src/Unrelated.php', "<?php\nfinal class Unrelated {}\n");
         file_put_contents($repo . '/big/Unrelated.txt', "not php\n");
 
-        $this->runGit($repo, 'add', 'src/Target.php', 'src/Unrelated.php', 'big/Unrelated.txt');
+        $this->runGit($repo, ...['add', 'src/Target.php', 'src/Unrelated.php', 'big/Unrelated.txt']);
         $this->runGit($repo, 'commit', '-m', 'base');
 
         return $repo;

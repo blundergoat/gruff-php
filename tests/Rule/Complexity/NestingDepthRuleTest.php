@@ -17,9 +17,14 @@ use PhpParser\NodeFinder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers NestingDepthRuleTest behavior.
+ */
 final class NestingDepthRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private NestingDepthRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -49,6 +54,8 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify nesting depth matches expected.
      *
+     * @param string $methodName Fixture method name.
+     * @param int    $expectedDepth Expected nesting depth.
      * @return void No return value.
      */
     #[DataProvider('methodDepthProvider')]
@@ -60,9 +67,9 @@ final class NestingDepthRuleTest extends TestCase
 
         $method = null;
 
-        foreach ($methods as $m) {
-            if ($m->name->toString() === $methodName) {
-                $method = $m;
+        foreach ($methods as $candidateMethod) {
+            if ($candidateMethod->name->toString() === $methodName) {
+                $method = $candidateMethod;
 
                 break;
             }
@@ -107,7 +114,7 @@ final class NestingDepthRuleTest extends TestCase
     {
         $findings = $this->analyse('nesting.php', ['warning' => 3, 'error' => 4]);
 
-        $errors = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
+        $errors = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
         self::assertNotSame([], $errors);
         self::assertSame('NestingFixture::fiveLevels()', $errors[0]->symbol);
     }

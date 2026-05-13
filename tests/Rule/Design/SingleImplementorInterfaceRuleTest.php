@@ -16,9 +16,14 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers SingleImplementorInterfaceRuleTest behavior.
+ */
 final class SingleImplementorInterfaceRuleTest extends TestCase
 {
+    /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
+    /** Fixture directory used by this test case. */
     private const FIXTURE_DIR  = 'tests/Fixtures/Design/single-implementor-interface';
 
     /**
@@ -35,6 +40,10 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
 
         self::assertContains(
             'Fixtures\\Design\\SingleImplementor\\InternalOneImpl\\BookingOtpGatewayInterface',
+            $symbols,
+        );
+        self::assertContains(
+            'Fixtures\\Design\\SingleImplementor\\MutationCases\\PositiveAfterSkipsInterface',
             $symbols,
         );
     }
@@ -128,6 +137,49 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             $symbols,
             'Child interface used as a type-hint outside its implementor must not flag.',
         );
+        self::assertNotContains(
+            'Fixtures\\Design\\SingleImplementor\\MutationCases\\ParentContract',
+            $symbols,
+            'Parent interface extended by another mutation-case interface must not flag.',
+        );
+        self::assertNotContains(
+            'Fixtures\\Design\\SingleImplementor\\MutationCases\\MultiParentExternalInterface',
+            $symbols,
+            'Interface with an external second parent must not flag.',
+        );
+    }
+
+    /**
+     * Verify external type-hint usage through returns properties and composite types does not flag.
+     *
+     * @return void No return value.
+     */
+    public function testExternalTypeHintUsageThroughReturnsPropertiesAndCompositeTypesDoesNotFlag(): void
+    {
+        $findings = $this->analyseFixtures();
+
+        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\ReturnUsageInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\PropertyUsageInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\NullableUsageInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\UnionUsageInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\IntersectionUsageInterface', $symbols);
+    }
+
+    /**
+     * Verify framework attributes exempt interfaces when any configured prefix matches.
+     *
+     * @return void No return value.
+     */
+    public function testFrameworkAttributeExemptionsCheckAllAttributesAndContainsMatches(): void
+    {
+        $findings = $this->analyseFixtures();
+
+        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\MultipleAttributeInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\ContainsAttributeInterface', $symbols);
     }
 
     /**
@@ -140,14 +192,35 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $findings = $this->analyseFixtures();
 
         self::assertNotEmpty($findings);
-        foreach ($findings as $finding) {
-            self::assertSame(Severity::Advisory, $finding->severity);
-            self::assertSame(Pillar::Design, $finding->pillar);
-            self::assertSame(1, $finding->metadata['implementorCount'] ?? null);
-            self::assertSame(0, $finding->metadata['externalUsageCount'] ?? null);
-            self::assertNotNull($finding->metadata['implementorFqn'] ?? null);
-            self::assertNotNull($finding->metadata['decision'] ?? null);
-        }
+        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $pillarValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
+        $implementorCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
+            $implementorCount = $finding->metadata['implementorCount'] ?? null;
+
+            self::assertIsInt($implementorCount);
+
+            return $implementorCount;
+        }, $findings)));
+        $externalUsageCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
+            $externalUsageCount = $finding->metadata['externalUsageCount'] ?? null;
+
+            self::assertIsInt($externalUsageCount);
+
+            return $externalUsageCount;
+        }, $findings)));
+        $missingImplementorFqns = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['implementorFqn'] ?? null) === null));
+        $missingDecisions = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['decision'] ?? null) === null));
+
+        self::assertSame([Severity::Advisory->value], $severityValues);
+        self::assertSame([Pillar::Design->value], $pillarValues);
+        self::assertSame([1], $implementorCounts);
+        self::assertSame([0], $externalUsageCounts);
+        self::assertSame([], $missingImplementorFqns);
+        self::assertSame([], $missingDecisions);
+        self::assertSame([], array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => ($finding->metadata['interfaceFqn'] ?? null) !== $finding->symbol,
+        )));
     }
 
     /**
@@ -159,7 +232,32 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        self::assertCount(2, $findings, 'Exactly two fixture shapes should flag (internal-one-impl, mock-only).');
+        self::assertCount(3, $findings, 'Exactly three fixture shapes should flag (internal-one-impl, mock-only, mutation positive).');
+    }
+
+    /**
+     * Verify additional excluded paths remove eligible units before analysis.
+     *
+     * @return void No return value.
+     */
+    public function testAdditionalExcludedPathsRemoveEligibleUnitsBeforeAnalysis(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(SingleImplementorInterfaceRule::ID);
+        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            SingleImplementorInterfaceRule::ID,
+            new \GruffPhp\Config\RuleSettings(
+                enabled:    true,
+                thresholds: $settings->thresholds,
+                options:    array_merge($settings->options, [
+                    'additionalExcludedPaths' => [self::FIXTURE_DIR . '/internal-one-impl'],
+                ]),
+            ),
+        );
+        $findings = $this->analyseFixtures($config);
+        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\InternalOneImpl\\BookingOtpGatewayInterface', $symbols);
     }
 
     /**
@@ -189,6 +287,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $parser = new PhpFileParser();
         $paths  = [
+            'mutation-cases/MutationCases.php',
             'psr/AuditPsrLogger.php',
             'symfony-tagged/SymfonyTaggedListener.php',
             'internal-one-impl/BookingOtpGateway.php',

@@ -32,6 +32,61 @@ final class RepeatedShapesTest extends TestCase
     }
 }
 
+// Positive: repeated control-flow-heavy shape covering the fingerprint token variants.
+final class RepeatedControlFlowTest extends TestCase
+{
+    public function testComplexAlpha(): void
+    {
+        $service = new OrderService();
+
+        if (helper('a')) {
+            foreach ([1] as $item) {
+                self::assertTrue(Helper::check($service->sum($item)));
+            }
+        }
+
+        if (false) {
+            throw new \RuntimeException('alpha');
+        }
+
+        return;
+    }
+
+    public function testComplexBeta(): void
+    {
+        $service = new OrderService();
+
+        if (helper('b')) {
+            foreach ([2] as $item) {
+                self::assertTrue(Helper::check($service->sum($item)));
+            }
+        }
+
+        if (false) {
+            throw new \RuntimeException('beta');
+        }
+
+        return;
+    }
+
+    public function testComplexGamma(): void
+    {
+        $service = new OrderService();
+
+        if (helper('c')) {
+            foreach ([3] as $item) {
+                self::assertTrue(Helper::check($service->sum($item)));
+            }
+        }
+
+        if (false) {
+            throw new \RuntimeException('gamma');
+        }
+
+        return;
+    }
+}
+
 // Negative: only 2 structurally identical methods - below the rule's minimum group size.
 final class TwoRepeatedShapesTest extends TestCase
 {

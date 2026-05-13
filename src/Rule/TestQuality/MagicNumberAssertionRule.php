@@ -13,6 +13,9 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar;
 
 /**
  * Detects assertions that compare against unexplained numeric literals.
@@ -32,6 +35,68 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         200, 201, 202, 204, 301, 302, 303, 304, 307, 308,
         400, 401, 403, 404, 405, 409, 410, 422, 429,
         500, 502, 503, 504,
+    ];
+
+    /**
+     * Assertions whose numeric literal is explicitly a cardinality.
+     *
+     * @var list<string>
+     */
+    private const CARDINALITY_ASSERTIONS = [
+        'assertcount',
+        'tohavecount',
+    ];
+
+    /**
+     * Methods whose names already explain the expected numeric contract.
+     *
+     * @var list<string>
+     */
+    private const CONTEXTUAL_METHOD_NAMES = [
+        'computecognitivecomplexity',
+        'coveragerate',
+        'coveredmsi',
+        'getexitcode',
+        'msi',
+        'numericthreshold',
+        'survivedmutants',
+        'totalmutants',
+    ];
+
+    /**
+     * Array keys and properties whose names already explain the expected numeric contract.
+     *
+     * @var list<string>
+     */
+    private const CONTEXTUAL_NUMERIC_NAMES = [
+        'advisory',
+        'complexity',
+        'coveredmsi',
+        'coveragerate',
+        'currentscore',
+        'delta',
+        'error',
+        'exitcode',
+        'filesdiscovered',
+        'findings',
+        'line',
+        'lines',
+        'averagelength',
+        'count',
+        'methodcount',
+        'msi',
+        'npath',
+        'parameters',
+        'parseerrors',
+        'previousscore',
+        'properties',
+        'publicmethods',
+        'score',
+        'survivedmutants',
+        'threshold',
+        'total',
+        'totalmutants',
+        'warning',
     ];
 
     /**
@@ -68,7 +133,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $number = TestQualityNodeHelper::isAssertionMagicNumber($call);
-                if ($number === null || in_array($number, $allowed, true)) {
+                if ($number === null || in_array($number, $allowed, true) || $this->hasContextualNumericTarget($call)) {
                     continue;
                 }
 
@@ -109,5 +174,102 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         }
 
         return $values;
+    }
+
+    /**
+     * @return bool True when the assertion target already names the number's meaning.
+     */
+    private function hasContextualNumericTarget(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $name = TestQualityNodeHelper::callName($call);
+        if ($name === null) {
+            return false;
+        }
+
+        if (in_array($name, self::CARDINALITY_ASSERTIONS, true)) {
+            return true;
+        }
+
+        $actual = $this->actualAssertionExpression($call, $name);
+
+        return $actual !== null && $this->isContextualNumericExpression($actual);
+    }
+
+    /**
+     * @return Expr|null The assertion expression being checked against the numeric literal.
+     */
+    private function actualAssertionExpression(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): ?Expr
+    {
+        if ($call instanceof Expr\MethodCall && in_array($name, ['tobe', 'toequal', 'tohavecount'], true)) {
+            return TestQualityNodeHelper::pestExpectationValue($call);
+        }
+
+        return TestQualityNodeHelper::argValue($call, 1);
+    }
+
+    /**
+     * @return bool True when the expression labels the expected numeric value.
+     */
+    private function isContextualNumericExpression(Expr $expr): bool
+    {
+        if ($expr instanceof Expr\BinaryOp\Coalesce) {
+            return $this->isContextualNumericExpression($expr->left);
+        }
+
+        if ($expr instanceof Expr\FuncCall) {
+            return TestQualityNodeHelper::functionName($expr) === 'count';
+        }
+
+        if ($expr instanceof Expr\MethodCall || $expr instanceof Expr\StaticCall) {
+            $name = TestQualityNodeHelper::callName($expr);
+
+            return $name !== null && in_array($name, self::CONTEXTUAL_METHOD_NAMES, true);
+        }
+
+        if ($expr instanceof Expr\PropertyFetch) {
+            return $this->isContextualName($expr->name)
+                || $this->isContextualNumericExpression($expr->var);
+        }
+
+        if ($expr instanceof Expr\ArrayDimFetch) {
+            return $this->isContextualArrayKey($expr->dim)
+                || $this->isContextualNumericExpression($expr->var);
+        }
+
+        return false;
+    }
+
+    /**
+     * @return bool True when the property node carries a contextual numeric name.
+     */
+    private function isContextualName(Node $node): bool
+    {
+        if (!$node instanceof Node\Identifier) {
+            return false;
+        }
+
+        return in_array($this->normalizeName($node->toString()), self::CONTEXTUAL_NUMERIC_NAMES, true);
+    }
+
+    /**
+     * @return bool True when the array key carries a contextual numeric name.
+     */
+    private function isContextualArrayKey(?Expr $expr): bool
+    {
+        if (!$expr instanceof Scalar\String_) {
+            return false;
+        }
+
+        return in_array($this->normalizeName($expr->value), self::CONTEXTUAL_NUMERIC_NAMES, true);
+    }
+
+    /**
+     * @return string Normalized identifier for loose config/report key matching.
+     */
+    private function normalizeName(string $name): string
+    {
+        $normalized = preg_replace('/[^a-z0-9]+/i', '', $name);
+
+        return strtolower((string) $normalized);
     }
 }

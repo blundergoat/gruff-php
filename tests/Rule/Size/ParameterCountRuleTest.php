@@ -14,9 +14,14 @@ use GruffPhp\Rule\Size\ParameterCountRule;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ParameterCountRuleTest behavior.
+ */
 final class ParameterCountRuleTest extends TestCase
 {
+    /** Rule instance under test. */
     private ParameterCountRule $rule;
+    /** Parser used to load fixture files. */
     private PhpFileParser $parser;
 
     /**
@@ -51,13 +56,13 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $warnings = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Warning));
-        $errors   = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
+        $warnings = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Warning));
+        $errors   = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
 
         self::assertCount(2, $warnings);
         self::assertCount(1, $errors);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('ManyParamsFixture::sixParams()', $symbols);
         self::assertContains('ManyParamsFixture::nineParams()', $symbols);
         self::assertContains('ManyParamsFixture::__construct()', $symbols);
@@ -72,7 +77,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $errors = array_values(array_filter($findings, static fn ($f) => $f->severity === Severity::Error));
+        $errors = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
         self::assertCount(1, $errors);
         self::assertSame('ManyParamsFixture::nineParams()', $errors[0]->symbol);
         self::assertSame(9, $errors[0]->metadata['parameters']);
@@ -87,7 +92,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('ManyParamsFixture::variadicParams()', $symbols);
     }
 
@@ -102,7 +107,7 @@ final class ParameterCountRuleTest extends TestCase
 
         $constructorFindings = array_values(array_filter(
             $findings,
-            static fn ($f) => $f->symbol === 'ManyParamsFixture::__construct()',
+            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
         ));
 
         self::assertCount(1, $constructorFindings);
@@ -118,7 +123,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('promoted-payload.php', ['warning' => 5, 'error' => 8]);
 
-        $symbols = array_map(static fn ($f) => $f->symbol, $findings);
+        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
     }
 

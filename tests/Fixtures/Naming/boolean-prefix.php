@@ -11,6 +11,7 @@ class BooleanPrefixFixture
     public function canEdit(): bool { return true; }
     public function shouldRetry(): bool { return false; }
     public function containsValue(): bool { return true; }
+    public function looksLikeTestFile(): bool { return true; }
     public function matchesPattern(): bool { return true; }
     public function supportsFeature(): bool { return true; }
 

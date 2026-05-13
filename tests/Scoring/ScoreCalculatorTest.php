@@ -15,6 +15,9 @@ use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Covers ScoreCalculatorTest behavior.
+ */
 final class ScoreCalculatorTest extends TestCase
 {
     /**
@@ -62,9 +65,9 @@ final class ScoreCalculatorTest extends TestCase
     public function testCompositeGodMethodFindingRequiresSizeAndComplexityOnSameSymbol(): void
     {
         $findings = [
-            $this->finding('size.method-length', Pillar::Size, Severity::Warning, 'src/TooMuch.php', 12, 'TooMuch::run()'),
-            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, 'src/TooMuch.php', 12, 'TooMuch::run()'),
-            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, 'src/Other.php', 9, 'Other::run()'),
+            $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, symbol: 'TooMuch::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, symbol: 'TooMuch::run()'),
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
         $composites = (new CompositeFindingFactory())->build($findings);
