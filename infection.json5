@@ -6,6 +6,8 @@
         ]
     },
     "testFrameworkOptions": "--testsuite=unit",
+    "minMsi": 80,
+    "minCoveredMsi": 80,
     "mutators": {
         "@default": true
     },
