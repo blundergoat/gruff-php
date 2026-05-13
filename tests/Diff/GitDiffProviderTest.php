@@ -131,6 +131,13 @@ final class GitDiffProviderTest extends TestCase
         }
     }
 
+    /**
+     * Build a finding fixture for assertions.
+     *
+     * @param string $filePath Finding file path.
+     * @param int $line Finding line number.
+     * @return Finding Fixture value.
+     */
     private function finding(string $filePath, int $line): Finding
     {
         return new Finding(
@@ -145,6 +152,11 @@ final class GitDiffProviderTest extends TestCase
         );
     }
 
+    /**
+     * Skip the current test when Git is unavailable.
+     *
+     * @return void No return value.
+     */
     private function skipWhenGitIsUnavailable(): void
     {
         $process = new Process(['git', '--version']);
@@ -155,6 +167,11 @@ final class GitDiffProviderTest extends TestCase
         }
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @return string Fixture value.
+     */
     private function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-diff-' . bin2hex(random_bytes(6));
@@ -164,6 +181,13 @@ final class GitDiffProviderTest extends TestCase
         return $path;
     }
 
+    /**
+     * Run a Git command in a fixture repository.
+     *
+     * @param string $cwd Working directory.
+     * @param string $args Command arguments.
+     * @return void No return value.
+     */
     private function runGit(string $cwd, string ...$args): void
     {
         $process = new Process(array_merge(['git'], $args), $cwd);
@@ -172,6 +196,12 @@ final class GitDiffProviderTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {

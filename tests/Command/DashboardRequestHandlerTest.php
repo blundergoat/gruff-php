@@ -97,6 +97,12 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 405 Method Not Allowed', $this->responseFor("POST /scan HTTP/1.1\r\nHost: 127.0.0.1:8765\r\n\r\n"));
     }
 
+    /**
+     * Return the dashboard response for a raw HTTP request.
+     *
+     * @param string $request Raw HTTP request.
+     * @return string Fixture value.
+     */
     private function responseFor(string $request): string
     {
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
@@ -115,6 +121,11 @@ final class DashboardRequestHandlerTest extends TestCase
         return $response;
     }
 
+    /**
+     * Build a dashboard request handler fixture.
+     *
+     * @return DashboardRequestHandler Fixture value.
+     */
     private function handler(): DashboardRequestHandler
     {
         $stateFactory = new DashboardStateFactory();
@@ -135,6 +146,11 @@ final class DashboardRequestHandlerTest extends TestCase
         );
     }
 
+    /**
+     * Build an empty console input fixture.
+     *
+     * @return ArrayInput Fixture value.
+     */
     private function input(): ArrayInput
     {
         return new ArrayInput([], new InputDefinition([
@@ -149,6 +165,11 @@ final class DashboardRequestHandlerTest extends TestCase
         ]));
     }
 
+    /**
+     * Create a fake gruff executable for dashboard tests.
+     *
+     * @return string Fixture value.
+     */
     private function fakeGruffBinary(): string
     {
         $path = sys_get_temp_dir() . '/gruff-dashboard-test-' . bin2hex(random_bytes(6)) . '.php';

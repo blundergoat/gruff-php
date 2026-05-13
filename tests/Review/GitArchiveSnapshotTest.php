@@ -127,6 +127,11 @@ final class GitArchiveSnapshotTest extends TestCase
         }
     }
 
+    /**
+     * Create a Git repository fixture with committed base files.
+     *
+     * @return string Fixture value.
+     */
     private function repoWithBaseFiles(): string
     {
         $repo = $this->tempDir('gruff-snapshot-repo-');
@@ -182,6 +187,11 @@ final class GitArchiveSnapshotTest extends TestCase
         return $paths;
     }
 
+    /**
+     * Skip the current test when Git is unavailable.
+     *
+     * @return void No return value.
+     */
     private function skipWhenGitIsUnavailable(): void
     {
         $process = new Process(['git', '--version']);
@@ -192,6 +202,13 @@ final class GitArchiveSnapshotTest extends TestCase
         }
     }
 
+    /**
+     * Run a Git command in a fixture repository.
+     *
+     * @param string $cwd Working directory.
+     * @param string $args Command arguments.
+     * @return void No return value.
+     */
     private function runGit(string $cwd, string ...$args): void
     {
         $process = new Process(array_merge(['git'], $args), $cwd);
@@ -200,6 +217,12 @@ final class GitArchiveSnapshotTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @param string $prefix Temporary directory prefix.
+     * @return string Fixture value.
+     */
     private function tempDir(string $prefix): string
     {
         $path = sys_get_temp_dir() . '/' . $prefix . bin2hex(random_bytes(6));
@@ -209,6 +232,12 @@ final class GitArchiveSnapshotTest extends TestCase
         return $path;
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {

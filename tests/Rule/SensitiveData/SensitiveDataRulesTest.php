@@ -234,6 +234,12 @@ PHP));
         );
     }
 
+    /**
+     * Parse the requested path into an analysis unit.
+     *
+     * @param string $path Filesystem path.
+     * @return AnalysisUnit Fixture value.
+     */
     private function unitForPath(string $path): AnalysisUnit
     {
         $absolutePath = self::PROJECT_ROOT . '/' . $path;

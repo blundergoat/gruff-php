@@ -13,6 +13,11 @@ abstract class CliTestCase extends TestCase
 {
     protected const PROJECT_ROOT = __DIR__ . '/../..';
 
+    /**
+     * Create an isolated project fixture for baseline CLI tests.
+     *
+     * @return string Fixture value.
+     */
     protected function createBaselineProject(): string
     {
         $project = $this->tempDir();
@@ -47,6 +52,11 @@ abstract class CliTestCase extends TestCase
         return $report;
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @return string Fixture value.
+     */
     protected function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-cli-' . bin2hex(random_bytes(6));
@@ -56,6 +66,12 @@ abstract class CliTestCase extends TestCase
         return $path;
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     protected function removeDir(string $path): void
     {
         if (!is_dir($path)) {
@@ -82,6 +98,13 @@ abstract class CliTestCase extends TestCase
         rmdir($path);
     }
 
+    /**
+     * Copy the package tree into an isolated test project.
+     *
+     * @param string $source Source directory.
+     * @param string $destination Destination directory.
+     * @return void No return value.
+     */
     protected function copyPackageTree(string $source, string $destination): void
     {
         self::assertTrue(mkdir($destination, 0777, true));
@@ -129,6 +152,12 @@ abstract class CliTestCase extends TestCase
         }
     }
 
+    /**
+     * Return an unused local TCP port for dashboard tests.
+     *
+     * @return int Fixture value.
+     * @throws RuntimeException When the helper cannot complete the fixture operation.
+     */
     protected function unusedPort(): int
     {
         $server = @stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
@@ -147,6 +176,13 @@ abstract class CliTestCase extends TestCase
         return (int) $matches[1];
     }
 
+    /**
+     * Wait for the dashboard HTTP server to accept connections.
+     *
+     * @param int $port Local TCP port.
+     * @param Process $process Dashboard server process.
+     * @return void No return value.
+     */
     protected function waitForHttpServer(int $port, Process $process): void
     {
         $deadline = microtime(true) + 5.0;
@@ -170,6 +206,14 @@ abstract class CliTestCase extends TestCase
         self::fail('Timed out waiting for gruff dashboard server. ' . $process->getErrorOutput() . $process->getOutput());
     }
 
+    /**
+     * Fetch a raw response from the local dashboard server.
+     *
+     * @param int $port Local TCP port.
+     * @param string $path Filesystem path.
+     * @return string Fixture value.
+     * @throws RuntimeException When the helper cannot complete the fixture operation.
+     */
     protected function fetchHttp(int $port, string $path): string
     {
         $socket = @stream_socket_client(sprintf('tcp://127.0.0.1:%d', $port), $errorCode, $errorMessage, 1.0);

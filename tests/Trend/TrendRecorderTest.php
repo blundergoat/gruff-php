@@ -71,6 +71,12 @@ final class TrendRecorderTest extends TestCase
         }
     }
 
+    /**
+     * Build a score report fixture for trend assertions.
+     *
+     * @param float $score Fixture value.
+     * @return ScoreReport Fixture value.
+     */
     private function score(float $score): ScoreReport
     {
         return new ScoreReport(
@@ -83,6 +89,11 @@ final class TrendRecorderTest extends TestCase
         );
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @return string Fixture value.
+     */
     private function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-trend-test-' . bin2hex(random_bytes(6));
@@ -92,6 +103,12 @@ final class TrendRecorderTest extends TestCase
         return $path;
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {

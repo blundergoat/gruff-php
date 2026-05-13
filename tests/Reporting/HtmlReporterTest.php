@@ -256,6 +256,11 @@ final class HtmlReporterTest extends TestCase
         self::assertSame($this->fixture('interactive.html'), $html);
     }
 
+    /**
+     * Build a sample analysis report for renderer assertions.
+     *
+     * @return AnalysisReport Fixture value.
+     */
     private function sampleReport(): AnalysisReport
     {
         return $this->report([
@@ -318,6 +323,12 @@ final class HtmlReporterTest extends TestCase
         );
     }
 
+    /**
+     * Load an expected fixture snapshot.
+     *
+     * @param string $name Fixture name.
+     * @return string Fixture value.
+     */
     private function fixture(string $name): string
     {
         $contents = file_get_contents(__DIR__ . '/../Fixtures/Reporting/InteractiveReport/' . $name);

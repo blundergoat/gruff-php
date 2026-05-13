@@ -584,6 +584,13 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
     }
 
+    /**
+     * Write a temporary configuration file for loader assertions.
+     *
+     * @param string $contents Config file contents.
+     * @param string $suffix File suffix.
+     * @return string Fixture value.
+     */
     private function writeTempConfig(string $contents, string $suffix = '.yaml'): string
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-config-');
@@ -605,6 +612,11 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
 {
     public const ID = 'fixture.default-disabled';
 
+    /**
+     * Return metadata for the fixture rule.
+     *
+     * @return RuleDefinition Fixture value.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -618,6 +630,13 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
         );
     }
 
+    /**
+     * Return findings produced by the fixture rule.
+     *
+     * @param AnalysisUnit $unit Analysis unit.
+     * @param RuleContext $context Rule context for the fixture.
+     * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         return [];
@@ -628,6 +647,11 @@ final readonly class FixtureOptionsRule implements RuleInterface
 {
     public const ID = 'fixture.options';
 
+    /**
+     * Return metadata for the fixture rule.
+     *
+     * @return RuleDefinition Fixture value.
+     */
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
@@ -648,6 +672,13 @@ final readonly class FixtureOptionsRule implements RuleInterface
         );
     }
 
+    /**
+     * Return findings produced by the fixture rule.
+     *
+     * @param AnalysisUnit $unit Analysis unit.
+     * @param RuleContext $context Rule context for the fixture.
+     * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+     */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         return [];

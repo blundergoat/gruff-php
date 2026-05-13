@@ -120,6 +120,12 @@ final class SourceDiscoveryTest extends TestCase
         self::assertTrue($result->hasInputErrors());
     }
 
+    /**
+     * Resolve a source-discovery fixture root.
+     *
+     * @param string $name Fixture name.
+     * @return string Fixture value.
+     */
     private function fixtureRoot(string $name): string
     {
         $root = realpath(__DIR__ . '/../Fixtures/Source/' . $name);

@@ -183,11 +183,23 @@ final class ModernisationRulesTest extends TestCase
         );
     }
 
+    /**
+     * Parse the requested path into an analysis unit.
+     *
+     * @param string $path Filesystem path.
+     * @return AnalysisUnit Fixture value.
+     */
     private function unitForPath(string $path): AnalysisUnit
     {
         return (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $path, $path));
     }
 
+    /**
+     * Build analysis configuration for modernisation assertions.
+     *
+     * @param string $path Filesystem path.
+     * @return AnalysisConfig Fixture value.
+     */
     private function config(string $path): AnalysisConfig
     {
         return (new ConfigLoader(self::PROJECT_ROOT))->load($path, RuleRegistry::defaults());

@@ -143,6 +143,11 @@ final class InfectionReportParserTest extends TestCase
         }
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @return string Fixture value.
+     */
     private function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-infection-runner-' . bin2hex(random_bytes(6));
@@ -154,6 +159,12 @@ final class InfectionReportParserTest extends TestCase
         return $path;
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {

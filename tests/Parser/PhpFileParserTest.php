@@ -43,6 +43,12 @@ final class PhpFileParserTest extends TestCase
         self::assertNotSame('', $unit->diagnostics[0]->message);
     }
 
+    /**
+     * Resolve a parser fixture path.
+     *
+     * @param string $path Filesystem path.
+     * @return string Fixture value.
+     */
     private function fixturePath(string $path): string
     {
         $fixture = realpath(__DIR__ . '/../Fixtures/Source/' . $path);

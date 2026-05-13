@@ -460,11 +460,22 @@ final class TestQualityRulesTest extends TestCase
         self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse($this->phpUnitDummyUnit(), $context));
     }
 
+    /**
+     * Build a dummy PHPUnit analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
         return $this->unitForPath('tests/Fixtures/TestQuality/non-candidates.php');
     }
 
+    /**
+     * Build a rule context for PHPUnit helper tests.
+     *
+     * @param string $relativeRoot Fixture value.
+     * @return RuleContext Fixture value.
+     */
     private function phpUnitContext(string $relativeRoot): RuleContext
     {
         $registry = RuleRegistry::defaults();
@@ -608,6 +619,12 @@ final class TestQualityRulesTest extends TestCase
         );
     }
 
+    /**
+     * Parse the requested path into an analysis unit.
+     *
+     * @param string $path Filesystem path.
+     * @return AnalysisUnit Fixture value.
+     */
     private function unitForPath(string $path): AnalysisUnit
     {
         return (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $path, $path));

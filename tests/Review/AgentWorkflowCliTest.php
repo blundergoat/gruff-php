@@ -628,6 +628,11 @@ final class AgentWorkflowCliTest extends TestCase
         return $result;
     }
 
+    /**
+     * Return source code for the base review fixture.
+     *
+     * @return string Fixture value.
+     */
     private function baseExampleSource(): string
     {
         return <<<'PHP'
@@ -643,6 +648,11 @@ final class Example
 PHP;
     }
 
+    /**
+     * Return source code for the changed review fixture.
+     *
+     * @return string Fixture value.
+     */
     private function changedExampleSource(): string
     {
         return <<<'PHP'
@@ -665,6 +675,11 @@ final class Example
 PHP;
     }
 
+    /**
+     * Return source code for the removed-base review fixture.
+     *
+     * @return string Fixture value.
+     */
     private function removedBaseExampleSource(): string
     {
         return <<<'PHP'
@@ -685,6 +700,11 @@ final class Example
 PHP;
     }
 
+    /**
+     * Return source code for an added risky review fixture.
+     *
+     * @return string Fixture value.
+     */
     private function addedRiskSource(): string
     {
         return <<<'PHP'
@@ -700,6 +720,11 @@ final class NewRisk
 PHP;
     }
 
+    /**
+     * Skip the current test when Git is unavailable.
+     *
+     * @return void No return value.
+     */
     private function skipWhenGitIsUnavailable(): void
     {
         $process = new Process(['git', '--version']);
@@ -710,6 +735,13 @@ PHP;
         }
     }
 
+    /**
+     * Run a Git command in a fixture repository.
+     *
+     * @param string $cwd Working directory.
+     * @param string $args Command arguments.
+     * @return void No return value.
+     */
     private function runGit(string $cwd, string ...$args): void
     {
         $process = new Process(array_merge(['git'], $args), $cwd);
@@ -718,6 +750,11 @@ PHP;
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
     }
 
+    /**
+     * Create a temporary directory for filesystem assertions.
+     *
+     * @return string Fixture value.
+     */
     private function tempDir(): string
     {
         $path = sys_get_temp_dir() . '/gruff-review-' . bin2hex(random_bytes(6));
@@ -727,6 +764,12 @@ PHP;
         return $path;
     }
 
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Filesystem path.
+     * @return void No return value.
+     */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {

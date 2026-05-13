@@ -75,6 +75,17 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame('TooMuch::run()', $composites[0]->symbol);
     }
 
+    /**
+     * Build a finding fixture for assertions.
+     *
+     * @param string $ruleId Rule identifier.
+     * @param Pillar $pillar Fixture value.
+     * @param Severity $severity Fixture value.
+     * @param string $filePath Finding file path.
+     * @param int $line Finding line number.
+     * @param string|null $symbol Fixture value.
+     * @return Finding Fixture value.
+     */
     private function finding(
         string $ruleId,
         Pillar $pillar,

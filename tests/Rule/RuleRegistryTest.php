@@ -276,6 +276,12 @@ final class RuleRegistryTest extends TestCase
         }
     }
 
+    /**
+     * Parse the named fixture into an analysis unit.
+     *
+     * @param string $displayPath Fixture display path.
+     * @return AnalysisUnit Fixture value.
+     */
     private function parseFixture(string $displayPath): AnalysisUnit
     {
         $absolutePath = __DIR__ . '/../..' . '/' . $displayPath;
@@ -283,13 +289,29 @@ final class RuleRegistryTest extends TestCase
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $displayPath));
     }
 
+    /**
+     * Build a fixture rule with the requested identifier.
+     *
+     * @param string $id Rule identifier.
+     * @return RuleInterface Fixture value.
+     */
     private function fakeRule(string $id): RuleInterface
     {
         return new readonly class ($id) implements RuleInterface {
+            /**
+             * Build the anonymous fixture rule.
+             *
+             * @param string $id Rule identifier.
+             */
             public function __construct(private string $id)
             {
             }
 
+            /**
+             * Return metadata for the fixture rule.
+             *
+             * @return RuleDefinition Fixture value.
+             */
             public function definition(): RuleDefinition
             {
                 return new RuleDefinition(
@@ -302,6 +324,13 @@ final class RuleRegistryTest extends TestCase
                 );
             }
 
+            /**
+             * Return findings produced by the fixture rule.
+             *
+             * @param AnalysisUnit $unit Analysis unit.
+             * @param RuleContext $context Rule context for the fixture.
+             * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+             */
             public function analyse(AnalysisUnit $unit, RuleContext $context): array
             {
                 return [
@@ -320,9 +349,19 @@ final class RuleRegistryTest extends TestCase
         };
     }
 
+    /**
+     * Build a project-level fixture rule with duplicate identity.
+     *
+     * @return RuleInterface Fixture value.
+     */
     private function duplicateProjectRule(): RuleInterface
     {
         return new readonly class () implements RuleInterface {
+            /**
+             * Return metadata for the fixture rule.
+             *
+             * @return RuleDefinition Fixture value.
+             */
             public function definition(): RuleDefinition
             {
                 return new RuleDefinition(
@@ -335,6 +374,13 @@ final class RuleRegistryTest extends TestCase
                 );
             }
 
+            /**
+             * Return findings produced by the fixture rule.
+             *
+             * @param AnalysisUnit $unit Analysis unit.
+             * @param RuleContext $context Rule context for the fixture.
+             * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+             */
             public function analyse(AnalysisUnit $unit, RuleContext $context): array
             {
                 return [

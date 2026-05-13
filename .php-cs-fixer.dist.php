@@ -14,11 +14,21 @@ use PhpCsFixer\Tokenizer\Tokens;
  */
 final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 {
+    /**
+     * Return the custom fixer rule name.
+     *
+     * @return string Fixture value.
+     */
     public function getName(): string
     {
         return 'GruffPhp/align_named_arguments';
     }
 
+    /**
+     * Return the custom fixer definition.
+     *
+     * @return FixerDefinitionInterface Fixture value.
+     */
     public function getDefinition(): FixerDefinitionInterface
     {
         return new FixerDefinition(
@@ -31,16 +41,34 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
         );
     }
 
+    /**
+     * Return the custom fixer priority.
+     *
+     * @return int Fixture value.
+     */
     public function getPriority(): int
     {
         return -100;
     }
 
+    /**
+     * Report whether the token stream may contain named arguments.
+     *
+     * @param Tokens $tokens Token stream to fix.
+     * @return bool True when the assertion condition is met.
+     */
     public function isCandidate(Tokens $tokens): bool
     {
         return str_contains($tokens->generateCode(), ':');
     }
 
+    /**
+     * Apply named-argument alignment to a token stream.
+     *
+     * @param SplFileInfo $file File being fixed.
+     * @param Tokens $tokens Token stream to fix.
+     * @return void No return value.
+     */
     protected function applyFix(SplFileInfo $file, Tokens $tokens): void
     {
         $code  = $tokens->generateCode();
@@ -51,6 +79,12 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
         }
     }
 
+    /**
+     * Align consecutive multiline named-argument groups in source code.
+     *
+     * @param string $code Source code to inspect.
+     * @return string Fixture value.
+     */
     private function alignNamedArgumentGroups(string $code): string
     {
         $parts = preg_split('/(\R)/', $code, -1, PREG_SPLIT_DELIM_CAPTURE);
@@ -87,6 +121,12 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
         return implode('', $lines);
     }
 
+    /**
+     * Report whether a source line contains a named argument.
+     *
+     * @param string $line Finding line number.
+     * @return bool True when the assertion condition is met.
+     */
     private function isNamedArgumentLine(string $line): bool
     {
         return preg_match('/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:(?!:)\s*\S.*(?:,)?\R?$/', $line) === 1;

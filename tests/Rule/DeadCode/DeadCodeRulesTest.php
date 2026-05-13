@@ -17,6 +17,11 @@ final class DeadCodeRulesTest extends TestCase
 {
     private PhpFileParser $parser;
 
+    /**
+     * Prepare parser fixtures before each rule test.
+     *
+     * @return void No return value.
+     */
     protected function setUp(): void
     {
         $this->parser = new PhpFileParser();
@@ -197,6 +202,12 @@ final class DeadCodeRulesTest extends TestCase
         return array_values(array_filter($findings, static fn ($f) => $f->ruleId === $ruleId));
     }
 
+    /**
+     * Parse the named fixture into an analysis unit.
+     *
+     * @param string $filename Fixture filename.
+     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;

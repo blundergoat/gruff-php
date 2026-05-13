@@ -35,6 +35,11 @@ final class SecurityRulesTest extends TestCase
 {
     private PhpFileParser $parser;
 
+    /**
+     * Prepare parser fixtures before each rule test.
+     *
+     * @return void No return value.
+     */
     protected function setUp(): void
     {
         $this->parser = new PhpFileParser();
@@ -220,6 +225,12 @@ final class SecurityRulesTest extends TestCase
         );
     }
 
+    /**
+     * Parse the named fixture into an analysis unit.
+     *
+     * @param string $filename Fixture filename.
+     * @return AnalysisUnit Fixture value.
+     */
     private function parseFixture(string $filename): AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Security/' . $filename;
@@ -227,6 +238,11 @@ final class SecurityRulesTest extends TestCase
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename));
     }
 
+    /**
+     * Parse the dangerous-execution fixture into an analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
     private function dangerousExecutionUnit(): AnalysisUnit
     {
         return $this->parseSource(
@@ -254,6 +270,11 @@ final class SecurityRulesTest extends TestCase
         );
     }
 
+    /**
+     * Parse the typed-callable fixture into an analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
     private function typedCallableUnit(): AnalysisUnit
     {
         return $this->parseSource(
@@ -278,6 +299,13 @@ PHP,
         );
     }
 
+    /**
+     * Parse inline source into an analysis unit.
+     *
+     * @param string $source Source directory.
+     * @param string $displayPath Fixture display path.
+     * @return AnalysisUnit Fixture value.
+     */
     private function parseSource(string $source, string $displayPath): AnalysisUnit
     {
         $parser = (new ParserFactory())->createForNewestSupportedVersion();

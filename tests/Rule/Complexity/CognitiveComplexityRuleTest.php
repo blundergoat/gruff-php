@@ -21,6 +21,11 @@ final class CognitiveComplexityRuleTest extends TestCase
     private CognitiveComplexityRule $rule;
     private PhpFileParser $parser;
 
+    /**
+     * Prepare parser fixtures before each rule test.
+     *
+     * @return void No return value.
+     */
     protected function setUp(): void
     {
         $this->rule   = new CognitiveComplexityRule();
@@ -142,6 +147,12 @@ final class CognitiveComplexityRuleTest extends TestCase
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
+    /**
+     * Parse the named fixture into an analysis unit.
+     *
+     * @param string $filename Fixture filename.
+     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
