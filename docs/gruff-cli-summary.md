@@ -100,7 +100,7 @@ php bin/gruff summary src --format=json --top=5
 }
 ```
 
-The schema is stable for this minor version. New top-level keys may be added; existing keys won't be renamed or change shape without bumping the schema version.
+The schema is versioned for this pre-release package. New top-level keys may be added; once the package is released, existing keys should not be renamed or change shape without bumping the schema version.
 
 ## What this is *not*
 
@@ -113,8 +113,8 @@ The schema is stable for this minor version. New top-level keys may be added; ex
 | Code | Meaning |
 |---|---|
 | `0` | Summary printed successfully. |
-| `2` | Usage error: bad `--format`, non-integer `--top`, `--config` combined with `--no-config`, or config load failure. |
 | `1` | Reserved for future "failure on threshold" support if added. Today the command never returns `1`. |
+| `2` | Usage error: bad `--format`, non-integer `--top`, `--config` combined with `--no-config`, or config load failure. |
 
 `summary` deliberately does **not** honour `--fail-on`. It is a read-only digest; use `analyse --fail-on=warning` if you want CI to fail on the same data.
 

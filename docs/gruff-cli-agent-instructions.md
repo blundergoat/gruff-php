@@ -83,10 +83,10 @@ Unstaged changes only:
 php bin/gruff analyse src --diff=unstaged --format markdown --fail-on none
 ```
 
-Compare the working tree to a base ref such as `deploy`:
+Compare the working tree to a base ref:
 
 ```bash
-php bin/gruff analyse src --diff=deploy --format json --fail-on none > /tmp/gruff-diff.json
+php bin/gruff analyse src --diff=<base-ref> --format json --fail-on none > /tmp/gruff-diff.json
 ```
 
 `--diff=<base>` semantics use Git diff filtering against that ref. It is still a changed-line/file filter, not base/current finding subtraction.
@@ -98,10 +98,10 @@ Use branch-review mode when you need the answer to "what did this branch make wo
 Quick JSON command from the target project root:
 
 ```bash
-php /path/to/gruff-php/bin/gruff analyse --diff-vs=origin/deploy --changed-only --format=json --fail-on=none > /tmp/gruff-review.json
+php /path/to/gruff-php/bin/gruff analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format=json --fail-on=none > /tmp/gruff-review.json
 ```
 
-With `--changed-only` and no explicit paths, gruff derives changed files from Git internally. Do not wrap the command in a separate `git diff | mapfile` step unless intentionally forcing a custom path list.
+With `--changed-only` and no explicit paths, gruff derives changed files from Git internally. Do not wrap the command in a separate `git diff | mapfile` step unless intentionally forcing a custom path list. Replace `<base-ref>` with the branch or ref you review against.
 
 ## Full Project vs Diff
 
@@ -126,13 +126,14 @@ Branch review:
 - Use `--changed-only` to compare only files changed from the base ref.
 - With no explicit paths, derives changed files from Git internally.
 - Requires Git, but does not mutate the working tree.
+- Project-level rules need full context. A zero count for `design.single-implementor-interface` or future `ProjectRuleInterface` rules under `--changed-only` is not proof of cleanliness; run a full-project scan and intersect relevant findings with changed files when those rules matter.
 
 When in doubt, run both:
 
 ```bash
 php bin/gruff analyse src --format json --fail-on none > /tmp/gruff-full.json
 php bin/gruff analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
-php bin/gruff analyse --diff-vs=deploy --changed-only --format json --fail-on none > /tmp/gruff-review.json
+php bin/gruff analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format json --fail-on none > /tmp/gruff-review.json
 ```
 
 ## Config

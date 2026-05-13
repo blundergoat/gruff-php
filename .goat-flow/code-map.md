@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-11. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-14. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -59,7 +59,9 @@ src/
 |   |-- AnalyseCommand.php                    = `analyse` command; loads config, derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
 |   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
 |   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
-|   `-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
+|   |-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
+|   |-- SummaryCommand.php                    = `summary` command; runs the analyser once and renders compact text/JSON aggregate output
+|   `-- SummaryReportData.php                 = aggregate payload for summary command rendering
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
@@ -67,7 +69,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`; registers `analyse`, `dashboard`, `list-rules`, and `report`
+|   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`; registers `analyse`, `summary`, `dashboard`, `list-rules`, and `report`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception

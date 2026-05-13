@@ -11,7 +11,7 @@ Pre-release: the application reports its version as `0.1.0-dev` ([`src/Console/A
 - PHP `^8.3` ([`composer.json`](composer.json))
 - Composer 2.x
 
-Runtime dependencies: `nikic/php-parser`, `symfony/console`, `symfony/finder`, `symfony/process`. Infection is optional and only required if you opt into mutation analysis.
+Runtime dependencies: `nikic/php-parser`, `symfony/console`, `symfony/finder`, `symfony/process`, `symfony/yaml`. Infection is optional and only required if you opt into mutation analysis.
 
 ## Install
 
@@ -24,7 +24,7 @@ composer install
 php bin/gruff --help
 ```
 
-Once the package is published to Packagist, the convenient form will be:
+Packagist install is not available yet. Once the package is published, the convenient form will be:
 
 ```bash
 composer require --dev devgoat/gruff-php
@@ -59,7 +59,7 @@ php bin/gruff analyse src/ --no-config
 | Command | Purpose |
 |---------|---------|
 | [`analyse`](src/Command/AnalyseCommand.php) | Run the rule registry over the supplied paths and emit a report in the chosen format. The main command. |
-| [`summary`](src/Command/SummaryCommand.php) | Run a scan and print a compact digest only &mdash; composite score, per-pillar finding counts, top rules, top file offenders &mdash; with no per-finding spam. See [`docs/gruff-cli-summary.md`](docs/gruff-cli-summary.md). |
+| [`summary`](src/Command/SummaryCommand.php) | Run a scan and print a compact digest only &mdash; composite score, per-pillar finding counts, top rules, top file offenders &mdash; with no per-finding spam. It has command-specific exit semantics; see [`docs/gruff-cli-summary.md`](docs/gruff-cli-summary.md). |
 | [`report`](src/Command/ReportCommand.php) | Convenience wrapper around `analyse` for static HTML or JSON reports written to stdout or `--output <file>`. |
 | [`dashboard`](src/Command/DashboardCommand.php) | Serve a local interactive dashboard (default `127.0.0.1:8765`) that re-runs scans against the current or another project root on demand. |
 | [`list-rules`](src/Command/ListRulesCommand.php) | Print rule metadata (id, pillar, default severity, description) as a table or JSON. |
@@ -167,9 +167,8 @@ allowlists:
 
 rules:
   size.method-length:
-    thresholds:
-      warning: 40
-      error: 80
+    threshold: 80
+    severity: error
   complexity.cyclomatic:
     enabled: false
   test-quality.excessive-mocking:
@@ -189,7 +188,7 @@ Top-level keys, recognised by `ConfigLoader::assertKnownRootKeys()`:
 | `selection.{tiers,pillars,rules,excludePillars,excludeRules}` | Explicit include/exclude over the rule set. If any include list is non-empty, a rule must match at least one include. |
 | `allowlists.acceptedAbbreviations` | Identifier tokens the naming rules will accept (e.g. `id`, `db`). |
 | `allowlists.secretPreviews` | Redacted previews to suppress for `SensitiveData` findings &mdash; copy them from a previous gruff report. |
-| `rules.<id>` | Per-rule `enabled` / `thresholds` / `options`. Threshold and option names must already exist in the rule's `RuleDefinition`; unknown keys raise a `ConfigException`. |
+| `rules.<id>` | Per-rule `enabled` / `threshold` + `severity` / `thresholds` / `options`. Use `threshold` + `severity` for metric rules with warning/error defaults; keep `thresholds` for named tuning values such as `maxMocks` or `minPositionalArguments`. Threshold and option names must already exist in the rule's `RuleDefinition`; unknown keys raise a `ConfigException`. |
 
 ## Baselines
 
@@ -276,7 +275,7 @@ php bin/gruff analyse \
   --mutation-budget=3
 ```
 
-The dashboard exposes a "Run mutation analysis" button when no report is present yet ([`src/Command/DashboardCommand.php`](src/Command/DashboardCommand.php)).
+This repository's [`infection.json5`](infection.json5) sets the full-suite goal at `minMsi: 80` and `minCoveredMsi: 80`. The dashboard does not run mutation analysis; use the dedicated scripts below or `analyse --infection-run --infection-report=...` when you need a fresh Infection report.
 
 ## Dashboard
 
@@ -293,7 +292,7 @@ php bin/gruff dashboard --diff
 php bin/gruff dashboard --scan-timeout=300
 ```
 
-The dashboard renders the HTML report inside a control panel with project root, scope (whole project vs `--diff`), config path, baseline, fail threshold, include-ignored, and interactive-findings toggles. `GET /scan` re-runs the analyser; `GET /health` returns a smoke-test response. `scripts/start-dev.sh` is a convenience wrapper with environment-overridable host, port, project root, and scan timeout.
+The dashboard renders the HTML report inside a control panel with project root, scope (whole project vs `--diff`), config path, baseline, fail threshold, include-ignored, and interactive-findings toggles. `GET /scan` re-runs the analyser; `GET /health` returns a smoke-test response. It is a static-analysis dashboard and omits mutation controls. `scripts/start-dev.sh` is a convenience wrapper with environment-overridable host, port, project root, and scan timeout.
 
 ## Development
 
@@ -304,7 +303,7 @@ composer test     # PHPUnit 11
 bash scripts/preflight-checks.sh  # PHPStan + PHPUnit with a coloured pass/fail summary
 ```
 
-The `composer check`/`preflight-checks.sh` pair is what CI runs (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Mutation testing has dedicated scripts: [`scripts/mutation-test-diff.sh`](scripts/mutation-test-diff.sh) for fast diff-scoped runs and [`scripts/mutation-test-full.sh`](scripts/mutation-test-full.sh) for full-project runs.
+The `composer check`/`preflight-checks.sh` pair is what CI runs (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Mutation testing has dedicated scripts: [`scripts/mutation-test-diff.sh`](scripts/mutation-test-diff.sh) for fast diff-scoped runs and [`scripts/mutation-test-full.sh`](scripts/mutation-test-full.sh) for full-project runs; the full run is expected to keep MSI and covered MSI at or above 80%.
 
 For deeper internals see [`.goat-flow/architecture.md`](.goat-flow/architecture.md), [`.goat-flow/code-map.md`](.goat-flow/code-map.md), and [`.goat-flow/glossary.md`](.goat-flow/glossary.md).
 

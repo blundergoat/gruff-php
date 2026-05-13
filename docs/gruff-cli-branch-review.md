@@ -13,7 +13,7 @@ Run from the target project root:
 
 ```bash
 php /path/to/gruff-php/bin/gruff analyse \
-  --diff-vs=origin/deploy \
+  --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -26,7 +26,7 @@ When running inside this checkout against this checkout, use:
 
 ```bash
 php bin/gruff analyse \
-  --diff-vs=origin/deploy \
+  --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -35,7 +35,9 @@ php bin/gruff analyse \
   > /tmp/gruff-branch-review.json
 ```
 
-`--diff-vs=<base> --changed-only` is the key combination. With no explicit paths, gruff derives changed files from Git internally and scopes both current-tree analysis and base snapshot comparison to those changed files. Agents should not wrap this in a separate `git diff | mapfile` command unless they intentionally need a custom path list.
+`--diff-vs=<base-ref> --changed-only` is the key combination. Replace `<base-ref>` with the branch or ref you review against. With no explicit paths, gruff derives changed files from Git internally and scopes both current-tree analysis and base snapshot comparison to those changed files. Agents should not wrap this in a separate `git diff | mapfile` command unless they intentionally need a custom path list.
+
+Project-level rules need full project context. A zero count for `design.single-implementor-interface` or any future `ProjectRuleInterface` rule under `--changed-only` is not proof that the branch is clean for that rule. When those rules matter, run a full-project scan and intersect relevant findings with changed files or review relevance after the fact.
 
 ## Optional Explicit Paths
 
@@ -44,7 +46,7 @@ Pass paths only when the review should be narrower than the branch diff:
 ```bash
 php /path/to/gruff-php/bin/gruff analyse \
   src/Foo.php src/Bar \
-  --diff-vs=origin/deploy \
+  --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
@@ -91,7 +93,7 @@ For performance smoke testing:
 ```bash
 /usr/bin/time -f 'elapsed=%E cpu=%P maxrss_kb=%M' \
 php /path/to/gruff-php/bin/gruff analyse \
-  --diff-vs=origin/deploy \
+  --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
   --no-baseline \
