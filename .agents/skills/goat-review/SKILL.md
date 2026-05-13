@@ -1,7 +1,7 @@
 ---
 name: goat-review
 description: "Use when reviewing a diff, PR, or set of code changes, or auditing a codebase area for quality issues. Triggers: 'review this', 'code review', 'audit X', 'look at these changes'."
-goat-flow-skill-version: "1.5.1"
+goat-flow-skill-version: "1.6.4"
 ---
 # /goat-review
 
@@ -63,6 +63,8 @@ Output three-bullet reconstruction:
 
 Pass 1 and Pass 2 anchor to BOTH the diff and the stated intent.
 
+**CHECKPOINT:** Scope locked, intent reconstructed. Proceeding to Pass 1.
+
 ## Diff Review (Quick) - Two-Pass Discipline
 
 The review runs two sequential passes. This is a deliberate reading discipline, not a doer-verifier split: you are the reviewer throughout, Pass 2 is the source of truth, and findings are only surfaced after Pass 2.
@@ -82,6 +84,8 @@ Scan for:
   - *Observability & DDT testability* - complex state transitions, background tasks, retry logic, or async flows without logging, telemetry, or surface-level signals. Ask: "can a human tell if this succeeded or failed without instrumenting it?" If no: `[SHOULD:needs-signal]` or `[MUST:needs-signal]` depending on risk
 
 Write raw suspicions with `file + semantic anchor` drawn from the diff. Do NOT verify, confirm, or dismiss in this pass. Over-capture is fine; Pass 2 filters.
+
+**CHECKPOINT:** Pass 1 complete - [N] suspicions captured (no resolution yet). Proceeding to Pass 2 grounded verification.
 
 ### Pass 2 - Grounded Verification (full files)
 
