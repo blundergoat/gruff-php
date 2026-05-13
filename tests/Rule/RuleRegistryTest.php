@@ -93,6 +93,11 @@ use PHPUnit\Framework\TestCase;
 
 final class RuleRegistryTest extends TestCase
 {
+    /**
+     * Verify default registry contains stable rule ids.
+     *
+     * @return void No return value.
+     */
     public function testDefaultRegistryContainsStableRuleIds(): void
     {
         $registry = RuleRegistry::defaults();
@@ -169,6 +174,11 @@ final class RuleRegistryTest extends TestCase
         self::assertTrue($registry->has(PublicMethodCountRule::ID));
     }
 
+    /**
+     * Verify runs enabled rules over parsed files.
+     *
+     * @return void No return value.
+     */
     public function testRunsEnabledRulesOverParsedFiles(): void
     {
         $registry = RuleRegistry::defaults();
@@ -191,6 +201,11 @@ final class RuleRegistryTest extends TestCase
         self::assertSame(['lines' => 27, 'threshold' => 3, 'thresholdType' => 'warning'], $findings[0]->metadata);
     }
 
+    /**
+     * Verify skips disabled rules.
+     *
+     * @return void No return value.
+     */
     public function testSkipsDisabledRules(): void
     {
         $registry = RuleRegistry::defaults();
@@ -208,6 +223,11 @@ final class RuleRegistryTest extends TestCase
         self::assertSame([], array_values($fileLengthFindings));
     }
 
+    /**
+     * Verify deduplicates project level findings across units.
+     *
+     * @return void No return value.
+     */
     public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
     {
         $registry = new RuleRegistry([$this->duplicateProjectRule()]);
@@ -226,6 +246,11 @@ final class RuleRegistryTest extends TestCase
         self::assertSame('README.md', $findings[0]->filePath);
     }
 
+    /**
+     * Verify rejects duplicate rule ids.
+     *
+     * @return void No return value.
+     */
     public function testRejectsDuplicateRuleIds(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -237,6 +262,11 @@ final class RuleRegistryTest extends TestCase
         ]);
     }
 
+    /**
+     * Verify default rules have listable descriptions.
+     *
+     * @return void No return value.
+     */
     public function testDefaultRulesHaveListableDescriptions(): void
     {
         foreach (RuleRegistry::defaults()->all() as $rule) {

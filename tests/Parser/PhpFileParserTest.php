@@ -10,6 +10,11 @@ use PHPUnit\Framework\TestCase;
 
 final class PhpFileParserTest extends TestCase
 {
+    /**
+     * Verify parses valid PHP file into analysis unit.
+     *
+     * @return void No return value.
+     */
     public function testParsesValidPhpFileIntoAnalysisUnit(): void
     {
         $path = $this->fixturePath('mixed/alpha.php');
@@ -21,6 +26,11 @@ final class PhpFileParserTest extends TestCase
         self::assertGreaterThan(0, $unit->lineCount());
     }
 
+    /**
+     * Verify reports syntax error diagnostic.
+     *
+     * @return void No return value.
+     */
     public function testReportsSyntaxErrorDiagnostic(): void
     {
         $path = $this->fixturePath('syntax-error/broken.php');

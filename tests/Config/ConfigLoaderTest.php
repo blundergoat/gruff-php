@@ -23,6 +23,11 @@ use PHPUnit\Framework\TestCase;
 
 final class ConfigLoaderTest extends TestCase
 {
+    /**
+     * Verify loads default rule settings when no config exists.
+     *
+     * @return void No return value.
+     */
     public function testLoadsDefaultRuleSettingsWhenNoConfigExists(): void
     {
         $registry = RuleRegistry::defaults();
@@ -34,6 +39,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(800, $settings->numericThreshold('error'));
     }
 
+    /**
+     * Verify loads explicit threshold overrides.
+     *
+     * @return void No return value.
+     */
     public function testLoadsExplicitThresholdOverrides(): void
     {
         $registry = RuleRegistry::defaults();
@@ -48,6 +58,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(999, $settings->numericThreshold('error'));
     }
 
+    /**
+     * Verify loads default YAML config file.
+     *
+     * @return void No return value.
+     */
     public function testLoadsDefaultYamlConfigFile(): void
     {
         $directory = sys_get_temp_dir() . '/gruff-config-' . bin2hex(random_bytes(6));
@@ -69,6 +84,11 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    /**
+     * Verify falls back to package default YAML config file.
+     *
+     * @return void No return value.
+     */
     public function testFallsBackToPackageDefaultYamlConfigFile(): void
     {
         $projectDirectory  = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
@@ -93,6 +113,11 @@ final class ConfigLoaderTest extends TestCase
         }
     }
 
+    /**
+     * Verify loads explicit YAML config file.
+     *
+     * @return void No return value.
+     */
     public function testLoadsExplicitYamlConfigFile(): void
     {
         $path = $this->writeTempConfig(
@@ -107,6 +132,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(90, $settings->numericThreshold('error'));
     }
 
+    /**
+     * Verify loads severity threshold with error severity.
+     *
+     * @return void No return value.
+     */
     public function testLoadsSeverityThresholdWithErrorSeverity(): void
     {
         $path = $this->writeTempConfig(
@@ -129,6 +159,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(Severity::Error, $thresholdMatch->severity);
     }
 
+    /**
+     * Verify loads severity threshold with warning severity.
+     *
+     * @return void No return value.
+     */
     public function testLoadsSeverityThresholdWithWarningSeverity(): void
     {
         $path = $this->writeTempConfig(
@@ -151,6 +186,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(Severity::Warning, $thresholdMatch->severity);
     }
 
+    /**
+     * Verify loads severity threshold with warning severity for inverse threshold rule.
+     *
+     * @return void No return value.
+     */
     public function testLoadsSeverityThresholdWithWarningSeverityForInverseThresholdRule(): void
     {
         $path = $this->writeTempConfig(
@@ -173,6 +213,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(Severity::Warning, $thresholdMatch->severity);
     }
 
+    /**
+     * Verify rejects severity threshold without severity.
+     *
+     * @return void No return value.
+     */
     public function testRejectsSeverityThresholdWithoutSeverity(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70}}}');
@@ -183,6 +228,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects severity without threshold.
+     *
+     * @return void No return value.
+     */
     public function testRejectsSeverityWithoutThreshold(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"severity":"error"}}}');
@@ -193,6 +243,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects severity threshold for named tuning threshold rule.
+     *
+     * @return void No return value.
+     */
     public function testRejectsSeverityThresholdForNamedTuningThresholdRule(): void
     {
         $path = $this->writeTempConfig('{"rules":{"docs.missing-public-phpdoc":{"threshold":8,"severity":"error"}}}');
@@ -203,6 +258,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects combining severity threshold and threshold map.
+     *
+     * @return void No return value.
+     */
     public function testRejectsCombiningSeverityThresholdAndThresholdMap(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}');
@@ -213,6 +273,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify can disable a rule.
+     *
+     * @return void No return value.
+     */
     public function testCanDisableARule(): void
     {
         $registry = RuleRegistry::defaults();
@@ -224,6 +289,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertFalse($config->ruleSettings(FileLengthRule::ID)->enabled);
     }
 
+    /**
+     * Verify loads minimum PHP version.
+     *
+     * @return void No return value.
+     */
     public function testLoadsMinimumPhpVersion(): void
     {
         $path = $this->writeTempConfig('{"minimumPhpVersion": 7.4}');
@@ -233,6 +303,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame(7.4, $config->minimumPhpVersion());
     }
 
+    /**
+     * Verify rejects unsupported minimum PHP version.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnsupportedMinimumPhpVersion(): void
     {
         $path = $this->writeTempConfig('{"minimumPhpVersion": 7.3}');
@@ -243,6 +318,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects unknown rule ids.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnknownRuleIds(): void
     {
         $this->expectException(ConfigException::class);
@@ -254,6 +334,11 @@ final class ConfigLoaderTest extends TestCase
         );
     }
 
+    /**
+     * Verify rejects unknown root keys.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnknownRootKeys(): void
     {
         $path = $this->writeTempConfig('{"plugins": []}');
@@ -264,6 +349,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects unknown threshold keys.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnknownThresholdKeys(): void
     {
         $path = $this->writeTempConfig('{"rules":{"size.file-length":{"thresholds":{"critical":1}}}}');
@@ -274,6 +364,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify loads path ignores allowlists and rule selection.
+     *
+     * @return void No return value.
+     */
     public function testLoadsPathIgnoresAllowlistsAndRuleSelection(): void
     {
         $path = $this->writeTempConfig(json_encode([
@@ -301,6 +396,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertFalse($config->ruleSelection()->allows($weakCrypto));
     }
 
+    /**
+     * Verify rejects invalid path ignore pattern.
+     *
+     * @return void No return value.
+     */
     public function testRejectsInvalidPathIgnorePattern(): void
     {
         $path = $this->writeTempConfig('{"paths":{"ignore":["../outside"]}}');
@@ -311,6 +411,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects unknown selection pillar.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnknownSelectionPillar(): void
     {
         $path = $this->writeTempConfig('{"selection":{"pillars":["quality"]}}');
@@ -321,6 +426,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify rejects invalid accepted abbreviation.
+     *
+     * @return void No return value.
+     */
     public function testRejectsInvalidAcceptedAbbreviation(): void
     {
         $path = $this->writeTempConfig('{"allowlists":{"acceptedAbbreviations":["not-valid!"]}}');
@@ -331,6 +441,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
+    /**
+     * Verify honours default enabled from rule definition.
+     *
+     * @return void No return value.
+     */
     public function testHonoursDefaultEnabledFromRuleDefinition(): void
     {
         $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
@@ -340,6 +455,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertFalse($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
     }
 
+    /**
+     * Verify can enable default disabled rule via config.
+     *
+     * @return void No return value.
+     */
     public function testCanEnableDefaultDisabledRuleViaConfig(): void
     {
         $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
@@ -353,6 +473,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertTrue($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
     }
 
+    /**
+     * Verify loads rule options.
+     *
+     * @return void No return value.
+     */
     public function testLoadsRuleOptions(): void
     {
         $registry = new RuleRegistry([new FixtureOptionsRule()]);
@@ -372,6 +497,11 @@ final class ConfigLoaderTest extends TestCase
         self::assertSame([1, 2], $settings->option('levels'));
     }
 
+    /**
+     * Verify rejects unknown rule option key.
+     *
+     * @return void No return value.
+     */
     public function testRejectsUnknownRuleOptionKey(): void
     {
         $registry = new RuleRegistry([new FixtureOptionsRule()]);
@@ -386,6 +516,11 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
     }
 
+    /**
+     * Verify rejects invalid rule option type.
+     *
+     * @return void No return value.
+     */
     public function testRejectsInvalidRuleOptionType(): void
     {
         $path = $this->writeTempConfig(sprintf(
@@ -432,6 +567,11 @@ final class ConfigLoaderTest extends TestCase
         ];
     }
 
+    /**
+     * Verify rejects invalid rule option type variants.
+     *
+     * @return void No return value.
+     */
     #[DataProvider('invalidRuleOptionTypeProvider')]
     public function testRejectsInvalidRuleOptionTypeVariants(string $configTemplate, string $messageTemplate): void
     {

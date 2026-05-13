@@ -20,6 +20,11 @@ use PHPUnit\Framework\TestCase;
 
 final class ComplexityIntegrationTest extends TestCase
 {
+    /**
+     * Verify complex fixture triggers multiple complexity rules.
+     *
+     * @return void No return value.
+     */
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
         $parser = new PhpFileParser();
@@ -54,6 +59,11 @@ final class ComplexityIntegrationTest extends TestCase
         }
     }
 
+    /**
+     * Verify simple fixture produces no complexity findings.
+     *
+     * @return void No return value.
+     */
     public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
         $parser = new PhpFileParser();
@@ -70,6 +80,11 @@ final class ComplexityIntegrationTest extends TestCase
         self::assertSame([], array_values($complexityFindings));
     }
 
+    /**
+     * Verify config override changes complexity findings.
+     *
+     * @return void No return value.
+     */
     public function testConfigOverrideChangesComplexityFindings(): void
     {
         $parser = new PhpFileParser();
@@ -102,6 +117,11 @@ final class ComplexityIntegrationTest extends TestCase
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));
     }
 
+    /**
+     * Verify NPath cap is explicit in metadata and message.
+     *
+     * @return void No return value.
+     */
     public function testNpathCapIsExplicitInMetadataAndMessage(): void
     {
         $parser = new PhpFileParser();

@@ -25,6 +25,11 @@ final class AverageMethodLengthRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for small averages.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForSmallAverages(): void
     {
         $findings = $this->analyse('short-method.php', ['warning' => 20, 'error' => 40]);
@@ -32,6 +37,11 @@ final class AverageMethodLengthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for high average method length.
+     *
+     * @return void No return value.
+     */
     public function testWarningForHighAverageMethodLength(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 10, 'error' => 40]);
@@ -44,6 +54,11 @@ final class AverageMethodLengthRuleTest extends TestCase
         self::assertGreaterThan(10.0, $findings[0]->metadata['averageLength']);
     }
 
+    /**
+     * Verify error for very high average.
+     *
+     * @return void No return value.
+     */
     public function testErrorForVeryHighAverage(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 5, 'error' => 10]);
@@ -52,6 +67,11 @@ final class AverageMethodLengthRuleTest extends TestCase
         self::assertSame(Severity::Error, $findings[0]->severity);
     }
 
+    /**
+     * Verify class with no methods skipped.
+     *
+     * @return void No return value.
+     */
     public function testClassWithNoMethodsSkipped(): void
     {
         $findings = $this->analyse('few-properties.php', ['warning' => 1, 'error' => 2]);

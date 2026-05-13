@@ -8,6 +8,11 @@ use Symfony\Component\Process\Process;
 
 final class ListRulesCliTest extends CliTestCase
 {
+    /**
+     * Verify version command runs through binary.
+     *
+     * @return void No return value.
+     */
     public function testVersionCommandRunsThroughBinary(): void
     {
         $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', '--version']);
@@ -18,6 +23,11 @@ final class ListRulesCliTest extends CliTestCase
         self::assertStringContainsString('0.1.0-dev', $process->getOutput());
     }
 
+    /**
+     * Verify list command runs through binary.
+     *
+     * @return void No return value.
+     */
     public function testListCommandRunsThroughBinary(): void
     {
         $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', 'list']);
@@ -29,6 +39,11 @@ final class ListRulesCliTest extends CliTestCase
         self::assertStringContainsString('report', $process->getOutput());
     }
 
+    /**
+     * Verify clean checkout install runs CLI help.
+     *
+     * @return void No return value.
+     */
     public function testCleanCheckoutInstallRunsCliHelp(): void
     {
         $composerPath = shell_exec('command -v composer');

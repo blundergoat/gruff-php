@@ -16,6 +16,11 @@ final class InfectionReportParserTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
+    /**
+     * Verify parses full infection JSON report.
+     *
+     * @return void No return value.
+     */
     public function testParsesFullInfectionJsonReport(): void
     {
         $report = (new InfectionReportParser(self::PROJECT_ROOT))->parse(
@@ -38,6 +43,11 @@ final class InfectionReportParserTest extends TestCase
         self::assertSame(50.0, $fileSummaries[0]->msi);
     }
 
+    /**
+     * Verify rejects malformed infection JSON report.
+     *
+     * @return void No return value.
+     */
     public function testRejectsMalformedInfectionJsonReport(): void
     {
         $this->expectException(MutationReportException::class);
@@ -46,6 +56,11 @@ final class InfectionReportParserTest extends TestCase
         (new InfectionReportParser(self::PROJECT_ROOT))->parse('tests/Fixtures/Mutation/Infection/infection-malformed.json');
     }
 
+    /**
+     * Verify infection runner prefers project vendor binary.
+     *
+     * @return void No return value.
+     */
     public function testInfectionRunnerPrefersProjectVendorBinary(): void
     {
         $projectRoot = $this->tempDir();
@@ -66,6 +81,11 @@ final class InfectionReportParserTest extends TestCase
         }
     }
 
+    /**
+     * Verify infection runner uses project infection config by default.
+     *
+     * @return void No return value.
+     */
     public function testInfectionRunnerUsesProjectInfectionConfigByDefault(): void
     {
         $projectRoot = $this->tempDir();
@@ -90,6 +110,11 @@ final class InfectionReportParserTest extends TestCase
         }
     }
 
+    /**
+     * Verify infection runner passes test framework options.
+     *
+     * @return void No return value.
+     */
     public function testInfectionRunnerPassesTestFrameworkOptions(): void
     {
         $projectRoot = $this->tempDir();

@@ -8,6 +8,11 @@ use Symfony\Component\Process\Process;
 
 final class DashboardCliTest extends CliTestCase
 {
+    /**
+     * Verify dashboard command serves refreshable HTML report.
+     *
+     * @return void No return value.
+     */
     public function testDashboardCommandServesRefreshableHtmlReport(): void
     {
         $port    = $this->unusedPort();
@@ -67,6 +72,11 @@ final class DashboardCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Verify dashboard scan omits mutation UI.
+     *
+     * @return void No return value.
+     */
     public function testDashboardScanOmitsMutationUi(): void
     {
         $port    = $this->unusedPort();
@@ -98,6 +108,11 @@ final class DashboardCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Verify dashboard command can scan another project from browser query.
+     *
+     * @return void No return value.
+     */
     public function testDashboardCommandCanScanAnotherProjectFromBrowserQuery(): void
     {
         $tempDir = $this->tempDir();

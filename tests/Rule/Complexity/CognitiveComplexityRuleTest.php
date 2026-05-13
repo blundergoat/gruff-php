@@ -43,6 +43,11 @@ final class CognitiveComplexityRuleTest extends TestCase
         ];
     }
 
+    /**
+     * Verify cognitive count matches expected.
+     *
+     * @return void No return value.
+     */
     #[DataProvider('methodCcProvider')]
     public function testCognitiveCountMatchesExpected(string $methodName, int $expectedCc): void
     {
@@ -64,6 +69,11 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame($expectedCc, CognitiveComplexityRule::computeCognitiveComplexity($method));
     }
 
+    /**
+     * Verify no findings for simple methods.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForSimpleMethods(): void
     {
         $findings = $this->analyse('simple.php', ['warning' => 15, 'error' => 30]);
@@ -71,6 +81,11 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for high cognitive complexity.
+     *
+     * @return void No return value.
+     */
     public function testWarningForHighCognitiveComplexity(): void
     {
         $findings = $this->analyse('cognitive.php', ['warning' => 2, 'error' => 30]);
@@ -81,6 +96,11 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertContains('CognitiveFixture::deeplyNested()', $symbols);
     }
 
+    /**
+     * Verify boolean chain collapsing.
+     *
+     * @return void No return value.
+     */
     public function testBooleanChainCollapsing(): void
     {
         $unit    = $this->parseFixture('cognitive.php');

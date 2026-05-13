@@ -9,6 +9,11 @@ use PHPUnit\Framework\TestCase;
 
 final class SourceDiscoveryTest extends TestCase
 {
+    /**
+     * Verify discovers PHP files deterministically and ignores default directories.
+     *
+     * @return void No return value.
+     */
     public function testDiscoversPhpFilesDeterministicallyAndIgnoresDefaultDirectories(): void
     {
         $root   = $this->fixtureRoot('mixed');
@@ -26,6 +31,11 @@ final class SourceDiscoveryTest extends TestCase
         self::assertSame([], $result->missingPaths);
     }
 
+    /**
+     * Verify can include ignored directories explicitly.
+     *
+     * @return void No return value.
+     */
     public function testCanIncludeIgnoredDirectoriesExplicitly(): void
     {
         $root   = $this->fixtureRoot('mixed');
@@ -42,6 +52,11 @@ final class SourceDiscoveryTest extends TestCase
         ], array_map(static fn ($file): string => $file->displayPath, $result->files));
     }
 
+    /**
+     * Verify default ignores well known lockfile names.
+     *
+     * @return void No return value.
+     */
     public function testDefaultIgnoresWellKnownLockfileNames(): void
     {
         $root   = $this->fixtureRoot('mixed');
@@ -52,6 +67,11 @@ final class SourceDiscoveryTest extends TestCase
         self::assertNotContains('composer.lock', $paths, 'composer.lock must be ignored by default.');
     }
 
+    /**
+     * Verify explicit lockfile path is still ignored without include flag.
+     *
+     * @return void No return value.
+     */
     public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
     {
         $root   = $this->fixtureRoot('mixed');
@@ -61,6 +81,11 @@ final class SourceDiscoveryTest extends TestCase
         self::assertContains('package-lock.json', $result->ignoredPaths);
     }
 
+    /**
+     * Verify configured ignores use project relative glob patterns.
+     *
+     * @return void No return value.
+     */
     public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
     {
         $root   = $this->fixtureRoot('mixed');
@@ -81,6 +106,11 @@ final class SourceDiscoveryTest extends TestCase
         self::assertContains('build', $result->ignoredPaths);
     }
 
+    /**
+     * Verify reports missing paths.
+     *
+     * @return void No return value.
+     */
     public function testReportsMissingPaths(): void
     {
         $root   = $this->fixtureRoot('mixed');

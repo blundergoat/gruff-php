@@ -25,6 +25,11 @@ final class MethodLengthRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for short methods.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForShortMethods(): void
     {
         $findings = $this->analyse('short-method.php', ['warning' => 30, 'error' => 60]);
@@ -32,6 +37,11 @@ final class MethodLengthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for method above warning threshold.
+     *
+     * @return void No return value.
+     */
     public function testWarningForMethodAboveWarningThreshold(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 30, 'error' => 60]);
@@ -43,6 +53,11 @@ final class MethodLengthRuleTest extends TestCase
         self::assertSame(31, $findings[0]->metadata['lines']);
     }
 
+    /**
+     * Verify error for method above error threshold.
+     *
+     * @return void No return value.
+     */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 3, 'error' => 10]);
@@ -54,6 +69,11 @@ final class MethodLengthRuleTest extends TestCase
         self::assertSame('LongMethodFixture::warningMethod()', $warning->symbol);
     }
 
+    /**
+     * Verify multiline call counts as one logical line.
+     *
+     * @return void No return value.
+     */
     public function testMultilineCallCountsAsOneLogicalLine(): void
     {
         $findings = $this->analyse('logical-method.php', ['warning' => 3, 'error' => 60]);
@@ -61,6 +81,11 @@ final class MethodLengthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify closure counted as method.
+     *
+     * @return void No return value.
+     */
     public function testClosureCountedAsMethod(): void
     {
         $findings = $this->analyse('closure.php', ['warning' => 3, 'error' => 60]);
@@ -71,6 +96,11 @@ final class MethodLengthRuleTest extends TestCase
         self::assertStringStartsWith('Closure@', $findings[0]->symbol);
     }
 
+    /**
+     * Verify disabled rule produces no findings.
+     *
+     * @return void No return value.
+     */
     public function testDisabledRuleProducesNoFindings(): void
     {
         $unit     = $this->parseFixture('long-method.php');

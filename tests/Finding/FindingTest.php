@@ -13,6 +13,11 @@ use PHPUnit\Framework\TestCase;
 
 final class FindingTest extends TestCase
 {
+    /**
+     * Verify serializes stable finding shape.
+     *
+     * @return void No return value.
+     */
     public function testSerializesStableFindingShape(): void
     {
         $finding = new Finding(

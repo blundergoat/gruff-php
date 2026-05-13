@@ -29,6 +29,11 @@ final class ModernisationRulesTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
+    /**
+     * Verify PHP version gating suppresses PHP eight suggestions.
+     *
+     * @return void No return value.
+     */
     public function testPhpVersionGatingSuppressesPhpEightSuggestions(): void
     {
         $findings = $this->analysePath(
@@ -47,6 +52,11 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify PHP eight two config enables modernisation candidates.
+     *
+     * @return void No return value.
+     */
     public function testPhpEightTwoConfigEnablesModernisationCandidates(): void
     {
         $findings = $this->analysePath(
@@ -65,6 +75,11 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify PHP eight candidates are detected.
+     *
+     * @return void No return value.
+     */
     public function testPhpEightCandidatesAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/Modernisation/php80-candidates.php');
@@ -77,6 +92,11 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(ForbiddenGlobalAccessRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify PHP eight one candidates are detected.
+     *
+     * @return void No return value.
+     */
     public function testPhpEightOneCandidatesAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/Modernisation/php81-candidates.php');
@@ -86,6 +106,11 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(FirstClassCallableCandidateRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify late mutation inheritance DTO and controller cases are not flagged.
+     *
+     * @return void No return value.
+     */
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
         $findings = $this->analysePaths([
@@ -100,6 +125,11 @@ final class ModernisationRulesTest extends TestCase
         self::assertRuleCount(NamedArgumentOpportunityRule::ID, 0, $findings);
     }
 
+    /**
+     * Verify error suppression uses security finding with modernisation secondary pillar.
+     *
+     * @return void No return value.
+     */
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
         $findings            = $this->analysePath('tests/Fixtures/Modernisation/cumulative-modernisation.php');

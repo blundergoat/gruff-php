@@ -30,6 +30,11 @@ final class SensitiveDataRulesTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
+    /**
+     * Verify credential patterns are detected with redacted previews.
+     *
+     * @return void No return value.
+     */
     public function testCredentialPatternsAreDetectedWithRedactedPreviews(): void
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/synthetic-secrets.php');
@@ -50,6 +55,11 @@ final class SensitiveDataRulesTest extends TestCase
         }
     }
 
+    /**
+     * Verify config like files are discovered and scanned as text.
+     *
+     * @return void No return value.
+     */
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
         $discovery = new SourceDiscovery(self::PROJECT_ROOT);
@@ -70,6 +80,11 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(HighEntropyStringRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify PHI and PII profiles are detected in fixture data.
+     *
+     * @return void No return value.
+     */
     public function testPhiAndPiiProfilesAreDetectedInFixtureData(): void
     {
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/profile-data.json');
@@ -78,6 +93,11 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(PiiTestFixtureRule::ID, 3, $findings);
     }
 
+    /**
+     * Verify allowed dummy values are not flagged.
+     *
+     * @return void No return value.
+     */
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
         $findings = array_values(array_filter(
@@ -88,6 +108,11 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify hardcoded env value requires secret like value evidence.
+     *
+     * @return void No return value.
+     */
     public function testHardcodedEnvValueRequiresSecretLikeValueEvidence(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
@@ -116,6 +141,11 @@ PHP));
         }
     }
 
+    /**
+     * Verify secret rules respect detector selection config.
+     *
+     * @return void No return value.
+     */
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
         $registry = RuleRegistry::defaults();
@@ -133,7 +163,10 @@ PHP));
     }
 
     /**
+     * Verify CLI text and JSON reports do not leak full secrets.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {

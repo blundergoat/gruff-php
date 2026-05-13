@@ -14,6 +14,11 @@ use PHPUnit\Framework\TestCase;
 
 final class BaselineStoreTest extends TestCase
 {
+    /**
+     * Verify write replaces baseline atomically without lingering temp files.
+     *
+     * @return void No return value.
+     */
     public function testWriteReplacesBaselineAtomicallyWithoutLingeringTempFiles(): void
     {
         $root = $this->tempDir();

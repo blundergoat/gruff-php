@@ -19,6 +19,11 @@ use Symfony\Component\Process\Process;
 
 final class GitDiffProviderTest extends TestCase
 {
+    /**
+     * Verify diff finding filter keeps only touched changed line findings.
+     *
+     * @return void No return value.
+     */
     public function testDiffFindingFilterKeepsOnlyTouchedChangedLineFindings(): void
     {
         $diff = new DiffResult(
@@ -41,6 +46,11 @@ final class GitDiffProviderTest extends TestCase
         self::assertSame(11, $filtered[0]->line);
     }
 
+    /**
+     * Verify Git diff provider parses unstaged changed lines.
+     *
+     * @return void No return value.
+     */
     public function testGitDiffProviderParsesUnstagedChangedLines(): void
     {
         $this->skipWhenGitIsUnavailable();
@@ -66,6 +76,11 @@ final class GitDiffProviderTest extends TestCase
         }
     }
 
+    /**
+     * Verify Git diff provider reports non Git directory.
+     *
+     * @return void No return value.
+     */
     public function testGitDiffProviderReportsNonGitDirectory(): void
     {
         $tempDir = $this->tempDir();
@@ -93,6 +108,11 @@ final class GitDiffProviderTest extends TestCase
         ];
     }
 
+    /**
+     * Verify Git diff provider rejects unsafe base refs.
+     *
+     * @return void No return value.
+     */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
     public function testGitDiffProviderRejectsUnsafeBaseRefs(string $mode): void
     {

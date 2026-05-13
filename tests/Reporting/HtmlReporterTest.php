@@ -18,6 +18,11 @@ use PHPUnit\Framework\TestCase;
 
 final class HtmlReporterTest extends TestCase
 {
+    /**
+     * Verify HTML reporter escapes run data and renders report sections.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterEscapesRunDataAndRendersReportSections(): void
     {
         $findings = [
@@ -63,6 +68,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('mutation', $html);
     }
 
+    /**
+     * Verify HTML reporter omits mutation visualization.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
         $score  = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
@@ -89,6 +99,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('MSI', $html);
     }
 
+    /**
+     * Verify HTML reporter uses canonical severity vocabulary and accessible markup.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterUsesCanonicalSeverityVocabularyAndAccessibleMarkup(): void
     {
         $html = (new HtmlReporter('/workspace/project'))->render($this->sampleReport());
@@ -114,6 +129,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="src/Example.php:9">src/Example.php:9</span>', $html);
     }
 
+    /**
+     * Verify HTML reporter renders diagnostics when present.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterRendersDiagnosticsWhenPresent(): void
     {
         $html = (new HtmlReporter())->render($this->report([], [
@@ -131,6 +151,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('tests/&lt;bad&gt;.php', $html);
     }
 
+    /**
+     * Verify HTML reporter uses celebration subtitle when no warning or error findings exist.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterUsesCelebrationSubtitleWhenNoWarningOrErrorFindingsExist(): void
     {
         $finding = new Finding(
@@ -149,6 +174,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('No warning or error findings flagged.', $html);
     }
 
+    /**
+     * Verify HTML reporter renders opt in editor links.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterRendersOptInEditorLinks(): void
     {
         $html = (new HtmlReporter('/workspace/project', 'vscode'))->render($this->sampleReport());
@@ -164,6 +194,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('data-path="src/Example.php:9"', $html);
     }
 
+    /**
+     * Verify HTML reporter renders PHP storm editor links.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterRendersPhpStormEditorLinks(): void
     {
         $html = (new HtmlReporter('/workspace/project', 'phpstorm'))->render($this->sampleReport());
@@ -174,6 +209,11 @@ final class HtmlReporterTest extends TestCase
         );
     }
 
+    /**
+     * Verify HTML reporter renders interactive findings only when enabled.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterRendersInteractiveFindingsOnlyWhenEnabled(): void
     {
         $static      = (new HtmlReporter('/workspace/project'))->render($this->sampleReport());
@@ -192,6 +232,11 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('localStorage', $interactive);
     }
 
+    /**
+     * Verify HTML reporter static snapshot matches fixture.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterStaticSnapshotMatchesFixture(): void
     {
         $html = (new HtmlReporter('/workspace/project'))->render($this->sampleReport());
@@ -199,6 +244,11 @@ final class HtmlReporterTest extends TestCase
         self::assertSame($this->fixture('static.html'), $html);
     }
 
+    /**
+     * Verify HTML reporter interactive snapshot matches fixture.
+     *
+     * @return void No return value.
+     */
     public function testHtmlReporterInteractiveSnapshotMatchesFixture(): void
     {
         $html = (new HtmlReporter('/workspace/project', 'none', true))->render($this->sampleReport());

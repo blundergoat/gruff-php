@@ -25,6 +25,11 @@ final class ParameterCountRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for few parameters.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForFewParameters(): void
     {
         $findings = $this->analyse('short-method.php', ['warning' => 5, 'error' => 8]);
@@ -32,6 +37,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for six parameters.
+     *
+     * @return void No return value.
+     */
     public function testWarningForSixParameters(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
@@ -48,6 +58,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertContains('ManyParamsFixture::__construct()', $symbols);
     }
 
+    /**
+     * Verify error for nine parameters.
+     *
+     * @return void No return value.
+     */
     public function testErrorForNineParameters(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
@@ -58,6 +73,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertSame(9, $errors[0]->metadata['parameters']);
     }
 
+    /**
+     * Verify variadic counts as one.
+     *
+     * @return void No return value.
+     */
     public function testVariadicCountsAsOne(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
@@ -66,6 +86,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertNotContains('ManyParamsFixture::variadicParams()', $symbols);
     }
 
+    /**
+     * Verify promoted constructor parameters counted.
+     *
+     * @return void No return value.
+     */
     public function testPromotedConstructorParametersCounted(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
@@ -79,6 +104,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertSame(6, $constructorFindings[0]->metadata['parameters']);
     }
 
+    /**
+     * Verify promoted readonly payload constructor is exempt.
+     *
+     * @return void No return value.
+     */
     public function testPromotedReadonlyPayloadConstructorIsExempt(): void
     {
         $findings = $this->analyse('promoted-payload.php', ['warning' => 5, 'error' => 8]);
@@ -87,6 +117,11 @@ final class ParameterCountRuleTest extends TestCase
         self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
     }
 
+    /**
+     * Verify interface parameters counted.
+     *
+     * @return void No return value.
+     */
     public function testInterfaceParametersCounted(): void
     {
         $findings = $this->analyse('interface-fixture.php', ['warning' => 5, 'error' => 8]);

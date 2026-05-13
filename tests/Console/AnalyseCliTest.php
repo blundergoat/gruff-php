@@ -9,6 +9,11 @@ use Symfony\Component\Process\Process;
 
 final class AnalyseCliTest extends CliTestCase
 {
+    /**
+     * Verify analyse command runs as no op.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandRunsAsNoOp(): void
     {
         $process = new Process([
@@ -27,6 +32,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringNotContainsString('ignored.php', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command reports syntax errors without aborting.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsSyntaxErrorsWithoutAborting(): void
     {
         $process = new Process([
@@ -45,6 +55,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('Exit code: 2', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command reports warning findings without failing by default.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsWarningFindingsWithoutFailingByDefault(): void
     {
         $process = new Process([
@@ -64,6 +79,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame($expected, $process->getOutput());
     }
 
+    /**
+     * Verify analyse command fails when finding meets default error threshold.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandFailsWhenFindingMeetsDefaultErrorThreshold(): void
     {
         $process = new Process([
@@ -81,6 +101,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('Exit code: 1', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command can fail on warning threshold.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandCanFailOnWarningThreshold(): void
     {
         $process = new Process([
@@ -101,7 +126,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command outputs JSON report.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandOutputsJsonReport(): void
     {
@@ -147,7 +175,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command outputs JSON parse errors.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandOutputsJsonParseErrors(): void
     {
@@ -178,6 +209,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame('parse-error', $firstDiagnostic['type'] ?? null);
     }
 
+    /**
+     * Verify analyse command fails invalid config.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandFailsInvalidConfig(): void
     {
         $process = new Process([
@@ -195,7 +231,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command applies configured rule selection.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
     {
@@ -223,6 +262,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $findingCounts['total'] ?? null);
     }
 
+    /**
+     * Verify analyse command applies configured path ignores.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
     {
         $process = new Process([
@@ -242,6 +286,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command reports invalid selection config.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
     {
         $process = new Process([
@@ -259,7 +308,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command applies configured secret preview allowlist.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
     {
@@ -291,7 +343,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command ingests infection report in JSON.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandIngestsInfectionReportInJson(): void
     {
@@ -343,6 +398,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertEquals(50.0, $metadata['coveredMsi'] ?? null);
     }
 
+    /**
+     * Verify analyse command renders mutation summary in text.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandRendersMutationSummaryInText(): void
     {
         $process = new Process([
@@ -364,7 +424,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command reports mutation budget and msi regression.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandReportsMutationBudgetAndMsiRegression(): void
     {
@@ -410,6 +473,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertContains('mutation.msi-regression', $ruleIds);
     }
 
+    /**
+     * Verify analyse command reports missing infection executable in run mode.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
     {
         $process = new Process([
@@ -433,7 +501,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command outputs scoring data in JSON report.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
     {
@@ -464,6 +535,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(false, $diff['active'] ?? null);
     }
 
+    /**
+     * Verify analyse command outputs HTML report.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandOutputsHtmlReport(): void
     {
         $process = new Process([
@@ -485,6 +561,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command supports HTML editor links.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandSupportsHtmlEditorLinks(): void
     {
         $process = new Process([
@@ -507,6 +588,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('tests/Fixtures/Source/Code/OrderCalculator.php:16', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command defaults HTML locations to copyable spans.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
     {
         $process = new Process([
@@ -530,6 +616,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringNotContainsString('phpstorm://open', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command supports interactive HTML report.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
     {
         $process = new Process([
@@ -569,6 +660,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringNotContainsString('<script type="module">', $static->getOutput());
     }
 
+    /**
+     * Verify analyse command reports invalid HTML report options.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
         $editor = new Process([
@@ -608,6 +704,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('--report-interactive must be true or false.', $interactive->getOutput());
     }
 
+    /**
+     * Verify analyse command outputs github annotations.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandOutputsGithubAnnotations(): void
     {
         $process = new Process([
@@ -628,6 +729,11 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('title=docs.missing-public-phpdoc', $process->getOutput());
     }
 
+    /**
+     * Verify analyse command reports non Git diff mode clearly.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandReportsNonGitDiffModeClearly(): void
     {
         $tempDir = $this->tempDir();
@@ -656,7 +762,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command writes trend history file.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandWritesTrendHistoryFile(): void
     {
@@ -694,7 +803,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command generates and applies baseline.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
     {
@@ -756,6 +868,11 @@ final class AnalyseCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Verify analyse command rejects invalid baseline JSON.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandRejectsInvalidBaselineJson(): void
     {
         $tempDir      = $this->tempDir();
@@ -785,7 +902,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command writes and auto applies default baseline file.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandWritesAndAutoAppliesDefaultBaselineFile(): void
     {
@@ -847,7 +967,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command skips auto baseline with no baseline flag.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandSkipsAutoBaselineWithNoBaselineFlag(): void
     {
@@ -895,7 +1018,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command shows new findings after baseline generation.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandShowsNewFindingsAfterBaselineGeneration(): void
     {
@@ -953,7 +1079,10 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command reports stale baseline entries.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testAnalyseCommandReportsStaleBaselineEntries(): void
     {
@@ -1002,6 +1131,11 @@ final class AnalyseCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Verify analyse command rejects no baseline combined with baseline.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandRejectsNoBaselineCombinedWithBaseline(): void
     {
         $project = $this->createBaselineProject();
@@ -1028,6 +1162,11 @@ final class AnalyseCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Verify analyse command rejects baseline combined with generate baseline.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandRejectsBaselineCombinedWithGenerateBaseline(): void
     {
         $project = $this->createBaselineProject();

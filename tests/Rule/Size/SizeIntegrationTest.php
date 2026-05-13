@@ -21,6 +21,11 @@ use PHPUnit\Framework\TestCase;
 
 final class SizeIntegrationTest extends TestCase
 {
+    /**
+     * Verify cumulative fixture triggers multiple rules.
+     *
+     * @return void No return value.
+     */
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
         $parser = new PhpFileParser();
@@ -63,6 +68,11 @@ final class SizeIntegrationTest extends TestCase
         }
     }
 
+    /**
+     * Verify config override changes findings.
+     *
+     * @return void No return value.
+     */
     public function testConfigOverrideChangesFindings(): void
     {
         $parser = new PhpFileParser();
@@ -89,6 +99,11 @@ final class SizeIntegrationTest extends TestCase
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));
     }
 
+    /**
+     * Verify clean fixture produces no size findings.
+     *
+     * @return void No return value.
+     */
     public function testCleanFixtureProducesNoSizeFindings(): void
     {
         $parser = new PhpFileParser();

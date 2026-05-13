@@ -9,6 +9,11 @@ use Symfony\Component\Process\Process;
 
 final class ReportCliTest extends CliTestCase
 {
+    /**
+     * Verify report command outputs static HTML report.
+     *
+     * @return void No return value.
+     */
     public function testReportCommandOutputsStaticHtmlReport(): void
     {
         $process = new Process([
@@ -25,6 +30,11 @@ final class ReportCliTest extends CliTestCase
         self::assertStringNotContainsString('gruff-dashboard-toolbar', $process->getOutput());
     }
 
+    /**
+     * Verify report command forwards HTML report flags.
+     *
+     * @return void No return value.
+     */
     public function testReportCommandForwardsHtmlReportFlags(): void
     {
         $process = new Process([
@@ -62,7 +72,10 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
+     * Verify report command outputs JSON report.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testReportCommandOutputsJsonReport(): void
     {
@@ -83,7 +96,10 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
+     * Verify report command forwards repeated rule filters.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testReportCommandForwardsRepeatedRuleFilters(): void
     {
@@ -113,6 +129,11 @@ final class ReportCliTest extends CliTestCase
         self::assertSame('docs.missing-public-phpdoc', $firstFinding['ruleId'] ?? null);
     }
 
+    /**
+     * Verify report command writes static HTML report.
+     *
+     * @return void No return value.
+     */
     public function testReportCommandWritesStaticHtmlReport(): void
     {
         $tempDir    = $this->tempDir();
@@ -142,7 +163,10 @@ final class ReportCliTest extends CliTestCase
     }
 
     /**
+     * Verify report command forwards baseline flag.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testReportCommandForwardsBaselineFlag(): void
     {

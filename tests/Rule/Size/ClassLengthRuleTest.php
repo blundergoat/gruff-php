@@ -25,6 +25,11 @@ final class ClassLengthRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for small class.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForSmallClass(): void
     {
         $findings = $this->analyse('short-method.php', ['warning' => 300, 'error' => 500]);
@@ -32,6 +37,11 @@ final class ClassLengthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for class above warning threshold.
+     *
+     * @return void No return value.
+     */
     public function testWarningForClassAboveWarningThreshold(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 10, 'error' => 500]);
@@ -42,6 +52,11 @@ final class ClassLengthRuleTest extends TestCase
         self::assertSame('LongMethodFixture', $findings[0]->symbol);
     }
 
+    /**
+     * Verify error for class above error threshold.
+     *
+     * @return void No return value.
+     */
     public function testErrorForClassAboveErrorThreshold(): void
     {
         $findings = $this->analyse('long-method.php', ['warning' => 5, 'error' => 10]);
@@ -50,6 +65,11 @@ final class ClassLengthRuleTest extends TestCase
         self::assertSame(Severity::Error, $findings[0]->severity);
     }
 
+    /**
+     * Verify interface is not flagged.
+     *
+     * @return void No return value.
+     */
     public function testInterfaceIsNotFlagged(): void
     {
         $findings = $this->analyse('interface-fixture.php', ['warning' => 5, 'error' => 10]);
@@ -57,6 +77,11 @@ final class ClassLengthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify trait is flagged.
+     *
+     * @return void No return value.
+     */
     public function testTraitIsFlagged(): void
     {
         $findings = $this->analyse('trait-fixture.php', ['warning' => 5, 'error' => 500]);

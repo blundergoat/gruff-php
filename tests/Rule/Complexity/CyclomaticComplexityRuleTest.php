@@ -44,6 +44,11 @@ final class CyclomaticComplexityRuleTest extends TestCase
         ];
     }
 
+    /**
+     * Verify cyclomatic count matches expected.
+     *
+     * @return void No return value.
+     */
     #[DataProvider('methodCcnProvider')]
     public function testCyclomaticCountMatchesExpected(string $methodName, int $expectedCcn): void
     {
@@ -65,6 +70,11 @@ final class CyclomaticComplexityRuleTest extends TestCase
         self::assertSame($expectedCcn, CyclomaticComplexityRule::computeCyclomaticComplexity($method));
     }
 
+    /**
+     * Verify no findings for simple methods.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForSimpleMethods(): void
     {
         $findings = $this->analyse('simple.php', ['warning' => 10, 'error' => 20]);
@@ -72,6 +82,11 @@ final class CyclomaticComplexityRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for method above threshold.
+     *
+     * @return void No return value.
+     */
     public function testWarningForMethodAboveThreshold(): void
     {
         $findings = $this->analyse('cyclomatic.php', ['warning' => 3, 'error' => 20]);
@@ -85,6 +100,11 @@ final class CyclomaticComplexityRuleTest extends TestCase
         }
     }
 
+    /**
+     * Verify error for method above error threshold.
+     *
+     * @return void No return value.
+     */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
         $findings = $this->analyse('cyclomatic.php', ['warning' => 3, 'error' => 4]);

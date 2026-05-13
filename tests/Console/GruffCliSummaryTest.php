@@ -12,6 +12,11 @@ final class GruffCliSummaryTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
+    /**
+     * Verify summary runs and shows digest sections.
+     *
+     * @return void No return value.
+     */
     public function testSummaryRunsAndShowsDigestSections(): void
     {
         $process = new Process([
@@ -34,6 +39,11 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('Totals', $output);
     }
 
+    /**
+     * Verify summary does not emit per finding lines.
+     *
+     * @return void No return value.
+     */
     public function testSummaryDoesNotEmitPerFindingLines(): void
     {
         $process = new Process([
@@ -55,7 +65,10 @@ final class GruffCliSummaryTest extends TestCase
     }
 
     /**
+     * Verify summary JSON output matches schema.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testSummaryJsonOutputMatchesSchema(): void
     {
@@ -107,6 +120,11 @@ final class GruffCliSummaryTest extends TestCase
         self::assertLessThanOrEqual(3, count($topRules));
     }
 
+    /**
+     * Verify summary rejects unknown format.
+     *
+     * @return void No return value.
+     */
     public function testSummaryRejectsUnknownFormat(): void
     {
         $process = new Process([
@@ -124,6 +142,11 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('USAGE-ERROR Unsupported summary format "yaml"', $process->getOutput());
     }
 
+    /**
+     * Verify summary rejects non integer top.
+     *
+     * @return void No return value.
+     */
     public function testSummaryRejectsNonIntegerTop(): void
     {
         $process = new Process([
@@ -141,6 +164,11 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('USAGE-ERROR --top must be a non-negative integer.', $process->getOutput());
     }
 
+    /**
+     * Verify summary rejects both config and no config.
+     *
+     * @return void No return value.
+     */
     public function testSummaryRejectsBothConfigAndNoConfig(): void
     {
         $process = new Process([
@@ -158,6 +186,11 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('--no-config cannot be combined with --config.', $process->getOutput());
     }
 
+    /**
+     * Verify list includes summary command.
+     *
+     * @return void No return value.
+     */
     public function testListIncludesSummaryCommand(): void
     {
         $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', 'list'], self::PROJECT_ROOT);

@@ -17,6 +17,11 @@ use PHPUnit\Framework\TestCase;
 
 final class ScoreCalculatorTest extends TestCase
 {
+    /**
+     * Verify grade boundaries use simple af scale.
+     *
+     * @return void No return value.
+     */
     public function testGradeBoundariesUseSimpleAFScale(): void
     {
         self::assertSame('A', Grade::letterFor(90.0));
@@ -26,6 +31,11 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame('F', Grade::letterFor(59.99));
     }
 
+    /**
+     * Verify score report omits mutation pillar when infection data is absent.
+     *
+     * @return void No return value.
+     */
     public function testScoreReportOmitsMutationPillarWhenInfectionDataIsAbsent(): void
     {
         $score = (new ScoreCalculator())->calculate([
@@ -44,6 +54,11 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame('F', $security->grade?->letter);
     }
 
+    /**
+     * Verify composite god method finding requires size and complexity on same symbol.
+     *
+     * @return void No return value.
+     */
     public function testCompositeGodMethodFindingRequiresSizeAndComplexityOnSameSymbol(): void
     {
         $findings = [

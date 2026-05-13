@@ -21,6 +21,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
     private const FIXTURE_DIR  = 'tests/Fixtures/Design/single-implementor-interface';
 
+    /**
+     * Verify internal one impl flags exactly one interface.
+     *
+     * @return void No return value.
+     */
     public function testInternalOneImplFlagsExactlyOneInterface(): void
     {
         $findings = $this->analyseFixtures();
@@ -34,6 +39,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify mock only interface flags by default.
+     *
+     * @return void No return value.
+     */
     public function testMockOnlyInterfaceFlagsByDefault(): void
     {
         $findings = $this->analyseFixtures();
@@ -46,6 +56,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify PSR interface is exempt.
+     *
+     * @return void No return value.
+     */
     public function testPsrInterfaceIsExempt(): void
     {
         $findings = $this->analyseFixtures();
@@ -58,6 +73,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify symfony tagged interface is exempt.
+     *
+     * @return void No return value.
+     */
     public function testSymfonyTaggedInterfaceIsExempt(): void
     {
         $findings = $this->analyseFixtures();
@@ -70,6 +90,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify multi impl interface does not flag.
+     *
+     * @return void No return value.
+     */
     public function testMultiImplInterfaceDoesNotFlag(): void
     {
         $findings = $this->analyseFixtures();
@@ -82,6 +107,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify interface hierarchy does not flag.
+     *
+     * @return void No return value.
+     */
     public function testInterfaceHierarchyDoesNotFlag(): void
     {
         $findings = $this->analyseFixtures();
@@ -100,6 +130,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify flagged findings carry severity pillar and metadata.
+     *
+     * @return void No return value.
+     */
     public function testFlaggedFindingsCarrySeverityPillarAndMetadata(): void
     {
         $findings = $this->analyseFixtures();
@@ -115,6 +150,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         }
     }
 
+    /**
+     * Verify only the expected two interfaces are flagged.
+     *
+     * @return void No return value.
+     */
     public function testOnlyTheExpectedTwoInterfacesAreFlagged(): void
     {
         $findings = $this->analyseFixtures();

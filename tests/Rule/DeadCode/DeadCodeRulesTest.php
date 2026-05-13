@@ -22,6 +22,11 @@ final class DeadCodeRulesTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify unused private methods detected.
+     *
+     * @return void No return value.
+     */
     public function testUnusedPrivateMethodsDetected(): void
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
@@ -33,6 +38,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertContains('UnusedPrivateMethodFixture::alsoUnused()', $symbols);
     }
 
+    /**
+     * Verify used private method not flagged.
+     *
+     * @return void No return value.
+     */
     public function testUsedPrivateMethodNotFlagged(): void
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
@@ -41,6 +51,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivateMethodFixture::usedPrivate()', $symbols);
     }
 
+    /**
+     * Verify magic methods excluded.
+     *
+     * @return void No return value.
+     */
     public function testMagicMethodsExcluded(): void
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
@@ -49,6 +64,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivateMethodFixture::__construct()', $symbols);
     }
 
+    /**
+     * Verify protected method not checked.
+     *
+     * @return void No return value.
+     */
     public function testProtectedMethodNotChecked(): void
     {
         $findings = $this->analyseRule('unused-private-method.php', UnusedPrivateMethodRule::ID);
@@ -57,6 +77,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivateMethodFixture::protectedMethod()', $symbols);
     }
 
+    /**
+     * Verify unused private property detected.
+     *
+     * @return void No return value.
+     */
     public function testUnusedPrivatePropertyDetected(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -68,6 +93,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertContains('UnusedPrivatePropertyFixture::$neverRead', $symbols);
     }
 
+    /**
+     * Verify used property not flagged.
+     *
+     * @return void No return value.
+     */
     public function testUsedPropertyNotFlagged(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -76,6 +106,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivatePropertyFixture::$usedProp', $symbols);
     }
 
+    /**
+     * Verify public property not checked.
+     *
+     * @return void No return value.
+     */
     public function testPublicPropertyNotChecked(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -84,6 +119,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('UnusedPrivatePropertyFixture::$publicProp', $symbols);
     }
 
+    /**
+     * Verify never read property distinguished.
+     *
+     * @return void No return value.
+     */
     public function testNeverReadPropertyDistinguished(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -97,6 +137,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertStringContainsString('written but never read', $neverRead[0]->message);
     }
 
+    /**
+     * Verify promoted private property detected when never read.
+     *
+     * @return void No return value.
+     */
     public function testPromotedPrivatePropertyDetectedWhenNeverRead(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -110,6 +155,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertStringContainsString('written but never read', $neverRead[0]->message);
     }
 
+    /**
+     * Verify used promoted private property not flagged.
+     *
+     * @return void No return value.
+     */
     public function testUsedPromotedPrivatePropertyNotFlagged(): void
     {
         $findings = $this->analyseRule('unused-private-property.php', UnusedPrivatePropertyRule::ID);
@@ -119,6 +169,11 @@ final class DeadCodeRulesTest extends TestCase
         self::assertNotContains('PromotedPrivatePropertyFixture::$publicPromoted', $symbols);
     }
 
+    /**
+     * Verify clean file has no dead code findings.
+     *
+     * @return void No return value.
+     */
     public function testCleanFileHasNoDeadCodeFindings(): void
     {
         $findings = array_merge(

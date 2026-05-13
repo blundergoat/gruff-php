@@ -11,6 +11,11 @@ use Symfony\Component\Process\Process;
 
 final class GitArchiveSnapshotTest extends TestCase
 {
+    /**
+     * Verify create archives only requested base paths.
+     *
+     * @return void No return value.
+     */
     public function testCreateArchivesOnlyRequestedBasePaths(): void
     {
         $this->skipWhenGitIsUnavailable();
@@ -33,6 +38,11 @@ final class GitArchiveSnapshotTest extends TestCase
         }
     }
 
+    /**
+     * Verify create returns empty snapshot when requested paths do not exist in base.
+     *
+     * @return void No return value.
+     */
     public function testCreateReturnsEmptySnapshotWhenRequestedPathsDoNotExistInBase(): void
     {
         $this->skipWhenGitIsUnavailable();
@@ -54,6 +64,11 @@ final class GitArchiveSnapshotTest extends TestCase
         }
     }
 
+    /**
+     * Verify create removes temporary snapshot when base ref fails.
+     *
+     * @return void No return value.
+     */
     public function testCreateRemovesTemporarySnapshotWhenBaseRefFails(): void
     {
         $this->skipWhenGitIsUnavailable();
@@ -91,6 +106,11 @@ final class GitArchiveSnapshotTest extends TestCase
         ];
     }
 
+    /**
+     * Verify create rejects unsafe refs before archiving.
+     *
+     * @return void No return value.
+     */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
     public function testCreateRejectsUnsafeRefsBeforeArchiving(string $ref): void
     {

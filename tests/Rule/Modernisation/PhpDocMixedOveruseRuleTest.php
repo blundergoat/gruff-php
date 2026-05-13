@@ -22,6 +22,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
     private const FIXTURE      = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
 
+    /**
+     * Verify fixture produces expected phpdoc mixed findings.
+     *
+     * @return void No return value.
+     */
     public function testFixtureProducesExpectedPhpdocMixedFindings(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
@@ -51,6 +56,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         );
     }
 
+    /**
+     * Verify standalone mixed param does not double fire with signature rule.
+     *
+     * @return void No return value.
+     */
     public function testStandaloneMixedParamDoesNotDoubleFireWithSignatureRule(): void
     {
         $findings = $this->analyseFixture();
@@ -74,6 +84,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         self::assertSame([], $standaloneMixedVar);
     }
 
+    /**
+     * Verify untyped signature mixed doc still fires.
+     *
+     * @return void No return value.
+     */
     public function testUntypedSignatureMixedDocStillFires(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
@@ -88,6 +103,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         self::assertSame('x', $untyped[0]->metadata['paramName'] ?? null);
     }
 
+    /**
+     * Verify template generic does not flag.
+     *
+     * @return void No return value.
+     */
     public function testTemplateGenericDoesNotFlag(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
@@ -100,6 +120,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         self::assertSame([], $template, '@template T should not be confused with mixed.');
     }
 
+    /**
+     * Verify throws only does not flag.
+     *
+     * @return void No return value.
+     */
     public function testThrowsOnlyDoesNotFlag(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
@@ -112,6 +137,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         self::assertSame([], $throws, '@throws is never scanned.');
     }
 
+    /**
+     * Verify findings are advisory and modernisation pillar.
+     *
+     * @return void No return value.
+     */
     public function testFindingsAreAdvisoryAndModernisationPillar(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
@@ -125,6 +155,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         }
     }
 
+    /**
+     * Verify signature mixed rule still fires independently.
+     *
+     * @return void No return value.
+     */
     public function testSignatureMixedRuleStillFiresIndependently(): void
     {
         $findings = $this->analyseFixture();

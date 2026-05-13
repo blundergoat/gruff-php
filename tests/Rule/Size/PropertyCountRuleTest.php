@@ -25,6 +25,11 @@ final class PropertyCountRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for few properties.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForFewProperties(): void
     {
         $findings = $this->analyse('few-properties.php', ['warning' => 15, 'error' => 25]);
@@ -32,6 +37,11 @@ final class PropertyCountRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for too many declared properties.
+     *
+     * @return void No return value.
+     */
     public function testWarningForTooManyDeclaredProperties(): void
     {
         $findings = $this->analyse('many-properties.php', ['warning' => 15, 'error' => 25]);
@@ -43,6 +53,11 @@ final class PropertyCountRuleTest extends TestCase
         self::assertSame(16, $findings[0]->metadata['properties']);
     }
 
+    /**
+     * Verify promoted properties counted.
+     *
+     * @return void No return value.
+     */
     public function testPromotedPropertiesCounted(): void
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 25]);
@@ -52,6 +67,11 @@ final class PropertyCountRuleTest extends TestCase
         self::assertSame('ManyParamsFixture', $findings[0]->symbol);
     }
 
+    /**
+     * Verify trait properties flagged.
+     *
+     * @return void No return value.
+     */
     public function testTraitPropertiesFlagged(): void
     {
         $findings = $this->analyse('trait-fixture.php', ['warning' => 15, 'error' => 25]);

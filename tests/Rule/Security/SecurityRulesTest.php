@@ -40,6 +40,11 @@ final class SecurityRulesTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify dangerous execution patterns detected.
+     *
+     * @return void No return value.
+     */
     public function testDangerousExecutionPatternsDetected(): void
     {
         $findings = $this->findingsForRule($this->dangerousExecutionUnit(), DangerousFunctionCallRule::ID);
@@ -55,6 +60,11 @@ final class SecurityRulesTest extends TestCase
         self::assertContains('dynamic function call', $functions);
     }
 
+    /**
+     * Verify typed callable invocations are not dangerous dynamic calls.
+     *
+     * @return void No return value.
+     */
     public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
     {
         $findings  = $this->findingsForRule($this->typedCallableUnit(), DangerousFunctionCallRule::ID);
@@ -64,6 +74,11 @@ final class SecurityRulesTest extends TestCase
         self::assertContains('system', $functions);
     }
 
+    /**
+     * Verify request data security heuristics detected.
+     *
+     * @return void No return value.
+     */
     public function testRequestDataSecurityHeuristicsDetected(): void
     {
         $findings = $this->analyse('data-flow-heuristics.php');
@@ -77,6 +92,11 @@ final class SecurityRulesTest extends TestCase
         self::assertRuleCount(SilentCatchRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify boundary security patterns detected.
+     *
+     * @return void No return value.
+     */
     public function testBoundarySecurityPatternsDetected(): void
     {
         $findings = $this->analyse('includes-sql-ssl.php');
@@ -86,6 +106,11 @@ final class SecurityRulesTest extends TestCase
         self::assertRuleCount(DisabledSslVerificationRule::ID, 3, $findings);
     }
 
+    /**
+     * Verify safe wrappers and literal patterns are not flagged.
+     *
+     * @return void No return value.
+     */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
         $findings = $this->analyse('safe-patterns.php');
@@ -98,6 +123,11 @@ final class SecurityRulesTest extends TestCase
         self::assertSame([], $securityFindings);
     }
 
+    /**
+     * Verify cumulative security fixture covers every security rule without duplicate findings.
+     *
+     * @return void No return value.
+     */
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
         $findings = array_values(array_filter(
@@ -128,6 +158,11 @@ final class SecurityRulesTest extends TestCase
         self::assertCount(count($fingerprints), array_unique($fingerprints));
     }
 
+    /**
+     * Verify security rules respect config disables.
+     *
+     * @return void No return value.
+     */
     public function testSecurityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();

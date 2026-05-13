@@ -29,6 +29,11 @@ final class WasteRulesTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify unreachable code after return.
+     *
+     * @return void No return value.
+     */
     public function testUnreachableCodeAfterReturn(): void
     {
         $findings = $this->analyseRule('unreachable.php', UnreachableCodeRule::ID);
@@ -41,6 +46,11 @@ final class WasteRulesTest extends TestCase
         }
     }
 
+    /**
+     * Verify no unreachable code in clean file.
+     *
+     * @return void No return value.
+     */
     public function testNoUnreachableCodeInCleanFile(): void
     {
         $findings = $this->analyseRule('clean.php', UnreachableCodeRule::ID);
@@ -48,6 +58,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify empty method detected.
+     *
+     * @return void No return value.
+     */
     public function testEmptyMethodDetected(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
@@ -60,6 +75,11 @@ final class WasteRulesTest extends TestCase
         }
     }
 
+    /**
+     * Verify abstract method not flagged as empty.
+     *
+     * @return void No return value.
+     */
     public function testAbstractMethodNotFlaggedAsEmpty(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
@@ -68,6 +88,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('AbstractFixture::abstractMethod()', $symbols);
     }
 
+    /**
+     * Verify promoted constructor not flagged as empty.
+     *
+     * @return void No return value.
+     */
     public function testPromotedConstructorNotFlaggedAsEmpty(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
@@ -76,6 +101,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('PromotedConstructorFixture::__construct()', $symbols);
     }
 
+    /**
+     * Verify empty class detected.
+     *
+     * @return void No return value.
+     */
     public function testEmptyClassDetected(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
@@ -84,6 +114,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame('EmptyClassFixture', $findings[0]->symbol);
     }
 
+    /**
+     * Verify empty exception marker not flagged as empty class.
+     *
+     * @return void No return value.
+     */
     public function testEmptyExceptionMarkerNotFlaggedAsEmptyClass(): void
     {
         $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
@@ -92,6 +127,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('EmptyExceptionFixture', $symbols);
     }
 
+    /**
+     * Verify unused imports detected.
+     *
+     * @return void No return value.
+     */
     public function testUnusedImportsDetected(): void
     {
         $findings = $this->analyseRule('unused-imports.php', UnusedImportRule::ID);
@@ -103,6 +143,11 @@ final class WasteRulesTest extends TestCase
         self::assertContains('LogicException', $symbols);
     }
 
+    /**
+     * Verify used import not flagged.
+     *
+     * @return void No return value.
+     */
     public function testUsedImportNotFlagged(): void
     {
         $findings = $this->analyseRule('unused-imports.php', UnusedImportRule::ID);
@@ -111,6 +156,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('RuntimeException', $symbols);
     }
 
+    /**
+     * Verify unused parameter in private method.
+     *
+     * @return void No return value.
+     */
     public function testUnusedParameterInPrivateMethod(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
@@ -119,6 +169,11 @@ final class WasteRulesTest extends TestCase
         self::assertContains('unused', $params);
     }
 
+    /**
+     * Verify used parameter not flagged.
+     *
+     * @return void No return value.
+     */
     public function testUsedParameterNotFlagged(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
@@ -129,6 +184,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('b', $params);
     }
 
+    /**
+     * Verify unused parameter in public method without external contract.
+     *
+     * @return void No return value.
+     */
     public function testUnusedParameterInPublicMethodWithoutExternalContract(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
@@ -147,6 +207,11 @@ final class WasteRulesTest extends TestCase
         self::assertArrayHasKey('UnusedParameterFixture::publicMethod():detailed', $reported);
     }
 
+    /**
+     * Verify public method parameters with external contracts are not checked.
+     *
+     * @return void No return value.
+     */
     public function testPublicMethodParametersWithExternalContractsAreNotChecked(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
@@ -161,6 +226,11 @@ final class WasteRulesTest extends TestCase
         self::assertArrayNotHasKey('ContractParameterFixture::handle()', $paramsBySymbol);
     }
 
+    /**
+     * Verify promoted private constructor parameters are used as properties.
+     *
+     * @return void No return value.
+     */
     public function testPromotedPrivateConstructorParametersAreUsedAsProperties(): void
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
@@ -169,6 +239,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('promoted', $params);
     }
 
+    /**
+     * Verify commented out code detected.
+     *
+     * @return void No return value.
+     */
     public function testCommentedOutCodeDetected(): void
     {
         $findings = $this->analyseRule('commented-out-code.php', CommentedOutCodeRule::ID);
@@ -177,6 +252,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $findings[0]->severity);
     }
 
+    /**
+     * Verify one line call wrapper methods are detected.
+     *
+     * @return void No return value.
+     */
     public function testOneLineCallWrapperMethodsAreDetected(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
@@ -187,6 +267,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame('return', $findings[0]->metadata['statementKind']);
     }
 
+    /**
+     * Verify one line method rule skips pure expressions and no argument accessors.
+     *
+     * @return void No return value.
+     */
     public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
@@ -197,6 +282,11 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
     }
 
+    /**
+     * Verify redundant variable before return detected.
+     *
+     * @return void No return value.
+     */
     public function testRedundantVariableBeforeReturnDetected(): void
     {
         $findings  = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
@@ -205,6 +295,11 @@ final class WasteRulesTest extends TestCase
         self::assertSame(['result', 'branchResult'], $variables);
     }
 
+    /**
+     * Verify clean file has no waste findings.
+     *
+     * @return void No return value.
+     */
     public function testCleanFileHasNoWasteFindings(): void
     {
         $unit     = $this->parseFixture('clean.php');

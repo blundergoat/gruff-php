@@ -53,6 +53,11 @@ final class TestQualityRulesTest extends TestCase
 {
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
+    /**
+     * Verify PHPUnit and pest test scopes support no assertion and trivial assertion checks.
+     *
+     * @return void No return value.
+     */
     public function testPhpUnitAndPestTestScopesSupportNoAssertionAndTrivialAssertionChecks(): void
     {
         $findings = $this->analysePaths([
@@ -64,6 +69,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TrivialAssertionRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify core control flow and flakiness smells are detected.
+     *
+     * @return void No return value.
+     */
     public function testCoreControlFlowAndFlakinessSmellsAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php');
@@ -74,6 +84,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(SleepInTestRule::ID, 5, $findings);
     }
 
+    /**
+     * Verify mechanics smells are detected.
+     *
+     * @return void No return value.
+     */
     public function testMechanicsSmellsAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php');
@@ -90,6 +105,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(SkippedWithoutReasonRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify advanced heuristic smells are detected.
+     *
+     * @return void No return value.
+     */
     public function testAdvancedHeuristicSmellsAreDetected(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-advanced-smells.php');
@@ -101,6 +121,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TestNamingConsistencyRule::ID, 3, $findings);
     }
 
+    /**
+     * Verify non candidate cases are not flagged by selected rules.
+     *
+     * @return void No return value.
+     */
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/non-candidates.php');
@@ -127,6 +152,11 @@ final class TestQualityRulesTest extends TestCase
         // not source-file rules, so they're intentionally excluded from this fixture-content assertion.
     }
 
+    /**
+     * Verify extends production class detected and allows test case descendants.
+     *
+     * @return void No return value.
+     */
     public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/extends-production.php');
@@ -134,6 +164,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(ExtendsProductionClassRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify test method too long detected and ignores whitespace lines.
+     *
+     * @return void No return value.
+     */
     public function testTestMethodTooLongDetectedAndIgnoresWhitespaceLines(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php');
@@ -141,6 +176,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TestMethodTooLongRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify empty data provider detected and yielding provider is allowed.
+     *
+     * @return void No return value.
+     */
     public function testEmptyDataProviderDetectedAndYieldingProviderIsAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/empty-data-provider.php');
@@ -148,6 +188,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(EmptyDataProviderRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify loop assertion without message detected and assertion with message allowed.
+     *
+     * @return void No return value.
+     */
     public function testLoopAssertionWithoutMessageDetectedAndAssertionWithMessageAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/loop-assertion-without-message.php');
@@ -155,6 +200,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify unused mock detected and used mocks allowed.
+     *
+     * @return void No return value.
+     */
     public function testUnusedMockDetectedAndUsedMocksAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/unused-mock.php');
@@ -162,6 +212,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(UnusedMockRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify exception type only detected and paired assertions allowed.
+     *
+     * @return void No return value.
+     */
     public function testExceptionTypeOnlyDetectedAndPairedAssertionsAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/exception-type-only.php');
@@ -169,6 +224,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(ExceptionTypeOnlyRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify tautological type assertion detected and cross class assertions allowed.
+     *
+     * @return void No return value.
+     */
     public function testTautologicalTypeAssertionDetectedAndCrossClassAssertionsAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/tautological-type-assertion.php');
@@ -176,6 +236,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TautologicalTypeAssertionRule::ID, 2, $findings);
     }
 
+    /**
+     * Verify global state mutation detected and cleaned up class allowed.
+     *
+     * @return void No return value.
+     */
     public function testGlobalStateMutationDetectedAndCleanedUpClassAllowed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/global-state-mutation.php');
@@ -184,6 +249,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(GlobalStateMutationRule::ID, 3, $findings);
     }
 
+    /**
+     * Verify mock without expectation detected with variant severities.
+     *
+     * @return void No return value.
+     */
     public function testMockWithoutExpectationDetectedWithVariantSeverities(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/mock-without-expectation.php');
@@ -210,6 +280,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertNotContains('fake', $variables);
     }
 
+    /**
+     * Verify repeated structure missing data provider detected and data provider users ignored.
+     *
+     * @return void No return value.
+     */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php');
@@ -217,6 +292,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify multiple AAA cycles is disabled by default but fires when opted in.
+     *
+     * @return void No return value.
+     */
     public function testMultipleAaaCyclesIsDisabledByDefaultButFiresWhenOptedIn(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
@@ -235,6 +315,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $optedInFindings);
     }
 
+    /**
+     * Verify multiple AAA cycles does not double count inline act assert after act statement.
+     *
+     * @return void No return value.
+     */
     public function testMultipleAaaCyclesDoesNotDoubleCountInlineActAssertAfterActStatement(): void
     {
         $registry = RuleRegistry::defaults();
@@ -253,6 +338,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertSame(1, $findings[0]->metadata['cycles']);
     }
 
+    /**
+     * Verify testdox readability is disabled by default but fires when opted in.
+     *
+     * @return void No return value.
+     */
     public function testTestdoxReadabilityIsDisabledByDefaultButFiresWhenOptedIn(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
@@ -271,6 +361,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $optedInFindings);
     }
 
+    /**
+     * Verify mocking domain object is disabled by default and requires patterns to fire.
+     *
+     * @return void No return value.
+     */
     public function testMockingDomainObjectIsDisabledByDefaultAndRequiresPatternsToFire(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
@@ -289,6 +384,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockingDomainObjectRule::ID, 2, $optedInFindings);
     }
 
+    /**
+     * Verify PHPUnit strict flags missing fires on lax config and stays silent on strict.
+     *
+     * @return void No return value.
+     */
     public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
         self::assertCount(0, (new PhpUnitStrictFlagsMissingRule())->analyse(
@@ -305,6 +405,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertSame(['failOnRisky', 'failOnWarning', 'beStrictAboutTestsThatDoNotTestAnything', 'beStrictAboutOutputDuringTests', 'beStrictAboutChangesToGlobalState'], $laxFindings[0]->metadata['missing']);
     }
 
+    /**
+     * Verify PHPUnit deprecations not fatal fires on lax config and stays silent on strict.
+     *
+     * @return void No return value.
+     */
     public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
         self::assertCount(0, (new PhpUnitDeprecationsNotFatalRule())->analyse(
@@ -318,6 +423,11 @@ final class TestQualityRulesTest extends TestCase
         ));
     }
 
+    /**
+     * Verify PHPUnit coverage source missing fires on lax config and allows legacy whitelist.
+     *
+     * @return void No return value.
+     */
     public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
     {
         self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse(
@@ -336,6 +446,11 @@ final class TestQualityRulesTest extends TestCase
         ));
     }
 
+    /**
+     * Verify PHPUnit rules stay silent when no config file is present.
+     *
+     * @return void No return value.
+     */
     public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
     {
         $context = $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/no-config');
@@ -360,6 +475,11 @@ final class TestQualityRulesTest extends TestCase
         );
     }
 
+    /**
+     * Verify test quality rules respect config disables.
+     *
+     * @return void No return value.
+     */
     public function testTestQualityRulesRespectConfigDisables(): void
     {
         $registry = RuleRegistry::defaults();
@@ -377,6 +497,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
     }
 
+    /**
+     * Verify non test class methods with test prefix are not analysed.
+     *
+     * @return void No return value.
+     */
     public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
     {
         $findings = $this->analysePath('tests/Fixtures/TestQuality/non-test-class.php');
@@ -390,6 +515,11 @@ final class TestQualityRulesTest extends TestCase
         self::assertSame([], $testQualityFindings, 'Library code with test* method names must not trigger test-quality rules.');
     }
 
+    /**
+     * Verify cumulative fixture represents every static test quality rule.
+     *
+     * @return void No return value.
+     */
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
         $findings = array_values(array_filter(

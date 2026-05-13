@@ -18,6 +18,11 @@ use Symfony\Component\Console\Input\InputOption;
 
 final class DashboardRequestHandlerTest extends TestCase
 {
+    /**
+     * Verify rejects missing host.
+     *
+     * @return void No return value.
+     */
     public function testRejectsMissingHost(): void
     {
         $response = $this->responseFor("GET / HTTP/1.1\r\n\r\n");
@@ -25,6 +30,11 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 421 Misdirected Request', $response);
     }
 
+    /**
+     * Verify rejects mismatched host.
+     *
+     * @return void No return value.
+     */
     public function testRejectsMismatchedHost(): void
     {
         $response = $this->responseFor("GET /scan HTTP/1.1\r\nHost: evil.example\r\n\r\n");
@@ -32,6 +42,11 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 421 Misdirected Request', $response);
     }
 
+    /**
+     * Verify rejects oversized request line.
+     *
+     * @return void No return value.
+     */
     public function testRejectsOversizedRequestLine(): void
     {
         $response = $this->responseFor('GET /' . str_repeat('a', 8200) . " HTTP/1.1\r\nHost: 127.0.0.1:8765\r\n\r\n");
@@ -39,6 +54,11 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 431 Request Header Fields Too Large', $response);
     }
 
+    /**
+     * Verify rejects oversized headers.
+     *
+     * @return void No return value.
+     */
     public function testRejectsOversizedHeaders(): void
     {
         $headers = '';
@@ -51,6 +71,11 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 431 Request Header Fields Too Large', $response);
     }
 
+    /**
+     * Verify rejects oversized header block by bytes.
+     *
+     * @return void No return value.
+     */
     public function testRejectsOversizedHeaderBlockByBytes(): void
     {
         $response = $this->responseFor("GET / HTTP/1.1\r\nHost: 127.0.0.1:8765\r\nX-Long: " . str_repeat('a', 17000) . "\r\n\r\n");
@@ -58,6 +83,11 @@ final class DashboardRequestHandlerTest extends TestCase
         self::assertStringContainsString('HTTP/1.1 431 Request Header Fields Too Large', $response);
     }
 
+    /**
+     * Verify allows dashboard health scan head and rejects post.
+     *
+     * @return void No return value.
+     */
     public function testAllowsDashboardHealthScanHeadAndRejectsPost(): void
     {
         self::assertStringContainsString('HTTP/1.1 200 OK', $this->responseFor("GET / HTTP/1.1\r\nHost: localhost:8765\r\n\r\n"));

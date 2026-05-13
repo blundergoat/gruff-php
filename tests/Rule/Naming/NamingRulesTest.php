@@ -31,6 +31,11 @@ final class NamingRulesTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify generic method names detected.
+     *
+     * @return void No return value.
+     */
     public function testGenericMethodNamesDetected(): void
     {
         $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
@@ -43,6 +48,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('GenericMethodFixture::execute()', $symbols);
     }
 
+    /**
+     * Verify qualified method names not flagged.
+     *
+     * @return void No return value.
+     */
     public function testQualifiedMethodNamesNotFlagged(): void
     {
         $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
@@ -53,6 +63,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('GenericMethodFixture::calculateTotal()', $symbols);
     }
 
+    /**
+     * Verify symfony console execute override not flagged.
+     *
+     * @return void No return value.
+     */
     public function testSymfonyConsoleExecuteOverrideNotFlagged(): void
     {
         $findings = $this->analyseRule('generic-method.php', GenericMethodNameRule::ID);
@@ -61,6 +76,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('FrameworkOverrideFixture::execute()', $symbols);
     }
 
+    /**
+     * Verify single char variables detected.
+     *
+     * @return void No return value.
+     */
     public function testSingleCharVariablesDetected(): void
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
@@ -70,6 +90,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('a', $vars);
     }
 
+    /**
+     * Verify loop counters excluded.
+     *
+     * @return void No return value.
+     */
     public function testLoopCountersExcluded(): void
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
@@ -79,6 +104,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('j', $vars);
     }
 
+    /**
+     * Verify accepted abbreviations can suppress short variable findings.
+     *
+     * @return void No return value.
+     */
     public function testAcceptedAbbreviationsCanSuppressShortVariableFindings(): void
     {
         $unit                  = $this->parseFixture('short-variable.php');
@@ -95,6 +125,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('a', $vars);
     }
 
+    /**
+     * Verify catch variable excluded.
+     *
+     * @return void No return value.
+     */
     public function testCatchVariableExcluded(): void
     {
         $findings = $this->analyseRule('short-variable.php', ShortVariableRule::ID);
@@ -103,6 +138,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('e', $vars);
     }
 
+    /**
+     * Verify boolean prefix missing.
+     *
+     * @return void No return value.
+     */
     public function testBooleanPrefixMissing(): void
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
@@ -115,6 +155,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('BooleanPrefixFixture::check()', $symbols);
     }
 
+    /**
+     * Verify good boolean prefix not flagged.
+     *
+     * @return void No return value.
+     */
     public function testGoodBooleanPrefixNotFlagged(): void
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
@@ -128,6 +173,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
     }
 
+    /**
+     * Verify non bool method not flagged.
+     *
+     * @return void No return value.
+     */
     public function testNonBoolMethodNotFlagged(): void
     {
         $findings = $this->analyseRule('boolean-prefix.php', BooleanPrefixRule::ID);
@@ -136,6 +186,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('BooleanPrefixFixture::getName()', $symbols);
     }
 
+    /**
+     * Verify hungarian notation detected.
+     *
+     * @return void No return value.
+     */
     public function testHungarianNotationDetected(): void
     {
         $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
@@ -148,6 +203,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('objUser', $vars);
     }
 
+    /**
+     * Verify clean variables not flagged as hungarian.
+     *
+     * @return void No return value.
+     */
     public function testCleanVariablesNotFlaggedAsHungarian(): void
     {
         $findings = $this->analyseRule('hungarian.php', HungarianNotationRule::ID);
@@ -158,6 +218,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('strategy', $vars);
     }
 
+    /**
+     * Verify confusing standalone class names.
+     *
+     * @return void No return value.
+     */
     public function testConfusingStandaloneClassNames(): void
     {
         $findings = $this->analyseRule('confusing-class.php', ConfusingNameRule::ID);
@@ -167,6 +232,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('Util', $symbols);
     }
 
+    /**
+     * Verify domain specific class names not flagged.
+     *
+     * @return void No return value.
+     */
     public function testDomainSpecificClassNamesNotFlagged(): void
     {
         $findings = $this->analyseRule('confusing-class.php', ConfusingNameRule::ID);
@@ -176,6 +246,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('OrderRepository', $symbols);
     }
 
+    /**
+     * Verify mixed test naming detected.
+     *
+     * @return void No return value.
+     */
     public function testMixedTestNamingDetected(): void
     {
         $findings = $this->analyseRule('test-naming.php', TestNamingConsistencyRule::ID);
@@ -184,6 +259,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame('MixedTestNamingFixture', $findings[0]->symbol);
     }
 
+    /**
+     * Verify consistent test naming not flagged.
+     *
+     * @return void No return value.
+     */
     public function testConsistentTestNamingNotFlagged(): void
     {
         $findings = $this->analyseRule('test-naming.php', TestNamingConsistencyRule::ID);
@@ -192,6 +272,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('ConsistentTestNamingFixture', $symbols);
     }
 
+    /**
+     * Verify class file mismatch.
+     *
+     * @return void No return value.
+     */
     public function testClassFileMismatch(): void
     {
         $findings = $this->analyseRule('clean.php', ClassFileMismatchRule::ID);
@@ -200,6 +285,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame('CleanNamingFixture', $findings[0]->symbol);
     }
 
+    /**
+     * Verify identifier tokenizer splits common identifier shapes.
+     *
+     * @return void No return value.
+     */
     public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
     {
         $tokenizer = new IdentifierTokenizer();
@@ -209,6 +299,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame(['temp'], $tokenizer->tokenize('_temp'));
     }
 
+    /**
+     * Verify identifier quality finds placeholder generic and numbered names.
+     *
+     * @return void No return value.
+     */
     public function testIdentifierQualityFindsPlaceholderGenericAndNumberedNames(): void
     {
         $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
@@ -235,6 +330,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame('placeholder', $reported['variable:tmp'] ?? null);
     }
 
+    /**
+     * Verify identifier quality exempts common noise sources.
+     *
+     * @return void No return value.
+     */
     public function testIdentifierQualityExemptsCommonNoiseSources(): void
     {
         $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
@@ -250,6 +350,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('invoiceTotal', $names);
     }
 
+    /**
+     * Verify identifier quality metadata is specific.
+     *
+     * @return void No return value.
+     */
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
         $findings    = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
@@ -270,6 +375,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame(Severity::Advisory, $itemFinding->severity);
     }
 
+    /**
+     * Verify parameter names match object type names.
+     *
+     * @return void No return value.
+     */
     public function testParameterNamesMatchObjectTypeNames(): void
     {
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
@@ -286,6 +396,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame('bookingRequestContext', $reported['requestContext'] ?? null);
     }
 
+    /**
+     * Verify parameter type name exempts already specific and builtin names.
+     *
+     * @return void No return value.
+     */
     public function testParameterTypeNameExemptsAlreadySpecificAndBuiltinNames(): void
     {
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
@@ -300,6 +415,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('dateTimeImmutable', $reported);
     }
 
+    /**
+     * Verify parameter type name flags union with null symmetrically.
+     *
+     * @return void No return value.
+     */
     public function testParameterTypeNameFlagsUnionWithNullSymmetrically(): void
     {
         // Regression: `Foo|null` used to be silently ignored because shortTypeName fell
@@ -318,6 +438,11 @@ final class NamingRulesTest extends TestCase
         self::assertSame('bookingSession', $bySymbol['ParameterTypeNameFixture::unionNullableRight()'] ?? null);
     }
 
+    /**
+     * Verify parameter type name leaves true union and intersection arm silent.
+     *
+     * @return void No return value.
+     */
     public function testParameterTypeNameLeavesTrueUnionAndIntersectionArmSilent(): void
     {
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
@@ -327,6 +452,11 @@ final class NamingRulesTest extends TestCase
         self::assertNotContains('ParameterTypeNameFixture::realIntersectionNullable()', $symbols);
     }
 
+    /**
+     * Verify parameter type name respects ignored parameter names option.
+     *
+     * @return void No return value.
+     */
     public function testParameterTypeNameRespectsIgnoredParameterNamesOption(): void
     {
         // Configured exemption: parameters whose name appears in
@@ -358,6 +488,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('requestContext', $parameters);
     }
 
+    /**
+     * Verify identifier quality can be tuned with config and accepted abbreviations.
+     *
+     * @return void No return value.
+     */
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
         $unit     = $this->parseFixture('identifier-quality.php');
@@ -390,6 +525,11 @@ final class NamingRulesTest extends TestCase
         self::assertContains('temp', $names);
     }
 
+    /**
+     * Verify clean fixture has no naming findings except file mismatch.
+     *
+     * @return void No return value.
+     */
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void
     {
         $unit     = $this->parseFixture('clean.php');

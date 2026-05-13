@@ -12,6 +12,11 @@ use RuntimeException;
 
 final class TrendRecorderTest extends TestCase
 {
+    /**
+     * Verify record appends entry and calculates previous score delta.
+     *
+     * @return void No return value.
+     */
     public function testRecordAppendsEntryAndCalculatesPreviousScoreDelta(): void
     {
         $root = $this->tempDir();
@@ -40,6 +45,11 @@ final class TrendRecorderTest extends TestCase
         }
     }
 
+    /**
+     * Verify record rejects nested history entry values.
+     *
+     * @return void No return value.
+     */
     public function testRecordRejectsNestedHistoryEntryValues(): void
     {
         $root = $this->tempDir();

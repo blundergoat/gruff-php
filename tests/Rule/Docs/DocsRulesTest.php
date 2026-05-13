@@ -32,6 +32,11 @@ final class DocsRulesTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify missing public phpdoc detected.
+     *
+     * @return void No return value.
+     */
     public function testMissingPublicPhpdocDetected(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -49,6 +54,11 @@ final class DocsRulesTest extends TestCase
         }
     }
 
+    /**
+     * Verify documented method not flagged.
+     *
+     * @return void No return value.
+     */
     public function testDocumentedMethodNotFlagged(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -57,6 +67,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('MissingPhpdocFixture::documented()', $symbols);
     }
 
+    /**
+     * Verify accessors require phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testAccessorsRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -67,6 +82,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('MissingPhpdocFixture::isActive()', $symbols);
     }
 
+    /**
+     * Verify private and protected methods require phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -76,6 +96,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('MissingPhpdocFixture::protectedMethod()', $symbols);
     }
 
+    /**
+     * Verify trivial typed public method requires phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -84,6 +109,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('MissingPhpdocFixture::trivialUndocumented()', $symbols);
     }
 
+    /**
+     * Verify magic method requires phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testMagicMethodRequiresPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -92,6 +122,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('MissingPhpdocFixture::__toString()', $symbols);
     }
 
+    /**
+     * Verify rule interface contract methods require local phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -101,6 +136,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('RuleContractFixture::analyse()', $symbols);
     }
 
+    /**
+     * Verify internal helpers and conventional reporters require phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
     {
         $findings = $this->analyseRule('missing-phpdoc.php', MissingPublicPhpdocRule::ID);
@@ -110,6 +150,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('TextReporter::render()', $symbols);
     }
 
+    /**
+     * Verify missing param tag detected for array parameters.
+     *
+     * @return void No return value.
+     */
     public function testMissingParamTagDetectedForArrayParameters(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -123,6 +168,12 @@ final class DocsRulesTest extends TestCase
         self::assertContains('y', $params);
     }
 
+    /**
+     * Verify missing param tag detected for documented methods even when signature type describes
+     * parameter.
+     *
+     * @return void No return value.
+     */
     public function testMissingParamTagDetectedForDocumentedMethodsEvenWhenSignatureTypeDescribesParameter(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -136,6 +187,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('y', $params);
     }
 
+    /**
+     * Verify missing param tag detected when throws doc omits scalar param.
+     *
+     * @return void No return value.
+     */
     public function testMissingParamTagDetectedWhenThrowsDocOmitsScalarParam(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -149,6 +205,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('groupId', $params);
     }
 
+    /**
+     * Verify missing param tag detected for descriptive docblock.
+     *
+     * @return void No return value.
+     */
     public function testMissingParamTagDetectedForDescriptiveDocblock(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -162,6 +223,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('groupId', $params);
     }
 
+    /**
+     * Verify complete param tag not flagged.
+     *
+     * @return void No return value.
+     */
     public function testCompleteParamTagNotFlagged(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -170,6 +236,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('PhpdocTagsFixture::complete()', $symbols);
     }
 
+    /**
+     * Verify generic param tags with spaces are not flagged.
+     *
+     * @return void No return value.
+     */
     public function testGenericParamTagsWithSpacesAreNotFlagged(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -178,6 +249,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('PhpdocTagsFixture::genericParamDocWithSpaces()', $symbols);
     }
 
+    /**
+     * Verify missing return tag detected for array return types.
+     *
+     * @return void No return value.
+     */
     public function testMissingReturnTagDetectedForArrayReturnTypes(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
@@ -186,6 +262,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::missingArrayReturn()', $symbols);
     }
 
+    /**
+     * Verify missing return tag detected when signature fully describes return.
+     *
+     * @return void No return value.
+     */
     public function testMissingReturnTagDetectedWhenSignatureFullyDescribesReturn(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
@@ -194,6 +275,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::missingReturn()', $symbols);
     }
 
+    /**
+     * Verify missing return tag detected for descriptive docblock.
+     *
+     * @return void No return value.
+     */
     public function testMissingReturnTagDetectedForDescriptiveDocblock(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
@@ -202,6 +288,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::missingReturnForDescriptiveDocblock()', $symbols);
     }
 
+    /**
+     * Verify any documented method requires return tag.
+     *
+     * @return void No return value.
+     */
     public function testAnyDocumentedMethodRequiresReturnTag(): void
     {
         $paramFindings  = $this->analyseRule('phpdoc-tags.php', MissingParamTagRule::ID);
@@ -216,6 +307,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('PhpdocTagsFixture::privateCompleteReturnTag()', $returnSymbols);
     }
 
+    /**
+     * Verify void method with docblock triggers missing return tag.
+     *
+     * @return void No return value.
+     */
     public function testVoidMethodWithDocblockTriggersMissingReturnTag(): void
     {
         // Policy lock: per .goat-flow/lessons/workflow.md "Respect explicit rule style
@@ -230,6 +326,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::neverWithDocblock()', $symbols);
     }
 
+    /**
+     * Verify stale param tag detected.
+     *
+     * @return void No return value.
+     */
     public function testStaleParamTagDetected(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', StaleParamTagRule::ID);
@@ -238,6 +339,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame('oldParam', $findings[0]->metadata['parameter']);
     }
 
+    /**
+     * Verify missing throws tag detected.
+     *
+     * @return void No return value.
+     */
     public function testMissingThrowsTagDetected(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', MissingThrowsTagRule::ID);
@@ -246,6 +352,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::throwsWithoutTag()', $symbols);
     }
 
+    /**
+     * Verify override aware throws rule uses inherited contracts but local phpdoc is required.
+     *
+     * @return void No return value.
+     */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
         $missingPhpdoc        = $this->analyseRule('phpdoc-tags.php', MissingPublicPhpdocRule::ID);
@@ -259,6 +370,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('OverrideDocumentedContract::inheritedThrows()', $missingThrowsSymbols);
     }
 
+    /**
+     * Verify useless phpdoc detected.
+     *
+     * @return void No return value.
+     */
     public function testUselessPhpdocDetected(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
@@ -267,6 +383,11 @@ final class DocsRulesTest extends TestCase
         self::assertContains('PhpdocTagsFixture::uselessDoc()', $symbols);
     }
 
+    /**
+     * Verify useful tag details are not useless phpdoc.
+     *
+     * @return void No return value.
+     */
     public function testUsefulTagDetailsAreNotUselessPhpdoc(): void
     {
         $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
@@ -282,6 +403,11 @@ final class DocsRulesTest extends TestCase
         );
     }
 
+    /**
+     * Verify todo density detected.
+     *
+     * @return void No return value.
+     */
     public function testTodoDensityDetected(): void
     {
         $findings = $this->analyseRule('todo-density.php', TodoDensityRule::ID);
@@ -290,6 +416,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame(6, $findings[0]->metadata['count']);
     }
 
+    /**
+     * Verify var annotations require description.
+     *
+     * @return void No return value.
+     */
     public function testVarAnnotationsRequireDescription(): void
     {
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
@@ -299,6 +430,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame('$missing', $findings[0]->symbol);
     }
 
+    /**
+     * Verify var annotation on attribute decorated property does not flag.
+     *
+     * @return void No return value.
+     */
     public function testVarAnnotationOnAttributeDecoratedPropertyDoesNotFlag(): void
     {
         // Regression: a property declaration with `@var` in its docblock and a `#[Attr]`
@@ -311,6 +447,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('$attributedProperty', $symbols);
     }
 
+    /**
+     * Verify var annotation on attribute decorated method does not flag.
+     *
+     * @return void No return value.
+     */
     public function testVarAnnotationOnAttributeDecoratedMethodDoesNotFlag(): void
     {
         $findings = $this->analyseRule('var-annotation-description.php', VarAnnotationDescriptionRule::ID);
@@ -319,6 +460,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('$attributedMethodResult', $symbols);
     }
 
+    /**
+     * Verify clean fixture has no doc findings.
+     *
+     * @return void No return value.
+     */
     public function testCleanFixtureHasNoDocFindings(): void
     {
         $unit     = $this->parseFixture('clean.php');
@@ -330,6 +476,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame([], array_values($docFindings));
     }
 
+    /**
+     * Verify missing class phpdoc flags class interface trait enum.
+     *
+     * @return void No return value.
+     */
     public function testMissingClassPhpdocFlagsClassInterfaceTraitEnum(): void
     {
         $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
@@ -352,6 +503,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame(['class', 'enum', 'interface', 'trait'], $kinds);
     }
 
+    /**
+     * Verify missing class phpdoc skips anonymous and documented classes.
+     *
+     * @return void No return value.
+     */
     public function testMissingClassPhpdocSkipsAnonymousAndDocumentedClasses(): void
     {
         $findings = $this->analyseRule('missing-class-phpdoc.php', MissingClassPhpdocRule::ID);
@@ -361,6 +517,11 @@ final class DocsRulesTest extends TestCase
         self::assertNotContains('AnonymousFactory', $symbols);
     }
 
+    /**
+     * Verify missing file phpdoc flags files without any docblock.
+     *
+     * @return void No return value.
+     */
     public function testMissingFilePhpdocFlagsFilesWithoutAnyDocblock(): void
     {
         $findings = $this->analyseRule(
@@ -373,6 +534,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame(1, $findings[0]->line);
     }
 
+    /**
+     * Verify missing file phpdoc skips file with explicit file docblock.
+     *
+     * @return void No return value.
+     */
     public function testMissingFilePhpdocSkipsFileWithExplicitFileDocblock(): void
     {
         $findings = $this->analyseRule(
@@ -383,6 +549,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify missing file phpdoc skips single documented class file.
+     *
+     * @return void No return value.
+     */
     public function testMissingFilePhpdocSkipsSingleDocumentedClassFile(): void
     {
         $findings = $this->analyseRule(
@@ -393,6 +564,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify missing property phpdoc flags declared and promoted properties.
+     *
+     * @return void No return value.
+     */
     public function testMissingPropertyPhpdocFlagsDeclaredAndPromotedProperties(): void
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
@@ -411,6 +587,11 @@ final class DocsRulesTest extends TestCase
         );
     }
 
+    /**
+     * Verify missing property phpdoc records kind metadata.
+     *
+     * @return void No return value.
+     */
     public function testMissingPropertyPhpdocRecordsKindMetadata(): void
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
@@ -426,6 +607,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame(['declared' => 1, 'promoted' => 3], $byKind);
     }
 
+    /**
+     * Verify missing property phpdoc skips anonymous class property.
+     *
+     * @return void No return value.
+     */
     public function testMissingPropertyPhpdocSkipsAnonymousClassProperty(): void
     {
         $findings = $this->analyseRule('missing-property-phpdoc.php', MissingPropertyPhpdocRule::ID);
@@ -436,6 +622,11 @@ final class DocsRulesTest extends TestCase
         }
     }
 
+    /**
+     * Verify missing constant phpdoc flags class constants and enum cases.
+     *
+     * @return void No return value.
+     */
     public function testMissingConstantPhpdocFlagsClassConstantsAndEnumCases(): void
     {
         $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);
@@ -457,6 +648,11 @@ final class DocsRulesTest extends TestCase
         self::assertSame(['class-constant', 'enum-case', 'enum-case'], $kinds);
     }
 
+    /**
+     * Verify missing constant phpdoc exempts enum cases when enum has docblock.
+     *
+     * @return void No return value.
+     */
     public function testMissingConstantPhpdocExemptsEnumCasesWhenEnumHasDocblock(): void
     {
         $findings = $this->analyseRule('missing-constant-phpdoc.php', MissingConstantPhpdocRule::ID);

@@ -13,7 +13,10 @@ final class AgentWorkflowCliTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
+     * Verify list rules JSON includes identifier quality metadata.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testListRulesJsonIncludesIdentifierQualityMetadata(): void
     {
@@ -38,7 +41,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify display filters are report metadata and do not enable rules.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testDisplayFiltersAreReportMetadataAndDoNotEnableRules(): void
     {
@@ -73,7 +79,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify SARIF output is JSON and contains findings.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testSarifOutputIsJsonAndContainsFindings(): void
     {
@@ -100,7 +109,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify paths relative to normalizes JSON finding files.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testPathsRelativeToNormalizesJsonFindingFiles(): void
     {
@@ -128,7 +140,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify branch review keeps line shifted finding unchanged and reports introduced.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testBranchReviewKeepsLineShiftedFindingUnchangedAndReportsIntroduced(): void
     {
@@ -199,7 +214,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify branch review reports removed findings.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testBranchReviewReportsRemovedFindings(): void
     {
@@ -246,7 +264,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify branch review added file does not fail base snapshot.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testBranchReviewAddedFileDoesNotFailBaseSnapshot(): void
     {
@@ -294,7 +315,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify branch review changed only without paths scopes current scan to changed files.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testBranchReviewChangedOnlyWithoutPathsScopesCurrentScanToChangedFiles(): void
     {
@@ -344,7 +368,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify branch review deleted file reports removed findings.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testBranchReviewDeletedFileReportsRemovedFindings(): void
     {
@@ -415,7 +442,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify review mode reports non Git diagnostic.
+     *
      * @throws JsonException
+     * @return void No return value.
      */
     public function testReviewModeReportsNonGitDiagnostic(): void
     {
@@ -447,6 +477,11 @@ final class AgentWorkflowCliTest extends TestCase
         }
     }
 
+    /**
+     * Verify review mode invalid option combinations fail early.
+     *
+     * @return void No return value.
+     */
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {
         $changedOnly = new Process([

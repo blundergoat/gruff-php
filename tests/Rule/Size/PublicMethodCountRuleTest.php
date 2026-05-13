@@ -25,6 +25,11 @@ final class PublicMethodCountRuleTest extends TestCase
         $this->parser = new PhpFileParser();
     }
 
+    /**
+     * Verify no findings for few public methods.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForFewPublicMethods(): void
     {
         $findings = $this->analyse('short-method.php', ['warning' => 15, 'error' => 25]);
@@ -32,6 +37,11 @@ final class PublicMethodCountRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for too many public methods.
+     *
+     * @return void No return value.
+     */
     public function testWarningForTooManyPublicMethods(): void
     {
         $findings = $this->analyse('many-public-methods.php', ['warning' => 15, 'error' => 25]);
@@ -43,6 +53,11 @@ final class PublicMethodCountRuleTest extends TestCase
         self::assertSame(16, $findings[0]->metadata['publicMethods']);
     }
 
+    /**
+     * Verify private and protected not counted.
+     *
+     * @return void No return value.
+     */
     public function testPrivateAndProtectedNotCounted(): void
     {
         $findings = $this->analyse('many-public-methods.php', ['warning' => 16, 'error' => 25]);
@@ -50,6 +65,11 @@ final class PublicMethodCountRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify interface not flagged.
+     *
+     * @return void No return value.
+     */
     public function testInterfaceNotFlagged(): void
     {
         $findings = $this->analyse('interface-fixture.php', ['warning' => 5, 'error' => 25]);

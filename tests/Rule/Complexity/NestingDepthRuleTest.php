@@ -41,6 +41,11 @@ final class NestingDepthRuleTest extends TestCase
         ];
     }
 
+    /**
+     * Verify nesting depth matches expected.
+     *
+     * @return void No return value.
+     */
     #[DataProvider('methodDepthProvider')]
     public function testNestingDepthMatchesExpected(string $methodName, int $expectedDepth): void
     {
@@ -62,6 +67,11 @@ final class NestingDepthRuleTest extends TestCase
         self::assertSame($expectedDepth, NestingDepthRule::computeMaximumNestingDepth($method));
     }
 
+    /**
+     * Verify no findings for shallow methods.
+     *
+     * @return void No return value.
+     */
     public function testNoFindingsForShallowMethods(): void
     {
         $findings = $this->analyse('simple.php', ['warning' => 4, 'error' => 6]);
@@ -69,6 +79,11 @@ final class NestingDepthRuleTest extends TestCase
         self::assertSame([], $findings);
     }
 
+    /**
+     * Verify warning for deeply nested method.
+     *
+     * @return void No return value.
+     */
     public function testWarningForDeeplyNestedMethod(): void
     {
         $findings = $this->analyse('nesting.php', ['warning' => 3, 'error' => 6]);
@@ -78,6 +93,11 @@ final class NestingDepthRuleTest extends TestCase
         self::assertSame(Severity::Warning, $findings[0]->severity);
     }
 
+    /**
+     * Verify error for very deeply nested method.
+     *
+     * @return void No return value.
+     */
     public function testErrorForVeryDeeplyNestedMethod(): void
     {
         $findings = $this->analyse('nesting.php', ['warning' => 3, 'error' => 4]);

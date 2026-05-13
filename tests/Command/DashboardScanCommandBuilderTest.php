@@ -9,6 +9,11 @@ use PHPUnit\Framework\TestCase;
 
 final class DashboardScanCommandBuilderTest extends TestCase
 {
+    /**
+     * Verify parse paths drops option prefixed entries.
+     *
+     * @return void No return value.
+     */
     public function testParsePathsDropsOptionPrefixedEntries(): void
     {
         $builder = new DashboardScanCommandBuilder('/tmp/gruff');
@@ -18,6 +23,11 @@ final class DashboardScanCommandBuilderTest extends TestCase
         self::assertSame(['src', 'tests'], $builder->parsePaths('src tests'));
     }
 
+    /**
+     * Verify analyse command separates owned options from user paths.
+     *
+     * @return void No return value.
+     */
     public function testAnalyseCommandSeparatesOwnedOptionsFromUserPaths(): void
     {
         $builder        = new DashboardScanCommandBuilder('/tmp/gruff');
@@ -30,6 +40,11 @@ final class DashboardScanCommandBuilderTest extends TestCase
         self::assertSame('none', $command[6]);
     }
 
+    /**
+     * Verify option like path cannot reach produced argument vector.
+     *
+     * @return void No return value.
+     */
     public function testOptionLikePathCannotReachProducedArgumentVector(): void
     {
         $builder = new DashboardScanCommandBuilder('/tmp/gruff');
