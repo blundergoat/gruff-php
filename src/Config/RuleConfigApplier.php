@@ -73,6 +73,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Reject unknown keys before applying a per-rule override.
+     *
      * @param ConfigObject $ruleConfig
      * @return void
      */
@@ -374,6 +376,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Validate that a decoded rule config value is an object-like array.
+     *
      * @return ConfigObject
      */
     private function requireObject(mixed $value, string $message): array
@@ -396,6 +400,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Normalise one decoded rule config value into the supported value set.
+     *
      * @return ConfigValue
      */
     private function configValue(mixed $value): array|bool|float|int|object|string|null
@@ -408,6 +414,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Validate scalar rule config values after YAML decoding.
+     *
      * @return ConfigScalar
      */
     private function configScalar(mixed $value): bool|float|int|object|string|null

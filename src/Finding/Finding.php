@@ -64,6 +64,8 @@ final readonly class Finding
     }
 
     /**
+     * Serialise the finding for report payloads.
+     *
      * @return FindingArray
      */
     public function toArray(): array

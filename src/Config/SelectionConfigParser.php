@@ -47,6 +47,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Reject unknown selection keys before parsing include/exclude lists.
+     *
      * @param ConfigObject $selection
      * @return void
      */
@@ -123,6 +125,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Validate that the selection config is an object-like array.
+     *
      * @param ConfigValue $value
      * @return ConfigObject
      */
@@ -146,6 +150,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Normalise one decoded selection value into the supported value set.
+     *
      * @return ConfigValue
      */
     private function configValue(mixed $value): array|bool|float|int|object|string|null
@@ -158,6 +164,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Validate scalar selection config values after YAML decoding.
+     *
      * @return ConfigScalar
      */
     private function configScalar(mixed $value): bool|float|int|object|string|null

@@ -49,6 +49,8 @@ final readonly class BaselineStore
     }
 
     /**
+     * Decode the baseline JSON root and validate its schema envelope.
+     *
      * @return BaselineFileData
      */
     private function readBaselineObject(string $path): array
@@ -189,7 +191,7 @@ final readonly class BaselineStore
 
         $handle = fopen($tempPath, 'wb');
         if ($handle === false) {
-            @unlink($tempPath);
+            $this->removeTemporaryFile($tempPath, $displayPath);
             throw new BaselineException(sprintf('Unable to write baseline file: %s', $displayPath));
         }
 
@@ -219,8 +221,24 @@ final readonly class BaselineStore
         }
 
         if (!rename($tempPath, $absolutePath)) {
-            @unlink($tempPath);
+            $this->removeTemporaryFile($tempPath, $displayPath);
             throw new BaselineException(sprintf('Unable to replace baseline file: %s', $displayPath));
+        }
+    }
+
+    /**
+     * Remove a temporary baseline file after a failed write.
+     *
+     * @return void No return value.
+     */
+    private function removeTemporaryFile(string $tempPath, string $displayPath): void
+    {
+        if (!is_file($tempPath)) {
+            return;
+        }
+
+        if (!unlink($tempPath)) {
+            throw new BaselineException(sprintf('Unable to remove temporary baseline file: %s', $displayPath));
         }
     }
 

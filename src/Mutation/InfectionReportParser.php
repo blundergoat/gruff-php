@@ -135,6 +135,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Validate one parsed Infection mutant row.
+     *
      * @return JsonObject
      */
     private function requireMutantRow(mixed $row, string $location, string $path): array
@@ -143,6 +145,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Extract and validate the mutator object from one mutant row.
+     *
      * @param JsonObject $row
      * @return JsonObject
      */
@@ -153,6 +157,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Validate that a decoded Infection value is an object-like array.
+     *
      * @return JsonObject
      */
     private function requireJsonObject(mixed $value, string $message): array
@@ -174,6 +180,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Normalise one decoded Infection JSON value.
+     *
      * @return JsonValue
      */
     private function jsonValue(mixed $value): array|bool|float|int|string|null
@@ -186,6 +194,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Validate scalar Infection JSON values after decoding.
+     *
      * @return JsonScalar
      */
     private function jsonScalar(mixed $value): bool|float|int|string|null

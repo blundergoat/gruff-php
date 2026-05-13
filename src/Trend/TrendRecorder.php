@@ -67,12 +67,8 @@ final readonly class TrendRecorder
      */
     private function readEntries(string $path): array
     {
-        if (!is_file($path)) {
-            return [];
-        }
-
-        $contents = file_get_contents($path);
-        if ($contents === false || trim($contents) === '') {
+        $contents = $this->readHistoryFile($path);
+        if ($contents === null) {
             return [];
         }
 
@@ -81,29 +77,62 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('History file must contain a JSON array: %s', $path));
         }
 
-        $entries = [];
-        foreach ($decoded as $entry) {
-            if (!is_array($entry) || array_is_list($entry)) {
-                throw new RuntimeException(sprintf('History file contains an invalid entry: %s', $path));
-            }
+        return array_map(
+            fn (mixed $entry): array => $this->normaliseEntry($entry, $path),
+            $decoded,
+        );
+    }
 
-            $normalisedEntry = [];
-            foreach ($entry as $key => $value) {
-                if (!is_string($key)) {
-                    throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
-                }
-
-                if (!is_bool($value) && !is_float($value) && !is_int($value) && !is_string($value) && $value !== null) {
-                    throw new RuntimeException(sprintf('History file contains a non-scalar entry value: %s', $path));
-                }
-
-                $normalisedEntry[$key] = $value;
-            }
-
-            $entries[] = $normalisedEntry;
+    /**
+     * @return string|null History file contents, or null when absent/empty.
+     */
+    private function readHistoryFile(string $path): ?string
+    {
+        if (!is_file($path)) {
+            return null;
         }
 
-        return $entries;
+        $contents = file_get_contents($path);
+        if ($contents === false || trim($contents) === '') {
+            return null;
+        }
+
+        return $contents;
+    }
+
+    /**
+     * Validate one decoded history row and preserve its scalar values.
+     *
+     * @return TrendEntry
+     */
+    private function normaliseEntry(mixed $entry, string $path): array
+    {
+        if (!is_array($entry) || array_is_list($entry)) {
+            throw new RuntimeException(sprintf('History file contains an invalid entry: %s', $path));
+        }
+
+        $normalisedEntry = [];
+        foreach ($entry as $key => $value) {
+            if (!is_string($key)) {
+                throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
+            }
+
+            $normalisedEntry[$key] = $this->normaliseEntryValue($value, $path);
+        }
+
+        return $normalisedEntry;
+    }
+
+    /**
+     * @return bool|float|int|string|null Scalar trend entry value.
+     */
+    private function normaliseEntryValue(mixed $value, string $path): bool|float|int|string|null
+    {
+        if (is_bool($value) || is_float($value) || is_int($value) || is_string($value) || $value === null) {
+            return $value;
+        }
+
+        throw new RuntimeException(sprintf('History file contains a non-scalar entry value: %s', $path));
     }
 
     /**

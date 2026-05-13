@@ -115,6 +115,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Read the YAML configuration root from disk.
+     *
      * @return ConfigObject
      */
     private function readRootConfig(string $path): array
@@ -282,6 +284,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Decode supported YAML config text into a root object.
+     *
      * @return ConfigObject
      */
     private function decodeConfig(string $contents, string $path): array
@@ -305,6 +309,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Validate that a decoded config value is an object-like array.
+     *
      * @return ConfigObject
      */
     private function requireObject(mixed $value, string $message): array
@@ -327,6 +333,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Normalise one decoded config value into the supported value set.
+     *
      * @return ConfigValue
      */
     private function configValue(mixed $value): array|bool|float|int|object|string|null
@@ -339,6 +347,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Validate scalar config values after YAML decoding.
+     *
      * @return ConfigScalar
      */
     private function configScalar(mixed $value): bool|float|int|object|string|null
