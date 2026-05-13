@@ -284,6 +284,38 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
+     * Verify default rule definitions keep stable reporting and config metadata.
+     *
+     * @return void No return value.
+     */
+    public function testDefaultRuleDefinitionsStayStable(): void
+    {
+        $definitions = array_map(static function ($rule): array {
+            $definition = $rule->definition();
+
+            return [
+                'id' => $definition->id,
+                'name' => $definition->name,
+                'description' => $definition->description(),
+                'pillar' => $definition->pillar->value,
+                'secondaryPillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $definition->secondaryPillars),
+                'tier' => $definition->tier->value,
+                'defaultSeverity' => $definition->defaultSeverity->value,
+                'confidence' => $definition->confidence->value,
+                'defaultThresholds' => $definition->defaultThresholds,
+                'defaultEnabled' => $definition->defaultEnabled,
+                'defaultOptions' => $definition->defaultOptions,
+            ];
+        }, RuleRegistry::defaults()->all());
+
+        usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
+        $json = json_encode($definitions, JSON_THROW_ON_ERROR);
+
+        self::assertCount(110, $definitions);
+        self::assertSame('9a44423e7b63191d5f6112bf75a6d6c5551eba5029acf223d39cb937785ad9c0', hash('sha256', $json));
+    }
+
+    /**
      * Parse the named fixture into an analysis unit.
      *
      * @param string $displayPath Fixture display path.

@@ -80,6 +80,89 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
+     * Verify Git diff provider parses staged, working-tree, and base-ref modes.
+     *
+     * @return void No return value.
+     */
+    public function testGitDiffProviderParsesModesAndDeletedFiles(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->initialiseRepository($tempDir);
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function value(): int\n    {\n        return 2;\n    }\n}\n");
+            file_put_contents($tempDir . '/Added.php', "<?php\nfinal class Added {}\n");
+            unlink($tempDir . '/DeleteMe.php');
+            $this->runGit($tempDir, 'add', 'Example.php', 'Added.php', 'DeleteMe.php');
+
+            $staged = (new GitDiffProvider())->changedLines($tempDir, 'staged');
+
+            self::assertSame('staged', $staged->mode);
+            self::assertNull($staged->base);
+            self::assertSame(['Added.php', 'DeleteMe.php', 'Example.php'], $staged->changedFiles);
+            self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->startLine);
+            self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->endLine);
+            self::assertNotSame([], $staged->rangesFor('Added.php'));
+            self::assertNotSame([], $staged->rangesFor('Example.php'));
+
+            $this->runGit($tempDir, 'commit', '-m', 'second');
+            file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function value(): int\n    {\n        return 3;\n    }\n}\n");
+
+            $workingTree = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
+            $baseRef = (new GitDiffProvider())->changedLines($tempDir, 'HEAD~1');
+
+            self::assertSame('working-tree', $workingTree->mode);
+            self::assertSame(['Example.php'], $workingTree->changedFiles);
+            self::assertSame('base-ref', $baseRef->mode);
+            self::assertSame('HEAD~1', $baseRef->base);
+            self::assertContains('Added.php', $baseRef->changedFiles);
+            self::assertContains('DeleteMe.php', $baseRef->changedFiles);
+            self::assertContains('Example.php', $baseRef->changedFiles);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify diff finding filter uses changed files when line ranges are unavailable.
+     *
+     * @return void No return value.
+     */
+    public function testDiffFindingFilterFallsBackToChangedFiles(): void
+    {
+        $diff = new DiffResult(
+            active:       true,
+            mode:         'staged',
+            base:         null,
+            changedLines: ['src/Example.php' => []],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+        $findings = [
+            $this->finding('src/Example.php', 20),
+            $this->finding('src/Other.php', 20),
+        ];
+
+        $filtered = (new DiffFindingFilter())->filter($findings, $diff);
+
+        self::assertCount(1, $filtered);
+        self::assertSame('src/Example.php', $filtered[0]->filePath);
+    }
+
+    /**
+     * Verify inactive diff leaves findings unchanged.
+     *
+     * @return void No return value.
+     */
+    public function testDiffFindingFilterLeavesInactiveDiffUnchanged(): void
+    {
+        $findings = [$this->finding('src/Example.php', 20)];
+
+        self::assertSame($findings, (new DiffFindingFilter())->filter($findings, DiffResult::inactive()));
+    }
+
+    /**
      * Verify Git diff provider reports non Git directory.
      *
      * @return void No return value.
@@ -198,6 +281,23 @@ final class GitDiffProviderTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+    }
+
+    /**
+     * Initialise a repository with two committed PHP files.
+     *
+     * @param string $tempDir Fixture repository root.
+     * @return void No return value.
+     */
+    private function initialiseRepository(string $tempDir): void
+    {
+        $this->runGit($tempDir, 'init');
+        $this->runGit($tempDir, 'config', 'user.email', 'test@example.com');
+        $this->runGit($tempDir, 'config', 'user.name', 'Gruff Test');
+        file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function value(): int\n    {\n        return 1;\n    }\n}\n");
+        file_put_contents($tempDir . '/DeleteMe.php', "<?php\nfinal class DeleteMe {}\n");
+        $this->runGit($tempDir, 'add', 'Example.php', 'DeleteMe.php');
+        $this->runGit($tempDir, 'commit', '-m', 'initial');
     }
 
     /**

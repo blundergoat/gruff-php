@@ -57,6 +57,10 @@ final class CognitiveComplexityRuleTest extends TestCase
             'logical keyword chain' => ['logicalKeywordChain', 3],
             'expression and return ternaries' => ['expressionAndReturnTernaries', 4],
             'closure and arrow function' => ['closureAndArrowFunction', 4],
+            'elseif and nested branches' => ['elseifAndNestedBranches', 8],
+            'switch with nested cases' => ['switchWithNestedCases', 8],
+            'short ternary' => ['shortTernary', 3],
+            'plain return' => ['plainReturn', 1],
         ];
     }
 

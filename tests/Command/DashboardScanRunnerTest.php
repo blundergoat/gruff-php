@@ -77,6 +77,55 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
+     * Verify config and baseline file changes invalidate cached full scans.
+     *
+     * @return void No return value.
+     */
+    public function testConfigAndBaselineChangesInvalidateFullScanCache(): void
+    {
+        $project = $this->projectDir();
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
+        $context = $this->context($project);
+
+        file_put_contents($project . '/.gruff.yaml', "rules: {}\n");
+
+        $first = $runner->scanHtml($context, ['paths' => 'src']);
+        $second = $runner->scanHtml($context, ['paths' => 'src']);
+        file_put_contents($project . '/.gruff.yaml', "rules:\n  size.file-length:\n    enabled: false\n");
+        $third = $runner->scanHtml($context, ['paths' => 'src']);
+        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
+        $fourth = $runner->scanHtml($context, ['paths' => 'src']);
+
+        self::assertStringContainsString('scan 1', $first);
+        self::assertStringContainsString('scan 1', $second);
+        self::assertStringContainsString('scan 2', $third);
+        self::assertStringContainsString('scan 3', $fourth);
+        self::assertSame('3', trim((string) file_get_contents($project . '/scan-count.txt')));
+    }
+
+    /**
+     * Verify no-config and no-baseline remove those files from cache invalidation.
+     *
+     * @return void No return value.
+     */
+    public function testNoConfigAndNoBaselineIgnoreConfigFileChangesForCache(): void
+    {
+        $project = $this->projectDir();
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
+        $context = $this->context($project);
+        $query   = ['paths' => 'src', 'noConfig' => '1', 'noBaseline' => '1'];
+
+        $first = $runner->scanHtml($context, $query);
+        file_put_contents($project . '/.gruff.yaml', "rules: {}\n");
+        file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
+        $second = $runner->scanHtml($context, $query);
+
+        self::assertStringContainsString('scan 1', $first);
+        self::assertStringContainsString('scan 1', $second);
+        self::assertSame('1', trim((string) file_get_contents($project . '/scan-count.txt')));
+    }
+
+    /**
      * Verify invalid project roots render a dashboard error.
      *
      * @return void No return value.
@@ -104,6 +153,22 @@ final class DashboardScanRunnerTest extends TestCase
 
         self::assertStringContainsString('The scan did not produce HTML output.', $html);
         self::assertStringContainsString('empty-output', $html);
+    }
+
+    /**
+     * Verify timed out scan processes render a dashboard error.
+     *
+     * @return void No return value.
+     */
+    public function testTimedOutScanRendersErrorDetail(): void
+    {
+        $project = $this->projectDir();
+        $runner  = $this->runner($this->fakeGruffBinary('slow'));
+        $context = new DashboardRequestContext($this->input(), $project, $project, 0.01, '127.0.0.1', 8765);
+        $html    = $runner->scanHtml($context, ['paths' => 'src']);
+
+        self::assertStringContainsString('The scan did not produce HTML output.', $html);
+        self::assertStringContainsString('exceeded the timeout', $html);
     }
 
     /**
@@ -171,16 +236,18 @@ final class DashboardScanRunnerTest extends TestCase
     private function fakeGruffBinary(string $mode): string
     {
         $binary = sys_get_temp_dir() . '/gruff-dashboard-scan-bin-' . bin2hex(random_bytes(6)) . '.php';
-        $script = $mode === 'empty'
-            ? "<?php fwrite(STDERR, 'empty-output');\n"
-            : <<<'PHP'
+        $script = match ($mode) {
+            'empty' => "<?php fwrite(STDERR, 'empty-output');\n",
+            'slow' => "<?php usleep(200000);\n",
+            default => <<<'PHP'
 <?php
 $counter = getcwd() . '/scan-count.txt';
 $count = is_file($counter) ? (int) file_get_contents($counter) : 0;
 $count++;
 file_put_contents($counter, (string) $count);
 echo '<!doctype html><html><body>scan ' . $count . '</body></html>';
-PHP;
+PHP,
+        };
 
         file_put_contents($binary, $script);
         chmod($binary, 0755);

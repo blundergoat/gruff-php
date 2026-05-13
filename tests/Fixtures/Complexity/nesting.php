@@ -60,4 +60,66 @@ class NestingFixture
 
         return $total;
     }
+
+    public function doWhileDepth(int $x): int
+    {
+        do {
+            if ($x > 0) {
+                $x--;
+            }
+        } while ($x > 0);
+
+        return $x;
+    }
+
+    public function switchDepth(int $x): int
+    {
+        switch ($x) {
+            case 1:
+                if ($x > 0) {
+                    return $x;
+                }
+                break;
+            default:
+                for ($i = 0; $i < $x; $i++) {
+                    if ($i > 3) {
+                        return $i;
+                    }
+                }
+        }
+
+        return 0;
+    }
+
+    public function tryCatchFinallyDepth(int $x): int
+    {
+        try {
+            if ($x > 0) {
+                return $x;
+            }
+        } catch (\RuntimeException) {
+            if ($x < 0) {
+                return -1;
+            }
+        } finally {
+            if ($x === 0) {
+                $x++;
+            }
+        }
+
+        return $x;
+    }
+
+    public function closureDepth(): void
+    {
+        $callback = function (): void {
+            if (true) {
+                foreach ([] as $item) {
+                    echo $item;
+                }
+            }
+        };
+
+        $callback();
+    }
 }

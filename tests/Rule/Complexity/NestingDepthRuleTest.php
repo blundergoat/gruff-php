@@ -48,6 +48,10 @@ final class NestingDepthRuleTest extends TestCase
             'one level' => ['oneLevel', 1],
             'four levels' => ['fourLevels', 4],
             'five levels' => ['fiveLevels', 5],
+            'do while depth' => ['doWhileDepth', 2],
+            'switch depth' => ['switchDepth', 3],
+            'try catch finally depth' => ['tryCatchFinallyDepth', 2],
+            'closure depth' => ['closureDepth', 3],
         ];
     }
 

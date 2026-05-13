@@ -182,4 +182,54 @@ class CognitiveFixture
 
         return $closure() + $arrow();
     }
+
+    public function elseifAndNestedBranches(int $x, int $y): int
+    {
+        if ($x > 10) {
+            return $x;
+        } elseif ($x > 0 && $y > 0) {
+            if ($y > 5) {
+                return $y;
+            }
+        } else {
+            while ($x < 0) {
+                $x++;
+            }
+        }
+
+        return 0;
+    }
+
+    public function switchWithNestedCases(int $x): int
+    {
+        switch ($x) {
+            case 1:
+                if ($x > 0) {
+                    return 1;
+                }
+                break;
+            default:
+                for ($i = 0; $i < $x; $i++) {
+                    if ($i > 2) {
+                        return $i;
+                    }
+                }
+        }
+
+        return 0;
+    }
+
+    public function shortTernary(int $x): int
+    {
+        return $x ?: ($x > 0 ? 1 : 0);
+    }
+
+    public function plainReturn(bool $flag): void
+    {
+        if ($flag) {
+            return;
+        }
+
+        return;
+    }
 }

@@ -7,6 +7,7 @@ namespace GruffPhp\Tests\Mutation;
 use GruffPhp\Mutation\InfectionReportParser;
 use GruffPhp\Mutation\InfectionRunner;
 use GruffPhp\Mutation\MutationReportException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -48,6 +49,138 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
+     * Verify parser normalises every Infection status section and optional mutant fields.
+     *
+     * @return void No return value.
+     */
+    public function testParsesStatusSectionsOptionalFieldsAndFileSummaries(): void
+    {
+        $projectRoot = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($projectRoot . '/reports', 0777, true));
+            $this->writeReport($projectRoot . '/reports/infection.json', [
+                'stats' => [
+                    'totalMutantsCount' => 8,
+                    'killedCount' => 2,
+                    'escapedCount' => 1,
+                    'timedOutCount' => 1,
+                    'msi' => 25.0,
+                    'coveredCodeMsi' => 50.0,
+                    'mutationCodeCoverage' => 75.0,
+                ],
+                'escaped' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Plus', 10, 'diff', 'escaped-output')],
+                'timeouted' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Timeout', 11)],
+                'killed' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Killed', 12, '', '')],
+                'killedByStaticAnalysis' => [$this->mutant($projectRoot . '/src/Alpha.php', 'StaticKill', null)],
+                'errored' => [$this->mutant($projectRoot . '/src/Beta.php', 'Error', 20)],
+                'syntaxErrors' => [$this->mutant($projectRoot . '/src/Beta.php', 'Syntax', 21)],
+                'uncovered' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Uncovered', 13)],
+                'ignored' => [$this->mutant($projectRoot . '/src/Beta.php', 'Ignored', 22)],
+            ]);
+
+            $report = (new InfectionReportParser($projectRoot))->parse('reports/infection.json');
+            $mutants = array_map(static fn ($mutant): array => $mutant->toArray(), $report->mutants);
+            $summaries = array_map(static fn ($summary): array => $summary->toArray(), $report->fileSummaries());
+
+            self::assertSame('reports/infection.json', $report->reportPath);
+            self::assertSame(8, $report->totalMutants());
+            self::assertSame(25.0, $report->msi());
+            self::assertSame(50.0, $report->coveredMsi());
+            self::assertSame(75.0, $report->coverageRate());
+            self::assertCount(2, $report->survivedMutants());
+            self::assertSame([
+                [
+                    'status' => 'escaped',
+                    'file' => 'src/Alpha.php',
+                    'line' => 10,
+                    'mutator' => 'Plus',
+                    'diff' => 'diff',
+                    'processOutput' => 'escaped-output',
+                ],
+                [
+                    'status' => 'timed out',
+                    'file' => 'src/Alpha.php',
+                    'line' => 11,
+                    'mutator' => 'Timeout',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'killed',
+                    'file' => 'src/Alpha.php',
+                    'line' => 12,
+                    'mutator' => 'Killed',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'killed by SA',
+                    'file' => 'src/Alpha.php',
+                    'line' => null,
+                    'mutator' => 'StaticKill',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'error',
+                    'file' => 'src/Beta.php',
+                    'line' => 20,
+                    'mutator' => 'Error',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'syntax error',
+                    'file' => 'src/Beta.php',
+                    'line' => 21,
+                    'mutator' => 'Syntax',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'not covered',
+                    'file' => 'src/Alpha.php',
+                    'line' => 13,
+                    'mutator' => 'Uncovered',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+                [
+                    'status' => 'ignored',
+                    'file' => 'src/Beta.php',
+                    'line' => 22,
+                    'mutator' => 'Ignored',
+                    'diff' => null,
+                    'processOutput' => null,
+                ],
+            ], $mutants);
+            self::assertSame([
+                [
+                    'file' => 'src/Alpha.php',
+                    'totalMutants' => 5,
+                    'killedMutants' => 2,
+                    'survivedMutants' => 2,
+                    'notCoveredMutants' => 1,
+                    'msi' => 40.0,
+                    'coveredMsi' => 50.0,
+                ],
+                [
+                    'file' => 'src/Beta.php',
+                    'totalMutants' => 3,
+                    'killedMutants' => 0,
+                    'survivedMutants' => 0,
+                    'notCoveredMutants' => 0,
+                    'msi' => 0.0,
+                    'coveredMsi' => 0.0,
+                ],
+            ], $summaries);
+        } finally {
+            $this->removeDir($projectRoot);
+        }
+    }
+
+    /**
      * Verify rejects malformed infection JSON report.
      *
      * @return void No return value.
@@ -58,6 +191,103 @@ final class InfectionReportParserTest extends TestCase
         $this->expectExceptionMessage('contains a non-numeric stats value');
 
         (new InfectionReportParser(self::PROJECT_ROOT))->parse('tests/Fixtures/Mutation/Infection/infection-malformed.json');
+    }
+
+    /**
+     * Verify missing reports are rejected before decoding.
+     *
+     * @return void No return value.
+     */
+    public function testRejectsMissingInfectionReport(): void
+    {
+        $this->expectException(MutationReportException::class);
+        $this->expectExceptionMessage('Infection report not found: missing-report.json');
+
+        (new InfectionReportParser(self::PROJECT_ROOT))->parse('missing-report.json');
+    }
+
+    /**
+     * Verify malformed report shapes surface specific diagnostics.
+     *
+     * @param array<string, mixed> $report Report payload.
+     * @param string               $message Expected exception message fragment.
+     * @return void No return value.
+     */
+    #[DataProvider('invalidReportProvider')]
+    public function testRejectsInvalidReportShapes(array $report, string $message): void
+    {
+        $projectRoot = $this->tempDir();
+
+        try {
+            $this->writeReport($projectRoot . '/report.json', $report);
+
+            $this->expectException(MutationReportException::class);
+            $this->expectExceptionMessage($message);
+
+            (new InfectionReportParser($projectRoot))->parse('report.json');
+        } finally {
+            $this->removeDir($projectRoot);
+        }
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>, string}>
+     */
+    public static function invalidReportProvider(): array
+    {
+        $validStats = [
+            'totalMutantsCount' => 1,
+            'msi' => 0.0,
+            'coveredCodeMsi' => 0.0,
+            'mutationCodeCoverage' => 0.0,
+        ];
+
+        return [
+            'missing stats' => [
+                ['escaped' => []],
+                'must contain a "stats" object',
+            ],
+            'missing required stat' => [
+                ['stats' => ['totalMutantsCount' => 1, 'msi' => 0.0, 'coveredCodeMsi' => 0.0], 'escaped' => []],
+                'is missing stats.mutationCodeCoverage',
+            ],
+            'section must be list' => [
+                ['stats' => $validStats, 'escaped' => ['bad' => 'shape']],
+                'section "escaped" must be a JSON array',
+            ],
+            'mutant must be object' => [
+                ['stats' => $validStats, 'escaped' => ['bad']],
+                'mutant escaped[0] must be a JSON object',
+            ],
+            'mutator must be object' => [
+                ['stats' => $validStats, 'escaped' => [['mutator' => 'bad']]],
+                'mutant escaped[0] must contain a mutator object',
+            ],
+            'missing mutator field' => [
+                ['stats' => $validStats, 'escaped' => [['mutator' => ['originalFilePath' => 'src/File.php']]]],
+                'is missing mutator.mutatorName',
+            ],
+            'non-integer line' => [
+                ['stats' => $validStats, 'escaped' => [[
+                    'mutator' => [
+                        'mutatorName' => 'Plus',
+                        'originalFilePath' => 'src/File.php',
+                        'originalStartLine' => '12',
+                    ],
+                ]]],
+                'has a non-integer mutator.originalStartLine',
+            ],
+            'too deep json' => [
+                ['stats' => $validStats, 'escaped' => [[
+                    'mutator' => [
+                        'mutatorName' => 'Plus',
+                        'originalFilePath' => 'src/File.php',
+                        'extra' => [[[[['too' => 'deep']]]]],
+                    ],
+                ]]],
+                'Infection report nesting is deeper than supported',
+            ],
+        ];
     }
 
     /**
@@ -161,6 +391,36 @@ final class InfectionReportParserTest extends TestCase
         }
 
         return $path;
+    }
+
+    /**
+     * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string}
+     */
+    private function mutant(string $filePath, string $mutatorName, ?int $line, string $diff = '', string $processOutput = ''): array
+    {
+        $mutator = [
+            'mutatorName' => $mutatorName,
+            'originalFilePath' => $filePath,
+        ];
+
+        if ($line !== null) {
+            $mutator['originalStartLine'] = $line;
+        }
+
+        return [
+            'mutator' => $mutator,
+            'diff' => $diff,
+            'processOutput' => $processOutput,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     * @return void No return value.
+     */
+    private function writeReport(string $path, array $report): void
+    {
+        self::assertNotFalse(file_put_contents($path, json_encode($report, JSON_THROW_ON_ERROR)));
     }
 
     /**

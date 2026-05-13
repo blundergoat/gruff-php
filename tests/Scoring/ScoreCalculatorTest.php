@@ -10,6 +10,9 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Mutation\InfectionMutant;
+use GruffPhp\Mutation\InfectionReport;
+use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreCalculator;
@@ -65,8 +68,8 @@ final class ScoreCalculatorTest extends TestCase
     public function testCompositeGodMethodFindingRequiresSizeAndComplexityOnSameSymbol(): void
     {
         $findings = [
-            $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, symbol: 'TooMuch::run()'),
-            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, symbol: 'TooMuch::run()'),
+            $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, endLine: 30, symbol: 'TooMuch::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/TooMuch.php', line: 14, endLine: 28, symbol: 'TooMuch::run()'),
             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
@@ -75,7 +78,84 @@ final class ScoreCalculatorTest extends TestCase
         self::assertCount(1, $composites);
         self::assertSame('design.god-method', $composites[0]->ruleId);
         self::assertSame(Pillar::Design, $composites[0]->pillar);
+        self::assertSame(12, $composites[0]->line);
+        self::assertSame(30, $composites[0]->endLine);
         self::assertSame('TooMuch::run()', $composites[0]->symbol);
+        self::assertSame(['complexity.cognitive', 'size.method-length'], $composites[0]->metadata['componentRules']);
+        self::assertSame([Pillar::Complexity, Pillar::Size], $composites[0]->secondaryPillars);
+    }
+
+    /**
+     * Verify score report includes mutation pillar, file mutation scores, distribution, and diff scope.
+     *
+     * @return void No return value.
+     */
+    public function testScoreReportIncludesMutationAndFileMetrics(): void
+    {
+        $findings = [
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/A.php', line: 4, metadata: ['complexity' => 4]),
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/A.php', line: 8, metadata: ['complexity' => 9]),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/A.php', line: 12, metadata: ['complexity' => 12]),
+            $this->finding('size.method-length', Pillar::Size, Severity::Advisory, filePath: 'src/A.php', line: 12, metadata: ['lines' => 44]),
+            $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error, filePath: 'src/B.php', line: 2),
+            $this->finding('mutation.survived', Pillar::Mutation, Severity::Warning, filePath: 'src/A.php', line: 20),
+        ];
+        $mutation = new MutationAnalysisResult(new InfectionReport(
+            reportPath: 'infection-report.json',
+            stats: [
+                'totalMutantsCount' => 3,
+                'msi' => 66.67,
+                'coveredCodeMsi' => 66.67,
+                'mutationCodeCoverage' => 100.0,
+            ],
+            mutants: [
+                new InfectionMutant('killed', 'src/A.php', 1, 'Plus'),
+                new InfectionMutant('escaped', 'src/A.php', 2, 'Minus'),
+                new InfectionMutant('killed', 'src/B.php', 3, 'ReturnRemoval'),
+            ],
+        ));
+
+        $score = (new ScoreCalculator())->calculate($findings, $mutation, new DiffResult(
+            active: true,
+            mode: 'unstaged',
+            base: null,
+            changedLines: [],
+            changedFiles: [],
+            message: 'diff',
+        ));
+        $payload = $score->toArray();
+
+        self::assertSame('diff', $score->scope);
+        self::assertSame(['1-5' => 1, '6-10' => 1, '11-15' => 0, '16-20' => 0, '21+' => 0], $score->complexityDistribution);
+        self::assertSame('diff', $payload['scope']);
+
+        $pillars = [];
+        foreach ($score->pillars as $pillarScore) {
+            $pillars[$pillarScore->pillar] = $pillarScore->toArray();
+        }
+
+        self::assertSame([
+            'pillar' => 'mutation',
+            'applicable' => true,
+            'score' => 66.67,
+            'grade' => 'D',
+            'findings' => 1,
+            'advisories' => 0,
+            'warnings' => 1,
+            'errors' => 0,
+            'penalty' => 33.33,
+        ], $pillars['mutation'] ?? null);
+
+        $offenders = [];
+        foreach ($score->topOffenders as $fileScore) {
+            $offenders[$fileScore->filePath] = $fileScore->toArray();
+        }
+
+        self::assertSame(50.0, $offenders['src/A.php']['mutationScore'] ?? null);
+        self::assertSame(100.0, $offenders['src/B.php']['mutationScore'] ?? null);
+        self::assertSame(9, $offenders['src/A.php']['maxCyclomatic'] ?? null);
+        self::assertSame(12, $offenders['src/A.php']['maxCognitive'] ?? null);
+        self::assertSame(44, $offenders['src/A.php']['maxLines'] ?? null);
     }
 
     /**
@@ -87,6 +167,7 @@ final class ScoreCalculatorTest extends TestCase
      * @param string $filePath Finding file path.
      * @param int $line Finding line number.
      * @param string|null $symbol Fixture value.
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata Fixture value.
      * @return Finding Fixture value.
      */
     private function finding(
@@ -95,7 +176,9 @@ final class ScoreCalculatorTest extends TestCase
         Severity $severity,
         string $filePath = 'src/Example.php',
         int $line = 1,
+        ?int $endLine = null,
         ?string $symbol = null,
+        array $metadata = [],
     ): Finding {
         return new Finding(
             ruleId:     $ruleId,
@@ -106,7 +189,9 @@ final class ScoreCalculatorTest extends TestCase
             pillar:     $pillar,
             tier:       RuleTier::V01,
             confidence: Confidence::High,
+            endLine:    $endLine,
             symbol:     $symbol,
+            metadata:   $metadata,
         );
     }
 }
