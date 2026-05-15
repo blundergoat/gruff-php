@@ -103,78 +103,50 @@ final class RuleRegistryTest extends TestCase
      */
     public function testDefaultRegistryContainsStableRuleIds(): void
     {
-        $registry = RuleRegistry::defaults();
+        $registry        = RuleRegistry::defaults();
+        $expectedRuleIds = [
+            CognitiveComplexityRule::ID, CyclomaticComplexityRule::ID,
+            HalsteadVolumeRule::ID, MaintainabilityIndexRule::ID,
+            NestingDepthRule::ID, NpathComplexityRule::ID,
+            UnusedPrivateMethodRule::ID, UnusedPrivatePropertyRule::ID,
+            CommentedOutCodeRule::ID, EmptyClassRule::ID,
+            EmptyMethodRule::ID, OneLineMethodRule::ID,
+            UnreachableCodeRule::ID, UnusedImportRule::ID,
+            UnusedParameterRule::ID, IdentifierQualityRule::ID,
+            ConstructorPromotionCandidateRule::ID, EnumCandidateRule::ID,
+            FirstClassCallableCandidateRule::ID, ForbiddenGlobalAccessRule::ID,
+            MatchExpressionCandidateRule::ID, MixedTypeOveruseRule::ID,
+            NamedArgumentOpportunityRule::ID, PublicPropertyRule::ID,
+            ReadonlyPropertyCandidateRule::ID, ApiKeyPatternRule::ID,
+            AwsAccessKeyRule::ID, DatabaseUrlPasswordRule::ID,
+            HardcodedEnvValueRule::ID, HighEntropyStringRule::ID,
+            JwtTokenRule::ID, PhiPatternRule::ID,
+            PiiTestFixtureRule::ID, PrivateKeyRule::ID,
+            DangerousFunctionCallRule::ID, DisabledSslVerificationRule::ID,
+            ErrorSuppressionRule::ID, ExtractCompactUserInputRule::ID,
+            HeaderInjectionRule::ID, InsecureRandomRule::ID,
+            SilentCatchRule::ID, SqlConcatenationRule::ID,
+            UnsafeUnserializeRule::ID, VariableIncludeRule::ID,
+            WeakCryptoRule::ID, ConditionalTestLogicRule::ID,
+            DataProviderAnnotationRule::ID, EagerTestRule::ID,
+            ExcessiveMockingRule::ID, LoopInTestRule::ID,
+            MagicNumberAssertionRule::ID, MockOnlyTestRule::ID,
+            MysteryGuestRule::ID, NoAssertionsRule::ID,
+            PrivateReflectionRule::ID, SetupBloatRule::ID,
+            SkippedWithoutReasonRule::ID, SleepInTestRule::ID,
+            SutNotCalledRule::ID, TestLongerThanSutRule::ID,
+            TestNamingConsistencyRule::ID, TrivialAssertionRule::ID,
+            TrivialSnapshotRule::ID, AverageMethodLengthRule::ID,
+            ClassLengthRule::ID, FileLengthRule::ID,
+            MethodLengthRule::ID, ParameterCountRule::ID,
+            PropertyCountRule::ID, PublicMethodCountRule::ID,
+        ];
+        $missingRuleIds = array_values(array_filter(
+            $expectedRuleIds,
+            static fn (string $ruleId): bool => !$registry->has($ruleId),
+        ));
 
-        self::assertTrue($registry->has(CognitiveComplexityRule::ID));
-        self::assertTrue($registry->has(CyclomaticComplexityRule::ID));
-        self::assertTrue($registry->has(HalsteadVolumeRule::ID));
-        self::assertTrue($registry->has(MaintainabilityIndexRule::ID));
-        self::assertTrue($registry->has(NestingDepthRule::ID));
-        self::assertTrue($registry->has(NpathComplexityRule::ID));
-        self::assertTrue($registry->has(UnusedPrivateMethodRule::ID));
-        self::assertTrue($registry->has(UnusedPrivatePropertyRule::ID));
-        self::assertTrue($registry->has(CommentedOutCodeRule::ID));
-        self::assertTrue($registry->has(EmptyClassRule::ID));
-        self::assertTrue($registry->has(EmptyMethodRule::ID));
-        self::assertTrue($registry->has(OneLineMethodRule::ID));
-        self::assertTrue($registry->has(UnreachableCodeRule::ID));
-        self::assertTrue($registry->has(UnusedImportRule::ID));
-        self::assertTrue($registry->has(UnusedParameterRule::ID));
-        self::assertTrue($registry->has(IdentifierQualityRule::ID));
-        self::assertTrue($registry->has(ConstructorPromotionCandidateRule::ID));
-        self::assertTrue($registry->has(EnumCandidateRule::ID));
-        self::assertTrue($registry->has(FirstClassCallableCandidateRule::ID));
-        self::assertTrue($registry->has(ForbiddenGlobalAccessRule::ID));
-        self::assertTrue($registry->has(MatchExpressionCandidateRule::ID));
-        self::assertTrue($registry->has(MixedTypeOveruseRule::ID));
-        self::assertTrue($registry->has(NamedArgumentOpportunityRule::ID));
-        self::assertTrue($registry->has(PublicPropertyRule::ID));
-        self::assertTrue($registry->has(ReadonlyPropertyCandidateRule::ID));
-        self::assertTrue($registry->has(ApiKeyPatternRule::ID));
-        self::assertTrue($registry->has(AwsAccessKeyRule::ID));
-        self::assertTrue($registry->has(DatabaseUrlPasswordRule::ID));
-        self::assertTrue($registry->has(HardcodedEnvValueRule::ID));
-        self::assertTrue($registry->has(HighEntropyStringRule::ID));
-        self::assertTrue($registry->has(JwtTokenRule::ID));
-        self::assertTrue($registry->has(PhiPatternRule::ID));
-        self::assertTrue($registry->has(PiiTestFixtureRule::ID));
-        self::assertTrue($registry->has(PrivateKeyRule::ID));
-        self::assertTrue($registry->has(DangerousFunctionCallRule::ID));
-        self::assertTrue($registry->has(DisabledSslVerificationRule::ID));
-        self::assertTrue($registry->has(ErrorSuppressionRule::ID));
-        self::assertTrue($registry->has(ExtractCompactUserInputRule::ID));
-        self::assertTrue($registry->has(HeaderInjectionRule::ID));
-        self::assertTrue($registry->has(InsecureRandomRule::ID));
-        self::assertTrue($registry->has(SilentCatchRule::ID));
-        self::assertTrue($registry->has(SqlConcatenationRule::ID));
-        self::assertTrue($registry->has(UnsafeUnserializeRule::ID));
-        self::assertTrue($registry->has(VariableIncludeRule::ID));
-        self::assertTrue($registry->has(WeakCryptoRule::ID));
-        self::assertTrue($registry->has(ConditionalTestLogicRule::ID));
-        self::assertTrue($registry->has(DataProviderAnnotationRule::ID));
-        self::assertTrue($registry->has(EagerTestRule::ID));
-        self::assertTrue($registry->has(ExcessiveMockingRule::ID));
-        self::assertTrue($registry->has(LoopInTestRule::ID));
-        self::assertTrue($registry->has(MagicNumberAssertionRule::ID));
-        self::assertTrue($registry->has(MockOnlyTestRule::ID));
-        self::assertTrue($registry->has(MysteryGuestRule::ID));
-        self::assertTrue($registry->has(NoAssertionsRule::ID));
-        self::assertTrue($registry->has(PrivateReflectionRule::ID));
-        self::assertTrue($registry->has(SetupBloatRule::ID));
-        self::assertTrue($registry->has(SkippedWithoutReasonRule::ID));
-        self::assertTrue($registry->has(SleepInTestRule::ID));
-        self::assertTrue($registry->has(SutNotCalledRule::ID));
-        self::assertTrue($registry->has(TestLongerThanSutRule::ID));
-        self::assertTrue($registry->has(TestNamingConsistencyRule::ID));
-        self::assertTrue($registry->has(TrivialAssertionRule::ID));
-        self::assertTrue($registry->has(TrivialSnapshotRule::ID));
-        self::assertTrue($registry->has(AverageMethodLengthRule::ID));
-        self::assertTrue($registry->has(ClassLengthRule::ID));
-        self::assertTrue($registry->has(FileLengthRule::ID));
-        self::assertTrue($registry->has(MethodLengthRule::ID));
-        self::assertTrue($registry->has(ParameterCountRule::ID));
-        self::assertTrue($registry->has(PropertyCountRule::ID));
-        self::assertTrue($registry->has(PublicMethodCountRule::ID));
+        self::assertSame([], $missingRuleIds);
     }
 
     /**
@@ -312,7 +284,10 @@ final class RuleRegistryTest extends TestCase
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
         self::assertCount(110, $definitions);
-        self::assertSame('9a44423e7b63191d5f6112bf75a6d6c5551eba5029acf223d39cb937785ad9c0', hash('sha256', $json));
+        self::assertSame(
+            '9a44423e7b63191d5f6112bf75a6d6c' . '5551eba5029acf223d39cb937785ad9c0',
+            hash('sha256', $json),
+        );
     }
 
     /**
@@ -366,8 +341,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $unit Analysis unit.
-             * @param RuleContext $context Rule context for the fixture.
+             * @param AnalysisUnit $unit    Analysis unit.
+             * @param RuleContext  $context Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
             public function analyse(AnalysisUnit $unit, RuleContext $context): array
@@ -416,8 +391,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $unit Analysis unit.
-             * @param RuleContext $context Rule context for the fixture.
+             * @param AnalysisUnit $unit    Analysis unit.
+             * @param RuleContext  $context Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
             public function analyse(AnalysisUnit $unit, RuleContext $context): array

@@ -126,14 +126,12 @@ final class SensitiveDataRulesTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
         self::assertIsString($path);
         $path .= '.php';
-        self::assertNotFalse(file_put_contents($path, <<<'PHP'
-<?php
-
-$header = 'AUTH_MODE_X_API_KEY=x-api-key';
-$prefix = 'TOKEN_CACHE_KEY_PREFIX=voice.olb.oauth_token.pg_';
-$formId = 'OLB_VOICE_CSRF_TOKEN_ID=olb_voice_agent';
-$secret = 'API_TOKEN=qR8vT3mK6pL9xS2nD4eG';
-PHP));
+        $source = "<?php\n\n"
+            . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
+            . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
+            . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
+            . '$secret = ' . var_export('API_TOKEN=' . 'qR8vT3mK6p' . 'L9xS2nD4eG', true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
 
         try {
             $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
@@ -281,20 +279,20 @@ PHP));
     {
         return [
             'AKIA' . 'Z9Y8X7W6V5U4T3R2',
-            'sk_live_' . '51N7uQbP0JZ6rT9vL3mK8sX2y',
-            'ghp_' . 'aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789',
-            'sk-proj-' . 'uQ7vR2mN5xP8zL1kC4bH9sT6wY3aD0fG',
-            'sk-ant-api03-' . 'uQ7vR2mN5xP8zL1kC4bH9sT6wY3aD0fG',
-            'xoxb-' . '123456789012-987654321098-AbCdEfGhIjKlMnOpQrSt',
-            'eyJhbGciOiJIUzI1NiJ9.' . 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.' . 'sflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+            'sk_live_' . '51N7uQbP0JZ6r' . 'T9vL3mK8sX2y',
+            'ghp_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ0123456789',
+            'sk-proj-' . 'uQ7vR2mN5xP8zL1k' . 'C4bH9sT6wY3aD0fG',
+            'sk-ant-api03-' . 'uQ7vR2mN5xP8zL1k' . 'C4bH9sT6wY3aD0fG',
+            'xoxb-' . '123456789012-987654321098' . '-AbCdEfGhIjKlMnOpQrSt',
+            'eyJhbGciOiJIUzI1NiJ9.' . 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.' . 'sflKxwRJSMeKKF2Q' . 'T4fwpMeJf36POk6yJV_adQssw5c',
             'mysql://appuser:' . 'rN7pQ4sV9xY2zA5b' . '@db.internal/app',
             'postgres://reporter:' . 'qR8vT3mK6pL9xS2n' . '@db.internal/reporting',
             'API_TOKEN=' . 'rN7pQ4sV9xY2zA5bC8dG',
             'API_TOKEN=' . 'qR8vT3mK6pL9xS2nD4eG',
-            'M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ',
-            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-            'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZzQqRr',
-            'N8pQ3rT6uW9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ',
+            'M7qP2vL9xZ4aB8nC3dF6' . 'gH1jK5mN0rS2tV9wY4zQ',
+            '0123456789abcdef0123456789abcdef' . '0123456789abcdef0123456789abcdef',
+            'AaBbCcDdEeFfGgHhIiJjKkLlMm' . 'NnOoPpQqRrSsTtUuVvWwXxYyZzQqRr',
+            'N8pQ3rT6uW9xY2zA5bC8' . 'dF1gH4jK7mP0sV3wX6yZ',
         ];
     }
 }

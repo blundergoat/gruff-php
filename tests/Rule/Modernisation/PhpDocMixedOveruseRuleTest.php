@@ -25,7 +25,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
     /** Fixture path used by this test case. */
-    private const FIXTURE      = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
+    private const FIXTURE = 'tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php';
 
     /**
      * Verify fixture produces expected phpdoc mixed findings.
@@ -80,10 +80,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      */
     public function testUnstructuredArrayBagsWithMixedLeavesAreAllowed(): void
     {
-        $findings = $this->phpdocMixedFindings($this->analyseFixture());
+        $findings       = $this->phpdocMixedFindings($this->analyseFixture());
         $allowedSymbols = [
             '$listOfMixedVar',
             'PhpDocMixedOveruseFixture::arrayShapeMixedParam()',
+            'PhpDocMixedOveruseFixture::isMixedOnlyInReturnDescription()',
             'PhpDocMixedOveruseFixture::nestedArrayShapeMixed()',
             'PhpDocMixedOveruseFixture::phpstanReturnMixed()',
             'PhpDocMixedOveruseFixture::psalmParamMixed()',
@@ -188,8 +189,8 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         self::assertNotEmpty($findings);
-        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
-        $pillarValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
+        $severityValues  = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $pillarValues    = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
         $missingTagKinds = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['tagKind'] ?? null) === null));
         $missingSnippets = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['snippet'] ?? '') === ''));
 

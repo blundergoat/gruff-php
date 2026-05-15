@@ -125,7 +125,7 @@ final class TestQualityNodeHelper
             return true;
         }
 
-        if (str_contains($method->getDocComment()?->getText() ?? '', '@test')) {
+        if (self::hasTestAnnotation($method)) {
             return true;
         }
 
@@ -139,6 +139,18 @@ final class TestQualityNodeHelper
         // class extends a *TestCase base. This stops library code with method names like
         // testScopes()/testCandidate() being analysed as test bodies.
         return self::extendsTestCase(self::parentClass($method));
+    }
+
+    /**
+     * Detect a real PHPUnit `@test` annotation line.
+     *
+     * @return bool True when the method docblock declares `@test` as a tag.
+     */
+    private static function hasTestAnnotation(Stmt\ClassMethod $method): bool
+    {
+        $docText = $method->getDocComment()?->getText() ?? '';
+
+        return preg_match('/^\s*\*\s*@test\b/m', $docText) === 1;
     }
 
     /**

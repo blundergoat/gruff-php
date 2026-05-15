@@ -3,6 +3,7 @@ paths:
     ignore:
         - 'history.json'
         - 'infection-report.json'
+        - '.goat-flow/audit-cache.json'
         - 'tests/Fixtures/**'
 allowlists:
     acceptedAbbreviations: []

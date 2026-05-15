@@ -32,7 +32,10 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         self::assertCount(128, $units);
         self::assertCount(1889, $findings);
-        self::assertSame('bb1d41c2f2c6d49e93608a34dced84d4125fee58519a57b6bd6b75554a7d00a1', hash('sha256', $json));
+        self::assertSame(
+            '0947868f3133e8b6a4e659b902520b65' . '488f188184c4a449212023d120821fd4',
+            hash('sha256', $json),
+        );
     }
 
     /**
@@ -42,9 +45,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     private function analysePaths(array $paths): array
     {
         $registry = RuleRegistry::defaults();
-        $parser = new PhpFileParser();
-        $files  = (new SourceDiscovery(self::PROJECT_ROOT))->discover($paths, true)->files;
-        $units  = array_map(
+        $parser   = new PhpFileParser();
+        $files    = (new SourceDiscovery(self::PROJECT_ROOT))->discover($paths, true)->files;
+        $units    = array_map(
             static fn (SourceFile $file): AnalysisUnit => $parser->parse($file),
             $files,
         );

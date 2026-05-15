@@ -116,7 +116,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     continue;
                 }
 
-                $analysis = $this->classifyMixedInBody($block['body']);
+                $analysis = $this->classifyMixedInBody($block['body'], in_array($tagKind, self::TYPE_ALIAS_TAGS, true));
                 if (!$analysis['hasMixed']) {
                     continue;
                 }
@@ -231,14 +231,17 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     /**
      * @return array{hasMixed: bool, isStandalone: bool}
      */
-    private function classifyMixedInBody(string $body): array
+    private function classifyMixedInBody(string $body, bool $isTypeAlias): array
     {
-        if (preg_match('/(?<![\\\\\w])mixed(?!\w)/i', $body) !== 1) {
+        $type = $isTypeAlias
+            ? $this->extractTypeAliasExpression($body)
+            : $this->extractTypeExpression($body);
+
+        if ($type === null || preg_match('/(?<![\\\\\w])mixed(?!\w)/i', $type) !== 1) {
             return ['hasMixed' => false, 'isStandalone' => false];
         }
 
-        $type       = $this->extractTypeExpression($body);
-        $standalone = $type !== null && strcasecmp($type, 'mixed') === 0;
+        $standalone = strcasecmp($type, 'mixed') === 0;
 
         return ['hasMixed' => true, 'isStandalone' => $standalone];
     }
@@ -323,6 +326,22 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $type = trim($type);
 
         return $type === '' ? null : $type;
+    }
+
+    /**
+     * Extract the type expression from a PHPDoc type alias body after the alias name.
+     *
+     * @return string|null The aliased type expression, or null when no type follows the alias.
+     */
+    private function extractTypeAliasExpression(string $body): ?string
+    {
+        $body = trim($body);
+
+        if (preg_match('/^\S+\s+(?:=\s*)?(?<type>.+)$/s', $body, $matches) !== 1) {
+            return null;
+        }
+
+        return $this->extractTypeExpression($matches['type']);
     }
 
     /**

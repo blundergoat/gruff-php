@@ -86,6 +86,16 @@ final class HelperEdgeCaseTest extends TestCase
     {
         helper('not a test');
     }
+
+    /**
+     * Mentions @test annotation prose without declaring the tag.
+     *
+     * @return void No return value.
+     */
+    public function annotationDocumentationOnly(): void
+    {
+        helper('not a test');
+    }
 }
 
 new class extends TestCase

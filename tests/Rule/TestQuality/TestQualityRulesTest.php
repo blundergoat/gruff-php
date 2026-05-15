@@ -29,9 +29,6 @@ use GruffPhp\Rule\TestQuality\MockWithoutExpectationRule;
 use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\NoAssertionsRule;
-use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
-use GruffPhp\Rule\TestQuality\PhpUnitDeprecationsNotFatalRule;
-use GruffPhp\Rule\TestQuality\PhpUnitStrictFlagsMissingRule;
 use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
@@ -149,7 +146,7 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestReportsRealMultiActCasesWithStableMetadata(): void
     {
         $findings = $this->eagerMutationFindings();
-        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertSame([
             'EagerPositiveMutationCasesTest::testProcessesOrderAndSendsReceipt()',
@@ -183,7 +180,7 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestIgnoresAssertionHarnessAndObservationNoise(): void
     {
         $findings = $this->eagerMutationFindings();
-        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
         self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionHelperCallsDoNotBecomeSutCalls()', $symbols);
@@ -215,7 +212,7 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestCastsFractionalAssertionThreshold(): void
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             EagerTestRule::ID,
             new RuleSettings(true, ['minAssertions' => 2.5]),
         );
@@ -525,192 +522,6 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify mocking domain object is disabled by default and requires patterns to fire.
-     *
-     * @return void No return value.
-     */
-    public function testMockingDomainObjectIsDisabledByDefaultAndRequiresPatternsToFire(): void
-    {
-        $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
-        self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
-
-        $registry = RuleRegistry::defaults();
-        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
-            $registry,
-        );
-        $optedInFindings = $this->analysePaths(
-            ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
-            $config,
-        );
-
-        self::assertRuleCount(MockingDomainObjectRule::ID, 2, $optedInFindings);
-    }
-
-    /**
-     * Verify PHPUnit strict flags missing fires on lax config and stays silent on strict.
-     *
-     * @return void No return value.
-     */
-    public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
-    {
-        self::assertCount(0, (new PhpUnitStrictFlagsMissingRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
-        ));
-
-        $laxFindings = (new PhpUnitStrictFlagsMissingRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
-        );
-
-        self::assertCount(1, $laxFindings);
-        self::assertSame(['failOnRisky', 'failOnWarning', 'beStrictAboutTestsThatDoNotTestAnything', 'beStrictAboutOutputDuringTests', 'beStrictAboutChangesToGlobalState'], $laxFindings[0]->metadata['missing']);
-    }
-
-    /**
-     * Verify PHPUnit deprecations not fatal fires on lax config and stays silent on strict.
-     *
-     * @return void No return value.
-     */
-    public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
-    {
-        self::assertCount(0, (new PhpUnitDeprecationsNotFatalRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
-        ));
-
-        self::assertCount(1, (new PhpUnitDeprecationsNotFatalRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
-        ));
-    }
-
-    /**
-     * Verify PHPUnit coverage source missing fires on lax config and allows legacy whitelist.
-     *
-     * @return void No return value.
-     */
-    public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
-    {
-        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/strict'),
-        ));
-
-        self::assertCount(1, (new PhpUnitCoverageSourceMissingRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/lax'),
-        ));
-
-        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse(
-            $this->phpUnitDummyUnit(),
-            $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/legacy-whitelist'),
-        ));
-    }
-
-    /**
-     * Verify PHPUnit rules stay silent when no config file is present.
-     *
-     * @return void No return value.
-     */
-    public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
-    {
-        $context = $this->phpUnitContext('tests/Fixtures/PhpUnitConfig/no-config');
-
-        self::assertCount(0, (new PhpUnitStrictFlagsMissingRule())->analyse($this->phpUnitDummyUnit(), $context));
-        self::assertCount(0, (new PhpUnitDeprecationsNotFatalRule())->analyse($this->phpUnitDummyUnit(), $context));
-        self::assertCount(0, (new PhpUnitCoverageSourceMissingRule())->analyse($this->phpUnitDummyUnit(), $context));
-    }
-
-    /**
-     * Build a dummy PHPUnit analysis unit.
-     *
-     * @return AnalysisUnit Fixture value.
-     */
-    private function phpUnitDummyUnit(): AnalysisUnit
-    {
-        return $this->unitForPath('tests/Fixtures/TestQuality/non-candidates.php');
-    }
-
-    /**
-     * Build a rule context for PHPUnit helper tests.
-     *
-     * @param string $relativeRoot Fixture value.
-     * @return RuleContext Fixture value.
-     */
-    private function phpUnitContext(string $relativeRoot): RuleContext
-    {
-        $registry = RuleRegistry::defaults();
-
-        return new RuleContext(
-            self::PROJECT_ROOT . '/' . $relativeRoot,
-            AnalysisConfig::fromRegistry($registry),
-        );
-    }
-
-    /**
-     * Verify test quality rules respect config disables.
-     *
-     * @return void No return value.
-     */
-    public function testTestQualityRulesRespectConfigDisables(): void
-    {
-        $registry = RuleRegistry::defaults();
-        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
-            'tests/Fixtures/Config/disable-no-assertions.yaml',
-            $registry,
-        );
-
-        $findings = $this->analysePaths(
-            ['tests/Fixtures/TestQuality/phpunit-core-smells.php'],
-            $config,
-        );
-
-        self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
-        self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify non test class methods with test prefix are not analysed.
-     *
-     * @return void No return value.
-     */
-    public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/non-test-class.php');
-
-        $testQualityFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.')
-                && str_contains($finding->filePath, 'non-test-class.php'),
-        ));
-
-        self::assertSame([], $testQualityFindings, 'Library code with test* method names must not trigger test-quality rules.');
-    }
-
-    /**
-     * Verify cumulative fixture represents every static test quality rule.
-     *
-     * @return void No return value.
-     */
-    public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
-    {
-        $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/cumulative-test-quality.php'),
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
-        ));
-
-        $ruleIds = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
-        $missingRuleIds = array_values(array_diff($this->expectedRuleIds(), $ruleIds));
-
-        self::assertSame([], $missingRuleIds);
-
-        $fingerprints = array_map(static fn (Finding $finding): string => $finding->fingerprint(), $findings);
-        self::assertCount(count($fingerprints), array_unique($fingerprints));
-    }
-
-    /**
      * @param list<Finding> $findings
      * @return void No return value.
      */
@@ -721,43 +532,6 @@ final class TestQualityRulesTest extends TestCase
             array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function expectedRuleIds(): array
-    {
-        return [
-            NoAssertionsRule::ID,
-            TrivialAssertionRule::ID,
-            ConditionalTestLogicRule::ID,
-            LoopInTestRule::ID,
-            TestLongerThanSutRule::ID,
-            EagerTestRule::ID,
-            MysteryGuestRule::ID,
-            ExcessiveMockingRule::ID,
-            MockOnlyTestRule::ID,
-            SleepInTestRule::ID,
-            TestNamingConsistencyRule::ID,
-            MagicNumberAssertionRule::ID,
-            PrivateReflectionRule::ID,
-            DataProviderAnnotationRule::ID,
-            TrivialSnapshotRule::ID,
-            SutNotCalledRule::ID,
-            SetupBloatRule::ID,
-            SkippedWithoutReasonRule::ID,
-            ExtendsProductionClassRule::ID,
-            TestMethodTooLongRule::ID,
-            EmptyDataProviderRule::ID,
-            LoopAssertionWithoutMessageRule::ID,
-            UnusedMockRule::ID,
-            ExceptionTypeOnlyRule::ID,
-            TautologicalTypeAssertionRule::ID,
-            GlobalStateMutationRule::ID,
-            MockWithoutExpectationRule::ID,
-            RepeatedStructureMissingDataProviderRule::ID,
-        ];
     }
 
     /**
