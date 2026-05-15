@@ -23,7 +23,7 @@ printf '  Project: %s\n' "$PROJECT"
 printf '  Paths:   %s\n' "${PATHS[*]}"
 printf '\n'
 
-exec php bin/gruff dashboard "${PATHS[@]}" \
+exec php bin/gruff-php dashboard "${PATHS[@]}" \
   --project "$PROJECT" \
   --host "$HOST" \
   --port "$PORT" \

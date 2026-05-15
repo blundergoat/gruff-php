@@ -31,7 +31,7 @@ Common commands:
 composer check
 composer test
 composer format:check
-php bin/gruff analyse --fail-on none
+php bin/gruff-php analyse --fail-on none
 ```
 
 `composer check` runs Composer validation, shell syntax checks, PHP syntax
@@ -58,8 +58,8 @@ When adding or changing a rule:
 - Register it in `RuleRegistry`.
 - Add fixture files under `tests/Fixtures/<Pillar>/`.
 - Add focused PHPUnit coverage.
-- Check `php bin/gruff list-rules --format json`.
-- Run `php bin/gruff analyse --fail-on none` and inspect dogfood impact.
+- Check `php bin/gruff-php list-rules --format json`.
+- Run `php bin/gruff-php analyse --fail-on none` and inspect dogfood impact.
 - Update docs when the public rule surface changes.
 
 Avoid rule names that describe an implementation detail rather than a stable
@@ -84,7 +84,7 @@ Do not include real credentials or private source code in public issues.
 - [ ] `composer check` passes.
 - [ ] `composer test` passes.
 - [ ] `composer format:check` passes, or formatter drift is explicitly scoped.
-- [ ] `php bin/gruff analyse` exits 0 for this repository.
+- [ ] `php bin/gruff-php analyse` exits 0 for this repository.
 - [ ] README, changelog, or docs updated for public behavior changes.
 
 ## Commit Messages

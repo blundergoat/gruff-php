@@ -12,21 +12,26 @@ use GruffPhp\Command\SummaryCommand;
 use Symfony\Component\Console\Application as SymfonyApplication;
 
 /**
- * Registers the gruff CLI commands with Symfony Console.
+ * Registers the gruff-php CLI commands with Symfony Console.
  */
 final class Application extends SymfonyApplication
 {
+    /**
+     * Console application name displayed by Symfony.
+     */
+    public const NAME = 'gruff-php';
+
     /**
      * Development version displayed by the CLI.
      */
     public const VERSION = '0.1.0-dev';
 
     /**
-     * Register the gruff CLI command surface with Symfony Console.
+     * Register the gruff-php CLI command surface with Symfony Console.
      */
     public function __construct()
     {
-        parent::__construct('gruff', self::VERSION);
+        parent::__construct(self::NAME, self::VERSION);
 
         $this->add(new AnalyseCommand());
         $this->add(new DashboardCommand());

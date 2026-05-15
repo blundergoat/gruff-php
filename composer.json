@@ -28,7 +28,7 @@
         }
     },
     "bin": [
-        "bin/gruff"
+        "bin/gruff-php"
     ],
     "scripts": {
         "check": [

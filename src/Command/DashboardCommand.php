@@ -34,7 +34,7 @@ final class DashboardCommand extends Command
     {
         $this
             ->setName('dashboard')
-            ->setDescription('Serve the local gruff dashboard.')
+            ->setDescription('Serve the local gruff-php dashboard.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Initial files or directories to analyse.')
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Initial project root for scans.')
             ->addOption('host', null, InputOption::VALUE_REQUIRED, 'Host for the dashboard server.', default: self::DEFAULT_HOST)
@@ -144,12 +144,12 @@ final class DashboardCommand extends Command
     }
 
     /**
-     * Return the package-local gruff executable path.
+     * Return the package-local gruff-php executable path.
      *
-     * @return string Absolute gruff binary path.
+     * @return string Absolute gruff-php binary path.
      */
     private function gruffBinary(): string
     {
-        return dirname(__DIR__, 2) . '/bin/gruff';
+        return dirname(__DIR__, 2) . '/bin/gruff-php';
     }
 }

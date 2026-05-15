@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-05-09
+last_reviewed: 2026-05-16
 ---
 
 # Setup Footguns
@@ -13,6 +13,6 @@ last_reviewed: 2026-05-09
 
 `README.md` (search: `# gruff-php`) names the project, but the repository currently has no `composer.json`, `src/`, `tests/`, or PHP runtime configuration. The name makes it easy for agents to assume Composer, PHPUnit, or PHPStan commands exist. They do not exist until real app structure is added.
 
-**Resolution:** M01 added `composer.json` (search: `"bin": [`), `bin/gruff` (search: `new Application()`), `src/Console/Application.php` (search: `final class Application`), `src/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`), and `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`).
+**Resolution:** M01 added `composer.json` (search: `"bin": [`), `bin/gruff-php` (search: `new Application()`), `src/Console/Application.php` (search: `final class Application`), `src/Command/AnalyseCommand.php` (search: `final class AnalyseCommand`), and `tests/Console/ListRulesCliTest.php` (search: `testVersionCommandRunsThroughBinary`).
 
 **Prevention:** Before listing app commands or describing runtime architecture, check for the actual files that define them. If a future scaffold has no app surface, say "no application command configured yet" instead of inventing PHP defaults.

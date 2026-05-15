@@ -13,10 +13,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 final readonly class DashboardServer
 {
     /**
-     * Create a dashboard server using the shared state factory and gruff binary path.
+     * Create a dashboard server using the shared state factory and gruff-php binary path.
      *
      * @param DashboardStateFactory $stateFactory Factory used to build dashboard state.
-     * @param string                $gruffBinary  Absolute gruff binary path used for scan requests.
+     * @param string                $gruffBinary  Absolute gruff-php binary path used for scan requests.
      */
     public function __construct(
         private DashboardStateFactory $stateFactory,
@@ -43,8 +43,8 @@ final readonly class DashboardServer
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Serving gruff dashboard at %s</info>', $this->url($host, $port, $context)));
-        $output->writeln('<comment>Use the form to refresh the scan or point gruff at another project. Press Ctrl+C to stop.</comment>');
+        $output->writeln(sprintf('<info>Serving gruff-php dashboard at %s</info>', $this->url($host, $port, $context)));
+        $output->writeln('<comment>Use the form to refresh the scan or point gruff-php at another project. Press Ctrl+C to stop.</comment>');
 
         $handler = $this->handler($context);
 

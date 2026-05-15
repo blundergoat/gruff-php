@@ -21,7 +21,7 @@ final class DashboardCliTest extends CliTestCase
         $port    = $this->unusedPort();
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'dashboard',
             'tests/Fixtures/Source/Code',
             '--host',
@@ -40,7 +40,7 @@ final class DashboardCliTest extends CliTestCase
             $response = $this->fetchHttp($port, '/');
 
             self::assertStringContainsString('HTTP/1.1 200 OK', $response);
-            self::assertStringContainsString('gruff dashboard', $response);
+            self::assertStringContainsString('gruff-php dashboard', $response);
             self::assertStringContainsString('controls-toggle', $response);
             self::assertStringContainsString('Dashboard controls', $response);
             self::assertStringContainsString('Project root', $response);
@@ -85,7 +85,7 @@ final class DashboardCliTest extends CliTestCase
         $port    = $this->unusedPort();
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'dashboard',
             'tests/Fixtures/Source/Code',
             '--host',
@@ -124,7 +124,7 @@ final class DashboardCliTest extends CliTestCase
 
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'dashboard',
             'tests/Fixtures/Source/Code',
             '--host',

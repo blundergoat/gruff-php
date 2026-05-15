@@ -169,7 +169,7 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
-     * Create a fake gruff executable for dashboard tests.
+     * Create a fake gruff-php executable for dashboard tests.
      *
      * @return string Fixture value.
      */

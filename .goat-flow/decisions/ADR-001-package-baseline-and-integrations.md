@@ -21,7 +21,7 @@ Dependency evidence from this session:
 `gruff-php` v0.1 is a Composer CLI package with:
 
 - PHP runtime floor `^8.3`.
-- CLI binary `bin/gruff`.
+- CLI binary `bin/gruff-php`.
 - Namespace `GruffPhp\`.
 - Runtime dependencies on `nikic/php-parser`, Symfony Console, Symfony Finder, and Symfony Process.
 - Dev dependency on PHPUnit 11.

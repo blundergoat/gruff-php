@@ -12,9 +12,9 @@ use GruffPhp\Config\ConfigLoader;
 final readonly class DashboardScanCommandBuilder
 {
     /**
-     * Build dashboard-triggered analyse commands for the given gruff binary.
+     * Build dashboard-triggered analyse commands for the given gruff-php binary.
      *
-     * @param string $gruffBinary Absolute gruff binary path used in dashboard scans.
+     * @param string $gruffBinary Absolute gruff-php binary path used in dashboard scans.
      */
     public function __construct(private string $gruffBinary)
     {

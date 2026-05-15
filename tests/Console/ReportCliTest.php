@@ -21,7 +21,7 @@ final class ReportCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
             'tests/Fixtures/Source/Code',
         ], self::PROJECT_ROOT);
@@ -42,7 +42,7 @@ final class ReportCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
             'tests/Fixtures/Source/Code',
             '--fail-on',
@@ -60,7 +60,7 @@ final class ReportCliTest extends CliTestCase
 
         $static = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
             'tests/Fixtures/Source/Code',
             '--fail-on',
@@ -84,7 +84,7 @@ final class ReportCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -108,7 +108,7 @@ final class ReportCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -145,7 +145,7 @@ final class ReportCliTest extends CliTestCase
         try {
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'report',
                 'tests/Fixtures/Source/Code',
                 '--output',
@@ -178,7 +178,7 @@ final class ReportCliTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -192,7 +192,7 @@ final class ReportCliTest extends CliTestCase
 
             $report = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'report',
                 'src',
                 '--format',

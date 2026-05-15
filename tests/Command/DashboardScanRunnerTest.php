@@ -174,7 +174,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build a runner fixture.
      *
-     * @param string $binary Fake gruff binary path.
+     * @param string $binary Fake gruff-php binary path.
      * @return DashboardScanRunner Fixture value.
      */
     private function runner(string $binary): DashboardScanRunner
@@ -228,7 +228,7 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
-     * Create a fake gruff executable.
+     * Create a fake gruff-php executable.
      *
      * @param string $mode Fake executable mode.
      * @return string Binary path.

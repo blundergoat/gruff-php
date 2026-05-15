@@ -19,7 +19,7 @@ final readonly class DashboardPageRenderer
         $scanUrl = '/scan?' . http_build_query($state, '', '&', PHP_QUERY_RFC3986);
 
         return '<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
-            . '<title>gruff dashboard</title><style>' . $this->dashboardCss() . '</style></head><body>'
+            . '<title>gruff-php dashboard</title><style>' . $this->dashboardCss() . '</style></head><body>'
             . '<button type="button" id="controls-toggle" class="controls-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="controls-panel" title="Dashboard controls">&#9881;</button>'
             . '<section id="controls-panel" class="controls-panel" role="dialog" aria-label="Dashboard controls" hidden>'
             . '<div class="panel-head"><div><strong>Dashboard controls</strong><span>local scan settings</span></div><button type="button" id="controls-close" aria-label="Close dashboard controls">&times;</button></div>'
@@ -54,7 +54,7 @@ final readonly class DashboardPageRenderer
             . '<label class="check"><input type="checkbox" name="reportInteractive" value="1"' . ($state['reportInteractive'] === '1' ? ' checked' : '') . '><span>interactive findings</span></label>'
             . '</div>'
             . '<div class="panel-actions"><button type="button" id="refresh">Refresh</button><button type="submit" id="run-scan">Run scan</button></div></form></section>'
-            . sprintf('<iframe id="report-frame" title="gruff report" data-initial-src="%s" srcdoc="%s"></iframe>', $this->escape($scanUrl), $this->escape($this->loadingFrame()))
+            . sprintf('<iframe id="report-frame" title="gruff-php report" data-initial-src="%s" srcdoc="%s"></iframe>', $this->escape($scanUrl), $this->escape($this->loadingFrame()))
             . '<script>' . $this->dashboardJs() . '</script></body></html>';
     }
 
@@ -110,9 +110,9 @@ final readonly class DashboardPageRenderer
      */
     public function errorHtml(string $message, string $detail, int $exitCode, int $durationMs): string
     {
-        return '<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff dashboard error</title>'
+        return '<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff-php dashboard error</title>'
             . '<style>body{font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#161412;color:#f3e9d2;padding:32px}main{max-width:920px;margin:0 auto}pre{white-space:pre-wrap;background:#0d0c0a;border:1px solid #2a2622;padding:16px;overflow:auto}</style></head><body><main>'
-            . '<h1>gruff dashboard</h1>'
+            . '<h1>gruff-php dashboard</h1>'
             . sprintf('<p>%s</p>', $this->escape($message))
             . sprintf('<p>Exit code: %d · Duration: %dms</p>', $exitCode, $durationMs)
             . sprintf('<pre>%s</pre>', $this->escape($detail))
@@ -191,7 +191,7 @@ JS;
      */
     private function displayCommand(array $command): string
     {
-        $display = ['php', 'bin/gruff', ...array_slice($command, 2)];
+        $display = ['php', 'bin/gruff-php', ...array_slice($command, 2)];
 
         return implode(' ', array_map(
             static fn (string $argument): string => preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument),

@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-14. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-16. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -37,11 +37,11 @@ Last reviewed 2026-05-14. Captures the v0.1 surface as wired in `composer.json`,
 
 ```text
 bin/
-`-- gruff                                     = `#!/usr/bin/env php` shim that loads autoload and runs Console\Application
+`-- gruff-php                                 = `#!/usr/bin/env php` shim that loads autoload and runs Console\Application
 
 scripts/
 |-- preflight-checks.sh                       = local PHPStan + PHPUnit runner with coloured pass/fail summary
-|-- start-dev.sh                              = starts `bin/gruff dashboard` with environment-overridable host/port/project/scan timeout
+|-- start-dev.sh                              = starts `bin/gruff-php dashboard` with environment-overridable host/port/project/scan timeout
 `-- maintenance/                              = ad-hoc maintenance scripts (developer-local)
 
 src/
@@ -69,7 +69,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff`, version constant `0.1.0-dev`; registers `analyse`, `summary`, `dashboard`, `list-rules`, and `report`
+|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.0-dev`; registers `analyse`, `summary`, `dashboard`, `list-rules`, and `report`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception
@@ -274,7 +274,7 @@ tests/
 |-- Config/
 |   `-- ConfigLoaderTest.php                  = default config, YAML overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff-php`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
 |-- Diff/
 |   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
 |-- Finding/

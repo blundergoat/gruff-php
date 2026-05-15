@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-11
+last_reviewed: 2026-05-16
 ---
 
 # Rule Footguns
@@ -41,7 +41,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`design.single-implementor-interface` is a `ProjectRuleInterface` (M31, see `.goat-flow/decisions/ADR-003-project-rule-seam.md`). It can only count implementations and external type-hint usages from the units it actually receives. Under `gruff analyse --diff-vs=<base> --changed-only`, the unit list is the diff's changed files, not the full project. A single-implementor interface whose implementor is in an unchanged file disappears from the project rule's view, so the rule emits zero findings on the diff even though a full-project scan would flag the interface. Observed during M31 dogfood: gruff scanned with `--diff-vs=deploy --changed-only` on healthkit's `feat/64272_voice-olb` branch reported `0` design.single-implementor-interface findings; a full `src` scan on the same branch reported 7.
+`design.single-implementor-interface` is a `ProjectRuleInterface` (M31, see `.goat-flow/decisions/ADR-003-project-rule-seam.md`). It can only count implementations and external type-hint usages from the units it actually receives. Under `gruff-php analyse --diff-vs=<base> --changed-only`, the unit list is the diff's changed files, not the full project. A single-implementor interface whose implementor is in an unchanged file disappears from the project rule's view, so the rule emits zero findings on the diff even though a full-project scan would flag the interface. Observed during M31 dogfood: gruff scanned with `--diff-vs=deploy --changed-only` on healthkit's `feat/64272_voice-olb` branch reported `0` design.single-implementor-interface findings; a full `src` scan on the same branch reported 7.
 
 **Prevention:** When the rule emits zero findings under `--changed-only`, do not treat that as "the diff is clean of this rule." Run a full-project scan (without `--changed-only`) to confirm. For agent review workflows that surface single-implementor-interface findings, the workflow should run the rule against the full project (or at least the project's `src/` tree) and intersect the findings with the diff's changed files afterwards, rather than relying on `--changed-only` to do the intersection. The same caveat applies to any future `ProjectRuleInterface`.
 
@@ -59,7 +59,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-05-11 | **Evidence:** OBSERVED
 
-Rules that inspect project-level config files (`test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-coverage-source-missing`) walk `$context->projectRoot` to discover `phpunit.xml.dist`, dedup per root, and emit a finding once per project. The unit being scanned was previously ignored - so `gruff analyse src/App/Foo.php` (a single production file with no test file in scope) still produced two warnings against `phpunit.xml.dist`. Targeting a production file should not surface test-config quality opinions.
+Rules that inspect project-level config files (`test-quality.phpunit-deprecations-not-fatal`, `test-quality.phpunit-strict-flags-missing`, `test-quality.phpunit-coverage-source-missing`) walk `$context->projectRoot` to discover `phpunit.xml.dist`, dedup per root, and emit a finding once per project. The unit being scanned was previously ignored - so `gruff-php analyse src/App/Foo.php` (a single production file with no test file in scope) still produced two warnings against `phpunit.xml.dist`. Targeting a production file should not surface test-config quality opinions.
 
 **Prevention:** Project-config rules now gate their first emission on "at least one unit in this run looks like a PHPUnit test file" (via `TestQualityNodeHelper::looksLikePhpUnitTestFile()` - matches `/tests/`, `/Tests/`, basename ending `Test.php` or `TestCase.php`). When extending a `RuleInterface` rule to inspect project-level state, the rule must look at the unit being analysed (or aggregate per-unit data through a `ProjectRuleInterface` instead) before emitting at the project level - otherwise the rule emits regardless of scope and adds noise to narrow scans. Reuse `TestQualityNodeHelper::looksLikePhpUnitTestFile()` for any future PHPUnit-config rule; do not duplicate the path heuristic.
 

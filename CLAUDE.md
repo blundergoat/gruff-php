@@ -20,7 +20,7 @@ gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and 
 ## Hard Rules
 
 - If a file exists, modify it in place; do not create backup or `_new` variants.
-- Keep app claims grounded in existing files. Current app surface: `composer.json`, `composer.lock`, `bin/gruff`, `src/`, `tests/`, and `phpunit.xml.dist`.
+- Keep app claims grounded in existing files. Current app surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, and `phpunit.xml.dist`.
 - Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
 - Preserve cross-agent consistency between `CLAUDE.md` and `AGENTS.md` for shared goat-flow rules.
 - Keep the controlling goat-flow workspace distinct from this selected target project when tools or prompts originate outside this checkout.
@@ -39,8 +39,8 @@ Application commands configured by `composer.json`:
 git status --short --untracked-files=all
 composer check
 composer test
-php bin/gruff --help
-php bin/gruff analyse
+php bin/gruff-php --help
+php bin/gruff-php analyse
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude --harness
 ```

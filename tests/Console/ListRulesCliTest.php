@@ -19,11 +19,11 @@ final class ListRulesCliTest extends CliTestCase
      */
     public function testVersionCommandRunsThroughBinary(): void
     {
-        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', '--version']);
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', '--version']);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff', $process->getOutput());
+        self::assertStringContainsString('gruff-php', $process->getOutput());
         self::assertStringContainsString('0.1.0-dev', $process->getOutput());
     }
 
@@ -34,7 +34,7 @@ final class ListRulesCliTest extends CliTestCase
      */
     public function testListCommandRunsThroughBinary(): void
     {
-        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', 'list']);
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list']);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -73,7 +73,7 @@ final class ListRulesCliTest extends CliTestCase
 
             self::assertSame(0, $install->getExitCode(), $install->getErrorOutput() . $install->getOutput());
 
-            $help = new Process([PHP_BINARY, $checkout . '/bin/gruff', '--help'], $checkout);
+            $help = new Process([PHP_BINARY, $checkout . '/bin/gruff-php', '--help'], $checkout);
             $help->run();
 
             self::assertSame(0, $help->getExitCode(), $help->getErrorOutput());

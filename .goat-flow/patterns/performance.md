@@ -1,6 +1,6 @@
 ---
 category: performance
-last_reviewed: 2026-05-11
+last_reviewed: 2026-05-16
 ---
 
 # Performance Patterns
@@ -17,7 +17,7 @@ last_reviewed: 2026-05-11
 
 ```bash
 cd /path/to/target-project
-php /path/to/gruff-php/bin/gruff analyse --diff-vs=origin/deploy --changed-only --no-config --no-baseline --format=json --fail-on=none
+php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=origin/deploy --changed-only --no-config --no-baseline --format=json --fail-on=none
 ```
 
 **Verification:** Keep lightweight tests that prove explicit changed files do not archive unrelated base files, added files do not fail base snapshot setup, deleted files can report removed findings, and failed snapshot creation removes temporary directories.

@@ -6,7 +6,7 @@
 
 ## Context
 
-`gruff-baseline.json` is the default static finding baseline for `gruff analyse` (see `.goat-flow/architecture.md`: "Static finding baselines default to `gruff-baseline.json` at the project root"). When `--generate-baseline` is run it writes the file; when `--baseline` is passed bare or omitted entirely, gruff auto-loads it; `--no-baseline` opts a single run out.
+`gruff-baseline.json` is the default static finding baseline for `gruff-php analyse` (see `.goat-flow/architecture.md`: "Static finding baselines default to `gruff-baseline.json` at the project root"). When `--generate-baseline` is run it writes the file; when `--baseline` is passed bare or omitted entirely, gruff auto-loads it; `--no-baseline` opts a single run out.
 
 A gitignore review surfaced the question of whether this file should be tracked in version control. Two policies are coherent:
 
@@ -25,8 +25,8 @@ Rules for changes to the file:
 
 - A finding is added to `gruff-baseline.json` only via a reviewable PR. The PR description must say why the finding is being deferred rather than fixed.
 - A finding is removed from `gruff-baseline.json` in the same PR that resolves the underlying problem (or in the PR that proves the rule mis-fires and is being narrowed).
-- The file is regenerated with `gruff analyse --generate-baseline` only when wholesale re-baselining is intentional and recorded in the PR description.
-- CI runs `gruff analyse` with the committed baseline applied (the default). Local developer runs do the same unless the developer is debugging baseline behaviour, in which case `--no-baseline` is the explicit opt-out.
+- The file is regenerated with `gruff-php analyse --generate-baseline` only when wholesale re-baselining is intentional and recorded in the PR description.
+- CI runs `gruff-php analyse` with the committed baseline applied (the default). Local developer runs do the same unless the developer is debugging baseline behaviour, in which case `--no-baseline` is the explicit opt-out.
 
 `auth.json` and `infection-report.json` remain gitignored because they are credential or generated-artifact files, not team contracts.
 

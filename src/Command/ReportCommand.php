@@ -13,7 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
 
 /**
- * Implements the gruff report CLI command for saved analysis output.
+ * Implements the gruff-php report CLI command for saved analysis output.
  */
 final class ReportCommand extends Command
 {
@@ -66,7 +66,7 @@ final class ReportCommand extends Command
     {
         $this
             ->setName('report')
-            ->setDescription('Render a gruff report to stdout or a file.')
+            ->setDescription('Render a gruff-php report to stdout or a file.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Report format: html or json.', default: 'html')
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'Write the report to this file.')
@@ -318,13 +318,13 @@ final class ReportCommand extends Command
     }
 
     /**
-     * Return the package-local gruff executable path.
+     * Return the package-local gruff-php executable path.
      *
-     * @return string Absolute gruff binary path.
+     * @return string Absolute gruff-php binary path.
      */
     private function gruffBinary(): string
     {
-        return dirname(__DIR__, 2) . '/bin/gruff';
+        return dirname(__DIR__, 2) . '/bin/gruff-php';
     }
 
     /**

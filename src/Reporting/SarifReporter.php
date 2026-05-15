@@ -49,7 +49,7 @@ final readonly class SarifReporter
             'runs' => [[
                 'tool' => [
                     'driver' => [
-                        'name' => 'gruff',
+                        'name' => AnalysisReport::TOOL_NAME,
                         'version' => $report->toolVersion,
                         'informationUri' => 'https://github.com/',
                         'rules' => array_values($rules),
@@ -108,7 +108,7 @@ final readonly class SarifReporter
     }
 
     /**
-     * Map gruff severities onto SARIF result levels.
+     * Map gruff-php severities onto SARIF result levels.
      *
      * @return string SARIF level name.
      */

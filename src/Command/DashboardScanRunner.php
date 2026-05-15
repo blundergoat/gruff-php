@@ -58,7 +58,7 @@ final class DashboardScanRunner
     /**
      * Capture collaborators used to execute dashboard scans and render results.
      *
-     * @param string                $gruffBinary  Absolute gruff binary path used for scan requests.
+     * @param string                $gruffBinary  Absolute gruff-php binary path used for scan requests.
      * @param DashboardStateFactory $stateFactory Factory used to resolve dashboard state.
      * @param DashboardPageRenderer $renderer     Renderer used for scan output and errors.
      */

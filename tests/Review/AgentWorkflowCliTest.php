@@ -24,7 +24,7 @@ final class AgentWorkflowCliTest extends TestCase
      */
     public function testListRulesJsonIncludesIdentifierQualityMetadata(): void
     {
-        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', 'list-rules', '--format=json'], self::PROJECT_ROOT);
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format=json'], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -54,7 +54,7 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             'tests/Fixtures/Naming',
             '--format=json',
@@ -92,7 +92,7 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             'tests/Fixtures/Naming',
             '--format=sarif',
@@ -122,7 +122,7 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             self::PROJECT_ROOT . '/tests/Fixtures/Naming',
             '--format=json',
@@ -173,7 +173,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src',
                 '--format=json',
@@ -202,7 +202,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $markdown = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src',
                 '--format=markdown',
@@ -247,7 +247,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src',
                 '--format=json',
@@ -298,7 +298,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src/NewRisk.php',
                 '--format=json',
@@ -349,7 +349,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 '--format=json',
                 '--fail-on=none',
@@ -401,7 +401,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src',
                 '--format=json',
@@ -425,7 +425,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $explicitPathProcess = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src/Deleted.php',
                 '--format=json',
@@ -467,7 +467,7 @@ final class AgentWorkflowCliTest extends TestCase
 
             $process = new Process([
                 PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff',
+                self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
                 'src',
                 '--format=json',
@@ -496,7 +496,7 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $changedOnly = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             '--changed-only',
         ], self::PROJECT_ROOT);
@@ -507,7 +507,7 @@ final class AgentWorkflowCliTest extends TestCase
 
         $diffConflict = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             '--diff',
             'working-tree',

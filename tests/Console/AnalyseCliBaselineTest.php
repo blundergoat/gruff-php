@@ -26,7 +26,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $process = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'tests/Fixtures/Source/Code',
                 '--format',
@@ -67,7 +67,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'tests/Fixtures/Source/Code',
                 '--format',
@@ -91,7 +91,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $apply = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'tests/Fixtures/Source/Code',
                 '--format',
@@ -134,7 +134,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $process = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'tests/Fixtures/Source/Code',
                 '--fail-on',
@@ -165,7 +165,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -189,7 +189,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $autoApply = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -230,7 +230,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -244,7 +244,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $skipped = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -281,7 +281,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -300,7 +300,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $rerun = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -342,7 +342,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $generate = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -361,7 +361,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             $rerun = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -394,7 +394,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $process = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',
@@ -425,7 +425,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $process = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 'src',
                 '--format',

@@ -89,7 +89,7 @@ final readonly class HtmlReporter
             . $this->metaRow('scope', $diffLabel)
             . $this->metaRow('format', $report->format)
             . $this->metaRow('fail', $report->failOn)
-            . sprintf('<div class="inspection-id">%s</div>', $this->escape('gruff ' . $report->toolVersion))
+            . sprintf('<div class="inspection-id">%s</div>', $this->escape(AnalysisReport::TOOL_NAME . ' ' . $report->toolVersion))
             . '</div></header>';
     }
 

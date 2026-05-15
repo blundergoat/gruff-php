@@ -16,7 +16,7 @@ prepared for a public `0.1.0` release.
 Current package facts:
 
 - Package name: `devgoat/gruff-php`
-- Binary: `bin/gruff`
+- Binary: `bin/gruff-php`
 - PHP requirement: `^8.3`
 - Runtime dependencies: `nikic/php-parser`, Symfony Console/Finder/Process/Yaml
 - Rule catalogue: 110 registry rules across 11 pillars
@@ -34,50 +34,50 @@ From a checkout:
 git clone <repo-url> gruff-php
 cd gruff-php
 composer install
-php bin/gruff --help
+php bin/gruff-php --help
 ```
 
 After Packagist publication:
 
 ```bash
 composer require --dev devgoat/gruff-php
-vendor/bin/gruff --help
+vendor/bin/gruff-php --help
 ```
 
 ## Quick Start
 
 ```bash
 # Analyze the current project
-php bin/gruff analyse
+php bin/gruff-php analyse
 
 # Analyze selected paths
-php bin/gruff analyse src tests
+php bin/gruff-php analyse src tests
 
 # Keep the process green while inspecting findings
-php bin/gruff analyse --fail-on none
+php bin/gruff-php analyse --fail-on none
 
 # JSON for automation
-php bin/gruff analyse --format json --fail-on none > gruff-report.json
+php bin/gruff-php analyse --format json --fail-on none > gruff-report.json
 
 # Markdown for PR comments
-php bin/gruff analyse --format markdown --fail-on none > gruff-report.md
+php bin/gruff-php analyse --format markdown --fail-on none > gruff-report.md
 
 # SARIF for code-scanning ingestion
-php bin/gruff analyse --format sarif --fail-on none > gruff.sarif
+php bin/gruff-php analyse --format sarif --fail-on none > gruff.sarif
 
 # Static HTML report
-php bin/gruff report --format html --output gruff-report.html
+php bin/gruff-php report --format html --output gruff-report.html
 
 # Local dashboard
-php bin/gruff dashboard
+php bin/gruff-php dashboard
 ```
 
 The default fail threshold is `error`, so warning and advisory findings do not
 fail the command unless you opt in:
 
 ```bash
-php bin/gruff analyse --fail-on warning
-php bin/gruff analyse --fail-on advisory
+php bin/gruff-php analyse --fail-on warning
+php bin/gruff-php analyse --fail-on advisory
 ```
 
 ## Commands
@@ -93,9 +93,9 @@ php bin/gruff analyse --fail-on advisory
 Symfony Console also provides `list`, `help`, and shell completion support:
 
 ```bash
-php bin/gruff list
-php bin/gruff analyse --help
-php bin/gruff list-rules --format json
+php bin/gruff-php list
+php bin/gruff-php analyse --help
+php bin/gruff-php list-rules --format json
 ```
 
 ## Output Formats
@@ -161,8 +161,8 @@ filtering by pillar.
 Use this command to inspect the full catalogue:
 
 ```bash
-php bin/gruff list-rules
-php bin/gruff list-rules --format json
+php bin/gruff-php list-rules
+php bin/gruff-php list-rules --format json
 ```
 
 ## Configuration
@@ -221,16 +221,16 @@ Baselines suppress known findings by fingerprint without disabling rules.
 
 ```bash
 # Write gruff-baseline.json in the project root
-php bin/gruff analyse --generate-baseline
+php bin/gruff-php analyse --generate-baseline
 
 # Auto-apply gruff-baseline.json when it exists
-php bin/gruff analyse
+php bin/gruff-php analyse
 
 # Use an explicit baseline file
-php bin/gruff analyse --baseline=baselines/release.json
+php bin/gruff-php analyse --baseline=baselines/release.json
 
 # Skip auto-baseline for one run
-php bin/gruff analyse --no-baseline
+php bin/gruff-php analyse --no-baseline
 ```
 
 Baseline files use schema `gruff.baseline.v1`. Full-project scans report stale
@@ -241,17 +241,17 @@ baseline entries when a stored finding no longer exists.
 Filter findings to changed files or changed lines:
 
 ```bash
-php bin/gruff analyse --diff
-php bin/gruff analyse --diff=staged
-php bin/gruff analyse --diff=unstaged
-php bin/gruff analyse --diff=origin/main
+php bin/gruff-php analyse --diff
+php bin/gruff-php analyse --diff=staged
+php bin/gruff-php analyse --diff=unstaged
+php bin/gruff-php analyse --diff=origin/main
 ```
 
 Compare current findings against a base ref:
 
 ```bash
-php bin/gruff analyse --diff-vs=origin/main
-php bin/gruff analyse --diff-vs=origin/main --changed-only
+php bin/gruff-php analyse --diff-vs=origin/main
+php bin/gruff-php analyse --diff-vs=origin/main --changed-only
 ```
 
 See [`docs/gruff-cli-branch-review.md`](docs/gruff-cli-branch-review.md) for
@@ -263,10 +263,10 @@ Display filters reduce report noise without changing what rules run or what
 fails the command:
 
 ```bash
-php bin/gruff analyse --min-severity warning
-php bin/gruff analyse --include-pillar security --include-pillar sensitive-data
-php bin/gruff analyse --exclude-rule test-quality.mystery-guest
-php bin/gruff analyse --paths-relative-to "$PWD"
+php bin/gruff-php analyse --min-severity warning
+php bin/gruff-php analyse --include-pillar security --include-pillar sensitive-data
+php bin/gruff-php analyse --exclude-rule test-quality.mystery-guest
+php bin/gruff-php analyse --paths-relative-to "$PWD"
 ```
 
 ## Mutation Analysis
@@ -275,15 +275,15 @@ Mutation analysis is optional. `gruff-php` can ingest an Infection JSON report
 or run Infection before ingesting the report path you provide.
 
 ```bash
-php bin/gruff analyse --infection-report=infection-report.json
+php bin/gruff-php analyse --infection-report=infection-report.json
 
-php bin/gruff analyse \
+php bin/gruff-php analyse \
   --infection-run \
   --infection-report=infection-report.json \
   --infection-bin=infection \
   --infection-config=infection.json5
 
-php bin/gruff analyse \
+php bin/gruff-php analyse \
   --infection-report=infection-report.json \
   --mutation-baseline=baseline-infection.json \
   --mutation-budget=3
@@ -294,11 +294,11 @@ The dashboard does not run mutation analysis.
 ## Dashboard
 
 ```bash
-php bin/gruff dashboard
-php bin/gruff dashboard --host=0.0.0.0 --port=9000
-php bin/gruff dashboard --project=/path/to/project
-php bin/gruff dashboard --diff
-php bin/gruff dashboard --scan-timeout=300
+php bin/gruff-php dashboard
+php bin/gruff-php dashboard --host=0.0.0.0 --port=9000
+php bin/gruff-php dashboard --project=/path/to/project
+php bin/gruff-php dashboard --diff
+php bin/gruff-php dashboard --scan-timeout=300
 ```
 
 The dashboard serves a local control page and refresh endpoint. It is intended
@@ -334,7 +334,7 @@ Before tagging `0.1.0`:
 - Choose the public license and add `LICENSE` if this is not staying proprietary.
 - Confirm Packagist metadata and repository URL.
 - Run `composer validate --strict`, `composer check`, and `composer test`.
-- Run `php bin/gruff analyse` and confirm the default self-scan exits 0.
+- Run `php bin/gruff-php analyse` and confirm the default self-scan exits 0.
 - Review [`CHANGELOG.md`](CHANGELOG.md).
 - Review [`SECURITY.md`](SECURITY.md) and replace any private-contact placeholder with the real reporting channel.
 - Confirm generated artifacts such as `history.json`, `infection-report.json`, and local caches are not part of the release archive.

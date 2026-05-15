@@ -20,7 +20,7 @@ Do not use public issues for vulnerability reports or real secrets. See
 Please include:
 
 - PHP version: `php -v`
-- gruff version: `php bin/gruff --version` or installed package version
+- gruff-php version: `php bin/gruff-php --version` or installed package version
 - Install method: source checkout or Composer package
 - Command run
 - Whether `.gruff.yaml` or a baseline was loaded
@@ -29,9 +29,9 @@ Please include:
 Useful diagnostic commands:
 
 ```bash
-php bin/gruff analyse --format json --fail-on none > gruff-report.json
-php bin/gruff summary --format json > gruff-summary.json
-php bin/gruff list-rules --format json > gruff-rules.json
+php bin/gruff-php analyse --format json --fail-on none > gruff-report.json
+php bin/gruff-php summary --format json > gruff-summary.json
+php bin/gruff-php list-rules --format json > gruff-rules.json
 ```
 
 Review generated JSON before attaching it to public issues.

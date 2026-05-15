@@ -24,7 +24,7 @@ final readonly class TextReporter
     {
         $counts = $report->findingCounts();
         $lines  = [
-            sprintf('gruff %s', $report->toolVersion),
+            sprintf('%s %s', AnalysisReport::TOOL_NAME, $report->toolVersion),
             sprintf('Format: %s', $report->format),
             sprintf('Fail threshold: %s', $report->failOn),
             '',
@@ -163,7 +163,7 @@ final readonly class TextReporter
 
         if ($report->baseline->generated) {
             $lines[] = sprintf(
-                '  Tip: commit %s and rerun `gruff analyse` to apply it; pass --baseline %s for explicit application.',
+                '  Tip: commit %s and rerun `gruff-php analyse` to apply it; pass --baseline %s for explicit application.',
                 $report->baseline->path,
                 $report->baseline->path,
             );
@@ -173,7 +173,7 @@ final readonly class TextReporter
 
         if ($report->baseline->staleEntries !== []) {
             $lines[] = sprintf(
-                '  Tip: %d stale baseline entries no longer match a finding. Regenerate with `gruff analyse --generate-baseline %s` after reviewing the diff.',
+                '  Tip: %d stale baseline entries no longer match a finding. Regenerate with `gruff-php analyse --generate-baseline %s` after reviewing the diff.',
                 count($report->baseline->staleEntries),
                 $report->baseline->path,
             );

@@ -386,7 +386,7 @@ final class SummaryCommand extends Command
     private function renderText(SummaryReportData $summaryReportData): string
     {
         $lines   = [];
-        $lines[] = sprintf('gruff %s — summary', Application::VERSION);
+        $lines[] = sprintf('%s %s — summary', Application::NAME, Application::VERSION);
         $lines[] = '';
         $lines[] = sprintf('Paths     %s', $summaryReportData->paths === [] ? '(none)' : implode(', ', $summaryReportData->paths));
         $lines[] = sprintf('Config    %s', $summaryReportData->configPath ?? '(none)');
@@ -482,7 +482,7 @@ final class SummaryCommand extends Command
     {
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
-            'tool' => ['name' => 'gruff', 'version' => Application::VERSION],
+            'tool' => ['name' => Application::NAME, 'version' => Application::VERSION],
             'scope' => [
                 'paths' => $summaryReportData->paths,
                 'configPath' => $summaryReportData->configPath,

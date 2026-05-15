@@ -21,7 +21,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -29,7 +29,7 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff 0.1.0-dev', $process->getOutput());
+        self::assertStringContainsString('gruff-php 0.1.0-dev', $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 4', $process->getOutput());
         self::assertStringNotContainsString('ignored.php', $process->getOutput());
@@ -44,7 +44,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             'tests/Fixtures/Source/syntax-error/broken.php',
@@ -67,7 +67,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
@@ -91,7 +91,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
@@ -113,7 +113,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
@@ -138,7 +138,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
@@ -187,7 +187,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/syntax-error',
             '--format',
@@ -221,7 +221,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             '--config',
             'tests/Fixtures/Config/unknown-rule.yaml',
@@ -243,7 +243,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--config',
@@ -274,7 +274,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--config',
@@ -298,7 +298,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             '--config',
             'tests/Fixtures/Config/invalid-selection-rule.yaml',
@@ -320,7 +320,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/SensitiveData/synthetic-secrets.php',
             '--config',
@@ -355,7 +355,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--infection-report',
@@ -410,7 +410,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--infection-report',
@@ -436,7 +436,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--infection-report',
@@ -485,7 +485,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--infection-run',
@@ -513,7 +513,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -547,7 +547,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -573,7 +573,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -600,7 +600,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -628,7 +628,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -646,7 +646,7 @@ final class AnalyseCliTest extends CliTestCase
 
         $static = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -672,7 +672,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $editor = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -690,7 +690,7 @@ final class AnalyseCliTest extends CliTestCase
 
         $interactive = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -716,7 +716,7 @@ final class AnalyseCliTest extends CliTestCase
     {
         $process = new Process([
             PHP_BINARY,
-            __DIR__ . '/../../bin/gruff',
+            __DIR__ . '/../../bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/Code',
             '--format',
@@ -746,7 +746,7 @@ final class AnalyseCliTest extends CliTestCase
 
             $process = new Process([
                 PHP_BINARY,
-                __DIR__ . '/../../bin/gruff',
+                __DIR__ . '/../../bin/gruff-php',
                 'analyse',
                 '.',
                 '--diff',

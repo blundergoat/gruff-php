@@ -12,7 +12,7 @@ Branch review is different from `--diff=<base>`:
 Run from the target project root:
 
 ```bash
-php /path/to/gruff-php/bin/gruff analyse \
+php /path/to/gruff-php/bin/gruff-php analyse \
   --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
@@ -25,7 +25,7 @@ php /path/to/gruff-php/bin/gruff analyse \
 When running inside this checkout against this checkout, use:
 
 ```bash
-php bin/gruff analyse \
+php bin/gruff-php analyse \
   --diff-vs=<base-ref> \
   --changed-only \
   --no-config \
@@ -44,7 +44,7 @@ Project-level rules need full project context. A zero count for `design.single-i
 Pass paths only when the review should be narrower than the branch diff:
 
 ```bash
-php /path/to/gruff-php/bin/gruff analyse \
+php /path/to/gruff-php/bin/gruff-php analyse \
   src/Foo.php src/Bar \
   --diff-vs=<base-ref> \
   --changed-only \
@@ -92,7 +92,7 @@ For performance smoke testing:
 
 ```bash
 /usr/bin/time -f 'elapsed=%E cpu=%P maxrss_kb=%M' \
-php /path/to/gruff-php/bin/gruff analyse \
+php /path/to/gruff-php/bin/gruff-php analyse \
   --diff-vs=<base-ref> \
   --changed-only \
   --no-config \

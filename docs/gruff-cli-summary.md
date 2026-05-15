@@ -1,4 +1,4 @@
-# `gruff summary`
+# `gruff-php summary`
 
 A compact digest of a scan. Runs the analyser once, aggregates by pillar and rule, and prints a single readable block — **no per-finding spam**.
 
@@ -12,7 +12,7 @@ Use it when:
 ## Usage
 
 ```bash
-php bin/gruff summary [paths...] [options]
+php bin/gruff-php summary [paths...] [options]
 ```
 
 `paths` defaults to whatever you pass; if empty, the analyser discovers from the project root just like `analyse`.
@@ -30,11 +30,11 @@ php bin/gruff summary [paths...] [options]
 ## Example — text format
 
 ```bash
-php bin/gruff summary tests/Fixtures/Source/mixed --no-config --top=3
+php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff 0.1.0-dev — summary
+gruff-php 0.1.0-dev — summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
@@ -66,13 +66,13 @@ Pillars are ordered by finding count (loudest first). Pillars with zero findings
 ## Example — JSON format
 
 ```bash
-php bin/gruff summary src --format=json --top=5
+php bin/gruff-php summary src --format=json --top=5
 ```
 
 ```json
 {
   "schemaVersion": "gruff.summary.v1",
-  "tool": { "name": "gruff", "version": "0.1.0-dev" },
+  "tool": { "name": "gruff-php", "version": "0.1.0-dev" },
   "scope": {
     "paths": ["src"],
     "configPath": ".gruff.yaml",

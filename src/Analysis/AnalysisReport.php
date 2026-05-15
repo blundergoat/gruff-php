@@ -23,6 +23,11 @@ use GruffPhp\Trend\TrendReport;
 final readonly class AnalysisReport
 {
     /**
+     * Tool name emitted in human-readable and machine-readable reports.
+     */
+    public const TOOL_NAME = 'gruff-php';
+
+    /**
      * Stable schema identifier emitted in machine-readable reports.
      */
     public const SCHEMA_VERSION = 'gruff.analysis.v1';
@@ -111,7 +116,7 @@ final readonly class AnalysisReport
         $report = [
             'schemaVersion' => self::SCHEMA_VERSION,
             'tool' => [
-                'name' => 'gruff',
+                'name' => self::TOOL_NAME,
                 'version' => $this->toolVersion,
             ],
             'run' => [

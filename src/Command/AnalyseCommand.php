@@ -45,7 +45,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Implements the primary gruff analyse CLI command.
+ * Implements the primary gruff-php analyse CLI command.
  */
 final class AnalyseCommand extends Command
 {
@@ -58,7 +58,7 @@ final class AnalyseCommand extends Command
     {
         $this
             ->setName('analyse')
-            ->setDescription('Run gruff analysis.')
+            ->setDescription('Run gruff-php analysis.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.yaml file for this run.')

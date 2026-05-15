@@ -222,7 +222,7 @@ abstract class CliTestCase extends TestCase
             }
         } while (microtime(true) < $deadline);
 
-        self::fail('Timed out waiting for gruff dashboard server. ' . $process->getErrorOutput() . $process->getOutput());
+        self::fail('Timed out waiting for gruff-php dashboard server. ' . $process->getErrorOutput() . $process->getOutput());
     }
 
     /**

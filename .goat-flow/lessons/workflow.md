@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-05-11
+last_reviewed: 2026-05-16
 ---
 
 # Workflow Lessons
@@ -39,7 +39,7 @@ last_reviewed: 2026-05-11
 
 **Prevention:** When adding a new rule, plan for three side-effects beyond the rule's own test:
 1. **Existing fixtures that should still produce N findings.** Audit every fixture under `tests/Fixtures/` for files that could newly fire the rule, and add the minimum decoration (docblock, type hint, parameter rename) needed to preserve the test's invariant. Touch the fixture, not the test, so the test's narrative ("baseline workflow with one finding") survives.
-2. **Goldens under `tests/Fixtures/Cli/Golden/`.** They will need regeneration: `php bin/gruff analyse <fixture> --config <golden's config> --format text > tests/Fixtures/Cli/Golden/<name>.txt` (same for `--format json`). Verify the diff is exactly the new rule's contribution and no stray drift.
+2. **Goldens under `tests/Fixtures/Cli/Golden/`.** They will need regeneration: `php bin/gruff-php analyse <fixture> --config <golden's config> --format text > tests/Fixtures/Cli/Golden/<name>.txt` (same for `--format json`). Verify the diff is exactly the new rule's contribution and no stray drift.
 3. **Inline expected-value assertions in `tests/Console/` and `tests/Rule/`.** Search for the affected fixture's filename plus literal numbers (line counts, line numbers) before assuming the file is unaffected. The `RuleRegistry::analyse` finding count and the file-length metadata `lines` value drift even when no test directly mentions the new rule.
 
 For the dogfood snapshots also expect new findings on the gruff source tree itself (new rule fires on the new rule files) and on test files that don't have docblocks. Those are signal, not regression, as long as every diff is contained to files added in the same PR.

@@ -25,7 +25,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -35,7 +35,7 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $output = $process->getOutput();
 
-        self::assertStringContainsString('gruff 0.1.0-dev — summary', $output);
+        self::assertStringContainsString('gruff-php 0.1.0-dev — summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
         self::assertStringContainsString('Composite', $output);
         self::assertStringContainsString('Pillars', $output);
@@ -52,7 +52,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -78,7 +78,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -97,7 +97,7 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame('gruff.summary.v1', $decoded['schemaVersion'] ?? null);
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
-        self::assertSame('gruff', $tool['name'] ?? null);
+        self::assertSame('gruff-php', $tool['name'] ?? null);
         self::assertSame('0.1.0-dev', $tool['version'] ?? null);
 
         $scope = $decoded['scope'] ?? null;
@@ -133,7 +133,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -155,7 +155,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -177,7 +177,7 @@ final class GruffCliSummaryTest extends TestCase
     {
         $process = new Process([
             PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff',
+            self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
@@ -197,7 +197,7 @@ final class GruffCliSummaryTest extends TestCase
      */
     public function testListIncludesSummaryCommand(): void
     {
-        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff', 'list'], self::PROJECT_ROOT);
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list'], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());

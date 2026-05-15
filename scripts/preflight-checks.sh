@@ -216,7 +216,7 @@ gruff_source_scan() {
     local report_path="${TMPDIR:-/tmp}/gruff-preflight-source-scan.json"
     local status
 
-    php bin/gruff analyse src --fail-on none --format json > "$report_path"
+    php bin/gruff-php analyse src --fail-on none --format json > "$report_path"
     status=$?
 
     if [[ -s "$report_path" ]]; then

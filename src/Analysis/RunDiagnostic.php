@@ -10,7 +10,7 @@ namespace GruffPhp\Analysis;
 final readonly class RunDiagnostic
 {
     /**
-     * Capture a non-finding diagnostic emitted during a gruff run.
+     * Capture a non-finding diagnostic emitted during a gruff-php run.
      *
      * @param string      $type     Diagnostic category used by report serializers.
      * @param string      $message  Human-readable diagnostic detail.

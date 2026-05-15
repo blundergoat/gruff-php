@@ -5,7 +5,7 @@ This file is the quick-start surface for agents that need to inspect a PHP proje
 ## Ground Rules
 
 - Run commands from the repository root unless `--project` is documented for that command.
-- Use `php bin/gruff analyse ...` in this checkout.
+- Use `php bin/gruff-php analyse ...` in this checkout.
 - Default config auto-loads from `.gruff.yaml` at the project root when present.
 - Default baseline auto-loads from `gruff-baseline.json` at the project root when present.
 - Full-project analysis is the default. Diff mode is opt-in with `--diff`.
@@ -14,10 +14,10 @@ This file is the quick-start surface for agents that need to inspect a PHP proje
 ## Check Available Commands
 
 ```bash
-php bin/gruff list
-php bin/gruff analyse --help
-php bin/gruff report --help
-php bin/gruff dashboard --help
+php bin/gruff-php list
+php bin/gruff-php analyse --help
+php bin/gruff-php report --help
+php bin/gruff-php dashboard --help
 ```
 
 As of this file, supported `analyse` formats are:
@@ -29,8 +29,8 @@ text, json, html, markdown, github, hotspot, sarif
 Rule metadata is discoverable from the registry:
 
 ```bash
-php bin/gruff list-rules
-php bin/gruff list-rules --format=json
+php bin/gruff-php list-rules
+php bin/gruff-php list-rules --format=json
 ```
 
 ## Full Project Scans
@@ -38,25 +38,25 @@ php bin/gruff list-rules --format=json
 Use full-project mode when you need the complete current quality picture for selected paths.
 
 ```bash
-php bin/gruff analyse src --format text --fail-on none
+php bin/gruff-php analyse src --format text --fail-on none
 ```
 
 Agent-friendly JSON:
 
 ```bash
-php bin/gruff analyse src --format json --fail-on none > /tmp/gruff-full.json
+php bin/gruff-php analyse src --format json --fail-on none > /tmp/gruff-full.json
 ```
 
 PR-comment style Markdown:
 
 ```bash
-php bin/gruff analyse src --format markdown --fail-on none > /tmp/gruff-full.md
+php bin/gruff-php analyse src --format markdown --fail-on none > /tmp/gruff-full.md
 ```
 
 HTML for manual inspection:
 
 ```bash
-php bin/gruff analyse src --format html --fail-on none > /tmp/gruff-full.html
+php bin/gruff-php analyse src --format html --fail-on none > /tmp/gruff-full.html
 ```
 
 `--fail-on none` keeps the command exit code green while you inspect findings. Use `--fail-on warning` or `--fail-on error` only when you want the scan to gate CI or fail the agent step.
@@ -68,25 +68,25 @@ Use diff mode when you need findings touching changed lines or changed files. Di
 Working tree compared with `HEAD`:
 
 ```bash
-php bin/gruff analyse src --diff --format markdown --fail-on none
+php bin/gruff-php analyse src --diff --format markdown --fail-on none
 ```
 
 Staged changes only:
 
 ```bash
-php bin/gruff analyse src --diff=staged --format markdown --fail-on none
+php bin/gruff-php analyse src --diff=staged --format markdown --fail-on none
 ```
 
 Unstaged changes only:
 
 ```bash
-php bin/gruff analyse src --diff=unstaged --format markdown --fail-on none
+php bin/gruff-php analyse src --diff=unstaged --format markdown --fail-on none
 ```
 
 Compare the working tree to a base ref:
 
 ```bash
-php bin/gruff analyse src --diff=<base-ref> --format json --fail-on none > /tmp/gruff-diff.json
+php bin/gruff-php analyse src --diff=<base-ref> --format json --fail-on none > /tmp/gruff-diff.json
 ```
 
 `--diff=<base>` semantics use Git diff filtering against that ref. It is still a changed-line/file filter, not base/current finding subtraction.
@@ -98,7 +98,7 @@ Use branch-review mode when you need the answer to "what did this branch make wo
 Quick JSON command from the target project root:
 
 ```bash
-php /path/to/gruff-php/bin/gruff analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format=json --fail-on=none > /tmp/gruff-review.json
+php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format=json --fail-on=none > /tmp/gruff-review.json
 ```
 
 With `--changed-only` and no explicit paths, gruff derives changed files from Git internally. Do not wrap the command in a separate `git diff | mapfile` step unless intentionally forcing a custom path list. Replace `<base-ref>` with the branch or ref you review against.
@@ -131,9 +131,9 @@ Branch review:
 When in doubt, run both:
 
 ```bash
-php bin/gruff analyse src --format json --fail-on none > /tmp/gruff-full.json
-php bin/gruff analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
-php bin/gruff analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format json --fail-on none > /tmp/gruff-review.json
+php bin/gruff-php analyse src --format json --fail-on none > /tmp/gruff-full.json
+php bin/gruff-php analyse src --diff --format json --fail-on none > /tmp/gruff-diff.json
+php bin/gruff-php analyse --diff-vs=<base-ref> --changed-only --no-config --no-baseline --format json --fail-on none > /tmp/gruff-review.json
 ```
 
 ## Config
@@ -147,7 +147,7 @@ Default config:
 Use an explicit config:
 
 ```bash
-php bin/gruff analyse src --config=.gruff.yaml --format json --fail-on none
+php bin/gruff-php analyse src --config=.gruff.yaml --format json --fail-on none
 ```
 
 Set one threshold for a metric rule:
@@ -165,7 +165,7 @@ Use `threshold` + `severity` for rules with warning/error metric defaults. Keep 
 Skip config for one run:
 
 ```bash
-php bin/gruff analyse src --no-config --format json --fail-on none
+php bin/gruff-php analyse src --no-config --format json --fail-on none
 ```
 
 Do not combine `--config` and `--no-config`.
@@ -181,19 +181,19 @@ gruff-baseline.json
 Apply the default baseline automatically:
 
 ```bash
-php bin/gruff analyse src --format json --fail-on none
+php bin/gruff-php analyse src --format json --fail-on none
 ```
 
 Skip baseline for one run:
 
 ```bash
-php bin/gruff analyse src --no-baseline --format json --fail-on none
+php bin/gruff-php analyse src --no-baseline --format json --fail-on none
 ```
 
 Generate or refresh a baseline deliberately:
 
 ```bash
-php bin/gruff analyse src --generate-baseline --format text --fail-on none
+php bin/gruff-php analyse src --generate-baseline --format text --fail-on none
 ```
 
 Only update `gruff-baseline.json` when accepting known findings is intentional and reviewable.
@@ -203,7 +203,7 @@ Only update `gruff-baseline.json` when accepting known findings is intentional a
 Use JSON for post-processing:
 
 ```bash
-php bin/gruff analyse src --format json --fail-on none > /tmp/gruff.json
+php bin/gruff-php analyse src --format json --fail-on none > /tmp/gruff.json
 ```
 
 Important JSON fields:
@@ -227,19 +227,19 @@ Important JSON fields:
 Use Markdown when posting a short human report:
 
 ```bash
-php bin/gruff analyse src --format markdown --fail-on none > /tmp/gruff.md
+php bin/gruff-php analyse src --format markdown --fail-on none > /tmp/gruff.md
 ```
 
 Use GitHub annotations in Actions:
 
 ```bash
-php bin/gruff analyse src --format github --fail-on warning
+php bin/gruff-php analyse src --format github --fail-on warning
 ```
 
 Use SARIF for GitHub Code Scanning ingestion:
 
 ```bash
-php bin/gruff analyse src --format sarif --fail-on none > /tmp/gruff.sarif
+php bin/gruff-php analyse src --format sarif --fail-on none > /tmp/gruff.sarif
 ```
 
 ## Display Filters
@@ -247,10 +247,10 @@ php bin/gruff analyse src --format sarif --fail-on none > /tmp/gruff.sarif
 Display filters run after analysis and before rendering. They change report contents, not rule execution, scoring, or baseline generation semantics.
 
 ```bash
-php bin/gruff analyse src --format markdown --fail-on none --min-severity warning
-php bin/gruff analyse src --format json --fail-on none --include-pillar security,sensitive-data
-php bin/gruff analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
-php bin/gruff analyse src --format json --fail-on none --include-rule complexity.npath
+php bin/gruff-php analyse src --format markdown --fail-on none --min-severity warning
+php bin/gruff-php analyse src --format json --fail-on none --include-pillar security,sensitive-data
+php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
+php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.npath
 ```
 
 ## Dashboard
@@ -258,13 +258,13 @@ php bin/gruff analyse src --format json --fail-on none --include-rule complexity
 Start the local dashboard:
 
 ```bash
-php bin/gruff dashboard src --host 127.0.0.1 --port 8765
+php bin/gruff-php dashboard src --host 127.0.0.1 --port 8765
 ```
 
 Start with diff mode selected:
 
 ```bash
-php bin/gruff dashboard src --diff --host 127.0.0.1 --port 8765
+php bin/gruff-php dashboard src --diff --host 127.0.0.1 --port 8765
 ```
 
 The dashboard config field defaults to `.gruff.yaml`. The scan scope selector maps `whole branch` to full selected-path analysis and `diff only` to `analyse --diff`.

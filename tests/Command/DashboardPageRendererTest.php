@@ -31,7 +31,7 @@ final class DashboardPageRendererTest extends TestCase
             'reportInteractive' => '1',
         ]));
 
-        self::assertStringStartsWith('<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff dashboard</title><style>:root{', $html);
+        self::assertStringStartsWith('<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff-php dashboard</title><style>:root{', $html);
         self::assertStringContainsString('</style></head><body><button type="button" id="controls-toggle" class="controls-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="controls-panel" title="Dashboard controls">&#9881;</button>', $html);
         self::assertStringContainsString('<section id="controls-panel" class="controls-panel" role="dialog" aria-label="Dashboard controls" hidden><div class="panel-head"><div><strong>Dashboard controls</strong><span>local scan settings</span></div><button type="button" id="controls-close" aria-label="Close dashboard controls">&times;</button></div>', $html);
         self::assertStringContainsString('<div class="scan-summary" aria-label="Scan status"><div class="scan-status"><span>Status</span><strong id="scan-status" aria-live="polite">Ready</strong></div><div class="scan-command"><span>Last scan</span><div class="scan-meta-line"><code id="scan-meta">Not run</code><button type="button" id="copy-scan-meta">Copy</button></div></div></div>', $html);
@@ -69,7 +69,7 @@ final class DashboardPageRendererTest extends TestCase
         $html = $this->renderer()->injectDashboardMetadata(
             '<!doctype html><html><body><main>scan</main></body></html>',
             '/tmp/<project>&"quoted"',
-            [PHP_BINARY, 'bin/gruff', 'analyse', 'src/File.php', '--name', 'value with spaces', "quote'arg"],
+            [PHP_BINARY, 'bin/gruff-php', 'analyse', 'src/File.php', '--name', 'value with spaces', "quote'arg"],
             2,
             345,
         );
@@ -83,7 +83,7 @@ final class DashboardPageRendererTest extends TestCase
         self::assertSame(2, $payload['exitCode']);
         self::assertSame(345, $payload['durationMs']);
         self::assertSame('/tmp/<project>&"quoted"', $payload['projectRoot']);
-        self::assertSame('php bin/gruff analyse src/File.php --name ' . escapeshellarg('value with spaces') . ' ' . escapeshellarg("quote'arg"), $payload['command']);
+        self::assertSame('php bin/gruff-php analyse src/File.php --name ' . escapeshellarg('value with spaces') . ' ' . escapeshellarg("quote'arg"), $payload['command']);
     }
 
     /**
@@ -93,11 +93,11 @@ final class DashboardPageRendererTest extends TestCase
      */
     public function testInjectDashboardMetadataPrependsPayloadWithoutBodyTag(): void
     {
-        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', '/repo', [PHP_BINARY, 'bin/gruff'], 0, 1);
+        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', '/repo', [PHP_BINARY, 'bin/gruff-php'], 0, 1);
 
         self::assertStringStartsWith('<script id="gruff-dashboard-meta" type="application/json">', $html);
         self::assertStringEndsWith('<main>scan</main>', $html);
-        self::assertSame('php bin/gruff', $this->metadataPayload($html)['command']);
+        self::assertSame('php bin/gruff-php', $this->metadataPayload($html)['command']);
     }
 
     /**
@@ -107,7 +107,7 @@ final class DashboardPageRendererTest extends TestCase
      */
     public function testInjectDashboardMetadataFallsBackWhenJsonEncodingFails(): void
     {
-        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', "\xB1", [PHP_BINARY, 'bin/gruff'], 1, 2);
+        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', "\xB1", [PHP_BINARY, 'bin/gruff-php'], 1, 2);
 
         self::assertStringContainsString('{"type":"gruff-scan-complete"}', $html);
         self::assertSame(['type' => 'gruff-scan-complete'], $this->metadataPayload($html));
@@ -122,9 +122,9 @@ final class DashboardPageRendererTest extends TestCase
     {
         $html = $this->renderer()->errorHtml('Failed <scan> "now"', "line & detail\nsecond line", 7, 1234);
 
-        self::assertStringStartsWith('<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff dashboard error</title>', $html);
+        self::assertStringStartsWith('<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff-php dashboard error</title>', $html);
         self::assertStringContainsString('<style>body{font:14px ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#161412;color:#f3e9d2;padding:32px}main{max-width:920px;margin:0 auto}pre{white-space:pre-wrap;background:#0d0c0a;border:1px solid #2a2622;padding:16px;overflow:auto}</style></head><body><main>', $html);
-        self::assertStringContainsString('<h1>gruff dashboard</h1><p>Failed &lt;scan&gt; &quot;now&quot;</p>', $html);
+        self::assertStringContainsString('<h1>gruff-php dashboard</h1><p>Failed &lt;scan&gt; &quot;now&quot;</p>', $html);
         self::assertStringContainsString("<p>Exit code: 7 · Duration: 1234ms</p><pre>line &amp; detail\nsecond line</pre>", $html);
         self::assertStringEndsWith('</main></body></html>', $html);
     }

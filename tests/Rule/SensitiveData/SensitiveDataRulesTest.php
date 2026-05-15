@@ -264,7 +264,7 @@ final class SensitiveDataRulesTest extends TestCase
      */
     private function runGruff(array $arguments): string
     {
-        $process = new Process(array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff'], $arguments), self::PROJECT_ROOT);
+        $process = new Process(array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $arguments), self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());

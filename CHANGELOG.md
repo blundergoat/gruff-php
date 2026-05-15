@@ -10,7 +10,7 @@ and uses semantic versioning once public tags begin. The current binary reports
 
 ### Added
 
-- Composer package scaffold for `devgoat/gruff-php` with the `bin/gruff` CLI.
+- Composer package scaffold for `devgoat/gruff-php` with the `bin/gruff-php` CLI.
 - Symfony Console command surface:
   - `analyse`
   - `summary`
@@ -96,7 +96,7 @@ Representative rule families:
 - Control-flow comment rules were removed from the v0.1 catalogue after
   dogfooding showed poor signal-to-noise.
 - The project dogfood baseline now runs with zero error and zero warning
-  findings under the default `php bin/gruff analyse` command.
+  findings under the default `php bin/gruff-php analyse` command.
 
 ### Fixed
 
