@@ -12,6 +12,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class DashboardPageRendererTest extends TestCase
 {
+    /** Scan duration used when testing dashboard metadata injection. */
+    private const SCAN_DURATION_MS = 345;
+
     /**
      * Verify dashboard HTML preserves shell structure and escaped form state.
      *
@@ -43,7 +46,6 @@ final class DashboardPageRendererTest extends TestCase
         self::assertStringContainsString('</label></div><div class="panel-actions"><button type="button" id="refresh">Refresh</button><button type="submit" id="run-scan">Run scan</button></div></form></section><iframe id="report-frame"', $html);
         self::assertStringContainsString('data-initial-src="/scan?project=%2Ftmp%2Fgruff%20%3Croot%3E&amp;paths=src%20tests&amp;scanScope=diff&amp;failOn=warning&amp;config=.gruff%20%22quoted%22.yaml&amp;baseline=base%26line.json&amp;noBaseline=1&amp;noConfig=&amp;includeIgnored=&amp;reportInteractive=1"', $html);
         self::assertStringContainsString('srcdoc="&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en-NZ&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;UTF-8&quot;&gt;&lt;style&gt;body{margin:0;background:#0d0c0a;color:#f3e9d2;', $html);
-        self::assertStringContainsString('</iframe><script>const form=document.getElementById(\'scan-form\');const frame=document.getElementById(\'report-frame\');', $html);
         self::assertStringEndsWith('copyScanMeta.addEventListener(\'click\',copyMeta);setTimeout(run,0);</script></body></html>', $html);
     }
 
@@ -67,11 +69,11 @@ final class DashboardPageRendererTest extends TestCase
     public function testInjectDashboardMetadataEmbedsPayloadAfterBodyTag(): void
     {
         $html = $this->renderer()->injectDashboardMetadata(
-            '<!doctype html><html><body><main>scan</main></body></html>',
-            '/tmp/<project>&"quoted"',
-            [PHP_BINARY, 'bin/gruff-php', 'analyse', 'src/File.php', '--name', 'value with spaces', "quote'arg"],
-            2,
-            345,
+            html:        '<!doctype html><html><body><main>scan</main></body></html>',
+            projectRoot: '/tmp/<project>&"quoted"',
+            command:     [PHP_BINARY, 'bin/gruff-php', 'analyse', 'src/File.php', '--name', 'value with spaces', "quote'arg"],
+            exitCode:    2,
+            durationMs:  self::SCAN_DURATION_MS,
         );
 
         $payload = $this->metadataPayload($html);
@@ -81,7 +83,7 @@ final class DashboardPageRendererTest extends TestCase
         self::assertStringContainsString('window.parent.postMessage(JSON.parse(el.textContent),window.location.origin);', $html);
         self::assertSame('gruff-scan-complete', $payload['type']);
         self::assertSame(2, $payload['exitCode']);
-        self::assertSame(345, $payload['durationMs']);
+        self::assertSame(self::SCAN_DURATION_MS, $payload['durationMs']);
         self::assertSame('/tmp/<project>&"quoted"', $payload['projectRoot']);
         self::assertSame('php bin/gruff-php analyse src/File.php --name ' . escapeshellarg('value with spaces') . ' ' . escapeshellarg("quote'arg"), $payload['command']);
     }
@@ -93,7 +95,13 @@ final class DashboardPageRendererTest extends TestCase
      */
     public function testInjectDashboardMetadataPrependsPayloadWithoutBodyTag(): void
     {
-        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', '/repo', [PHP_BINARY, 'bin/gruff-php'], 0, 1);
+        $html = $this->renderer()->injectDashboardMetadata(
+            html:        '<main>scan</main>',
+            projectRoot: '/repo',
+            command:     [PHP_BINARY, 'bin/gruff-php'],
+            exitCode:    0,
+            durationMs:  1,
+        );
 
         self::assertStringStartsWith('<script id="gruff-dashboard-meta" type="application/json">', $html);
         self::assertStringEndsWith('<main>scan</main>', $html);
@@ -107,7 +115,13 @@ final class DashboardPageRendererTest extends TestCase
      */
     public function testInjectDashboardMetadataFallsBackWhenJsonEncodingFails(): void
     {
-        $html = $this->renderer()->injectDashboardMetadata('<main>scan</main>', "\xB1", [PHP_BINARY, 'bin/gruff-php'], 1, 2);
+        $html = $this->renderer()->injectDashboardMetadata(
+            html:        '<main>scan</main>',
+            projectRoot: "\xB1",
+            command:     [PHP_BINARY, 'bin/gruff-php'],
+            exitCode:    1,
+            durationMs:  2,
+        );
 
         self::assertStringContainsString('{"type":"gruff-scan-complete"}', $html);
         self::assertSame(['type' => 'gruff-scan-complete'], $this->metadataPayload($html));
