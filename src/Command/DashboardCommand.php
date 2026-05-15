@@ -51,7 +51,7 @@ final class DashboardCommand extends Command
                 'Initial gruff baseline JSON path. Defaults to "gruff-baseline.json" at the project root when present.',
             )
             ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for dashboard scans.')
-            ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.');
+            ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.');
     }
 
     /**

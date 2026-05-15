@@ -257,7 +257,7 @@ src/
 |   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, and mutation scoring
 |   `-- ScoreReport.php                       = serialisable score payload for reports
 |-- Source/
-|   |-- SourceDiscovery.php                   = recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/neon/xml/yaml/yml + `.env*`); deterministic ksort + path canonicalisation; default and configured ignore patterns
+|   |-- SourceDiscovery.php                   = Git-visible or fallback recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/md/neon/sh/toml/xml/yaml/yml + `.env*`, `.editorconfig`, `.gitattributes`, `.gitignore`); deterministic ksort + path canonicalisation; configured ignores and generated lockfile skips
 |   |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
 |   `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
 `-- Trend/
@@ -265,7 +265,7 @@ src/
     `-- TrendReport.php                       = current-vs-previous score delta payload
 ```
 
-Default ignored directories (`SourceDiscovery::IGNORED_DIRECTORIES`): `.fleet`, `.git`, `.goat-flow/logs`, `.goat-flow/scratchpad`, `.goat-flow/tasks`, `.hg`, `.idea`, `.phpunit.cache`, `.svn`, `.vscode`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `tmp`, `var/cache`, `vendor`. Discovery uses a `RecursiveCallbackFilterIterator` to prune subtrees instead of descending into them, so each ignored root is reported once. The `--include-ignored` flag opts back in.
+Git worktree discovery uses `git ls-files --cached --others --exclude-standard` by default so tracked files and unignored untracked files define the broad scan boundary. Configured `paths.ignore` still applies after Git enumeration, and generated lockfile names (`package-lock.json`, `composer.lock`, `pnpm-lock.yaml`, `yarn.lock`, `npm-shrinkwrap.json`, `bun.lockb`) stay skipped to avoid known generated-artifact noise. `--include-ignored` opts into filesystem traversal for deliberate ignored-file scans. Non-Git fallback traversal uses `SourceDiscovery::IGNORED_DIRECTORIES`: `.fleet`, `.git`, `.goat-flow/logs`, `.goat-flow/scratchpad`, `.goat-flow/tasks`, `.hg`, `.idea`, `.phpunit.cache`, `.svn`, `.vscode`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `tmp`, `var/cache`, `vendor`.
 
 ## Test surface
 

@@ -51,7 +51,7 @@ final class SummaryCommand extends Command
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff.yaml file for this run.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text or json.', default: 'text')
             ->addOption('top', null, InputOption::VALUE_REQUIRED, 'How many top rules and file offenders to list.', default: (string) self::DEFAULT_TOP)
-            ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Include files under default ignored directories.');
+            ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.');
     }
 
     /**

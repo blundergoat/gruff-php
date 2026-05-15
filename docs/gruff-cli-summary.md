@@ -25,7 +25,7 @@ php bin/gruff-php summary [paths...] [options]
 | `--no-config` | off | Skip `.gruff.yaml` for this run; built-in defaults only. Cannot combine with `--config`. |
 | `--format=text\|json` | `text` | `text` is the human digest, `json` is `gruff.summary.v1` for tooling. |
 | `--top=N` | `10` | Cap the "Top N rules" and "Top N file offenders" sections. |
-| `--include-ignored` | off | Scan files under default ignored directories (`vendor/`, `node_modules/`, etc.). |
+| `--include-ignored` | off | Scan ignored files by using filesystem traversal instead of Git/default ignores. |
 
 ## Example — text format
 
@@ -38,27 +38,29 @@ gruff-php 0.1.0-dev — summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
-Files     2 discovered, 2 parsed, 4 ignored, 0 missing, 0 parse errors
+Files     6 discovered, 6 parsed, 2 ignored, 0 missing, 0 parse errors
 
-Composite A (95.80 / 100)
+Composite B (85.40 / 100)
 Scope     full-project
 
 Pillars
-  documentation   A  90.00 findings=3     advisory=3     warning=0     error=0
-  naming          D  68.00 findings=2     advisory=0     warning=2     error=0
+  documentation   D  62.00 findings=11    advisory=11    warning=0     error=0
+  naming          F   4.00 findings=6     advisory=0     warning=6     error=0
+  dead-code       B  88.00 findings=4     advisory=4     warning=0     error=0
   size            A 100.00 findings=0     advisory=0     warning=0     error=0
   ...
 
 Top 3 rules by finding count
-      2  naming.class-file-mismatch      naming         a=0 w=2 e=0
-      1  docs.missing-class-phpdoc       documentation  a=1 w=0 e=0
-      1  docs.missing-constant-phpdoc    documentation  a=1 w=0 e=0
+      6  naming.class-file-mismatch      naming         a=0 w=6 e=0
+      5  docs.missing-class-phpdoc       documentation  a=5 w=0 e=0
+      5  docs.missing-file-phpdoc        documentation  a=5 w=0 e=0
 
-Top 2 file offenders
-  D   67.50  tests/Fixtures/Source/mixed/nested/beta.php   findings=4  a=3 w=1 e=0
-  B   80.00  tests/Fixtures/Source/mixed/alpha.php         findings=1  a=0 w=1 e=0
+Top 3 file offenders
+  D   67.50  tests/Fixtures/Source/mixed/build/ignored.php      findings=4  a=3 w=1 e=0
+  D   67.50  tests/Fixtures/Source/mixed/cache/ignored.php      findings=4  a=3 w=1 e=0
+  D   67.50  tests/Fixtures/Source/mixed/generated/ignored.php  findings=4  a=3 w=1 e=0
 
-Totals    5 findings (advisory=3, warning=2, error=0)
+Totals    21 findings (advisory=15, warning=6, error=0)
 ```
 
 Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.

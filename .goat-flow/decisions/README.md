@@ -43,6 +43,7 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-004-public-phpdoc-template.md`
 - `ADR-005-intent-bearing-one-line-methods.md`
 - `ADR-006-control-flow-comment-policy.md`
+- `ADR-007-gitignore-aware-discovery.md`
 
 ## Required Structure
 
