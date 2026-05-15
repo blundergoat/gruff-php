@@ -56,7 +56,7 @@ final class SensitiveDataRulesTest extends TestCase
             static fn (Finding $finding): string => json_encode($finding->metadata, JSON_THROW_ON_ERROR),
             $findings,
         ));
-        $messageLeaks = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($messages, $secret)));
+        $messageLeaks  = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($messages, $secret)));
         $metadataLeaks = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($metadata, $secret)));
 
         self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
@@ -143,7 +143,7 @@ final class SensitiveDataRulesTest extends TestCase
             self::assertCount(1, $findings);
             self::assertStringContainsString('API_TOKEN', $findings[0]->message);
         } finally {
-            @unlink($path);
+            self::assertTrue(unlink($path));
         }
     }
 

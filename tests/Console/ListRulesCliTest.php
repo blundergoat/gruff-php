@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -49,10 +50,9 @@ final class ListRulesCliTest extends CliTestCase
      */
     public function testCleanCheckoutInstallRunsCliHelp(): void
     {
-        $composerPath = shell_exec('command -v composer');
+        $composerPath = (new ExecutableFinder())->find('composer');
 
         self::assertIsString($composerPath);
-        self::assertNotSame('', trim($composerPath));
 
         $tempDir  = $this->tempDir();
         $checkout = $tempDir . '/gruff-php';
@@ -61,7 +61,7 @@ final class ListRulesCliTest extends CliTestCase
             $this->copyPackageTree(self::PROJECT_ROOT, $checkout);
 
             $install = new Process([
-                'composer',
+                $composerPath,
                 'install',
                 '--no-dev',
                 '--no-interaction',

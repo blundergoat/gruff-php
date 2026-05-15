@@ -62,10 +62,11 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      */
     public function testLoadsDefaultYamlConfigFile(): void
     {
-        $directory = sys_get_temp_dir() . '/gruff-config-' . bin2hex(random_bytes(6));
+        $directory  = sys_get_temp_dir() . '/gruff-config-' . bin2hex(random_bytes(6));
+        $configPath = $directory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
-            $directory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE,
+            $configPath,
             "rules:\n    size.file-length:\n        thresholds:\n            warning: 7\n            error: 70\n",
         ));
 
@@ -76,8 +77,8 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             self::assertSame(7, $settings->numericThreshold('warning'));
             self::assertSame(70, $settings->numericThreshold('error'));
         } finally {
-            @unlink($directory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
-            @rmdir($directory);
+            self::assertTrue(unlink($configPath));
+            self::assertTrue(rmdir($directory));
         }
     }
 
@@ -90,10 +91,11 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     {
         $projectDirectory  = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
         $fallbackDirectory = sys_get_temp_dir() . '/gruff-config-fallback-' . bin2hex(random_bytes(6));
+        $fallbackPath      = $fallbackDirectory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
         self::assertTrue(mkdir($projectDirectory));
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
-            $fallbackDirectory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE,
+            $fallbackPath,
             "rules:\n    size.file-length:\n        thresholds:\n            warning: 11\n            error: 110\n",
         ));
 
@@ -104,9 +106,9 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             self::assertSame(11, $settings->numericThreshold('warning'));
             self::assertSame(110, $settings->numericThreshold('error'));
         } finally {
-            @unlink($fallbackDirectory . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
-            @rmdir($fallbackDirectory);
-            @rmdir($projectDirectory);
+            self::assertTrue(unlink($fallbackPath));
+            self::assertTrue(rmdir($fallbackDirectory));
+            self::assertTrue(rmdir($projectDirectory));
         }
     }
 

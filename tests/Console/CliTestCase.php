@@ -105,7 +105,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Copy the package tree into an isolated test project.
      *
-     * @param string $source Source directory.
+     * @param string $source      Source directory.
      * @param string $destination Destination directory.
      * @return void No return value.
      */
@@ -164,10 +164,25 @@ abstract class CliTestCase extends TestCase
      */
     protected function unusedPort(): int
     {
-        $server = @stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+        $warningMessage = null;
+        set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
+            $warningMessage = $message;
+
+            return true;
+        });
+
+        try {
+            $server = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+        } finally {
+            restore_error_handler();
+        }
 
         if ($server === false) {
-            throw new RuntimeException(sprintf('Unable to allocate test port: %s (%d)', $errorMessage, $errorCode));
+            throw new RuntimeException(sprintf(
+                'Unable to allocate test port: %s (%d)',
+                $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
+                $errorCode,
+            ));
         }
 
         $name = stream_socket_get_name($server, false);
@@ -183,7 +198,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Wait for the dashboard HTTP server to accept connections.
      *
-     * @param int $port Local TCP port.
+     * @param int     $port    Local TCP port.
      * @param Process $process Dashboard server process.
      * @return void No return value.
      */
@@ -213,17 +228,32 @@ abstract class CliTestCase extends TestCase
     /**
      * Fetch a raw response from the local dashboard server.
      *
-     * @param int $port Local TCP port.
+     * @param int    $port Local TCP port.
      * @param string $path Filesystem path.
      * @return string Fixture value.
      * @throws RuntimeException When the helper cannot complete the fixture operation.
      */
     protected function fetchHttp(int $port, string $path): string
     {
-        $socket = @stream_socket_client(sprintf('tcp://127.0.0.1:%d', $port), $errorCode, $errorMessage, 1.0);
+        $warningMessage = null;
+        set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
+            $warningMessage = $message;
+
+            return true;
+        });
+
+        try {
+            $socket = stream_socket_client(sprintf('tcp://127.0.0.1:%d', $port), $errorCode, $errorMessage, 1.0);
+        } finally {
+            restore_error_handler();
+        }
 
         if ($socket === false) {
-            throw new RuntimeException(sprintf('Unable to connect to report server: %s (%d)', $errorMessage, $errorCode));
+            throw new RuntimeException(sprintf(
+                'Unable to connect to report server: %s (%d)',
+                $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
+                $errorCode,
+            ));
         }
 
         stream_set_timeout($socket, 5);
