@@ -51,6 +51,11 @@ final class ScoreCalculatorTest extends TestCase
 
         self::assertLessThan(100.0, $score->composite->score);
         self::assertSame('full-project', $score->scope);
+        self::assertSame(
+            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. '
+            . 'Mutation is omitted when no Infection report is supplied.',
+            $score->explanation,
+        );
         self::assertNotContains('mutation', array_map(static fn ($pillar): string => $pillar->pillar, $score->pillars));
 
         $security = array_values(array_filter($score->pillars, static fn ($pillar): bool => $pillar->pillar === 'security'))[0] ?? null;
@@ -102,7 +107,7 @@ final class ScoreCalculatorTest extends TestCase
         ];
         $mutation = new MutationAnalysisResult(new InfectionReport(
             reportPath: 'infection-report.json',
-            stats: [
+            stats:      [
                 'totalMutantsCount' => 3,
                 'msi' => 66.67,
                 'coveredCodeMsi' => 66.67,
@@ -116,18 +121,23 @@ final class ScoreCalculatorTest extends TestCase
         ));
 
         $score = (new ScoreCalculator())->calculate($findings, $mutation, new DiffResult(
-            active: true,
-            mode: 'unstaged',
-            base: null,
+            active:       true,
+            mode:         'unstaged',
+            base:         null,
             changedLines: [],
             changedFiles: [],
-            message: 'diff',
+            message:      'diff',
         ));
         $payload = $score->toArray();
 
         self::assertSame('diff', $score->scope);
         self::assertSame(['1-5' => 1, '6-10' => 1, '11-15' => 0, '16-20' => 0, '21+' => 0], $score->complexityDistribution);
         self::assertSame('diff', $payload['scope']);
+        self::assertSame(
+            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. '
+            . 'Mutation uses the supplied Infection MSI as the mutation pillar score.',
+            $payload['explanation'],
+        );
 
         $pillars = [];
         foreach ($score->pillars as $pillarScore) {
@@ -161,12 +171,12 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string $ruleId Rule identifier.
-     * @param Pillar $pillar Fixture value.
-     * @param Severity $severity Fixture value.
-     * @param string $filePath Finding file path.
-     * @param int $line Finding line number.
-     * @param string|null $symbol Fixture value.
+     * @param string                                                                                 $ruleId   Rule identifier.
+     * @param Pillar                                                                                 $pillar   Fixture value.
+     * @param Severity                                                                               $severity Fixture value.
+     * @param string                                                                                 $filePath Finding file path.
+     * @param int                                                                                    $line     Finding line number.
+     * @param string|null                                                                            $symbol   Fixture value.
      * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata Fixture value.
      * @return Finding Fixture value.
      */

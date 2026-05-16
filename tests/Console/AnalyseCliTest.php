@@ -453,6 +453,7 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('**Score drivers:** Per-pillar scores start at 100', $process->getOutput());
+        self::assertStringContainsString('Mutation uses the supplied Infection MSI as the mutation pillar score.', $process->getOutput());
         self::assertStringContainsString('**Mutation:** MSI 50.00%', $process->getOutput());
         self::assertStringContainsString('**Mutation statuses:** escaped=1, killed=2, timed out=1.', $process->getOutput());
     }

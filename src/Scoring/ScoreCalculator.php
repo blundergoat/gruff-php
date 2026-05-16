@@ -64,8 +64,22 @@ final readonly class ScoreCalculator
             topOffenders:           $this->fileScores($findings, $mutationAnalysisResult),
             complexityDistribution: $this->complexityDistribution($findings),
             scope:                  $scope,
-            explanation:            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.',
+            explanation:            $this->scoreExplanation($mutationAnalysisResult),
         );
+    }
+
+    /**
+     * @return string Human-readable score calculation summary.
+     */
+    private function scoreExplanation(?MutationAnalysisResult $mutationAnalysisResult): string
+    {
+        $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores.';
+
+        if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
+            return $base . ' Mutation uses the supplied Infection MSI as the mutation pillar score.';
+        }
+
+        return $base . ' Mutation is omitted when no Infection report is supplied.';
     }
 
     /**
