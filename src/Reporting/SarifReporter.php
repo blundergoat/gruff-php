@@ -6,7 +6,10 @@ namespace GruffPhp\Reporting;
 
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Rule\RuleDefinition;
+use GruffPhp\Rule\RuleRegistry;
 use JsonException;
 
 /**
@@ -23,6 +26,11 @@ final readonly class SarifReporter
     public function render(AnalysisReport $report): string
     {
         $rules = [];
+        foreach (RuleRegistry::defaults()->all() as $rule) {
+            $definition             = $rule->definition();
+            $rules[$definition->id] = $this->rule($definition);
+        }
+
         foreach ($report->findings as $finding) {
             $rules[$finding->ruleId] ??= [
                 'id' => $finding->ruleId,
@@ -42,6 +50,13 @@ final readonly class SarifReporter
         ksort($rules, SORT_STRING);
         $ruleIds     = array_keys($rules);
         $ruleIndexes = array_flip($ruleIds);
+        $properties  = [
+            'gruffSchemaVersion' => AnalysisReport::SCHEMA_VERSION,
+        ];
+        if ($report->score !== null) {
+            $properties['score'] = $report->score->composite->score;
+            $properties['grade'] = $report->score->composite->letter;
+        }
 
         $payload = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
@@ -50,12 +65,12 @@ final readonly class SarifReporter
                 'tool' => [
                     'driver' => [
                         'name' => AnalysisReport::TOOL_NAME,
-                        'version' => $report->toolVersion,
-                        'informationUri' => 'https://github.com/',
+                        'semanticVersion' => $report->toolVersion,
                         'rules' => array_values($rules),
                     ],
                 ],
                 'results' => array_map(fn (Finding $finding): array => $this->result($finding, (int) $ruleIndexes[$finding->ruleId]), $report->findings),
+                'properties' => $properties,
             ]],
         ];
 
@@ -67,18 +82,101 @@ final readonly class SarifReporter
     }
 
     /**
+     * Render one registry definition as a SARIF driver rule.
+     *
+     * @param RuleDefinition $definition Native rule definition.
      * @return array{
-     *     ruleId: string,
-     *     ruleIndex: int,
-     *     level: string,
-     *     message: array{text: string},
-     *     locations: list<array{physicalLocation: array{artifactLocation: array{uri: string}, region: array{startLine: int}}}>,
-     *     partialFingerprints: array{gruffFingerprint: string},
-     *     properties: array{symbol: string|null, pillar: string, metadata: array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>>}
+     *     id: string,
+     *     name: string,
+     *     shortDescription: array{text: string},
+     *     fullDescription: array{text: string},
+     *     help: array{text: string},
+     *     properties: array<string, mixed>
      * }
+     */
+    private function rule(RuleDefinition $definition): array
+    {
+        $properties = [
+            'pillar' => $definition->pillar->value,
+            'tier' => $definition->tier->value,
+            'defaultSeverity' => $definition->defaultSeverity->value,
+            'confidence' => $definition->confidence->value,
+            'defaultEnabled' => $definition->defaultEnabled,
+        ];
+        if ($definition->secondaryPillars !== []) {
+            $properties['secondaryPillars'] = array_map(
+                static fn (Pillar $pillar): string => $pillar->value,
+                $definition->secondaryPillars,
+            );
+        }
+        if ($definition->defaultThresholds !== []) {
+            $properties['thresholds'] = $definition->defaultThresholds;
+        }
+        if ($definition->defaultOptions !== []) {
+            $properties['options'] = $definition->defaultOptions;
+        }
+
+        return [
+            'id' => $definition->id,
+            'name' => $definition->name,
+            'shortDescription' => [
+                'text' => $definition->name,
+            ],
+            'fullDescription' => [
+                'text' => $definition->description(),
+            ],
+            'help' => [
+                'text' => $definition->description(),
+            ],
+            'properties' => $properties,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
      */
     private function result(Finding $finding, int $ruleIndex): array
     {
+        $physicalLocation = [
+            'artifactLocation' => [
+                'uri' => $this->uri($finding->filePath),
+            ],
+        ];
+        if ($finding->line !== null) {
+            $region = [
+                'startLine' => $finding->line,
+            ];
+            if ($finding->column !== null) {
+                $region['startColumn'] = $finding->column;
+            }
+            if ($finding->endLine !== null) {
+                $region['endLine'] = $finding->endLine;
+            }
+            $physicalLocation['region'] = $region;
+        }
+
+        $properties = [
+            'severity' => $finding->severity->value,
+            'pillar' => $finding->pillar->value,
+            'tier' => $finding->tier->value,
+            'confidence' => $finding->confidence->value,
+        ];
+        if ($finding->secondaryPillars !== []) {
+            $properties['secondaryPillars'] = array_map(
+                static fn (Pillar $pillar): string => $pillar->value,
+                $finding->secondaryPillars,
+            );
+        }
+        if ($finding->symbol !== null) {
+            $properties['symbol'] = $finding->symbol;
+        }
+        if ($finding->remediation !== null) {
+            $properties['remediation'] = $finding->remediation;
+        }
+        if ($finding->metadata !== []) {
+            $properties['metadata'] = $finding->metadata;
+        }
+
         return [
             'ruleId' => $finding->ruleId,
             'ruleIndex' => $ruleIndex,
@@ -87,24 +185,24 @@ final readonly class SarifReporter
                 'text' => $finding->message,
             ],
             'locations' => [[
-                'physicalLocation' => [
-                    'artifactLocation' => [
-                        'uri' => $finding->filePath,
-                    ],
-                    'region' => [
-                        'startLine' => $finding->line ?? 1,
-                    ],
-                ],
+                'physicalLocation' => $physicalLocation,
             ]],
             'partialFingerprints' => [
                 'gruffFingerprint' => $finding->fingerprint(),
             ],
-            'properties' => [
-                'symbol' => $finding->symbol,
-                'pillar' => $finding->pillar->value,
-                'metadata' => $finding->metadata,
-            ],
+            'properties' => $properties,
         ];
+    }
+
+    /**
+     * Normalize SARIF artifact URIs to portable project-relative slash paths.
+     *
+     * @param string $filePath Native finding display path.
+     * @return string SARIF artifact URI.
+     */
+    private function uri(string $filePath): string
+    {
+        return (string) preg_replace('/^(?:\\.\\/)+/', '', str_replace('\\', '/', $filePath));
     }
 
     /**
