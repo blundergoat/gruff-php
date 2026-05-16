@@ -25,6 +25,18 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers SARIF report rendering contracts.
+ *
+ * @phpstan-type JsonScalar bool|float|int|object|string|null
+ * @phpstan-type JsonLevel8 array<array-key, JsonScalar>
+ * @phpstan-type JsonLevel7 array<array-key, JsonScalar|JsonLevel8>
+ * @phpstan-type JsonLevel6 array<array-key, JsonScalar|JsonLevel7>
+ * @phpstan-type JsonLevel5 array<array-key, JsonScalar|JsonLevel6>
+ * @phpstan-type JsonLevel4 array<array-key, JsonScalar|JsonLevel5>
+ * @phpstan-type JsonLevel3 array<array-key, JsonScalar|JsonLevel4>
+ * @phpstan-type JsonLevel2 array<array-key, JsonScalar|JsonLevel3>
+ * @phpstan-type JsonLevel1 array<array-key, JsonScalar|JsonLevel2>
+ * @phpstan-type JsonArray array<array-key, JsonScalar|JsonLevel1>
+ * @phpstan-type JsonValue JsonScalar|JsonLevel1|JsonLevel2|JsonLevel3|JsonLevel4|JsonLevel5|JsonLevel6|JsonLevel7|JsonLevel8|JsonArray
  */
 final class SarifReporterTest extends TestCase
 {
@@ -324,8 +336,8 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param array<mixed> $payload SARIF payload.
-     * @return array<mixed>
+     * @param JsonArray $payload SARIF payload.
+     * @return JsonArray
      */
     private function sarifRun(array $payload): array
     {
@@ -333,7 +345,9 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @return array<mixed>
+     * Extract the physical location object from a SARIF result fixture.
+     *
+     * @return JsonArray Location payload.
      */
     private function physicalLocation(mixed $result): array
     {
@@ -345,49 +359,75 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @throws JsonException
-     * @return array<mixed>
+     * @return JsonArray
      */
     private function decode(string $json): array
     {
         $value = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($value);
 
-        return $value;
+        return $this->stringKeyedArray($value);
     }
 
     /**
-     * @param array<mixed> $value Source array.
-     * @return list<mixed>
+     * @param JsonArray $value Source array.
+     * @return list<JsonValue>
      */
     private function listValue(array $value, string $key): array
     {
-        $item = $value[$key] ?? null;
-        self::assertIsArray($item);
+        $payloadValue = $value[$key] ?? null;
+        self::assertIsArray($payloadValue);
 
-        return array_values($item);
+        return array_values($payloadValue);
     }
 
     /**
-     * @param array<mixed>|mixed $value Source value.
-     * @return array<mixed>
+     * Normalize a decoded JSON value or keyed child to an array payload.
+     *
+     * @return JsonArray String-keyed payload.
      */
     private function stringKeyedArray(mixed $value, ?string $key = null): array
     {
-        $item = $key === null && is_array($value) ? $value : (is_array($value) ? ($value[$key] ?? null) : null);
-        self::assertIsArray($item);
+        $payloadValue = $key === null && is_array($value) ? $value : (is_array($value) ? ($value[$key] ?? null) : null);
+        $this->assertJsonArray($payloadValue);
 
-        return $item;
+        return $payloadValue;
     }
 
     /**
-     * @param array<mixed> $value Source array.
+     * @phpstan-assert JsonArray $value
+     * @return void No return value.
+     */
+    private function assertJsonArray(mixed $value): void
+    {
+        self::assertIsArray($value);
+
+        foreach ($value as $payloadValue) {
+            if (is_array($payloadValue)) {
+                $this->assertJsonArray($payloadValue);
+
+                continue;
+            }
+
+            self::assertTrue(
+                $payloadValue === null
+                || is_bool($payloadValue)
+                || is_float($payloadValue)
+                || is_int($payloadValue)
+                || is_object($payloadValue)
+                || is_string($payloadValue),
+            );
+        }
+    }
+
+    /**
+     * @param JsonArray $value Source array.
      * @return string String value.
      */
     private function stringValue(array $value, string $key): string
     {
-        $item = $value[$key] ?? null;
-        self::assertIsString($item);
+        $payloadValue = $value[$key] ?? null;
+        self::assertIsString($payloadValue);
 
-        return $item;
+        return $payloadValue;
     }
 }

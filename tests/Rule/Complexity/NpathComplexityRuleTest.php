@@ -35,7 +35,7 @@ final class NpathComplexityRuleTest extends TestCase
     protected function setUp(): void
     {
         $this->parser = new PhpFileParser();
-        $this->rule = new NpathComplexityRule();
+        $this->rule   = new NpathComplexityRule();
     }
 
     /**
@@ -64,6 +64,8 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Verify NPath complexity values match expected fixture paths.
      *
+     * @param string $methodName    Fixture method name.
+     * @param int    $expectedNpath Expected NPath complexity.
      * @return void No return value.
      */
     #[DataProvider('npathProvider')]
@@ -90,7 +92,7 @@ final class NpathComplexityRuleTest extends TestCase
     public function testFindingsIncludeNpathMetadata(): void
     {
         $findings = $this->analyse($this->parseFixture('cognitive.php'), ['warning' => 3, 'error' => 5]);
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::jumpsAndGoto()',
         ))[0] ?? null;
@@ -130,7 +132,7 @@ final class NpathComplexityRuleTest extends TestCase
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
         $findings = $this->analyse($this->parseFixture('cognitive.php'), ['warning' => 1.5, 'error' => 200]);
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::oneIf()',
         ))[0] ?? null;
@@ -149,7 +151,7 @@ final class NpathComplexityRuleTest extends TestCase
     private function analyse(AnalysisUnit $unit, array $thresholds): array
     {
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             NpathComplexityRule::ID,
             new RuleSettings(true, $thresholds),
         );

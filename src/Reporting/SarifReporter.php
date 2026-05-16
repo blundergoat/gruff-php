@@ -91,7 +91,7 @@ final readonly class SarifReporter
      *     shortDescription: array{text: string},
      *     fullDescription: array{text: string},
      *     help: array{text: string},
-     *     properties: array<string, mixed>
+     *     properties: array<string, bool|float|int|string|array<array-key, bool|float|int|string|array<array-key, bool|float|int|string>>>
      * }
      */
     private function rule(RuleDefinition $definition): array

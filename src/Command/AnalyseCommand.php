@@ -143,12 +143,12 @@ final class AnalyseCommand extends Command
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
         $projectContextUnits = $this->projectContextUnits(
-            projectRoot: $projectRoot,
-            options:     $options,
-            config:      $config,
-            registry:    $registry,
-            reviewDiff:  $reviewDiff,
-            fallback:    $sources,
+            projectRoot:       $projectRoot,
+            options:           $options,
+            config:            $config,
+            registry:          $registry,
+            reviewDiff:        $reviewDiff,
+            analysisSourceSet: $sources,
         );
 
         $findings         = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config), $projectContextUnits);
@@ -449,7 +449,7 @@ final class AnalyseCommand extends Command
 
         $snapshot            = new GitArchiveSnapshot();
         $baseRoot            = null;
-        $needsProjectContext = $this->needsChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
+        $needsProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
         $baseSnapshotPaths   = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $needsProjectContext);
         $baseAnalysisPaths   = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
@@ -597,10 +597,10 @@ final class AnalyseCommand extends Command
         AnalysisConfig $config,
         RuleRegistry $registry,
         ?DiffResult $reviewDiff,
-        AnalysisSourceSet $fallback,
+        AnalysisSourceSet $analysisSourceSet,
     ): array {
-        if (!$this->needsChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
-            return $fallback->analysisUnits;
+        if (!$this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
+            return $analysisSourceSet->analysisUnits;
         }
 
         return (new AnalysisSourceLoader())->load(
@@ -627,7 +627,7 @@ final class AnalyseCommand extends Command
     /**
      * @return bool True when changed-only mode still needs complete context for project-level rules.
      */
-    private function needsChangedOnlyProjectContext(
+    private function shouldLoadChangedOnlyProjectContext(
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
         AnalysisConfig $config,

@@ -139,6 +139,7 @@ final class DashboardStateFactoryTest extends TestCase
 
     /**
      * @param array<string, mixed> $parameters
+     * @return ArrayInput Input fixture value.
      */
     private function input(array $parameters = []): ArrayInput
     {

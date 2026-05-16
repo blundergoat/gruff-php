@@ -28,9 +28,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Covers cross-rule regression behaviour over the fixture corpus.
+ *
+ * @phpstan-import-type FindingArray from Finding
+ * @phpstan-import-type FindingMetadata from Finding
  */
 final class RuleRegressionSnapshotTest extends TestCase
 {
+    /** Project root used by fixture snapshot tests. */
     private const PROJECT_ROOT = __DIR__ . '/../..';
 
     /**
@@ -212,16 +216,14 @@ final class RuleRegressionSnapshotTest extends TestCase
 
     /**
      * @param list<Finding> $findings
-     * @return list<array<mixed>>
+     * @return list<FindingArray>
      */
     private function canonicalFindingPayload(array $findings): array
     {
-        $payload = array_map(static function (Finding $finding): array {
-            $row = $finding->toArray();
-            self::sortRecursively($row);
-
-            return $row;
-        }, $findings);
+        $payload = array_map(
+            static fn (Finding $finding): array => self::canonicalFindingArray($finding),
+            $findings,
+        );
 
         usort($payload, static fn (array $left, array $right): int => $left <=> $right);
 
@@ -229,21 +231,40 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
-     * @param array<mixed> $value
-     * @return void No return value.
+     * Build a stable finding payload row for snapshot hashing.
+     *
+     * @return FindingArray Canonical finding payload.
      */
-    private static function sortRecursively(array &$value): void
+    private static function canonicalFindingArray(Finding $finding): array
     {
-        foreach ($value as &$item) {
-            if (is_array($item)) {
-                self::sortRecursively($item);
-            }
-        }
-        unset($item);
+        $row = $finding->toArray();
 
-        if (!array_is_list($value)) {
-            ksort($value, SORT_STRING);
+        if (is_array($row['metadata'])) {
+            $row['metadata'] = self::canonicalMetadata($row['metadata']);
         }
+
+        ksort($row, SORT_STRING);
+
+        return $row;
+    }
+
+    /**
+     * @param FindingMetadata $metadata Finding metadata payload.
+     * @return FindingMetadata Canonical metadata payload.
+     */
+    private static function canonicalMetadata(array $metadata): array
+    {
+        foreach ($metadata as $key => $value) {
+            if (is_array($value) && !array_is_list($value)) {
+                ksort($value, SORT_STRING);
+            }
+
+            $metadata[$key] = $value;
+        }
+
+        ksort($metadata, SORT_STRING);
+
+        return $metadata;
     }
 
     /**

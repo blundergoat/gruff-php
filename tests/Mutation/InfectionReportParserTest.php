@@ -15,6 +15,20 @@ use SplFileInfo;
 
 /**
  * Covers InfectionReportParserTest behavior.
+ *
+ * @phpstan-type InvalidReportScalar bool|float|int|object|string|null
+ * @phpstan-type InvalidReportLevel10 array<array-key, InvalidReportScalar>
+ * @phpstan-type InvalidReportLevel9 array<array-key, InvalidReportScalar|InvalidReportLevel10>
+ * @phpstan-type InvalidReportLevel8 array<array-key, InvalidReportScalar|InvalidReportLevel9>
+ * @phpstan-type InvalidReportLevel7 array<array-key, InvalidReportScalar|InvalidReportLevel8>
+ * @phpstan-type InvalidReportLevel6 array<array-key, InvalidReportScalar|InvalidReportLevel7>
+ * @phpstan-type InvalidReportLevel5 array<array-key, InvalidReportScalar|InvalidReportLevel6>
+ * @phpstan-type InvalidReportLevel4 array<array-key, InvalidReportScalar|InvalidReportLevel5>
+ * @phpstan-type InvalidReportLevel3 array<array-key, InvalidReportScalar|InvalidReportLevel4>
+ * @phpstan-type InvalidReportLevel2 array<array-key, InvalidReportScalar|InvalidReportLevel3>
+ * @phpstan-type InvalidReportLevel1 array<array-key, InvalidReportScalar|InvalidReportLevel2>
+ * @phpstan-type InvalidReportValue InvalidReportScalar|InvalidReportLevel1|InvalidReportLevel2|InvalidReportLevel3|InvalidReportLevel4|InvalidReportLevel5|InvalidReportLevel6|InvalidReportLevel7|InvalidReportLevel8|InvalidReportLevel9|InvalidReportLevel10
+ * @phpstan-type InvalidReportShape array<string, InvalidReportValue>
  */
 final class InfectionReportParserTest extends TestCase
 {
@@ -69,9 +83,21 @@ final class InfectionReportParserTest extends TestCase
                     'coveredCodeMsi' => 50.0,
                     'mutationCodeCoverage' => 75.0,
                 ],
-                'escaped' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Plus', 10, 'diff', 'escaped-output')],
+                'escaped' => [$this->mutant(
+                    filePath:      $projectRoot . '/src/Alpha.php',
+                    mutatorName:   'Plus',
+                    line:          10,
+                    diff:          'diff',
+                    processOutput: 'escaped-output',
+                )],
                 'timeouted' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Timeout', 11)],
-                'killed' => [$this->mutant($projectRoot . '/src/Alpha.php', 'Killed', 12, '', '')],
+                'killed' => [$this->mutant(
+                    filePath:      $projectRoot . '/src/Alpha.php',
+                    mutatorName:   'Killed',
+                    line:          12,
+                    diff:          '',
+                    processOutput: '',
+                )],
                 'killedByStaticAnalysis' => [$this->mutant($projectRoot . '/src/Alpha.php', 'StaticKill', null)],
                 'errored' => [$this->mutant($projectRoot . '/src/Beta.php', 'Error', 20)],
                 'syntaxErrors' => [$this->mutant($projectRoot . '/src/Beta.php', 'Syntax', 21)],
@@ -219,8 +245,8 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify malformed report shapes surface specific diagnostics.
      *
-     * @param array<string, mixed> $report  Report payload.
-     * @param string               $message Expected exception message fragment.
+     * @param InvalidReportShape $report  Report payload.
+     * @param string             $message Expected exception message fragment.
      * @return void No return value.
      */
     #[DataProvider('invalidReportProvider')]
@@ -241,7 +267,7 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
-     * @return array<string, array{array<string, mixed>, string}>
+     * @return array<string, array{InvalidReportShape, string}>
      */
     public static function invalidReportProvider(): array
     {
@@ -425,7 +451,7 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $report
+     * @param InvalidReportShape $report
      * @return void No return value.
      */
     private function writeReport(string $path, array $report): void

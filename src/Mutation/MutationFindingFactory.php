@@ -23,26 +23,26 @@ final readonly class MutationFindingFactory
     {
         $findings = [];
 
-        foreach ($result->report->survivedMutants() as $mutant) {
+        foreach ($result->report->survivedMutants() as $infectionMutant) {
             $findings[] = new Finding(
                 ruleId:      'mutation.survived-mutant',
-                message:     $this->survivedMessage($mutant),
-                filePath:    $mutant->filePath,
-                line:        $mutant->line,
+                message:     $this->survivedMessage($infectionMutant),
+                filePath:    $infectionMutant->filePath,
+                line:        $infectionMutant->line,
                 severity:    Severity::Warning,
                 pillar:      Pillar::Mutation,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::High,
-                symbol:      $mutant->mutator,
-                remediation: $this->survivedRemediation($mutant),
+                symbol:      $infectionMutant->mutator,
+                remediation: $this->survivedRemediation($infectionMutant),
                 metadata:    [
-                    'status' => $mutant->status,
-                    'mutator' => $mutant->mutator,
+                    'status' => $infectionMutant->status,
+                    'mutator' => $infectionMutant->mutator,
                     'msi' => $result->report->msi(),
                     'coveredMsi' => $result->report->coveredMsi(),
                     'mutationCodeCoverage' => $result->report->coverageRate(),
-                    'diff' => $mutant->diff,
-                    'processOutput' => $mutant->processOutput,
+                    'diff' => $infectionMutant->diff,
+                    'processOutput' => $infectionMutant->processOutput,
                 ],
             );
         }
@@ -97,18 +97,18 @@ final readonly class MutationFindingFactory
      *
      * @return string Human-readable finding message.
      */
-    private function survivedMessage(InfectionMutant $mutant): string
+    private function survivedMessage(InfectionMutant $infectionMutant): string
     {
-        if ($mutant->status === 'timed out') {
+        if ($infectionMutant->status === 'timed out') {
             return sprintf(
                 'Mutation timed out via %s; Infection exceeded the timeout before a clear test failure.',
-                $mutant->mutator,
+                $infectionMutant->mutator,
             );
         }
 
         return sprintf(
             'Mutation escaped via %s; tests did not fail against this mutant.',
-            $mutant->mutator,
+            $infectionMutant->mutator,
         );
     }
 
@@ -117,9 +117,9 @@ final readonly class MutationFindingFactory
      *
      * @return string Human-readable remediation text.
      */
-    private function survivedRemediation(InfectionMutant $mutant): string
+    private function survivedRemediation(InfectionMutant $infectionMutant): string
     {
-        if ($mutant->status === 'timed out') {
+        if ($infectionMutant->status === 'timed out') {
             return 'Investigate slow or non-terminating behavior first, then add or strengthen unit tests if the mutant should be killed; gruff-php consumes Infection output and does not generate mutants.';
         }
 

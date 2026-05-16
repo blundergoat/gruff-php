@@ -34,7 +34,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     protected function setUp(): void
     {
         $this->parser = new PhpFileParser();
-        $this->rule = new MaintainabilityIndexRule();
+        $this->rule   = new MaintainabilityIndexRule();
     }
 
     /**
@@ -63,6 +63,8 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify maintainability index values match expected formula output.
      *
+     * @param string $methodName    Fixture method name.
+     * @param float  $expectedIndex Expected maintainability index.
      * @return void No return value.
      */
     #[DataProvider('indexProvider')]
@@ -90,13 +92,13 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public function testFindingsIncludeRoundedMetadata(): void
     {
-        $unit = $this->parseFixture();
+        $unit   = $this->parseFixture();
         $config = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 70, 'error' => 65]),
         );
         $findings = $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::deeplyNested()',
         ))[0] ?? null;
@@ -115,13 +117,13 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
-        $unit = $this->parseFixture();
+        $unit   = $this->parseFixture();
         $config = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 80.5, 'error' => 35]),
         );
         $findings = $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::oneIf()',
         ))[0] ?? null;

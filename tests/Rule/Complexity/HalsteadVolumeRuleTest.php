@@ -34,7 +34,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     protected function setUp(): void
     {
         $this->parser = new PhpFileParser();
-        $this->rule = new HalsteadVolumeRule();
+        $this->rule   = new HalsteadVolumeRule();
     }
 
     /**
@@ -63,6 +63,12 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify Halstead metrics match expected counts and formula output.
      *
+     * @param string $methodName         Fixture method name.
+     * @param float  $expectedVolume     Expected Halstead volume.
+     * @param float  $expectedDifficulty Expected Halstead difficulty.
+     * @param float  $expectedEffort     Expected Halstead effort.
+     * @param int    $expectedVocabulary Expected vocabulary count.
+     * @param int    $expectedLength     Expected token length.
      * @return void No return value.
      */
     #[DataProvider('metricsProvider')]
@@ -101,7 +107,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     public function testFindingsIncludeRoundedMetricMetadata(): void
     {
         $findings = $this->analyse(['warning' => 30, 'error' => 100]);
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::deeplyNested()',
         ))[0] ?? null;
@@ -124,7 +130,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
         $findings = $this->analyse(['warning' => 10.5, 'error' => 2000]);
-        $finding = array_values(array_filter(
+        $finding  = array_values(array_filter(
             $findings,
             static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::oneIf()',
         ))[0] ?? null;
@@ -141,9 +147,9 @@ final class HalsteadVolumeRuleTest extends TestCase
      */
     private function analyse(array $thresholds): array
     {
-        $unit = $this->parseFixture();
+        $unit     = $this->parseFixture();
         $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             HalsteadVolumeRule::ID,
             new RuleSettings(true, $thresholds),
         );
