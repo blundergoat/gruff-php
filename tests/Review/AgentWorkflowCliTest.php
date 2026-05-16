@@ -165,11 +165,11 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Example.php', $this->baseExampleSource());
+            file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::baseExampleSource());
             $this->runGit($repo, 'add', 'src/Example.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            file_put_contents($repo . '/src/Example.php', $this->changedExampleSource());
+            file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::changedExampleSource());
 
             $process = new Process([
                 PHP_BINARY,
@@ -239,11 +239,11 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Example.php', $this->removedBaseExampleSource());
+            file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::removedBaseExampleSource());
             $this->runGit($repo, 'add', 'src/Example.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            file_put_contents($repo . '/src/Example.php', $this->baseExampleSource());
+            file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::baseExampleSource());
 
             $process = new Process([
                 PHP_BINARY,
@@ -289,11 +289,11 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Existing.php', $this->baseExampleSource());
+            file_put_contents($repo . '/src/Existing.php', AgentWorkflowFixtureSources::baseExampleSource());
             $this->runGit($repo, 'add', 'src/Existing.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            file_put_contents($repo . '/src/NewRisk.php', $this->addedRiskSource());
+            file_put_contents($repo . '/src/NewRisk.php', AgentWorkflowFixtureSources::addedRiskSource());
             $this->runGit($repo, 'add', 'src/NewRisk.php');
 
             $process = new Process([
@@ -340,12 +340,12 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Target.php', $this->baseExampleSource());
-            file_put_contents($repo . '/src/Unrelated.php', $this->addedRiskSource());
+            file_put_contents($repo . '/src/Target.php', AgentWorkflowFixtureSources::baseExampleSource());
+            file_put_contents($repo . '/src/Unrelated.php', AgentWorkflowFixtureSources::addedRiskSource());
             $this->runGit($repo, 'add', 'src/Target.php', 'src/Unrelated.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            file_put_contents($repo . '/src/Target.php', $this->changedExampleSource());
+            file_put_contents($repo . '/src/Target.php', AgentWorkflowFixtureSources::changedExampleSource());
 
             $process = new Process([
                 PHP_BINARY,
@@ -394,12 +394,12 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', $this->bookingGatewayInterfaceSource());
-            file_put_contents($repo . '/src/Infrastructure/BookingOtpGateway.php', $this->bookingOtpGatewaySource());
+            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', AgentWorkflowFixtureSources::bookingGatewayInterfaceSource());
+            file_put_contents($repo . '/src/Infrastructure/BookingOtpGateway.php', AgentWorkflowFixtureSources::bookingOtpGatewaySource());
             $this->runGit($repo, 'add', 'src/Contracts/BookingGatewayInterface.php', 'src/Infrastructure/BookingOtpGateway.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
-            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', $this->changedBookingGatewayInterfaceSource());
+            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', AgentWorkflowFixtureSources::changedBookingGatewayInterfaceSource());
 
             $process = new Process([
                 PHP_BINARY,
@@ -453,7 +453,7 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'init');
             $this->runGit($repo, 'config', 'user.email', 'test@example.com');
             $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Deleted.php', $this->removedBaseExampleSource());
+            file_put_contents($repo . '/src/Deleted.php', AgentWorkflowFixtureSources::removedBaseExampleSource());
             $this->runGit($repo, 'add', 'src/Deleted.php');
             $this->runGit($repo, 'commit', '-m', 'base');
 
@@ -523,7 +523,7 @@ final class AgentWorkflowCliTest extends TestCase
 
         try {
             self::assertTrue(mkdir($repo . '/src', 0777, true));
-            file_put_contents($repo . '/src/Example.php', $this->baseExampleSource());
+            file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::baseExampleSource());
 
             $process = new Process([
                 PHP_BINARY,
@@ -687,173 +687,6 @@ final class AgentWorkflowCliTest extends TestCase
         }
 
         return $result;
-    }
-
-    /**
-     * Return source code for the base review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function baseExampleSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-/**
- * Covers Example behavior.
- */
-final class Example
-{
-    public function calculate(string $left, string $right): string
-    {
-        return $left . $right;
-    }
-}
-PHP;
-    }
-
-    /**
-     * Return source code for the changed review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function changedExampleSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-
-
-/**
- * Covers Example behavior.
- */
-final class Example
-{
-    public function calculate(string $left, string $right): string
-    {
-        return $left . $right;
-    }
-
-    public function newRisk(string $left, string $right): string
-    {
-        return $left . $right;
-    }
-}
-PHP;
-    }
-
-    /**
-     * Return source code for the removed-base review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function removedBaseExampleSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-/**
- * Covers Example behavior.
- */
-final class Example
-{
-    public function calculate(string $left, string $right): string
-    {
-        return $left . $right;
-    }
-
-    public function oldRisk(string $left, string $right): string
-    {
-        return $left . $right;
-    }
-}
-PHP;
-    }
-
-    /**
-     * Return source code for an added risky review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function addedRiskSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-/**
- * Covers NewRisk behavior.
- */
-final class NewRisk
-{
-    public function decode(string $payload): mixed
-    {
-        return unserialize($payload);
-    }
-}
-PHP;
-    }
-
-    /**
-     * Return source code for a project-rule interface review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function bookingGatewayInterfaceSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-namespace App\Contracts;
-
-interface BookingGatewayInterface
-{
-    public function issueOtp(string $phoneNumber): string;
-}
-PHP;
-    }
-
-    /**
-     * Return changed source code for a project-rule interface review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function changedBookingGatewayInterfaceSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-namespace App\Contracts;
-
-// Branch edit keeps this interface in changed-only scope.
-interface BookingGatewayInterface
-{
-    public function issueOtp(string $phoneNumber): string;
-}
-PHP;
-    }
-
-    /**
-     * Return source code for the unchanged implementor side of a project-rule review fixture.
-     *
-     * @return string Fixture value.
-     */
-    private function bookingOtpGatewaySource(): string
-    {
-        return <<<'PHP'
-<?php
-
-namespace App\Infrastructure;
-
-use App\Contracts\BookingGatewayInterface;
-
-final class BookingOtpGateway implements BookingGatewayInterface
-{
-    public function issueOtp(string $phoneNumber): string
-    {
-        return $phoneNumber;
-    }
-}
-PHP;
     }
 
     /**

@@ -20,16 +20,36 @@ final readonly class MarkdownReporter
      */
     public function render(AnalysisReport $report): string
     {
-        $score   = $report->score;
-        $counts  = $report->findingCounts();
-        $pillars = $score === null ? [] : $score->pillars;
-        $lines   = [
+        $lines = [];
+
+        $this->appendSummary($lines, $report);
+        $this->appendBranchReviewSection($lines, $report);
+        $this->appendPillarSection($lines, $report);
+        $this->appendFindingsSection($lines, $report);
+
+        return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * Append report-level summary lines.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void No return value.
+     */
+    private function appendSummary(array &$lines, AnalysisReport $report): void
+    {
+        $score  = $report->score;
+        $counts = $report->findingCounts();
+
+        array_push(
+            $lines,
             '# gruff-php report',
             '',
             sprintf('**Grade:** %s (%s/100)', $score === null ? 'n/a' : $score->composite->letter, $score === null ? 'n/a' : sprintf('%.2f', $score->composite->score)),
             sprintf('**Scope:** %s', $score === null ? 'full-project' : $score->scope),
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
-        ];
+        );
 
         if ($score !== null) {
             $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
@@ -56,23 +76,7 @@ final readonly class MarkdownReporter
         }
 
         if ($report->mutation !== null) {
-            $lines[] = sprintf(
-                '**Mutation:** MSI %.2f%%, Covered MSI %.2f%%, Mutation coverage %.2f%%, survived %d/%d.',
-                $report->mutation->report->msi(),
-                $report->mutation->report->coveredMsi(),
-                $report->mutation->report->coverageRate(),
-                $report->mutation->survivedCount(),
-                $report->mutation->report->totalMutants(),
-            );
-            $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($report->mutation->report->statusCounts()));
-
-            $contextStatuses = $this->mutationContextSummary($report->mutation->report->statusCounts());
-            if ($contextStatuses !== null) {
-                $lines[] = sprintf(
-                    '**Mutation context-only statuses:** %s. These do not create `mutation.survived-mutant` findings.',
-                    $contextStatuses,
-                );
-            }
+            $this->appendMutationSummary($lines, $report);
         }
 
         if ($report->review !== null) {
@@ -84,7 +88,50 @@ final readonly class MarkdownReporter
                 count($report->review->unchanged),
             );
         }
+    }
 
+    /**
+     * Append mutation summary lines.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void No return value.
+     */
+    private function appendMutationSummary(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->mutation === null) {
+            return;
+        }
+
+        $mutation = $report->mutation;
+        $lines[]  = sprintf(
+            '**Mutation:** MSI %.2f%%, Covered MSI %.2f%%, Mutation coverage %.2f%%, survived %d/%d.',
+            $mutation->report->msi(),
+            $mutation->report->coveredMsi(),
+            $mutation->report->coverageRate(),
+            $mutation->survivedCount(),
+            $mutation->report->totalMutants(),
+        );
+        $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
+
+        $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
+        if ($contextStatuses !== null) {
+            $lines[] = sprintf(
+                '**Mutation context-only statuses:** %s. These do not create `mutation.survived-mutant` findings.',
+                $contextStatuses,
+            );
+        }
+    }
+
+    /**
+     * Append the branch-review section.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void No return value.
+     */
+    private function appendBranchReviewSection(array &$lines, AnalysisReport $report): void
+    {
         $lines[] = '';
         $lines[] = '## Branch Review';
         $lines[] = '';
@@ -96,6 +143,18 @@ final readonly class MarkdownReporter
             $this->appendFindingGroups($lines, 'Removed findings', $report->review->removed);
             $this->appendFindingGroups($lines, 'Unchanged findings', $report->review->unchanged);
         }
+    }
+
+    /**
+     * Append the score pillar table.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void No return value.
+     */
+    private function appendPillarSection(array &$lines, AnalysisReport $report): void
+    {
+        $pillars = $report->score === null ? [] : $report->score->pillars;
 
         array_push(
             $lines,
@@ -115,7 +174,17 @@ final readonly class MarkdownReporter
                 $pillar->findings,
             );
         }
+    }
 
+    /**
+     * Append current findings.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void No return value.
+     */
+    private function appendFindingsSection(array &$lines, AnalysisReport $report): void
+    {
         $lines[] = '';
         $lines[] = '## Findings';
         $lines[] = '';
@@ -125,8 +194,6 @@ final readonly class MarkdownReporter
         } else {
             $this->appendFindingGroups($lines, 'Current findings', $report->findings, includeHeading: false);
         }
-
-        return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
     /**

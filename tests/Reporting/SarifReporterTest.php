@@ -143,6 +143,9 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify severity values map to SARIF result levels.
      *
+     * @param Severity $severity Finding severity to render.
+     * @param string   $level    Expected SARIF level.
+     *
      * @throws JsonException
      * @return void No return value.
      */
@@ -276,6 +279,7 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param list<Finding> $findings Findings to attach to the report.
+     * @return AnalysisReport Focused report fixture.
      */
     private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
     {
@@ -299,40 +303,23 @@ final class SarifReporterTest extends TestCase
     /**
      * Build a focused finding for SARIF renderer tests.
      *
-     * @param list<Pillar>                                                                           $secondaryPillars Secondary pillars attached to the finding.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata         Machine-readable metadata.
+     * @return Finding Focused finding fixture.
      */
     private function finding(
         string $ruleId = 'security.dangerous-function-call',
-        string $message = 'Finding message.',
         string $filePath = 'src/app.php',
         ?int $line = 1,
         Severity $severity = Severity::Warning,
-        Pillar $pillar = Pillar::Security,
-        RuleTier $tier = RuleTier::V01,
-        Confidence $confidence = Confidence::High,
-        ?int $endLine = null,
-        ?int $column = null,
-        ?string $symbol = null,
-        ?string $remediation = null,
-        array $secondaryPillars = [],
-        array $metadata = [],
     ): Finding {
         return new Finding(
-            ruleId:           $ruleId,
-            message:          $message,
-            filePath:         $filePath,
-            line:             $line,
-            severity:         $severity,
-            pillar:           $pillar,
-            tier:             $tier,
-            confidence:       $confidence,
-            endLine:          $endLine,
-            column:           $column,
-            symbol:           $symbol,
-            remediation:      $remediation,
-            secondaryPillars: $secondaryPillars,
-            metadata:         $metadata,
+            ruleId:     $ruleId,
+            message:    'Finding message.',
+            filePath:   $filePath,
+            line:       $line,
+            severity:   $severity,
+            pillar:     Pillar::Security,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
         );
     }
 
