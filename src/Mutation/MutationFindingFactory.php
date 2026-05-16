@@ -26,7 +26,7 @@ final readonly class MutationFindingFactory
         foreach ($result->report->survivedMutants() as $mutant) {
             $findings[] = new Finding(
                 ruleId:      'mutation.survived-mutant',
-                message:     sprintf('Mutation survived via %s (%s).', $mutant->mutator, $mutant->status),
+                message:     $this->survivedMessage($mutant),
                 filePath:    $mutant->filePath,
                 line:        $mutant->line,
                 severity:    Severity::Warning,
@@ -34,7 +34,7 @@ final readonly class MutationFindingFactory
                 tier:        RuleTier::V01,
                 confidence:  Confidence::High,
                 symbol:      $mutant->mutator,
-                remediation: 'Add or strengthen unit tests that fail when this mutant changes behavior; gruff-php consumes Infection output and does not generate mutants.',
+                remediation: $this->survivedRemediation($mutant),
                 metadata:    [
                     'status' => $mutant->status,
                     'mutator' => $mutant->mutator,
@@ -90,5 +90,39 @@ final readonly class MutationFindingFactory
         }
 
         return $findings;
+    }
+
+    /**
+     * Render a survived-mutant message that distinguishes escaped and timed-out statuses.
+     *
+     * @return string Human-readable finding message.
+     */
+    private function survivedMessage(InfectionMutant $mutant): string
+    {
+        if ($mutant->status === 'timed out') {
+            return sprintf(
+                'Mutation timed out via %s; Infection exceeded the timeout before a clear test failure.',
+                $mutant->mutator,
+            );
+        }
+
+        return sprintf(
+            'Mutation escaped via %s; tests did not fail against this mutant.',
+            $mutant->mutator,
+        );
+    }
+
+    /**
+     * Render remediation guidance that matches the survived-mutant status.
+     *
+     * @return string Human-readable remediation text.
+     */
+    private function survivedRemediation(InfectionMutant $mutant): string
+    {
+        if ($mutant->status === 'timed out') {
+            return 'Investigate slow or non-terminating behavior first, then add or strengthen unit tests if the mutant should be killed; gruff-php consumes Infection output and does not generate mutants.';
+        }
+
+        return 'Add or strengthen unit tests that fail when this mutant changes behavior; gruff-php consumes Infection output and does not generate mutants.';
     }
 }

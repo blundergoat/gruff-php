@@ -38,6 +38,7 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('gruff-php 0.1.0-dev — summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
         self::assertStringContainsString('Composite', $output);
+        self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
         self::assertStringContainsString('Totals', $output);

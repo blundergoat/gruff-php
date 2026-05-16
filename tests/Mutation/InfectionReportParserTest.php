@@ -79,8 +79,8 @@ final class InfectionReportParserTest extends TestCase
                 'ignored' => [$this->mutant($projectRoot . '/src/Beta.php', 'Ignored', 22)],
             ]);
 
-            $report = (new InfectionReportParser($projectRoot))->parse('reports/infection.json');
-            $mutants = array_map(static fn ($mutant): array => $mutant->toArray(), $report->mutants);
+            $report    = (new InfectionReportParser($projectRoot))->parse('reports/infection.json');
+            $mutants   = array_map(static fn ($mutant): array => $mutant->toArray(), $report->mutants);
             $summaries = array_map(static fn ($summary): array => $summary->toArray(), $report->fileSummaries());
 
             self::assertSame('reports/infection.json', $report->reportPath);
@@ -89,6 +89,16 @@ final class InfectionReportParserTest extends TestCase
             self::assertSame(50.0, $report->coveredMsi());
             self::assertSame(75.0, $report->coverageRate());
             self::assertCount(2, $report->survivedMutants());
+            self::assertSame([
+                'error' => 1,
+                'escaped' => 1,
+                'ignored' => 1,
+                'killed' => 1,
+                'killed by SA' => 1,
+                'not covered' => 1,
+                'syntax error' => 1,
+                'timed out' => 1,
+            ], $report->statusCounts());
             self::assertSame([
                 [
                     'status' => 'escaped',
@@ -209,7 +219,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify malformed report shapes surface specific diagnostics.
      *
-     * @param array<string, mixed> $report Report payload.
+     * @param array<string, mixed> $report  Report payload.
      * @param string               $message Expected exception message fragment.
      * @return void No return value.
      */

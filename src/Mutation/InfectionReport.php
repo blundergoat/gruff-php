@@ -73,6 +73,25 @@ final readonly class InfectionReport
     }
 
     /**
+     * Count mutants by normalized Infection status for human report context.
+     *
+     * @return array<string, int> Status counts keyed by normalized status label.
+     */
+    public function statusCounts(): array
+    {
+        $counts = [];
+
+        foreach ($this->mutants as $mutant) {
+            $counts[$mutant->status] ??= 0;
+            $counts[$mutant->status]++;
+        }
+
+        ksort($counts, SORT_STRING);
+
+        return $counts;
+    }
+
+    /**
      * @return list<MutationFileSummary>
      */
     public function fileSummaries(): array

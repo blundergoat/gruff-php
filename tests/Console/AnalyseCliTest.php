@@ -424,7 +424,37 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('Mutation', $process->getOutput());
         self::assertStringContainsString('MSI: 50.00%', $process->getOutput());
+        self::assertStringContainsString('Statuses: escaped=1, killed=2, timed out=1', $process->getOutput());
+        self::assertStringContainsString('Mutation escaped via Plus; tests did not fail against this mutant.', $process->getOutput());
+        self::assertStringContainsString('Mutation timed out via IntegerPlus; Infection exceeded the timeout before a clear test failure.', $process->getOutput());
         self::assertStringContainsString('mutation.survived-mutant', $process->getOutput());
+    }
+
+    /**
+     * Verify analyse command renders score and mutation context in markdown.
+     *
+     * @return void No return value.
+     */
+    public function testAnalyseCommandRendersScoreAndMutationContextInMarkdown(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--infection-report',
+            'tests/Fixtures/Mutation/Infection/infection-valid.json',
+            '--format',
+            'markdown',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('**Score drivers:** Per-pillar scores start at 100', $process->getOutput());
+        self::assertStringContainsString('**Mutation:** MSI 50.00%', $process->getOutput());
+        self::assertStringContainsString('**Mutation statuses:** escaped=1, killed=2, timed out=1.', $process->getOutput());
     }
 
     /**
@@ -561,7 +591,9 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('<section class="verdict">', $process->getOutput());
         self::assertStringContainsString('pillar grades', $process->getOutput());
-        self::assertStringNotContainsString('mutation', $process->getOutput());
+        self::assertStringContainsString('score drivers', $process->getOutput());
+        self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $process->getOutput());
+        self::assertStringNotContainsString('<div class="name">mutation</div>', $process->getOutput());
         self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
     }
 

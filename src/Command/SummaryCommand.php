@@ -401,6 +401,7 @@ final class SummaryCommand extends Command
         $lines[] = '';
         $lines[] = sprintf('Composite %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
         $lines[] = sprintf('Scope     %s', $summaryReportData->score->scope);
+        $lines[] = sprintf('Score note %s', $summaryReportData->score->explanation);
         $lines[] = '';
         $lines[] = 'Pillars';
 

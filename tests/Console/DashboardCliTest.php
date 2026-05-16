@@ -104,8 +104,9 @@ final class DashboardCliTest extends CliTestCase
             $scan = $this->fetchHttp($port, '/scan');
 
             self::assertStringContainsString('HTTP/1.1 200 OK', $scan);
-            self::assertStringNotContainsString('mutation', $scan);
-            self::assertStringNotContainsString('Infection', $scan);
+            self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $scan);
+            self::assertStringNotContainsString('<div class="name">mutation</div>', $scan);
+            self::assertStringNotContainsString('MSI', $scan);
         } finally {
             $process->stop(1);
         }

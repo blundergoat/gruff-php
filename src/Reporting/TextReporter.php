@@ -118,6 +118,7 @@ final readonly class TextReporter
             $report->score->composite->score,
         );
         $lines[] = sprintf('  Scope: %s', $report->score->scope);
+        $lines[] = sprintf('  Score drivers: %s', $report->score->explanation);
 
         if ($report->diff !== null && $report->diff->active) {
             $lines[] = sprintf(
@@ -125,6 +126,11 @@ final readonly class TextReporter
                 $report->diff->mode,
                 count($report->diff->changedFiles),
             );
+            $lines[] = sprintf('  Diff note: %s', $report->diff->message);
+        }
+
+        if ($report->filters !== null && $report->filters->isActive()) {
+            $lines[] = '  Display filters: score and exit code use the scored finding set; filters only change rendered findings.';
         }
 
         $lines[] = '  Pillars:';
@@ -160,6 +166,7 @@ final readonly class TextReporter
         $lines[] = sprintf('  Suppressed findings: %d', $report->baseline->suppressedFindings);
         $lines[] = sprintf('  Stale evaluation: %s', $report->baseline->staleEvaluation);
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
+        $lines[] = '  Note: suppressed findings are accepted debt and are removed before scoring.';
 
         if ($report->baseline->generated) {
             $lines[] = sprintf(
@@ -204,6 +211,19 @@ final readonly class TextReporter
             $mutation->report->totalMutants(),
             $mutation->survivedCount(),
         );
+        $lines[] = sprintf('  Statuses: %s', $this->mutationStatusSummary($mutation->report->statusCounts()));
+
+        if (($mutation->report->statusCounts()['escaped'] ?? 0) > 0 || ($mutation->report->statusCounts()['timed out'] ?? 0) > 0) {
+            $lines[] = '  Survived status note: escaped mutants are test gaps; timed-out mutants exceeded Infection timeout and are tracked separately.';
+        }
+
+        $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
+        if ($contextStatuses !== null) {
+            $lines[] = sprintf(
+                '  Context-only statuses: %s. These do not create mutation.survived-mutant findings.',
+                $contextStatuses,
+            );
+        }
 
         $baselineDelta = $mutation->msiDelta();
         if ($mutation->baselineReport !== null && $baselineDelta !== null) {
@@ -227,14 +247,51 @@ final readonly class TextReporter
         $lines[] = '  Files:';
         foreach ($fileSummaries as $summary) {
             $lines[] = sprintf(
-                '    %s: MSI %.2f%%, Covered MSI %.2f%%, survived %d/%d',
+                '    %s: MSI %.2f%%, Covered MSI %.2f%%, survived %d/%d, not covered %d',
                 $summary->filePath,
                 $summary->msi,
                 $summary->coveredMsi,
                 $summary->survivedMutants,
                 $summary->totalMutants,
+                $summary->notCoveredMutants,
             );
         }
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return string Human-readable mutation status summary.
+     */
+    private function mutationStatusSummary(array $counts): string
+    {
+        if ($counts === []) {
+            return 'none';
+        }
+
+        $parts = [];
+        foreach ($counts as $status => $count) {
+            $parts[] = sprintf('%s=%d', $status, $count);
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return string|null Context-only status summary, or null when absent.
+     */
+    private function mutationContextSummary(array $counts): ?string
+    {
+        $parts = [];
+
+        foreach (['not covered', 'error', 'syntax error', 'ignored', 'skipped'] as $status) {
+            $count = $counts[$status] ?? 0;
+            if ($count > 0) {
+                $parts[] = sprintf('%s=%d', $status, $count);
+            }
+        }
+
+        return $parts === [] ? null : implode(', ', $parts);
     }
 
     /**

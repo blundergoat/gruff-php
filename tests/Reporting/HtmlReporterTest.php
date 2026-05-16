@@ -72,7 +72,9 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('src/&lt;bad&gt;.php', $html);
         self::assertStringNotContainsString('<script>alert("x")</script>', $html);
         self::assertStringNotContainsString('fonts.googleapis.com', $html);
-        self::assertStringNotContainsString('mutation', $html);
+        self::assertStringContainsString('score drivers', $html);
+        self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $html);
+        self::assertStringNotContainsString('<div class="name">mutation</div>', $html);
     }
 
     /**
@@ -102,7 +104,8 @@ final class HtmlReporterTest extends TestCase
         $html = (new HtmlReporter())->render($report);
 
         self::assertStringContainsString('cyclomatic complexity · flagged methods', $html);
-        self::assertStringNotContainsString('mutation', $html);
+        self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $html);
+        self::assertStringNotContainsString('<div class="name">mutation</div>', $html);
         self::assertStringNotContainsString('MSI', $html);
     }
 
@@ -134,6 +137,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('2 findings at warning or error severity across 2 pillars.', $html);
         self::assertStringContainsString('1 method exceeds CC 10 (1 in 11-15, 0 in 16-20, 0 at 21+).', $html);
         self::assertStringContainsString('<span class="loc-link" tabindex="0" data-path="src/Example.php:9">src/Example.php:9</span>', $html);
+        self::assertStringContainsString('<div class="score-context-title">score drivers</div>', $html);
     }
 
     /**
@@ -306,9 +310,9 @@ final class HtmlReporterTest extends TestCase
             new RunDiagnostic(type: 'parse-error', message: 'broken', filePath: 'src/Broken.php', line: 7),
         ]));
 
-        $masthead = strpos($html, '<header class="masthead">');
+        $masthead    = strpos($html, '<header class="masthead">');
         $diagnostics = strpos($html, '<section class="diagnostics">');
-        $verdict = strpos($html, '<section class="verdict">');
+        $verdict     = strpos($html, '<section class="verdict">');
 
         self::assertIsInt($masthead);
         self::assertIsInt($diagnostics);
@@ -343,8 +347,8 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
         $score = new ScoreReport(
-            composite:              new Grade(88.25, 'B'),
-            pillars:                [
+            composite: new Grade(88.25, 'B'),
+            pillars:   [
                 new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
                 new PillarScore('documentation', true, null, 0, 0, 0, 0, 0.0),
             ],
@@ -359,6 +363,7 @@ final class HtmlReporterTest extends TestCase
 
         self::assertStringContainsString('No offenders found.', $html);
         self::assertStringNotContainsString('<div class="name">Mutation</div>', $html);
+        self::assertStringContainsString('<li>custom score</li>', $html);
         self::assertStringContainsString('<div class="grade n">n/a</div>', $html);
         self::assertStringContainsString('2 methods exceed CC 10 (2 in 11-15, 0 in 16-20, 0 at 21+).', $html);
         self::assertStringContainsString('style="height:50%;"', $html);
@@ -373,9 +378,9 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
         $score = new ScoreReport(
-            composite:              new Grade(72.0, 'C'),
-            pillars:                [],
-            topOffenders:           [
+            composite:    new Grade(72.0, 'C'),
+            pillars:      [],
+            topOffenders: [
                 new FileScore('src/Metrics.php', new Grade(72.0, 'C'), 4, 1, 2, 1, 28.0, 3, 5, 8, null),
             ],
             complexityDistribution: ['0-5' => 1, '11-15' => 2, '16-20' => 3],
@@ -422,7 +427,7 @@ final class HtmlReporterTest extends TestCase
         ];
 
         $singleHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report([$singlePillar]));
-        $manyHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report($manyPillars));
+        $manyHtml   = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report($manyPillars));
 
         self::assertStringContainsString('<label>Pillar<select name="pillar" multiple size="2">', $singleHtml);
         self::assertStringContainsString('<label>Pillar<select name="pillar" multiple size="6">', $manyHtml);
@@ -471,9 +476,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * @param list<Finding>        $findings
-     * @param list<RunDiagnostic>  $diagnostics
-     * @param ScoreReport|null     $score
+     * @param list<Finding>       $findings
+     * @param list<RunDiagnostic> $diagnostics
+     * @param ScoreReport|null    $score
      * @return AnalysisReport Report fixture.
      */
     private function report(array $findings, array $diagnostics = [], ?ScoreReport $score = null): AnalysisReport

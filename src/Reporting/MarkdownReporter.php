@@ -31,8 +31,48 @@ final readonly class MarkdownReporter
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         ];
 
+        if ($score !== null) {
+            $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
+        }
+
+        if ($report->diff !== null && $report->diff->active) {
+            $lines[] = sprintf('**Diff scope:** %s', $report->diff->message);
+        }
+
         if ($report->filters !== null && $report->filters->isActive()) {
-            $lines[] = sprintf('**Filters:** `%s`', json_encode($report->filters->toArray(), JSON_UNESCAPED_SLASHES) ?: '{}');
+            $lines[] = sprintf(
+                '**Display filters:** `%s`; score and exit code use the scored finding set.',
+                json_encode($report->filters->toArray(), JSON_UNESCAPED_SLASHES) ?: '{}',
+            );
+        }
+
+        if ($report->baseline !== null) {
+            $lines[] = sprintf(
+                '**Baseline:** suppressed %d finding(s) from `%s`; stale entries %d. Suppressed findings are accepted debt and are removed before scoring.',
+                $report->baseline->suppressedFindings,
+                $report->baseline->path,
+                count($report->baseline->staleEntries),
+            );
+        }
+
+        if ($report->mutation !== null) {
+            $lines[] = sprintf(
+                '**Mutation:** MSI %.2f%%, Covered MSI %.2f%%, Mutation coverage %.2f%%, survived %d/%d.',
+                $report->mutation->report->msi(),
+                $report->mutation->report->coveredMsi(),
+                $report->mutation->report->coverageRate(),
+                $report->mutation->survivedCount(),
+                $report->mutation->report->totalMutants(),
+            );
+            $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($report->mutation->report->statusCounts()));
+
+            $contextStatuses = $this->mutationContextSummary($report->mutation->report->statusCounts());
+            if ($contextStatuses !== null) {
+                $lines[] = sprintf(
+                    '**Mutation context-only statuses:** %s. These do not create `mutation.survived-mutant` findings.',
+                    $contextStatuses,
+                );
+            }
         }
 
         if ($report->review !== null) {
@@ -157,6 +197,42 @@ final readonly class MarkdownReporter
             $lines[] = '</details>';
             $lines[] = '';
         }
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return string Human-readable mutation status summary.
+     */
+    private function mutationStatusSummary(array $counts): string
+    {
+        if ($counts === []) {
+            return 'none';
+        }
+
+        $parts = [];
+        foreach ($counts as $status => $count) {
+            $parts[] = sprintf('%s=%d', $status, $count);
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return string|null Context-only status summary, or null when absent.
+     */
+    private function mutationContextSummary(array $counts): ?string
+    {
+        $parts = [];
+
+        foreach (['not covered', 'error', 'syntax error', 'ignored', 'skipped'] as $status) {
+            $count = $counts[$status] ?? 0;
+            if ($count > 0) {
+                $parts[] = sprintf('%s=%d', $status, $count);
+            }
+        }
+
+        return $parts === [] ? null : implode(', ', $parts);
     }
 
 }
