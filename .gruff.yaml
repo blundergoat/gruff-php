@@ -9,8 +9,25 @@ allowlists:
     acceptedAbbreviations: []
     secretPreviews: []
 selection:
-    tiers: []
-    pillars: []
+    # Keep built-in catalogue rubrics explicit. The per-rule settings below
+    # still reference every built-in RuleRegistry rule id individually.
+    tiers:
+        - v0.1
+    pillars:
+        - size
+        - complexity
+        - coupling
+        - dead-code
+        - naming
+        - documentation
+        - security
+        - sensitive-data
+        - design
+        - modernisation
+        - test-quality
+        - architecture
+        - maintainability
+        - mutation
     rules: []
     excludePillars: []
     excludeRules: []
