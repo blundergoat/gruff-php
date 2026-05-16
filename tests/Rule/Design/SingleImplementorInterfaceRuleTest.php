@@ -24,7 +24,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /** Project root used by filesystem and CLI tests. */
     private const PROJECT_ROOT = __DIR__ . '/../../..';
     /** Fixture directory used by this test case. */
-    private const FIXTURE_DIR  = 'tests/Fixtures/Design/single-implementor-interface';
+    private const FIXTURE_DIR = 'tests/Fixtures/Design/single-implementor-interface';
 
     /**
      * Verify internal one impl flags exactly one interface.
@@ -192,8 +192,8 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $findings = $this->analyseFixtures();
 
         self::assertNotEmpty($findings);
-        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
-        $pillarValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
+        $severityValues    = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $pillarValues      = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
         $implementorCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
             $implementorCount = $finding->metadata['implementorCount'] ?? null;
 
@@ -209,7 +209,11 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             return $externalUsageCount;
         }, $findings)));
         $missingImplementorFqns = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['implementorFqn'] ?? null) === null));
-        $missingDecisions = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['decision'] ?? null) === null));
+        $missingDecisions       = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['decision'] ?? null) === null));
+        $missingExclusionHint   = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => !str_contains($finding->remediation ?? '', 'additionalExcludedPaths'),
+        ));
 
         self::assertSame([Severity::Advisory->value], $severityValues);
         self::assertSame([Pillar::Design->value], $pillarValues);
@@ -217,6 +221,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         self::assertSame([0], $externalUsageCounts);
         self::assertSame([], $missingImplementorFqns);
         self::assertSame([], $missingDecisions);
+        self::assertSame([], $missingExclusionHint);
         self::assertSame([], array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => ($finding->metadata['interfaceFqn'] ?? null) !== $finding->symbol,
@@ -244,7 +249,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
         $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(SingleImplementorInterfaceRule::ID);
-        $config = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             SingleImplementorInterfaceRule::ID,
             new \GruffPhp\Config\RuleSettings(
                 enabled:    true,
@@ -255,7 +260,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             ),
         );
         $findings = $this->analyseFixtures($config);
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols  = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\InternalOneImpl\\BookingOtpGatewayInterface', $symbols);
     }

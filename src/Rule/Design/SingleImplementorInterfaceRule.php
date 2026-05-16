@@ -257,7 +257,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $fqn,
-                remediation: 'Either delete the interface and depend on the concrete class, or add a second implementor / external type-hint usage that justifies the abstraction.',
+                remediation: 'Either delete the interface and depend on the concrete class, add a second implementor / external type-hint usage that justifies the abstraction, or configure additionalExcludedPaths when the interface comes from copied vendor/framework code.',
                 metadata:    [
                     'interfaceFqn' => $fqn,
                     'implementorCount' => $implementorCount,

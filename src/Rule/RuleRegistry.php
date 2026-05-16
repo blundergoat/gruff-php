@@ -322,13 +322,31 @@ final class RuleRegistry
     }
 
     /**
+     * Check whether the effective config enables at least one project-level rule.
+     *
+     * @param AnalysisConfig $config Config used to filter registered rules.
+     * @return bool True when project-level analysis needs complete project context.
+     */
+    public function hasEnabledProjectRules(AnalysisConfig $config): bool
+    {
+        foreach ($this->enabledRules($config) as $rule) {
+            if ($rule instanceof ProjectRuleInterface) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Run all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit> $units   Parsed units to analyse.
-     * @param RuleContext        $context Rule execution context.
+     * @param list<AnalysisUnit>      $units        Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $context      Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits Parsed units available to project-level rules.
      * @return list<Finding> Findings produced by enabled rules.
      */
-    public function analyse(array $units, RuleContext $context): array
+    public function analyse(array $units, RuleContext $context, ?array $projectUnits = null): array
     {
         $findings     = [];
         $enabledRules = $this->enabledRules($context->config);
@@ -353,8 +371,9 @@ final class RuleRegistry
             }
         }
 
+        $projectUnits ??= $units;
         $analyseableUnits = array_values(array_filter(
-            $units,
+            $projectUnits,
             static fn (AnalysisUnit $unit): bool => !$unit->hasParseErrors() && $unit->file->isPhp(),
         ));
 

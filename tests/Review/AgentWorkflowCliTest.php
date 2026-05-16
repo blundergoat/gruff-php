@@ -378,6 +378,66 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Verify changed-only review gives project rules full context before changed-file filtering.
+     *
+     * @throws JsonException
+     * @return void No return value.
+     */
+    public function testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($repo . '/src/Contracts', 0777, true));
+            self::assertTrue(mkdir($repo . '/src/Infrastructure', 0777, true));
+            $this->runGit($repo, 'init');
+            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
+            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
+            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', $this->bookingGatewayInterfaceSource());
+            file_put_contents($repo . '/src/Infrastructure/BookingOtpGateway.php', $this->bookingOtpGatewaySource());
+            $this->runGit($repo, 'add', 'src/Contracts/BookingGatewayInterface.php', 'src/Infrastructure/BookingOtpGateway.php');
+            $this->runGit($repo, 'commit', '-m', 'base');
+
+            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', $this->changedBookingGatewayInterfaceSource());
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                '--format=json',
+                '--fail-on=none',
+                '--no-config',
+                '--no-baseline',
+                '--diff-vs=HEAD',
+                '--changed-only',
+                '--include-rule=design.single-implementor-interface',
+            ], $repo);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $report = $this->decodeJson($process);
+            self::assertSame([], $this->diagnosticTypes($report));
+
+            $summary = $this->arrayValue($report, 'summary');
+            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
+
+            $review = $this->arrayValue($report, 'review');
+            $counts = $this->arrayValue($review, 'counts');
+
+            self::assertSame(0, $this->intValue($counts, 'introduced'));
+            self::assertSame(0, $this->intValue($counts, 'removed'));
+            self::assertSame(1, $this->intValue($counts, 'unchanged'));
+            self::assertContains(
+                'App\\Contracts\\BookingGatewayInterface',
+                $this->symbolsFromFindings($review['unchanged'] ?? null),
+            );
+        } finally {
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
      * Verify branch review deleted file reports removed findings.
      *
      * @throws JsonException
@@ -734,6 +794,69 @@ PHP;
     }
 
     /**
+     * Return source code for a project-rule interface review fixture.
+     *
+     * @return string Fixture value.
+     */
+    private function bookingGatewayInterfaceSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App\Contracts;
+
+interface BookingGatewayInterface
+{
+    public function issueOtp(string $phoneNumber): string;
+}
+PHP;
+    }
+
+    /**
+     * Return changed source code for a project-rule interface review fixture.
+     *
+     * @return string Fixture value.
+     */
+    private function changedBookingGatewayInterfaceSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App\Contracts;
+
+// Branch edit keeps this interface in changed-only scope.
+interface BookingGatewayInterface
+{
+    public function issueOtp(string $phoneNumber): string;
+}
+PHP;
+    }
+
+    /**
+     * Return source code for the unchanged implementor side of a project-rule review fixture.
+     *
+     * @return string Fixture value.
+     */
+    private function bookingOtpGatewaySource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App\Infrastructure;
+
+use App\Contracts\BookingGatewayInterface;
+
+final class BookingOtpGateway implements BookingGatewayInterface
+{
+    public function issueOtp(string $phoneNumber): string
+    {
+        return $phoneNumber;
+    }
+}
+PHP;
+    }
+
+    /**
      * Skip the current test when Git is unavailable.
      *
      * @return void No return value.
@@ -751,7 +874,7 @@ PHP;
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd Working directory.
+     * @param string $cwd  Working directory.
      * @param string $args Command arguments.
      * @return void No return value.
      */

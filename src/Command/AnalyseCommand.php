@@ -32,6 +32,7 @@ use GruffPhp\Review\BranchReviewComparator;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
+use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
 use GruffPhp\Source\SourceDiscoveryResult;
@@ -141,8 +142,16 @@ final class AnalyseCommand extends Command
             $diagnostics,
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
+        $projectContextUnits = $this->projectContextUnits(
+            projectRoot: $projectRoot,
+            options:     $options,
+            config:      $config,
+            registry:    $registry,
+            reviewDiff:  $reviewDiff,
+            fallback:    $sources,
+        );
 
-        $findings         = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
+        $findings         = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config), $projectContextUnits);
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
             $projectRoot,
             $options->mutation,
@@ -428,7 +437,7 @@ final class AnalyseCommand extends Command
         string $projectRoot,
         AnalyseCommandOptions $options,
         AnalysisConfig $config,
-        \GruffPhp\Rule\RuleRegistry $registry,
+        RuleRegistry $registry,
         array $currentFindings,
         float $currentScore,
         ?DiffResult $reviewDiff,
@@ -438,12 +447,13 @@ final class AnalyseCommand extends Command
             return null;
         }
 
-        $snapshot          = new GitArchiveSnapshot();
-        $baseRoot          = null;
-        $baseSnapshotPaths = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff);
-        $baseAnalysisPaths = $this->baseAnalysisPaths($projectRoot, $options);
+        $snapshot            = new GitArchiveSnapshot();
+        $baseRoot            = null;
+        $needsProjectContext = $this->needsChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
+        $baseSnapshotPaths   = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $needsProjectContext);
+        $baseAnalysisPaths   = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
-        if ($options->changedOnly && $baseSnapshotPaths === []) {
+        if ($options->changedOnly && !$needsProjectContext && $baseSnapshotPaths === []) {
             $baseScore = (new ScoreCalculator())->calculate([], null, null);
 
             return (new BranchReviewComparator())->compare(
@@ -467,7 +477,10 @@ final class AnalyseCommand extends Command
                     $options->includeIgnored,
                     $config->ignoredPathPatterns(),
                 );
-                $baseFindings = $registry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config));
+                $baseProjectContextUnits = $needsProjectContext
+                    ? $this->baseProjectContextUnits($baseRoot, $options, $config)
+                    : $baseSources->analysisUnits;
+                $baseFindings = $registry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
                 $baseFindings = array_merge($baseFindings, (new CompositeFindingFactory())->build($baseFindings));
                 $baseFindings = $this->filterAllowedSecretPreviews($baseFindings, $config);
             }
@@ -503,10 +516,19 @@ final class AnalyseCommand extends Command
     /**
      * @return list<string>
      */
-    private function baseSnapshotPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
+    private function baseSnapshotPaths(
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        DiffResult $reviewDiff,
+        bool $needsProjectContext,
+    ): array
     {
         if (!$options->changedOnly) {
             return $this->normaliseRequestedPaths($projectRoot, $options->paths);
+        }
+
+        if ($needsProjectContext) {
+            return [];
         }
 
         if ($reviewDiff->changedFiles === []) {
@@ -534,8 +556,12 @@ final class AnalyseCommand extends Command
     /**
      * @return list<string>
      */
-    private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options): array
+    private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
+        if ($options->changedOnly && $options->paths === []) {
+            return $reviewDiff->changedFiles;
+        }
+
         if ($options->paths === []) {
             return [];
         }
@@ -560,6 +586,57 @@ final class AnalyseCommand extends Command
         }
 
         return $existing === [] ? [] : $existing;
+    }
+
+    /**
+     * @return list<\GruffPhp\Parser\AnalysisUnit>
+     */
+    private function projectContextUnits(
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        AnalysisConfig $config,
+        RuleRegistry $registry,
+        ?DiffResult $reviewDiff,
+        AnalysisSourceSet $fallback,
+    ): array {
+        if (!$this->needsChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
+            return $fallback->analysisUnits;
+        }
+
+        return (new AnalysisSourceLoader())->load(
+            $projectRoot,
+            [],
+            $options->includeIgnored,
+            $config->ignoredPathPatterns(),
+        )->analysisUnits;
+    }
+
+    /**
+     * @return list<\GruffPhp\Parser\AnalysisUnit>
+     */
+    private function baseProjectContextUnits(string $baseRoot, AnalyseCommandOptions $options, AnalysisConfig $config): array
+    {
+        return (new AnalysisSourceLoader())->load(
+            $baseRoot,
+            [],
+            $options->includeIgnored,
+            $config->ignoredPathPatterns(),
+        )->analysisUnits;
+    }
+
+    /**
+     * @return bool True when changed-only mode still needs complete context for project-level rules.
+     */
+    private function needsChangedOnlyProjectContext(
+        AnalyseCommandOptions $options,
+        RuleRegistry $registry,
+        AnalysisConfig $config,
+        ?DiffResult $reviewDiff,
+    ): bool {
+        return $options->changedOnly
+            && $reviewDiff instanceof DiffResult
+            && $reviewDiff->changedFiles !== []
+            && $registry->hasEnabledProjectRules($config);
     }
 
     /**
