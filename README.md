@@ -319,11 +319,23 @@ Useful scripts:
 | --- | --- |
 | `composer check` | Composer validation, shell syntax checks, PHP syntax checks, PHPStan. |
 | `composer test` | PHPUnit test suite. |
+| `composer perf` | Wall, peak-memory, per-rule timing vs. a local baseline. See below. |
 | `composer format` | Apply PHP-CS-Fixer formatting. |
 | `composer format:check` | Check PHP-CS-Fixer formatting. |
 | `scripts/mutation-test-diff.sh` | Diff-scoped Infection workflow. |
 | `scripts/mutation-test-full.sh` | Full Infection workflow. |
 | `scripts/start-dev.sh` | Start the local dashboard. |
+
+### Performance harness
+
+`composer perf` runs `php bin/gruff-php analyse` against three corpora (`src/Diff`,
+`src/`, full self-scan), captures wall time and peak memory, and compares each
+result to `.goat-flow/logs/perf/m50-baseline/baseline.json`. Use
+`composer perf -- --baseline --yes` to overwrite the baseline after intentional
+rule or threshold changes. Baselines are machine- and PHP-version-specific —
+regenerate locally rather than committing a CI-host baseline. Tolerances default
+to wall +20%, peak +25%; override with `GRUFF_PERF_WALL_TOLERANCE` /
+`GRUFF_PERF_MEM_TOLERANCE`. Use `--quick` for a single-corpus, no-warmup run.
 
 CI runs on PHP 8.3 and 8.4 via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 

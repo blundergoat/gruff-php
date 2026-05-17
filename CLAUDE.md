@@ -39,6 +39,7 @@ Application commands configured by `composer.json`:
 git status --short --untracked-files=all
 composer check
 composer test
+composer perf
 php bin/gruff-php --help
 php bin/gruff-php analyse
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude

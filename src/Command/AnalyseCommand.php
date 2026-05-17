@@ -16,6 +16,7 @@ use GruffPhp\Diff\DiffResult;
 use GruffPhp\Diff\GitDiffProvider;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
+use GruffPhp\Command\Runtime\RuntimeTimingObserver;
 use GruffPhp\Mutation\MutationAnalysisBuilder;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Mutation\MutationFindingFactory;
@@ -43,6 +44,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -103,7 +105,9 @@ final class AnalyseCommand extends Command
                     BaselineStore::DEFAULT_FILENAME,
                 ),
             )
-            ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.');
+            ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.')
+            ->addOption('print-runtime', null, InputOption::VALUE_NONE, 'Emit performance instrumentation (wall, peak memory, phase, optional per-rule) as JSON on stderr.')
+            ->addOption('runtime-mode', null, InputOption::VALUE_REQUIRED, 'Runtime payload detail: summary (default) or detailed (adds per-rule totals).', default: 'summary');
     }
 
     /**
@@ -113,6 +117,12 @@ final class AnalyseCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $runtimeStart    = hrtime(true);
+        $printRuntime    = (bool) $input->getOption('print-runtime');
+        $runtimeModeOpt  = $input->getOption('runtime-mode');
+        $runtimeDetailed = $printRuntime && $runtimeModeOpt === 'detailed';
+        $observer        = $runtimeDetailed ? new RuntimeTimingObserver() : null;
+
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input);
 
         if (!$setupResult->setup instanceof AnalyseCommandSetup) {
@@ -129,6 +139,7 @@ final class AnalyseCommand extends Command
         $diagnostics   = [];
         $reviewDiff    = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
         $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
+        $discoverStart = hrtime(true);
 
         $sources = $analysisPaths === null
             ? new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], [])
@@ -138,6 +149,7 @@ final class AnalyseCommand extends Command
                 $options->includeIgnored,
                 $config->ignoredPathPatterns(),
             );
+        $discoverParseNs = hrtime(true) - $discoverStart;
         $diagnostics = array_merge(
             $diagnostics,
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
@@ -151,7 +163,14 @@ final class AnalyseCommand extends Command
             analysisSourceSet: $sources,
         );
 
-        $findings         = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config), $projectContextUnits);
+        $analyseStart     = hrtime(true);
+        $findings         = $registry->analyse(
+            $sources->analysisUnits,
+            new RuleContext($projectRoot, $config),
+            $projectContextUnits,
+            $observer,
+        );
+        $analyseNs        = hrtime(true) - $analyseStart;
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
             $projectRoot,
             $options->mutation,
@@ -182,7 +201,9 @@ final class AnalyseCommand extends Command
         );
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
-        $score  = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $scoreStart = hrtime(true);
+        $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $scoreNs    = hrtime(true) - $scoreStart;
         $review = $this->buildBranchReview(
             projectRoot:     $projectRoot,
             options:         $options,
@@ -233,6 +254,7 @@ final class AnalyseCommand extends Command
             filters:         $displayFilter,
         );
 
+        $reportStart = hrtime(true);
         $this->renderReport(
             report:            $report,
             format:            $format,
@@ -241,8 +263,72 @@ final class AnalyseCommand extends Command
             reportEditorLink:  $options->reportEditorLink,
             reportInteractive: $options->reportInteractive,
         );
+        $reportNs = hrtime(true) - $reportStart;
+
+        if ($printRuntime) {
+            $this->emitRuntimePayload(
+                output:           $output,
+                runtimeStart:     $runtimeStart,
+                discoverParseNs:  $discoverParseNs,
+                analyseNs:        $analyseNs,
+                scoreNs:          $scoreNs,
+                reportNs:         $reportNs,
+                filesParsed:      $sources->parsedFileCount(),
+                rulesExecuted:    count($registry->enabledRules($config)),
+                observer:         $observer,
+                detailed:         $runtimeDetailed,
+            );
+        }
 
         return $exitCode;
+    }
+
+    /**
+     * Write the performance instrumentation payload as a single JSON line on stderr.
+     *
+     * @return void No return value.
+     */
+    private function emitRuntimePayload(
+        OutputInterface $output,
+        int $runtimeStart,
+        int $discoverParseNs,
+        int $analyseNs,
+        int $scoreNs,
+        int $reportNs,
+        int $filesParsed,
+        int $rulesExecuted,
+        ?RuntimeTimingObserver $observer,
+        bool $detailed,
+    ): void {
+        $totalNs = hrtime(true) - $runtimeStart;
+        $payload = [
+            'wallMs'          => (int) round($totalNs / 1_000_000),
+            'peakBytes'       => memory_get_peak_usage(true),
+            'filesParsed'     => $filesParsed,
+            'rulesExecuted'   => $rulesExecuted,
+            'phases'          => [
+                'discoverParseNs' => $discoverParseNs,
+                'analyseNs'       => $analyseNs,
+                'scoreNs'         => $scoreNs,
+                'reportNs'        => $reportNs,
+            ],
+            'mode'            => $detailed ? 'detailed' : 'summary',
+        ];
+
+        if ($detailed && $observer !== null) {
+            $payload['rules'] = $observer->snapshot();
+        }
+
+        $line   = json_encode($payload, JSON_THROW_ON_ERROR) . PHP_EOL;
+        $stderr = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : null;
+
+        if ($stderr !== null) {
+            $stderr->write($line);
+
+            return;
+        }
+
+        fwrite(STDERR, $line);
     }
 
     /**

@@ -39,10 +39,12 @@
             "bash -n scripts/format-php-code.sh",
             "find src tests -name '*.php' -not -path 'tests/Fixtures/Source/syntax-error/*' -print0 | xargs -0 -n1 -P 4 php -l > /dev/null",
             "bash -n scripts/start-dev.sh",
+            "bash -n scripts/test-performance.sh",
             "@phpstan"
         ],
         "format": "scripts/format-php-code.sh",
         "format:check": "php-cs-fixer check --config=.php-cs-fixer.dist.php --diff",
+        "perf": "scripts/test-performance.sh",
         "phpstan": "phpstan analyse --configuration=phpstan.neon.dist",
         "test": "phpunit"
     },
