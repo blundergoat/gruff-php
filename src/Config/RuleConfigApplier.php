@@ -260,7 +260,7 @@ final readonly class RuleConfigApplier
             return $this->listOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
         }
 
-        throw new ConfigException(sprintf('Option "rules.%s.options.%s" has an unsupported default value type.', $ruleId, $optionName));
+        return $this->mapOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
     }
 
     /**
@@ -372,6 +372,74 @@ final readonly class RuleConfigApplier
 
         if (is_int($sample) && !is_int($optionItem)) {
             throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be an integer.', $ruleId, $optionName, $index));
+        }
+    }
+
+    /**
+     * Validate an associative option map with scalar values.
+     *
+     * @param array<array-key, int|float|bool|string> $defaultValue Default option map used as the type contract.
+     * @return array<string, int|float|bool|string> Validated option map.
+     */
+    private function mapOptionValue(string $ruleId, string $optionName, mixed $optionValue, array $defaultValue): array
+    {
+        if (!is_array($optionValue) || array_is_list($optionValue)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an object.', $ruleId, $optionName));
+        }
+
+        $result = [];
+        $sample = reset($defaultValue);
+        foreach ($optionValue as $key => $item) {
+            if (!is_string($key)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s" keys must be strings.', $ruleId, $optionName));
+            }
+
+            if (!is_int($item) && !is_float($item) && !is_bool($item) && !is_string($item)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a scalar value.', $ruleId, $optionName, $key));
+            }
+
+            if ($sample !== false) {
+                $this->assertMapItemType(
+                    ruleId:     $ruleId,
+                    optionName: $optionName,
+                    key:        $key,
+                    optionItem: $item,
+                    sample:     $sample,
+                );
+            }
+
+            $result[$key] = $item;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Validate one configured map item against the default map sample type.
+     *
+     * @return void No return value.
+     */
+    private function assertMapItemType(
+        string $ruleId,
+        string $optionName,
+        string $key,
+        mixed $optionItem,
+        mixed $sample,
+    ): void {
+        if (is_string($sample) && !is_string($optionItem)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a string.', $ruleId, $optionName, $key));
+        }
+
+        if (is_int($sample) && !is_int($optionItem)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be an integer.', $ruleId, $optionName, $key));
+        }
+
+        if (is_float($sample) && !is_int($optionItem) && !is_float($optionItem)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be numeric.', $ruleId, $optionName, $key));
+        }
+
+        if (is_bool($sample) && !is_bool($optionItem)) {
+            throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be boolean.', $ruleId, $optionName, $key));
         }
     }
 

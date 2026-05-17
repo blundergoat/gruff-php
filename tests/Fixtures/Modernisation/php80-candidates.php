@@ -62,3 +62,15 @@ final class ModernServiceConfigurator
     {
     }
 }
+
+final class VariadicRunnerFixture
+{
+    public function exercise(): void
+    {
+        $this->runGit('/repo', 'add', '-A', '--', 'Example.php');
+    }
+
+    private function runGit(string $cwd, string ...$args): void
+    {
+    }
+}

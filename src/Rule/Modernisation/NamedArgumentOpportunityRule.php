@@ -15,6 +15,7 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\NodeFinder;
 
 /**
@@ -62,10 +63,15 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         $definition             = $this->definition();
         $minPositionalArguments = (int) $context->settingsFor($definition)->numericThreshold('minPositionalArguments');
         $finder                 = new NodeFinder();
+        $variadicMethodNames    = $this->variadicMethodNames($unit->statements, $finder);
         $findings               = [];
 
         foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
             if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
+                continue;
+            }
+
+            if ($this->isVariadicMethodCall($call, $variadicMethodNames)) {
                 continue;
             }
 
@@ -112,5 +118,42 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
         }
 
         return $positionalCount >= $minPositionalArguments ? sprintf('%d positional arguments', $positionalCount) : null;
+    }
+
+    /**
+     * Find method names declared with variadic parameters in the same file.
+     *
+     * @param list<Node> $statements Parsed statements to inspect.
+     * @return array<string, true> Lowercase variadic method names.
+     */
+    private function variadicMethodNames(array $statements, NodeFinder $finder): array
+    {
+        $names = [];
+
+        foreach ($finder->findInstanceOf($statements, ClassMethod::class) as $method) {
+            foreach ($method->params as $param) {
+                if ($param->variadic) {
+                    $names[strtolower($method->name->toString())] = true;
+                    break;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Detect calls to same-file variadic methods, where named arguments would be misleading.
+     *
+     * @param array<string, true> $variadicMethodNames Lowercase method names declared with variadic params.
+     * @return bool True when the call target is variadic.
+     */
+    private function isVariadicMethodCall(Expr\MethodCall|Expr\StaticCall $call, array $variadicMethodNames): bool
+    {
+        if (!$call->name instanceof Node\Identifier) {
+            return false;
+        }
+
+        return isset($variadicMethodNames[strtolower($call->name->toString())]);
     }
 }

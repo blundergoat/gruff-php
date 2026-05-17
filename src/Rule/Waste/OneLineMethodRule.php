@@ -16,6 +16,8 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Name;
+use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
@@ -68,12 +70,14 @@ final readonly class OneLineMethodRule implements RuleInterface
         return new RuleDefinition(
             id:              self::ID,
             name:            'One-line method',
-            pillar:          Pillar::DeadCode,
+            pillar:          Pillar::Maintainability,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
             defaultOptions:  [
                 'minParameters' => 1,
+                'minInFileCallers' => 0,
+                'namedAlternativeFactoryExempt' => false,
             ],
             description: 'Flags trivial methods that only wrap a one-line call expression.',
         );
@@ -93,11 +97,22 @@ final readonly class OneLineMethodRule implements RuleInterface
         $settings           = $context->settingsFor($definition);
         $minParameterOption = $settings->option('minParameters');
         $minParameters      = is_int($minParameterOption) ? max(0, $minParameterOption) : 1;
+        $minCallersOption   = $settings->option('minInFileCallers');
+        $minInFileCallers   = is_int($minCallersOption) ? max(0, $minCallersOption) : 0;
+        $factoryExempt      = $settings->option('namedAlternativeFactoryExempt') === true;
         $finder             = new NodeFinder();
+        $methodCallCounts   = $this->methodCallCounts($unit->statements, $finder);
+        $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($unit->statements, $finder) : [];
         $findings           = [];
 
         foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
-            if ($this->shouldSkip($method, $minParameters)) {
+            if ($this->shouldSkip(
+                method:            $method,
+                minParameters:     $minParameters,
+                minInFileCallers:  $minInFileCallers,
+                methodCallCounts:  $methodCallCounts,
+                factoryMethodIds:  $factoryMethodIds,
+            )) {
                 continue;
             }
 
@@ -143,9 +158,18 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Decide whether a method shape is exempt from one-line wrapper checks.
      *
+     * @param array<string, int> $methodCallCounts Method-call counts keyed by lowercase method name.
+     * @param array<int, true>   $factoryMethodIds Alternative named-factory method object ids.
+     *
      * @return bool True when the method should not be reported.
      */
-    private function shouldSkip(ClassMethod $method, int $minParameters): bool
+    private function shouldSkip(
+        ClassMethod $method,
+        int $minParameters,
+        int $minInFileCallers,
+        array $methodCallCounts,
+        array $factoryMethodIds,
+    ): bool
     {
         $name = $method->name->toString();
 
@@ -157,7 +181,15 @@ final readonly class OneLineMethodRule implements RuleInterface
             return true;
         }
 
-        return count($method->params) < $minParameters || $method->stmts === null || count($method->stmts) !== 1;
+        if (count($method->params) < $minParameters || $method->stmts === null || count($method->stmts) !== 1) {
+            return true;
+        }
+
+        if (isset($factoryMethodIds[spl_object_id($method)])) {
+            return true;
+        }
+
+        return $minInFileCallers > 0 && ($methodCallCounts[strtolower($name)] ?? 0) >= $minInFileCallers;
     }
 
     /**
@@ -173,5 +205,93 @@ final readonly class OneLineMethodRule implements RuleInterface
                 || $node instanceof Expr\FuncCall
                 || $node instanceof Expr\New_;
         }) !== null;
+    }
+
+    /**
+     * Count method and static-call names inside the current file.
+     *
+     * @param list<Node> $statements Parsed statements to inspect.
+     * @return array<string, int> Counts keyed by lowercase method name.
+     */
+    private function methodCallCounts(array $statements, NodeFinder $finder): array
+    {
+        $counts = [];
+
+        foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+            if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
+                continue;
+            }
+
+            if (!$call->name instanceof Node\Identifier) {
+                continue;
+            }
+
+            $name          = strtolower($call->name->toString());
+            $counts[$name] = ($counts[$name] ?? 0) + 1;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Find public static self-factory methods when a class exposes multiple named alternatives.
+     *
+     * @param list<Node> $statements Parsed statements to inspect.
+     * @return array<int, true> Method object ids that are exempt.
+     */
+    private function namedAlternativeFactoryMethodIds(array $statements, NodeFinder $finder): array
+    {
+        $factoryIds = [];
+
+        foreach ($finder->findInstanceOf($statements, Class_::class) as $class) {
+            $factories = [];
+
+            foreach ($class->getMethods() as $method) {
+                if ($this->isNamedAlternativeFactory($method, $class)) {
+                    $factories[] = $method;
+                }
+            }
+
+            if (count($factories) < 2) {
+                continue;
+            }
+
+            foreach ($factories as $method) {
+                $factoryIds[spl_object_id($method)] = true;
+            }
+        }
+
+        return $factoryIds;
+    }
+
+    /**
+     * Detect public static methods that return a new instance of their own class.
+     *
+     * @return bool True when the method is a named constructor/factory candidate.
+     */
+    private function isNamedAlternativeFactory(ClassMethod $method, Class_ $class): bool
+    {
+        if (!$method->isPublic() || !$method->isStatic() || $method->stmts === null || count($method->stmts) !== 1) {
+            return false;
+        }
+
+        $statement = $method->stmts[0];
+        if (!$statement instanceof Return_ || !$statement->expr instanceof Expr\New_) {
+            return false;
+        }
+
+        $target = $statement->expr->class;
+        if (!$target instanceof Name) {
+            return false;
+        }
+
+        $targetName = strtolower($target->toString());
+        if ($targetName === 'self' || $targetName === 'static') {
+            return true;
+        }
+
+        $className = $class->name?->toString();
+
+        return $className !== null && strtolower($className) === $targetName;
     }
 }

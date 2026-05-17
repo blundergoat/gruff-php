@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\Naming;
 
 use GruffPhp\Config\AnalysisConfig;
+use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\Naming\BooleanPrefixRule;
@@ -147,6 +148,7 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::check()', $symbols);
+        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
     }
 
     /**
@@ -162,10 +164,37 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::isActive()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::hasPermission()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::canEdit()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::wasReady()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::containsValue()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
+    }
+
+    /**
+     * Verify projects can opt in additional boolean prefixes.
+     *
+     * @return void No return value.
+     */
+    public function testBooleanPrefixAllowedPrefixesCanBeConfigured(): void
+    {
+        $unit     = $this->parseFixture('boolean-prefix.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $prefixes = $settings->stringListOption('allowedPrefixes');
+        $prefixes[] = 'did';
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, ['allowedPrefixes' => $prefixes]),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+        ));
+
+        self::assertNotContains('BooleanPrefixFixture::didRun()', $symbols);
+        self::assertContains('BooleanPrefixFixture::active()', $symbols);
     }
 
     /**

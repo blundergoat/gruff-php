@@ -54,6 +54,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            defaultOptions:  ['allowedPrefixes' => self::GOOD_PREFIXES],
         );
     }
 
@@ -68,6 +69,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
+        $prefixes   = $context->settingsFor($definition)->stringListOption('allowedPrefixes');
         $finder     = new NodeFinder();
         $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
@@ -83,19 +85,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
             $name = $node->name->toString();
 
-            foreach (self::GOOD_PREFIXES as $prefix) {
-                if (!str_starts_with($name, $prefix)) {
-                    continue;
-                }
-
-                if (strlen($name) === strlen($prefix)) {
-                    continue 2;
-                }
-
-                $nextChar = $name[strlen($prefix)];
-                if ($nextChar >= 'A' && $nextChar <= 'Z') {
-                    continue 2;
-                }
+            if ($this->hasAllowedPrefix($name, $prefixes)) {
+                continue;
             }
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
@@ -132,6 +123,32 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
         if ($returnType instanceof Name) {
             return $returnType->toString() === 'bool';
+        }
+
+        return false;
+    }
+
+    /**
+     * Check whether the callable name starts with a configured predicate prefix.
+     *
+     * @param list<string> $prefixes Configured predicate prefixes.
+     * @return bool True when the name has an allowed prefix followed by a word boundary.
+     */
+    private function hasAllowedPrefix(string $name, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            if (!str_starts_with($name, $prefix)) {
+                continue;
+            }
+
+            if (strlen($name) === strlen($prefix)) {
+                return true;
+            }
+
+            $nextChar = $name[strlen($prefix)];
+            if ($nextChar >= 'A' && $nextChar <= 'Z') {
+                return true;
+            }
         }
 
         return false;

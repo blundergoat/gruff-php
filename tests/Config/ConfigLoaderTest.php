@@ -14,6 +14,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 
 /**
  * Covers ConfigLoaderTest behavior.
@@ -129,6 +130,24 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
 
         self::assertSame(9, $settings->numericThreshold('warning'));
         self::assertSame(90, $settings->numericThreshold('error'));
+    }
+
+    /**
+     * Verify loads compact path override list options.
+     *
+     * @return void No return value.
+     */
+    public function testLoadsCompactPathOverrideListOptions(): void
+    {
+        $path = $this->writeTempConfig(
+            "rules:\n    test-quality.test-method-too-long:\n        options:\n            pathOverrides:\n                - 'tests/Console/**=40'\n",
+            '.yaml',
+        );
+
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(TestMethodTooLongRule::ID);
+
+        self::assertSame(['tests/Console/**=40'], $settings->option('pathOverrides'));
     }
 
     /**

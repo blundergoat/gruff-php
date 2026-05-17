@@ -39,6 +39,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::High,
             defaultThresholds: ['maxMeaningfulLines' => 25],
+            defaultOptions:    ['pathOverrides' => []],
         );
     }
 
@@ -53,7 +54,12 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition  = $this->definition();
-        $threshold   = (int) $context->settingsFor($definition)->numericThreshold('maxMeaningfulLines');
+        $settings    = $context->settingsFor($definition);
+        $threshold   = $this->thresholdForPath(
+            $unit->file->displayPath,
+            (int) $settings->numericThreshold('maxMeaningfulLines'),
+            $settings->option('pathOverrides'),
+        );
         $sourceLines = explode("\n", $unit->source);
         $findings    = [];
 
@@ -128,5 +134,52 @@ final readonly class TestMethodTooLongRule implements RuleInterface
         }
 
         return $count;
+    }
+
+    /**
+     * Resolve a path-specific threshold override when configured.
+     *
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides Configured path override map.
+     * @return int Effective max meaningful lines threshold.
+     */
+    private function thresholdForPath(string $displayPath, int $defaultThreshold, int|float|bool|string|array $pathOverrides): int
+    {
+        if (!is_array($pathOverrides)) {
+            return $defaultThreshold;
+        }
+
+        $normalizedPath = str_replace('\\', '/', $displayPath);
+        foreach ($pathOverrides as $pattern => $threshold) {
+            if (is_int($pattern) && is_string($threshold)) {
+                [$pattern, $threshold] = $this->parsePathOverride($threshold);
+            }
+
+            if (!is_string($pattern) || (!is_int($threshold) && !is_float($threshold))) {
+                continue;
+            }
+
+            if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                return max(1, (int) $threshold);
+            }
+        }
+
+        return $defaultThreshold;
+    }
+
+    /**
+     * Parse a compact `glob=threshold` override entry from config.
+     *
+     * @return array{0: string, 1: int|float|string}
+     */
+    private function parsePathOverride(string $pathOverride): array
+    {
+        $parts = explode('=', $pathOverride, 2);
+        if (count($parts) !== 2 || !is_numeric($parts[1])) {
+            return ['', ''];
+        }
+
+        $threshold = str_contains($parts[1], '.') ? (float) $parts[1] : (int) $parts[1];
+
+        return [$parts[0], $threshold];
     }
 }

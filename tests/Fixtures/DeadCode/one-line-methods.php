@@ -11,6 +11,21 @@ final class OneLineMethodFixture
         return $this->rejectionReason($session, $requestContext) === null;
     }
 
+    public function sharedHelper(BookingSession $session, BookingRequestContext $requestContext): ?string
+    {
+        return $this->rejectionReason($session, $requestContext);
+    }
+
+    public function usesSharedHelperForPrimaryPath(BookingSession $session, BookingRequestContext $requestContext): ?string
+    {
+        return $this->sharedHelper($session, $requestContext);
+    }
+
+    public function usesSharedHelperForSecondaryPath(BookingSession $session, BookingRequestContext $requestContext): ?string
+    {
+        return $this->sharedHelper($session, $requestContext);
+    }
+
     public function formatGreeting(string $name): string
     {
         return 'Hello, ' . $name;
@@ -47,4 +62,33 @@ final class BookingSession
 
 final class BookingRequestContext
 {
+}
+
+final class AlternativeFactoryFixture
+{
+    private function __construct(private string $status)
+    {
+    }
+
+    public static function ready(string $status): self
+    {
+        return new self($status);
+    }
+
+    public static function failed(string $status): self
+    {
+        return new self($status);
+    }
+}
+
+final class SingleFactoryFixture
+{
+    private function __construct(private string $status)
+    {
+    }
+
+    public static function only(string $status): self
+    {
+        return new self($status);
+    }
 }

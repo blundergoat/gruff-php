@@ -510,6 +510,12 @@ rules:
         enabled: true
         thresholds:
             maxMeaningfulLines: 25
+        options:
+            pathOverrides:
+                - 'tests/Command/**=40'
+                - 'tests/Console/**=40'
+                - 'tests/Reporting/**=40'
+                - 'tests/Review/**=40'
     # Readable TestDox names make behavior reports useful.
     test-quality.testdox-readability:
         enabled: false
@@ -540,6 +546,8 @@ rules:
         enabled: true
         options:
             minParameters: 1
+            minInFileCallers: 2
+            namedAlternativeFactoryExempt: true
     # Variables assigned only to be returned add noise without naming value.
     waste.redundant-variable:
         enabled: true

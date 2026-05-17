@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Rule\Waste;
 
 use GruffPhp\Config\AnalysisConfig;
+use GruffPhp\Config\RuleSettings;
+use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
@@ -273,6 +275,7 @@ final class WasteRulesTest extends TestCase
 
         self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
         self::assertSame(Severity::Advisory, $findings[0]->severity);
+        self::assertSame(Pillar::Maintainability, $findings[0]->pillar);
         self::assertSame('return', $findings[0]->metadata['statementKind']);
     }
 
@@ -289,6 +292,36 @@ final class WasteRulesTest extends TestCase
         self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
         self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
         self::assertNotContains('OneLineMethodFixture::testItUsesFixture()', $symbols);
+    }
+
+    /**
+     * Verify one-line method caller and named-factory exemptions are opt-in.
+     *
+     * @return void No return value.
+     */
+    public function testOneLineMethodRuleSupportsIntentBearingExemptions(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            OneLineMethodRule::ID,
+            new RuleSettings(
+                true,
+                [],
+                [
+                    'minParameters' => 1,
+                    'minInFileCallers' => 2,
+                    'namedAlternativeFactoryExempt' => true,
+                ],
+            ),
+        );
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
+        self::assertContains('SingleFactoryFixture::only()', $symbols);
+        self::assertNotContains('OneLineMethodFixture::sharedHelper()', $symbols);
+        self::assertNotContains('AlternativeFactoryFixture::ready()', $symbols);
+        self::assertNotContains('AlternativeFactoryFixture::failed()', $symbols);
     }
 
     /**
@@ -323,12 +356,11 @@ final class WasteRulesTest extends TestCase
     /**
      * @return list<\GruffPhp\Finding\Finding>
      */
-    private function analyseRule(string $fixture, string $ruleId): array
+    private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config ?? AnalysisConfig::fromRegistry($registry)));
 
         return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
     }

@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-05-12
 **Author(s):** Codex
-**Ticket/Context:** M36 complexity, size, and dead-code refactors
+**Ticket/Context:** M36 complexity, size, and dead-code refactors; M49 rubric recalibration
 
 ## Context
 
@@ -36,6 +36,14 @@ Keep these one-line methods as intent-bearing exemptions unless a future refacto
 | `TestQualityNodeHelper::docComment()` | Shared AST helper that centralizes doc-comment access. |
 
 Future cleanup may inline one of these only when the callsite remains clearer and no public helper contract is removed. The `waste.one-line-method` rule should remain enabled; these exemptions are a documented project decision, not a threshold relaxation.
+
+M49 converted the recurring exemption shapes into narrow rule options used by this repository's `.gruff.yaml`:
+
+- `minInFileCallers: 2` skips one-line helpers called at least twice in the same file, such as shared escaping or path-normalisation helpers.
+- `namedAlternativeFactoryExempt: true` skips public static self-factory methods only when a class exposes at least two named alternatives.
+- `waste.one-line-method` now reports on the `maintainability` pillar instead of `dead-code`, because the rule describes avoidable indirection rather than unreachable or unused code.
+
+The options remain opt-in for this project configuration so downstream default rule behaviour does not silently loosen.
 
 ## Failure Mode Comparison
 

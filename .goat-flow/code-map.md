@@ -244,7 +244,7 @@ src/
 |       |-- CommentedOutCodeRule.php          = `waste.commented-out-code`
 |       |-- EmptyClassRule.php                = `waste.empty-class`
 |       |-- EmptyMethodRule.php               = `waste.empty-method`
-|       |-- OneLineMethodRule.php             = `waste.one-line-method`
+|       |-- OneLineMethodRule.php             = `waste.one-line-method` (Maintainability pillar)
 |       |-- RedundantVariableRule.php         = `waste.redundant-variable`
 |       |-- UnreachableCodeRule.php           = `waste.unreachable-code`
 |       |-- UnusedImportRule.php              = `waste.unused-import`

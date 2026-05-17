@@ -13,6 +13,8 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Name;
 
 /**
  * Detects tests whose body outweighs the apparent production code under test.
@@ -57,14 +59,18 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         $findings     = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $sutCalls = $this->sutCallCount($scope);
-            if ($scope->lineCount() < $minTestLines || $sutCalls > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
+            $sutCalls = $this->sutCalls($scope);
+            if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
+                continue;
+            }
+
+            if (count($sutCalls) === 1 && $this->isIntegrationHarnessCall($sutCalls[0])) {
                 continue;
             }
 
             $findings[] = new Finding(
                 ruleId:      self::ID,
-                message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, $sutCalls),
+                message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, count($sutCalls)),
                 filePath:    $unit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
@@ -73,7 +79,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
                 remediation: 'Review whether setup and assertions can be simplified or split; this static rule cannot measure the SUT directly.',
-                metadata:    ['testLines' => $scope->lineCount(), 'sutCalls' => $sutCalls],
+                metadata:    ['testLines' => $scope->lineCount(), 'sutCalls' => count($sutCalls)],
             );
         }
 
@@ -83,11 +89,11 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Count apparent non-assertion SUT calls in a test scope.
      *
-     * @return int Number of apparent SUT calls.
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Apparent SUT calls.
      */
-    private function sutCallCount(TestQualityScope $scope): int
+    private function sutCalls(TestQualityScope $scope): array
     {
-        $count = 0;
+        $calls = [];
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
@@ -96,10 +102,59 @@ final readonly class TestLongerThanSutRule implements RuleInterface
 
             $name = TestQualityNodeHelper::callName($call);
             if ($name !== null && !in_array($name, ['sleep', 'usleep'], true)) {
-                $count++;
+                $calls[] = $call;
             }
         }
 
-        return $count;
+        return $calls;
+    }
+
+    /**
+     * Detect integration-test harness calls that naturally need more arrangement than the SUT call itself.
+     *
+     * @return bool True when the single call is a command/process/application harness invocation.
+     */
+    private function isIntegrationHarnessCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        if (!$call instanceof Expr\MethodCall) {
+            return false;
+        }
+
+        $name = TestQualityNodeHelper::callName($call);
+        if ($name === 'execute') {
+            return $this->isHarnessReceiver($call->var, ['tester']);
+        }
+
+        if ($name === 'run') {
+            return $this->isHarnessReceiver($call->var, ['process', 'tester']);
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect harness-looking receiver variables and direct new expressions.
+     *
+     * @param list<string> $variableTokens Lowercase variable-name fragments accepted as harnesses.
+     * @return bool True when the receiver looks like a test harness.
+     */
+    private function isHarnessReceiver(Expr $receiver, array $variableTokens): bool
+    {
+        if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
+            $variableName = strtolower($receiver->name);
+            foreach ($variableTokens as $token) {
+                if (str_contains($variableName, $token)) {
+                    return true;
+                }
+            }
+        }
+
+        if ($receiver instanceof Expr\New_ && $receiver->class instanceof Name) {
+            $className = strtolower($receiver->class->getLast());
+
+            return in_array($className, ['applicationtester', 'commandtester', 'process'], true);
+        }
+
+        return false;
     }
 }
