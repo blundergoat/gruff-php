@@ -80,6 +80,7 @@ final class GitArchiveSnapshotTest extends TestCase
 
         try {
             self::expectException(DiffException::class);
+            self::expectExceptionMessageMatches('/does-not-exist/');
             try {
                 (new GitArchiveSnapshot())->create($repo, 'does-not-exist', ['src/Target.php']);
             } finally {

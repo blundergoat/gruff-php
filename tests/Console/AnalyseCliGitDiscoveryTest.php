@@ -61,9 +61,13 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
             self::assertSame(5, $summary['filesDiscovered'] ?? null);
             $findings = $report['findings'] ?? null;
             self::assertIsArray($findings);
-            foreach ($findings as $finding) {
-                self::assertIsArray($finding);
-                self::assertNotSame('.codex/state.local.json', $finding['file'] ?? null);
+            foreach ($findings as $index => $finding) {
+                self::assertIsArray($finding, "finding #{$index} must be an array");
+                self::assertNotSame(
+                    '.codex/state.local.json',
+                    $finding['file'] ?? null,
+                    "finding #{$index} unexpectedly references the git-ignored state file",
+                );
             }
         } finally {
             $this->removeDir($project);

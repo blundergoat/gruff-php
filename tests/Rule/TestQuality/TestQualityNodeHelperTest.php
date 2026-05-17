@@ -144,7 +144,7 @@ final class TestQualityNodeHelperTest extends TestCase
                 continue;
             }
 
-            self::assertIsString($name);
+            self::assertIsString($name, 'every iterated assertion call should resolve to a string name');
             $results[] = [$name, TestQualityNodeHelper::isTrivialAssertion($call)];
         }
 
@@ -244,7 +244,7 @@ final class TestQualityNodeHelperTest extends TestCase
 
         foreach ($calls as $call) {
             $name = TestQualityNodeHelper::callName($call);
-            self::assertIsString($name);
+            self::assertIsString($name, 'every mock-API call should resolve to a string name');
 
             if (TestQualityNodeHelper::isMockCreationCall($call)) {
                 $mockCreations[] = $name;

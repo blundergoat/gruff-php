@@ -327,14 +327,14 @@ final class NamingRulesTest extends NamingRuleTestCase
     {
         $findings = $this->analyseRule('identifier-quality.php', IdentifierQualityRule::ID);
         $reported = [];
-        foreach ($findings as $finding) {
+        foreach ($findings as $index => $finding) {
             $kind    = $finding->metadata['identifierKind'] ?? null;
             $name    = $finding->metadata['identifierName'] ?? null;
             $variant = $finding->metadata['variant'] ?? null;
 
-            self::assertIsString($kind);
-            self::assertIsString($name);
-            self::assertIsString($variant);
+            self::assertIsString($kind, "finding #{$index} is missing string metadata.identifierKind");
+            self::assertIsString($name, "finding #{$index} is missing string metadata.identifierName");
+            self::assertIsString($variant, "finding #{$index} is missing string metadata.variant");
 
             $reported[sprintf('%s:%s', $kind, $name)] = $variant;
         }

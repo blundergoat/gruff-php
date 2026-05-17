@@ -25,12 +25,12 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     {
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
         $reported = [];
-        foreach ($findings as $finding) {
+        foreach ($findings as $index => $finding) {
             $parameter    = $finding->metadata['parameter'] ?? null;
             $expectedName = $finding->metadata['expectedName'] ?? null;
 
-            self::assertIsString($parameter);
-            self::assertIsString($expectedName);
+            self::assertIsString($parameter, "finding #{$index} is missing string metadata.parameter");
+            self::assertIsString($expectedName, "finding #{$index} is missing string metadata.expectedName");
 
             $reported[$parameter] = $expectedName;
         }
@@ -70,12 +70,12 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
         // through `UnionType` to `return null`; single non-null unions now match `?Foo`.
         $findings = $this->analyseRule('parameter-type-name.php', ParameterTypeNameRule::ID);
         $bySymbol = [];
-        foreach ($findings as $finding) {
+        foreach ($findings as $index => $finding) {
             $symbol       = $finding->symbol;
             $expectedName = $finding->metadata['expectedName'] ?? null;
 
-            self::assertIsString($symbol);
-            self::assertIsString($expectedName);
+            self::assertIsString($symbol, "finding #{$index} is missing a string symbol");
+            self::assertIsString($expectedName, "finding #{$index} is missing string metadata.expectedName");
 
             $bySymbol[$symbol] = $expectedName;
         }
@@ -230,12 +230,12 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
             static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
         ));
         $reported = [];
-        foreach ($findings as $finding) {
+        foreach ($findings as $index => $finding) {
             $symbol = $finding->symbol;
             $name   = $finding->metadata['identifierName'] ?? null;
 
-            self::assertIsString($symbol);
-            self::assertIsString($name);
+            self::assertIsString($symbol, "finding #{$index} is missing a string symbol");
+            self::assertIsString($name, "finding #{$index} is missing string metadata.identifierName");
 
             $reported[] = sprintf('%s:%s', $symbol, $name);
         }

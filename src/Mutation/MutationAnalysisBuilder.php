@@ -89,7 +89,7 @@ final readonly class MutationAnalysisBuilder
 
         clearstatcache(true, $reportPath);
 
-        if ($runResult->exitCode === Command::SUCCESS || $this->reportWasFreshlyWritten($reportPath, $preRunMtime)) {
+        if ($runResult->exitCode === Command::SUCCESS || $this->isReportFresh($reportPath, $preRunMtime)) {
             return true;
         }
 
@@ -168,8 +168,10 @@ final readonly class MutationAnalysisBuilder
      *
      * A pre-existing report whose mtime has not advanced is treated as stale to avoid
      * surfacing outdated mutation results when Infection exits before rewriting it.
+     *
+     * @return bool True when the report file was (re)written after $preRunMtime.
      */
-    private function reportWasFreshlyWritten(string $reportPath, ?int $preRunMtime): bool
+    private function isReportFresh(string $reportPath, ?int $preRunMtime): bool
     {
         if (!is_file($reportPath)) {
             return false;
