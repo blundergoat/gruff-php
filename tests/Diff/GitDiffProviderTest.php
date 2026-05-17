@@ -102,7 +102,8 @@ final class GitDiffProviderTest extends TestCase
             self::assertNull($staged->base);
             self::assertSame(['Added.php', 'DeleteMe.php', 'Example.php'], $staged->changedFiles);
             self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->startLine);
-            self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->endLine);
+            self::assertSame(-1, $staged->rangesFor('DeleteMe.php')[0]->endLine);
+            self::assertFalse($staged->rangesFor('DeleteMe.php')[0]->touches(1, 1000));
             self::assertNotSame([], $staged->rangesFor('Added.php'));
             self::assertNotSame([], $staged->rangesFor('Example.php'));
 

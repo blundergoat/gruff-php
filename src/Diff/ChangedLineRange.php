@@ -30,9 +30,7 @@ final readonly class ChangedLineRange
      */
     public static function fromStartAndLength(int $startLine, int $length): self
     {
-        $safeLength = max(1, $length);
-
-        return new self($startLine, $startLine + $safeLength - 1);
+        return new self($startLine, $startLine + $length - 1);
     }
 
     /**

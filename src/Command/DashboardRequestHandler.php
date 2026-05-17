@@ -219,14 +219,18 @@ final readonly class DashboardRequestHandler
         }
 
         $host = strtolower($hostHeader);
-        $port = null;
+        $port = $this->context->bindPort;
 
-        if (preg_match('/^\[(?<host>[^\]]+)\]:(?<port>\d+)$/', $host, $matches) === 1) {
+        if (preg_match('/^\[(?<host>[^\]]+)\](?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = '[' . $matches['host'] . ']';
-            $port = (int) $matches['port'];
-        } elseif (preg_match('/^(?<host>[^:]+):(?<port>\d+)$/', $host, $matches) === 1) {
+            if (isset($matches['port']) && $matches['port'] !== '') {
+                $port = (int) $matches['port'];
+            }
+        } elseif (preg_match('/^(?<host>[^:]+)(?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = $matches['host'];
-            $port = (int) $matches['port'];
+            if (isset($matches['port']) && $matches['port'] !== '') {
+                $port = (int) $matches['port'];
+            }
         }
 
         if ($port !== $this->context->bindPort) {
@@ -237,7 +241,17 @@ final readonly class DashboardRequestHandler
             return in_array($host, ['127.0.0.1', 'localhost', '[::1]'], true);
         }
 
-        return $host === strtolower($this->context->bindHost);
+        if ($this->isBindHostWildcard()) {
+            return true;
+        }
+
+        $bindHost = strtolower($this->context->bindHost);
+
+        if (str_contains($bindHost, ':') && !str_starts_with($bindHost, '[')) {
+            $bindHost = '[' . $bindHost . ']';
+        }
+
+        return $host === $bindHost;
     }
 
     /**
@@ -248,6 +262,16 @@ final readonly class DashboardRequestHandler
     private function isBindHostLoopback(): bool
     {
         return in_array(strtolower($this->context->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
+    }
+
+    /**
+     * Check whether the configured bind host is a wildcard address.
+     *
+     * @return bool True when the dashboard is listening on all interfaces.
+     */
+    private function isBindHostWildcard(): bool
+    {
+        return in_array(strtolower($this->context->bindHost), ['0.0.0.0', '::', '[::]'], true);
     }
 
     /**

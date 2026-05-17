@@ -126,6 +126,14 @@ final class ReportCommand extends Command
             return $process->getExitCode() ?? Command::FAILURE;
         }
 
+        $exitCode  = $process->getExitCode() ?? Command::FAILURE;
+
+        if ($report === '' && $exitCode !== Command::SUCCESS) {
+            $output->writeln(sprintf('<error>Analyse exited with code %d before producing a report; %s was not written.</error>', $exitCode, $outputPath));
+
+            return $exitCode;
+        }
+
         $path      = $this->absolutePath($outputPath, $projectRoot);
         $directory = dirname($path);
 
@@ -143,7 +151,7 @@ final class ReportCommand extends Command
 
         $output->writeln(sprintf('<info>Report written to %s</info>', $path));
 
-        return $process->getExitCode() ?? Command::FAILURE;
+        return $exitCode;
     }
 
     /**

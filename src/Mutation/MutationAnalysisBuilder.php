@@ -66,6 +66,9 @@ final readonly class MutationAnalysisBuilder
             return true;
         }
 
+        $reportPath  = $this->absolutePath($projectRoot, $options->infectionReportPath ?? '');
+        $preRunMtime = is_file($reportPath) ? filemtime($reportPath) : null;
+
         $runResult = (new InfectionRunner())->runInfection(
             $projectRoot,
             $options->infectionBin,
@@ -79,7 +82,9 @@ final readonly class MutationAnalysisBuilder
             return false;
         }
 
-        if ($runResult->exitCode === Command::SUCCESS || is_file($this->absolutePath($projectRoot, $options->infectionReportPath ?? ''))) {
+        clearstatcache(true, $reportPath);
+
+        if ($runResult->exitCode === Command::SUCCESS || $this->reportWasFreshlyWritten($reportPath, $preRunMtime)) {
             return true;
         }
 
@@ -151,5 +156,26 @@ final readonly class MutationAnalysisBuilder
         }
 
         return rtrim($projectRoot, '/') . '/' . $path;
+    }
+
+    /**
+     * Decide whether the report on disk reflects this Infection invocation.
+     *
+     * Mtime is unreliable to a one-second resolution, so a same-second rewrite
+     * is also treated as fresh; this matches what users expect when re-running.
+     */
+    private function reportWasFreshlyWritten(string $reportPath, ?int $preRunMtime): bool
+    {
+        if (!is_file($reportPath)) {
+            return false;
+        }
+
+        if ($preRunMtime === null) {
+            return true;
+        }
+
+        $currentMtime = filemtime($reportPath);
+
+        return is_int($currentMtime) && $currentMtime >= $preRunMtime;
     }
 }

@@ -80,7 +80,7 @@ final readonly class GitDiffProvider
      */
     private function validatedRef(string $ref): string
     {
-        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {
+        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
         }
 
@@ -140,7 +140,7 @@ final readonly class GitDiffProvider
      */
     private function parseNewFilePath(string $line): ?string
     {
-        $rawPath = substr($line, 4);
+        $rawPath = $this->normaliseHeaderPath(substr($line, 4));
 
         if ($rawPath === '/dev/null') {
             return null;
@@ -160,7 +160,7 @@ final readonly class GitDiffProvider
      */
     private function parseOldFilePath(string $line): ?string
     {
-        $rawPath = substr($line, 4);
+        $rawPath = $this->normaliseHeaderPath(substr($line, 4));
 
         if ($rawPath === '/dev/null') {
             return null;
@@ -168,6 +168,29 @@ final readonly class GitDiffProvider
 
         if (str_starts_with($rawPath, 'a/')) {
             return substr($rawPath, 2);
+        }
+
+        return $rawPath;
+    }
+
+    /**
+     * Normalise the raw path portion of a git diff header.
+     *
+     * Handles git's quoted form (core.quotePath / non-ASCII filenames) and strips
+     * trailing tab-separated metadata that some patch formats append.
+     *
+     * @return string Cleaned header path.
+     */
+    private function normaliseHeaderPath(string $rawPath): string
+    {
+        if (strlen($rawPath) >= 2 && $rawPath[0] === '"' && $rawPath[strlen($rawPath) - 1] === '"') {
+            return stripcslashes(substr($rawPath, 1, -1));
+        }
+
+        $tabIndex = strpos($rawPath, "\t");
+
+        if ($tabIndex !== false) {
+            return substr($rawPath, 0, $tabIndex);
         }
 
         return $rawPath;

@@ -209,7 +209,7 @@ final readonly class GitArchiveSnapshot
      */
     private function validatedRef(string $ref): string
     {
-        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~-]+$/', $ref) !== 1) {
+        if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Git archive base ref "%s" is not a safe git ref name.', $ref));
         }
 

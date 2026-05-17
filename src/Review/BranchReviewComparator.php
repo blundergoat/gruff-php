@@ -33,18 +33,25 @@ final readonly class BranchReviewComparator
         $unchanged    = [];
         $removed      = [];
 
-        foreach ($currentByKey as $key => $finding) {
-            if (isset($baseByKey[$key])) {
-                $unchanged[] = $finding;
-                continue;
+        foreach ($currentByKey as $key => $currentFindings) {
+            $baseFindings = $baseByKey[$key] ?? [];
+            $matched      = min(count($currentFindings), count($baseFindings));
+
+            for ($i = 0; $i < $matched; $i++) {
+                $unchanged[] = $currentFindings[$i];
             }
 
-            $introduced[] = $finding;
+            for ($i = $matched, $end = count($currentFindings); $i < $end; $i++) {
+                $introduced[] = $currentFindings[$i];
+            }
         }
 
-        foreach ($baseByKey as $key => $finding) {
-            if (!isset($currentByKey[$key])) {
-                $removed[] = $finding;
+        foreach ($baseByKey as $key => $baseFindings) {
+            $currentFindings = $currentByKey[$key] ?? [];
+            $matched         = min(count($baseFindings), count($currentFindings));
+
+            for ($i = $matched, $end = count($baseFindings); $i < $end; $i++) {
+                $removed[] = $baseFindings[$i];
             }
         }
 
@@ -53,14 +60,14 @@ final readonly class BranchReviewComparator
 
     /**
      * @param list<Finding> $findings
-     * @return array<string, Finding>
+     * @return array<string, list<Finding>>
      */
     private function index(array $findings, FindingReviewIdentity $identity): array
     {
         $indexed = [];
 
         foreach ($findings as $finding) {
-            $indexed[$identity->key($finding)] ??= $finding;
+            $indexed[$identity->key($finding)][] = $finding;
         }
 
         ksort($indexed, SORT_STRING);

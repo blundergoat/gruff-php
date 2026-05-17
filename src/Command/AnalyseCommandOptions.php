@@ -330,7 +330,7 @@ final readonly class AnalyseCommandOptions
      */
     private static function diffMode(InputInterface $input): ?string
     {
-        if (!$input->hasParameterOption('--diff')) {
+        if (!$input->hasParameterOption('--diff', true)) {
             return null;
         }
 
