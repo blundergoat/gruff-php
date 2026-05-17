@@ -223,12 +223,12 @@ final readonly class DashboardRequestHandler
 
         if (preg_match('/^\[(?<host>[^\]]+)\](?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = '[' . $matches['host'] . ']';
-            if (isset($matches['port']) && $matches['port'] !== '') {
+            if (isset($matches['port'])) {
                 $port = (int) $matches['port'];
             }
         } elseif (preg_match('/^(?<host>[^:]+)(?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = $matches['host'];
-            if (isset($matches['port']) && $matches['port'] !== '') {
+            if (isset($matches['port'])) {
                 $port = (int) $matches['port'];
             }
         }

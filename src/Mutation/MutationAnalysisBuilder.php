@@ -67,7 +67,12 @@ final readonly class MutationAnalysisBuilder
         }
 
         $reportPath  = $this->absolutePath($projectRoot, $options->infectionReportPath ?? '');
-        $preRunMtime = is_file($reportPath) ? filemtime($reportPath) : null;
+        $preRunMtime = null;
+
+        if (is_file($reportPath)) {
+            $mtime       = filemtime($reportPath);
+            $preRunMtime = $mtime === false ? null : $mtime;
+        }
 
         $runResult = (new InfectionRunner())->runInfection(
             $projectRoot,
@@ -159,10 +164,10 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
-     * Decide whether the report on disk reflects this Infection invocation.
+     * Decide whether the report on disk was produced by this Infection invocation.
      *
-     * Mtime is unreliable to a one-second resolution, so a same-second rewrite
-     * is also treated as fresh; this matches what users expect when re-running.
+     * A pre-existing report whose mtime has not advanced is treated as stale to avoid
+     * surfacing outdated mutation results when Infection exits before rewriting it.
      */
     private function reportWasFreshlyWritten(string $reportPath, ?int $preRunMtime): bool
     {
@@ -176,6 +181,6 @@ final readonly class MutationAnalysisBuilder
 
         $currentMtime = filemtime($reportPath);
 
-        return is_int($currentMtime) && $currentMtime >= $preRunMtime;
+        return is_int($currentMtime) && $currentMtime > $preRunMtime;
     }
 }
