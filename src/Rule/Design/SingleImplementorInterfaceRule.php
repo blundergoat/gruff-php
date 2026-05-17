@@ -114,82 +114,138 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);
         $resolvedUnits = $this->resolveNames($eligibleUnits);
 
-        $interfaces         = [];
-        $implementations    = [];
-        $typeReferences     = [];
-        $extendedInterfaces = [];
-
-        foreach ($resolvedUnits as $resolved) {
-            $unit       = $resolved['unit'];
-            $statements = $resolved['statements'];
-            $finder     = new NodeFinder();
-
-            foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
-                if ($node instanceof Interface_) {
-                    if ($node->name === null) {
-                        continue;
-                    }
-
-                    $fqn = $this->declarationFqn($node);
-                    if ($fqn === null) {
-                        continue;
-                    }
-
-                    $extends = $this->resolveNameList($node->extends);
-                    $interfaces[$fqn] = [
-                        'fqn' => $fqn,
-                        'unit' => $unit,
-                        'line' => $node->getStartLine(),
-                        'extends' => $extends,
-                        'attributes' => $this->resolveAttributes(array_values($node->attrGroups)),
-                    ];
-
-                    foreach ($extends as $parentFqn) {
-                        $extendedInterfaces[$parentFqn] = true;
-                    }
-
-                    continue;
-                }
-
-                if (!$node instanceof Class_) {
-                    continue;
-                }
-
-                if ($node->name === null) {
-                    continue;
-                }
-
-                $classFqn = $this->declarationFqn($node);
-                if ($classFqn === null) {
-                    continue;
-                }
-
-                foreach ($this->resolveNameList($node->implements) as $implementedFqn) {
-                    $implementations[$implementedFqn][] = [
-                        'classFqn' => $classFqn,
-                        'unit' => $unit,
-                        'line' => $node->getStartLine(),
-                    ];
-                }
-
-                foreach ($this->collectClassTypeReferences($node, $classFqn, $finder) as $reference) {
-                    $typeReferences[$reference['targetFqn']][] = [
-                        'classFqn' => $reference['classFqn'],
-                        'unit' => $unit,
-                        'line' => $reference['line'],
-                    ];
-                }
-            }
-        }
+        $projectTypes = $this->collectProjectTypes($resolvedUnits);
 
         return $this->buildFindings(
-            interfaces:                 $interfaces,
-            implementations:            $implementations,
-            typeReferences:             $typeReferences,
-            extendedInterfaces:         $extendedInterfaces,
+            interfaces:                 $projectTypes['interfaces'],
+            implementations:            $projectTypes['implementations'],
+            typeReferences:             $projectTypes['typeReferences'],
+            extendedInterfaces:         $projectTypes['extendedInterfaces'],
             externalPrefixes:           $externalPrefixes,
             frameworkAttributePrefixes: $frameworkAttributePrefixes,
         );
+    }
+
+    /**
+     * @param list<array{unit: AnalysisUnit, statements: list<Node\Stmt>}> $resolvedUnits
+     * @return array{
+     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * }
+     */
+    private function collectProjectTypes(array $resolvedUnits): array
+    {
+        $projectTypes = [
+            'interfaces' => [],
+            'implementations' => [],
+            'typeReferences' => [],
+            'extendedInterfaces' => [],
+        ];
+
+        foreach ($resolvedUnits as $resolved) {
+            $this->collectUnitTypes($resolved['unit'], $resolved['statements'], $projectTypes);
+        }
+
+        return $projectTypes;
+    }
+
+    /**
+     * @param list<Node\Stmt> $statements
+     * @param array{
+     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * } $projectTypes
+     * @return void No return value.
+     */
+    private function collectUnitTypes(AnalysisUnit $unit, array $statements, array &$projectTypes): void
+    {
+        $finder = new NodeFinder();
+
+        foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
+            if ($node instanceof Interface_) {
+                $this->recordInterface($node, $unit, $projectTypes);
+                continue;
+            }
+
+            if ($node instanceof Class_) {
+                $this->recordClass($node, $unit, $finder, $projectTypes);
+            }
+        }
+    }
+
+    /**
+     * @param array{
+     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * } $projectTypes
+     * @return void No return value.
+     */
+    private function recordInterface(Interface_ $interface, AnalysisUnit $unit, array &$projectTypes): void
+    {
+        if ($interface->name === null) {
+            return;
+        }
+
+        $fqn = $this->declarationFqn($interface);
+        if ($fqn === null) {
+            return;
+        }
+
+        $extends                          = $this->resolveNameList($interface->extends);
+        $projectTypes['interfaces'][$fqn] = [
+            'fqn' => $fqn,
+            'unit' => $unit,
+            'line' => $interface->getStartLine(),
+            'extends' => $extends,
+            'attributes' => $this->resolveAttributes(array_values($interface->attrGroups)),
+        ];
+
+        foreach ($extends as $parentFqn) {
+            $projectTypes['extendedInterfaces'][$parentFqn] = true;
+        }
+    }
+
+    /**
+     * @param array{
+     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * } $projectTypes
+     * @return void No return value.
+     */
+    private function recordClass(Class_ $class, AnalysisUnit $unit, NodeFinder $finder, array &$projectTypes): void
+    {
+        if ($class->name === null) {
+            return;
+        }
+
+        $classFqn = $this->declarationFqn($class);
+        if ($classFqn === null) {
+            return;
+        }
+
+        foreach ($this->resolveNameList($class->implements) as $implementedFqn) {
+            $projectTypes['implementations'][$implementedFqn][] = [
+                'classFqn' => $classFqn,
+                'unit' => $unit,
+                'line' => $class->getStartLine(),
+            ];
+        }
+
+        foreach ($this->collectClassTypeReferences($class, $classFqn, $finder) as $reference) {
+            $projectTypes['typeReferences'][$reference['targetFqn']][] = [
+                'classFqn' => $reference['classFqn'],
+                'unit' => $unit,
+                'line' => $reference['line'],
+            ];
+        }
     }
 
     /**

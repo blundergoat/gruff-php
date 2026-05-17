@@ -128,7 +128,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
         $payload = json_decode($lines[count($lines) - 1], true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($payload);
 
-        /** @var array<string, mixed> $payload */
+        /** @var array<string, mixed> $payload decoded JSON payload is validated key by key below. */
         return $payload;
     }
 }

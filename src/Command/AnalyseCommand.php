@@ -117,11 +117,11 @@ final class AnalyseCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $runtimeStart    = hrtime(true);
-        $printRuntime    = (bool) $input->getOption('print-runtime');
-        $runtimeModeOpt  = $input->getOption('runtime-mode');
-        $runtimeDetailed = $printRuntime && $runtimeModeOpt === 'detailed';
-        $observer        = $runtimeDetailed ? new RuntimeTimingObserver() : null;
+        $runtimeStart          = hrtime(true);
+        $printRuntime          = (bool) $input->getOption('print-runtime');
+        $runtimeModeOpt        = $input->getOption('runtime-mode');
+        $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
+        $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input);
 
@@ -150,7 +150,7 @@ final class AnalyseCommand extends Command
                 $config->ignoredPathPatterns(),
             );
         $discoverParseNs = hrtime(true) - $discoverStart;
-        $diagnostics = array_merge(
+        $diagnostics     = array_merge(
             $diagnostics,
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
@@ -163,12 +163,12 @@ final class AnalyseCommand extends Command
             analysisSourceSet: $sources,
         );
 
-        $analyseStart     = hrtime(true);
-        $findings         = $registry->analyse(
+        $analyseStart = hrtime(true);
+        $findings     = $registry->analyse(
             $sources->analysisUnits,
             new RuleContext($projectRoot, $config),
             $projectContextUnits,
-            $observer,
+            $runtimeTimingObserver,
         );
         $analyseNs        = hrtime(true) - $analyseStart;
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
@@ -204,7 +204,7 @@ final class AnalyseCommand extends Command
         $scoreStart = hrtime(true);
         $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
         $scoreNs    = hrtime(true) - $scoreStart;
-        $review = $this->buildBranchReview(
+        $review     = $this->buildBranchReview(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
@@ -269,14 +269,16 @@ final class AnalyseCommand extends Command
             $this->emitRuntimePayload(
                 output:           $output,
                 runtimeStart:     $runtimeStart,
-                discoverParseNs:  $discoverParseNs,
-                analyseNs:        $analyseNs,
-                scoreNs:          $scoreNs,
-                reportNs:         $reportNs,
-                filesParsed:      $sources->parsedFileCount(),
-                rulesExecuted:    count($registry->enabledRules($config)),
-                observer:         $observer,
-                detailed:         $runtimeDetailed,
+                phaseDurationsNs: [
+                    'discoverParseNs' => $discoverParseNs,
+                    'analyseNs' => $analyseNs,
+                    'scoreNs' => $scoreNs,
+                    'reportNs' => $reportNs,
+                ],
+                filesParsed:           $sources->parsedFileCount(),
+                rulesExecuted:         count($registry->enabledRules($config)),
+                runtimeTimingObserver: $runtimeTimingObserver,
+                detailed:              $runtimeDetailed,
             );
         }
 
@@ -286,37 +288,30 @@ final class AnalyseCommand extends Command
     /**
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
+     * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs Timed analyse phase durations in nanoseconds.
      * @return void No return value.
      */
     private function emitRuntimePayload(
         OutputInterface $output,
         int $runtimeStart,
-        int $discoverParseNs,
-        int $analyseNs,
-        int $scoreNs,
-        int $reportNs,
+        array $phaseDurationsNs,
         int $filesParsed,
         int $rulesExecuted,
-        ?RuntimeTimingObserver $observer,
+        ?RuntimeTimingObserver $runtimeTimingObserver,
         bool $detailed,
     ): void {
         $totalNs = hrtime(true) - $runtimeStart;
         $payload = [
-            'wallMs'          => (int) round($totalNs / 1_000_000),
-            'peakBytes'       => memory_get_peak_usage(true),
-            'filesParsed'     => $filesParsed,
-            'rulesExecuted'   => $rulesExecuted,
-            'phases'          => [
-                'discoverParseNs' => $discoverParseNs,
-                'analyseNs'       => $analyseNs,
-                'scoreNs'         => $scoreNs,
-                'reportNs'        => $reportNs,
-            ],
-            'mode'            => $detailed ? 'detailed' : 'summary',
+            'wallMs' => (int) round($totalNs / 1_000_000),
+            'peakBytes' => memory_get_peak_usage(true),
+            'filesParsed' => $filesParsed,
+            'rulesExecuted' => $rulesExecuted,
+            'phases' => $phaseDurationsNs,
+            'mode' => $detailed ? 'detailed' : 'summary',
         ];
 
-        if ($detailed && $observer !== null) {
-            $payload['rules'] = $observer->snapshot();
+        if ($detailed && $runtimeTimingObserver !== null) {
+            $payload['rules'] = $runtimeTimingObserver->snapshot();
         }
 
         $line   = json_encode($payload, JSON_THROW_ON_ERROR) . PHP_EOL;

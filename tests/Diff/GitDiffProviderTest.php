@@ -94,7 +94,7 @@ final class GitDiffProviderTest extends TestCase
             file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function value(): int\n    {\n        return 2;\n    }\n}\n");
             file_put_contents($tempDir . '/Added.php', "<?php\nfinal class Added {}\n");
             unlink($tempDir . '/DeleteMe.php');
-            $this->runGit($tempDir, 'add', 'Example.php', 'Added.php', 'DeleteMe.php');
+            $this->runGit($tempDir, 'add', '-A');
 
             $staged = (new GitDiffProvider())->changedLines($tempDir, 'staged');
 
@@ -103,7 +103,7 @@ final class GitDiffProviderTest extends TestCase
             self::assertSame(['Added.php', 'DeleteMe.php', 'Example.php'], $staged->changedFiles);
             self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->startLine);
             self::assertSame(-1, $staged->rangesFor('DeleteMe.php')[0]->endLine);
-            self::assertFalse($staged->rangesFor('DeleteMe.php')[0]->touches(1, 1000));
+            self::assertFalse($staged->rangesFor('DeleteMe.php')[0]->touches(startLine: 1, endLine: 1000));
             self::assertNotSame([], $staged->rangesFor('Added.php'));
             self::assertNotSame([], $staged->rangesFor('Example.php'));
 
@@ -111,7 +111,7 @@ final class GitDiffProviderTest extends TestCase
             file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function value(): int\n    {\n        return 3;\n    }\n}\n");
 
             $workingTree = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
-            $baseRef = (new GitDiffProvider())->changedLines($tempDir, 'HEAD~1');
+            $baseRef     = (new GitDiffProvider())->changedLines($tempDir, 'HEAD~1');
 
             self::assertSame('working-tree', $workingTree->mode);
             self::assertSame(['Example.php'], $workingTree->changedFiles);
@@ -223,7 +223,7 @@ final class GitDiffProviderTest extends TestCase
      * Build a finding fixture for assertions.
      *
      * @param string $filePath Finding file path.
-     * @param int $line Finding line number.
+     * @param int    $line     Finding line number.
      * @return Finding Fixture value.
      */
     private function finding(string $filePath, int $line): Finding
@@ -272,7 +272,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd Working directory.
+     * @param string $cwd  Working directory.
      * @param string $args Command arguments.
      * @return void No return value.
      */

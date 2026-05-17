@@ -341,17 +341,17 @@ final class RuleRegistry
     /**
      * Run all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit>       $units        Parsed units to analyse with file-scoped rules.
-     * @param RuleContext              $context      Rule execution context.
-     * @param list<AnalysisUnit>|null  $projectUnits Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null  $observer     Optional per-rule timing hook; default analyse runs leave this null.
+     * @param list<AnalysisUnit>      $units              Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $context            Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
      * @return list<Finding> Findings produced by enabled rules.
      */
     public function analyse(
         array $units,
         RuleContext $context,
         ?array $projectUnits = null,
-        ?RuleRunnerObserver $observer = null,
+        ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
         $findings     = [];
         $enabledRules = $this->enabledRules($context->config);
@@ -372,15 +372,15 @@ final class RuleRegistry
                     continue;
                 }
 
-                if ($observer === null) {
+                if ($ruleRunnerObserver === null) {
                     array_push($findings, ...$rule->analyse($unit, $context));
                     continue;
                 }
 
-                $ruleId  = $rule->definition()->id;
-                $started = hrtime(true);
+                $ruleId       = $rule->definition()->id;
+                $started      = hrtime(true);
                 $ruleFindings = $rule->analyse($unit, $context);
-                $observer->onRuleExecuted($ruleId, hrtime(true) - $started);
+                $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
                 array_push($findings, ...$ruleFindings);
             }
         }
@@ -397,15 +397,15 @@ final class RuleRegistry
                     continue;
                 }
 
-                if ($observer === null) {
+                if ($ruleRunnerObserver === null) {
                     array_push($findings, ...$rule->analyseProject($analyseableUnits, $context));
                     continue;
                 }
 
-                $ruleId  = $rule->definition()->id;
-                $started = hrtime(true);
+                $ruleId          = $rule->definition()->id;
+                $started         = hrtime(true);
                 $projectFindings = $rule->analyseProject($analyseableUnits, $context);
-                $observer->onRuleExecuted($ruleId, hrtime(true) - $started);
+                $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
                 array_push($findings, ...$projectFindings);
             }
         }

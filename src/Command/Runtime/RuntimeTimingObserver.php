@@ -17,6 +17,8 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     /**
      * Accumulate one rule invocation's duration into the per-rule totals.
      *
+     * @param string $ruleId     Rule identifier as declared in the rule's RuleDefinition.
+     * @param int    $durationNs Wall-clock nanoseconds the rule spent in analyse().
      * @return void No return value.
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
