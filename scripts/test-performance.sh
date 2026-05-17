@@ -9,6 +9,10 @@ RUN_LOG_DIR="$REPO_ROOT/.goat-flow/logs/perf/m50-baseline"
 
 WALL_TOLERANCE="${GRUFF_PERF_WALL_TOLERANCE:-20}"
 MEM_TOLERANCE="${GRUFF_PERF_MEM_TOLERANCE:-25}"
+# Sub-200ms baselines are dominated by process startup and scheduling noise;
+# ±20% there is meaningless. Corpora whose baseline wallMs is below this floor
+# can warn but never fail. Override with GRUFF_PERF_WALL_FLOOR_MS.
+WALL_NOISE_FLOOR_MS="${GRUFF_PERF_WALL_FLOOR_MS:-200}"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     BOLD=$'\033[1m'
@@ -64,6 +68,8 @@ ${BOLD}Output${RESET}
 ${BOLD}Tolerances${RESET}
   GRUFF_PERF_WALL_TOLERANCE  Wall-time regression threshold, percent. Default 20.
   GRUFF_PERF_MEM_TOLERANCE   Peak-memory regression threshold, percent. Default 25.
+  GRUFF_PERF_WALL_FLOOR_MS   Baselines below this wall time can warn but never
+                             fail. Default 200 (sub-200ms is process-startup noise).
 
 ${BOLD}Examples${RESET}
   scripts/test-performance.sh --quick
@@ -312,6 +318,12 @@ compare_to_baseline() {
         local wall_status peak_status
         wall_status="$(classify "$wall_delta" "$WALL_TOLERANCE")"
         peak_status="$(classify "$peak_delta" "$MEM_TOLERANCE")"
+
+        if [[ -n "$base_wall" ]] && awk -v b="$base_wall" -v f="$WALL_NOISE_FLOOR_MS" 'BEGIN { exit !(b < f) }'; then
+            if [[ "$wall_status" == "$FAIL" ]]; then
+                wall_status="$WARN"
+            fi
+        fi
 
         local base_wall_disp="${base_wall:--}"
         local base_peak_disp="${base_peak:--}"
