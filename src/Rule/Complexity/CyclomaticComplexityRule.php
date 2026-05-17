@@ -150,6 +150,18 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function computeCyclomaticComplexity(Node $node): int
     {
+        static $cache = null;
+        if (!$cache instanceof \WeakMap) {
+            $cache = new \WeakMap();
+        }
+
+        if (isset($cache[$node])) {
+            $cached = $cache[$node];
+            if (is_int($cached)) {
+                return $cached;
+            }
+        }
+
         $ccn = 1;
 
         $finder = new NodeFinder();
@@ -166,6 +178,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 }
             }
         }
+
+        $cache[$node] = $ccn;
 
         return $ccn;
     }

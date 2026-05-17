@@ -124,58 +124,61 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             $statements = $resolved['statements'];
             $finder     = new NodeFinder();
 
-            /** @var list<Interface_> $interfaceNodes NodeFinder narrows the statement walk to interface declarations. */
-            $interfaceNodes = $finder->findInstanceOf($statements, Interface_::class);
-            foreach ($interfaceNodes as $interface) {
-                if ($interface->name === null) {
+            foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
+                if ($node instanceof Interface_) {
+                    if ($node->name === null) {
+                        continue;
+                    }
+
+                    $fqn = $this->declarationFqn($node);
+                    if ($fqn === null) {
+                        continue;
+                    }
+
+                    $extends = $this->resolveNameList($node->extends);
+                    $interfaces[$fqn] = [
+                        'fqn' => $fqn,
+                        'unit' => $unit,
+                        'line' => $node->getStartLine(),
+                        'extends' => $extends,
+                        'attributes' => $this->resolveAttributes(array_values($node->attrGroups)),
+                    ];
+
+                    foreach ($extends as $parentFqn) {
+                        $extendedInterfaces[$parentFqn] = true;
+                    }
+
                     continue;
                 }
 
-                $fqn = $this->declarationFqn($interface);
-                if ($fqn === null) {
+                if (!$node instanceof Class_) {
                     continue;
                 }
 
-                $interfaces[$fqn] = [
-                    'fqn' => $fqn,
-                    'unit' => $unit,
-                    'line' => $interface->getStartLine(),
-                    'extends' => $this->resolveNameList($interface->extends),
-                    'attributes' => $this->resolveAttributes(array_values($interface->attrGroups)),
-                ];
-
-                foreach ($this->resolveNameList($interface->extends) as $parentFqn) {
-                    $extendedInterfaces[$parentFqn] = true;
-                }
-            }
-
-            /** @var list<Class_> $classNodes NodeFinder narrows the statement walk to class declarations. */
-            $classNodes = $finder->findInstanceOf($statements, Class_::class);
-            foreach ($classNodes as $class) {
-                if ($class->name === null) {
+                if ($node->name === null) {
                     continue;
                 }
 
-                $classFqn = $this->declarationFqn($class);
+                $classFqn = $this->declarationFqn($node);
                 if ($classFqn === null) {
                     continue;
                 }
 
-                foreach ($this->resolveNameList($class->implements) as $implementedFqn) {
+                foreach ($this->resolveNameList($node->implements) as $implementedFqn) {
                     $implementations[$implementedFqn][] = [
                         'classFqn' => $classFqn,
                         'unit' => $unit,
-                        'line' => $class->getStartLine(),
+                        'line' => $node->getStartLine(),
                     ];
                 }
-            }
 
-            foreach ($this->collectTypeReferences($statements, $finder) as $reference) {
-                $typeReferences[$reference['targetFqn']][] = [
-                    'classFqn' => $reference['classFqn'],
-                    'unit' => $unit,
-                    'line' => $reference['line'],
-                ];
+                foreach ($this->collectClassTypeReferences($node, $classFqn, $finder) as $reference) {
+                    $typeReferences[$reference['targetFqn']][] = [
+                        'classFqn' => $reference['classFqn'],
+                        'unit' => $unit,
+                        'line' => $reference['line'],
+                    ];
+                }
             }
         }
 
@@ -383,55 +386,29 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     }
 
     /**
-     * @param list<Node\Stmt> $statements
      * @return list<array{targetFqn: string, classFqn: string, line: int}>
      */
-    private function collectTypeReferences(array $statements, NodeFinder $finder): array
+    private function collectClassTypeReferences(Class_ $class, string $classFqn, NodeFinder $finder): array
     {
         $references = [];
 
-        /** @var list<Class_> $classNodes NodeFinder narrows the statement walk to class declarations. */
-        $classNodes = $finder->findInstanceOf($statements, Class_::class);
-        foreach ($classNodes as $class) {
-            $classFqn = $this->declarationFqn($class);
-            if ($classFqn === null) {
+        foreach ($finder->find([$class], static fn (Node $node): bool => $node instanceof Param || $node instanceof ClassMethod || $node instanceof Property) as $node) {
+            if ($node instanceof Param) {
+                $type = $node->type;
+            } elseif ($node instanceof ClassMethod) {
+                $type = $node->returnType;
+            } elseif ($node instanceof Property) {
+                $type = $node->type;
+            } else {
                 continue;
             }
 
-            /** @var list<Param> $params NodeFinder narrows the class subtree to parameter nodes. */
-            $params = $finder->findInstanceOf([$class], Param::class);
-            foreach ($params as $param) {
-                foreach ($this->namesFromType($param->type) as $name) {
-                    $references[] = [
-                        'targetFqn' => $this->resolveName($name),
-                        'classFqn' => $classFqn,
-                        'line' => $param->getStartLine(),
-                    ];
-                }
-            }
-
-            /** @var list<ClassMethod> $methods NodeFinder narrows the class subtree to method declarations. */
-            $methods = $finder->findInstanceOf([$class], ClassMethod::class);
-            foreach ($methods as $method) {
-                foreach ($this->namesFromType($method->returnType) as $name) {
-                    $references[] = [
-                        'targetFqn' => $this->resolveName($name),
-                        'classFqn' => $classFqn,
-                        'line' => $method->getStartLine(),
-                    ];
-                }
-            }
-
-            /** @var list<Property> $properties NodeFinder narrows the class subtree to property declarations. */
-            $properties = $finder->findInstanceOf([$class], Property::class);
-            foreach ($properties as $property) {
-                foreach ($this->namesFromType($property->type) as $name) {
-                    $references[] = [
-                        'targetFqn' => $this->resolveName($name),
-                        'classFqn' => $classFqn,
-                        'line' => $property->getStartLine(),
-                    ];
-                }
+            foreach ($this->namesFromType($type) as $name) {
+                $references[] = [
+                    'targetFqn' => $this->resolveName($name),
+                    'classFqn' => $classFqn,
+                    'line' => $node->getStartLine(),
+                ];
             }
         }
 

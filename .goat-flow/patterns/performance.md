@@ -1,6 +1,6 @@
 ---
 category: performance
-last_reviewed: 2026-05-16
+last_reviewed: 2026-05-17
 ---
 
 # Performance Patterns
@@ -21,3 +21,13 @@ php /path/to/gruff-php/bin/gruff-php analyse --diff-vs=origin/deploy --changed-o
 ```
 
 **Verification:** Keep lightweight tests that prove explicit changed files do not archive unrelated base files, added files do not fail base snapshot setup, deleted files can report removed findings, and failed snapshot creation removes temporary directories.
+
+## Pattern: Cache repeated AST metrics within one analyse process
+
+**Created:** 2026-05-17
+
+**Context:** `scripts/test-performance.sh --full --corpus=all` identified repeated AST traversals as a real analyse hot path. Before the optimisation pass, the large corpus showed `design.single-implementor-interface` at about 688 ms and `complexity.maintainability-index` at about 522 ms in the per-rule top list. The relevant anchors are `src/Rule/Complexity/CyclomaticComplexityRule.php` (search: `static $cache = null`), `src/Rule/Complexity/HalsteadVolumeRule.php` (search: `validatedMetrics`), and `src/Rule/Design/SingleImplementorInterfaceRule.php` (search: `collectClassTypeReferences`).
+
+**Approach:** When two rules or helper calculations need the same expensive AST metric for the same `PhpParser\Node`, cache it in a process-local `WeakMap` keyed by the node. This lets `complexity.maintainability-index` reuse cyclomatic and Halstead calculations that other complexity rules already requested, while avoiding retention of parsed ASTs after the analyse process releases them. For project rules that scan whole corpora, prefer one broad `NodeFinder::find()` pass that collects the needed class/interface nodes over multiple `findInstanceOf()` passes for each node type, then do targeted subtree scans only where the rule needs class-local references.
+
+**Verification:** Use the performance script before and after the change, not ad hoc stopwatch timing. The 2026-05-17 optimisation pass kept focused rule tests green (`tests/Rule/Complexity/*`, `tests/Rule/Design/SingleImplementorInterfaceRuleTest.php`), `composer test` green, and `composer check` green. A follow-up `scripts/test-performance.sh --full --corpus=large` run reported `design.single-implementor-interface` at about 401 ms and `complexity.maintainability-index` at about 177 ms; rerun on the same machine/PHP build because wall time has normal local variance.

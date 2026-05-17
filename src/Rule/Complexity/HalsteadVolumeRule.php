@@ -125,6 +125,18 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     public static function computeHalsteadMetrics(Node $node): array
     {
+        static $cache = null;
+        if (!$cache instanceof \WeakMap) {
+            $cache = new \WeakMap();
+        }
+
+        if (isset($cache[$node])) {
+            $cached = self::validatedMetrics($cache[$node]);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
         $operators      = [];
         $operands       = [];
         $totalOperators = 0;
@@ -147,7 +159,38 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             }
         }
 
-        return self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
+        $metrics      = self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
+        $cache[$node] = $metrics;
+
+        return $metrics;
+    }
+
+    /**
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null
+     */
+    private static function validatedMetrics(mixed $value): ?array
+    {
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $volume     = $value['volume'] ?? null;
+        $difficulty = $value['difficulty'] ?? null;
+        $effort     = $value['effort'] ?? null;
+        $vocabulary = $value['vocabulary'] ?? null;
+        $length     = $value['length'] ?? null;
+
+        if (!is_float($volume) || !is_float($difficulty) || !is_float($effort) || !is_int($vocabulary) || !is_int($length)) {
+            return null;
+        }
+
+        return [
+            'volume' => $volume,
+            'difficulty' => $difficulty,
+            'effort' => $effort,
+            'vocabulary' => $vocabulary,
+            'length' => $length,
+        ];
     }
 
     /**
