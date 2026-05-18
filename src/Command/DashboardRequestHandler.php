@@ -149,13 +149,13 @@ final readonly class DashboardRequestHandler
      */
     private function query(string $target): array
     {
-        $queryString = parse_url($target, PHP_URL_QUERY);
+        $rawQuery = parse_url($target, PHP_URL_QUERY);
 
-        if (!is_string($queryString) || $queryString === '') {
+        if (!is_string($rawQuery) || $rawQuery === '') {
             return [];
         }
 
-        parse_str($queryString, $query);
+        parse_str($rawQuery, $query);
         $clean = [];
 
         foreach ($query as $key => $value) {

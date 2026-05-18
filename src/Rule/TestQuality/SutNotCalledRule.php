@@ -185,7 +185,7 @@ final readonly class SutNotCalledRule implements RuleInterface
      */
     private function hasNamedSutCall(TestQualityScope $scope, array $candidates): bool
     {
-        $candidateSet = array_fill_keys($candidates, true);
+        $candidateLookup = array_fill_keys($candidates, true);
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
@@ -193,7 +193,7 @@ final readonly class SutNotCalledRule implements RuleInterface
             }
 
             $name = TestQualityNodeHelper::callName($call);
-            if ($name !== null && isset($candidateSet[TestQualityNodeHelper::normalizedTestName($name)])) {
+            if ($name !== null && isset($candidateLookup[TestQualityNodeHelper::normalizedTestName($name)])) {
                 return true;
             }
         }

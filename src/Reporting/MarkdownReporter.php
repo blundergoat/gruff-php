@@ -192,7 +192,7 @@ final readonly class MarkdownReporter
         if ($report->findings === []) {
             $lines[] = 'No findings.';
         } else {
-            $this->appendFindingGroups($lines, 'Current findings', $report->findings, includeHeading: false);
+            $this->appendFindingGroups($lines, 'Current findings', $report->findings, hasHeading: false);
         }
     }
 
@@ -222,9 +222,9 @@ final readonly class MarkdownReporter
      *
      * @return void No return value.
      */
-    private function appendFindingGroups(array &$lines, string $title, array $findings, bool $includeHeading = true): void
+    private function appendFindingGroups(array &$lines, string $title, array $findings, bool $hasHeading = true): void
     {
-        if ($includeHeading) {
+        if ($hasHeading) {
             $lines[] = sprintf('### %s', $title);
             $lines[] = '';
         }

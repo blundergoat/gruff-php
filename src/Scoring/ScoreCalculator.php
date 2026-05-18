@@ -285,7 +285,7 @@ final readonly class ScoreCalculator
      */
     private function maxMetadataInt(array $findings, string $ruleId, string $key): ?int
     {
-        $max = null;
+        $maximumValue = null;
 
         foreach ($findings as $finding) {
             if ($finding->ruleId !== $ruleId) {
@@ -297,10 +297,10 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            $max = $max === null ? $value : max($max, $value);
+            $maximumValue = $maximumValue === null ? $value : max($maximumValue, $value);
         }
 
-        return $max;
+        return $maximumValue;
     }
 
     /**
@@ -309,7 +309,7 @@ final readonly class ScoreCalculator
      */
     private function maxLineMetric(array $findings): ?int
     {
-        $max = null;
+        $maximumLines = null;
 
         foreach ($findings as $finding) {
             if (!in_array($finding->ruleId, ['size.file-length', 'size.method-length', 'size.class-length'], true)) {
@@ -321,9 +321,9 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            $max = $max === null ? $value : max($max, $value);
+            $maximumLines = $maximumLines === null ? $value : max($maximumLines, $value);
         }
 
-        return $max;
+        return $maximumLines;
     }
 }

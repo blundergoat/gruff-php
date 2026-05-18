@@ -408,15 +408,15 @@ final class NamingRulesTest extends NamingRuleTestCase
     {
         $findings = $this->analyseFixture('closure-coverage.php');
 
-        self::assertTrue($this->hasFinding($findings, ShortVariableRule::ID, 'variable', 'x', 'arrow@'));
-        self::assertTrue($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'foo', 'closure@'));
-        self::assertTrue($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'tmp', 'closure@'));
-        self::assertTrue($this->hasFinding($findings, HungarianNotationRule::ID, 'variable', 'strName', 'closure@'));
-        self::assertTrue($this->hasFinding($findings, BooleanPrefixRule::ID, 'identifierName', 'changedOnly', 'closure@'));
-        self::assertTrue($this->hasFinding($findings, ParameterTypeNameRule::ID, 'parameter', 'session', 'closure@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'arrow@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'closure@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'tmp', symbolPrefix: 'closure@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: HungarianNotationRule::ID, metadataKey: 'variable', metadataValue: 'strName', symbolPrefix: 'closure@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: BooleanPrefixRule::ID, metadataKey: 'identifierName', metadataValue: 'changedOnly', symbolPrefix: 'closure@'));
+        self::assertTrue($this->hasFinding(findings: $findings, ruleId: ParameterTypeNameRule::ID, metadataKey: 'parameter', metadataValue: 'session', symbolPrefix: 'closure@'));
 
-        self::assertFalse($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'foo', 'ClosureCoverageFixture::run()'));
-        self::assertFalse($this->hasFinding($findings, ShortVariableRule::ID, 'variable', 'x', 'ClosureCoverageFixture::run()'));
+        self::assertFalse($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'ClosureCoverageFixture::run()'));
+        self::assertFalse($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'ClosureCoverageFixture::run()'));
     }
 
     /**

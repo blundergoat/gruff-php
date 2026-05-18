@@ -136,9 +136,9 @@ final readonly class SleepInTestRule implements RuleInterface
     {
         $findings = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $new) {
-            if ($new instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($new)) {
-                $findings[] = $this->dateTimeFinding($unit, $scope, $new);
+        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $newExpression) {
+            if ($newExpression instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($newExpression)) {
+                $findings[] = $this->dateTimeFinding($unit, $scope, $newExpression);
             }
         }
 
@@ -150,16 +150,16 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return bool True when the class is a DateTime variant constructed with "now" or no argument.
      */
-    private function isWallClockDateTimeConstructor(Expr\New_ $new): bool
+    private function isWallClockDateTimeConstructor(Expr\New_ $newExpression): bool
     {
-        if (!$new->class instanceof Name) {
+        if (!$newExpression->class instanceof Name) {
             return false;
         }
 
-        $className = strtolower($new->class->getLast());
+        $className = strtolower($newExpression->class->getLast());
 
         return in_array($className, self::WALL_CLOCK_DATETIME_CLASSES, true)
-            && $this->isWallClockDateTime($new);
+            && $this->isWallClockDateTime($newExpression);
     }
 
     /**
@@ -167,13 +167,13 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return bool
      */
-    private function isWallClockDateTime(Expr\New_ $new): bool
+    private function isWallClockDateTime(Expr\New_ $newExpression): bool
     {
-        if ($new->args === []) {
+        if ($newExpression->args === []) {
             return true;
         }
 
-        $first = $new->args[0];
+        $first = $newExpression->args[0];
         if (!$first instanceof Arg) {
             return false;
         }
@@ -232,19 +232,19 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return Finding
      */
-    private function dateTimeFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\New_ $new): Finding
+    private function dateTimeFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\New_ $newExpression): Finding
     {
-        if (!$new->class instanceof Name) {
+        if (!$newExpression->class instanceof Name) {
             throw new \LogicException('DateTime finding requires a named class.');
         }
 
-        $className = $new->class;
+        $className = $newExpression->class;
 
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),
             filePath:    $unit->file->displayPath,
-            line:        $new->getStartLine(),
+            line:        $newExpression->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::TestQuality,
             tier:        RuleTier::V01,

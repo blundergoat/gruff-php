@@ -13,14 +13,14 @@ namespace GruffPhp\Config;
 final readonly class StringListConfigParser
 {
     /**
-     * @param ConfigValue $value        Raw config value to normalize.
-     * @param string      $path         Config path used in validation messages.
-     * @param bool        $pathPatterns Whether values are interpreted as path patterns.
-     * @param bool        $allowGlobs   Whether glob-like wildcard patterns are accepted.
+     * @param ConfigValue $value           Raw config value to normalize.
+     * @param string      $path            Config path used in validation messages.
+     * @param bool        $hasPathPatterns Whether values are interpreted as path patterns.
+     * @param bool        $allowsGlobs     Whether glob-like wildcard patterns are accepted.
      * @return list<string>
      * @throws ConfigException When the config value is not a valid string list.
      */
-    public function parse(object|array|string|int|float|bool|null $value, string $path, bool $pathPatterns, bool $allowGlobs): array
+    public function parse(object|array|string|int|float|bool|null $value, string $path, bool $hasPathPatterns, bool $allowsGlobs): array
     {
         if (!is_array($value) || !array_is_list($value)) {
             throw new ConfigException(sprintf('Config key "%s" must be a list of strings.', $path));
@@ -28,8 +28,8 @@ final readonly class StringListConfigParser
 
         $strings = [];
 
-        foreach ($value as $index => $rawString) {
-            $strings[] = $this->normalizedString($rawString, $path, $index, pathPatterns: $pathPatterns, allowGlobs: $allowGlobs);
+        foreach ($value as $index => $rawConfigValue) {
+            $strings[] = $this->normalizedString($rawConfigValue, $path, $index, hasPathPatterns: $hasPathPatterns, allowsGlobs: $allowsGlobs);
         }
 
         return array_values(array_unique($strings));
@@ -41,20 +41,20 @@ final readonly class StringListConfigParser
      * @return string Trimmed string with directory separators normalized.
      */
     private function normalizedString(
-        mixed $rawString,
+        mixed $rawConfigValue,
         string $path,
         int|string $index,
-        bool $pathPatterns,
-        bool $allowGlobs,
+        bool $hasPathPatterns,
+        bool $allowsGlobs,
     ): string {
-        if (!is_string($rawString) || trim($rawString) === '') {
+        if (!is_string($rawConfigValue) || trim($rawConfigValue) === '') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a non-empty string.', $path, $index));
         }
 
-        $normalized = str_replace('\\', '/', trim($rawString));
+        $normalized = str_replace('\\', '/', trim($rawConfigValue));
 
-        if ($pathPatterns) {
-            $this->assertPathPattern($normalized, $path, $index, $allowGlobs);
+        if ($hasPathPatterns) {
+            $this->assertPathPattern($normalized, $path, $index, $allowsGlobs);
         }
 
         return $normalized;
@@ -65,13 +65,13 @@ final readonly class StringListConfigParser
      *
      * @return void
      */
-    private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowGlobs): void
+    private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowsGlobs): void
     {
         if (str_starts_with($normalized, '/') || str_contains($normalized, '../') || $normalized === '..') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a relative project path pattern.', $path, $index));
         }
 
-        if (!$allowGlobs && str_contains($normalized, '*')) {
+        if (!$allowsGlobs && str_contains($normalized, '*')) {
             throw new ConfigException(sprintf('Config key "%s.%s" does not support glob syntax.', $path, $index));
         }
     }

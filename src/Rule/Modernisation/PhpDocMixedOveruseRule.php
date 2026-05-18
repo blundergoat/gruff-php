@@ -165,13 +165,13 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      *
      * @return bool
      */
-    private function isScannedTag(string $tag): bool
+    private function isScannedTag(string $tagName): bool
     {
-        return in_array($tag, self::PARAM_TAGS, true)
-            || in_array($tag, self::RETURN_TAGS, true)
-            || in_array($tag, self::VAR_TAGS, true)
-            || in_array($tag, self::PROPERTY_TAGS, true)
-            || in_array($tag, self::TYPE_ALIAS_TAGS, true);
+        return in_array($tagName, self::PARAM_TAGS, true)
+            || in_array($tagName, self::RETURN_TAGS, true)
+            || in_array($tagName, self::VAR_TAGS, true)
+            || in_array($tagName, self::PROPERTY_TAGS, true)
+            || in_array($tagName, self::TYPE_ALIAS_TAGS, true);
     }
 
     /**

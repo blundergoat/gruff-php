@@ -63,9 +63,9 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $useMap   = $this->collectUseMap($unit, $finder);
-        $findings = [];
+        $finder     = new NodeFinder();
+        $useAliases = $this->collectUseAliases($unit, $finder);
+        $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
@@ -78,7 +78,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
                     continue;
                 }
 
-                $resolved = $this->resolveClassName($className, $useMap);
+                $resolved = $this->resolveClassName($className, $useAliases);
                 $matched  = $this->matchesAnyPattern($resolved, $patterns);
 
                 if ($matched === null) {
@@ -112,26 +112,26 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * @return array<string, string>
      */
-    private function collectUseMap(AnalysisUnit $unit, NodeFinder $finder): array
+    private function collectUseAliases(AnalysisUnit $unit, NodeFinder $finder): array
     {
-        $map = [];
+        $useAliases = [];
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\Use_::class) as $use) {
             foreach ($use->uses as $useUse) {
-                $alias       = $useUse->getAlias()->toString();
-                $map[$alias] = $useUse->name->toString();
+                $alias              = $useUse->getAlias()->toString();
+                $useAliases[$alias] = $useUse->name->toString();
             }
         }
 
         foreach ($finder->findInstanceOf($unit->statements, Stmt\GroupUse::class) as $group) {
             $prefix = $group->prefix->toString();
             foreach ($group->uses as $useUse) {
-                $alias       = $useUse->getAlias()->toString();
-                $map[$alias] = $prefix . '\\' . $useUse->name->toString();
+                $alias              = $useUse->getAlias()->toString();
+                $useAliases[$alias] = $prefix . '\\' . $useUse->name->toString();
             }
         }
 
-        return $map;
+        return $useAliases;
     }
 
     /**
@@ -155,11 +155,11 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * @param array<string, string> $useMap
+     * @param array<string, string> $useAliases
      *
      * @return string Resolved class name.
      */
-    private function resolveClassName(string $className, array $useMap): string
+    private function resolveClassName(string $className, array $useAliases): string
     {
         if (str_starts_with($className, '\\')) {
             return ltrim($className, '\\');
@@ -167,10 +167,10 @@ final readonly class MockingDomainObjectRule implements RuleInterface
 
         $first = explode('\\', $className, 2)[0];
 
-        if (isset($useMap[$first])) {
+        if (isset($useAliases[$first])) {
             $rest = substr($className, strlen($first));
 
-            return $useMap[$first] . $rest;
+            return $useAliases[$first] . $rest;
         }
 
         return $className;

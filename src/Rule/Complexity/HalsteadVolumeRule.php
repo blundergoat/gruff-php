@@ -140,10 +140,10 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $totalOperators = 0;
         $totalOperands  = 0;
 
-        $finder = new NodeFinder();
-        $all    = $finder->find($node->stmts ?? [], static fn (): bool => true);
+        $finder          = new NodeFinder();
+        $descendantNodes = $finder->find($node->stmts ?? [], static fn (): bool => true);
 
-        foreach ($all as $childNode) {
+        foreach ($descendantNodes as $childNode) {
             $operatorKey = self::operatorKey($childNode);
             if ($operatorKey !== null) {
                 $operators[$operatorKey] = true;

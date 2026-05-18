@@ -105,10 +105,10 @@ final readonly class RuleConfigApplier
      * @param ConfigObject $ruleConfig
      * @return bool Effective enabled flag for the rule.
      */
-    private function isEnabled(string $ruleId, array $ruleConfig, bool $default): bool
+    private function isEnabled(string $ruleId, array $ruleConfig, bool $isEnabledByDefault): bool
     {
         if (!array_key_exists('enabled', $ruleConfig)) {
-            return $default;
+            return $isEnabledByDefault;
         }
 
         if (!is_bool($ruleConfig['enabled'])) {

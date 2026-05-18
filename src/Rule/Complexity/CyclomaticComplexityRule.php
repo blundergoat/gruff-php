@@ -165,9 +165,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         $finder = new NodeFinder();
         $body   = $node->stmts ?? [];
 
-        $all = $finder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
+        $decisionNodes = $finder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
 
-        $ccn += count($all);
+        $ccn += count($decisionNodes);
 
         foreach ($finder->findInstanceOf($body, Expr\Match_::class) as $match) {
             foreach ($match->arms as $arm) {

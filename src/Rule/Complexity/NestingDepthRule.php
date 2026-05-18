@@ -127,13 +127,13 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkStatements(array $stmts, int $depth): int
     {
-        $max = $depth;
+        $maximumDepth = $depth;
 
         foreach ($stmts as $stmt) {
-            $max = max($max, self::walkNode($stmt, $depth));
+            $maximumDepth = max($maximumDepth, self::walkNode($stmt, $depth));
         }
 
-        return $max;
+        return $maximumDepth;
     }
 
     /**
@@ -163,18 +163,18 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkIf(Stmt\If_ $node, int $depth): int
     {
-        $inner = $depth + 1;
-        $max   = self::walkStatements($node->stmts, $inner);
+        $inner        = $depth + 1;
+        $maximumDepth = self::walkStatements($node->stmts, $inner);
 
         foreach ($node->elseifs as $elseif) {
-            $max = max($max, self::walkStatements($elseif->stmts, $inner));
+            $maximumDepth = max($maximumDepth, self::walkStatements($elseif->stmts, $inner));
         }
 
         if ($node->else !== null) {
-            $max = max($max, self::walkStatements($node->else->stmts, $inner));
+            $maximumDepth = max($maximumDepth, self::walkStatements($node->else->stmts, $inner));
         }
 
-        return $max;
+        return $maximumDepth;
     }
 
     /**
@@ -184,13 +184,13 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkSwitch(Stmt\Switch_ $node, int $depth): int
     {
-        $max = $depth + 1;
+        $maximumDepth = $depth + 1;
 
         foreach ($node->cases as $case) {
-            $max = max($max, self::walkStatements($case->stmts, $depth + 1));
+            $maximumDepth = max($maximumDepth, self::walkStatements($case->stmts, $depth + 1));
         }
 
-        return $max;
+        return $maximumDepth;
     }
 
     /**
@@ -200,17 +200,17 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkTryCatch(Stmt\TryCatch $node, int $depth): int
     {
-        $max = self::walkStatements($node->stmts, $depth);
+        $maximumDepth = self::walkStatements($node->stmts, $depth);
 
         foreach ($node->catches as $catch) {
-            $max = max($max, self::walkStatements($catch->stmts, $depth + 1));
+            $maximumDepth = max($maximumDepth, self::walkStatements($catch->stmts, $depth + 1));
         }
 
         if ($node->finally !== null) {
-            $max = max($max, self::walkStatements($node->finally->stmts, $depth));
+            $maximumDepth = max($maximumDepth, self::walkStatements($node->finally->stmts, $depth));
         }
 
-        return $max;
+        return $maximumDepth;
     }
 
     /**
@@ -224,17 +224,17 @@ final readonly class NestingDepthRule implements RuleInterface
             return self::walkStatements($expr->stmts ?? [], $depth + 1);
         }
 
-        $max = $depth;
+        $maximumDepth = $depth;
 
         foreach ($expr->getSubNodeNames() as $name) {
-            $sub = $expr->$name;
+            $subExpression = $expr->$name;
 
-            if ($sub instanceof Expr) {
-                $max = max($max, self::walkExprNesting($sub, $depth));
+            if ($subExpression instanceof Expr) {
+                $maximumDepth = max($maximumDepth, self::walkExprNesting($subExpression, $depth));
             }
         }
 
-        return $max;
+        return $maximumDepth;
     }
 
     /**

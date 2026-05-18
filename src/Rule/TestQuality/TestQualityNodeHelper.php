@@ -454,14 +454,14 @@ final class TestQualityNodeHelper
      */
     public static function pestExpectationValue(Expr\MethodCall $call): ?Expr
     {
-        $var = $call->var;
+        $receiver = $call->var;
 
-        if ($var instanceof Expr\FuncCall && self::functionName($var) === 'expect') {
-            return self::firstArgValue($var);
+        if ($receiver instanceof Expr\FuncCall && self::functionName($receiver) === 'expect') {
+            return self::firstArgValue($receiver);
         }
 
-        if ($var instanceof Expr\MethodCall) {
-            return self::pestExpectationValue($var);
+        if ($receiver instanceof Expr\MethodCall) {
+            return self::pestExpectationValue($receiver);
         }
 
         return null;

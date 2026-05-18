@@ -10,12 +10,12 @@ namespace GruffPhp\Command;
 final class DashboardHttpResponder
 {
     /**
-     * @param resource              $client   Socket client receiving the dashboard response.
-     * @param DashboardHttpResponse $response HTTP response to write to the client.
-     * @param bool                  $headOnly Whether the body should be omitted for a HEAD request.
+     * @param resource              $client        Socket client receiving the dashboard response.
+     * @param DashboardHttpResponse $response      HTTP response to write to the client.
+     * @param bool                  $isHeadRequest Whether the body should be omitted for a HEAD request.
      * @return void
      */
-    public function write($client, DashboardHttpResponse $response, bool $headOnly): void
+    public function write($client, DashboardHttpResponse $response, bool $isHeadRequest): void
     {
         $headers = [
             sprintf('HTTP/1.1 %d %s', $response->statusCode, $response->reasonPhrase),
@@ -29,7 +29,7 @@ final class DashboardHttpResponder
 
         fwrite($client, implode("\r\n", $headers));
 
-        if (!$headOnly) {
+        if (!$isHeadRequest) {
             fwrite($client, $response->body);
         }
     }

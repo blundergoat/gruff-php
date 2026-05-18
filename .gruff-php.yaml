@@ -301,6 +301,7 @@ rules:
                 - expression
                 - first
                 - name
+                - newExpression
                 - parameter
                 - receiver
                 - returnStatement

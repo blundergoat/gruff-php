@@ -71,8 +71,8 @@ final class SummaryCommand extends Command
             return Command::INVALID;
         }
 
-        $top = $this->topLimit($input, $output);
-        if ($top === null) {
+        $topLimit = $this->topLimit($input, $output);
+        if ($topLimit === null) {
             return Command::INVALID;
         }
 
@@ -96,16 +96,16 @@ final class SummaryCommand extends Command
         }
 
         return $this->writeSummary(
-            output:              $output,
-            format:              $format,
-            summaryReportData:   $this->summaryData(
-                projectRoot:         $projectRoot,
-                paths:               $this->paths($input),
-                includeIgnored:      (bool) $input->getOption('include-ignored'),
-                effectiveConfigPath: $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
-                config:              $config,
-                registry:            $registry,
-                top:                 $top,
+            output:               $output,
+            format:               $format,
+            summaryReportData:    $this->summaryData(
+                projectRoot:          $projectRoot,
+                paths:                $this->paths($input),
+                shouldIncludeIgnored: (bool) $input->getOption('include-ignored'),
+                effectiveConfigPath:  $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
+                config:               $config,
+                registry:             $registry,
+                topLimit:             $topLimit,
             ),
         );
     }
@@ -239,16 +239,16 @@ final class SummaryCommand extends Command
     private function summaryData(
         string $projectRoot,
         array $paths,
-        bool $includeIgnored,
+        bool $shouldIncludeIgnored,
         ?string $effectiveConfigPath,
         AnalysisConfig $config,
         RuleRegistry $registry,
-        int $top,
+        int $topLimit,
     ): SummaryReportData {
         $sources = (new AnalysisSourceLoader())->load(
             $projectRoot,
             $paths,
-            $includeIgnored,
+            $shouldIncludeIgnored,
             $config->ignoredPathPatterns(),
         );
         $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
@@ -265,8 +265,8 @@ final class SummaryCommand extends Command
             parseErrors:       $this->parseErrorCount($sources->diagnostics),
             score:             $score,
             totals:            $this->severityTotals($findings),
-            topRules:          array_slice($this->aggregateByRule($findings, $this->pillarLookup($registry)), 0, $top),
-            topOffenders:      array_slice($score->topOffenders, 0, $top),
+            topRules:          array_slice($this->aggregateByRule($findings, $this->pillarLookup($registry)), 0, $topLimit),
+            topOffenders:      array_slice($score->topOffenders, 0, $topLimit),
         );
     }
 

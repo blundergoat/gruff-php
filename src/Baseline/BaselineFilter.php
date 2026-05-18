@@ -12,12 +12,12 @@ use GruffPhp\Finding\Finding;
 final readonly class BaselineFilter
 {
     /**
-     * @param BaselineData  $baseline  Loaded baseline data to apply.
-     * @param list<Finding> $findings  Findings to compare against the baseline.
-     * @param bool          $diffScope Whether diff filtering is active for this baseline pass.
+     * @param BaselineData  $baseline     Loaded baseline data to apply.
+     * @param list<Finding> $findings     Findings to compare against the baseline.
+     * @param bool          $hasDiffScope Whether diff filtering is active for this baseline pass.
      * @return array{findings: list<Finding>, report: BaselineReport}
      */
-    public function apply(BaselineData $baseline, array $findings, bool $diffScope): array
+    public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
     {
         $entriesByFingerprint = $baseline->byFingerprint();
         $matchedFingerprints  = [];
@@ -43,7 +43,7 @@ final readonly class BaselineFilter
         $staleEntries    = [];
         $staleEvaluation = 'full-project';
 
-        if ($diffScope) {
+        if ($hasDiffScope) {
             $staleEvaluation = 'not-evaluated-diff-scope';
         } else {
             foreach ($baseline->entries as $entry) {

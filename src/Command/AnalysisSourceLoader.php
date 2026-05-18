@@ -14,19 +14,19 @@ use GruffPhp\Source\SourceDiscovery;
 final readonly class AnalysisSourceLoader
 {
     /**
-     * @param string       $projectRoot         Root used for source discovery and parsing.
-     * @param list<string> $paths               Project-relative paths requested by the CLI.
-     * @param bool         $includeIgnored      Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns Configured path patterns to skip unless ignored files are included.
+     * @param string       $projectRoot          Root used for source discovery and parsing.
+     * @param list<string> $paths                Project-relative paths requested by the CLI.
+     * @param bool         $shouldIncludeIgnored Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns  Configured path patterns to skip unless ignored files are included.
      * @return AnalysisSourceSet Discovered files, parsed units, and load diagnostics.
      */
     public function load(
         string $projectRoot,
         array $paths,
-        bool $includeIgnored,
+        bool $shouldIncludeIgnored,
         array $ignoredPathPatterns,
     ): AnalysisSourceSet {
-        $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $includeIgnored, $ignoredPathPatterns);
+        $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
         $parser          = new PhpFileParser();
         $diagnostics     = [];
         $analysisUnits   = [];

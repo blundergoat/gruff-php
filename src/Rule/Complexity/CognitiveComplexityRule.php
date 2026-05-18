@@ -258,12 +258,12 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $total = 0;
 
         foreach ($node->getSubNodeNames() as $name) {
-            $sub = $node->$name;
+            $subNode = $node->$name;
 
-            if ($sub instanceof Node) {
-                $total += self::walkNode($sub, $nesting);
-            } elseif (is_array($sub)) {
-                foreach ($sub as $child) {
+            if ($subNode instanceof Node) {
+                $total += self::walkNode($subNode, $nesting);
+            } elseif (is_array($subNode)) {
+                foreach ($subNode as $child) {
                     if ($child instanceof Node) {
                         $total += self::walkNode($child, $nesting);
                     }
@@ -305,12 +305,12 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $total = 0;
 
         foreach ($expr->getSubNodeNames() as $name) {
-            $sub = $expr->$name;
+            $subNode = $expr->$name;
 
-            if ($sub instanceof Expr) {
-                $total += self::walkExprCognitive($sub, $nesting);
-            } elseif (is_array($sub)) {
-                foreach ($sub as $child) {
+            if ($subNode instanceof Expr) {
+                $total += self::walkExprCognitive($subNode, $nesting);
+            } elseif (is_array($subNode)) {
+                foreach ($subNode as $child) {
                     if ($child instanceof Expr) {
                         $total += self::walkExprCognitive($child, $nesting);
                     }
