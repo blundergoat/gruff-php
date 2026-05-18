@@ -64,7 +64,7 @@ final readonly class RuleConfigApplier
         }
 
         $settings         = $config->ruleSettings($ruleId);
-        $definitionSingle = $registry->get($ruleId)->definition()->defaultSeverityThreshold;
+        $definitionSingle = $registry->get($ruleId)->definition()->severityThreshold;
 
         if ($definitionSingle instanceof SeverityThreshold && array_key_exists('thresholds', $ruleConfig)) {
             throw new ConfigException(sprintf(
@@ -177,7 +177,7 @@ final readonly class RuleConfigApplier
         $severityValue     = $ruleConfig['severity'] ?? null;
         $definition        = $registry->get($ruleId)->definition();
         $defaultThresholds = $definition->defaultThresholds;
-        $hasSingleDefault  = $definition->defaultSeverityThreshold instanceof SeverityThreshold;
+        $hasSingleDefault  = $definition->severityThreshold instanceof SeverityThreshold;
         $hasTieredDefault  = array_key_exists('warning', $defaultThresholds)
             && array_key_exists('error', $defaultThresholds)
             && count($defaultThresholds) === 2;

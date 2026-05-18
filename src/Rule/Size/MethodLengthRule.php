@@ -46,7 +46,7 @@ final readonly class MethodLengthRule implements RuleInterface
             tier:                     RuleTier::V01,
             defaultSeverity:          Severity::Error,
             confidence:               Confidence::High,
-            defaultSeverityThreshold: new SeverityThreshold(100, Severity::Error),
+            severityThreshold: new SeverityThreshold(100, Severity::Error),
         );
     }
 

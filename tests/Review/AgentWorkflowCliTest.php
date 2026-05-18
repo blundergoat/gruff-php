@@ -70,8 +70,8 @@ final class AgentWorkflowCliTest extends TestCase
         $report    = $this->decodeJson($process);
         $summary   = $this->arrayValue($report, 'summary');
         $findings  = $this->arrayValue($summary, 'findings');
-        $run       = $this->arrayValue($report, 'run');
-        $filters   = $this->arrayValue($run, 'filters');
+        $runMetadata = $this->arrayValue($report, 'run');
+        $filters     = $this->arrayValue($runMetadata, 'filters');
         $score     = $this->arrayValue($report, 'score');
         $composite = $this->arrayValue($score, 'composite');
 
@@ -681,9 +681,9 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertIsArray($value);
 
         $result = [];
-        foreach ($value as $key => $item) {
+        foreach ($value as $key => $entryValue) {
             self::assertIsString($key);
-            $result[$key] = $item;
+            $result[$key] = $entryValue;
         }
 
         return $result;
@@ -748,12 +748,12 @@ final class AgentWorkflowCliTest extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
+        foreach ($items as $directoryEntry) {
+            if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
 
-            $child = $path . '/' . $item;
+            $child = $path . '/' . $directoryEntry;
             if (is_dir($child) && !is_link($child)) {
                 $this->removeDir($child);
                 continue;

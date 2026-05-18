@@ -96,9 +96,11 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         $findings              = [];
 
         foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
-            $symbol = $this->symbol($scope);
+            $symbol             = $this->symbol($scope);
+            $expectedByPosition = [];
+            $expectedCounts     = [];
 
-            foreach ($scope->node->params as $param) {
+            foreach ($scope->node->params as $position => $param) {
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                     continue;
                 }
@@ -113,7 +115,23 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                 }
 
                 $expectedName = $this->expectedParameterName($typeName, $tokenizer, $typeSuffixesToTrim);
-                if ($expectedName === null || $param->var->name === $expectedName) {
+                if ($expectedName === null) {
+                    continue;
+                }
+
+                $expectedByPosition[$position] = [$param, $typeName, $expectedName];
+                $expectedCounts[$expectedName] = ($expectedCounts[$expectedName] ?? 0) + 1;
+            }
+
+            foreach ($expectedByPosition as [$param, $typeName, $expectedName]) {
+                $parameterName = $param->var instanceof Variable && is_string($param->var->name)
+                    ? $param->var->name
+                    : '';
+
+                if (
+                    $parameterName === $expectedName
+                    || $this->isSpecificDuplicateName($parameterName, $expectedName, $expectedCounts[$expectedName], $tokenizer)
+                ) {
                     continue;
                 }
 
@@ -121,7 +139,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                     ruleId:  $definition->id,
                     message: sprintf(
                         'Parameter $%s in %s should be named $%s to match %s.',
-                        $param->var->name,
+                        $parameterName,
                         $symbol,
                         $expectedName,
                         $typeName,
@@ -133,9 +151,9 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                     tier:        $definition->tier,
                     confidence:  $definition->confidence,
                     symbol:      $symbol,
-                    remediation: sprintf('Rename $%s to $%s.', $param->var->name, $expectedName),
+                    remediation: sprintf('Rename $%s to $%s.', $parameterName, $expectedName),
                     metadata:    [
-                        'parameter' => $param->var->name,
+                        'parameter' => $parameterName,
                         'type' => $typeName,
                         'expectedName' => $expectedName,
                     ],
@@ -144,6 +162,50 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Allow duplicate same-type parameters to carry both role and type words.
+     *
+     * @return bool True when a duplicate type name is still present in a more specific parameter name.
+     */
+    private function isSpecificDuplicateName(
+        string $parameterName,
+        string $expectedName,
+        int $expectedCount,
+        IdentifierTokenizer $tokenizer,
+    ): bool {
+        if ($expectedCount < 2) {
+            return false;
+        }
+
+        $parameterTokens = $tokenizer->tokenize($parameterName);
+        $expectedTokens  = $tokenizer->tokenize($expectedName);
+
+        if (count($parameterTokens) <= count($expectedTokens) || $expectedTokens === []) {
+            return false;
+        }
+
+        return $this->containsTokenSequence($parameterTokens, $expectedTokens);
+    }
+
+    /**
+     * @param list<string> $haystack Identifier tokens to scan.
+     * @param list<string> $needle   Expected type-name tokens.
+     *
+     * @return bool True when all expected tokens appear contiguously.
+     */
+    private function containsTokenSequence(array $haystack, array $needle): bool
+    {
+        $needleCount = count($needle);
+
+        for ($offset = 0, $max = count($haystack) - $needleCount; $offset <= $max; $offset++) {
+            if (array_slice($haystack, $offset, $needleCount) === $needle) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

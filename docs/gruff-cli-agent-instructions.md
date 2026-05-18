@@ -6,7 +6,7 @@ This file is the quick-start surface for agents that need to inspect a PHP proje
 
 - Run commands from the repository root unless `--project` is documented for that command.
 - Use `php bin/gruff-php analyse ...` in this checkout.
-- Default config auto-loads from `.gruff.yaml` at the project root when present.
+- Default config auto-loads from `.gruff-php.yaml` at the project root when present (legacy `.gruff.yaml` is still accepted when `.gruff-php.yaml` is absent).
 - Default baseline auto-loads from `gruff-baseline.json` at the project root when present.
 - Full-project analysis is the default. Diff mode is opt-in with `--diff`.
 - Git is only required for diff mode. Full-project scans work outside Git worktrees.
@@ -141,13 +141,16 @@ php bin/gruff-php analyse --diff-vs=<base-ref> --changed-only --no-config --no-b
 Default config:
 
 ```bash
-.gruff.yaml
+.gruff-php.yaml
 ```
+
+`.gruff.yaml` is still auto-loaded as a legacy fallback when `.gruff-php.yaml`
+is absent.
 
 Use an explicit config:
 
 ```bash
-php bin/gruff-php analyse src --config=.gruff.yaml --format json --fail-on none
+php bin/gruff-php analyse src --config=.gruff-php.yaml --format json --fail-on none
 ```
 
 Set one threshold for a metric rule:
@@ -267,7 +270,7 @@ Start with diff mode selected:
 php bin/gruff-php dashboard src --diff --host 127.0.0.1 --port 8765
 ```
 
-The dashboard config field defaults to `.gruff.yaml`. The scan scope selector maps `whole branch` to full selected-path analysis and `diff only` to `analyse --diff`.
+The dashboard config field defaults to `.gruff-php.yaml` (or legacy `.gruff.yaml` when present). The scan scope selector maps `whole branch` to full selected-path analysis and `diff only` to `analyse --diff`.
 
 ## Exit Codes
 

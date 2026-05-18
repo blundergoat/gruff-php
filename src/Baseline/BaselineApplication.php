@@ -117,7 +117,7 @@ final readonly class BaselineApplication
             suppressedFindings: $report->suppressedFindings,
             staleEvaluation:    $report->staleEvaluation,
             staleEntries:       $report->staleEntries,
-            source:             $options->baselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
+            source:             $options->isBaselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
         );
     }
 }

@@ -85,12 +85,12 @@ abstract class CliTestCase extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
+        foreach ($items as $directoryEntry) {
+            if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
 
-            $child = $path . '/' . $item;
+            $child = $path . '/' . $directoryEntry;
             if (is_dir($child) && !is_link($child)) {
                 $this->removeDir($child);
                 continue;
@@ -139,12 +139,12 @@ abstract class CliTestCase extends TestCase
             \RecursiveIteratorIterator::SELF_FIRST,
         );
 
-        foreach ($iterator as $item) {
-            self::assertInstanceOf(\SplFileInfo::class, $item);
-            $relativePath = substr($item->getPathname(), strlen($source) + 1);
+        foreach ($iterator as $sourceEntry) {
+            self::assertInstanceOf(\SplFileInfo::class, $sourceEntry);
+            $relativePath = substr($sourceEntry->getPathname(), strlen($source) + 1);
             $targetPath   = $destination . '/' . $relativePath;
 
-            if ($item->isDir()) {
+            if ($sourceEntry->isDir()) {
                 if (!is_dir($targetPath)) {
                     self::assertTrue(mkdir($targetPath, 0777, true));
                 }
@@ -152,7 +152,7 @@ abstract class CliTestCase extends TestCase
                 continue;
             }
 
-            self::assertTrue(copy($item->getPathname(), $targetPath));
+            self::assertTrue(copy($sourceEntry->getPathname(), $targetPath));
         }
     }
 

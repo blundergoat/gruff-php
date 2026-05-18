@@ -101,17 +101,6 @@ final readonly class RuleSettings
     }
 
     /**
-     * Check whether an option was configured.
-     *
-     * @param string $name Option key to check.
-     * @return bool True when the option key exists.
-     */
-    public function hasOption(string $name): bool
-    {
-        return array_key_exists($name, $this->options);
-    }
-
-    /**
      * Return a configured option by name.
      *
      * @param string $name Option key to read.

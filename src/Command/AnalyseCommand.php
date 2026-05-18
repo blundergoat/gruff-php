@@ -146,7 +146,7 @@ final class AnalyseCommand extends Command
             : (new AnalysisSourceLoader())->load(
                 $projectRoot,
                 $analysisPaths,
-                $options->includeIgnored,
+                $options->shouldIncludeIgnored,
                 $config->ignoredPathPatterns(),
             );
         $discoverParseNs = hrtime(true) - $discoverStart;
@@ -182,7 +182,7 @@ final class AnalyseCommand extends Command
         }
 
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        if ($options->diffVs !== null && $options->changedOnly && $reviewDiff instanceof DiffResult) {
+        if ($options->diffVs !== null && $options->isChangedOnly && $reviewDiff instanceof DiffResult) {
             $findings = $this->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }
 
@@ -261,7 +261,7 @@ final class AnalyseCommand extends Command
             output:            $output,
             projectRoot:       $projectRoot,
             reportEditorLink:  $options->reportEditorLink,
-            reportInteractive: $options->reportInteractive,
+                isReportInteractive: $options->isReportInteractive,
         );
         $reportNs = hrtime(true) - $reportStart;
 
@@ -278,7 +278,7 @@ final class AnalyseCommand extends Command
                 filesParsed:           $sources->parsedFileCount(),
                 rulesExecuted:         count($registry->enabledRules($config)),
                 runtimeTimingObserver: $runtimeTimingObserver,
-                detailed:              $runtimeDetailed,
+                isDetailed:            $runtimeDetailed,
             );
         }
 
@@ -298,7 +298,7 @@ final class AnalyseCommand extends Command
         int $filesParsed,
         int $rulesExecuted,
         ?RuntimeTimingObserver $runtimeTimingObserver,
-        bool $detailed,
+        bool $isDetailed,
     ): void {
         $totalNs = hrtime(true) - $runtimeStart;
         $payload = [
@@ -307,10 +307,10 @@ final class AnalyseCommand extends Command
             'filesParsed' => $filesParsed,
             'rulesExecuted' => $rulesExecuted,
             'phases' => $phaseDurationsNs,
-            'mode' => $detailed ? 'detailed' : 'summary',
+            'mode' => $isDetailed ? 'detailed' : 'summary',
         ];
 
-        if ($detailed && $runtimeTimingObserver !== null) {
+        if ($isDetailed && $runtimeTimingObserver !== null) {
             $payload['rules'] = $runtimeTimingObserver->snapshot();
         }
 
@@ -397,7 +397,7 @@ final class AnalyseCommand extends Command
      */
     private function currentAnalysisPaths(AnalyseCommandOptions $options, ?DiffResult $reviewDiff): ?array
     {
-        if (!$options->changedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
+        if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
             return $options->paths;
         }
 
@@ -414,7 +414,7 @@ final class AnalyseCommand extends Command
         AnalyseCommandOptions $options,
         ?DiffResult $reviewDiff,
     ): array {
-        if (!$options->changedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
+        if (!$options->isChangedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
             return $diagnostics;
         }
 
@@ -473,11 +473,11 @@ final class AnalyseCommand extends Command
         OutputInterface $output,
         ?string $projectRoot = null,
         string $reportEditorLink = 'none',
-        bool $reportInteractive = false,
+        bool $isReportInteractive = false,
     ): void {
         $renderer = match ($format) {
             OutputFormat::Json => new JsonReporter(),
-            OutputFormat::Html => new HtmlReporter($projectRoot ?? '', $reportEditorLink, $reportInteractive),
+            OutputFormat::Html => new HtmlReporter($projectRoot ?? '', $reportEditorLink, $isReportInteractive),
             OutputFormat::Markdown => new MarkdownReporter(),
             OutputFormat::Github => new GithubAnnotationsReporter(),
             OutputFormat::Hotspot => new HotspotReporter(),
@@ -530,18 +530,18 @@ final class AnalyseCommand extends Command
 
         $snapshot            = new GitArchiveSnapshot();
         $baseRoot            = null;
-        $needsProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
-        $baseSnapshotPaths   = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $needsProjectContext);
+        $shouldLoadProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
+        $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths   = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
-        if ($options->changedOnly && !$needsProjectContext && $baseSnapshotPaths === []) {
+        if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
             $baseScore = (new ScoreCalculator())->calculate([], null, null);
 
             return (new BranchReviewComparator())->compare(
                 current:     $currentFindings,
                 base:        [],
                 baseRef:     $options->diffVs,
-                changedOnly: true,
+                isChangedOnly: true,
                 deltaScore:  $currentScore - $baseScore->composite->score,
             );
         }
@@ -555,10 +555,10 @@ final class AnalyseCommand extends Command
                 $baseSources = (new AnalysisSourceLoader())->load(
                     $baseRoot,
                     $basePaths,
-                    $options->includeIgnored,
+                    $options->shouldIncludeIgnored,
                     $config->ignoredPathPatterns(),
                 );
-                $baseProjectContextUnits = $needsProjectContext
+                $baseProjectContextUnits = $shouldLoadProjectContext
                     ? $this->baseProjectContextUnits($baseRoot, $options, $config)
                     : $baseSources->analysisUnits;
                 $baseFindings = $registry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
@@ -566,7 +566,7 @@ final class AnalyseCommand extends Command
                 $baseFindings = $this->filterAllowedSecretPreviews($baseFindings, $config);
             }
 
-            if ($options->changedOnly) {
+            if ($options->isChangedOnly) {
                 $baseFindings = $this->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
             }
 
@@ -577,7 +577,7 @@ final class AnalyseCommand extends Command
                 current:     $currentFindings,
                 base:        $baseFindings,
                 baseRef:     $options->diffVs,
-                changedOnly: $options->changedOnly,
+                isChangedOnly: $options->isChangedOnly,
                 deltaScore:  $currentScore - $baseScore->composite->score,
             );
         } catch (DiffException | RuntimeException $exception) {
@@ -601,14 +601,14 @@ final class AnalyseCommand extends Command
         string $projectRoot,
         AnalyseCommandOptions $options,
         DiffResult $reviewDiff,
-        bool $needsProjectContext,
+        bool $shouldLoadProjectContext,
     ): array
     {
-        if (!$options->changedOnly) {
+        if (!$options->isChangedOnly) {
             return $this->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
-        if ($needsProjectContext) {
+        if ($shouldLoadProjectContext) {
             return [];
         }
 
@@ -639,7 +639,7 @@ final class AnalyseCommand extends Command
      */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
-        if ($options->changedOnly && $options->paths === []) {
+        if ($options->isChangedOnly && $options->paths === []) {
             return $reviewDiff->changedFiles;
         }
 
@@ -687,7 +687,7 @@ final class AnalyseCommand extends Command
         return (new AnalysisSourceLoader())->load(
             $projectRoot,
             [],
-            $options->includeIgnored,
+            $options->shouldIncludeIgnored,
             $config->ignoredPathPatterns(),
         )->analysisUnits;
     }
@@ -700,7 +700,7 @@ final class AnalyseCommand extends Command
         return (new AnalysisSourceLoader())->load(
             $baseRoot,
             [],
-            $options->includeIgnored,
+            $options->shouldIncludeIgnored,
             $config->ignoredPathPatterns(),
         )->analysisUnits;
     }
@@ -714,7 +714,7 @@ final class AnalyseCommand extends Command
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
-        return $options->changedOnly
+        return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== []
             && $registry->hasEnabledProjectRules($config);

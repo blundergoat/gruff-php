@@ -62,7 +62,7 @@ final readonly class MutationAnalysisBuilder
         MutationAnalysisOptions $options,
         array &$diagnostics,
     ): bool {
-        if (!$options->infectionRun) {
+        if (!$options->shouldRunInfection) {
             return true;
         }
 
@@ -111,7 +111,7 @@ final readonly class MutationAnalysisBuilder
      */
     private function addOptionDiagnostics(MutationAnalysisOptions $options, array &$diagnostics): void
     {
-        if ($options->infectionRun) {
+        if ($options->shouldRunInfection) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'usage-error',
                 message: '--infection-run requires --infection-report because Infection writes full JSON through configured log paths.',

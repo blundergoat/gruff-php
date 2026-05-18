@@ -438,16 +438,16 @@ final class RuleRegistry
 
         usort(
             $findings,
-            static fn (Finding $findingLeft, Finding $findingRight): int => [
-                $findingLeft->filePath,
-                $findingLeft->line ?? 0,
-                $findingLeft->ruleId,
-                $findingLeft->message,
+            static fn (Finding $leftFinding, Finding $rightFinding): int => [
+                $leftFinding->filePath,
+                $leftFinding->line ?? 0,
+                $leftFinding->ruleId,
+                $leftFinding->message,
             ] <=> [
-                $findingRight->filePath,
-                $findingRight->line ?? 0,
-                $findingRight->ruleId,
-                $findingRight->message,
+                $rightFinding->filePath,
+                $rightFinding->line ?? 0,
+                $rightFinding->ruleId,
+                $rightFinding->message,
             ],
         );
 

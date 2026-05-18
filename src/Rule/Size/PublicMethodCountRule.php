@@ -44,7 +44,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
             tier:                     RuleTier::V01,
             defaultSeverity:          Severity::Error,
             confidence:               Confidence::High,
-            defaultSeverityThreshold: new SeverityThreshold(25, Severity::Error),
+            severityThreshold: new SeverityThreshold(25, Severity::Error),
         );
     }
 

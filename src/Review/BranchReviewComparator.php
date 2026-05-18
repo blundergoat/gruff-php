@@ -15,7 +15,7 @@ final readonly class BranchReviewComparator
      * @param list<Finding> $current     Current branch findings to compare.
      * @param list<Finding> $base        Base branch findings to compare against.
      * @param string        $baseRef     Base ref used to produce the comparison.
-     * @param bool          $changedOnly Whether unchanged changed-file scope applies.
+     * @param bool          $isChangedOnly Whether unchanged changed-file scope applies.
      * @param float|null    $deltaScore  Optional score delta between base and current runs.
      * @return BranchReviewResult Introduced, removed, and unchanged finding sets.
      */
@@ -23,7 +23,7 @@ final readonly class BranchReviewComparator
         array $current,
         array $base,
         string $baseRef,
-        bool $changedOnly,
+        bool $isChangedOnly,
         ?float $deltaScore,
     ): BranchReviewResult {
         $identity     = new FindingReviewIdentity();
@@ -55,7 +55,7 @@ final readonly class BranchReviewComparator
             }
         }
 
-        return new BranchReviewResult($baseRef, $changedOnly, $introduced, $removed, $unchanged, $deltaScore);
+        return new BranchReviewResult($baseRef, $isChangedOnly, $introduced, $removed, $unchanged, $deltaScore);
     }
 
     /**

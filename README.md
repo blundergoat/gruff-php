@@ -19,12 +19,9 @@ Current package facts:
 - Binary: `bin/gruff-php`
 - PHP requirement: `^8.3`
 - Runtime dependencies: `nikic/php-parser`, Symfony Console/Finder/Process/Yaml
-- Rule catalogue: 110 registry rules across 11 pillars
-- Config format: YAML only (`.yaml` / `.yml`)
-- License in `composer.json`: `proprietary`
-
-If this project will be released as open source, choose a license and add a
-`LICENSE` file before tagging `0.1.0`.
+- Rule catalogue: 113 registry rules across 11 pillars
+- Config format: YAML only (`.yaml`)
+- License: MIT (see [`LICENSE`](LICENSE))
 
 ## Installation
 
@@ -326,6 +323,7 @@ Useful scripts:
 | `scripts/mutation-test-diff.sh` | Diff-scoped Infection workflow. |
 | `scripts/mutation-test-full.sh` | Full Infection workflow. |
 | `scripts/start-dev.sh` | Start the local dashboard. |
+| `scripts/bump-version.sh` | Bump `Application::VERSION` and stamp the matching `CHANGELOG.md` entry. |
 
 ### Performance harness
 
@@ -344,7 +342,8 @@ CI runs on PHP 8.3 and 8.4 via [`.github/workflows/ci.yml`](.github/workflows/ci
 
 Before tagging `0.1.0`:
 
-- Choose the public license and add `LICENSE` if this is not staying proprietary.
+- Run `scripts/bump-version.sh 0.1.0` to update `src/Console/Application.php`
+  and stamp the `CHANGELOG.md` entry.
 - Confirm Packagist metadata and repository URL.
 - Run `composer validate --strict`, `composer check`, and `composer test`.
 - Run `php bin/gruff-php analyse` and confirm the default self-scan exits 0.
@@ -365,5 +364,5 @@ Before tagging `0.1.0`:
 
 ## License
 
-`composer.json` currently declares this package as `proprietary`. Add a
-`LICENSE` file and update `composer.json` before an open-source release.
+`gruff-php` is released under the MIT License. See [`LICENSE`](LICENSE) for the
+full text.

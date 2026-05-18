@@ -270,7 +270,7 @@ final class RuleRegistryTest extends TestCase
         $definitions = array_map(static function ($rule): array {
             $definition = $rule->definition();
 
-            $single = $definition->defaultSeverityThreshold;
+            $single = $definition->severityThreshold;
 
             return [
                 'id' => $definition->id,
@@ -285,7 +285,7 @@ final class RuleRegistryTest extends TestCase
                 'defaultSeverityThreshold' => $single === null
                     ? null
                     : ['threshold' => $single->threshold, 'severity' => $single->severity->value],
-                'defaultEnabled' => $definition->defaultEnabled,
+                'defaultEnabled' => $definition->isEnabledByDefault,
                 'defaultOptions' => $definition->defaultOptions,
             ];
         }, RuleRegistry::defaults()->all());

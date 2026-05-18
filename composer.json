@@ -2,7 +2,7 @@
     "name": "devgoat/gruff-php",
     "description": "Opinionated PHP code quality analyzer.",
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
     "require": {
         "php": "^8.3",
         "nikic/php-parser": "^5.6",
@@ -37,6 +37,7 @@
             "bash -n scripts/mutation-test-diff.sh",
             "bash -n scripts/mutation-test-full.sh",
             "bash -n scripts/format-php-code.sh",
+            "bash -n scripts/bump-version.sh",
             "find src tests -name '*.php' -not -path 'tests/Fixtures/Source/syntax-error/*' -print0 | xargs -0 -n1 -P 4 php -l > /dev/null",
             "bash -n scripts/start-dev.sh",
             "bash -n scripts/test-performance.sh",

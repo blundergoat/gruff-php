@@ -38,17 +38,6 @@ final readonly class DiffResult
     }
 
     /**
-     * Check whether a display path is part of the changed-file set.
-     *
-     * @param string $filePath Display path to test.
-     * @return bool True when the file was marked as changed.
-     */
-    public function hasFile(string $filePath): bool
-    {
-        return in_array($filePath, $this->changedFiles, true);
-    }
-
-    /**
      * Return changed line ranges for a display path.
      *
      * @param string $filePath Display path to look up.

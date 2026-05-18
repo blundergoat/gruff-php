@@ -39,7 +39,7 @@ final readonly class FileLengthRule implements RuleInterface
             tier:                     RuleTier::V01,
             defaultSeverity:          Severity::Error,
             confidence:               Confidence::High,
-            defaultSeverityThreshold: new SeverityThreshold(1000, Severity::Error),
+            severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }
 

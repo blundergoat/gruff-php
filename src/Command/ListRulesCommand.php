@@ -92,7 +92,7 @@ final class ListRulesCommand extends Command
      */
     private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array
     {
-        $single     = $definition->defaultSeverityThreshold;
+        $single     = $definition->severityThreshold;
         $thresholds = $single instanceof \GruffPhp\Config\SeverityThreshold
             ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
             : ($definition->defaultThresholds === [] ? (object) [] : $definition->defaultThresholds);

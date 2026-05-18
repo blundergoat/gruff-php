@@ -247,12 +247,12 @@ final class TrendRecorderTest extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
+        foreach ($items as $directoryEntry) {
+            if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
 
-            $child = $path . '/' . $item;
+            $child = $path . '/' . $directoryEntry;
             if (is_dir($child) && !is_link($child)) {
                 $this->removeDir($child);
                 continue;

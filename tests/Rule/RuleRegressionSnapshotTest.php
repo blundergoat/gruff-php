@@ -52,9 +52,9 @@ final class RuleRegressionSnapshotTest extends TestCase
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
         self::assertCount(136, $units);
-        self::assertCount(2129, $findings);
+        self::assertCount(2131, $findings);
         self::assertSame(
-            'b3cb2491f682f9734b07' . 'e65c57b98b467d3baea0dbcecf067b17e7d1f3d169d2',
+            'b73c740c8621eeebc312' . 'ef4e45427a860b05eb32be0c2aa4c359e4f1339cfda5',
             hash('sha256', $json),
         );
     }
@@ -245,15 +245,15 @@ final class RuleRegressionSnapshotTest extends TestCase
      */
     private static function canonicalFindingArray(Finding $finding): array
     {
-        $row = $finding->toArray();
+        $findingPayload = $finding->toArray();
 
-        if (is_array($row['metadata'])) {
-            $row['metadata'] = self::canonicalMetadata($row['metadata']);
+        if (is_array($findingPayload['metadata'])) {
+            $findingPayload['metadata'] = self::canonicalMetadata($findingPayload['metadata']);
         }
 
-        ksort($row, SORT_STRING);
+        ksort($findingPayload, SORT_STRING);
 
-        return $row;
+        return $findingPayload;
     }
 
     /**
@@ -304,12 +304,12 @@ final class RuleRegressionSnapshotTest extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
+        foreach ($items as $directoryEntry) {
+            if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
 
-            $child = $path . '/' . $item;
+            $child = $path . '/' . $directoryEntry;
             if (is_dir($child) && !is_link($child)) {
                 $this->removeDir($child);
                 continue;

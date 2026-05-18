@@ -77,16 +77,16 @@ final class AnalyseCliRuntimeTest extends CliTestCase
         self::assertIsArray($payload['rules']);
         self::assertNotEmpty($payload['rules'], 'detailed mode must report at least one rule invocation');
 
-        foreach ($payload['rules'] as $index => $row) {
-            self::assertIsArray($row, "rule row #{$index} must be an array");
-            self::assertArrayHasKey('ruleId', $row, "rule row #{$index} must include ruleId");
-            self::assertIsString($row['ruleId'], "rule row #{$index} ruleId must be a string");
-            self::assertArrayHasKey('totalNs', $row, "rule row #{$index} must include totalNs");
-            self::assertIsInt($row['totalNs'], "rule row #{$index} totalNs must be an integer");
-            self::assertGreaterThanOrEqual(0, $row['totalNs'], "rule row #{$index} totalNs must be non-negative");
-            self::assertArrayHasKey('invocations', $row, "rule row #{$index} must include invocations");
-            self::assertIsInt($row['invocations'], "rule row #{$index} invocations must be an integer");
-            self::assertGreaterThan(0, $row['invocations'], "rule row #{$index} invocations must be positive");
+        foreach ($payload['rules'] as $index => $ruleRuntime) {
+            self::assertIsArray($ruleRuntime, "rule row #{$index} must be an array");
+            self::assertArrayHasKey('ruleId', $ruleRuntime, "rule row #{$index} must include ruleId");
+            self::assertIsString($ruleRuntime['ruleId'], "rule row #{$index} ruleId must be a string");
+            self::assertArrayHasKey('totalNs', $ruleRuntime, "rule row #{$index} must include totalNs");
+            self::assertIsInt($ruleRuntime['totalNs'], "rule row #{$index} totalNs must be an integer");
+            self::assertGreaterThanOrEqual(0, $ruleRuntime['totalNs'], "rule row #{$index} totalNs must be non-negative");
+            self::assertArrayHasKey('invocations', $ruleRuntime, "rule row #{$index} must include invocations");
+            self::assertIsInt($ruleRuntime['invocations'], "rule row #{$index} invocations must be an integer");
+            self::assertGreaterThan(0, $ruleRuntime['invocations'], "rule row #{$index} invocations must be positive");
         }
 
         $totals = array_column($payload['rules'], 'totalNs');

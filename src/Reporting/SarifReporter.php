@@ -101,7 +101,7 @@ final readonly class SarifReporter
             'tier' => $definition->tier->value,
             'defaultSeverity' => $definition->defaultSeverity->value,
             'confidence' => $definition->confidence->value,
-            'defaultEnabled' => $definition->defaultEnabled,
+            'defaultEnabled' => $definition->isEnabledByDefault,
         ];
         if ($definition->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
@@ -109,7 +109,7 @@ final readonly class SarifReporter
                 $definition->secondaryPillars,
             );
         }
-        $single = $definition->defaultSeverityThreshold;
+        $single = $definition->severityThreshold;
         if ($single instanceof \GruffPhp\Config\SeverityThreshold) {
             $properties['threshold'] = $single->threshold;
             $properties['severity']  = $single->severity->value;

@@ -88,15 +88,15 @@ final readonly class SourceDiscovery
 
     /**
      * @param list<string> $paths                    Requested paths to discover.
-     * @param bool         $includeIgnored           Whether built-in ignored paths should still be included.
+     * @param bool         $shouldIncludeIgnored     Whether built-in ignored paths should still be included.
      * @param list<string> $configuredIgnorePatterns Additional ignore patterns from config.
      * @return SourceDiscoveryResult Files, missing inputs, and ignored paths.
      */
-    public function discover(array $paths, bool $includeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
+    public function discover(array $paths, bool $shouldIncludeIgnored = false, array $configuredIgnorePatterns = []): SourceDiscoveryResult
     {
         $requestedPaths = $paths === [] ? ['.'] : $paths;
 
-        if (!$includeIgnored) {
+        if (!$shouldIncludeIgnored) {
             $gitResult = $this->discoverGitVisible($requestedPaths, $configuredIgnorePatterns);
             if ($gitResult instanceof SourceDiscoveryResult) {
                 return $gitResult;
@@ -120,7 +120,7 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            if (!$includeIgnored && $this->isDefaultIgnoredPath($absolutePath)) {
+            if (!$shouldIncludeIgnored && $this->isDefaultIgnoredPath($absolutePath)) {
                 $ignoredPaths[] = $this->displayPath($absolutePath);
                 continue;
             }
@@ -139,7 +139,7 @@ final readonly class SourceDiscovery
             }
 
             if (is_dir($absolutePath)) {
-                foreach ($this->walkDirectory($absolutePath, $includeIgnored, $configuredIgnorePatterns, $ignoredPaths) as $file) {
+                foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredPaths) as $file) {
                     $canonicalPath = $this->canonicalPath($file->getPathname());
                     $type          = $this->sourceType($canonicalPath);
 
@@ -164,14 +164,14 @@ final readonly class SourceDiscovery
      */
     private function walkDirectory(
         string $directory,
-        bool $includeIgnored,
+        bool $shouldIncludeIgnored,
         array $configuredIgnorePatterns,
         array &$ignoredPaths,
     ): iterable {
         $inner  = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
         $filter = new RecursiveCallbackFilterIterator(
             $inner,
-            function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($includeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
+            function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($shouldIncludeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
                 $path  = $file->getPathname();
                 $isDir = $file->isDir();
 
@@ -180,7 +180,7 @@ final readonly class SourceDiscovery
                     return false;
                 }
 
-                if (!$includeIgnored && $this->isDefaultIgnoredPath($path)) {
+                if (!$shouldIncludeIgnored && $this->isDefaultIgnoredPath($path)) {
                     if ($isDir) {
                         $ignoredPaths[] = $this->displayPath($path);
                     }

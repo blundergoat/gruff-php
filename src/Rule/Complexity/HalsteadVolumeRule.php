@@ -46,7 +46,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             tier:                     RuleTier::V01,
             defaultSeverity:          Severity::Error,
             confidence:               Confidence::Medium,
-            defaultSeverityThreshold: new SeverityThreshold(8000, Severity::Error),
+            severityThreshold: new SeverityThreshold(8000, Severity::Error),
         );
     }
 

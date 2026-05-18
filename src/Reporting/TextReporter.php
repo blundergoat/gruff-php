@@ -72,7 +72,7 @@ final readonly class TextReporter
         $lines[] = '';
         $lines[] = 'Branch review';
         $lines[] = sprintf('  Base: %s', $report->review->base);
-        $lines[] = sprintf('  Changed only: %s', $report->review->changedOnly ? 'yes' : 'no');
+        $lines[] = sprintf('  Changed only: %s', $report->review->isChangedOnly ? 'yes' : 'no');
         $lines[] = sprintf(
             '  Findings: %d introduced, %d removed, %d unchanged',
             count($report->review->introduced),

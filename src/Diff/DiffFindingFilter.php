@@ -25,7 +25,7 @@ final readonly class DiffFindingFilter
         return array_values(array_filter(
             $findings,
             static function (Finding $finding) use ($diff): bool {
-                if (!$diff->hasFile($finding->filePath)) {
+                if (!in_array($finding->filePath, $diff->changedFiles, true)) {
                     return false;
                 }
 

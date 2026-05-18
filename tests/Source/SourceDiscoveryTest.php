@@ -134,7 +134,7 @@ final class SourceDiscoveryTest extends TestCase
         self::assertSame([], $default->files);
         self::assertContains('secret.local.json', $default->ignoredPaths);
 
-        $included = (new SourceDiscovery($root))->discover(['secret.local.json'], includeIgnored: true);
+        $included = (new SourceDiscovery($root))->discover(['secret.local.json'], shouldIncludeIgnored: true);
         self::assertSame(['secret.local.json'], array_map(static fn ($file): string => $file->displayPath, $included->files));
     }
 
@@ -146,7 +146,7 @@ final class SourceDiscoveryTest extends TestCase
     public function testCanIncludeIgnoredDirectoriesExplicitly(): void
     {
         $root   = $this->fixtureRoot('mixed');
-        $result = (new SourceDiscovery($root))->discover(['.'], includeIgnored: true);
+        $result = (new SourceDiscovery($root))->discover(['.'], shouldIncludeIgnored: true);
 
         self::assertSame([
             'alpha.php',
@@ -198,7 +198,7 @@ final class SourceDiscoveryTest extends TestCase
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(
             ['.'],
-            includeIgnored:           true,
+            shouldIncludeIgnored:     true,
             configuredIgnorePatterns: ['nested/**', 'build'],
         );
 

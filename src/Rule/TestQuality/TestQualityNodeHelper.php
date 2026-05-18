@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace GruffPhp\Rule\TestQuality;
 
 use GruffPhp\Parser\AnalysisUnit;
-use PhpParser\Comment\Doc;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
@@ -535,14 +534,4 @@ final class TestQualityNodeHelper
         return is_int($value) && !in_array($value, [-1, 0, 1], true) ? $value : null;
     }
 
-    /**
-     * Get the node's docComment, or null when absent.
-     *
-     * @param Node $node Node whose doc comment should be returned.
-     * @return Doc|null
-     */
-    public static function docComment(Node $node): ?Doc
-    {
-        return $node->getDocComment();
-    }
 }

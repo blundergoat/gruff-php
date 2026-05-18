@@ -43,7 +43,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Low,
-            defaultEnabled:  false,
+            isEnabledByDefault: false,
             defaultOptions:  ['domainNamespaces' => []],
         );
     }

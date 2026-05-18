@@ -16,7 +16,7 @@ final readonly class BranchReviewResult
 {
     /**
      * @param string        $base        Base ref used for the review comparison.
-     * @param bool          $changedOnly Whether the review was restricted to changed files.
+     * @param bool          $isChangedOnly Whether the review was restricted to changed files.
      * @param list<Finding> $introduced  Findings introduced by the branch.
      * @param list<Finding> $removed     Findings removed by the branch.
      * @param list<Finding> $unchanged   Findings present in both base and branch.
@@ -24,7 +24,7 @@ final readonly class BranchReviewResult
      */
     public function __construct(
         public string $base,
-        public bool $changedOnly,
+        public bool $isChangedOnly,
         public array $introduced,
         public array $removed,
         public array $unchanged,
@@ -40,7 +40,7 @@ final readonly class BranchReviewResult
     {
         return new self(
             base:        $this->base,
-            changedOnly: $this->changedOnly,
+            isChangedOnly: $this->isChangedOnly,
             introduced:  $filter($this->introduced),
             removed:     $filter($this->removed),
             unchanged:   $filter($this->unchanged),
@@ -56,7 +56,7 @@ final readonly class BranchReviewResult
         return [
             'active' => true,
             'base' => $this->base,
-            'changedOnly' => $this->changedOnly,
+            'changedOnly' => $this->isChangedOnly,
             'counts' => [
                 'introduced' => count($this->introduced),
                 'removed' => count($this->removed),

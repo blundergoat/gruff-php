@@ -29,6 +29,32 @@ final class ParameterTypeNameFixture
     {
     }
 
+    /**
+     * Exercise duplicate same-type parameters that still include the type words.
+     *
+     * @param BookingSession $leftBookingSession Left session fixture.
+     * @param BookingSession $rightBookingSession Right session fixture.
+     * @return void
+     */
+    public function duplicateTypedPair(BookingSession $leftBookingSession, BookingSession $rightBookingSession): void
+    {
+        $leftType = get_debug_type($leftBookingSession);
+        echo $leftType . get_debug_type($rightBookingSession);
+    }
+
+    /**
+     * Exercise duplicate same-type parameters that omit the type words.
+     *
+     * @param BookingIntent $left  Left intent fixture.
+     * @param BookingIntent $right Right intent fixture.
+     * @return void
+     */
+    public function duplicateTypedPairStillNeedsType(BookingIntent $left, BookingIntent $right): void
+    {
+        $leftType = get_debug_type($left);
+        echo $leftType . get_debug_type($right);
+    }
+
     public function stripsInterfaceSuffix(EntityManagerInterface $entityManager): void
     {
     }

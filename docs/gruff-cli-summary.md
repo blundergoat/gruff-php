@@ -21,8 +21,8 @@ php bin/gruff-php summary [paths...] [options]
 
 | Option | Default | Purpose |
 |---|---|---|
-| `--config=PATH` | auto-discover `.gruff.yaml` | Use a specific config file. |
-| `--no-config` | off | Skip `.gruff.yaml` for this run; built-in defaults only. Cannot combine with `--config`. |
+| `--config=PATH` | auto-discover `.gruff-php.yaml` (legacy `.gruff.yaml`) | Use a specific config file. |
+| `--no-config` | off | Skip the auto-discovered config for this run; built-in defaults only. Cannot combine with `--config`. |
 | `--format=text\|json` | `text` | `text` is the human digest, `json` is `gruff.summary.v1` for tooling. |
 | `--top=N` | `10` | Cap the "Top N rules" and "Top N file offenders" sections. |
 | `--include-ignored` | off | Scan ignored files by using filesystem traversal instead of Git/default ignores. |
@@ -77,7 +77,7 @@ php bin/gruff-php summary src --format=json --top=5
   "tool": { "name": "gruff-php", "version": "0.1.0-dev" },
   "scope": {
     "paths": ["src"],
-    "configPath": ".gruff.yaml",
+    "configPath": ".gruff-php.yaml",
     "filesDiscovered": 234,
     "filesParsed": 234,
     "ignoredPaths": 0,

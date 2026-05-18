@@ -38,6 +38,8 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
         self::assertSame('bookingSession', $reported['session'] ?? null);
         self::assertSame('bookingIntent', $reported['intent'] ?? null);
         self::assertSame('bookingRequestContext', $reported['requestContext'] ?? null);
+        self::assertSame('bookingIntent', $reported['left'] ?? null);
+        self::assertSame('bookingIntent', $reported['right'] ?? null);
     }
 
     /**
@@ -53,6 +55,8 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
         self::assertNotContains('bookingSession', $reported);
         self::assertNotContains('bookingIntent', $reported);
         self::assertNotContains('bookingRequestContext', $reported);
+        self::assertNotContains('leftBookingSession', $reported);
+        self::assertNotContains('rightBookingSession', $reported);
         self::assertNotContains('entityManager', $reported);
         self::assertNotContains('name', $reported);
         self::assertNotContains('items', $reported);

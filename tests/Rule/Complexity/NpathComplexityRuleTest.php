@@ -84,9 +84,9 @@ final class NpathComplexityRuleTest extends TestCase
         $definition = $this->rule->definition();
 
         self::assertSame([], $definition->defaultThresholds);
-        self::assertNotNull($definition->defaultSeverityThreshold);
-        self::assertSame(200, $definition->defaultSeverityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->defaultSeverityThreshold->severity);
+        self::assertNotNull($definition->severityThreshold);
+        self::assertSame(200, $definition->severityThreshold->threshold);
+        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
     }
 
     /**

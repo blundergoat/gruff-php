@@ -69,8 +69,8 @@ final class SarifReporterTest extends TestCase
         $report   = $this->report($findings, $score);
 
         $payload = $this->decode((new SarifReporter())->render($report));
-        $run     = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
-        $driver  = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($run, 'tool'), 'driver'));
+        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
         $rules   = $this->listValue($driver, 'rules');
         $ruleIds = array_map(
             fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
@@ -78,7 +78,7 @@ final class SarifReporterTest extends TestCase
         );
         $sortedRuleIds = $ruleIds;
         sort($sortedRuleIds, SORT_STRING);
-        $result    = $this->stringKeyedArray($this->listValue($run, 'results')[0] ?? null);
+        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
         $ruleIndex = $result['ruleIndex'] ?? null;
         self::assertIsInt($ruleIndex);
         $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
@@ -122,7 +122,7 @@ final class SarifReporterTest extends TestCase
         $resultProperties = $this->stringKeyedArray($result, 'properties');
         self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
         self::assertSame('eval', $this->stringKeyedArray($resultProperties, 'metadata')['target'] ?? null);
-        $runProperties = $this->stringKeyedArray($run, 'properties');
+        $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
         self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertSame($score->composite->score, $runProperties['score'] ?? null);
         self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
@@ -141,15 +141,15 @@ final class SarifReporterTest extends TestCase
     public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
     {
         $payload = $this->decode((new SarifReporter())->render($this->report([])));
-        $run     = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
-        $driver  = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($run, 'tool'), 'driver'));
+        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
 
-        self::assertSame([], $this->listValue($run, 'results'));
+        self::assertSame([], $this->listValue($sarifRun, 'results'));
         self::assertContains('size.file-length', array_map(
             fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
             $this->listValue($driver, 'rules'),
         ));
-        $runProperties = $this->stringKeyedArray($run, 'properties');
+        $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
         self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertArrayNotHasKey('score', $runProperties);
         self::assertArrayNotHasKey('grade', $runProperties);
@@ -214,10 +214,10 @@ final class SarifReporterTest extends TestCase
         ));
         $finding   = (new MutationFindingFactory())->findingsFor($mutationResult)[0];
         $payload   = $this->decode((new SarifReporter())->render($this->report([$finding])));
-        $run       = $this->sarifRun($payload);
-        $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($run, 'tool'), 'driver'));
+        $sarifRun  = $this->sarifRun($payload);
+        $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
         $rules     = $this->listValue($driver, 'rules');
-        $result    = $this->stringKeyedArray($this->listValue($run, 'results')[0] ?? null);
+        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
         $ruleIndex = $result['ruleIndex'] ?? null;
         self::assertIsInt($ruleIndex);
         $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
@@ -276,11 +276,11 @@ final class SarifReporterTest extends TestCase
         ]);
         $json  = $this->decode((new JsonReporter())->render($report));
         $sarif = $this->decode((new SarifReporter())->render($report));
-        $run   = $this->sarifRun($sarif);
+        $sarifRun = $this->sarifRun($sarif);
 
         self::assertSame('gruff.analysis.v1', $this->stringValue($json, 'schemaVersion'));
-        self::assertSame($this->stringValue($json, 'schemaVersion'), $this->stringValue($this->stringKeyedArray($run, 'properties'), 'gruffSchemaVersion'));
-        self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($run, 'results'));
+        self::assertSame($this->stringValue($json, 'schemaVersion'), $this->stringValue($this->stringKeyedArray($sarifRun, 'properties'), 'gruffSchemaVersion'));
+        self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($sarifRun, 'results'));
         self::assertSame(
             array_map(
                 fn (mixed $finding): string => $this->stringValue($this->stringKeyedArray($finding), 'ruleId'),
@@ -288,7 +288,7 @@ final class SarifReporterTest extends TestCase
             ),
             array_map(
                 fn (mixed $result): string => $this->stringValue($this->stringKeyedArray($result), 'ruleId'),
-                $this->listValue($run, 'results'),
+                $this->listValue($sarifRun, 'results'),
             ),
         );
     }

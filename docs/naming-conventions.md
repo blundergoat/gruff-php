@@ -27,8 +27,10 @@ Rule IDs use the shape `<namespace>.<rule-slug>`.
 ## Config Files
 
 The shared project config filename is `.gruff.yaml`. Implementations may also
-support `.gruff.yml`, `.gruff.json`, or language-native config for
-compatibility, but checked-in dogfood config should prefer `.gruff.yaml`.
+support a tool-prefixed variant (for example `gruff-php` prefers
+`.gruff-php.yaml` and falls back to `.gruff.yaml`), `.gruff.yml`, or
+language-native config for compatibility. Checked-in dogfood config should
+prefer the implementation's primary YAML filename.
 
 Use these root keys when the implementation supports them:
 
@@ -76,7 +78,7 @@ the source of truth.
 | Project | Naming status |
 | --- | --- |
 | `gruff-go` | Emits dotted rule IDs and accepts legacy hyphen-only plus `documentation.*` config aliases. Its `acceptedAbbreviations` loader currently requires uppercase initialisms. |
-| `gruff-php` | Uses dotted rule IDs, `docs.*`, YAML-only config, `selection`, and `warning` / `error` threshold names. |
+| `gruff-php` | Uses dotted rule IDs, `docs.*`, YAML-only config (`.gruff-php.yaml` preferred, legacy `.gruff.yaml` accepted), `selection`, and a single `threshold` + `severity` shorthand for rubric rules. |
 | `gruff-py` | Uses dotted rule IDs, `docs.*`, `.gruff.yaml` before `pyproject.toml`, and `warning` / `error` threshold names. |
 | `gruff-rs` | Uses dotted rule IDs and `.gruff.yaml`; `metrics.*` and `architecture.*` are documented Rust-specific namespaces, and several threshold names use `warn`. |
 | `gruff-ts` | Uses dotted rule IDs, `docs.*`, and several threshold names that use `warn`; its default discovery still checks `.gruff.json` before `.gruff.yaml`. |

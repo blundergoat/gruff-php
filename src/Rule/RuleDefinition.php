@@ -23,12 +23,12 @@ final readonly class RuleDefinition
      * @param RuleTier                                                                     $tier              Rule catalogue tier.
      * @param Severity                                                                     $defaultSeverity   Severity used when config does not override it.
      * @param Confidence                                                                   $confidence        Default confidence assigned to rule findings.
-     * @param array<string, int|float>                                                     $defaultThresholds        Named numeric thresholds for rule settings (legacy tiered shape; mutually exclusive with $defaultSeverityThreshold per ADR-008).
+     * @param array<string, int|float>                                                     $defaultThresholds        Named numeric thresholds for rule settings (legacy tiered shape; mutually exclusive with $severityThreshold per ADR-008).
      * @param list<Pillar>                                                                 $secondaryPillars         Additional pillars affected by the rule.
-     * @param bool                                                                         $defaultEnabled           Whether the rule runs unless disabled by config.
+     * @param bool                                                                         $isEnabledByDefault       Whether the rule runs unless disabled by config.
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $defaultOptions           Rule-specific default option values.
      * @param string                                                                       $description              Longer display description for rule listings.
-     * @param SeverityThreshold|null                                                       $defaultSeverityThreshold Single threshold + severity default (ADR-008/ADR-009 shape); mutually exclusive with $defaultThresholds.
+     * @param SeverityThreshold|null                                                       $severityThreshold        Single threshold + severity default (ADR-008/ADR-009 shape); mutually exclusive with $defaultThresholds.
      * @throws InvalidArgumentException When the rule id, threshold names, or option names are invalid.
      */
     public function __construct(
@@ -40,18 +40,18 @@ final readonly class RuleDefinition
         public Confidence $confidence = Confidence::High,
         public array $defaultThresholds = [],
         public array $secondaryPillars = [],
-        public bool $defaultEnabled = true,
+        public bool $isEnabledByDefault = true,
         public array $defaultOptions = [],
         public string $description = '',
-        public ?SeverityThreshold $defaultSeverityThreshold = null,
+        public ?SeverityThreshold $severityThreshold = null,
     ) {
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
         }
 
-        if ($defaultSeverityThreshold instanceof SeverityThreshold && $defaultThresholds !== []) {
+        if ($severityThreshold instanceof SeverityThreshold && $defaultThresholds !== []) {
             throw new InvalidArgumentException(sprintf(
-                'Rule "%s" declares both defaultSeverityThreshold and defaultThresholds; use one form.',
+                'Rule "%s" declares both severityThreshold and defaultThresholds; use one form.',
                 $id,
             ));
         }
