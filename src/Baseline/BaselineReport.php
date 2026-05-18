@@ -62,7 +62,7 @@ final readonly class BaselineReport
             'staleEntries' => count($this->staleEntries),
             'source' => $this->source,
             'stale' => array_map(
-                static fn (BaselineEntry $entry): array => $entry->toArray(),
+                static fn (BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
                 $this->staleEntries,
             ),
         ];

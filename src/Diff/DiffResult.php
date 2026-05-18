@@ -77,7 +77,7 @@ final readonly class DiffResult
             $files[] = [
                 'file' => $filePath,
                 'ranges' => array_map(
-                    static fn (ChangedLineRange $range): array => $range->toArray(),
+                    static fn (ChangedLineRange $changedLineRange): array => $changedLineRange->toArray(),
                     $this->rangesFor($filePath),
                 ),
             ];

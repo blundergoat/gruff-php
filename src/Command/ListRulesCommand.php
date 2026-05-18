@@ -53,7 +53,7 @@ final class ListRulesCommand extends Command
         foreach ($registry->all() as $rule) {
             $definition = $rule->definition();
             $settings   = $config->ruleSettings($definition->id);
-            $rows[]     = $this->row($definition, $settings->enabled);
+            $rows[]     = $this->ruleMetadataRow($definition, $settings->enabled);
         }
 
         if ($format === 'json') {
@@ -71,16 +71,16 @@ final class ListRulesCommand extends Command
         $output->writeln('Rule ID | Pillar | Tier | Severity | Confidence | Enabled | Description');
         $output->writeln('--- | --- | --- | --- | --- | --- | ---');
 
-        foreach ($rows as $row) {
+        foreach ($rows as $ruleMetadata) {
             $output->writeln(sprintf(
                 '%s | %s | %s | %s | %s | %s | %s',
-                $row['id'],
-                $row['pillar'],
-                $row['tier'],
-                $row['defaultSeverity'],
-                $row['confidence'],
-                $row['defaultEnabled'] ? 'yes' : 'no',
-                $row['description'],
+                $ruleMetadata['id'],
+                $ruleMetadata['pillar'],
+                $ruleMetadata['tier'],
+                $ruleMetadata['defaultSeverity'],
+                $ruleMetadata['confidence'],
+                $ruleMetadata['defaultEnabled'] ? 'yes' : 'no',
+                $ruleMetadata['description'],
             ));
         }
 
@@ -90,7 +90,7 @@ final class ListRulesCommand extends Command
     /**
      * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}
      */
-    private function row(RuleDefinition $definition, bool $enabled): array
+    private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array
     {
         $single     = $definition->defaultSeverityThreshold;
         $thresholds = $single instanceof \GruffPhp\Config\SeverityThreshold

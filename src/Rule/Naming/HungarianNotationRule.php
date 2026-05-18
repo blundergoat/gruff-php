@@ -89,7 +89,14 @@ final readonly class HungarianNotationRule implements RuleInterface
                 continue;
             }
 
-            $finding = $this->finding($definition, $unit, $param, 'parameter', $param->var->name, $symbol);
+            $finding = $this->finding(
+                definition: $definition,
+                unit:       $unit,
+                node:       $param,
+                kind:       'parameter',
+                name:       $param->var->name,
+                symbol:     $symbol,
+            );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }
@@ -109,7 +116,14 @@ final readonly class HungarianNotationRule implements RuleInterface
         $symbol   = $this->symbol($scope);
 
         foreach ($scope->localVariables as $name => $variable) {
-            $finding = $this->finding($definition, $unit, $variable, 'variable', $name, $symbol);
+            $finding = $this->finding(
+                definition: $definition,
+                unit:       $unit,
+                node:       $variable,
+                kind:       'variable',
+                name:       $name,
+                symbol:     $symbol,
+            );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
             }

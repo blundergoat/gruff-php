@@ -84,7 +84,12 @@ final readonly class NegativeBooleanRule implements RuleInterface
             }
 
             foreach ($property->props as $prop) {
-                $finding = $this->propertyFinding($definition, $unit, $prop, $allowlist);
+                $finding = $this->propertyFinding(
+                    definition:       $definition,
+                    unit:             $unit,
+                    propertyProperty: $prop,
+                    allowlist:        $allowlist,
+                );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -93,7 +98,13 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
         foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
             foreach ($scope->node->params as $param) {
-                $finding = $this->parameterFinding($definition, $unit, $scope, $param, $allowlist);
+                $finding = $this->parameterFinding(
+                    definition: $definition,
+                    unit:       $unit,
+                    scope:      $scope,
+                    param:      $param,
+                    allowlist:  $allowlist,
+                );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }

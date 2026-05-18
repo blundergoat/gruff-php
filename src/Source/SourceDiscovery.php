@@ -103,9 +103,9 @@ final readonly class SourceDiscovery
             }
         }
 
-        $files          = [];
-        $missingPaths   = [];
-        $ignoredPaths   = [];
+        $files        = [];
+        $missingPaths = [];
+        $ignoredPaths = [];
 
         foreach ($requestedPaths as $path) {
             $absolutePath = $this->absolutePath($path);
@@ -171,7 +171,7 @@ final readonly class SourceDiscovery
         $inner  = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
         $filter = new RecursiveCallbackFilterIterator(
             $inner,
-            function (SplFileInfo $file, mixed $key, RecursiveIterator $iterator) use ($includeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
+            function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($includeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
                 $path  = $file->getPathname();
                 $isDir = $file->isDir();
 
@@ -350,10 +350,10 @@ final readonly class SourceDiscovery
             $request['ignoredPaths'],
             $this->ignoredRequestedGitPaths($request['requestedExistingPaths'], $visiblePaths),
         );
-        $sourceResult  = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns);
-        $files         = $sourceResult['files'];
-        $ignoredPaths  = array_merge($ignoredPaths, $sourceResult['ignoredPaths']);
-        $missingPaths  = $request['missingPaths'];
+        $sourceResult = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns);
+        $files        = $sourceResult['files'];
+        $ignoredPaths = array_merge($ignoredPaths, $sourceResult['ignoredPaths']);
+        $missingPaths = $request['missingPaths'];
 
         ksort($files, SORT_STRING);
         sort($missingPaths, SORT_STRING);
@@ -393,7 +393,7 @@ final readonly class SourceDiscovery
                 return null;
             }
 
-            $pathspecs[]               = $pathspec;
+            $pathspecs[]              = $pathspec;
             $requestedExistingPaths[] = [
                 'absolutePath' => $absolutePath,
                 'pathspec' => $pathspec,
@@ -424,7 +424,7 @@ final readonly class SourceDiscovery
 
     /**
      * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths
-     * @param list<string>                                                        $visiblePaths
+     * @param list<string>                                                      $visiblePaths
      * @return list<string> Existing requested paths skipped by Git or generated-file protection.
      */
     private function ignoredRequestedGitPaths(array $requestedExistingPaths, array $visiblePaths): array

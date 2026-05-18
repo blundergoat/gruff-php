@@ -100,13 +100,26 @@ final readonly class BooleanPrefixRule implements RuleInterface
             $node                 = $scope->node;
             $symbol               = $this->symbol($scope);
             $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
-                ? $this->functionLikeFindings($definition, $unit, $node, $symbol, $prefixes)
+                ? $this->functionLikeFindings(
+                    definition: $definition,
+                    unit:       $unit,
+                    node:       $node,
+                    symbol:     $symbol,
+                    prefixes:   $prefixes,
+                )
                 : [];
 
             array_push(
                 $findings,
                 ...$functionLikeFindings,
-                ...$this->parameterFindings($definition, $unit, $scope, $symbol, $prefixes, $stateAdjectives),
+                ...$this->parameterFindings(
+                    definition:      $definition,
+                    unit:            $unit,
+                    scope:           $scope,
+                    symbol:          $symbol,
+                    prefixes:        $prefixes,
+                    stateAdjectives: $stateAdjectives,
+                ),
             );
         }
 

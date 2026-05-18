@@ -32,7 +32,7 @@ final readonly class TrendRecorder
         $entries       = $this->readEntries($resolvedPath);
         $previous      = $entries === [] ? null : $entries[array_key_last($entries)];
         $previousScore = $this->scoreFromEntry($previous);
-        $entry         = [
+        $trendEntry    = [
             'schemaVersion' => AnalysisReport::SCHEMA_VERSION,
             'timestamp' => gmdate(DATE_ATOM),
             'score' => $score->composite->score,
@@ -41,7 +41,7 @@ final readonly class TrendRecorder
             'findings' => $findingCount,
         ];
 
-        $entries[] = $entry;
+        $entries[] = $trendEntry;
         $entries   = array_slice($entries, -50);
         $directory = dirname($resolvedPath);
 
@@ -78,7 +78,7 @@ final readonly class TrendRecorder
         }
 
         return array_map(
-            fn (mixed $entry): array => $this->normaliseEntry($entry, $path),
+            fn (mixed $trendEntry): array => $this->normaliseEntry($trendEntry, $path),
             $decoded,
         );
     }
@@ -105,14 +105,14 @@ final readonly class TrendRecorder
      *
      * @return TrendEntry
      */
-    private function normaliseEntry(mixed $entry, string $path): array
+    private function normaliseEntry(mixed $trendEntry, string $path): array
     {
-        if (!is_array($entry) || array_is_list($entry)) {
+        if (!is_array($trendEntry) || array_is_list($trendEntry)) {
             throw new RuntimeException(sprintf('History file contains an invalid entry: %s', $path));
         }
 
         $normalisedEntry = [];
-        foreach ($entry as $key => $value) {
+        foreach ($trendEntry as $key => $value) {
             if (!is_string($key)) {
                 throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
             }
@@ -136,13 +136,13 @@ final readonly class TrendRecorder
     }
 
     /**
-     * @param TrendEntry|null $entry
+     * @param TrendEntry|null $trendEntry
      *
      * @return float|null Score value from the entry, or null when absent.
      */
-    private function scoreFromEntry(?array $entry): ?float
+    private function scoreFromEntry(?array $trendEntry): ?float
     {
-        $score = $entry['score'] ?? null;
+        $score = $trendEntry['score'] ?? null;
 
         return is_int($score) || is_float($score) ? (float) $score : null;
     }

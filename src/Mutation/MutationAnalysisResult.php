@@ -89,11 +89,11 @@ final readonly class MutationAnalysisResult
                 'mutationCodeCoverage' => $this->report->coverageRate(),
             ],
             'files' => array_map(
-                static fn (MutationFileSummary $summary): array => $summary->toArray(),
+                static fn (MutationFileSummary $mutationFileSummary): array => $mutationFileSummary->toArray(),
                 $this->report->fileSummaries(),
             ),
             'survivedMutants' => array_map(
-                static fn (InfectionMutant $mutant): array => $mutant->toArray(),
+                static fn (InfectionMutant $infectionMutant): array => $infectionMutant->toArray(),
                 $this->report->survivedMutants(),
             ),
             'baseline' => $this->baselineReport instanceof InfectionReport

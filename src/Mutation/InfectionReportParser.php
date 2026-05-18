@@ -117,12 +117,12 @@ final readonly class InfectionReportParser
      *
      * @return InfectionMutant Parsed mutant record.
      */
-    private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
+    private function parseMutant(mixed $mutantRecord, string $status, string $location, string $path): InfectionMutant
     {
-        $row           = $this->requireJsonObject($row, sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
-        $mutator       = $this->requireMutatorObject($row, $location, $path);
-        $diff          = $row['diff'] ?? null;
-        $processOutput = $row['processOutput'] ?? null;
+        $mutantRecord  = $this->requireJsonObject($mutantRecord, sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
+        $mutator       = $this->requireMutatorObject($mutantRecord, $location, $path);
+        $diff          = $mutantRecord['diff'] ?? null;
+        $processOutput = $mutantRecord['processOutput'] ?? null;
 
         return new InfectionMutant(
             status:        $status,
@@ -137,12 +137,12 @@ final readonly class InfectionReportParser
     /**
      * Extract and validate the mutator object from one mutant row.
      *
-     * @param JsonObject $row
+     * @param JsonObject $mutantRecord
      * @return JsonObject
      */
-    private function requireMutatorObject(array $row, string $location, string $path): array
+    private function requireMutatorObject(array $mutantRecord, string $location, string $path): array
     {
-        $mutator = $row['mutator'] ?? null;
+        $mutator = $mutantRecord['mutator'] ?? null;
         return $this->requireJsonObject($mutator, sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
     }
 

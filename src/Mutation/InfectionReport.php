@@ -68,7 +68,7 @@ final readonly class InfectionReport
     {
         return array_values(array_filter(
             $this->mutants,
-            static fn (InfectionMutant $mutant): bool => in_array($mutant->status, ['escaped', 'timed out'], true),
+            static fn (InfectionMutant $infectionMutant): bool => in_array($infectionMutant->status, ['escaped', 'timed out'], true),
         ));
     }
 

@@ -429,16 +429,16 @@ final class SummaryCommand extends Command
         if ($summaryReportData->topRules !== []) {
             $lines[] = '';
             $lines[] = sprintf('Top %d rules by finding count', count($summaryReportData->topRules));
-            $idWidth = $this->columnWidth(array_map(static fn (array $row): string => $row['ruleId'], $summaryReportData->topRules), 30);
-            foreach ($summaryReportData->topRules as $row) {
+            $idWidth = $this->columnWidth(array_map(static fn (array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
+            foreach ($summaryReportData->topRules as $ruleSummary) {
                 $lines[] = sprintf(
                     '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
-                    $row['count'],
-                    $row['ruleId'],
-                    $row['pillar'],
-                    $row['advisory'],
-                    $row['warning'],
-                    $row['error'],
+                    $ruleSummary['count'],
+                    $ruleSummary['ruleId'],
+                    $ruleSummary['pillar'],
+                    $ruleSummary['advisory'],
+                    $ruleSummary['warning'],
+                    $ruleSummary['error'],
                 );
             }
         }

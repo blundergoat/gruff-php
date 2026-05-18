@@ -80,14 +80,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
-                    $definition,
-                    $unit,
-                    $prop,
-                    ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
-                    $ignored,
-                    $accepted,
-                    $minLength,
-                    $maxLength,
+                    definition: $definition,
+                    unit:       $unit,
+                    node:       $prop,
+                    identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                    ignored:    $ignored,
+                    accepted:   $accepted,
+                    minLength:  $minLength,
+                    maxLength:  $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -103,14 +103,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    $definition,
-                    $unit,
-                    $param,
-                    ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
-                    $ignored,
-                    $accepted,
-                    $minLength,
-                    $maxLength,
+                    definition: $definition,
+                    unit:       $unit,
+                    node:       $param,
+                    identifier: ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
+                    ignored:    $ignored,
+                    accepted:   $accepted,
+                    minLength:  $minLength,
+                    maxLength:  $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -124,14 +124,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    $definition,
-                    $unit,
-                    $variable,
-                    ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    $ignored,
-                    $accepted,
-                    $minLength,
-                    $maxLength,
+                    definition: $definition,
+                    unit:       $unit,
+                    node:       $variable,
+                    identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                    ignored:    $ignored,
+                    accepted:   $accepted,
+                    minLength:  $minLength,
+                    maxLength:  $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;

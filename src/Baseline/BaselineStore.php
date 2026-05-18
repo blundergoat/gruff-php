@@ -101,7 +101,7 @@ final readonly class BaselineStore
                 throw new BaselineException(sprintf('Baseline finding %d must be a JSON object.', $index));
             }
 
-            $row = [];
+            $baselineFinding = [];
             foreach ($finding as $key => $value) {
                 if (!is_string($key)) {
                     throw new BaselineException(sprintf('Baseline finding %d contains a non-string key.', $index));
@@ -111,10 +111,10 @@ final readonly class BaselineStore
                     throw new BaselineException(sprintf('Baseline finding %d field "%s" must be a scalar or null.', $index, $key));
                 }
 
-                $row[$key] = $value;
+                $baselineFinding[$key] = $value;
             }
 
-            $rows[] = $row;
+            $rows[] = $baselineFinding;
         }
 
         return $rows;
@@ -159,7 +159,7 @@ final readonly class BaselineStore
             'schemaVersion' => self::SCHEMA_VERSION,
             'generatedAt' => gmdate('c'),
             'findings' => array_map(
-                static fn (BaselineEntry $entry): array => $entry->toArray(),
+                static fn (BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
                 $entries,
             ),
         ];
