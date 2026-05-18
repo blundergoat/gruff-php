@@ -11,7 +11,10 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
+use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
+use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use GruffPhp\Source\SourceFile;
@@ -68,6 +71,48 @@ final class TestQualityCalibrationRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php', $config);
 
         self::assertRuleCount(TestMethodTooLongRule::ID, 0, $findings);
+    }
+
+    /**
+     * Verify control-flow test rubrics support project-specific path exemptions.
+     *
+     * @return void No return value.
+     */
+    public function testControlFlowRulesSupportIgnoredPathPatterns(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)
+            ->withRuleSettings(
+                ConditionalTestLogicRule::ID,
+                new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
+            )
+            ->withRuleSettings(
+                LoopInTestRule::ID,
+                new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
+            );
+
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php', $config);
+
+        self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
+        self::assertRuleCount(LoopInTestRule::ID, 0, $findings);
+    }
+
+    /**
+     * Verify repeated-structure rubric supports project-specific path exemptions.
+     *
+     * @return void No return value.
+     */
+    public function testRepeatedStructureRuleSupportsIgnoredPathPatterns(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            RepeatedStructureMissingDataProviderRule::ID,
+            new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
+        );
+
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php', $config);
+
+        self::assertRuleCount(RepeatedStructureMissingDataProviderRule::ID, 0, $findings);
     }
 
     /**

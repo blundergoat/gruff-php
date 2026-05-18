@@ -42,6 +42,7 @@ final readonly class LoopInTestRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::High,
+            defaultOptions:  ['ignoredPathPatterns' => []],
         );
     }
 
@@ -55,6 +56,13 @@ final readonly class LoopInTestRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
+        $definition = $this->definition();
+        $settings   = $context->settingsFor($definition);
+
+        if ($this->isPathIgnored($unit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+            return [];
+        }
+
         $finder   = new NodeFinder();
         $findings = [];
 
@@ -88,6 +96,25 @@ final readonly class LoopInTestRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Check whether a project-configured path exemption applies.
+     *
+     * @param list<string> $patterns Glob patterns for accepted test shapes.
+     * @return bool True when the display path matches an ignored pattern.
+     */
+    private function isPathIgnored(string $displayPath, array $patterns): bool
+    {
+        $normalizedPath = str_replace('\\', '/', $displayPath);
+
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

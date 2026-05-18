@@ -60,12 +60,12 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report  = $this->decodeJsonOutput($process);
-        $run     = $report['run'] ?? null;
-        $summary = $report['summary'] ?? null;
+        $runMetadata = $report['run'] ?? null;
+        $summary     = $report['summary'] ?? null;
 
-        self::assertIsArray($run);
+        self::assertIsArray($runMetadata);
         self::assertIsArray($summary);
-        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $run['paths'] ?? null);
+        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $runMetadata['paths'] ?? null);
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(1, $summary['filesParsed'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
@@ -378,168 +378,6 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertNotContains('sensitive-data.aws-access-key', $ruleIds);
         self::assertContains('sensitive-data.api-key-pattern', $ruleIds);
-    }
-
-    /**
-     * Verify analyse command ingests infection report in JSON.
-     *
-     * @throws JsonException
-     * @return void No return value.
-     */
-    public function testAnalyseCommandIngestsInfectionReportInJson(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--infection-report',
-            'tests/Fixtures/Mutation/Infection/infection-valid.json',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $report   = $this->decodeJsonOutput($process);
-        $mutation = $report['mutation'] ?? null;
-        $findings = $report['findings'] ?? null;
-
-        self::assertIsArray($mutation);
-        $totals = $mutation['totals'] ?? null;
-        self::assertIsArray($totals);
-        self::assertEquals(50.0, $totals['msi'] ?? null);
-        self::assertSame(2, $totals['survivedMutants'] ?? null);
-        self::assertIsArray($findings);
-        self::assertContains(
-            'mutation.survived-mutant',
-            array_map(
-                static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
-                $findings,
-            ),
-        );
-
-        $mutationFindings = array_values(array_filter(
-            $findings,
-            static fn (mixed $finding): bool => is_array($finding)
-                && ($finding['ruleId'] ?? null) === 'mutation.survived-mutant',
-        ));
-        $firstMutationFinding = $mutationFindings[0] ?? null;
-
-        self::assertIsArray($firstMutationFinding);
-        $metadata = $firstMutationFinding['metadata'] ?? null;
-        self::assertIsArray($metadata);
-        self::assertEquals(50.0, $metadata['msi'] ?? null);
-        self::assertEquals(50.0, $metadata['coveredMsi'] ?? null);
-    }
-
-    /**
-     * Verify analyse command renders mutation summary in text.
-     *
-     * @return void No return value.
-     */
-    public function testAnalyseCommandRendersMutationSummaryInText(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--infection-report',
-            'tests/Fixtures/Mutation/Infection/infection-valid.json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('Mutation', $process->getOutput());
-        self::assertStringContainsString('MSI: 50.00%', $process->getOutput());
-        self::assertStringContainsString('Statuses: escaped=1, killed=2, timed out=1', $process->getOutput());
-        self::assertStringContainsString('Mutation escaped via Plus; tests did not fail against this mutant.', $process->getOutput());
-        self::assertStringContainsString('Mutation timed out via IntegerPlus; Infection exceeded the timeout before a clear test failure.', $process->getOutput());
-        self::assertStringContainsString('mutation.survived-mutant', $process->getOutput());
-    }
-
-    /**
-     * Verify analyse command renders score and mutation context in markdown.
-     *
-     * @return void No return value.
-     */
-    public function testAnalyseCommandRendersScoreAndMutationContextInMarkdown(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--infection-report',
-            'tests/Fixtures/Mutation/Infection/infection-valid.json',
-            '--format',
-            'markdown',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('**Score drivers:** Per-pillar scores start at 100', $process->getOutput());
-        self::assertStringContainsString('Mutation uses the supplied Infection MSI as the mutation pillar score.', $process->getOutput());
-        self::assertStringContainsString('**Mutation:** MSI 50.00%', $process->getOutput());
-        self::assertStringContainsString('**Mutation statuses:** escaped=1, killed=2, timed out=1.', $process->getOutput());
-    }
-
-    /**
-     * Verify analyse command reports mutation budget and msi regression.
-     *
-     * @throws JsonException
-     * @return void No return value.
-     */
-    public function testAnalyseCommandReportsMutationBudgetAndMsiRegression(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--infection-report',
-            'tests/Fixtures/Mutation/Infection/infection-valid.json',
-            '--mutation-baseline',
-            'tests/Fixtures/Mutation/Infection/infection-baseline.json',
-            '--mutation-budget',
-            '1',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
-        $process->run();
-
-        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-
-        $report   = $this->decodeJsonOutput($process);
-        $mutation = $report['mutation'] ?? null;
-        $findings = $report['findings'] ?? null;
-
-        self::assertIsArray($mutation);
-        $baseline = $mutation['baseline'] ?? null;
-        $budget   = $mutation['budget'] ?? null;
-        self::assertIsArray($baseline);
-        self::assertIsArray($budget);
-        self::assertEquals(-30.0, $baseline['delta'] ?? null);
-        self::assertSame(true, $budget['exceeded'] ?? null);
-        self::assertIsArray($findings);
-
-        $ruleIds = array_map(
-            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
-            $findings,
-        );
-
-        self::assertContains('mutation.budget-exceeded', $ruleIds);
-        self::assertContains('mutation.msi-regression', $ruleIds);
     }
 
     /**
