@@ -40,7 +40,7 @@ bin/
 `-- gruff-php                                 = `#!/usr/bin/env php` shim that loads autoload and runs Console\Application
 
 scripts/
-|-- preflight-checks.sh                       = local PHPStan + PHPUnit runner with coloured pass/fail summary
+|-- preflight-checks.sh                       = local PHPStan + PHPUnit + full-project gruff analysis runner with coloured pass/fail summary
 |-- start-dev.sh                              = starts `bin/gruff-php dashboard` with environment-overridable host/port/project/scan timeout
 `-- maintenance/                              = ad-hoc maintenance scripts (developer-local)
 

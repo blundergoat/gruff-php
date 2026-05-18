@@ -176,51 +176,51 @@ test_suite_check() {
 
 gruff_report_summary() {
     local report_path=$1
-    local include_mutation=${2:-0}
 
     # shellcheck disable=SC2016
     php -r '
 $report = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
-$includeMutation = $argv[2] === "1";
 $summary = $report["summary"] ?? [];
 $findings = $summary["findings"] ?? [];
 $score = $report["score"]["composite"] ?? null;
 
 $parts = [
-    sprintf("%d findings", (int) ($findings["total"] ?? 0)),
+    sprintf(
+        "%d findings (advisory=%d, warning=%d, error=%d)",
+        (int) ($findings["total"] ?? 0),
+        (int) ($findings["advisory"] ?? 0),
+        (int) ($findings["warning"] ?? 0),
+        (int) ($findings["error"] ?? 0),
+    ),
 ];
 
 if (is_array($score)) {
     $parts[] = sprintf("%s %.2f/100", (string) ($score["grade"] ?? "n/a"), (float) ($score["score"] ?? 0));
 }
 
-if ($includeMutation) {
-    $mutation = $report["mutation"]["totals"] ?? null;
-    if (is_array($mutation)) {
-        $parts[] = sprintf(
-            "unit MSI %.2f%%, survived %d/%d",
-            (float) ($mutation["msi"] ?? 0),
-            (int) ($mutation["survivedMutants"] ?? 0),
-            (int) ($mutation["totalMutants"] ?? 0),
-        );
-    } else {
-        $parts[] = "unit mutation data unavailable";
-    }
-}
-
 echo implode(", ", $parts);
-' "$report_path" "$include_mutation"
+' "$report_path"
 }
 
-gruff_source_scan() {
-    local report_path="${TMPDIR:-/tmp}/gruff-preflight-source-scan.json"
+gruff_php_check() {
+    local report_path="${TMPDIR:-/tmp}/gruff-preflight-analysis.json"
+    local error_path="${TMPDIR:-/tmp}/gruff-preflight-analysis.err"
     local status
+    local printed=0
 
-    php bin/gruff-php analyse src --fail-on none --format json > "$report_path"
+    php bin/gruff-php analyse --fail-on advisory --format json > "$report_path" 2> "$error_path"
     status=$?
 
     if [[ -s "$report_path" ]]; then
-        gruff_report_summary "$report_path" 0 || return $?
+        gruff_report_summary "$report_path" || return $?
+        printed=1
+    fi
+
+    if [[ -s "$error_path" ]]; then
+        if ((printed)); then
+            printf '\n'
+        fi
+        cat "$error_path"
     fi
 
     return "$status"
@@ -276,7 +276,7 @@ Usage: scripts/preflight-checks.sh [--mutate-diff|--mutate-full]
 Runs the standard preflight gate:
   - PHPStan
   - PHPUnit
-  - Gruff source scan
+  - Gruff full-project scan
 
 Options:
   --mutate-diff    Run Infection using edited PHPUnit unit test files only.
@@ -331,7 +331,7 @@ main() {
     run_step "Tests (PHPUnit)" test_suite_check
     test_status=$?
 
-    run_step "Gruff source scan" gruff_source_scan
+    run_step "Gruff full-project scan" gruff_php_check
     gruff_status=$?
 
     if [[ "$MUTATION_MODE" == "diff" ]]; then

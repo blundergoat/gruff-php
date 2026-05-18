@@ -148,7 +148,7 @@ Composer is the package manager. Local verification is defined by `composer.json
 - `composer check` runs `composer validate --strict`, `bash -n scripts/preflight-checks.sh`, an explicit `php -l` over every committed PHP source/test file, and PHPStan.
 - `composer phpstan` runs PHPStan 2 at level 10 against `src/` and `tests/`.
 - `composer test` runs PHPUnit 11.
-- `scripts/preflight-checks.sh` runs `composer phpstan` then `composer test` with a coloured pass/fail summary.
+- `scripts/preflight-checks.sh` runs `composer phpstan`, `composer test`, and a full-project `php bin/gruff-php analyse --fail-on advisory --format json` gate with a coloured pass/fail summary.
 
 CI is `.github/workflows/ci.yml`. It runs on push to `main` and pull requests, installs dependencies on PHP 8.3, then runs `composer check` and `bash scripts/preflight-checks.sh`.
 

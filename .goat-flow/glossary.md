@@ -310,7 +310,7 @@ PHPUnit 11 against `phpunit.xml.dist`.
 
 ### `scripts/preflight-checks.sh`
 
-Runs `composer phpstan` then `composer test` and prints a coloured summary. Used as the default local quality gate before commits.
+Runs `composer phpstan`, `composer test`, then full-project `php bin/gruff-php analyse --fail-on advisory --format json` and prints a coloured summary. Used as the default local quality gate before commits.
 
 ## Milestones (M0X)
 
