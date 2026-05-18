@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Complexity;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -40,16 +41,13 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Cognitive complexity',
-            pillar:            Pillar::Complexity,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::High,
-            defaultThresholds: [
-                'warning' => 15,
-                'error' => 30,
-            ],
+            id:                       self::ID,
+            name:                     'Cognitive complexity',
+            pillar:                   Pillar::Complexity,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::High,
+            defaultSeverityThreshold: new SeverityThreshold(30, Severity::Error),
         );
     }
 

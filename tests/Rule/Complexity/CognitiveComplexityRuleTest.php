@@ -138,9 +138,12 @@ final class CognitiveComplexityRuleTest extends TestCase
      */
     public function testDefinitionThresholdsAreStable(): void
     {
-        $thresholds = $this->rule->definition()->defaultThresholds;
+        $definition = $this->rule->definition();
 
-        self::assertSame(['warning' => 15, 'error' => 30], $thresholds);
+        self::assertSame([], $definition->defaultThresholds);
+        self::assertNotNull($definition->defaultSeverityThreshold);
+        self::assertSame(30, $definition->defaultSeverityThreshold->threshold);
+        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->defaultSeverityThreshold->severity);
     }
 
     /**

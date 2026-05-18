@@ -96,7 +96,12 @@ final class HalsteadVolumeRuleTest extends TestCase
      */
     public function testDefinitionThresholdsAreStable(): void
     {
-        self::assertSame(['warning' => 1000, 'error' => 2000], $this->rule->definition()->defaultThresholds);
+        $definition = $this->rule->definition();
+
+        self::assertSame([], $definition->defaultThresholds);
+        self::assertNotNull($definition->defaultSeverityThreshold);
+        self::assertSame(8000, $definition->defaultSeverityThreshold->threshold);
+        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->defaultSeverityThreshold->severity);
     }
 
     /**

@@ -82,7 +82,12 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public function testDefinitionThresholdsAreStable(): void
     {
-        self::assertSame(['warning' => 55, 'error' => 35], $this->rule->definition()->defaultThresholds);
+        $definition = $this->rule->definition();
+
+        self::assertSame([], $definition->defaultThresholds);
+        self::assertNotNull($definition->defaultSeverityThreshold);
+        self::assertSame(35, $definition->defaultSeverityThreshold->threshold);
+        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->defaultSeverityThreshold->severity);
     }
 
     /**

@@ -71,15 +71,15 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
             $configPath,
-            "rules:\n    complexity.cyclomatic:\n        thresholds:\n            warning: 7\n            error: 70\n",
+            "rules:\n    complexity.cyclomatic:\n        threshold: 70\n        severity: error\n",
         ));
 
         try {
             $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings('complexity.cyclomatic');
 
-            self::assertSame(7, $settings->numericThreshold('warning'));
-            self::assertSame(70, $settings->numericThreshold('error'));
+            self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+            self::assertSame(70, $settings->severityThreshold->threshold);
         } finally {
             self::assertTrue(unlink($configPath));
             self::assertTrue(rmdir($directory));
@@ -98,15 +98,15 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
             $configPath,
-            "rules:\n    complexity.cyclomatic:\n        thresholds:\n            warning: 13\n            error: 130\n",
+            "rules:\n    complexity.cyclomatic:\n        threshold: 130\n        severity: error\n",
         ));
 
         try {
             $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings('complexity.cyclomatic');
 
-            self::assertSame(13, $settings->numericThreshold('warning'));
-            self::assertSame(130, $settings->numericThreshold('error'));
+            self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+            self::assertSame(130, $settings->severityThreshold->threshold);
         } finally {
             self::assertTrue(unlink($configPath));
             self::assertTrue(rmdir($directory));
@@ -127,15 +127,15 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
             $fallbackPath,
-            "rules:\n    complexity.cyclomatic:\n        thresholds:\n            warning: 11\n            error: 110\n",
+            "rules:\n    complexity.cyclomatic:\n        threshold: 110\n        severity: error\n",
         ));
 
         try {
             $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings('complexity.cyclomatic');
 
-            self::assertSame(11, $settings->numericThreshold('warning'));
-            self::assertSame(110, $settings->numericThreshold('error'));
+            self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+            self::assertSame(110, $settings->severityThreshold->threshold);
         } finally {
             self::assertTrue(unlink($fallbackPath));
             self::assertTrue(rmdir($fallbackDirectory));
@@ -157,15 +157,15 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
             $fallbackPath,
-            "rules:\n    complexity.cyclomatic:\n        thresholds:\n            warning: 17\n            error: 170\n",
+            "rules:\n    complexity.cyclomatic:\n        threshold: 170\n        severity: error\n",
         ));
 
         try {
             $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings('complexity.cyclomatic');
 
-            self::assertSame(17, $settings->numericThreshold('warning'));
-            self::assertSame(170, $settings->numericThreshold('error'));
+            self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+            self::assertSame(170, $settings->severityThreshold->threshold);
         } finally {
             self::assertTrue(unlink($fallbackPath));
             self::assertTrue(rmdir($fallbackDirectory));
@@ -181,15 +181,15 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     public function testLoadsExplicitYamlConfigFile(): void
     {
         $path = $this->writeTempConfig(
-            "rules:\n    complexity.cyclomatic:\n        thresholds:\n            warning: 9\n            error: 90\n",
+            "rules:\n    complexity.cyclomatic:\n        threshold: 90\n        severity: error\n",
             '.yaml',
         );
 
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings('complexity.cyclomatic');
 
-        self::assertSame(9, $settings->numericThreshold('warning'));
-        self::assertSame(90, $settings->numericThreshold('error'));
+        self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+        self::assertSame(90, $settings->severityThreshold->threshold);
     }
 
     /**
@@ -275,8 +275,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
         $settings = $config->ruleSettings('complexity.maintainability-index');
 
-        self::assertSame(55, $settings->numericThreshold('warning'));
-        self::assertSame(35, $settings->numericThreshold('error'));
         self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
         self::assertSame(45, $settings->severityThreshold->threshold);
         self::assertSame(Severity::Warning, $settings->severityThreshold->severity);
@@ -325,7 +323,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             ],
             'combined severity threshold and threshold map' => [
                 '{"rules":{"complexity.cyclomatic":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}',
-                'Config key "rules.complexity.cyclomatic" cannot combine "threshold" and "thresholds".',
+                'Config key "rules.complexity.cyclomatic.thresholds" is not supported; this rule uses a single threshold and severity.',
             ],
             'unsupported minimum PHP version' => [
                 '{"minimumPhpVersion": 7.3}',
@@ -337,7 +335,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             ],
             'unknown threshold key' => [
                 '{"rules":{"complexity.cyclomatic":{"thresholds":{"critical":1}}}}',
-                'Unknown threshold "rules.complexity.cyclomatic.thresholds.critical".',
+                'Config key "rules.complexity.cyclomatic.thresholds" is not supported; this rule uses a single threshold and severity.',
             ],
             'invalid path ignore pattern' => [
                 '{"paths":{"ignore":["../outside"]}}',

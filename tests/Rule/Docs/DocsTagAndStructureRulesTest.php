@@ -107,7 +107,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $findings = $this->analyseRule('todo-density.php', TodoDensityRule::ID);
 
         self::assertCount(1, $findings);
-        self::assertSame(6, $findings[0]->metadata['count']);
+        self::assertSame(12, $findings[0]->metadata['count']);
     }
 
     /**

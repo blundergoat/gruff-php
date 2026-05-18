@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Complexity;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -39,16 +40,13 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Halstead volume',
-            pillar:            Pillar::Complexity,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::Medium,
-            defaultThresholds: [
-                'warning' => 1000,
-                'error' => 2000,
-            ],
+            id:                       self::ID,
+            name:                     'Halstead volume',
+            pillar:                   Pillar::Complexity,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::Medium,
+            defaultSeverityThreshold: new SeverityThreshold(8000, Severity::Error),
         );
     }
 

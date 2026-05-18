@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Complexity;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -38,16 +39,13 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Maintainability index',
-            pillar:            Pillar::Maintainability,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::Medium,
-            defaultThresholds: [
-                'warning' => 55,
-                'error' => 35,
-            ],
+            id:                       self::ID,
+            name:                     'Maintainability index',
+            pillar:                   Pillar::Maintainability,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::Medium,
+            defaultSeverityThreshold: new SeverityThreshold(35, Severity::Error),
         );
     }
 

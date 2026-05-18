@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Docs;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -33,16 +34,13 @@ final readonly class TodoDensityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'TODO/FIXME density',
-            pillar:            Pillar::Documentation,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::High,
-            defaultThresholds: [
-                'warning' => 5,
-                'error' => 10,
-            ],
+            id:                       self::ID,
+            name:                     'TODO/FIXME density',
+            pillar:                   Pillar::Documentation,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::High,
+            defaultSeverityThreshold: new SeverityThreshold(10, Severity::Error),
         );
     }
 
