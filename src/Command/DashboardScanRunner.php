@@ -97,17 +97,17 @@ final class DashboardScanRunner
         $startedAt = microtime(true);
 
         if ($state['scanScope'] !== 'diff' && $state['includeIgnored'] !== '1') {
-            $cacheKey     = $this->cacheKey($scanRoot, $command);
+            $cacheKey     = hash('sha256', $scanRoot . "\0" . implode("\0", $command));
             $fingerprint  = $this->cacheFingerprint($scanRoot, $paths, $state);
             $cachedResult = $this->cache[$cacheKey] ?? null;
 
             if ($cachedResult !== null && $cachedResult['fingerprint'] === $fingerprint) {
                 return $renderer->injectDashboardMetadata(
-                    html: $cachedResult['html'],
+                    html:        $cachedResult['html'],
                     projectRoot: $scanRoot,
-                    command: $command,
-                    exitCode: $cachedResult['exitCode'],
-                    durationMs: (int) round((microtime(true) - $startedAt) * 1000),
+                    command:     $command,
+                    exitCode:    $cachedResult['exitCode'],
+                    durationMs:  (int) round((microtime(true) - $startedAt) * 1000),
                 );
             }
         } else {
@@ -115,7 +115,7 @@ final class DashboardScanRunner
             $fingerprint = null;
         }
 
-        $process   = new Process($command, $scanRoot);
+        $process = new Process($command, $scanRoot);
         $process->setTimeout($context->scanTimeout);
         $stderr   = '';
         $exitCode = Command::SUCCESS;
@@ -148,21 +148,10 @@ final class DashboardScanRunner
     }
 
     /**
-     * Build a stable cache key for a dashboard scan command.
-     *
-     * @param list<string> $command Analyse command argv.
-     * @return string Cache key for the project root and command options.
-     */
-    private function cacheKey(string $scanRoot, array $command): string
-    {
-        return hash('sha256', $scanRoot . "\0" . implode("\0", $command));
-    }
-
-    /**
      * Build an invalidation fingerprint for the requested scan inputs.
      *
-     * @param list<string>          $paths Requested scan paths.
-     * @param array<string, string> $state Dashboard query state.
+     * @param         list<string>                                                                                                                                                                                        $paths Requested scan paths.
+     * @param         array<string, string>                                                                                                                                                                               $state Dashboard query state.
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
      * @return string Fingerprint covering source paths plus config and baseline inputs.
      */

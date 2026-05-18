@@ -119,7 +119,7 @@ final readonly class InfectionReportParser
      */
     private function parseMutant(mixed $row, string $status, string $location, string $path): InfectionMutant
     {
-        $row           = $this->requireMutantRow($row, $location, $path);
+        $row           = $this->requireJsonObject($row, sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
         $mutator       = $this->requireMutatorObject($row, $location, $path);
         $diff          = $row['diff'] ?? null;
         $processOutput = $row['processOutput'] ?? null;
@@ -132,16 +132,6 @@ final readonly class InfectionReportParser
             diff:          is_string($diff) && $diff !== '' ? $diff : null,
             processOutput: is_string($processOutput) && $processOutput !== '' ? $processOutput : null,
         );
-    }
-
-    /**
-     * Validate one parsed Infection mutant row.
-     *
-     * @return JsonObject
-     */
-    private function requireMutantRow(mixed $row, string $location, string $path): array
-    {
-        return $this->requireJsonObject($row, sprintf('Infection report "%s" mutant %s must be a JSON object.', $path, $location));
     }
 
     /**

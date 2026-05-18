@@ -137,9 +137,12 @@ final readonly class SarifReporter
      */
     private function result(Finding $finding, int $ruleIndex): array
     {
+        $uri = str_replace('\\', '/', $finding->filePath);
+        $uri = (string) preg_replace('/^(?:\\.\\/)+/', '', $uri);
+
         $physicalLocation = [
             'artifactLocation' => [
-                'uri' => $this->uri($finding->filePath),
+                'uri' => $uri,
             ],
         ];
         if ($finding->line !== null) {
@@ -192,17 +195,6 @@ final readonly class SarifReporter
             ],
             'properties' => $properties,
         ];
-    }
-
-    /**
-     * Normalize SARIF artifact URIs to portable project-relative slash paths.
-     *
-     * @param string $filePath Native finding display path.
-     * @return string SARIF artifact URI.
-     */
-    private function uri(string $filePath): string
-    {
-        return (string) preg_replace('/^(?:\\.\\/)+/', '', str_replace('\\', '/', $filePath));
     }
 
     /**

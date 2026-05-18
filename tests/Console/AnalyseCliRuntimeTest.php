@@ -43,9 +43,9 @@ final class AnalyseCliRuntimeTest extends CliTestCase
 
         self::assertIsArray($payload['phases']);
         foreach (['discoverParseNs', 'analyseNs', 'scoreNs', 'reportNs'] as $phaseKey) {
-            self::assertArrayHasKey($phaseKey, $payload['phases']);
+            self::assertArrayHasKey($phaseKey, $payload['phases'], "phase {$phaseKey} must be present");
             self::assertIsInt($payload['phases'][$phaseKey], "phase {$phaseKey} must be an integer nanosecond count");
-            self::assertGreaterThanOrEqual(0, $payload['phases'][$phaseKey]);
+            self::assertGreaterThanOrEqual(0, $payload['phases'][$phaseKey], "phase {$phaseKey} must be non-negative");
         }
 
         self::assertArrayNotHasKey('rules', $payload, 'summary mode must omit per-rule totals');
@@ -79,14 +79,14 @@ final class AnalyseCliRuntimeTest extends CliTestCase
 
         foreach ($payload['rules'] as $index => $row) {
             self::assertIsArray($row, "rule row #{$index} must be an array");
-            self::assertArrayHasKey('ruleId', $row);
-            self::assertIsString($row['ruleId']);
-            self::assertArrayHasKey('totalNs', $row);
-            self::assertIsInt($row['totalNs']);
-            self::assertGreaterThanOrEqual(0, $row['totalNs']);
-            self::assertArrayHasKey('invocations', $row);
-            self::assertIsInt($row['invocations']);
-            self::assertGreaterThan(0, $row['invocations']);
+            self::assertArrayHasKey('ruleId', $row, "rule row #{$index} must include ruleId");
+            self::assertIsString($row['ruleId'], "rule row #{$index} ruleId must be a string");
+            self::assertArrayHasKey('totalNs', $row, "rule row #{$index} must include totalNs");
+            self::assertIsInt($row['totalNs'], "rule row #{$index} totalNs must be an integer");
+            self::assertGreaterThanOrEqual(0, $row['totalNs'], "rule row #{$index} totalNs must be non-negative");
+            self::assertArrayHasKey('invocations', $row, "rule row #{$index} must include invocations");
+            self::assertIsInt($row['invocations'], "rule row #{$index} invocations must be an integer");
+            self::assertGreaterThan(0, $row['invocations'], "rule row #{$index} invocations must be positive");
         }
 
         $totals = array_column($payload['rules'], 'totalNs');

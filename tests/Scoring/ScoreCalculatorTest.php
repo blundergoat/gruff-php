@@ -84,7 +84,8 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame('design.god-method', $composites[0]->ruleId);
         self::assertSame(Pillar::Design, $composites[0]->pillar);
         self::assertSame(12, $composites[0]->line);
-        self::assertSame(30, $composites[0]->endLine);
+        $expectedCompositeEndLine = 30;
+        self::assertSame($expectedCompositeEndLine, $composites[0]->endLine);
         self::assertSame('TooMuch::run()', $composites[0]->symbol);
         self::assertSame(['complexity.cognitive', 'size.method-length'], $composites[0]->metadata['componentRules']);
         self::assertSame([Pillar::Complexity, Pillar::Size], $composites[0]->secondaryPillars);
@@ -163,9 +164,12 @@ final class ScoreCalculatorTest extends TestCase
 
         self::assertSame(50.0, $offenders['src/A.php']['mutationScore'] ?? null);
         self::assertSame(100.0, $offenders['src/B.php']['mutationScore'] ?? null);
-        self::assertSame(9, $offenders['src/A.php']['maxCyclomatic'] ?? null);
-        self::assertSame(12, $offenders['src/A.php']['maxCognitive'] ?? null);
-        self::assertSame(44, $offenders['src/A.php']['maxLines'] ?? null);
+        $expectedMaxCyclomatic = 9;
+        $expectedMaxCognitive  = 12;
+        $expectedMaxLines      = 44;
+        self::assertSame($expectedMaxCyclomatic, $offenders['src/A.php']['maxCyclomatic'] ?? null);
+        self::assertSame($expectedMaxCognitive, $offenders['src/A.php']['maxCognitive'] ?? null);
+        self::assertSame($expectedMaxLines, $offenders['src/A.php']['maxLines'] ?? null);
     }
 
     /**

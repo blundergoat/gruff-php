@@ -76,9 +76,8 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $expected = file_get_contents(__DIR__ . '/../Fixtures/Cli/Golden/text-warning.txt');
+        $expected = $this->goldenOutput('text-warning.txt');
 
-        self::assertIsString($expected);
         self::assertSame($expected, $process->getOutput());
     }
 
@@ -150,9 +149,8 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $expected = file_get_contents(__DIR__ . '/../Fixtures/Cli/Golden/json-warning.json');
+        $expected = $this->goldenOutput('json-warning.json');
 
-        self::assertIsString($expected);
         self::assertSame($expected, $process->getOutput());
 
         $report   = $this->decodeJsonOutput($process);
@@ -798,4 +796,16 @@ final class AnalyseCliTest extends CliTestCase
         }
     }
 
+    /**
+     * Load an expected CLI golden output fixture.
+     *
+     * @return string Fixture contents.
+     */
+    private function goldenOutput(string $fileName): string
+    {
+        $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
+        self::assertIsString($contents);
+
+        return $contents;
+    }
 }

@@ -116,8 +116,10 @@ final class HalsteadVolumeRuleTest extends TestCase
         self::assertSame(106.6, $finding->metadata['volume'] ?? null);
         self::assertSame(15.3, $finding->metadata['difficulty'] ?? null);
         self::assertSame(1631.1, $finding->metadata['effort'] ?? null);
-        self::assertSame(14, $finding->metadata['vocabulary'] ?? null);
-        self::assertSame(28, $finding->metadata['length'] ?? null);
+        $expectedVocabulary = 14;
+        $expectedLength     = 28;
+        self::assertSame($expectedVocabulary, $finding->metadata['vocabulary'] ?? null);
+        self::assertSame($expectedLength, $finding->metadata['length'] ?? null);
         self::assertSame(100, $finding->metadata['threshold'] ?? null);
         self::assertSame('error', $finding->metadata['thresholdType'] ?? null);
     }

@@ -15,6 +15,7 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Covers ConfigLoaderTest behavior.
@@ -232,63 +233,70 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects severity threshold without severity.
+     * Verify inline invalid config shapes are rejected with explicit messages.
      *
+     * @param string $configJson      Inline JSON config.
+     * @param string $expectedMessage Expected exception message.
      * @return void No return value.
      */
-    public function testRejectsSeverityThresholdWithoutSeverity(): void
+    #[DataProvider('invalidInlineConfigProvider')]
+    public function testRejectsInlineInvalidConfig(string $configJson, string $expectedMessage): void
     {
-        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70}}}');
+        $path = $this->writeTempConfig($configJson);
 
         $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "rules.size.file-length.severity" must be "warning" or "error".');
+        $this->expectExceptionMessage($expectedMessage);
 
         (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
     /**
-     * Verify rejects severity without threshold.
-     *
-     * @return void No return value.
+     * @return array<string, array{string, string}>
      */
-    public function testRejectsSeverityWithoutThreshold(): void
+    public static function invalidInlineConfigProvider(): array
     {
-        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"severity":"error"}}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "rules.size.file-length.severity" requires "threshold".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
-     * Verify rejects severity threshold for named tuning threshold rule.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsSeverityThresholdForNamedTuningThresholdRule(): void
-    {
-        $path = $this->writeTempConfig('{"rules":{"docs.missing-public-phpdoc":{"threshold":8,"severity":"error"}}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "rules.docs.missing-public-phpdoc.threshold" is only supported for rules with warning/error thresholds.');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
-     * Verify rejects combining severity threshold and threshold map.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsCombiningSeverityThresholdAndThresholdMap(): void
-    {
-        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "rules.size.file-length" cannot combine "threshold" and "thresholds".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        return [
+            'severity threshold without severity' => [
+                '{"rules":{"size.file-length":{"threshold":70}}}',
+                'Config key "rules.size.file-length.severity" must be "warning" or "error".',
+            ],
+            'severity without threshold' => [
+                '{"rules":{"size.file-length":{"severity":"error"}}}',
+                'Config key "rules.size.file-length.severity" requires "threshold".',
+            ],
+            'severity threshold on named tuning threshold rule' => [
+                '{"rules":{"docs.missing-public-phpdoc":{"threshold":8,"severity":"error"}}}',
+                'Config key "rules.docs.missing-public-phpdoc.threshold" is only supported for rules with warning/error thresholds.',
+            ],
+            'combined severity threshold and threshold map' => [
+                '{"rules":{"size.file-length":{"threshold":70,"severity":"error","thresholds":{"warning":7}}}}',
+                'Config key "rules.size.file-length" cannot combine "threshold" and "thresholds".',
+            ],
+            'unsupported minimum PHP version' => [
+                '{"minimumPhpVersion": 7.3}',
+                'Config key "minimumPhpVersion" must be at least 7.4.',
+            ],
+            'unknown root key' => [
+                '{"plugins": []}',
+                'Unknown config key "plugins".',
+            ],
+            'unknown threshold key' => [
+                '{"rules":{"size.file-length":{"thresholds":{"critical":1}}}}',
+                'Unknown threshold "rules.size.file-length.thresholds.critical".',
+            ],
+            'invalid path ignore pattern' => [
+                '{"paths":{"ignore":["../outside"]}}',
+                'Config key "paths.ignore.0" must be a relative project path pattern.',
+            ],
+            'unknown selection pillar' => [
+                '{"selection":{"pillars":["quality"]}}',
+                'Unknown pillar "selection.pillars.quality".',
+            ],
+            'invalid accepted abbreviation' => [
+                '{"allowlists":{"acceptedAbbreviations":["not-valid!"]}}',
+                'Config value "allowlists.acceptedAbbreviations" contains invalid identifier "not-valid!".',
+            ],
+        ];
     }
 
     /**
@@ -322,21 +330,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects unsupported minimum PHP version.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsUnsupportedMinimumPhpVersion(): void
-    {
-        $path = $this->writeTempConfig('{"minimumPhpVersion": 7.3}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "minimumPhpVersion" must be at least 7.4.');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
      * Verify rejects unknown rule ids.
      *
      * @return void No return value.
@@ -350,36 +343,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             'tests/Fixtures/Config/unknown-rule.yaml',
             RuleRegistry::defaults(),
         );
-    }
-
-    /**
-     * Verify rejects unknown root keys.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsUnknownRootKeys(): void
-    {
-        $path = $this->writeTempConfig('{"plugins": []}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Unknown config key "plugins".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
-     * Verify rejects unknown threshold keys.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsUnknownThresholdKeys(): void
-    {
-        $path = $this->writeTempConfig('{"rules":{"size.file-length":{"thresholds":{"critical":1}}}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Unknown threshold "rules.size.file-length.thresholds.critical".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
     /**
@@ -412,51 +375,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         $weakCrypto = RuleRegistry::defaults()->get('security.weak-crypto')->definition();
         self::assertSame(Pillar::Security, $weakCrypto->pillar);
         self::assertFalse($config->ruleSelection()->allows($weakCrypto));
-    }
-
-    /**
-     * Verify rejects invalid path ignore pattern.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsInvalidPathIgnorePattern(): void
-    {
-        $path = $this->writeTempConfig('{"paths":{"ignore":["../outside"]}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config key "paths.ignore.0" must be a relative project path pattern.');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
-     * Verify rejects unknown selection pillar.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsUnknownSelectionPillar(): void
-    {
-        $path = $this->writeTempConfig('{"selection":{"pillars":["quality"]}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Unknown pillar "selection.pillars.quality".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
-
-    /**
-     * Verify rejects invalid accepted abbreviation.
-     *
-     * @return void No return value.
-     */
-    public function testRejectsInvalidAcceptedAbbreviation(): void
-    {
-        $path = $this->writeTempConfig('{"allowlists":{"acceptedAbbreviations":["not-valid!"]}}');
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Config value "allowlists.acceptedAbbreviations" contains invalid identifier "not-valid!".');
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 
 }

@@ -110,9 +110,12 @@ final class SarifReporterTest extends TestCase
             'physicalLocation',
         )['region'];
         self::assertIsArray($region);
-        self::assertSame(12, $region['startLine'] ?? null);
-        self::assertSame(5, $region['startColumn'] ?? null);
-        self::assertSame(13, $region['endLine'] ?? null);
+        $expectedStartLine   = $finding->line;
+        $expectedStartColumn = $finding->column;
+        $expectedEndLine     = $finding->endLine;
+        self::assertSame($expectedStartLine, $region['startLine'] ?? null);
+        self::assertSame($expectedStartColumn, $region['startColumn'] ?? null);
+        self::assertSame($expectedEndLine, $region['endLine'] ?? null);
         $partialFingerprints = $this->stringKeyedArray($result, 'partialFingerprints');
         self::assertSame($finding->fingerprint(), $this->stringValue($partialFingerprints, 'gruffFingerprint'));
         self::assertArrayNotHasKey('primary', $partialFingerprints);
@@ -251,8 +254,9 @@ final class SarifReporterTest extends TestCase
         self::assertArrayNotHasKey('region', $firstLocation);
 
         $secondLocation = $this->physicalLocation($results[1] ?? null);
+        $nestedDotLine  = 4;
         self::assertSame('src/NestedDot.php', $this->stringValue($this->stringKeyedArray($secondLocation, 'artifactLocation'), 'uri'));
-        self::assertSame(4, $this->stringKeyedArray($secondLocation, 'region')['startLine'] ?? null);
+        self::assertSame($nestedDotLine, $this->stringKeyedArray($secondLocation, 'region')['startLine'] ?? null);
 
         $thirdLocation = $this->physicalLocation($results[2] ?? null);
         self::assertSame('C:/repo/src/Mixed.php', $this->stringValue($this->stringKeyedArray($thirdLocation, 'artifactLocation'), 'uri'));

@@ -59,7 +59,9 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      */
     public function isCandidate(Tokens $tokens): bool
     {
-        return str_contains($tokens->generateCode(), ':');
+        $code = $tokens->generateCode();
+
+        return str_contains($code, ':');
     }
 
     /**
@@ -129,7 +131,9 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      */
     private function isNamedArgumentLine(string $line): bool
     {
-        return preg_match('/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:(?!:)\s*\S.*(?:,)?\R?$/', $line) === 1;
+        $namedArgumentPattern = '/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:(?!:)\s*\S.*(?:,)?\R?$/';
+
+        return preg_match($namedArgumentPattern, $line) === 1;
     }
 
     /**

@@ -257,6 +257,8 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      */
     private function unitForPath(string $path): AnalysisUnit
     {
-        return (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $path, $path));
+        $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
+
+        return (new PhpFileParser())->parse($sourceFile);
     }
 }

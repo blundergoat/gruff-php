@@ -127,7 +127,8 @@ final class CognitiveComplexityRuleTest extends TestCase
         self::assertSame(11, $deeplyNested->metadata['complexity'] ?? null);
         self::assertSame(2, $deeplyNested->metadata['threshold'] ?? null);
         self::assertSame('warning', $deeplyNested->metadata['thresholdType'] ?? null);
-        self::assertSame(97, $deeplyNested->endLine);
+        $deeplyNestedFixtureEndLine = 97;
+        self::assertSame($deeplyNestedFixtureEndLine, $deeplyNested->endLine);
     }
 
     /**

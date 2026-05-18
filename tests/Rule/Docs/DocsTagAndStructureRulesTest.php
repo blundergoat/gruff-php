@@ -296,7 +296,8 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         self::assertSame([], $invalidKinds);
         self::assertSame(1, $byKind['declared'] ?? 0);
-        self::assertSame(3, $byKind['promoted'] ?? 0);
+        $expectedPromotedPropertyFindings = 3;
+        self::assertSame($expectedPromotedPropertyFindings, $byKind['promoted'] ?? 0);
     }
 
     /**

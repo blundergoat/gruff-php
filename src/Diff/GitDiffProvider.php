@@ -119,9 +119,11 @@ final readonly class GitDiffProvider
                 continue;
             }
 
-            $startLine                    = (int) $matches[1];
-            $length                       = isset($matches[2]) ? (int) $matches[2] : 1;
-            $changedLines[$currentFile][] = ChangedLineRange::fromStartAndLength($startLine, $length);
+            $startLine = (int) $matches[1];
+            $length    = isset($matches[2]) ? (int) $matches[2] : 1;
+            $endLine   = $startLine + $length - 1;
+
+            $changedLines[$currentFile][] = new ChangedLineRange($startLine, $endLine);
         }
 
         sort($changedFiles, SORT_STRING);

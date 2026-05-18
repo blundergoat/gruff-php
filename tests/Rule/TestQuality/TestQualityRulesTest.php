@@ -165,7 +165,8 @@ final class TestQualityRulesTest extends TestCase
             'EagerPositiveMutationCasesTest::testLargestReceiverTieKeepsFirstReceiver()',
         ], $symbols);
 
-        self::assertSame(3, $findings[0]->metadata['assertions'] ?? null);
+        $expectedAssertionCount = 3;
+        self::assertSame($expectedAssertionCount, $findings[0]->metadata['assertions'] ?? null);
         self::assertSame(['processorder', 'sendreceipt', 'audittrailwritten'], $findings[0]->metadata['sutCalls'] ?? null);
         self::assertSame(['processorder', 'sendreceipt'], $findings[1]->metadata['sutCalls'] ?? null);
         self::assertSame(['getstatus', 'hasreceipt'], $findings[4]->metadata['sutCalls'] ?? null);
@@ -576,6 +577,8 @@ final class TestQualityRulesTest extends TestCase
      */
     private function unitForPath(string $path): AnalysisUnit
     {
-        return (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $path, $path));
+        $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
+
+        return (new PhpFileParser())->parse($sourceFile);
     }
 }
