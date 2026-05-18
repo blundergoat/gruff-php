@@ -77,12 +77,18 @@ final readonly class AnalyseCommandOptions
     {
         /** @var list<string> $paths The command definition declares a variadic paths argument. */
         $paths               = $input->getArgument('paths');
+        $filePaths           = self::repeatedStringOption($input, 'file');
         $configPath          = $input->getOption('config');
         $baselineFlagPresent = $input->hasParameterOption('--baseline', true);
         $generateFlagPresent = $input->hasParameterOption('--generate-baseline', true);
         $reportEditorLink    = self::optionalStringOption($input, 'report-editor-link') ?? 'none';
         $isReportInteractive = self::reportInteractive($input);
         $optionError         = null;
+
+        if (is_string($filePaths)) {
+            $optionError = $filePaths;
+            $filePaths   = [];
+        }
 
         if (!in_array($reportEditorLink, ['none', 'vscode', 'phpstorm'], true)) {
             $optionError = '--report-editor-link must be one of: vscode, phpstorm, none.';
@@ -92,6 +98,8 @@ final readonly class AnalyseCommandOptions
             $optionError         = $isReportInteractive;
             $isReportInteractive = false;
         }
+
+        $paths = array_merge($paths, $filePaths);
 
         return new self(
             paths:                         $paths,
@@ -292,6 +300,32 @@ final readonly class AnalyseCommandOptions
         $value = $input->getOption($name);
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Read a repeatable string option without comma expansion.
+     *
+     * @return list<string>|string Non-empty option values, or a usage-error message.
+     */
+    private static function repeatedStringOption(InputInterface $input, string $name): array|string
+    {
+        $values = $input->getOption($name);
+
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($values as $value) {
+            if (!is_string($value) || $value === '') {
+                return sprintf('--%s requires a non-empty value.', $name);
+            }
+
+            $items[] = $value;
+        }
+
+        return $items;
     }
 
     /**

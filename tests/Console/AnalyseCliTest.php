@@ -36,6 +36,42 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify analyse command supports an explicit single-file option.
+     *
+     * @throws JsonException
+     * @return void No return value.
+     */
+    public function testAnalyseCommandSupportsSingleFileOption(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            '--file',
+            'tests/Fixtures/Source/mixed/alpha.php',
+            '--no-config',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report  = $this->decodeJsonOutput($process);
+        $run     = $report['run'] ?? null;
+        $summary = $report['summary'] ?? null;
+
+        self::assertIsArray($run);
+        self::assertIsArray($summary);
+        self::assertSame(['tests/Fixtures/Source/mixed/alpha.php'], $run['paths'] ?? null);
+        self::assertSame(1, $summary['filesDiscovered'] ?? null);
+        self::assertSame(1, $summary['filesParsed'] ?? null);
+        self::assertSame(0, $summary['exitCode'] ?? null);
+    }
+
+    /**
      * Verify analyse command reports syntax errors without aborting.
      *
      * @return void No return value.

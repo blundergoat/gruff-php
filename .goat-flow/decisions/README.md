@@ -47,6 +47,7 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-008-single-threshold-rubric-severity.md`
 - `ADR-009-size-rubric-default-recalibration.md`
 - `ADR-010-complexity-and-docs-rubric-default-recalibration.md`
+- `ADR-011-single-file-scan-option.md`
 
 ## Required Structure
 

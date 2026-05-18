@@ -28,6 +28,9 @@ First public release of `gruff-php`.
 #### CLI Commands
 
 - `analyse` — runs the registry over discovered paths and renders findings.
+- `analyse --file=PATH` for explicit single-file scans; the option is repeatable
+  and uses the same discovery, ignore, config, baseline, and reporting pipeline
+  as positional paths.
 - `summary` — compact per-pillar, top-rule, and top-offender digest with text
   and `gruff.summary.v1` JSON output and a configurable `--top` cap.
 - `report` — renders an HTML or JSON report to stdout or `--output`.
