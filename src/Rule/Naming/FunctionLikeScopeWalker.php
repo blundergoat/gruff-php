@@ -1,0 +1,139 @@
+<?php
+declare(strict_types=1);
+namespace GruffPhp\Rule\Naming;
+use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
+/**
+ * Discovers isolated function-like scopes for naming rules.
+ *
+ * M51 adopters: IdentifierQualityRule, ShortVariableRule, HungarianNotationRule,
+ * BooleanPrefixRule parameter checks, ParameterTypeNameRule, and AbbreviationAllowlistRule.
+ * Excluded: GenericMethodNameRule has no closure name to check; ClassFileMismatchRule
+ * is file-level; ConfusingNameRule and TestNamingConsistencyRule are class-level.
+ */
+final readonly class FunctionLikeScopeWalker
+{
+    /**
+     * @param list<Node> $statements
+     * @return list<FunctionLikeScope>
+     */
+    public function scopes(array $statements): array
+    {
+        $scopes = [];
+        foreach ($statements as $statement) {
+            $this->discoverScopes($statement, $scopes);
+        }
+        return $scopes;
+    }
+    /** @param list<FunctionLikeScope> $scopes */
+    private function discoverScopes(Node $node, array &$scopes): void
+    {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            $scopes[] = $this->scopeFor($node);
+            foreach ($this->bodyNodes($node) as $child) {
+                $this->discoverScopes($child, $scopes);
+            }
+            return;
+        }
+        foreach ($this->childNodes($node) as $child) {
+            $this->discoverScopes($child, $scopes);
+        }
+    }
+    private function scopeFor(ClassMethod|Function_|Closure|ArrowFunction $node): FunctionLikeScope
+    {
+        $parameterNames = $this->parameterNames($node);
+
+        return new FunctionLikeScope($node, $this->kind($node), $parameterNames, $this->localVariables($node, $parameterNames));
+    }
+    /** @return array<string, true> */
+    private function parameterNames(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        $names = [];
+        foreach ($node->params as $param) {
+            if ($param->var instanceof Variable && is_string($param->var->name)) {
+                $names[$param->var->name] = true;
+            }
+        }
+        return $names;
+    }
+    /**
+     * @param array<string, true> $parameterNames
+     * @return array<string, Variable>
+     */
+    private function localVariables(ClassMethod|Function_|Closure|ArrowFunction $node, array $parameterNames): array
+    {
+        $variables = [];
+        $excluded  = $parameterNames;
+        if ($node instanceof Closure) {
+            foreach ($node->uses as $use) {
+                if (is_string($use->var->name)) {
+                    $excluded[$use->var->name] = true;
+                }
+            }
+        }
+        foreach ($this->bodyNodes($node) as $child) {
+            $this->collectLocalVariables($child, $variables, $excluded);
+        }
+        return $variables;
+    }
+    /**
+     * @param array<string, Variable> $variables
+     * @param array<string, true>     $excludedNames
+     */
+    private function collectLocalVariables(Node $node, array &$variables, array $excludedNames): void
+    {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            return;
+        }
+        if ($node instanceof Variable && is_string($node->name) && !isset($excludedNames[$node->name])) {
+            $variables[$node->name] ??= $node;
+        }
+        foreach ($this->childNodes($node) as $child) {
+            $this->collectLocalVariables($child, $variables, $excludedNames);
+        }
+    }
+    /** @return list<Node> */
+    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        if ($node instanceof ArrowFunction) {
+            return [$node->expr];
+        }
+        return array_values($node->stmts ?? []);
+    }
+    private function kind(ClassMethod|Function_|Closure|ArrowFunction $node): string
+    {
+        return match (true) {
+            $node instanceof ClassMethod => 'method',
+            $node instanceof Function_ => 'function',
+            $node instanceof Closure => 'closure',
+            default => 'arrow',
+        };
+    }
+    /** @return list<Node> */
+    private function childNodes(Node $node): array
+    {
+        $children = [];
+        foreach ($node->getSubNodeNames() as $name) {
+            $this->collectChildNodes($node->{$name}, $children);
+        }
+        return $children;
+    }
+    /** @param list<Node> $children */
+    private function collectChildNodes(mixed $value, array &$children): void
+    {
+        if ($value instanceof Node) {
+            $children[] = $value;
+            return;
+        }
+        if (!is_array($value)) {
+            return;
+        }
+        foreach ($value as $item) {
+            $this->collectChildNodes($item, $children);
+        }
+    }
+}

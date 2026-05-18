@@ -6,14 +6,14 @@ namespace Fixtures\Naming;
 
 class CleanNamingFixture
 {
-    public function calculateTotal(array $items): int
+    public function calculateTotal(array $cartItems): int
     {
-        $total = 0;
+        $runningTotal = 0;
 
-        foreach ($items as $item) {
-            $total += $item;
+        foreach ($cartItems as $cartItem) {
+            $runningTotal += $cartItem;
         }
 
-        return $total;
+        return $runningTotal;
     }
 }

@@ -39,6 +39,7 @@ use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rule\Modernisation\PhpDocMixedOveruseRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
+use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rule\Naming\BooleanPrefixRule;
 use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
@@ -173,6 +174,7 @@ final class RuleRegistry
             new UnreachableCodeRule(),
             new UnusedImportRule(),
             new UnusedParameterRule(),
+            new AbbreviationAllowlistRule(),
             new BooleanPrefixRule(),
             new ClassFileMismatchRule(),
             new ConfusingNameRule(),

@@ -10,7 +10,25 @@ paths:
         - 'infection-report.json'
         - 'tests/Fixtures/**'
 allowlists:
-    acceptedAbbreviations: []
+    acceptedAbbreviations:
+        - arg # argument
+        - arm # match expression arm
+        - cb # callback
+        - cc # cognitive complexity
+        - ccn # cyclomatic complexity number
+        - css # cascading style sheets
+        - cwd # current working directory
+        - doc # documentation
+        - fn # function
+        - fqn # fully qualified name
+        - id # identifier
+        - key # array key
+        - mi # maintainability index
+        - msi # mutation score indicator
+        - nmi # normalized maintainability index
+        - raw # raw input value
+        - ref # git reference
+        - uri # uniform resource identifier
     secretPreviews: []
 selection:
     # Keep built-in catalogue rubrics explicit. The per-rule settings below
@@ -148,6 +166,12 @@ rules:
     # Readonly properties protect values that should not change.
     modernisation.readonly-property-candidate:
         enabled: true
+    # Short project abbreviations must be declared with their meaning.
+    naming.abbreviation-allowlist:
+        enabled: true
+        options:
+            minLength: 2
+            maxLength: 3
     # Boolean names should read clearly at call sites.
     naming.boolean-prefix:
         enabled: true
@@ -177,12 +201,15 @@ rules:
                 - arr
             genericTokens:
                 - data
+                - entry
+                - helper
                 - info
                 - item
-                - thing
+                - row
                 - stuff
-                - helper
+                - thing
                 - util
+                - value
             ignoredNames:
                 - _
                 - e
@@ -196,6 +223,7 @@ rules:
                 - key
                 - value
             minScopeReferences: 1
+            loopBodyThreshold: 4
     # Class-typed parameters should carry their object role in the variable name.
     # The ignoredParameterNames list exempts gruff's own AST-walker, visitor, and
     # framework conventions (Stmt $stmt, NodeFinder $finder, ClassMethod $method,

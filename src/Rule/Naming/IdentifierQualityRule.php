@@ -47,7 +47,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Generic tokens that need enough scope usage to be acceptable.
      */
-    private const DEFAULT_GENERIC_TOKENS = ['data', 'info', 'item', 'thing', 'stuff', 'helper', 'util'];
+    private const DEFAULT_GENERIC_TOKENS = ['data', 'entry', 'info', 'item', 'row', 'thing', 'stuff', 'helper', 'util', 'value'];
 
     /**
      * Short conventional names ignored by the identifier quality rule.
@@ -122,6 +122,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 'genericTokens' => self::DEFAULT_GENERIC_TOKENS,
                 'ignoredNames' => self::DEFAULT_IGNORED_NAMES,
                 'minScopeReferences' => 1,
+                'loopBodyThreshold' => 4,
             ],
             description: 'Catches placeholder, generic, and numbered identifiers that obscure intent.',
         );
@@ -147,6 +148,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 findingContext:     $findingContext,
                 finder:             $finder,
                 minScopeReferences: $this->minScopeReferences($context, $definition),
+                loopBodyThreshold:  $this->loopBodyThreshold($context, $definition),
             ),
             ...$this->propertyFindings($findingContext, $finder),
         ];
@@ -185,6 +187,18 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $minScopeOption = $context->settingsFor($definition)->option('minScopeReferences');
 
         return is_int($minScopeOption) ? max(1, $minScopeOption) : 1;
+    }
+
+    /**
+     * Resolve the foreach body-size threshold before generic loop variables report.
+     *
+     * @return int Minimum statement count for generic foreach loop-variable findings.
+     */
+    private function loopBodyThreshold(RuleContext $context, RuleDefinition $definition): int
+    {
+        $thresholdOption = $context->settingsFor($definition)->option('loopBodyThreshold');
+
+        return is_int($thresholdOption) ? max(1, $thresholdOption) : 4;
     }
 
     /**
@@ -231,6 +245,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         IdentifierFindingContext $findingContext,
         NodeFinder $finder,
         int $minScopeReferences,
+        int $loopBodyThreshold,
     ): array {
         $findings = [];
 
@@ -240,7 +255,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 $findings,
                 ...$this->functionNameFindings($findingContext, $function),
                 ...$this->parameterFindings($findingContext, $function),
-                ...$this->localVariableFindings($findingContext, $function, $finder, $minScopeReferences),
+                ...$this->localVariableFindings($findingContext, $function, $finder, $minScopeReferences, $loopBodyThreshold),
             );
         }
 
@@ -310,6 +325,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         ClassMethod|Function_ $function,
         NodeFinder $finder,
         int $minScopeReferences,
+        int $loopBodyThreshold,
     ): array {
         $findings = [];
         $symbol   = CyclomaticComplexityRule::resolveSymbol($function);
@@ -321,6 +337,22 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 kind:    'variable',
                 name:    $name,
                 symbol:  $symbol,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        $loopIgnoredNames = array_values(array_diff($findingContext->ignoredNames, $findingContext->genericTokens));
+        foreach ($this->reportableLoopVariableNames($function, $finder, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
+            $finding = $this->finding(
+                context:              $findingContext,
+                node:                 $variable,
+                kind:                 'variable',
+                name:                 $name,
+                symbol:               $symbol,
+                ignoredNamesOverride: $loopIgnoredNames,
             );
 
             if ($finding instanceof Finding) {
@@ -361,6 +393,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * @param list<string>|null $ignoredNamesOverride Optional ignored-name list for loop-variable checks.
      * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
@@ -369,8 +402,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
         string $kind,
         string $name,
         ?string $symbol,
+        ?array $ignoredNamesOverride = null,
     ): ?Finding {
-        if ($this->isIgnored($name, $context->ignoredNames, $context->acceptedAbbreviations)) {
+        $ignoredNames = $ignoredNamesOverride ?? $context->ignoredNames;
+        if ($this->isIgnored($name, $ignoredNames, $context->acceptedAbbreviations)) {
             return null;
         }
 
@@ -596,6 +631,49 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         return $variables;
+    }
+
+    /**
+     * @param list<string> $genericTokens
+     * @return array<string, Variable>
+     */
+    private function reportableLoopVariableNames(
+        ClassMethod|Function_ $function,
+        NodeFinder $finder,
+        array $genericTokens,
+        int $loopBodyThreshold,
+    ): array {
+        $variables = [];
+
+        foreach ($finder->findInstanceOf($function->stmts ?? [], Foreach_::class) as $foreach) {
+            if (count($foreach->stmts) < $loopBodyThreshold || $this->isCanonicalMapLoop($foreach)) {
+                continue;
+            }
+
+            foreach ([$foreach->keyVar, $foreach->valueVar] as $variable) {
+                if (!$variable instanceof Variable || !is_string($variable->name)) {
+                    continue;
+                }
+
+                $name = strtolower($variable->name);
+                if (in_array($name, $genericTokens, true)) {
+                    $variables[$variable->name] ??= $variable;
+                }
+            }
+        }
+
+        return $variables;
+    }
+
+    /**
+     * @return bool True for the conventional key/value map iteration idiom.
+     */
+    private function isCanonicalMapLoop(Foreach_ $foreach): bool
+    {
+        return $foreach->keyVar instanceof Variable
+            && $foreach->valueVar instanceof Variable
+            && $foreach->keyVar->name === 'key'
+            && $foreach->valueVar->name === 'value';
     }
 
     /**

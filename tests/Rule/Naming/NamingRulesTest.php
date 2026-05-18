@@ -8,6 +8,7 @@ use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rule\Naming\BooleanPrefixRule;
 use GruffPhp\Rule\Naming\ClassFileMismatchRule;
 use GruffPhp\Rule\Naming\ConfusingNameRule;
@@ -121,6 +122,28 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify undeclared short lowercase abbreviations are reported.
+     *
+     * @return void No return value.
+     */
+    public function testAbbreviationAllowlistDetectsUndeclaredNames(): void
+    {
+        $findings = $this->abbreviationFindings(['id', 'fqn', 'raw', 'uri']);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertContains('cfg', $names);
+        self::assertContains('db', $names);
+        self::assertContains('tmp', $names);
+        self::assertNotContains('id', $names);
+        self::assertNotContains('fqn', $names);
+        self::assertNotContains('raw', $names);
+        self::assertNotContains('uri', $names);
+        self::assertNotContains('key', $names);
+        self::assertNotContains('row', $names);
+        self::assertNotContains('ex', $names);
+    }
+
+    /**
      * Verify catch variable excluded.
      *
      * @return void No return value.
@@ -178,12 +201,12 @@ final class NamingRulesTest extends NamingRuleTestCase
      */
     public function testBooleanPrefixAllowedPrefixesCanBeConfigured(): void
     {
-        $unit     = $this->parseFixture('boolean-prefix.php');
-        $registry = RuleRegistry::defaults();
-        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
-        $prefixes = $settings->stringListOption('allowedPrefixes');
+        $unit       = $this->parseFixture('boolean-prefix.php');
+        $registry   = RuleRegistry::defaults();
+        $settings   = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $prefixes   = $settings->stringListOption('allowedPrefixes');
         $prefixes[] = 'did';
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $config     = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             BooleanPrefixRule::ID,
             new RuleSettings(true, $settings->thresholds, ['allowedPrefixes' => $prefixes]),
         );
@@ -208,6 +231,44 @@ final class NamingRulesTest extends NamingRuleTestCase
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('BooleanPrefixFixture::getName()', $symbols);
+    }
+
+    /**
+     * Verify typed bool properties and parameters need boolean-style names.
+     *
+     * @return void No return value.
+     */
+    public function testBooleanPrefixDetectsPropertiesAndParameters(): void
+    {
+        $findings = $this->booleanPrefixPropertyFindings();
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertContains('changedOnly', $names);
+        self::assertContains('infectionRun', $names);
+        self::assertContains('infectionRunCtor', $names);
+        self::assertNotContains('isPest', $names);
+        self::assertNotContains('active', $names);
+        self::assertNotContains('emitted', $names);
+        self::assertNotContains('valid', $names);
+        self::assertNotContains('silent', $names);
+        self::assertNotContains('interactive', $names);
+        self::assertNotContains('flag', $names);
+    }
+
+    /**
+     * Verify the state adjective allowlist controls bool property and parameter exemptions.
+     *
+     * @return void No return value.
+     */
+    public function testBooleanPrefixStateAdjectiveAllowlistCanBeConfigured(): void
+    {
+        $findings = $this->booleanPrefixPropertyFindings(['stateAdjectiveAllowlist' => ['active']]);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertContains('emitted', $names);
+        self::assertContains('interactive', $names);
+        self::assertNotContains('active', $names);
+        self::assertNotContains('isPest', $names);
     }
 
     /**
@@ -423,6 +484,28 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify generic foreach variables report only once the configured body threshold is reached.
+     *
+     * @return void No return value.
+     */
+    public function testIdentifierQualityFlagsGenericLoopVariablesAtConfiguredBodyThreshold(): void
+    {
+        $findings = $this->identifierQualityFindingsWithOptions(['loopBodyThreshold' => 4]);
+        $reported = $this->reportedVariableSymbolsByName($findings);
+
+        self::assertContains('LoopVariableFixture::longItemLoop()', $reported['item'] ?? []);
+        self::assertContains('LoopVariableFixture::longRowLoop()', $reported['row'] ?? []);
+        self::assertNotContains('LoopVariableFixture::shortItemLoop()', $reported['item'] ?? []);
+        self::assertNotContains('LoopVariableFixture::longMapLoop()', $reported['key'] ?? []);
+        self::assertNotContains('LoopVariableFixture::longMapLoop()', $reported['value'] ?? []);
+
+        $raisedThresholdFindings = $this->identifierQualityFindingsWithOptions(['loopBodyThreshold' => 5]);
+        $raisedReported          = $this->reportedVariableSymbolsByName($raisedThresholdFindings);
+        self::assertNotContains('LoopVariableFixture::longItemLoop()', $raisedReported['item'] ?? []);
+        self::assertNotContains('LoopVariableFixture::longRowLoop()', $raisedReported['row'] ?? []);
+    }
+
+    /**
      * Verify clean fixture has no naming findings except file mismatch.
      *
      * @return void No return value.
@@ -441,4 +524,86 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertSame([], array_values($namingFindings));
     }
 
+    /**
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function identifierQualityFindingsWithOptions(array $options): array
+    {
+        $unit     = $this->parseFixture('identifier-quality.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(IdentifierQualityRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            IdentifierQualityRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, $options)),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+        return array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
+        ));
+    }
+
+    /**
+     * @param list<string> $acceptedAbbreviations
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function abbreviationFindings(array $acceptedAbbreviations): array
+    {
+        $unit     = $this->parseFixture('abbreviation-allowlist.php');
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations($acceptedAbbreviations);
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+        return array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
+        ));
+    }
+
+    /**
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function booleanPrefixPropertyFindings(array $options = []): array
+    {
+        $unit     = $this->parseFixture('boolean-prefix-properties.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, $options)),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+        return array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+        ));
+    }
+
+    /**
+     * @param list<\GruffPhp\Finding\Finding> $findings
+     * @return array<string, list<string>>
+     */
+    private function reportedVariableSymbolsByName(array $findings): array
+    {
+        $reported = [];
+
+        foreach ($findings as $finding) {
+            if (($finding->metadata['identifierKind'] ?? null) !== 'variable') {
+                continue;
+            }
+
+            $name = $finding->metadata['identifierName'] ?? null;
+            if (!is_string($name) || $finding->symbol === null) {
+                continue;
+            }
+
+            $reported[$name][] = $finding->symbol;
+        }
+
+        return $reported;
+    }
 }

@@ -109,12 +109,12 @@ final class DisabledSslVerificationRule implements RuleInterface
             return false;
         }
 
-        foreach ($optionsArg->items as $item) {
-            if (!$item->key instanceof Node) {
+        foreach ($optionsArg->items as $arrayItem) {
+            if (!$arrayItem->key instanceof Node) {
                 continue;
             }
 
-            $option = SecurityNodeHelper::constantName($item->key);
+            $option = SecurityNodeHelper::constantName($arrayItem->key);
             if ($option === null) {
                 continue;
             }
@@ -123,7 +123,7 @@ final class DisabledSslVerificationRule implements RuleInterface
                 continue;
             }
 
-            if (SecurityNodeHelper::isFalseLike($item->value)) {
+            if (SecurityNodeHelper::isFalseLike($arrayItem->value)) {
                 return true;
             }
         }

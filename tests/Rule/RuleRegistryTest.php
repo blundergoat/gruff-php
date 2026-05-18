@@ -30,6 +30,7 @@ use GruffPhp\Rule\Modernisation\MixedTypeOveruseRule;
 use GruffPhp\Rule\Modernisation\NamedArgumentOpportunityRule;
 use GruffPhp\Rule\Modernisation\PublicPropertyRule;
 use GruffPhp\Rule\Modernisation\ReadonlyPropertyCandidateRule;
+use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -112,7 +113,8 @@ final class RuleRegistryTest extends TestCase
             CommentedOutCodeRule::ID, EmptyClassRule::ID,
             EmptyMethodRule::ID, OneLineMethodRule::ID,
             UnreachableCodeRule::ID, UnusedImportRule::ID,
-            UnusedParameterRule::ID, IdentifierQualityRule::ID,
+            UnusedParameterRule::ID, AbbreviationAllowlistRule::ID,
+            IdentifierQualityRule::ID,
             ConstructorPromotionCandidateRule::ID, EnumCandidateRule::ID,
             FirstClassCallableCandidateRule::ID, ForbiddenGlobalAccessRule::ID,
             MatchExpressionCandidateRule::ID, MixedTypeOveruseRule::ID,
@@ -283,9 +285,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(110, $definitions);
+        self::assertCount(111, $definitions);
         self::assertSame(
-            '5b10be37eee04eca007ff19599c' . '7b38882a8cd45e0b611886f3b23c2cde93d25',
+            'b2b13f019971ce5f30d748c' . '69cf3222ac01aab379044b1676148aaae3c41c36c',
             hash('sha256', $json),
         );
     }

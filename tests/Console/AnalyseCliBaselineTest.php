@@ -356,7 +356,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
 
             file_put_contents(
                 $project . '/src/OrderCalculator.php',
-                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$tax): int\n    {\n        return \$subtotal + \$tax;\n    }\n}\n",
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
             );
 
             $rerun = new Process([

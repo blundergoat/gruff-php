@@ -389,12 +389,12 @@ final readonly class RuleConfigApplier
 
         $result = [];
         $sample = reset($defaultValue);
-        foreach ($optionValue as $key => $item) {
+        foreach ($optionValue as $key => $configuredValue) {
             if (!is_string($key)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s" keys must be strings.', $ruleId, $optionName));
             }
 
-            if (!is_int($item) && !is_float($item) && !is_bool($item) && !is_string($item)) {
+            if (!is_int($configuredValue) && !is_float($configuredValue) && !is_bool($configuredValue) && !is_string($configuredValue)) {
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%s" must be a scalar value.', $ruleId, $optionName, $key));
             }
 
@@ -403,12 +403,12 @@ final readonly class RuleConfigApplier
                     ruleId:     $ruleId,
                     optionName: $optionName,
                     key:        $key,
-                    optionItem: $item,
+                    optionItem: $configuredValue,
                     sample:     $sample,
                 );
             }
 
-            $result[$key] = $item;
+            $result[$key] = $configuredValue;
         }
 
         return $result;
