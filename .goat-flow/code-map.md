@@ -65,7 +65,7 @@ src/
 |-- Config/
 |   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
 |   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
-|   |-- ConfigLoader.php                      = `.gruff.yaml` / `--config` YAML loader (`.yaml`/`.yml` only); strict unknown-key, path, allowlist, selection, type, and threshold validation
+|   |-- ConfigLoader.php                      = `.gruff-php.yaml` / legacy `.gruff.yaml` / `--config` YAML loader (`.yaml`/`.yml` only); strict unknown-key, path, allowlist, selection, type, and threshold validation
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/

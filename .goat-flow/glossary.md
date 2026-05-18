@@ -22,7 +22,7 @@ Files owned by one specific agent runtime. Claude Code uses `CLAUDE.md` and `.cl
 
 ### Gruff naming conventions
 
-Shared naming policy for the gruff implementation family. See repo-root `docs/naming-conventions.md`. Public rule ids use `<namespace>.<rule-slug>` with lowercase kebab-case segments, documentation rule ids use `docs.*` while the emitted pillar remains `documentation`, and shared config keys prefer `.gruff.yaml`, `paths.ignore`, `allowlists.acceptedAbbreviations`, `allowlists.secretPreviews`, `selection`, and `rules`.
+Shared naming policy for the gruff implementation family. See repo-root `docs/naming-conventions.md`. Public rule ids use `<namespace>.<rule-slug>` with lowercase kebab-case segments, documentation rule ids use `docs.*` while the emitted pillar remains `documentation`, and shared config keys prefer `.gruff-php.yaml`, `paths.ignore`, `allowlists.acceptedAbbreviations`, `allowlists.secretPreviews`, `selection`, and `rules`.
 
 ## CLI surface
 
@@ -102,13 +102,13 @@ Project-relative path used in findings and reports. Computed in `SourceDiscovery
 
 ## Configuration
 
-### `.gruff.yaml`
+### `.gruff-php.yaml`
 
-Project-root config file consumed by `ConfigLoader`. Default location is `<projectRoot>/.gruff.yaml`; `--config <path>` overrides it and `--no-config` opts out for a run. Recognised root keys are `minimumPhpVersion`, `paths`, `selection`, `allowlists`, and `rules`; everything else throws `ConfigException`. The repository's root `.gruff.yaml` lists the default config surface explicitly and does not contain an absolute project-root setting. Only `.yaml` and `.yml` extensions are accepted; passing `.json` raises a `ConfigException`.
+Project-root config file consumed by `ConfigLoader`. Preferred default location is `<projectRoot>/.gruff-php.yaml`; legacy `<projectRoot>/.gruff.yaml` is still auto-loaded when the preferred file is absent. `--config <path>` overrides both defaults and `--no-config` opts out for a run. Recognised root keys are `minimumPhpVersion`, `paths`, `selection`, `allowlists`, and `rules`; everything else throws `ConfigException`. The repository's root `.gruff-php.yaml` lists the default config surface explicitly and does not contain an absolute project-root setting. Only `.yaml` and `.yml` extensions are accepted; passing `.json` raises a `ConfigException`.
 
 ### Minimum PHP Version
 
-`minimumPhpVersion` in `.gruff.yaml`, defaulting to `AnalysisConfig::DEFAULT_MINIMUM_PHP_VERSION` (`8.3`). Must be numeric and at least `7.4`. Modernisation rules that suggest PHP 8.0/8.1 syntax use it to suppress findings unsupported by the configured target.
+`minimumPhpVersion` in `.gruff-php.yaml`, defaulting to `AnalysisConfig::DEFAULT_MINIMUM_PHP_VERSION` (`8.3`). Must be numeric and at least `7.4`. Modernisation rules that suggest PHP 8.0/8.1 syntax use it to suppress findings unsupported by the configured target.
 
 ### `AnalysisConfig`
 
@@ -116,15 +116,15 @@ Project-root config file consumed by `ConfigLoader`. Default location is `<proje
 
 ### Path Ignores
 
-`paths.ignore` in `.gruff.yaml`. A list of project-relative exact or glob-like patterns (`*`, `?`, `**`) applied by `SourceDiscovery`. Absolute paths and parent traversal are rejected so config cannot silently point outside the project.
+`paths.ignore` in `.gruff-php.yaml`. A list of project-relative exact or glob-like patterns (`*`, `?`, `**`) applied by `SourceDiscovery`. Absolute paths and parent traversal are rejected so config cannot silently point outside the project.
 
 ### Rule Selection
 
-`src/Config/RuleSelection.php` and `selection` in `.gruff.yaml`. Includes can target `tiers`, `pillars`, and explicit `rules`; exclusions can target `excludePillars` and `excludeRules`. If any include list is non-empty, a rule must match at least one include before exclusions apply. Per-rule `enabled: false` still disables a selected rule.
+`src/Config/RuleSelection.php` and `selection` in `.gruff-php.yaml`. Includes can target `tiers`, `pillars`, and explicit `rules`; exclusions can target `excludePillars` and `excludeRules`. If any include list is non-empty, a rule must match at least one include before exclusions apply. Per-rule `enabled: false` still disables a selected rule.
 
 ### Allowlists
 
-`allowlists` in `.gruff.yaml`. `acceptedAbbreviations` feeds naming rules such as `naming.short-variable`; `secretPreviews` suppresses exact redacted secret previews already emitted by gruff findings. This avoids putting raw secret values in normal config for known synthetic fixtures.
+`allowlists` in `.gruff-php.yaml`. `acceptedAbbreviations` feeds naming rules such as `naming.short-variable`; `secretPreviews` suppresses exact redacted secret previews already emitted by gruff findings. This avoids putting raw secret values in normal config for known synthetic fixtures.
 
 ### `RuleSettings`
 

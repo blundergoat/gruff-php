@@ -87,11 +87,11 @@ final class DashboardScanRunnerTest extends TestCase
         $runner  = $this->runner($this->fakeGruffBinary('counter'));
         $context = $this->context($project);
 
-        file_put_contents($project . '/.gruff.yaml', "rules: {}\n");
+        file_put_contents($project . '/.gruff-php.yaml', "rules: {}\n");
 
         $first = $runner->scanHtml($context, ['paths' => 'src']);
         $second = $runner->scanHtml($context, ['paths' => 'src']);
-        file_put_contents($project . '/.gruff.yaml', "rules:\n  size.file-length:\n    enabled: false\n");
+        file_put_contents($project . '/.gruff-php.yaml', "rules:\n  size.file-length:\n    enabled: false\n");
         $third = $runner->scanHtml($context, ['paths' => 'src']);
         file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
         $fourth = $runner->scanHtml($context, ['paths' => 'src']);
@@ -116,7 +116,7 @@ final class DashboardScanRunnerTest extends TestCase
         $query   = ['paths' => 'src', 'noConfig' => '1', 'noBaseline' => '1'];
 
         $first = $runner->scanHtml($context, $query);
-        file_put_contents($project . '/.gruff.yaml', "rules: {}\n");
+        file_put_contents($project . '/.gruff-php.yaml', "rules: {}\n");
         file_put_contents($project . '/gruff-baseline.json', "{\"schemaVersion\":\"gruff.baseline.v1\",\"findings\":[]}\n");
         $second = $runner->scanHtml($context, $query);
 

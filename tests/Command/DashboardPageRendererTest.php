@@ -39,7 +39,7 @@ final class DashboardPageRendererTest extends TestCase
         self::assertStringContainsString('<section id="controls-panel" class="controls-panel" role="dialog" aria-label="Dashboard controls" hidden><div class="panel-head"><div><strong>Dashboard controls</strong><span>local scan settings</span></div><button type="button" id="controls-close" aria-label="Close dashboard controls">&times;</button></div>', $html);
         self::assertStringContainsString('<div class="scan-summary" aria-label="Scan status"><div class="scan-status"><span>Status</span><strong id="scan-status" aria-live="polite">Ready</strong></div><div class="scan-command"><span>Last scan</span><div class="scan-meta-line"><code id="scan-meta">Not run</code><button type="button" id="copy-scan-meta">Copy</button></div></div></div>', $html);
         self::assertStringContainsString('<form id="scan-form" method="get" action="/"><div class="field-stack"><label>Project root<input name="project" value="/tmp/gruff &lt;root&gt;" placeholder=""></label><label>Paths<input name="paths" value="src tests" placeholder=""></label></div>', $html);
-        self::assertStringContainsString('<div class="field-grid"><label>Config path<input name="config" value=".gruff &quot;quoted&quot;.yaml" placeholder=".gruff.yaml"></label><label>Baseline<input name="baseline" value="base&amp;line.json" placeholder="gruff-baseline.json"></label></div>', $html);
+        self::assertStringContainsString('<div class="field-grid"><label>Config path<input name="config" value=".gruff &quot;quoted&quot;.yaml" placeholder=".gruff-php.yaml"></label><label>Baseline<input name="baseline" value="base&amp;line.json" placeholder="gruff-baseline.json"></label></div>', $html);
         self::assertStringContainsString('<div class="field-grid"><label>Scan scope<select name="scanScope"><option value="full">whole branch</option><option value="diff" selected>diff only</option></select></label>', $html);
         self::assertStringContainsString('<label>Fail on<select name="failOn"><option value="none">none</option><option value="advisory">advisory</option><option value="warning" selected>warning</option><option value="error">error</option></select></label></div><div class="option-grid">', $html);
         self::assertStringContainsString('<div class="option-grid"><label class="check"><input type="checkbox" name="noBaseline" value="1" checked><span>skip baseline</span></label><label class="check"><input type="checkbox" name="includeIgnored" value="1"><span>include ignored</span></label><label class="check"><input type="checkbox" name="reportInteractive" value="1" checked><span>interactive findings</span></label></div>', $html);
@@ -166,7 +166,7 @@ final class DashboardPageRendererTest extends TestCase
             'paths' => '',
             'scanScope' => 'full',
             'failOn' => 'none',
-            'config' => '.gruff.yaml',
+            'config' => '.gruff-php.yaml',
             'baseline' => '',
             'noBaseline' => '',
             'noConfig' => '',

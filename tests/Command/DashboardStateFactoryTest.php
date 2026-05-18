@@ -60,7 +60,7 @@ final class DashboardStateFactoryTest extends TestCase
         self::assertSame('.', $state['paths']);
         self::assertSame('full', $state['scanScope']);
         self::assertSame('none', $state['failOn']);
-        self::assertSame('.gruff.yaml', $state['config']);
+        self::assertSame('.gruff-php.yaml', $state['config']);
         self::assertSame('', $state['baseline']);
         self::assertSame('0', $state['noBaseline']);
         self::assertSame('0', $state['noConfig']);

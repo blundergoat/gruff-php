@@ -167,8 +167,9 @@ php bin/gruff-php list-rules --format json
 
 ## Configuration
 
-Place `.gruff.yaml` in the project root. `analyse`, `report`, and `dashboard`
-auto-load it unless `--no-config` is supplied. You can also pass
+Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard`
+auto-load it unless `--no-config` is supplied. Legacy `.gruff.yaml` files are
+still auto-loaded when `.gruff-php.yaml` is absent. You can also pass
 `--config=path/to/file.yaml`.
 
 ```yaml

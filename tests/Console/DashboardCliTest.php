@@ -49,7 +49,7 @@ final class DashboardCliTest extends CliTestCase
             self::assertStringContainsString('name="scanScope"', $response);
             self::assertStringContainsString('whole branch', $response);
             self::assertStringContainsString('diff only', $response);
-            self::assertStringContainsString('value=".gruff.yaml"', $response);
+            self::assertStringContainsString('value=".gruff-php.yaml"', $response);
             self::assertStringContainsString('class="field-grid"', $response);
 
             $scan = $this->fetchHttp($port, '/scan');

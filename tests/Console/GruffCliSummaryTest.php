@@ -183,7 +183,7 @@ final class GruffCliSummaryTest extends TestCase
             'tests/Fixtures/Source/mixed',
             '--no-config',
             '--config',
-            '.gruff.yaml',
+            '.gruff-php.yaml',
         ], self::PROJECT_ROOT);
         $process->run();
 

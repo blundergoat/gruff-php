@@ -18,15 +18,20 @@ use Symfony\Component\Yaml\Yaml;
 final readonly class ConfigLoader
 {
     /**
-     * Default config file name discovered from project roots.
+     * Preferred default config file name discovered from project roots.
      */
-    public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
+    public const DEFAULT_CONFIG_FILE = '.gruff-php.yaml';
+
+    /**
+     * Legacy default config file name accepted during the config rename.
+     */
+    public const LEGACY_DEFAULT_CONFIG_FILE = '.gruff.yaml';
 
     /**
      * Create a loader for a project root with an optional package config fallback.
      *
      * @param string      $projectRoot        Project root used for primary config discovery.
-     * @param string|null $fallbackConfigRoot Root used for fallback `.gruff.yaml` discovery.
+     * @param string|null $fallbackConfigRoot Root used for fallback config discovery.
      */
     public function __construct(
         private string $projectRoot,
@@ -82,18 +87,39 @@ final readonly class ConfigLoader
             return $path;
         }
 
-        $defaultPath = rtrim($this->projectRoot, '/') . '/' . self::DEFAULT_CONFIG_FILE;
-        if (is_file($defaultPath)) {
-            return $defaultPath;
+        $projectDefaultPaths = $this->defaultConfigPaths($this->projectRoot);
+        foreach ($projectDefaultPaths as $path) {
+            if (is_file($path)) {
+                return $path;
+            }
         }
 
         if ($this->fallbackConfigRoot === null) {
             return null;
         }
 
-        $fallbackPath = rtrim($this->fallbackConfigRoot, '/') . '/' . self::DEFAULT_CONFIG_FILE;
+        foreach ($this->defaultConfigPaths($this->fallbackConfigRoot) as $fallbackPath) {
+            if (!in_array($fallbackPath, $projectDefaultPaths, true) && is_file($fallbackPath)) {
+                return $fallbackPath;
+            }
+        }
 
-        return $fallbackPath !== $defaultPath && is_file($fallbackPath) ? $fallbackPath : null;
+        return null;
+    }
+
+    /**
+     * Return preferred then legacy default config paths for a root.
+     *
+     * @return list<string>
+     */
+    private function defaultConfigPaths(string $root): array
+    {
+        $root = rtrim($root, '/');
+
+        return [
+            $root . '/' . self::DEFAULT_CONFIG_FILE,
+            $root . '/' . self::LEGACY_DEFAULT_CONFIG_FILE,
+        ];
     }
 
     /**

@@ -30,7 +30,7 @@ This ADR decides discovery eligibility only. It does not require gruff to parse 
 | Option | What fails | Why rejected or accepted |
 | --- | --- | --- |
 | Keep only the hard-coded ignore list | Gruff's scan boundary drifts from the repository's own checkout policy, and local generated state can leak into broad scans. | Rejected. The repository already has a source of truth for what belongs in the working tree. |
-| Add more project-specific path ignores to `.gruff.yaml` | The default self-scan becomes quieter, but each project must duplicate Git ignore semantics manually. | Rejected. It scales poorly and makes security scans depend on hand-maintained analyzer config. |
+| Add more project-specific path ignores to `.gruff-php.yaml` | The default self-scan becomes quieter, but each project must duplicate Git ignore semantics manually. | Rejected. It scales poorly and makes security scans depend on hand-maintained analyzer config. |
 | Ignore whole control-surface directories | Broad scans avoid local state, but also miss committed automation and policy files that can affect security and workflow behavior. | Rejected. Hiding those surfaces is worse than scanning them. |
 | Use Git-visible files as the default boundary | Discovery follows the working tree contract, while explicit opt-in remains available for ignored paths. | Accepted. This best matches security-oriented broad scans and keeps app-only scans available through explicit path arguments. |
 

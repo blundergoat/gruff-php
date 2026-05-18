@@ -70,7 +70,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
             'paths' => '.',
             'scanScope' => 'full',
             'failOn' => 'none',
-            'config' => '.gruff.yaml',
+            'config' => '.gruff-php.yaml',
             'baseline' => '',
             'noBaseline' => '0',
             'noConfig' => '0',

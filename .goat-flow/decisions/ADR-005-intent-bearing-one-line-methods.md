@@ -37,7 +37,7 @@ Keep these one-line methods as intent-bearing exemptions unless a future refacto
 
 Future cleanup may inline one of these only when the callsite remains clearer and no public helper contract is removed. The `waste.one-line-method` rule should remain enabled; these exemptions are a documented project decision, not a threshold relaxation.
 
-M49 converted the recurring exemption shapes into narrow rule options used by this repository's `.gruff.yaml`:
+M49 converted the recurring exemption shapes into narrow rule options used by this repository's `.gruff-php.yaml`:
 
 - `minInFileCallers: 2` skips one-line helpers called at least twice in the same file, such as shared escaping or path-normalisation helpers.
 - `namedAlternativeFactoryExempt: true` skips public static self-factory methods only when a class exposes at least two named alternatives.

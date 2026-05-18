@@ -93,7 +93,7 @@ public function render(...): string
 
 ```
 /**
- * Read the project's `.gruff.yaml` and produce an AnalysisConfig.
+ * Read the project's `.gruff-php.yaml` and produce an AnalysisConfig.
  *
  * @return AnalysisConfig
  */
@@ -179,7 +179,7 @@ Describe the role of the constant in configuration, matching, or reporting. Avoi
 /**
  * Default config file name discovered from project roots.
  */
-public const DEFAULT_CONFIG_FILE = '.gruff.yaml';
+public const DEFAULT_CONFIG_FILE = '.gruff-php.yaml';
 ```
 
 Counter-example: `/** The default config file. */`

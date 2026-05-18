@@ -107,7 +107,7 @@ Add ignoredParameterNames option to naming.parameter-type-name
 
 AST-walker parameters like $node, $context, $stmt trip the rule
 even when the type makes the convention obvious. Default empty
-list; gruff opts in to its own AST vocabulary in .gruff.yaml.
+list; gruff opts in to its own AST vocabulary in .gruff-php.yaml.
 ```
 
 ```

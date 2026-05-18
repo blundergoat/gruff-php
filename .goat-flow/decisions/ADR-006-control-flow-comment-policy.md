@@ -27,7 +27,7 @@ Any future replacement must target high-signal cases where a comment explains wh
 | --- | --- | --- |
 | Keep the blanket rules enabled | The self-scan stays dominated by low-value comment findings, and adopters inherit noisy defaults. | Rejected. Finding volume showed ceremony pressure, not quality signal. |
 | Keep the rules but lower severity | The report becomes quieter for CI, but still teaches users that every control-flow statement deserves a comment. | Rejected. Severity tuning does not fix a weak rule shape. |
-| Disable the rules in `.gruff.yaml` only for this repo | gruff would ship rules it cannot satisfy itself, hiding the default-noise problem from the project that owns the rules. | Rejected. Dogfooding should shape defaults, not hide failures locally. |
+| Disable the rules in `.gruff-php.yaml` only for this repo | gruff would ship rules it cannot satisfy itself, hiding the default-noise problem from the project that owns the rules. | Rejected. Dogfooding should shape defaults, not hide failures locally. |
 | Delete the v0.1 rules and defer reconsideration to a narrower 0.2 decision/spike | v0.1 loses a possible documentation rule. | Accepted. It protects default signal-to-noise while preserving a measured path for a future intent-focused rule. |
 
 ## Reversibility

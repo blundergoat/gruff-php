@@ -85,6 +85,33 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify loads the legacy default YAML config file when the preferred file is absent.
+     *
+     * @return void No return value.
+     */
+    public function testLoadsLegacyDefaultYamlConfigFile(): void
+    {
+        $directory  = sys_get_temp_dir() . '/gruff-config-legacy-' . bin2hex(random_bytes(6));
+        $configPath = $directory . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+        self::assertTrue(mkdir($directory));
+        self::assertNotFalse(file_put_contents(
+            $configPath,
+            "rules:\n    size.file-length:\n        thresholds:\n            warning: 13\n            error: 130\n",
+        ));
+
+        try {
+            $config   = (new ConfigLoader($directory))->load(null, RuleRegistry::defaults());
+            $settings = $config->ruleSettings(FileLengthRule::ID);
+
+            self::assertSame(13, $settings->numericThreshold('warning'));
+            self::assertSame(130, $settings->numericThreshold('error'));
+        } finally {
+            self::assertTrue(unlink($configPath));
+            self::assertTrue(rmdir($directory));
+        }
+    }
+
+    /**
      * Verify falls back to package default YAML config file.
      *
      * @return void No return value.
@@ -107,6 +134,36 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
 
             self::assertSame(11, $settings->numericThreshold('warning'));
             self::assertSame(110, $settings->numericThreshold('error'));
+        } finally {
+            self::assertTrue(unlink($fallbackPath));
+            self::assertTrue(rmdir($fallbackDirectory));
+            self::assertTrue(rmdir($projectDirectory));
+        }
+    }
+
+    /**
+     * Verify falls back to package legacy default YAML config file.
+     *
+     * @return void No return value.
+     */
+    public function testFallsBackToPackageLegacyDefaultYamlConfigFile(): void
+    {
+        $projectDirectory  = sys_get_temp_dir() . '/gruff-config-project-' . bin2hex(random_bytes(6));
+        $fallbackDirectory = sys_get_temp_dir() . '/gruff-config-fallback-legacy-' . bin2hex(random_bytes(6));
+        $fallbackPath      = $fallbackDirectory . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+        self::assertTrue(mkdir($projectDirectory));
+        self::assertTrue(mkdir($fallbackDirectory));
+        self::assertNotFalse(file_put_contents(
+            $fallbackPath,
+            "rules:\n    size.file-length:\n        thresholds:\n            warning: 17\n            error: 170\n",
+        ));
+
+        try {
+            $config   = (new ConfigLoader($projectDirectory, $fallbackDirectory))->load(null, RuleRegistry::defaults());
+            $settings = $config->ruleSettings(FileLengthRule::ID);
+
+            self::assertSame(17, $settings->numericThreshold('warning'));
+            self::assertSame(170, $settings->numericThreshold('error'));
         } finally {
             self::assertTrue(unlink($fallbackPath));
             self::assertTrue(rmdir($fallbackDirectory));

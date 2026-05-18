@@ -33,7 +33,7 @@ final readonly class DashboardPageRenderer
             . $this->field('Paths', 'paths', $state['paths'])
             . '</div>'
             . '<div class="field-grid">'
-            . $this->field('Config path', 'config', $state['config'], '.gruff.yaml')
+            . $this->field('Config path', 'config', $state['config'], '.gruff-php.yaml')
             . $this->field('Baseline', 'baseline', $state['baseline'], 'gruff-baseline.json')
             . '</div>'
             . '<div class="field-grid">'
