@@ -175,6 +175,20 @@ rules:
     # Boolean names should read clearly at call sites.
     naming.boolean-prefix:
         enabled: true
+        options:
+            stateAdjectiveAllowlist:
+                - active
+                - enabled
+                - disabled
+                - applicable
+                - generated
+                - interactive
+                - emitted
+                - visible
+                - available
+                - valid
+                - strict
+                - silent
     # Matching class and file names keeps navigation predictable.
     naming.class-file-mismatch:
         enabled: true
@@ -305,9 +319,33 @@ rules:
                 - scanRunner
                 - stateFactory
                 - tokenizer
+    # Negative boolean flags create double-negative call sites unless they mirror CLI flags.
+    naming.negative-boolean:
+        enabled: true
+        options:
+            cliMirrorAllowlist:
+                - 'GruffPhp\Command\AnalyseCommandOptions::noConfig'
+                - 'GruffPhp\Command\AnalyseCommandOptions::noBaseline'
+                - 'GruffPhp\Command\SummaryCommand::hasConfigConflict::noConfig'
+                - 'GruffPhp\Command\SummaryCommand::analysisConfig::noConfig'
     # Over-short names make logic harder to scan.
     naming.short-variable:
         enabled: true
+    # Type suffixes duplicate type information that signatures or local context already provide.
+    naming.suffix-hungarian:
+        enabled: true
+        options:
+            typeSuffixes:
+                - String
+                - Array
+                - List
+                - Map
+                - Set
+                - Hash
+                - Object
+                - Integer
+                - Float
+                - Boolean
     # Consistent test names make failures easier to triage.
     naming.test-naming-consistency:
         enabled: true

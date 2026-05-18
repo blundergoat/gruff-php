@@ -15,13 +15,13 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\For_;
-use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects one-character variables outside narrow local conventions.
@@ -70,68 +70,51 @@ final readonly class ShortVariableRule implements RuleInterface
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $findings   = [];
 
-        $loopVars  = $this->collectLoopVars($unit->statements, $finder);
-        $catchVars = $this->collectCatchVars($unit->statements, $finder);
+        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+            array_push(
+                $findings,
+                ...$this->parameterFindings($definition, $unit, $context, $scope),
+                ...$this->localVariableFindings($definition, $unit, $context, $scope),
+            );
+        }
 
-        $functions = $finder->find($unit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod || $node instanceof Function_;
-        });
+        return $findings;
+    }
 
+    /**
+     * Find short parameters in one function-like scope.
+     *
+     * @return list<Finding> Findings for single-character parameters.
+     */
+    private function parameterFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+        RuleContext $context,
+        FunctionLikeScope $scope,
+    ): array
+    {
         $findings = [];
-        $reported = [];
+        $symbol   = $this->symbol($scope);
 
-        foreach ($functions as $fn) {
-            /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
-            $vars   = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
-            $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
+        foreach ($scope->node->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
+            }
 
-            foreach ($vars as $var) {
-                /** @var Variable $var NodeFinder narrows the function body walk to variable nodes. */
-                if (!is_string($var->name) || strlen($var->name) > 1) {
-                    continue;
-                }
+            $finding = $this->finding(
+                definition: $definition,
+                unit:       $unit,
+                context:    $context,
+                node:       $param,
+                kind:       $param->flags === 0 ? 'parameter' : 'property',
+                name:       $param->var->name,
+                symbol:     $symbol,
+            );
 
-                $name = $var->name;
-
-                if ($name === '_') {
-                    continue;
-                }
-
-                if (in_array($name, $context->config->acceptedAbbreviations(), true)) {
-                    continue;
-                }
-
-                if (in_array($name, self::LOOP_COUNTER_ALLOWLIST, true) && isset($loopVars[$name])) {
-                    continue;
-                }
-
-                if (in_array($name, self::CATCH_ALLOWLIST, true) && isset($catchVars[$name])) {
-                    continue;
-                }
-
-                $key = $fn->getStartLine() . ':' . $name;
-
-                if (isset($reported[$key])) {
-                    continue;
-                }
-
-                $reported[$key] = true;
-
-                $findings[] = new Finding(
-                    ruleId:      $definition->id,
-                    message:     sprintf('Variable $%s in %s is a single character.', $name, $symbol),
-                    filePath:    $unit->file->displayPath,
-                    line:        $var->getStartLine(),
-                    severity:    $definition->defaultSeverity,
-                    pillar:      $definition->pillar,
-                    tier:        $definition->tier,
-                    confidence:  $definition->confidence,
-                    symbol:      $symbol,
-                    remediation: 'Use a descriptive name that communicates the variable\'s purpose.',
-                    metadata:    ['variable' => $name],
-                );
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
             }
         }
 
@@ -139,27 +122,138 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * @param array<Node> $stmts
+     * Find short local variables in one function-like scope.
+     *
+     * @return list<Finding> Findings for single-character local variables.
+     */
+    private function localVariableFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+        RuleContext $context,
+        FunctionLikeScope $scope,
+    ): array
+    {
+        $findings  = [];
+        $symbol    = $this->symbol($scope);
+        $loopVars  = $this->collectLoopVars($scope);
+        $catchVars = $this->collectCatchVars($scope);
+
+        foreach ($scope->localVariables as $name => $variable) {
+            if (in_array($name, self::LOOP_COUNTER_ALLOWLIST, true) && isset($loopVars[$name])) {
+                continue;
+            }
+
+            if (in_array($name, self::CATCH_ALLOWLIST, true) && isset($catchVars[$name])) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition: $definition,
+                unit:       $unit,
+                context:    $context,
+                node:       $variable,
+                kind:       'variable',
+                name:       $name,
+                symbol:     $symbol,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build a short-variable finding when the name violates the rule.
+     *
+     * @return Finding|null Finding when the identifier is a reportable single-character name.
+     */
+    private function finding(
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+        RuleContext $context,
+        Node $node,
+        string $kind,
+        string $name,
+        string $symbol,
+    ): ?Finding {
+        if (strlen($name) > 1 || $name === '_') {
+            return null;
+        }
+
+        if (in_array($name, $context->config->acceptedAbbreviations(), true)) {
+            return null;
+        }
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('%s $%s in %s is a single character.', ucfirst($kind), $name, $symbol),
+            filePath:    $unit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            column:      $this->columnForName($unit, $node, $name),
+            symbol:      $symbol,
+            remediation: 'Use a descriptive name that communicates the variable\'s purpose.',
+            metadata:    ['variable' => $name, 'identifierKind' => $kind],
+        );
+    }
+
+    /**
+     * Return a best-effort 1-indexed column for a variable or parameter name.
+     *
+     * @return int|null Source column, or null when the name cannot be found on the node line.
+     */
+    private function columnForName(AnalysisUnit $unit, Node $node, string $name): ?int
+    {
+        $lines = preg_split('/\R/', $unit->source);
+
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        $line = $lines[$node->getStartLine() - 1] ?? null;
+        if ($line === null) {
+            return null;
+        }
+
+        $position = strpos($line, '$' . $name);
+
+        return $position === false ? null : $position + 1;
+    }
+
+    /**
      * @return array<string, true>
      */
-    private function collectLoopVars(array $stmts, NodeFinder $finder): array
+    private function collectLoopVars(FunctionLikeScope $scope): array
     {
-        $vars  = [];
-        $loops = $finder->find($stmts, static function (Node $node): bool {
-            return $node instanceof For_ || $node instanceof Foreach_;
-        });
+        $vars = [];
 
-        foreach ($loops as $loop) {
-            if ($loop instanceof For_) {
-                foreach ($loop->init as $init) {
-                    $initVars = $finder->findInstanceOf([$init], Variable::class);
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof For_) as $loop) {
+            if (!$loop instanceof For_) {
+                continue;
+            }
 
-                    foreach ($initVars as $variable) {
-                        if (is_string($variable->name)) {
-                            $vars[$variable->name] = true;
-                        }
-                    }
-                }
+            $this->collectVariablesByName($loop->init, $vars);
+        }
+
+        return $vars;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function collectCatchVars(FunctionLikeScope $scope): array
+    {
+        $vars = [];
+
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Catch_) as $catch) {
+            if ($catch instanceof Catch_ && $catch->var !== null && is_string($catch->var->name)) {
+                $vars[$catch->var->name] = true;
             }
         }
 
@@ -167,20 +261,118 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
-     * @param array<Node> $stmts
-     * @return array<string, true>
+     * @param array<Node>        $nodes
+     * @param array<string,true> $variables
+     * @return void No return value.
      */
-    private function collectCatchVars(array $stmts, NodeFinder $finder): array
+    private function collectVariablesByName(array $nodes, array &$variables): void
     {
-        $vars    = [];
-        $catches = $finder->findInstanceOf($stmts, Catch_::class);
-
-        foreach ($catches as $catch) {
-            if ($catch->var !== null && is_string($catch->var->name)) {
-                $vars[$catch->var->name] = true;
+        foreach ($nodes as $node) {
+            foreach ($this->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
+                if ($variable instanceof Variable && is_string($variable->name)) {
+                    $variables[$variable->name] = true;
+                }
             }
         }
+    }
 
-        return $vars;
+    /**
+     * @param callable(Node): bool $predicate
+     * @return list<Node>
+     */
+    private function nodesInScope(FunctionLikeScope $scope, callable $predicate): array
+    {
+        return $this->nodesMatching($this->bodyNodes($scope->node), $predicate);
+    }
+
+    /**
+     * @param list<Node>           $nodes
+     * @param callable(Node): bool $predicate
+     * @return list<Node>
+     */
+    private function nodesMatching(array $nodes, callable $predicate): array
+    {
+        $matches = [];
+
+        foreach ($nodes as $node) {
+            $this->collectMatchingNodes($node, $predicate, $matches);
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @param callable(Node): bool $predicate
+     * @param list<Node>           $matches
+     * @return void No return value.
+     */
+    private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
+    {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            return;
+        }
+
+        if ($predicate($node)) {
+            $matches[] = $node;
+        }
+
+        foreach ($this->childNodes($node) as $child) {
+            $this->collectMatchingNodes($child, $predicate, $matches);
+        }
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        if ($node instanceof ArrowFunction) {
+            return [$node->expr];
+        }
+
+        return array_values($node->stmts ?? []);
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function childNodes(Node $node): array
+    {
+        $children = [];
+
+        foreach ($node->getSubNodeNames() as $name) {
+            $this->collectChildNodes($node->{$name}, $children);
+        }
+
+        return $children;
+    }
+
+    /**
+     * @param list<Node> $children
+     * @return void No return value.
+     */
+    private function collectChildNodes(mixed $value, array &$children): void
+    {
+        if ($value instanceof Node) {
+            $children[] = $value;
+            return;
+        }
+
+        if (!is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $item) {
+            $this->collectChildNodes($item, $children);
+        }
+    }
+
+    private function symbol(FunctionLikeScope $scope): string
+    {
+        if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+        }
+
+        return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

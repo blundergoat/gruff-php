@@ -79,7 +79,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
-        self::assertSame('C', $this->stringValue($composite, 'grade'));
+        self::assertSame('F', $this->stringValue($composite, 'grade'));
     }
 
     /**

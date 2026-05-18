@@ -43,7 +43,7 @@ and uses semantic versioning once public tags begin. The current binary reports
 
 ### Rule Catalogue
 
-The v0.1 catalogue includes 110 registry rules across these pillars:
+The v0.1 catalogue includes 113 registry rules across these pillars:
 
 - `size`
 - `complexity`
@@ -66,9 +66,10 @@ Representative rule families:
 - Dead-code checks for unused private members, unused imports,
   unused parameters, unreachable code, empty declarations, commented-out code,
   and one-line method wrappers.
-- Naming checks for short variables, boolean prefixes, generic methods,
-  Hungarian notation, class/file mismatch, test naming consistency, identifier
-  quality, and parameter/type-name alignment.
+- Naming checks for short variables, declared abbreviation vocabulary, boolean
+  prefixes, negative boolean flags, generic methods, prefix/suffix Hungarian
+  notation, class/file mismatch, test naming consistency, identifier quality,
+  closure/arrow scopes, and parameter/type-name alignment.
 - Documentation checks for missing PHPDoc, missing/stale PHPDoc tags, useless
   PHPDoc, missing README files, TODO density, and `@var` assertion descriptions.
 - Modernisation suggestions for constructor promotion, readonly properties,
@@ -97,6 +98,10 @@ Representative rule families:
   dogfooding showed poor signal-to-noise.
 - The project dogfood baseline now runs with zero error and zero warning
   findings under the default `php bin/gruff-php analyse` command.
+- Naming rules now share isolated function/method/closure/arrow scope walking
+  where parameter or local-variable checks need closure coverage.
+- Overlapping naming findings on the same identifier now keep the more specific
+  rule according to the documented naming deferral order.
 
 ### Fixed
 

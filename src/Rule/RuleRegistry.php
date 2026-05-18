@@ -46,8 +46,10 @@ use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
+use GruffPhp\Rule\Naming\NegativeBooleanRule;
 use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
+use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
@@ -125,6 +127,24 @@ use InvalidArgumentException;
  */
 final class RuleRegistry
 {
+    /**
+     * Rule priority for overlapping naming findings on the same identifier.
+     *
+     * Lower numbers win. The order is the M51 documented deferral contract.
+     */
+    private const NAMING_RULE_PRIORITY = [
+        'naming.class-file-mismatch' => 0,
+        'naming.confusing-name' => 1,
+        'naming.negative-boolean' => 2,
+        'naming.boolean-prefix' => 3,
+        'naming.parameter-type-name' => 4,
+        'naming.identifier-quality' => 5,
+        'naming.hungarian-notation' => 6,
+        'naming.suffix-hungarian' => 7,
+        'naming.short-variable' => 8,
+        'naming.abbreviation-allowlist' => 9,
+    ];
+
     /** @var array<string, RuleInterface|ProjectRuleInterface> */
     private readonly array $rules;
 
@@ -181,8 +201,10 @@ final class RuleRegistry
             new GenericMethodNameRule(),
             new HungarianNotationRule(),
             new IdentifierQualityRule(),
+            new NegativeBooleanRule(),
             new ParameterTypeNameRule(),
             new ShortVariableRule(),
+            new SuffixHungarianRule(),
             new TestNamingConsistencyRule(),
             new ConstructorPromotionCandidateRule(),
             new EnumCandidateRule(),
@@ -412,20 +434,20 @@ final class RuleRegistry
             }
         }
 
-        $findings = $this->deduplicateFindings($findings);
+        $findings = $this->deduplicateNamingFindings($this->deduplicateFindings($findings));
 
         usort(
             $findings,
-            static fn (Finding $left, Finding $right): int => [
-                $left->filePath,
-                $left->line ?? 0,
-                $left->ruleId,
-                $left->message,
+            static fn (Finding $findingLeft, Finding $findingRight): int => [
+                $findingLeft->filePath,
+                $findingLeft->line ?? 0,
+                $findingLeft->ruleId,
+                $findingLeft->message,
             ] <=> [
-                $right->filePath,
-                $right->line ?? 0,
-                $right->ruleId,
-                $right->message,
+                $findingRight->filePath,
+                $findingRight->line ?? 0,
+                $findingRight->ruleId,
+                $findingRight->message,
             ],
         );
 
@@ -462,5 +484,71 @@ final class RuleRegistry
         }
 
         return $uniqueFindings;
+    }
+
+    /**
+     * Keep only the highest-priority naming finding when multiple naming rules
+     * report the same identifier at the same source location.
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function deduplicateNamingFindings(array $findings): array
+    {
+        $bestByIdentifier = [];
+        $selectedIndexes  = [];
+
+        foreach ($findings as $index => $finding) {
+            $key = $this->namingOverlapKey($finding);
+            if ($key === null) {
+                $selectedIndexes[$index] = true;
+                continue;
+            }
+
+            $priority = self::NAMING_RULE_PRIORITY[$finding->ruleId];
+            if (!isset($bestByIdentifier[$key]) || $priority < $bestByIdentifier[$key]['priority']) {
+                $bestByIdentifier[$key] = ['index' => $index, 'priority' => $priority];
+            }
+        }
+
+        foreach ($bestByIdentifier as $selected) {
+            $selectedIndexes[$selected['index']] = true;
+        }
+
+        ksort($selectedIndexes, SORT_NUMERIC);
+
+        return array_values(array_intersect_key($findings, $selectedIndexes));
+    }
+
+    private function namingOverlapKey(Finding $finding): ?string
+    {
+        if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
+            return null;
+        }
+
+        $identifierName = $this->findingIdentifierName($finding);
+        if ($identifierName === null) {
+            return null;
+        }
+
+        return implode("\0", [
+            $finding->filePath,
+            (string) ($finding->line ?? ''),
+            (string) ($finding->column ?? ''),
+            $finding->symbol ?? '',
+            strtolower($identifierName),
+        ]);
+    }
+
+    private function findingIdentifierName(Finding $finding): ?string
+    {
+        foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
+            $value = $finding->metadata[$metadataKey] ?? null;
+            if (is_string($value)) {
+                return $value;
+            }
+        }
+
+        return $finding->symbol;
     }
 }

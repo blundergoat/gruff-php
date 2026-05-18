@@ -18,7 +18,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects variable names that encode type prefixes.
@@ -62,57 +61,95 @@ final readonly class HungarianNotationRule implements RuleInterface
     public function analyse(AnalysisUnit $unit, RuleContext $context): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $functions  = $finder->find($unit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod || $node instanceof Function_;
-        });
+        $findings   = [];
 
+        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+            array_push(
+                $findings,
+                ...$this->parameterFindings($definition, $unit, $scope),
+                ...$this->localVariableFindings($definition, $unit, $scope),
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Find Hungarian notation parameters in one function-like scope.
+     *
+     * @return list<Finding> Findings for prefixed parameters.
+     */
+    private function parameterFindings(RuleDefinition $definition, AnalysisUnit $unit, FunctionLikeScope $scope): array
+    {
         $findings = [];
-        $reported = [];
+        $symbol   = $this->symbol($scope);
 
-        foreach ($functions as $fn) {
-            /** @var ClassMethod|Function_ $fn Finder predicate restricts results to function-like nodes. */
-            $vars   = $finder->findInstanceOf($fn->stmts ?? [], Variable::class);
-            $symbol = CyclomaticComplexityRule::resolveSymbol($fn);
+        foreach ($scope->node->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
+            }
 
-            foreach ($vars as $var) {
-                /** @var Variable $var NodeFinder narrows the function body walk to variable nodes. */
-                if (!is_string($var->name)) {
-                    continue;
-                }
-
-                $name   = $var->name;
-                $prefix = $this->detectPrefix($name);
-
-                if ($prefix === null) {
-                    continue;
-                }
-
-                $key = $fn->getStartLine() . ':' . $name;
-
-                if (isset($reported[$key])) {
-                    continue;
-                }
-
-                $reported[$key] = true;
-
-                $findings[] = new Finding(
-                    ruleId:      $definition->id,
-                    message:     sprintf('Variable $%s in %s uses Hungarian notation prefix "%s".', $name, $symbol, $prefix),
-                    filePath:    $unit->file->displayPath,
-                    line:        $var->getStartLine(),
-                    severity:    $definition->defaultSeverity,
-                    pillar:      $definition->pillar,
-                    tier:        $definition->tier,
-                    confidence:  $definition->confidence,
-                    symbol:      $symbol,
-                    remediation: sprintf('Remove the type prefix. Use $%s instead.', lcfirst(substr($name, strlen($prefix)))),
-                    metadata:    ['variable' => $name, 'prefix' => $prefix],
-                );
+            $finding = $this->finding($definition, $unit, $param, 'parameter', $param->var->name, $symbol);
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Find Hungarian notation local variables in one function-like scope.
+     *
+     * @return list<Finding> Findings for prefixed local variables.
+     */
+    private function localVariableFindings(RuleDefinition $definition, AnalysisUnit $unit, FunctionLikeScope $scope): array
+    {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->localVariables as $name => $variable) {
+            $finding = $this->finding($definition, $unit, $variable, 'variable', $name, $symbol);
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build a Hungarian notation finding when the identifier matches a type prefix.
+     *
+     * @return Finding|null Finding for a prefixed identifier.
+     */
+    private function finding(
+        RuleDefinition $definition,
+        AnalysisUnit $unit,
+        Node $node,
+        string $kind,
+        string $name,
+        string $symbol,
+    ): ?Finding {
+        $prefix = $this->detectPrefix($name);
+
+        if ($prefix === null) {
+            return null;
+        }
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('%s $%s in %s uses Hungarian notation prefix "%s".', ucfirst($kind), $name, $symbol, $prefix),
+            filePath:    $unit->file->displayPath,
+            line:        $node->getStartLine(),
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: sprintf('Remove the type prefix. Use $%s instead.', lcfirst(substr($name, strlen($prefix)))),
+            metadata:    ['variable' => $name, 'prefix' => $prefix, 'identifierKind' => $kind],
+        );
     }
 
     /**
@@ -132,5 +169,14 @@ final readonly class HungarianNotationRule implements RuleInterface
         }
 
         return null;
+    }
+
+    private function symbol(FunctionLikeScope $scope): string
+    {
+        if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+        }
+
+        return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

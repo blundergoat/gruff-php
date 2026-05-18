@@ -7,26 +7,33 @@ use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use WeakMap;
 /**
  * Discovers isolated function-like scopes for naming rules.
- *
- * M51 adopters: IdentifierQualityRule, ShortVariableRule, HungarianNotationRule,
- * BooleanPrefixRule parameter checks, ParameterTypeNameRule, and AbbreviationAllowlistRule.
- * Excluded: GenericMethodNameRule has no closure name to check; ClassFileMismatchRule
- * is file-level; ConfusingNameRule and TestNamingConsistencyRule are class-level.
  */
-final readonly class FunctionLikeScopeWalker
+final class FunctionLikeScopeWalker
 {
+    /** @var WeakMap<Node, array{count: int, scopes: list<FunctionLikeScope>}>|null */
+    private static ?WeakMap $cache = null;
     /**
      * @param list<Node> $statements
      * @return list<FunctionLikeScope>
      */
     public function scopes(array $statements): array
     {
+        if ($statements === []) {
+            return [];
+        }
+        $cache  = self::$cache ??= new WeakMap();
+        $cached = $cache[$statements[0]] ?? null;
+        if ($cached !== null && $cached['count'] === count($statements)) {
+            return $cached['scopes'];
+        }
         $scopes = [];
         foreach ($statements as $statement) {
             $this->discoverScopes($statement, $scopes);
         }
+        $cache[$statements[0]] = ['count' => count($statements), 'scopes' => $scopes];
         return $scopes;
     }
     /** @param list<FunctionLikeScope> $scopes */

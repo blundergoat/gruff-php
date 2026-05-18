@@ -16,7 +16,10 @@ use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Naming\IdentifierTokenizer;
+use GruffPhp\Rule\Naming\NegativeBooleanRule;
+use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
+use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
@@ -506,6 +509,99 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify closure and arrow scopes are checked without leaking into the parent method.
+     *
+     * @return void No return value.
+     */
+    public function testClosureAndArrowScopesAreCoveredByNamingRules(): void
+    {
+        $findings = $this->analyseFixture('closure-coverage.php');
+
+        self::assertTrue($this->hasFinding($findings, ShortVariableRule::ID, 'variable', 'x', 'arrow@'));
+        self::assertTrue($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'foo', 'closure@'));
+        self::assertTrue($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'tmp', 'closure@'));
+        self::assertTrue($this->hasFinding($findings, HungarianNotationRule::ID, 'variable', 'strName', 'closure@'));
+        self::assertTrue($this->hasFinding($findings, BooleanPrefixRule::ID, 'identifierName', 'changedOnly', 'closure@'));
+        self::assertTrue($this->hasFinding($findings, ParameterTypeNameRule::ID, 'parameter', 'session', 'closure@'));
+
+        self::assertFalse($this->hasFinding($findings, IdentifierQualityRule::ID, 'identifierName', 'foo', 'ClosureCoverageFixture::run()'));
+        self::assertFalse($this->hasFinding($findings, ShortVariableRule::ID, 'variable', 'x', 'ClosureCoverageFixture::run()'));
+    }
+
+    /**
+     * Verify suffix-Hungarian notation is detected while conversion idioms stay clear.
+     *
+     * @return void No return value.
+     */
+    public function testSuffixHungarianDetectsTrailingTypeTokens(): void
+    {
+        $findings = $this->analyseRule('suffix-hungarian.php', SuffixHungarianRule::ID);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        self::assertContains('rawString', $names);
+        self::assertContains('useMap', $names);
+        self::assertNotContains('cache', $names);
+        self::assertNotContains('nameAsString', $names);
+    }
+
+    /**
+     * Verify negative boolean flags are reported and CLI mirror keys can exempt them.
+     *
+     * @return void No return value.
+     */
+    public function testNegativeBooleanDetectsFlagsAndHonoursCliMirrorAllowlist(): void
+    {
+        $findings = $this->negativeBooleanFindings();
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $keys     = array_map(static fn ($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $findings);
+
+        self::assertContains('noConfig', $names);
+        self::assertContains('disableCache', $names);
+        self::assertContains('skipValidation', $names);
+        self::assertNotContains('nonNull', $names);
+        self::assertNotContains('notFound', $names);
+        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $keys);
+        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::disableCache', $keys);
+        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::configure::skipValidation', $keys);
+        self::assertContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $keys);
+
+        $allowlistedFindings = $this->negativeBooleanFindings(['Fixtures\\Naming\\CliMirrorOptions::noConfig']);
+        $allowlistedKeys     = array_map(static fn ($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $allowlistedFindings);
+
+        self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $allowlistedKeys);
+        self::assertNotContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $allowlistedKeys);
+    }
+
+    /**
+     * Verify overlapping naming findings keep the documented primary rule.
+     *
+     * @return void No return value.
+     */
+    public function testDuplicateNamingFindingsRespectDeferralOrder(): void
+    {
+        $unit     = $this->parseFixture('duplicate-deferral.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(IdentifierQualityRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            IdentifierQualityRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, [
+                'genericTokens' => ['cb', 'str', 'x'],
+            ])),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $rules    = $this->rulesByIdentifierName($findings);
+
+        self::assertContains(IdentifierQualityRule::ID, $rules['cb'] ?? []);
+        self::assertNotContains(AbbreviationAllowlistRule::ID, $rules['cb'] ?? []);
+
+        self::assertContains(NegativeBooleanRule::ID, $rules['disableCache'] ?? []);
+        self::assertNotContains(BooleanPrefixRule::ID, $rules['disableCache'] ?? []);
+
+        self::assertContains(IdentifierQualityRule::ID, $rules['strX'] ?? []);
+        self::assertNotContains(HungarianNotationRule::ID, $rules['strX'] ?? []);
+    }
+
+    /**
      * Verify clean fixture has no naming findings except file mismatch.
      *
      * @return void No return value.
@@ -554,12 +650,54 @@ final class NamingRulesTest extends NamingRuleTestCase
         $unit     = $this->parseFixture('abbreviation-allowlist.php');
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations($acceptedAbbreviations);
+        $settings = $config->ruleSettings(IdentifierQualityRule::ID);
+        $config   = $config->withRuleSettings(
+            IdentifierQualityRule::ID,
+            new RuleSettings(false, $settings->thresholds, $settings->options),
+        );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
         ));
+    }
+
+    /**
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function analyseFixture(string $fixture): array
+    {
+        $unit     = $this->parseFixture($fixture);
+        $registry = RuleRegistry::defaults();
+
+        return $registry->analyse([$unit], new RuleContext(
+            __DIR__ . '/../../..',
+            AnalysisConfig::fromRegistry($registry),
+        ));
+    }
+
+    /**
+     * @param list<\GruffPhp\Finding\Finding> $findings
+     */
+    private function hasFinding(
+        array $findings,
+        string $ruleId,
+        string $metadataKey,
+        string $metadataValue,
+        string $symbolPrefix,
+    ): bool {
+        foreach ($findings as $finding) {
+            if ($finding->ruleId !== $ruleId || ($finding->metadata[$metadataKey] ?? null) !== $metadataValue) {
+                continue;
+            }
+
+            if ($finding->symbol !== null && str_starts_with($finding->symbol, $symbolPrefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -581,6 +719,57 @@ final class NamingRulesTest extends NamingRuleTestCase
             $findings,
             static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
         ));
+    }
+
+    /**
+     * @param list<string> $cliMirrorAllowlist
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function negativeBooleanFindings(array $cliMirrorAllowlist = []): array
+    {
+        $unit     = $this->parseFixture('negative-boolean.php');
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings(NegativeBooleanRule::ID);
+        $config   = $config->withRuleSettings(
+            NegativeBooleanRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['cliMirrorAllowlist' => $cliMirrorAllowlist])),
+        );
+        $booleanSettings = $config->ruleSettings(BooleanPrefixRule::ID);
+        $config          = $config->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(false, $booleanSettings->thresholds, $booleanSettings->options),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+        return array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === NegativeBooleanRule::ID,
+        ));
+    }
+
+    /**
+     * @param list<\GruffPhp\Finding\Finding> $findings
+     * @return array<string, list<string>>
+     */
+    private function rulesByIdentifierName(array $findings): array
+    {
+        $rules = [];
+
+        foreach ($findings as $finding) {
+            $name = $finding->metadata['identifierName']
+                ?? $finding->metadata['variable']
+                ?? $finding->metadata['parameter']
+                ?? null;
+
+            if (!is_string($name)) {
+                continue;
+            }
+
+            $rules[$name][] = $finding->ruleId;
+        }
+
+        return $rules;
     }
 
     /**

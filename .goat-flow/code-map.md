@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-16. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-18. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -120,7 +120,7 @@ src/
 |   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
 |   |-- ProjectRuleInterface.php              = `definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>` contract; project-wide rules run once after the per-unit loop (see ADR-003)
-|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs per-unit `RuleInterface` rules first, then project-wide `ProjectRuleInterface` rules over the full unit list, then sorts findings by file/line/ruleId/message
+|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs per-unit `RuleInterface` rules first, then project-wide `ProjectRuleInterface` rules over the full unit list, deduplicates overlapping naming findings by documented rule priority, then sorts findings by file/line/ruleId/message
 |   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
 |   |-- Complexity/
 |   |   |-- CognitiveComplexityRule.php       = `complexity.cognitive`
@@ -149,15 +149,20 @@ src/
 |   |   |-- UselessPhpdocRule.php             = `docs.useless-phpdoc`
 |   |   `-- VarAnnotationDescriptionRule.php  = `docs.var-annotation-description` (flags local `@var` assertions that only restate type/variable without a reason)
 |   |-- Naming/
+|   |   |-- AbbreviationAllowlistRule.php      = `naming.abbreviation-allowlist` (requires 2-3 char lowercase project abbreviations to be declared in `allowlists.acceptedAbbreviations`)
 |   |   |-- BooleanPrefixRule.php             = `naming.boolean-prefix`
 |   |   |-- ClassFileMismatchRule.php         = `naming.class-file-mismatch`
 |   |   |-- ConfusingNameRule.php             = `naming.confusing-name`
+|   |   |-- FunctionLikeScope.php             = scope value for closure-aware naming walks
+|   |   |-- FunctionLikeScopeWalker.php       = shared isolated function/method/closure/arrow scope walker for naming rules
 |   |   |-- GenericMethodNameRule.php         = `naming.generic-method`
 |   |   |-- HungarianNotationRule.php         = `naming.hungarian-notation`
 |   |   |-- IdentifierQualityRule.php         = `naming.identifier-quality`
 |   |   |-- IdentifierTokenizer.php           = shared camel/snake/acronym tokenizer for identifier-quality
+|   |   |-- NegativeBooleanRule.php           = `naming.negative-boolean` (bool properties/params with negative prefixes; configurable `cliMirrorAllowlist`)
 |   |   |-- ParameterTypeNameRule.php         = `naming.parameter-type-name` (expects class-typed parameters to use lower-camel short type names; trims configurable suffixes such as Interface)
 |   |   |-- ShortVariableRule.php             = `naming.short-variable`
+|   |   |-- SuffixHungarianRule.php           = `naming.suffix-hungarian` (type suffixes such as String/Map/Set; configurable `typeSuffixes`)
 |   |   `-- TestNamingConsistencyRule.php     = `naming.test-naming-consistency`
 |   |-- Modernisation/                        = AST-driven PHP-modernisation opportunity rules; PHP syntax suggestions respect `minimumPhpVersion`
 |   |   |-- ConstructorPromotionCandidateRule.php = `modernisation.constructor-promotion-candidate`

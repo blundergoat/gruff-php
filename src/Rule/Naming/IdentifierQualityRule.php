@@ -15,6 +15,8 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Class_;
@@ -249,13 +251,17 @@ final readonly class IdentifierQualityRule implements RuleInterface
     ): array {
         $findings = [];
 
-        foreach ($finder->find($findingContext->unit->statements, static fn (Node $node): bool => $node instanceof ClassMethod || $node instanceof Function_) as $function) {
-            /** @var ClassMethod|Function_ $function Finder predicate restricts results to function-like nodes. */
+        foreach ((new FunctionLikeScopeWalker())->scopes($findingContext->unit->statements) as $scope) {
+            $function         = $scope->node;
+            $functionFindings = $function instanceof ClassMethod || $function instanceof Function_
+                ? $this->functionNameFindings($findingContext, $function)
+                : [];
+
             array_push(
                 $findings,
-                ...$this->functionNameFindings($findingContext, $function),
-                ...$this->parameterFindings($findingContext, $function),
-                ...$this->localVariableFindings($findingContext, $function, $finder, $minScopeReferences, $loopBodyThreshold),
+                ...$functionFindings,
+                ...$this->parameterFindings($findingContext, $scope),
+                ...$this->localVariableFindings($findingContext, $scope, $minScopeReferences, $loopBodyThreshold),
             );
         }
 
@@ -289,12 +295,12 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return list<Finding> Findings for parameters and promoted properties.
      */
-    private function parameterFindings(IdentifierFindingContext $findingContext, ClassMethod|Function_ $function): array
+    private function parameterFindings(IdentifierFindingContext $findingContext, FunctionLikeScope $scope): array
     {
         $findings = [];
-        $symbol   = CyclomaticComplexityRule::resolveSymbol($function);
+        $symbol   = $this->symbol($scope);
 
-        foreach ($function->params as $param) {
+        foreach ($scope->node->params as $param) {
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
@@ -322,15 +328,16 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function localVariableFindings(
         IdentifierFindingContext $findingContext,
-        ClassMethod|Function_ $function,
-        NodeFinder $finder,
+        FunctionLikeScope $scope,
         int $minScopeReferences,
         int $loopBodyThreshold,
     ): array {
-        $findings = [];
-        $symbol   = CyclomaticComplexityRule::resolveSymbol($function);
+        $findings  = [];
+        $symbol    = $this->symbol($scope);
+        $loopVars  = $this->loopVariables($scope);
+        $catchVars = $this->catchVariables($scope);
 
-        foreach ($this->localVariableNames($function, $finder, $minScopeReferences) as $name => $variable) {
+        foreach ($this->localVariableNames($scope, $minScopeReferences, $loopVars + $catchVars) as $name => $variable) {
             $finding = $this->finding(
                 context: $findingContext,
                 node:    $variable,
@@ -345,7 +352,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         $loopIgnoredNames = array_values(array_diff($findingContext->ignoredNames, $findingContext->genericTokens));
-        foreach ($this->reportableLoopVariableNames($function, $finder, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
+        foreach ($this->reportableLoopVariableNames($scope, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
             $finding = $this->finding(
                 context:              $findingContext,
                 node:                 $variable,
@@ -552,57 +559,37 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * @param array<string, true> $excludedNames
      * @return array<string, Variable>
      */
-    private function localVariableNames(ClassMethod|Function_ $function, NodeFinder $finder, int $minScopeReferences): array
+    private function localVariableNames(FunctionLikeScope $scope, int $minScopeReferences, array $excludedNames): array
     {
-        $variables      = [];
-        $counts         = [];
-        $loopVars       = $this->loopVariables($function, $finder);
-        $catchVars      = $this->catchVariables($function, $finder);
-        $parameterNames = [];
+        $counts    = $this->localVariableReferenceCounts($scope);
+        $variables = [];
 
-        foreach ($function->params as $param) {
-            if ($param->var instanceof Variable && is_string($param->var->name)) {
-                $parameterNames[$param->var->name] = true;
-            }
-        }
-
-        foreach ($finder->findInstanceOf($function->stmts ?? [], Variable::class) as $variable) {
-            if (!is_string($variable->name)) {
+        foreach ($scope->localVariables as $name => $variable) {
+            if (isset($excludedNames[$name])) {
                 continue;
             }
 
-            $name = $variable->name;
-            if (isset($parameterNames[$name]) || isset($loopVars[$name]) || isset($catchVars[$name])) {
-                continue;
+            if (($counts[$name] ?? 0) >= $minScopeReferences) {
+                $variables[$name] = $variable;
             }
-
-            $counts[$name] = ($counts[$name] ?? 0) + 1;
-            $variables[$name] ??= $variable;
         }
 
-        return array_filter(
-            $variables,
-            static fn (Variable $variable, string $name): bool => ($counts[$name] ?? 0) >= $minScopeReferences,
-            ARRAY_FILTER_USE_BOTH,
-        );
+        return $variables;
     }
 
     /**
      * @return array<string, true>
      */
-    private function loopVariables(ClassMethod|Function_ $function, NodeFinder $finder): array
+    private function loopVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
 
-        foreach ($finder->find($function->stmts ?? [], static fn (Node $node): bool => $node instanceof For_ || $node instanceof Foreach_) as $loop) {
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof For_ || $node instanceof Foreach_) as $loop) {
             if ($loop instanceof For_) {
-                foreach ($finder->findInstanceOf($loop->init, Variable::class) as $variable) {
-                    if (is_string($variable->name)) {
-                        $variables[$variable->name] = true;
-                    }
-                }
+                $this->collectVariablesByName($loop->init, $variables);
             }
 
             if ($loop instanceof Foreach_) {
@@ -620,11 +607,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * @return array<string, true>
      */
-    private function catchVariables(ClassMethod|Function_ $function, NodeFinder $finder): array
+    private function catchVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
 
-        foreach ($finder->findInstanceOf($function->stmts ?? [], Catch_::class) as $catch) {
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Catch_) as $catch) {
+            if (!$catch instanceof Catch_) {
+                continue;
+            }
+
             if ($catch->var instanceof Variable && is_string($catch->var->name)) {
                 $variables[$catch->var->name] = true;
             }
@@ -638,14 +629,17 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @return array<string, Variable>
      */
     private function reportableLoopVariableNames(
-        ClassMethod|Function_ $function,
-        NodeFinder $finder,
+        FunctionLikeScope $scope,
         array $genericTokens,
         int $loopBodyThreshold,
     ): array {
         $variables = [];
 
-        foreach ($finder->findInstanceOf($function->stmts ?? [], Foreach_::class) as $foreach) {
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Foreach_) as $foreach) {
+            if (!$foreach instanceof Foreach_) {
+                continue;
+            }
+
             if (count($foreach->stmts) < $loopBodyThreshold || $this->isCanonicalMapLoop($foreach)) {
                 continue;
             }
@@ -674,6 +668,138 @@ final readonly class IdentifierQualityRule implements RuleInterface
             && $foreach->valueVar instanceof Variable
             && $foreach->keyVar->name === 'key'
             && $foreach->valueVar->name === 'value';
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function localVariableReferenceCounts(FunctionLikeScope $scope): array
+    {
+        $counts = [];
+
+        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Variable) as $variable) {
+            if ($variable instanceof Variable && is_string($variable->name)) {
+                $counts[$variable->name] = ($counts[$variable->name] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @param array<Node>        $nodes
+     * @param array<string,true> $variables
+     * @return void No return value.
+     */
+    private function collectVariablesByName(array $nodes, array &$variables): void
+    {
+        foreach ($nodes as $node) {
+            foreach ($this->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
+                if ($variable instanceof Variable && is_string($variable->name)) {
+                    $variables[$variable->name] = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * @param callable(Node): bool $predicate
+     * @return list<Node>
+     */
+    private function nodesInScope(FunctionLikeScope $scope, callable $predicate): array
+    {
+        return $this->nodesMatching($this->bodyNodes($scope->node), $predicate);
+    }
+
+    /**
+     * @param list<Node>           $nodes
+     * @param callable(Node): bool $predicate
+     * @return list<Node>
+     */
+    private function nodesMatching(array $nodes, callable $predicate): array
+    {
+        $matches = [];
+
+        foreach ($nodes as $node) {
+            $this->collectMatchingNodes($node, $predicate, $matches);
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @param callable(Node): bool $predicate
+     * @param list<Node>           $matches
+     * @return void No return value.
+     */
+    private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
+    {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            return;
+        }
+
+        if ($predicate($node)) {
+            $matches[] = $node;
+        }
+
+        foreach ($this->childNodes($node) as $child) {
+            $this->collectMatchingNodes($child, $predicate, $matches);
+        }
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        if ($node instanceof ArrowFunction) {
+            return [$node->expr];
+        }
+
+        return array_values($node->stmts ?? []);
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function childNodes(Node $node): array
+    {
+        $children = [];
+
+        foreach ($node->getSubNodeNames() as $name) {
+            $this->collectChildNodes($node->{$name}, $children);
+        }
+
+        return $children;
+    }
+
+    /**
+     * @param list<Node> $children
+     * @return void No return value.
+     */
+    private function collectChildNodes(mixed $value, array &$children): void
+    {
+        if ($value instanceof Node) {
+            $children[] = $value;
+            return;
+        }
+
+        if (!is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $item) {
+            $this->collectChildNodes($item, $children);
+        }
+    }
+
+    private function symbol(FunctionLikeScope $scope): string
+    {
+        if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+        }
+
+        return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 
     /**

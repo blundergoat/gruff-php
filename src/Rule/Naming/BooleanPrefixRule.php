@@ -53,6 +53,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
     ];
 
     /**
+     * Negative flag prefixes owned by NegativeBooleanRule for properties and parameters.
+     */
+    private const NEGATIVE_PREFIXES = ['no', 'not', 'non', 'disable', 'skip', 'dont', 'cant', 'wont'];
+
+    /**
      * Describe the boolean method prefix rule.
      *
      * @return RuleDefinition Rule metadata and defaults.
@@ -88,19 +93,20 @@ final readonly class BooleanPrefixRule implements RuleInterface
         $prefixes        = $settings->stringListOption('allowedPrefixes');
         $stateAdjectives = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateAdjectiveAllowlist'));
         $finder          = new NodeFinder();
-        $nodes           = $finder->find($unit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod || $node instanceof Function_;
-        });
 
         $findings = [];
 
-        foreach ($nodes as $node) {
-            /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $symbol = CyclomaticComplexityRule::resolveSymbol($node);
+        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+            $node                 = $scope->node;
+            $symbol               = $this->symbol($scope);
+            $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
+                ? $this->functionLikeFindings($definition, $unit, $node, $symbol, $prefixes)
+                : [];
+
             array_push(
                 $findings,
-                ...$this->functionLikeFindings($definition, $unit, $node, $symbol, $prefixes),
-                ...$this->parameterFindings($definition, $unit, $node, $symbol, $prefixes, $stateAdjectives),
+                ...$functionLikeFindings,
+                ...$this->parameterFindings($definition, $unit, $scope, $symbol, $prefixes, $stateAdjectives),
             );
         }
 
@@ -111,7 +117,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
             foreach ($property->props as $prop) {
                 $name = $prop->name->toString();
-                if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives)) {
+                if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives) || $this->hasNegativeFlagName($name)) {
                     continue;
                 }
 
@@ -178,20 +184,20 @@ final readonly class BooleanPrefixRule implements RuleInterface
     private function parameterFindings(
         RuleDefinition $definition,
         AnalysisUnit $unit,
-        ClassMethod|Function_ $node,
+        FunctionLikeScope $scope,
         string $symbol,
         array $prefixes,
         array $stateAdjectives,
     ): array {
         $findings = [];
 
-        foreach ($node->params as $param) {
+        foreach ($scope->node->params as $param) {
             if (!$this->isBoolType($param->type) || !$param->var instanceof Variable || !is_string($param->var->name)) {
                 continue;
             }
 
             $name = $param->var->name;
-            if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives)) {
+            if ($this->hasBooleanStyleName($name, $prefixes, $stateAdjectives) || $this->hasNegativeFlagName($name)) {
                 continue;
             }
 
@@ -261,7 +267,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
-                static fn (Node $arm): bool => !($arm instanceof Identifier && $arm->toLowerString() === 'null'),
+                static fn (Node $node): bool => !($node instanceof Identifier && $node->toLowerString() === 'null'),
             ));
 
             return count($nonNull) === 1 && $this->isBoolType($nonNull[0]);
@@ -306,5 +312,30 @@ final readonly class BooleanPrefixRule implements RuleInterface
         }
 
         return false;
+    }
+
+    private function hasNegativeFlagName(string $name): bool
+    {
+        foreach (self::NEGATIVE_PREFIXES as $prefix) {
+            if (!str_starts_with($name, $prefix) || strlen($name) <= strlen($prefix)) {
+                continue;
+            }
+
+            $nextChar = $name[strlen($prefix)];
+            if ($nextChar >= 'A' && $nextChar <= 'Z') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function symbol(FunctionLikeScope $scope): string
+    {
+        if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+        }
+
+        return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

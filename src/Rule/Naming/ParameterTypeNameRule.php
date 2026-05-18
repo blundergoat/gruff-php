@@ -22,7 +22,6 @@ use PhpParser\Node\NullableType;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeFinder;
 
 /**
  * Detects class-typed parameters whose names do not match their type.
@@ -93,15 +92,13 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         $settings              = $context->settingsFor($definition);
         $typeSuffixesToTrim    = $settings->stringListOption('typeSuffixesToTrim');
         $ignoredParameterNames = $settings->stringListOption('ignoredParameterNames');
-        $finder                = new NodeFinder();
         $tokenizer             = new IdentifierTokenizer();
         $findings              = [];
 
-        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof ClassMethod || $node instanceof Function_) as $function) {
-            /** @var ClassMethod|Function_ $function Finder predicate restricts results to function-like nodes. */
-            $symbol = CyclomaticComplexityRule::resolveSymbol($function);
+        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+            $symbol = $this->symbol($scope);
 
-            foreach ($function->params as $param) {
+            foreach ($scope->node->params as $param) {
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
                     continue;
                 }
@@ -149,6 +146,15 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         return $findings;
     }
 
+    private function symbol(FunctionLikeScope $scope): string
+    {
+        if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            return CyclomaticComplexityRule::resolveSymbol($scope->node);
+        }
+
+        return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
+    }
+
     /**
      * Extract a short type name from nullable, named, identifier, or simple union types.
      *
@@ -173,7 +179,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         if ($type instanceof UnionType) {
             $nonNull = array_values(array_filter(
                 $type->types,
-                static fn (Node $arm): bool => !($arm instanceof Identifier && $arm->toLowerString() === 'null'),
+                static fn (Node $node): bool => !($node instanceof Identifier && $node->toLowerString() === 'null'),
             ));
 
             if (count($nonNull) !== 1) {
