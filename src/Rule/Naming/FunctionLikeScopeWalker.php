@@ -36,7 +36,12 @@ final class FunctionLikeScopeWalker
         $cache[$statements[0]] = ['count' => count($statements), 'scopes' => $scopes];
         return $scopes;
     }
-    /** @param list<FunctionLikeScope> $scopes */
+    /**
+     * Recursively collect function-like scopes, descending only into scope bodies.
+     *
+     * @param list<FunctionLikeScope> $scopes
+     * @return void No return value.
+     */
     private function discoverScopes(Node $node, array &$scopes): void
     {
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
@@ -50,6 +55,11 @@ final class FunctionLikeScopeWalker
             $this->discoverScopes($child, $scopes);
         }
     }
+    /**
+     * Build one isolated scope description for a function-like node.
+     *
+     * @return FunctionLikeScope Scope with parameters and local variables separated.
+     */
     private function scopeFor(ClassMethod|Function_|Closure|ArrowFunction $node): FunctionLikeScope
     {
         $parameterNames = $this->parameterNames($node);
@@ -90,6 +100,7 @@ final class FunctionLikeScopeWalker
     /**
      * @param array<string, Variable> $variables
      * @param array<string, true>     $excludedNames
+     * @return void No return value.
      */
     private function collectLocalVariables(Node $node, array &$variables, array $excludedNames): void
     {
@@ -111,6 +122,11 @@ final class FunctionLikeScopeWalker
         }
         return array_values($node->stmts ?? []);
     }
+    /**
+     * Name the function-like node shape for synthetic symbols.
+     *
+     * @return string One of method, function, closure, or arrow.
+     */
     private function kind(ClassMethod|Function_|Closure|ArrowFunction $node): string
     {
         return match (true) {
@@ -129,7 +145,10 @@ final class FunctionLikeScopeWalker
         }
         return $children;
     }
-    /** @param list<Node> $children */
+    /**
+     * @param list<Node> $children
+     * @return void No return value.
+     */
     private function collectChildNodes(mixed $value, array &$children): void
     {
         if ($value instanceof Node) {

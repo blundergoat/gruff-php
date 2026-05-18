@@ -520,6 +520,11 @@ final class RuleRegistry
         return array_values(array_intersect_key($findings, $selectedIndexes));
     }
 
+    /**
+     * Build the cross-rule identifier key used to collapse duplicate naming findings.
+     *
+     * @return string|null Deduplication key for naming findings.
+     */
     private function namingOverlapKey(Finding $finding): ?string
     {
         if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
@@ -540,6 +545,11 @@ final class RuleRegistry
         ]);
     }
 
+    /**
+     * Extract the identifier name from finding metadata.
+     *
+     * @return string|null Identifier name if this finding carries one.
+     */
     private function findingIdentifierName(Finding $finding): ?string
     {
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {

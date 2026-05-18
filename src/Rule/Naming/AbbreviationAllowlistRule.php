@@ -79,7 +79,16 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
         foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
-                $finding = $this->finding($definition, $unit, $prop, 'property', $prop->name->toString(), '$' . $prop->name->toString(), $ignored, $accepted, $minLength, $maxLength);
+                $finding = $this->finding(
+                    $definition,
+                    $unit,
+                    $prop,
+                    ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                    $ignored,
+                    $accepted,
+                    $minLength,
+                    $maxLength,
+                );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -93,7 +102,16 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                     continue;
                 }
 
-                $finding = $this->finding($definition, $unit, $param, 'parameter', $param->var->name, $symbol, $ignored, $accepted, $minLength, $maxLength);
+                $finding = $this->finding(
+                    $definition,
+                    $unit,
+                    $param,
+                    ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
+                    $ignored,
+                    $accepted,
+                    $minLength,
+                    $maxLength,
+                );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -105,7 +123,16 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                     continue;
                 }
 
-                $finding = $this->finding($definition, $unit, $variable, 'variable', $name, $symbol, $ignored, $accepted, $minLength, $maxLength);
+                $finding = $this->finding(
+                    $definition,
+                    $unit,
+                    $variable,
+                    ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                    $ignored,
+                    $accepted,
+                    $minLength,
+                    $maxLength,
+                );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
                 }
@@ -116,21 +143,24 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $ignored
-     * @param list<string> $accepted
+     * @param array{kind: string, name: string, symbol: string|null} $identifier
+     * @param list<string>                                           $ignored
+     * @param list<string>                                           $accepted
+     * @return Finding|null Finding for an undeclared abbreviation.
      */
     private function finding(
         RuleDefinition $definition,
         AnalysisUnit $unit,
         Node $node,
-        string $kind,
-        string $name,
-        ?string $symbol,
+        array $identifier,
         array $ignored,
         array $accepted,
         int $minLength,
         int $maxLength,
     ): ?Finding {
+        $kind      = $identifier['kind'];
+        $name      = $identifier['name'];
+        $symbol    = $identifier['symbol'];
         $lowerName = strtolower($name);
         if ($lowerName !== $name || !preg_match('/^[a-z]+$/', $name)) {
             return null;
@@ -160,6 +190,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         );
     }
 
+    /**
+     * Read a positive integer rule option, falling back when configuration is not numeric.
+     *
+     * @return int Option value clamped to at least 1.
+     */
     private function lengthOption(RuleContext $context, RuleDefinition $definition, string $name, int $default): int
     {
         $value = $context->settingsFor($definition)->option($name);
@@ -176,29 +211,40 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
         foreach ($this->bodyNodes($node) as $bodyNode) {
             foreach ($finder->find([$bodyNode], static fn (Node $candidate): bool => $candidate instanceof For_ || $candidate instanceof Foreach_ || $candidate instanceof Catch_) as $scopeNode) {
-                if ($scopeNode instanceof For_) {
-                    foreach ($finder->findInstanceOf($scopeNode->init, Variable::class) as $variable) {
-                        if (is_string($variable->name)) {
-                            $names[$variable->name] = true;
-                        }
-                    }
-                }
-
-                if ($scopeNode instanceof Foreach_) {
-                    foreach ([$scopeNode->keyVar, $scopeNode->valueVar] as $variable) {
-                        if ($variable instanceof Variable && is_string($variable->name)) {
-                            $names[$variable->name] = true;
-                        }
-                    }
-                }
-
-                if ($scopeNode instanceof Catch_ && $scopeNode->var instanceof Variable && is_string($scopeNode->var->name)) {
-                    $names[$scopeNode->var->name] = true;
-                }
+                $this->collectExemptLocalNames($scopeNode, $finder, $names);
             }
         }
 
         return $names;
+    }
+
+    /**
+     * Add loop and catch variables that are conventional enough to skip abbreviation findings.
+     *
+     * @param array<string, true> $names
+     * @return void No return value.
+     */
+    private function collectExemptLocalNames(Node $node, NodeFinder $finder, array &$names): void
+    {
+        if ($node instanceof For_) {
+            foreach ($finder->findInstanceOf($node->init, Variable::class) as $variable) {
+                if (is_string($variable->name)) {
+                    $names[$variable->name] = true;
+                }
+            }
+        }
+
+        if ($node instanceof Foreach_) {
+            foreach ([$node->keyVar, $node->valueVar] as $variable) {
+                if ($variable instanceof Variable && is_string($variable->name)) {
+                    $names[$variable->name] = true;
+                }
+            }
+        }
+
+        if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
+            $names[$node->var->name] = true;
+        }
     }
 
     /**
@@ -213,6 +259,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         return array_values($node->stmts ?? []);
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {

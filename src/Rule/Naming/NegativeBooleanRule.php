@@ -105,6 +105,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
     /**
      * @param list<string> $allowlist
+     * @return Finding|null Finding for a negative boolean property.
      */
     private function propertyFinding(
         RuleDefinition $definition,
@@ -134,6 +135,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
     /**
      * @param list<string> $allowlist
+     * @return Finding|null Finding for a negative boolean parameter.
      */
     private function parameterFinding(
         RuleDefinition $definition,
@@ -166,6 +168,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         );
     }
 
+    /**
+     * Build a negative boolean finding.
+     *
+     * @return Finding Finding for a negative boolean identifier.
+     */
     private function finding(
         RuleDefinition $definition,
         AnalysisUnit $unit,
@@ -196,6 +203,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         );
     }
 
+    /**
+     * Detect the configured negative prefix at a camel-case word boundary.
+     *
+     * @return string|null Matched prefix, or null when the name is acceptable.
+     */
     private function negativePrefix(string $name): ?string
     {
         foreach (self::NEGATIVE_PREFIXES as $prefix) {
@@ -212,6 +224,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Build the allowlist key for a property when its declaring class is known.
+     *
+     * @return string|null Fully qualified property key.
+     */
     private function propertyAllowlistKey(PropertyProperty $propertyProperty): ?string
     {
         $class = $this->enclosingClassLike($propertyProperty);
@@ -220,6 +237,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return $fqn === null ? null : sprintf('%s::%s', $fqn, $propertyProperty->name->toString());
     }
 
+    /**
+     * Build the allowlist key for a parameter or promoted property.
+     *
+     * @return string|null Fully qualified parameter key.
+     */
     private function parameterAllowlistKey(FunctionLikeScope $scope, Param $param): ?string
     {
         if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -243,6 +265,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return sprintf('%s::%s::%s', $fqn, $scope->node->name->toString(), $param->var->name);
     }
 
+    /**
+     * Resolve a class-like node to its namespace-qualified name.
+     *
+     * @return string|null Fully qualified class-like name.
+     */
     private function classLikeFqn(ClassLike $class): ?string
     {
         if ($class->name === null) {
@@ -257,6 +284,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
             : $className;
     }
 
+    /**
+     * Walk parent attributes to find the enclosing class-like declaration.
+     *
+     * @return ClassLike|null Enclosing class, interface, trait, or enum.
+     */
     private function enclosingClassLike(Node $node): ?ClassLike
     {
         $parent = $node->getAttribute('parent');
@@ -272,6 +304,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return null;
     }
 
+    /**
+     * Walk parent attributes to find the enclosing namespace.
+     *
+     * @return Namespace_|null Enclosing namespace node.
+     */
     private function enclosingNamespace(Node $node): ?Namespace_
     {
         $parent = $node->getAttribute('parent');
@@ -318,6 +355,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {

@@ -148,7 +148,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
             ...$this->classLikeFindings($findingContext, $finder),
             ...$this->functionLikeFindings(
                 findingContext:     $findingContext,
-                finder:             $finder,
                 minScopeReferences: $this->minScopeReferences($context, $definition),
                 loopBodyThreshold:  $this->loopBodyThreshold($context, $definition),
             ),
@@ -245,7 +244,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function functionLikeFindings(
         IdentifierFindingContext $findingContext,
-        NodeFinder $finder,
         int $minScopeReferences,
         int $loopBodyThreshold,
     ): array {
@@ -793,6 +791,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {

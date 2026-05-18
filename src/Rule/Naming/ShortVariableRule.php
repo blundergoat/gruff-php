@@ -367,6 +367,11 @@ final readonly class ShortVariableRule implements RuleInterface
         }
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {

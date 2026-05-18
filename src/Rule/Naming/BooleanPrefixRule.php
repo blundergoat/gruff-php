@@ -314,6 +314,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Check whether a boolean name starts with a negative flag prefix.
+     *
+     * @return bool True when the name starts with a configured negative prefix.
+     */
     private function hasNegativeFlagName(string $name): bool
     {
         foreach (self::NEGATIVE_PREFIXES as $prefix) {
@@ -330,6 +335,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return false;
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {

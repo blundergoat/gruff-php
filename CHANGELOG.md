@@ -17,7 +17,8 @@ and uses semantic versioning once public tags begin. The current binary reports
   - `report`
   - `dashboard`
   - `list-rules`
-- YAML project configuration via `.gruff.yaml`, `--config`, and `--no-config`.
+- YAML project configuration via `.gruff-php.yaml` (with legacy `.gruff.yaml`
+  fallback), `--config`, and `--no-config`.
 - Rule selection by tier, pillar, and rule id.
 - Per-rule enablement, threshold overrides, and rule options.
 - Source discovery for PHP and text/config-like files with default ignored paths.
@@ -102,6 +103,14 @@ Representative rule families:
   where parameter or local-variable checks need closure coverage.
 - Overlapping naming findings on the same identifier now keep the more specific
   rule according to the documented naming deferral order.
+- Rubric defaults (size, complexity, `docs.todo-density`) now ship as a single
+  `threshold` plus `severity` rather than as `warning` / `error` tiered pairs.
+  Defaults are anchored to PHPMD, Sonar PHP, and PhpMetrics published
+  thresholds: size file/class/method/avg-method/parameter/property/public-method
+  at 1000/1000/100/50/10/15/25, complexity cyclomatic/cognitive/npath/halstead/
+  maintainability-index/nesting at 20/30/200/8000/35/5, and `docs.todo-density`
+  at 10. Projects that previously used `thresholds: {warning, error}` overrides
+  on these rules must switch to `threshold` + `severity`.
 
 ### Fixed
 

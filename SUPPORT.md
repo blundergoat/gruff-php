@@ -23,7 +23,7 @@ Please include:
 - gruff-php version: `php bin/gruff-php --version` or installed package version
 - Install method: source checkout or Composer package
 - Command run
-- Whether `.gruff.yaml` or a baseline was loaded
+- Whether `.gruff-php.yaml` (or legacy `.gruff.yaml`) or a baseline was loaded
 - Minimal code sample or fixture when possible
 
 Useful diagnostic commands:

@@ -136,6 +136,11 @@ final class FunctionLikeScopeWalkerTest extends TestCase
         return (new FunctionLikeScopeWalker())->scopes($unit->statements);
     }
 
+    /**
+     * Parse inline PHP source through the production parser.
+     *
+     * @return AnalysisUnit Parsed source fixture.
+     */
     private function parseSource(string $source): AnalysisUnit
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-scope-');
@@ -145,7 +150,9 @@ final class FunctionLikeScopeWalkerTest extends TestCase
         try {
             $unit = (new PhpFileParser())->parse(new SourceFile($path, 'inline.php'));
         } finally {
-            @unlink($path);
+            if (is_file($path)) {
+                unlink($path);
+            }
         }
 
         self::assertSame([], $unit->diagnostics);

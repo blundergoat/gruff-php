@@ -48,7 +48,7 @@ checks, and PHPStan. It does not run PHPUnit; run `composer test` separately.
   better.
 - Keep sensitive-data tests synthetic and ensure full secret values do not leak
   into report messages or JSON metadata.
-- Use `.gruff.yaml` for project-specific calibration, not hidden code paths.
+- Use `.gruff-php.yaml` for project-specific calibration, not hidden code paths.
 
 ## Adding Or Changing Rules
 

@@ -6,7 +6,6 @@ namespace GruffPhp\Tests\Rule;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
-use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;

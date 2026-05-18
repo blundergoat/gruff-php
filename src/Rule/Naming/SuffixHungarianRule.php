@@ -99,9 +99,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                     definition: $definition,
                     unit:       $unit,
                     node:       $prop,
-                    kind:       'property',
-                    name:       $prop->name->toString(),
-                    symbol:     '$' . $prop->name->toString(),
+                    identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
                     suffixes:   $suffixes,
                     tokenizer:  $tokenizer,
                     type:       $property->type,
@@ -125,9 +123,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                     definition: $definition,
                     unit:       $unit,
                     node:       $param,
-                    kind:       $param->flags === 0 ? 'parameter' : 'property',
-                    name:       $param->var->name,
-                    symbol:     $symbol,
+                    identifier: ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
                     suffixes:   $suffixes,
                     tokenizer:  $tokenizer,
                     type:       $param->type,
@@ -148,9 +144,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
                     definition: $definition,
                     unit:       $unit,
                     node:       $variable,
-                    kind:       'variable',
-                    name:       $name,
-                    symbol:     $symbol,
+                    identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
                     suffixes:   $suffixes,
                     tokenizer:  $tokenizer,
                     type:       null,
@@ -166,19 +160,22 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @param array<string, string> $suffixes Map of lower-case suffix token to configured display suffix.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier
+     * @param array<string, string>                                  $suffixes   Map of lower-case suffix token to configured display suffix.
+     * @return Finding|null Finding for an identifier with a type suffix.
      */
     private function finding(
         RuleDefinition $definition,
         AnalysisUnit $unit,
         Node $node,
-        string $kind,
-        string $name,
-        ?string $symbol,
+        array $identifier,
         array $suffixes,
         IdentifierTokenizer $tokenizer,
         ?Node $type,
     ): ?Finding {
+        $kind        = $identifier['kind'];
+        $name        = $identifier['name'];
+        $symbol      = $identifier['symbol'];
         $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
         if ($suffixToken === null) {
             return null;
@@ -232,6 +229,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         return isset($suffixes[$suffixToken]) ? $suffixToken : null;
     }
 
+    /**
+     * Read the nearest local `@var` type attached to a variable assignment.
+     *
+     * @return string|null PHPDoc type text when present.
+     */
     private function localVarDocType(Variable $variable): ?string
     {
         $parent = $variable->getAttribute('parent');
@@ -266,6 +268,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         return $typeName !== null && !$this->matchesTypeNameSuffix($typeName, $suffix);
     }
 
+    /**
+     * Check whether a single-arm PHPDoc type supports the configured suffix.
+     *
+     * @return bool True when the PHPDoc type matches the suffix.
+     */
     private function matchesDocTypeSuffix(string $type, string $suffix): bool
     {
         $normalised = trim($type, " \t\n\r\0\x0B?");
@@ -281,6 +288,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         return $this->matchesTypeNameSuffix($arms[0], $suffix);
     }
 
+    /**
+     * Check whether a native or short type name supports the configured suffix.
+     *
+     * @return bool True when the type name matches the suffix.
+     */
     private function matchesTypeNameSuffix(string $typeName, string $suffix): bool
     {
         $normalised = strtolower(ltrim($typeName, '\\'));
@@ -299,6 +311,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         };
     }
 
+    /**
+     * Resolve nullable or simple single-arm types to one type name.
+     *
+     * @return string|null Type name when the declaration has exactly one non-null arm.
+     */
     private function singleTypeName(Node $type): ?string
     {
         if ($type instanceof NullableType) {
@@ -341,6 +358,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
 
     /**
      * @param list<string> $tokens
+     * @return bool True when the suffix is part of an explicit conversion idiom.
      */
     private function isConversionIdiom(array $tokens): bool
     {
@@ -353,6 +371,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
         return in_array($previousToken, ['as', 'to'], true);
     }
 
+    /**
+     * Resolve the human-readable symbol for a function-like scope.
+     *
+     * @return string Named callable symbol or synthetic closure/arrow label.
+     */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
