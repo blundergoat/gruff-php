@@ -362,7 +362,10 @@ Before tagging `0.1.0`:
 - [`docs/gruff-cli-branch-review.md`](docs/gruff-cli-branch-review.md)
 - [`docs/naming-conventions.md`](docs/naming-conventions.md)
 
+## Author
+
+Built by [Matthew Hansen](https://www.blundergoat.com/about).
+
 ## License
 
-`gruff-php` is released under the MIT License. See [`LICENSE`](LICENSE) for the
-full text.
+[MIT](LICENSE)

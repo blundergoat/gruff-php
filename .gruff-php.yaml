@@ -619,6 +619,15 @@ rules:
             minParameters: 1
             minInFileCallers: 2
             namedAlternativeFactoryExempt: true
+            allowedSymbols:
+                - DashboardStateFactory::initialProjectRoot()
+                - FindingDisplayFilter::apply()
+                - NestingDepthRule::computeMaximumNestingDepth()
+                - NpathComplexityRule::computeNpathComplexity()
+                - ModernisationNodeHelper::supportsPhp()
+                - RuleContext::settingsFor()
+                - SecretScannerHelper::lineNumberForOffset()
+                - SecretScannerHelper::redactedKeyValue()
     # Variables assigned only to be returned add noise without naming value.
     waste.redundant-variable:
         enabled: true

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Console;
 
 use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -126,69 +127,26 @@ final class GruffCliSummaryTest extends TestCase
     }
 
     /**
-     * Verify summary rejects unknown format.
+     * Verify summary rejects invalid option combinations.
      *
+     * @param list<string> $arguments CLI arguments appended after the base command.
+     * @param string       $message   Expected usage error excerpt.
      * @return void No return value.
      */
-    public function testSummaryRejectsUnknownFormat(): void
+    #[DataProvider('invalidSummaryOptionProvider')]
+    public function testSummaryRejectsInvalidOptions(array $arguments, string $message): void
     {
-        $process = new Process([
+        $process = new Process(array_merge([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'summary',
             'tests/Fixtures/Source/mixed',
             '--no-config',
-            '--format',
-            'yaml',
-        ], self::PROJECT_ROOT);
+        ], $arguments), self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('USAGE-ERROR Unsupported summary format "yaml"', $process->getOutput());
-    }
-
-    /**
-     * Verify summary rejects non integer top.
-     *
-     * @return void No return value.
-     */
-    public function testSummaryRejectsNonIntegerTop(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-            '--top',
-            'lots',
-        ], self::PROJECT_ROOT);
-        $process->run();
-
-        self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('USAGE-ERROR --top must be a non-negative integer.', $process->getOutput());
-    }
-
-    /**
-     * Verify summary rejects both config and no config.
-     *
-     * @return void No return value.
-     */
-    public function testSummaryRejectsBothConfigAndNoConfig(): void
-    {
-        $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-            '--config',
-            '.gruff-php.yaml',
-        ], self::PROJECT_ROOT);
-        $process->run();
-
-        self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('--no-config cannot be combined with --config.', $process->getOutput());
+        self::assertStringContainsString($message, $process->getOutput());
     }
 
     /**
@@ -203,5 +161,26 @@ final class GruffCliSummaryTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('summary', $process->getOutput());
+    }
+
+    /**
+     * Provide invalid summary option combinations and their usage errors.
+     *
+     * @return iterable<string, array{0: list<string>, 1: string}>
+     */
+    public static function invalidSummaryOptionProvider(): iterable
+    {
+        yield 'unknown format' => [
+            ['--format', 'yaml'],
+            'USAGE-ERROR Unsupported summary format "yaml"',
+        ];
+        yield 'non integer top' => [
+            ['--top', 'lots'],
+            'USAGE-ERROR --top must be a non-negative integer.',
+        ];
+        yield 'config with no config' => [
+            ['--config', '.gruff-php.yaml'],
+            '--no-config cannot be combined with --config.',
+        ];
     }
 }

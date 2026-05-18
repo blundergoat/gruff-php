@@ -12,6 +12,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\PublicMethodCountRule;
 use GruffPhp\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -36,13 +37,16 @@ final class PublicMethodCountRuleTest extends TestCase
     }
 
     /**
-     * Verify no findings for few public methods.
+     * Verify allowed public method shapes are not flagged.
      *
+     * @param string             $fixture    Fixture filename.
+     * @param array<string, int> $thresholds Rule thresholds.
      * @return void No return value.
      */
-    public function testNoFindingsForFewPublicMethods(): void
+    #[DataProvider('allowedPublicMethodShapeProvider')]
+    public function testAllowedPublicMethodShapesAreNotFlagged(string $fixture, array $thresholds): void
     {
-        $findings = $this->analyse('short-method.php', ['warning' => 15, 'error' => 25]);
+        $findings = $this->analyse($fixture, $thresholds);
 
         self::assertSame([], $findings);
     }
@@ -64,30 +68,6 @@ final class PublicMethodCountRuleTest extends TestCase
     }
 
     /**
-     * Verify private and protected not counted.
-     *
-     * @return void No return value.
-     */
-    public function testPrivateAndProtectedNotCounted(): void
-    {
-        $findings = $this->analyse('many-public-methods.php', ['warning' => 16, 'error' => 25]);
-
-        self::assertSame([], $findings);
-    }
-
-    /**
-     * Verify interface not flagged.
-     *
-     * @return void No return value.
-     */
-    public function testInterfaceNotFlagged(): void
-    {
-        $findings = $this->analyse('interface-fixture.php', ['warning' => 5, 'error' => 25]);
-
-        self::assertSame([], $findings);
-    }
-
-    /**
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -102,6 +82,18 @@ final class PublicMethodCountRuleTest extends TestCase
         $context = new RuleContext(__DIR__ . '/../../..', $config);
 
         return $this->rule->analyse($unit, $context);
+    }
+
+    /**
+     * Provide fixture and threshold combinations that should stay below the rule limit.
+     *
+     * @return iterable<string, array{0: string, 1: array<string, int>}>
+     */
+    public static function allowedPublicMethodShapeProvider(): iterable
+    {
+        yield 'few public methods' => ['short-method.php', ['warning' => 15, 'error' => 25]];
+        yield 'private and protected not counted' => ['many-public-methods.php', ['warning' => 16, 'error' => 25]];
+        yield 'interfaces are ignored' => ['interface-fixture.php', ['warning' => 5, 'error' => 25]];
     }
 
     /**

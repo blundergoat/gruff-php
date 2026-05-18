@@ -7,11 +7,16 @@ namespace GruffPhp\Tests\Trend;
 use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Trend\TrendRecorder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
  * Covers TrendRecorderTest behavior.
+ *
+ * @phpstan-type InvalidHistoryScalar bool|float|int|string
+ * @phpstan-type InvalidHistoryNested array<array-key, InvalidHistoryScalar>
+ * @phpstan-type InvalidHistoryPayload array<array-key, InvalidHistoryScalar|array<array-key, InvalidHistoryScalar|InvalidHistoryNested>>
  */
 final class TrendRecorderTest extends TestCase
 {
@@ -133,19 +138,22 @@ final class TrendRecorderTest extends TestCase
     }
 
     /**
-     * Verify record rejects non-list history roots and list entries.
+     * Verify record rejects invalid history JSON shapes.
      *
+     * @param InvalidHistoryPayload $historyPayload Invalid history payload.
+     * @param string                $message        Expected exception message.
      * @return void No return value.
      */
-    public function testRecordRejectsInvalidHistoryShape(): void
+    #[DataProvider('invalidHistoryProvider')]
+    public function testRecordRejectsInvalidHistoryPayloads(array $historyPayload, string $message): void
     {
         $root = $this->tempDir();
 
         try {
-            file_put_contents($root . '/history.json', json_encode(['score' => 80.0], JSON_THROW_ON_ERROR));
+            file_put_contents($root . '/history.json', json_encode($historyPayload, JSON_THROW_ON_ERROR));
 
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('History file must contain a JSON array');
+            $this->expectExceptionMessage($message);
 
             (new TrendRecorder())->record($root, 'history.json', $this->score(90.25), 3);
         } finally {
@@ -154,50 +162,29 @@ final class TrendRecorderTest extends TestCase
     }
 
     /**
-     * Verify record rejects list-shaped history entries.
+     * Provide invalid persisted history payloads.
      *
-     * @return void No return value.
+     * @return iterable<string, array{0: InvalidHistoryPayload, 1: string}>
      */
-    public function testRecordRejectsListHistoryEntries(): void
+    public static function invalidHistoryProvider(): iterable
     {
-        $root = $this->tempDir();
-
-        try {
-            file_put_contents($root . '/history.json', json_encode([['score', 80.0]], JSON_THROW_ON_ERROR));
-
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('History file contains an invalid entry');
-
-            (new TrendRecorder())->record($root, 'history.json', $this->score(90.25), 3);
-        } finally {
-            $this->removeDir($root);
-        }
-    }
-
-    /**
-     * Verify record rejects nested history entry values.
-     *
-     * @return void No return value.
-     */
-    public function testRecordRejectsNestedHistoryEntryValues(): void
-    {
-        $root = $this->tempDir();
-
-        try {
-            file_put_contents($root . '/history.json', json_encode([
+        yield 'object root' => [
+            ['score' => 80.0],
+            'History file must contain a JSON array',
+        ];
+        yield 'list entry' => [
+            [['score', 80.0]],
+            'History file contains an invalid entry',
+        ];
+        yield 'nested entry value' => [
+            [
                 [
                     'score' => 80.0,
                     'nested' => ['not' => 'allowed'],
                 ],
-            ], JSON_THROW_ON_ERROR));
-
-            $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('History file contains a non-scalar entry value');
-
-            (new TrendRecorder())->record($root, 'history.json', $this->score(90.25), 3);
-        } finally {
-            $this->removeDir($root);
-        }
+            ],
+            'History file contains a non-scalar entry value',
+        ];
     }
 
     /**

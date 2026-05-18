@@ -325,6 +325,34 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
+     * Verify one-line method rule supports explicit symbol allowlists.
+     *
+     * @return void No return value.
+     */
+    public function testOneLineMethodRuleSupportsExplicitSymbolAllowlists(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            OneLineMethodRule::ID,
+            new RuleSettings(
+                true,
+                [],
+                [
+                    'minParameters' => 1,
+                    'minInFileCallers' => 0,
+                    'namedAlternativeFactoryExempt' => false,
+                    'allowedSymbols' => ['OneLineMethodFixture::isEligible()'],
+                ],
+            ),
+        );
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertNotContains('OneLineMethodFixture::isEligible()', $symbols);
+        self::assertContains('OneLineMethodFixture::sharedHelper()', $symbols);
+    }
+
+    /**
      * Verify redundant variable before return detected.
      *
      * @return void No return value.

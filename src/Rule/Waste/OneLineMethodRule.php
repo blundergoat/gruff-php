@@ -78,6 +78,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                 'minParameters' => 1,
                 'minInFileCallers' => 0,
                 'namedAlternativeFactoryExempt' => false,
+                'allowedSymbols' => [],
             ],
             description: 'Flags trivial methods that only wrap a one-line call expression.',
         );
@@ -100,6 +101,7 @@ final readonly class OneLineMethodRule implements RuleInterface
         $minCallersOption   = $settings->option('minInFileCallers');
         $minInFileCallers   = is_int($minCallersOption) ? max(0, $minCallersOption) : 0;
         $factoryExempt      = $settings->option('namedAlternativeFactoryExempt') === true;
+        $allowedSymbols     = array_fill_keys($settings->stringListOption('allowedSymbols'), true);
         $finder             = new NodeFinder();
         $methodCallCounts   = $this->methodCallCounts($unit->statements, $finder);
         $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($unit->statements, $finder) : [];
@@ -131,6 +133,9 @@ final readonly class OneLineMethodRule implements RuleInterface
             }
 
             $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+            if (isset($allowedSymbols[$symbol])) {
+                continue;
+            }
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,

@@ -14,6 +14,7 @@ use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -66,54 +67,31 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     }
 
     /**
-     * Verify PSR interface is exempt.
+     * Verify configured interface exemption cases are not flagged.
      *
+     * @param string $symbol Interface symbol expected to be absent from findings.
      * @return void No return value.
      */
-    public function testPsrInterfaceIsExempt(): void
+    #[DataProvider('configuredInterfaceExemptionProvider')]
+    public function testConfiguredInterfaceExemptionsAreNotFlagged(string $symbol): void
     {
         $findings = $this->analyseFixtures();
 
         $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
 
-        self::assertNotContains(
-            'Fixtures\\Design\\SingleImplementor\\Psr\\AuditLoggerInterface',
-            $symbols,
-        );
+        self::assertNotContains($symbol, $symbols);
     }
 
     /**
-     * Verify symfony tagged interface is exempt.
+     * Provide interface symbols that are exempt from single-implementor findings.
      *
-     * @return void No return value.
+     * @return iterable<string, array{0: string}>
      */
-    public function testSymfonyTaggedInterfaceIsExempt(): void
+    public static function configuredInterfaceExemptionProvider(): iterable
     {
-        $findings = $this->analyseFixtures();
-
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
-
-        self::assertNotContains(
-            'Fixtures\\Design\\SingleImplementor\\SymfonyTagged\\AuditListenerInterface',
-            $symbols,
-        );
-    }
-
-    /**
-     * Verify multi impl interface does not flag.
-     *
-     * @return void No return value.
-     */
-    public function testMultiImplInterfaceDoesNotFlag(): void
-    {
-        $findings = $this->analyseFixtures();
-
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
-
-        self::assertNotContains(
-            'Fixtures\\Design\\SingleImplementor\\MultiImpl\\RendererInterface',
-            $symbols,
-        );
+        yield 'psr interface' => ['Fixtures\\Design\\SingleImplementor\\Psr\\AuditLoggerInterface'];
+        yield 'symfony tagged interface' => ['Fixtures\\Design\\SingleImplementor\\SymfonyTagged\\AuditListenerInterface'];
+        yield 'multi impl interface' => ['Fixtures\\Design\\SingleImplementor\\MultiImpl\\RendererInterface'];
     }
 
     /**
