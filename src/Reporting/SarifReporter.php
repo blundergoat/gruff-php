@@ -109,7 +109,11 @@ final readonly class SarifReporter
                 $definition->secondaryPillars,
             );
         }
-        if ($definition->defaultThresholds !== []) {
+        $single = $definition->defaultSeverityThreshold;
+        if ($single instanceof \GruffPhp\Config\SeverityThreshold) {
+            $properties['threshold'] = $single->threshold;
+            $properties['severity']  = $single->severity->value;
+        } elseif ($definition->defaultThresholds !== []) {
             $properties['thresholds'] = $definition->defaultThresholds;
         }
         if ($definition->defaultOptions !== []) {

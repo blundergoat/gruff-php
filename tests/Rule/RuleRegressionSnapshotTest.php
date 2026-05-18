@@ -15,7 +15,9 @@ use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\AverageMethodLengthRule;
+use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
+use GruffPhp\Rule\Size\MethodLengthRule;
 use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
@@ -47,9 +49,9 @@ final class RuleRegressionSnapshotTest extends TestCase
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
         self::assertCount(135, $units);
-        self::assertCount(2152, $findings);
+        self::assertCount(2137, $findings);
         self::assertSame(
-            '72053e1f75e1c7f9d3ef' . '54f4f94bc008ae9696726a343c615fdff1605766057a',
+            '4bf3071a0d7c1fcc0d101f' . '0d1c3011c9ef18eda1abb59e50ba94974a79bd5d76',
             hash('sha256', $json),
         );
     }
@@ -70,7 +72,10 @@ final class RuleRegressionSnapshotTest extends TestCase
         self::assertSame([
             HalsteadVolumeRule::ID,
             MissingReadmeRule::ID,
+            AverageMethodLengthRule::ID,
+            ClassLengthRule::ID,
             FileLengthRule::ID,
+            MethodLengthRule::ID,
             MockingDomainObjectRule::ID,
             MultipleAaaCyclesRule::ID,
             PhpUnitCoverageSourceMissingRule::ID,
@@ -136,7 +141,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         array_push(
             $findings,
             ...$this->analysePaths(
-                ['tests/Fixtures/Size/long-method.php'],
+                ['tests/Fixtures/Size'],
                 (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/size-low-thresholds.yaml', $registry),
             )[1],
         );

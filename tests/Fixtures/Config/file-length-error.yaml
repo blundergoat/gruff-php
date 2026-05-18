@@ -1,5 +1,4 @@
 rules:
     size.file-length:
-        thresholds:
-            warning: 3
-            error: 3
+        threshold: 3
+        severity: error

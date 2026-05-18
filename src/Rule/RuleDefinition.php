@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
@@ -22,11 +23,12 @@ final readonly class RuleDefinition
      * @param RuleTier                                                                     $tier              Rule catalogue tier.
      * @param Severity                                                                     $defaultSeverity   Severity used when config does not override it.
      * @param Confidence                                                                   $confidence        Default confidence assigned to rule findings.
-     * @param array<string, int|float>                                                     $defaultThresholds Named numeric thresholds for rule settings.
-     * @param list<Pillar>                                                                 $secondaryPillars  Additional pillars affected by the rule.
-     * @param bool                                                                         $defaultEnabled    Whether the rule runs unless disabled by config.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $defaultOptions    Rule-specific default option values.
-     * @param string                                                                       $description       Longer display description for rule listings.
+     * @param array<string, int|float>                                                     $defaultThresholds        Named numeric thresholds for rule settings (legacy tiered shape; mutually exclusive with $defaultSeverityThreshold per ADR-008).
+     * @param list<Pillar>                                                                 $secondaryPillars         Additional pillars affected by the rule.
+     * @param bool                                                                         $defaultEnabled           Whether the rule runs unless disabled by config.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $defaultOptions           Rule-specific default option values.
+     * @param string                                                                       $description              Longer display description for rule listings.
+     * @param SeverityThreshold|null                                                       $defaultSeverityThreshold Single threshold + severity default (ADR-008/ADR-009 shape); mutually exclusive with $defaultThresholds.
      * @throws InvalidArgumentException When the rule id, threshold names, or option names are invalid.
      */
     public function __construct(
@@ -41,9 +43,17 @@ final readonly class RuleDefinition
         public bool $defaultEnabled = true,
         public array $defaultOptions = [],
         public string $description = '',
+        public ?SeverityThreshold $defaultSeverityThreshold = null,
     ) {
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
+        }
+
+        if ($defaultSeverityThreshold instanceof SeverityThreshold && $defaultThresholds !== []) {
+            throw new InvalidArgumentException(sprintf(
+                'Rule "%s" declares both defaultSeverityThreshold and defaultThresholds; use one form.',
+                $id,
+            ));
         }
 
         foreach (array_keys($defaultThresholds) as $name) {

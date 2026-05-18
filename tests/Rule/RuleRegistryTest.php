@@ -270,6 +270,8 @@ final class RuleRegistryTest extends TestCase
         $definitions = array_map(static function ($rule): array {
             $definition = $rule->definition();
 
+            $single = $definition->defaultSeverityThreshold;
+
             return [
                 'id' => $definition->id,
                 'name' => $definition->name,
@@ -280,6 +282,9 @@ final class RuleRegistryTest extends TestCase
                 'defaultSeverity' => $definition->defaultSeverity->value,
                 'confidence' => $definition->confidence->value,
                 'defaultThresholds' => $definition->defaultThresholds,
+                'defaultSeverityThreshold' => $single === null
+                    ? null
+                    : ['threshold' => $single->threshold, 'severity' => $single->severity->value],
                 'defaultEnabled' => $definition->defaultEnabled,
                 'defaultOptions' => $definition->defaultOptions,
             ];
@@ -290,7 +295,7 @@ final class RuleRegistryTest extends TestCase
 
         self::assertCount(113, $definitions);
         self::assertSame(
-            '3984704eeffc45725d316' . '06f1cf9d91409b7163cf4cf33aedc242eee0bcf5dfb',
+            '50fed779145b4df56113' . '63f517066fe598e49595c9f02523f38506d6eb8a8f8e',
             hash('sha256', $json),
         );
     }

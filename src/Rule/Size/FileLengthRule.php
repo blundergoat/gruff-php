@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Size;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -32,16 +33,13 @@ final readonly class FileLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'File length',
-            pillar:            Pillar::Size,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::High,
-            defaultThresholds: [
-                'warning' => 400,
-                'error' => 800,
-            ],
+            id:                       self::ID,
+            name:                     'File length',
+            pillar:                   Pillar::Size,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::High,
+            defaultSeverityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }
 

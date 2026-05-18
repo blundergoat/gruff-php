@@ -88,10 +88,15 @@ final class ListRulesCommand extends Command
     }
 
     /**
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}
+     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}
      */
     private function row(RuleDefinition $definition, bool $enabled): array
     {
+        $single     = $definition->defaultSeverityThreshold;
+        $thresholds = $single instanceof \GruffPhp\Config\SeverityThreshold
+            ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
+            : ($definition->defaultThresholds === [] ? (object) [] : $definition->defaultThresholds);
+
         return [
             'id' => $definition->id,
             'name' => $definition->name,
@@ -100,7 +105,7 @@ final class ListRulesCommand extends Command
             'defaultSeverity' => $definition->defaultSeverity->value,
             'confidence' => $definition->confidence->value,
             'defaultEnabled' => $enabled,
-            'thresholds' => $definition->defaultThresholds === [] ? (object) [] : $definition->defaultThresholds,
+            'thresholds' => $thresholds,
             'options' => $definition->defaultOptions === [] ? (object) [] : $definition->defaultOptions,
             'description' => $definition->description(),
         ];

@@ -59,8 +59,22 @@ final readonly class RuleConfigApplier
     ): AnalysisConfig {
         $this->assertKnownRuleKeys($ruleId, $ruleConfig);
 
-        $settings          = $config->ruleSettings($ruleId);
-        $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry);
+        if (array_key_exists('severity', $ruleConfig) && !array_key_exists('threshold', $ruleConfig)) {
+            throw new ConfigException(sprintf('Config key "rules.%s.severity" requires "threshold".', $ruleId));
+        }
+
+        $settings         = $config->ruleSettings($ruleId);
+        $definitionSingle = $registry->get($ruleId)->definition()->defaultSeverityThreshold;
+
+        if ($definitionSingle instanceof SeverityThreshold && array_key_exists('thresholds', $ruleConfig)) {
+            throw new ConfigException(sprintf(
+                'Config key "rules.%s.thresholds" is not supported; this rule uses a single threshold and severity.',
+                $ruleId,
+            ));
+        }
+
+        $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry)
+            ?? $settings->severityThreshold;
 
         return $config->withRuleSettings($ruleId, new RuleSettings(
             enabled:    $this->isEnabled($ruleId, $ruleConfig, $settings->enabled),
@@ -161,10 +175,15 @@ final readonly class RuleConfigApplier
 
         $thresholdValue    = $ruleConfig['threshold'];
         $severityValue     = $ruleConfig['severity'] ?? null;
-        $defaultThresholds = $registry->get($ruleId)->definition()->defaultThresholds;
+        $definition        = $registry->get($ruleId)->definition();
+        $defaultThresholds = $definition->defaultThresholds;
+        $hasSingleDefault  = $definition->defaultSeverityThreshold instanceof SeverityThreshold;
+        $hasTieredDefault  = array_key_exists('warning', $defaultThresholds)
+            && array_key_exists('error', $defaultThresholds)
+            && count($defaultThresholds) === 2;
 
-        if (!array_key_exists('warning', $defaultThresholds) || !array_key_exists('error', $defaultThresholds) || count($defaultThresholds) !== 2) {
-            throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with warning/error thresholds.', $ruleId));
+        if (!$hasSingleDefault && !$hasTieredDefault) {
+            throw new ConfigException(sprintf('Config key "rules.%s.threshold" is only supported for rules with a threshold/severity rubric.', $ruleId));
         }
 
         if (!is_int($thresholdValue) && !is_float($thresholdValue)) {

@@ -55,6 +55,7 @@ final readonly class AnalysisConfig
                 $definition->defaultEnabled,
                 $definition->defaultThresholds,
                 $definition->defaultOptions,
+                $definition->defaultSeverityThreshold,
             );
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Size;
 
+use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -39,16 +40,13 @@ final readonly class PropertyCountRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Property count',
-            pillar:            Pillar::Size,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Warning,
-            confidence:        Confidence::High,
-            defaultThresholds: [
-                'warning' => 15,
-                'error' => 25,
-            ],
+            id:                       self::ID,
+            name:                     'Property count',
+            pillar:                   Pillar::Size,
+            tier:                     RuleTier::V01,
+            defaultSeverity:          Severity::Error,
+            confidence:               Confidence::High,
+            defaultSeverityThreshold: new SeverityThreshold(15, Severity::Error),
         );
     }
 
