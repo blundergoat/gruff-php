@@ -10,7 +10,11 @@ use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
+use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
+use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rule\Complexity\NestingDepthRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
@@ -48,10 +52,10 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(135, $units);
-        self::assertCount(2137, $findings);
+        self::assertCount(136, $units);
+        self::assertCount(2129, $findings);
         self::assertSame(
-            '4bf3071a0d7c1fcc0d101f' . '0d1c3011c9ef18eda1abb59e50ba94974a79bd5d76',
+            'b3cb2491f682f9734b07' . 'e65c57b98b467d3baea0dbcecf067b17e7d1f3d169d2',
             hash('sha256', $json),
         );
     }
@@ -70,7 +74,11 @@ final class RuleRegressionSnapshotTest extends TestCase
         $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
+            CognitiveComplexityRule::ID,
+            CyclomaticComplexityRule::ID,
             HalsteadVolumeRule::ID,
+            MaintainabilityIndexRule::ID,
+            NestingDepthRule::ID,
             MissingReadmeRule::ID,
             AverageMethodLengthRule::ID,
             ClassLengthRule::ID,
@@ -131,11 +139,8 @@ final class RuleRegressionSnapshotTest extends TestCase
         array_push(
             $findings,
             ...$this->analysePaths(
-                ['tests/Fixtures/Complexity/cognitive.php'],
-                AnalysisConfig::fromRegistry($registry)->withRuleSettings(
-                    HalsteadVolumeRule::ID,
-                    new RuleSettings(true, ['warning' => 30, 'error' => 100]),
-                ),
+                ['tests/Fixtures/Complexity'],
+                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
             )[1],
         );
         array_push(

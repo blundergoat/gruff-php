@@ -1,0 +1,19 @@
+rules:
+    complexity.cyclomatic:
+        threshold: 1
+        severity: warning
+    complexity.cognitive:
+        threshold: 1
+        severity: warning
+    complexity.npath:
+        threshold: 1
+        severity: warning
+    complexity.nesting-depth:
+        threshold: 1
+        severity: warning
+    complexity.maintainability-index:
+        threshold: 200
+        severity: warning
+    complexity.halstead-volume:
+        threshold: 1
+        severity: warning
