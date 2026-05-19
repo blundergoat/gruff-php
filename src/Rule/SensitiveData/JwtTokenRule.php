@@ -52,9 +52,14 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     {
         preg_match_all('/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
+            if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

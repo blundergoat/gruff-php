@@ -57,9 +57,14 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             PREG_OFFSET_CAPTURE,
         );
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches[0] as $index => $match) {
             [$databaseUrl, $offset] = $match;
+            if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
             $password              = $matches['password'][$index][0];
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;

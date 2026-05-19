@@ -60,9 +60,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches['value'] as $match) {
             [$candidateSecret, $offset] = $match;
+            if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
             if (strlen($candidateSecret) < $minLength) {
                 continue;
             }

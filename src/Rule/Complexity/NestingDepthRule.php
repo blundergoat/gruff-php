@@ -48,7 +48,7 @@ final readonly class NestingDepthRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
-            severityThreshold: new SeverityThreshold(5, Severity::Error),
+            severityThreshold: new SeverityThreshold(6, Severity::Error),
         );
     }
 

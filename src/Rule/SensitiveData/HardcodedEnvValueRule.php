@@ -61,11 +61,16 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             PREG_OFFSET_CAPTURE,
         );
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches[0] as $index => $match) {
             $key        = $matches['key'][$index][0];
             $secretValue = $matches['value'][$index][0];
             $offset     = $match[1];
+            if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
             if (SecretScannerHelper::isLikelyDummyValue($secretValue) || !$this->hasSecretValueEvidence($key, $secretValue)) {
                 continue;
             }

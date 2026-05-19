@@ -52,9 +52,14 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     {
         preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches[0] as $match) {
             [$candidateSecret, $offset] = $match;
+            if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                continue;
+            }
+
             if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }

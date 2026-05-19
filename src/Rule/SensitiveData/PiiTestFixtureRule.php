@@ -66,12 +66,17 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             return [];
         }
 
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($this->patterns() as $definition) {
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             foreach ($matches[0] as $match) {
                 [$candidateFixture, $offset] = $match;
+                if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                    continue;
+                }
+
                 if ($this->isAllowedExample($candidateFixture)) {
                     continue;
                 }

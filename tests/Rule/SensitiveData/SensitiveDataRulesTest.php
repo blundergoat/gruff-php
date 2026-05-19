@@ -117,6 +117,26 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify matches inside PHP comments are skipped for opt-in pattern rules but private-key still fires.
+     *
+     * @return void No return value.
+     */
+    public function testInCommentMatchesAreSkippedExceptPrivateKey(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/SensitiveData/comments-skipped.php');
+
+        self::assertRuleCount(ApiKeyPatternRule::ID, 0, $findings);
+        self::assertRuleCount(AwsAccessKeyRule::ID, 0, $findings);
+        self::assertRuleCount(JwtTokenRule::ID, 0, $findings);
+        self::assertRuleCount(DatabaseUrlPasswordRule::ID, 0, $findings);
+        self::assertRuleCount(HardcodedEnvValueRule::ID, 0, $findings);
+        self::assertRuleCount(HighEntropyStringRule::ID, 0, $findings);
+        self::assertRuleCount(PhiPatternRule::ID, 0, $findings);
+        self::assertRuleCount(PiiTestFixtureRule::ID, 0, $findings);
+        self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
+    }
+
+    /**
      * Verify hardcoded env value requires secret like value evidence.
      *
      * @return void No return value.

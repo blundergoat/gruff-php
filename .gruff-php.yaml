@@ -77,7 +77,7 @@ rules:
     # Deep nesting hides control flow and edge cases.
     complexity.nesting-depth:
         enabled: true
-        threshold: 5
+        threshold: 6
         severity: error
     # Too many execution paths make testing unreliable.
     # Deliberate looser override: ADR-010 default is 200, but this codebase

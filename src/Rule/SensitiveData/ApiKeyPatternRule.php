@@ -64,13 +64,18 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings = [];
+        $findings      = [];
+        $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         foreach ($this->patterns() as $definition) {
             preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             foreach ($matches[0] as $match) {
                 [$candidateSecret, $offset] = $match;
+                if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
+                    continue;
+                }
+
                 if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                     continue;
                 }

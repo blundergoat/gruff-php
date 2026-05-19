@@ -17,11 +17,61 @@ use GruffPhp\Parser\AnalysisUnit;
 final class SecretScannerHelper
 {
     /**
+     * Cache of comment-range tuples keyed by analysis-unit display path. Computed once per unit.
+     *
+     * @var array<string, list<array{0:int,1:int}>>
+     */
+    private static array $commentRangeCache = [];
+
+    /**
      * @return list<string>
      */
     public static function sensitiveKeyFragments(): array
     {
         return ['API_KEY', 'KEY', 'PASSWORD', 'PASS', 'SECRET', 'TOKEN', 'PRIVATE'];
+    }
+
+    /**
+     * Build the list of comment byte ranges for an analysis unit so pattern rules can skip in-comment matches.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose tokens describe comment spans.
+     * @return list<array{0:int,1:int}> Ordered list of [startOffset, endOffsetExclusive] tuples.
+     */
+    public static function commentRanges(AnalysisUnit $analysisUnit): array
+    {
+        $cacheKey = $analysisUnit->file->displayPath;
+
+        if (isset(self::$commentRangeCache[$cacheKey])) {
+            return self::$commentRangeCache[$cacheKey];
+        }
+
+        $ranges = [];
+
+        foreach ($analysisUnit->tokens as $token) {
+            if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
+                $ranges[] = [$token->pos, $token->getEndPos()];
+            }
+        }
+
+        return self::$commentRangeCache[$cacheKey] = $ranges;
+    }
+
+    /**
+     * Check whether a source-text byte offset falls inside one of the given comment ranges.
+     *
+     * @param int                              $offset Zero-based byte offset of a pattern match.
+     * @param list<array{0:int,1:int}>         $ranges Comment ranges produced by commentRanges().
+     * @return bool True when the offset is inside a comment span and should be skipped.
+     */
+    public static function isInsideComment(int $offset, array $ranges): bool
+    {
+        foreach ($ranges as [$start, $end]) {
+            if ($offset >= $start && $offset < $end) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
