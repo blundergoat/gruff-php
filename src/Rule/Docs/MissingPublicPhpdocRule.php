@@ -58,13 +58,13 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
-            /** @var ClassMethod $method Finder predicate restricts results to method declarations. */
-            if ($method->getDocComment() !== null) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $classMethod) {
+            /** @var ClassMethod $classMethod Finder predicate restricts results to method declarations. */
+            if ($classMethod->getDocComment() !== null) {
                 continue;
             }
 
-            $findings[] = $this->findingForMethod($analysisUnit, $definition, $method);
+            $findings[] = $this->findingForMethod($analysisUnit, $definition, $classMethod);
         }
 
         return $findings;
@@ -75,15 +75,15 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
      *
      * @return Finding Documentation finding.
      */
-    private function findingForMethod(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod $method): Finding
+    private function findingForMethod(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod $classMethod): Finding
     {
-        $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+        $symbol = CyclomaticComplexityRule::resolveSymbol($classMethod);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Method %s has no PHPDoc.', $symbol),
             filePath:    $analysisUnit->file->displayPath,
-            line:        $method->getStartLine(),
+            line:        $classMethod->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
             tier:        $definition->tier,

@@ -292,7 +292,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
     /**
      * @param list<Node> $nodes
-     * @return void No return value.
+     * @return void
      */
     private function collectScopeNode(Node $node, array &$nodes): void
     {
@@ -309,7 +309,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
     /**
      * @param list<Node> $nodes
-     * @return void No return value.
+     * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$nodes): void
     {
@@ -323,8 +323,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
             return;
         }
 
-        foreach ($subNode as $item) {
-            $this->collectChildNodes($item, $nodes);
+        foreach ($subNode as $childSubNode) {
+            $this->collectChildNodes($childSubNode, $nodes);
         }
     }
 

@@ -346,10 +346,10 @@ final readonly class AnalyseCommandOptions
                 continue;
             }
 
-            foreach (explode(',', $optionValue) as $item) {
-                $trimmed = trim($item);
-                if ($trimmed !== '') {
-                    $items[] = $trimmed;
+            foreach (explode(',', $optionValue) as $optionPart) {
+                $trimmedOptionPart = trim($optionPart);
+                if ($trimmedOptionPart !== '') {
+                    $items[] = $trimmedOptionPart;
                 }
             }
         }

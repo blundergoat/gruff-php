@@ -665,6 +665,7 @@ final readonly class SourceDiscovery
             '\\?' => '[^/]',
         ]) . '$#';
 
+        // Apply the converted glob pattern to the normalized project-relative path.
         return preg_match($regex, $normalizedPath) === 1;
     }
 }

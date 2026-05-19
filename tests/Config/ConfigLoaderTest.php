@@ -25,7 +25,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads default rule settings when no config exists.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsDefaultRuleSettingsWhenNoConfigExists(): void
     {
@@ -42,7 +42,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads explicit threshold overrides.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsExplicitThresholdOverrides(): void
     {
@@ -62,7 +62,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads default YAML config file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsDefaultYamlConfigFile(): void
     {
@@ -89,7 +89,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads the legacy default YAML config file when the preferred file is absent.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsLegacyDefaultYamlConfigFile(): void
     {
@@ -116,7 +116,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify falls back to package default YAML config file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFallsBackToPackageDefaultYamlConfigFile(): void
     {
@@ -146,7 +146,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify falls back to package legacy default YAML config file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFallsBackToPackageLegacyDefaultYamlConfigFile(): void
     {
@@ -176,7 +176,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads explicit YAML config file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsExplicitYamlConfigFile(): void
     {
@@ -195,7 +195,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads compact path override list options.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsCompactPathOverrideListOptions(): void
     {
@@ -213,7 +213,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with error severity.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsSeverityThresholdWithErrorSeverity(): void
     {
@@ -238,7 +238,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with warning severity.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsSeverityThresholdWithWarningSeverity(): void
     {
@@ -263,7 +263,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads severity threshold with warning severity for inverse threshold rule.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsSeverityThresholdWithWarningSeverityForInverseThresholdRule(): void
     {
@@ -290,7 +290,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      *
      * @param string $configJson      Inline JSON config.
      * @param string $expectedMessage Expected exception message.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('invalidInlineConfigProvider')]
     public function testRejectsInlineInvalidConfig(string $configJson, string $expectedMessage): void
@@ -355,7 +355,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify can disable a rule.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCanDisableARule(): void
     {
@@ -371,7 +371,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads minimum PHP version.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsMinimumPhpVersion(): void
     {
@@ -385,7 +385,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify rejects unknown rule ids.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsUnknownRuleIds(): void
     {
@@ -401,7 +401,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify loads path ignores allowlists and rule selection.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsPathIgnoresAllowlistsAndRuleSelection(): void
     {

@@ -265,8 +265,8 @@ final readonly class MysteryGuestRule implements RuleInterface
 
         if ($expression instanceof Expr\Array_) {
             $keys = [];
-            foreach ($expression->items as $item) {
-                array_push($keys, ...$this->pathKeys($item->value));
+            foreach ($expression->items as $arrayItem) {
+                array_push($keys, ...$this->pathKeys($arrayItem->value));
             }
 
             return array_values(array_unique($keys));

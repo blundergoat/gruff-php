@@ -19,7 +19,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify parameter names match object type names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterNamesMatchObjectTypeNames(): void
     {
@@ -45,7 +45,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify parameter type name exempts already specific and builtin names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameExemptsAlreadySpecificAndBuiltinNames(): void
     {
@@ -66,7 +66,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify parameter type name flags union with null symmetrically.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameFlagsUnionWithNullSymmetrically(): void
     {
@@ -91,7 +91,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify parameter type name leaves true union and intersection arm silent.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameLeavesTrueUnionAndIntersectionArmSilent(): void
     {
@@ -105,7 +105,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify parameter type name respects ignored parameter names option.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameRespectsIgnoredParameterNamesOption(): void
     {
@@ -137,7 +137,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     /**
      * Verify interface method parameters use the lower-camel class name.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameFlagsRuleStyleInterfaceParameters(): void
     {
@@ -147,10 +147,14 @@ declare(strict_types=1);
 namespace GruffPhp\Tests\Fixtures\Naming;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\NodeFinder;
 interface RuleLike
 {
     public function analyse(AnalysisUnit $unit, RuleContext $context): array;
     public function clean(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array;
+    public function find(NodeFinder $finder, ClassMethod $method): array;
+    public function scan(NodeFinder $nodeFinder, ClassMethod $classMethod): array;
 }
 PHP, ParameterTypeNameRule::ID);
 
@@ -168,14 +172,18 @@ PHP, ParameterTypeNameRule::ID);
 
         self::assertSame('analysisUnit', $reported['unit'] ?? null);
         self::assertSame('ruleContext', $reported['context'] ?? null);
+        self::assertSame('nodeFinder', $reported['finder'] ?? null);
+        self::assertSame('classMethod', $reported['method'] ?? null);
         self::assertArrayNotHasKey('analysisUnit', $reported);
         self::assertArrayNotHasKey('ruleContext', $reported);
+        self::assertArrayNotHasKey('nodeFinder', $reported);
+        self::assertArrayNotHasKey('classMethod', $reported);
     }
 
     /**
      * Verify local variables assigned direct object instances use the lower-camel class name.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParameterTypeNameFlagsDirectObjectLocalVariables(): void
     {
@@ -224,7 +232,7 @@ PHP, ParameterTypeNameRule::ID);
     /**
      * Verify identifier quality can be tuned with config and accepted abbreviations.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityCanBeTunedWithConfigAndAcceptedAbbreviations(): void
     {
@@ -261,7 +269,7 @@ PHP, ParameterTypeNameRule::ID);
     /**
      * Verify plain value parameters are not hidden behind the generic-name ignore list.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityFlagsGenericValueParameters(): void
     {
@@ -302,7 +310,7 @@ PHP, IdentifierQualityRule::ID);
     /**
      * Verify identifier quality mutation fixture reports stable kinds and messages.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityMutationFixtureFindingsAreStable(): void
     {
@@ -343,7 +351,7 @@ PHP, IdentifierQualityRule::ID);
     /**
      * Verify identifier quality honours local-variable reference thresholds.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityHonoursLocalVariableReferenceThreshold(): void
     {

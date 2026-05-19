@@ -80,6 +80,7 @@ final readonly class GitDiffProvider
      */
     private function validatedRef(string $ref): string
     {
+        // Allow only ref characters that can be passed to git without shell expansion or option confusion.
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
         }
@@ -115,6 +116,7 @@ final readonly class GitDiffProvider
                 continue;
             }
 
+            // Read a unified-diff hunk header and capture the starting new-file line and length.
             if ($currentFile === null || !preg_match('/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/', $line, $matches)) {
                 continue;
             }

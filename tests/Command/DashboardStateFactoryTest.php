@@ -19,7 +19,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify console input is converted into complete dashboard defaults.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultQueryUsesConsoleInputAndFlags(): void
     {
@@ -51,7 +51,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify default query falls back to conventional paths and config.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultQueryFallsBackToConventions(): void
     {
@@ -71,7 +71,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify request state overrides defaults and coerces checkbox-like values.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testStateMergesQueryAndCoercesControls(): void
     {
@@ -110,7 +110,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify project root resolution handles relative, absolute, and invalid paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testProjectRootResolution(): void
     {
@@ -127,7 +127,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Verify optional string options reject empty values.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOptionalStringOptionRejectsEmptyValues(): void
     {

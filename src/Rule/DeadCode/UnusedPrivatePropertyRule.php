@@ -143,11 +143,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
      * @return array{reads: array<string, true>, writes: array<string, true>}
      */
-    private function propertyUsage(NodeFinder $finder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
+    private function propertyUsage(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
     {
         $reads        = [];
         $writes       = [];
-        $allNodes     = $finder->find($classLike->stmts, static fn (): bool => true);
+        $allNodes     = $nodeFinder->find($classLike->stmts, static fn (): bool => true);
         $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
 
         foreach ($allNodes as $node) {
@@ -169,7 +169,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param array<string, true> $reads
      * @param array<string, true> $writes
      *
-     * @return void No return value.
+     * @return void
      */
     private function recordPropertyUsage(Node $node, string $name, array &$reads, array &$writes): void
     {

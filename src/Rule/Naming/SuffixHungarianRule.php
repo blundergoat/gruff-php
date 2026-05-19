@@ -240,6 +240,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
 
         while ($parent instanceof Node) {
             $docComment = $parent->getDocComment();
+            // Read an adjacent @var type assertion before using it to infer suffix intent.
             if ($docComment !== null && preg_match('/@var\s+([^\s]+)/', $docComment->getText(), $matches) === 1) {
                 return $matches[1];
             }

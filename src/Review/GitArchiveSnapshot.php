@@ -209,6 +209,7 @@ final readonly class GitArchiveSnapshot
      */
     private function validatedRef(string $ref): string
     {
+        // Allow only ref characters that can be passed to git archive without shell expansion or option confusion.
         if ($ref === '' || str_starts_with($ref, '-') || preg_match('/^[A-Za-z0-9._\/@^~+-]+$/', $ref) !== 1) {
             throw new DiffException(sprintf('Git archive base ref "%s" is not a safe git ref name.', $ref));
         }

@@ -111,9 +111,9 @@ final readonly class NoAssertionsRule implements RuleInterface
      *
      * @return bool True when the method docblock declares an expected exception.
      */
-    private function hasExpectedExceptionAnnotation(ClassMethod $method): bool
+    private function hasExpectedExceptionAnnotation(ClassMethod $classMethod): bool
     {
-        $docText = strtolower($method->getDocComment()?->getText() ?? '');
+        $docText = strtolower($classMethod->getDocComment()?->getText() ?? '');
 
         return str_contains($docText, '@expectedexception');
     }

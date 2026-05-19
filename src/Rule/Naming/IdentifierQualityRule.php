@@ -207,11 +207,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return list<Finding> Findings for class-like identifiers.
      */
-    private function classLikeFindings(IdentifierFindingContext $findingContext, NodeFinder $finder): array
+    private function classLikeFindings(IdentifierFindingContext $findingContext, NodeFinder $nodeFinder): array
     {
         $findings = [];
 
-        foreach ($finder->findInstanceOf($findingContext->analysisUnit->statements, ClassLike::class) as $node) {
+        foreach ($nodeFinder->findInstanceOf($findingContext->analysisUnit->statements, ClassLike::class) as $node) {
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
@@ -373,11 +373,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return list<Finding> Findings for property identifiers.
      */
-    private function propertyFindings(IdentifierFindingContext $findingContext, NodeFinder $finder): array
+    private function propertyFindings(IdentifierFindingContext $findingContext, NodeFinder $nodeFinder): array
     {
         $findings = [];
 
-        foreach ($finder->findInstanceOf($findingContext->analysisUnit->statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($findingContext->analysisUnit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $name    = $prop->name->toString();
                 $finding = $this->finding(
@@ -529,6 +529,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             return false;
         }
 
+        // Permit acronym-style identifiers that are only disambiguated by a trailing number.
         if (preg_match('/[A-Z]{2,}\d+$/', $name) === 1) {
             return false;
         }
@@ -687,7 +688,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * @param array<Node>        $nodes
      * @param array<string,true> $variables
-     * @return void No return value.
+     * @return void
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
     {
@@ -728,7 +729,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * @param callable(Node): bool $predicate
      * @param list<Node>           $matches
-     * @return void No return value.
+     * @return void
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
@@ -773,7 +774,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
     /**
      * @param list<Node> $children
-     * @return void No return value.
+     * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
@@ -786,8 +787,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
             return;
         }
 
-        foreach ($subNode as $item) {
-            $this->collectChildNodes($item, $children);
+        foreach ($subNode as $childSubNode) {
+            $this->collectChildNodes($childSubNode, $children);
         }
     }
 

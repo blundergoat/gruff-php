@@ -77,26 +77,26 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $finder): array
+    private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $nodeFinder): array
     {
         $assignedVarObjectIds = [];
-        $mockAssignments      = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
+        $mockAssignments      = $this->mockAssignments($scope, $nodeFinder, $assignedVarObjectIds);
 
         if ($mockAssignments === []) {
             return [];
         }
 
-        $reads    = $this->variableReads($scope, $finder, $assignedVarObjectIds);
+        $reads    = $this->variableReads($scope, $nodeFinder, $assignedVarObjectIds);
         $findings = [];
 
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
                 analysisUnit:       $analysisUnit,
-                scope:      $scope,
-                finder:     $finder,
-                varName:    $varName,
-                assignment: $assignment,
-                reads:      $reads,
+                scope:              $scope,
+                nodeFinder:         $nodeFinder,
+                varName:            $varName,
+                assignment:         $assignment,
+                reads:              $reads,
             );
 
             if ($finding instanceof Finding) {
@@ -113,11 +113,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     private function mockAssignments(
         TestQualityScope $scope,
-        NodeFinder $finder,
+        NodeFinder $nodeFinder,
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
-        $assignments     = $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
+        $assignments     = $nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
 
         foreach ($assignments as $assign) {
             if (!$assign instanceof Expr\Assign) {
@@ -148,11 +148,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, list<Expr\Variable>>
      */
-    private function variableReads(TestQualityScope $scope, NodeFinder $finder, array $assignedVarObjectIds): array
+    private function variableReads(TestQualityScope $scope, NodeFinder $nodeFinder, array $assignedVarObjectIds): array
     {
         $reads = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
             if (!$var instanceof Expr\Variable || !is_string($var->name)) {
                 continue;
             }
@@ -177,7 +177,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     private function findingForMock(
         AnalysisUnit $analysisUnit,
         TestQualityScope $scope,
-        NodeFinder $finder,
+        NodeFinder $nodeFinder,
         string $varName,
         array $assignment,
         array $reads,
@@ -186,7 +186,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             return null;
         }
 
-        $methodNames = $this->methodNamesCalledOnVariable($scope, $finder, $varName);
+        $methodNames = $this->methodNamesCalledOnVariable($scope, $nodeFinder, $varName);
         if ($this->hasAnyIntersection($methodNames, self::VERIFICATION_METHODS)) {
             return null;
         }
@@ -268,11 +268,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @return list<string>
      */
-    private function methodNamesCalledOnVariable(TestQualityScope $scope, NodeFinder $finder, string $varName): array
+    private function methodNamesCalledOnVariable(TestQualityScope $scope, NodeFinder $nodeFinder, string $varName): array
     {
         $names = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall) as $call) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall) as $call) {
             if (!$call instanceof Expr\MethodCall) {
                 continue;
             }

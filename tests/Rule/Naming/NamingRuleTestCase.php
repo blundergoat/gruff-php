@@ -22,7 +22,7 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {

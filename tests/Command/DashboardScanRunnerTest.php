@@ -25,7 +25,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Remove temporary projects created by tests.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function tearDown(): void
     {
@@ -37,7 +37,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify full scans are cached until source fingerprints change.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFullScanUsesCacheUntilSourceFingerprintChanges(): void
     {
@@ -60,7 +60,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify diff and include-ignored scans bypass the dashboard cache.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDiffAndIncludeIgnoredScansBypassCache(): void
     {
@@ -79,7 +79,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify config and baseline file changes invalidate cached full scans.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfigAndBaselineChangesInvalidateFullScanCache(): void
     {
@@ -106,7 +106,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify no-config and no-baseline remove those files from cache invalidation.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoConfigAndNoBaselineIgnoreConfigFileChangesForCache(): void
     {
@@ -128,7 +128,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify invalid project roots render a dashboard error.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInvalidProjectRootRendersError(): void
     {
@@ -143,7 +143,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify empty scan output renders stderr detail.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEmptyScanOutputRendersErrorDetail(): void
     {
@@ -158,7 +158,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Verify timed out scan processes render a dashboard error.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTimedOutScanRendersErrorDetail(): void
     {
@@ -259,7 +259,7 @@ PHP,
      * Recursively remove a temporary directory.
      *
      * @param string $directory Directory to remove.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $directory): void
     {

@@ -19,7 +19,7 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
      *
      * @param string $ruleId     Rule identifier as declared in the rule's RuleDefinition.
      * @param int    $durationNs Wall-clock nanoseconds the rule spent in analyse().
-     * @return void No return value.
+     * @return void
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
     {

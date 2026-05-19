@@ -23,7 +23,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify accepted abbreviations can suppress short variable findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAcceptedAbbreviationsCanSuppressShortVariableFindings(): void
     {
@@ -44,7 +44,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify undeclared short lowercase abbreviations are reported.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAbbreviationAllowlistDetectsUndeclaredNames(): void
     {
@@ -66,7 +66,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify projects can opt in additional boolean prefixes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBooleanPrefixAllowedPrefixesCanBeConfigured(): void
     {
@@ -92,7 +92,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify typed bool properties and parameters need boolean-style names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBooleanPrefixDetectsPropertiesAndParameters(): void
     {
@@ -114,7 +114,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify the state adjective allowlist controls bool property and parameter exemptions.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBooleanPrefixStateAdjectiveAllowlistCanBeConfigured(): void
     {
@@ -128,9 +128,26 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify Hungarian notation type prefixes can be limited to structural types.
+     *
+     * @return void
+     */
+    public function testHungarianNotationTypePrefixesCanBeConfigured(): void
+    {
+        $findings = $this->hungarianFindings(['arr', 'obj']);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
+
+        self::assertContains('arrItems', $names);
+        self::assertContains('objUser', $names);
+        self::assertNotContains('strName', $names);
+        self::assertNotContains('intCount', $names);
+        self::assertNotContains('boolReady', $names);
+    }
+
+    /**
      * Verify negative boolean flags are reported and CLI mirror keys can exempt them.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNegativeBooleanDetectsFlagsAndHonoursCliMirrorAllowlist(): void
     {
@@ -158,7 +175,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Verify overlapping naming findings keep the documented primary rule.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDuplicateNamingFindingsRespectDeferralOrder(): void
     {
@@ -203,6 +220,27 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
+        ));
+    }
+
+    /**
+     * @param list<string> $typePrefixes
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function hungarianFindings(array $typePrefixes): array
+    {
+        $unit     = $this->parseFixture('hungarian.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(HungarianNotationRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            HungarianNotationRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['typePrefixes' => $typePrefixes])),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+        return array_values(array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
         ));
     }
 

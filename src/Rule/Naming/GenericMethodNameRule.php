@@ -110,11 +110,11 @@ final readonly class GenericMethodNameRule implements RuleInterface
      *
      * @return bool True when the method matches a supported framework override.
      */
-    private function matchesFrameworkOverride(ClassMethod $method): bool
+    private function matchesFrameworkOverride(ClassMethod $classMethod): bool
     {
-        $name = strtolower($method->name->toString());
+        $name = strtolower($classMethod->name->toString());
 
-        if ($name === 'execute' && $this->matchesSymfonyConsoleExecute($method)) {
+        if ($name === 'execute' && $this->matchesSymfonyConsoleExecute($classMethod)) {
             return true;
         }
 
@@ -126,14 +126,14 @@ final readonly class GenericMethodNameRule implements RuleInterface
      *
      * @return bool True when parameters match the Symfony command signature.
      */
-    private function matchesSymfonyConsoleExecute(ClassMethod $method): bool
+    private function matchesSymfonyConsoleExecute(ClassMethod $classMethod): bool
     {
-        if (count($method->params) !== 2) {
+        if (count($classMethod->params) !== 2) {
             return false;
         }
 
-        $first  = $method->params[0]->type ?? null;
-        $second = $method->params[1]->type ?? null;
+        $first  = $classMethod->params[0]->type ?? null;
+        $second = $classMethod->params[1]->type ?? null;
 
         return $this->hasParameterTypeShortName($first, 'InputInterface')
             && $this->hasParameterTypeShortName($second, 'OutputInterface');

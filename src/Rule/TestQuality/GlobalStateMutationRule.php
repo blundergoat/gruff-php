@@ -113,11 +113,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $finder): array
+    private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $nodeFinder): array
     {
         $findings = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
             if (!$assign instanceof Expr\Assign) {
                 continue;
             }
@@ -206,20 +206,20 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
         $visited[$classId] = true;
 
-        foreach ($class->getMethods() as $method) {
-            $methodName = strtolower($method->name->toString());
+        foreach ($class->getMethods() as $classMethod) {
+            $methodName = strtolower($classMethod->name->toString());
 
             if (in_array($methodName, ['teardown', 'teardownafterclass'], true)) {
                 return true;
             }
 
-            $doc = strtolower($method->getDocComment()?->getText() ?? '');
+            $doc = strtolower($classMethod->getDocComment()?->getText() ?? '');
             if (str_contains($doc, '@after') || str_contains($doc, '@afterclass')) {
                 return true;
             }
 
-            if (TestQualityNodeHelper::hasAttribute($method, 'After')
-                || TestQualityNodeHelper::hasAttribute($method, 'AfterClass')
+            if (TestQualityNodeHelper::hasAttribute($classMethod, 'After')
+                || TestQualityNodeHelper::hasAttribute($classMethod, 'AfterClass')
             ) {
                 return true;
             }
@@ -242,11 +242,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return array<string, Stmt\Class_>
      */
-    private function classesByName(AnalysisUnit $analysisUnit, NodeFinder $finder): array
+    private function classesByName(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
         $classes = [];
 
-        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             if (!$class->name instanceof Node\Identifier) {
                 continue;
             }

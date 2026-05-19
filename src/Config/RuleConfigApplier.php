@@ -376,7 +376,7 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured list item against the default list sample type.
      *
-     * @return void No return value.
+     * @return void
      */
     private function assertListItemType(
         string $ruleId,
@@ -436,7 +436,7 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured map item against the default map sample type.
      *
-     * @return void No return value.
+     * @return void
      */
     private function assertMapItemType(
         string $ruleId,
@@ -473,17 +473,17 @@ final readonly class RuleConfigApplier
             throw new ConfigException($message);
         }
 
-        $result = [];
+        $normalizedRuleConfig = [];
 
-        foreach ($decodedValue as $key => $item) {
+        foreach ($decodedValue as $key => $decodedItem) {
             if (!is_string($key)) {
                 throw new ConfigException($message);
             }
 
-            $result[$key] = $this->configValue($item);
+            $normalizedRuleConfig[$key] = $this->configValue($decodedItem);
         }
 
-        return $result;
+        return $normalizedRuleConfig;
     }
 
     /**
@@ -515,66 +515,66 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
-    private function configArray(array $values): array
+    private function configArray(array $decodedRuleValues): array
     {
-        $result = [];
+        $normalizedRuleValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        foreach ($decodedRuleValues as $key => $decodedItem) {
+            $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedRuleValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
-    private function configArrayDepth2(array $values): array
+    private function configArrayDepth2(array $decodedRuleValues): array
     {
-        $result = [];
+        $normalizedRuleValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        foreach ($decodedRuleValues as $key => $decodedItem) {
+            $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedRuleValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
-    private function configArrayDepth3(array $values): array
+    private function configArrayDepth3(array $decodedRuleValues): array
     {
-        $result = [];
+        $normalizedRuleValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        foreach ($decodedRuleValues as $key => $decodedItem) {
+            $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedRuleValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar>
      */
-    private function configArrayDepth4(array $values): array
+    private function configArrayDepth4(array $decodedRuleValues): array
     {
-        $result = [];
+        $normalizedRuleValues = [];
 
-        foreach ($values as $key => $item) {
-            if (is_array($item)) {
+        foreach ($decodedRuleValues as $key => $decodedItem) {
+            if (is_array($decodedItem)) {
                 throw new ConfigException('Config value nesting is deeper than supported.');
             }
 
-            $result[$key] = $this->configScalar($item);
+            $normalizedRuleValues[$key] = $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedRuleValues;
     }
 }

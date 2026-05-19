@@ -69,6 +69,7 @@ final readonly class UnusedImportRule implements RuleInterface
             foreach ($use->uses as $useUse) {
                 $alias = $useUse->getAlias()->toString();
 
+                // Search for the import alias as a whole token outside the use statement itself.
                 if (preg_match('/\b' . preg_quote($alias, '/') . '\b/', $sourceWithoutUses) === 1) {
                     continue;
                 }

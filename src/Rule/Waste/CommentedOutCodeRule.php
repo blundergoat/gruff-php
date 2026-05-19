@@ -133,18 +133,22 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         foreach ($lines as $line) {
             $trimmed = trim($line);
 
+            // Count commented snippets that look like variable-bearing statements.
             if (str_contains($trimmed, ';') && preg_match('/\$\w/', $trimmed) === 1) {
                 $codeIndicators++;
             }
 
+            // Count commented snippets that begin with common PHP control-flow or output keywords.
             if (preg_match('/^(if|for|foreach|while|return|throw|echo)\s*\(/', $trimmed) === 1) {
                 $codeIndicators++;
             }
 
+            // Count commented snippets that look like method calls on variables.
             if (preg_match('/\$\w+\s*->\s*\w+\s*\(/', $trimmed) === 1) {
                 $codeIndicators++;
             }
 
+            // Count commented snippets that look like variable assignments.
             if (preg_match('/\$\w+\s*=\s*/', $trimmed) === 1) {
                 $codeIndicators++;
             }

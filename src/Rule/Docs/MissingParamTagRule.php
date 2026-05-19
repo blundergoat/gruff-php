@@ -123,16 +123,17 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     public static function extractParamNames(string $docText): array
     {
-        $result = [];
+        $paramNames = [];
         foreach (preg_split('/\R/', $docText) ?: [] as $line) {
+            // Extract the documented variable name from each @param tag line.
             if (preg_match('/@param\s+.+?\s+\$(\w+)\b/', $line, $matches) !== 1) {
                 continue;
             }
 
-            $result[] = $matches[1];
+            $paramNames[] = $matches[1];
         }
 
-        return $result;
+        return $paramNames;
     }
 
     /**
@@ -151,6 +152,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             return true;
         }
 
+        // Treat contract-bearing tags as enough context to require complete parameter docs.
         return preg_match('/@(param|return|throws|var|template|phpstan-param|psalm-param)\b/', $docText) === 1;
     }
 }

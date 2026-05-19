@@ -56,6 +56,7 @@ final readonly class RuleDefinition
         public string             $description = '',
         public ?SeverityThreshold $severityThreshold = null,
     ) {
+        // Enforce the dotted slug format used by config, baselines, and reporters.
         if (!preg_match('/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/', $id)) {
             throw new InvalidArgumentException(sprintf('Invalid rule id "%s".', $id));
         }

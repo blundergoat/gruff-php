@@ -144,6 +144,7 @@ src/
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag` (flags any documented method/function without `@return`, excluding constructors/destructors)
 |   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
+|   |   |-- RegexCommentRule.php              = `docs.regex-comment` (requires an immediate one-line comment explaining configured regex matcher calls, defaulting to `preg_match`)
 |   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
 |   |   |-- TodoDensityRule.php               = `docs.todo-density`
 |   |   |-- UselessPhpdocRule.php             = `docs.useless-phpdoc`

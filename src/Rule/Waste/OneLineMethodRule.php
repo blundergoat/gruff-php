@@ -107,9 +107,9 @@ final readonly class OneLineMethodRule implements RuleInterface
         $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit->statements, $nodeFinder) : [];
         $findings           = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $classMethod) {
             if ($this->shouldSkip(
-                method:           $method,
+                classMethod:      $classMethod,
                 minParameters:    $minParameters,
                 minInFileCallers: $minInFileCallers,
                 methodCallCounts: $methodCallCounts,
@@ -118,7 +118,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                 continue;
             }
 
-            $statement = $method->stmts[0] ?? null;
+            $statement = $classMethod->stmts[0] ?? null;
             if (!$statement instanceof Return_ && !$statement instanceof Expression) {
                 continue;
             }
@@ -132,7 +132,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                 continue;
             }
 
-            $symbol = CyclomaticComplexityRule::resolveSymbol($method);
+            $symbol = CyclomaticComplexityRule::resolveSymbol($classMethod);
             if (isset($allowedSymbols[$symbol])) {
                 continue;
             }
@@ -141,17 +141,17 @@ final readonly class OneLineMethodRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('%s only wraps a one-line call expression.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $method->getStartLine(),
+                line:        $classMethod->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
-                endLine:     $method->getEndLine() > 0 ? $method->getEndLine() : null,
+                endLine:     $classMethod->getEndLine() > 0 ? $classMethod->getEndLine() : null,
                 symbol:      $symbol,
                 remediation: 'Inline the expression at the call site or expand the method so it owns a meaningful contract.',
                 metadata:    [
-                    'method' => $method->name->toString(),
-                    'parameterCount' => count($method->params),
+                    'method' => $classMethod->name->toString(),
+                    'parameterCount' => count($classMethod->params),
                     'statementKind' => $statement instanceof Return_ ? 'return' : 'expression',
                 ],
             );
@@ -169,16 +169,16 @@ final readonly class OneLineMethodRule implements RuleInterface
      * @return bool True when the method should not be reported.
      */
     private function shouldSkip(
-        ClassMethod $method,
+        ClassMethod $classMethod,
         int $minParameters,
         int $minInFileCallers,
         array $methodCallCounts,
         array $factoryMethodIds,
     ): bool
     {
-        $name = $method->name->toString();
+        $name = $classMethod->name->toString();
 
-        if ($method->isAbstract() || in_array($name, self::SKIPPED_METHODS, true)) {
+        if ($classMethod->isAbstract() || in_array($name, self::SKIPPED_METHODS, true)) {
             return true;
         }
 
@@ -186,11 +186,11 @@ final readonly class OneLineMethodRule implements RuleInterface
             return true;
         }
 
-        if (count($method->params) < $minParameters || $method->stmts === null || count($method->stmts) !== 1) {
+        if (count($classMethod->params) < $minParameters || $classMethod->stmts === null || count($classMethod->stmts) !== 1) {
             return true;
         }
 
-        if (isset($factoryMethodIds[spl_object_id($method)])) {
+        if (isset($factoryMethodIds[spl_object_id($classMethod)])) {
             return true;
         }
 
@@ -202,9 +202,9 @@ final readonly class OneLineMethodRule implements RuleInterface
      *
      * @return bool True when the expression contains callable work.
      */
-    private function containsCall(Expr $expression, NodeFinder $finder): bool
+    private function containsCall(Expr $expression, NodeFinder $nodeFinder): bool
     {
-        return $finder->findFirst([$expression], static function (Node $node): bool {
+        return $nodeFinder->findFirst([$expression], static function (Node $node): bool {
             return $node instanceof Expr\MethodCall
                 || $node instanceof Expr\StaticCall
                 || $node instanceof Expr\FuncCall
@@ -218,11 +218,11 @@ final readonly class OneLineMethodRule implements RuleInterface
      * @param list<Node> $statements Parsed statements to inspect.
      * @return array<string, int> Counts keyed by lowercase method name.
      */
-    private function methodCallCounts(array $statements, NodeFinder $finder): array
+    private function methodCallCounts(array $statements, NodeFinder $nodeFinder): array
     {
         $counts = [];
 
-        foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+        foreach ($nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
             if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                 continue;
             }
@@ -244,16 +244,16 @@ final readonly class OneLineMethodRule implements RuleInterface
      * @param list<Node> $statements Parsed statements to inspect.
      * @return array<int, true> Method object ids that are exempt.
      */
-    private function namedAlternativeFactoryMethodIds(array $statements, NodeFinder $finder): array
+    private function namedAlternativeFactoryMethodIds(array $statements, NodeFinder $nodeFinder): array
     {
         $factoryIds = [];
 
-        foreach ($finder->findInstanceOf($statements, Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($statements, Class_::class) as $class) {
             $factories = [];
 
-            foreach ($class->getMethods() as $method) {
-                if ($this->isNamedAlternativeFactory($method, $class)) {
-                    $factories[] = $method;
+            foreach ($class->getMethods() as $classMethod) {
+                if ($this->isNamedAlternativeFactory($classMethod, $class)) {
+                    $factories[] = $classMethod;
                 }
             }
 
@@ -261,8 +261,8 @@ final readonly class OneLineMethodRule implements RuleInterface
                 continue;
             }
 
-            foreach ($factories as $method) {
-                $factoryIds[spl_object_id($method)] = true;
+            foreach ($factories as $classMethod) {
+                $factoryIds[spl_object_id($classMethod)] = true;
             }
         }
 
@@ -274,13 +274,13 @@ final readonly class OneLineMethodRule implements RuleInterface
      *
      * @return bool True when the method is a named constructor/factory candidate.
      */
-    private function isNamedAlternativeFactory(ClassMethod $method, Class_ $class): bool
+    private function isNamedAlternativeFactory(ClassMethod $classMethod, Class_ $class): bool
     {
-        if (!$method->isPublic() || !$method->isStatic() || $method->stmts === null || count($method->stmts) !== 1) {
+        if (!$classMethod->isPublic() || !$classMethod->isStatic() || $classMethod->stmts === null || count($classMethod->stmts) !== 1) {
             return false;
         }
 
-        $statement = $method->stmts[0];
+        $statement = $classMethod->stmts[0];
         if (!$statement instanceof Return_ || !$statement->expr instanceof Expr\New_) {
             return false;
         }

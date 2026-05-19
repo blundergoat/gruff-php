@@ -28,7 +28,7 @@ final class DashboardCommand extends Command
     /**
      * Configure the dashboard command arguments and options.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function configure(): void
     {

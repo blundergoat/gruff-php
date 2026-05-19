@@ -102,13 +102,13 @@ final readonly class EmptyMethodRule implements RuleInterface
      *
      * @return bool True when the constructor exists solely for property promotion.
      */
-    private function isPromotedConstructor(ClassMethod $method): bool
+    private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
-        if ($method->name->toString() !== '__construct') {
+        if ($classMethod->name->toString() !== '__construct') {
             return false;
         }
 
-        foreach ($method->params as $param) {
+        foreach ($classMethod->params as $param) {
             if ($param->isPromoted()) {
                 return true;
             }

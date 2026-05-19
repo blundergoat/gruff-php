@@ -48,6 +48,8 @@ final readonly class HungarianNotationRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            defaultOptions:  ['typePrefixes' => self::PREFIXES],
+            description:     'Flags identifiers that duplicate type information with configured prefixes such as arr, obj, str, or bool.',
         );
     }
 
@@ -61,13 +63,14 @@ final readonly class HungarianNotationRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
+        $prefixes   = $this->normalisedPrefixes($ruleContext->settingsFor($definition)->stringListOption('typePrefixes'));
         $findings   = [];
 
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
-                ...$this->parameterFindings($definition, $analysisUnit, $scope),
-                ...$this->localVariableFindings($definition, $analysisUnit, $scope),
+                ...$this->parameterFindings($definition, $analysisUnit, $scope, $prefixes),
+                ...$this->localVariableFindings($definition, $analysisUnit, $scope, $prefixes),
             );
         }
 
@@ -77,9 +80,15 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find Hungarian notation parameters in one function-like scope.
      *
+     * @param list<string> $prefixes Configured lowercase type prefixes.
      * @return list<Finding> Findings for prefixed parameters.
      */
-    private function parameterFindings(RuleDefinition $definition, AnalysisUnit $analysisUnit, FunctionLikeScope $scope): array
+    private function parameterFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $prefixes,
+    ): array
     {
         $findings = [];
         $symbol   = $this->symbol($scope);
@@ -96,6 +105,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 kind:       'parameter',
                 name:       $param->var->name,
                 symbol:     $symbol,
+                prefixes:   $prefixes,
             );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
@@ -108,9 +118,15 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find Hungarian notation local variables in one function-like scope.
      *
+     * @param list<string> $prefixes Configured lowercase type prefixes.
      * @return list<Finding> Findings for prefixed local variables.
      */
-    private function localVariableFindings(RuleDefinition $definition, AnalysisUnit $analysisUnit, FunctionLikeScope $scope): array
+    private function localVariableFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $prefixes,
+    ): array
     {
         $findings = [];
         $symbol   = $this->symbol($scope);
@@ -123,6 +139,7 @@ final readonly class HungarianNotationRule implements RuleInterface
                 kind:       'variable',
                 name:       $name,
                 symbol:     $symbol,
+                prefixes:   $prefixes,
             );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
@@ -135,6 +152,7 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Build a Hungarian notation finding when the identifier matches a type prefix.
      *
+     * @param list<string> $prefixes Configured lowercase type prefixes.
      * @return Finding|null Finding for a prefixed identifier.
      */
     private function finding(
@@ -144,8 +162,9 @@ final readonly class HungarianNotationRule implements RuleInterface
         string $kind,
         string $name,
         string $symbol,
+        array $prefixes,
     ): ?Finding {
-        $prefix = $this->detectPrefix($name);
+        $prefix = $this->detectPrefix($name, $prefixes);
 
         if ($prefix === null) {
             return null;
@@ -169,11 +188,12 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Detect a configured type prefix followed by an uppercase boundary.
      *
+     * @param list<string> $prefixes Configured lowercase type prefixes.
      * @return string|null Matched prefix, or null when the name is acceptable.
      */
-    private function detectPrefix(string $name): ?string
+    private function detectPrefix(string $name, array $prefixes): ?string
     {
-        foreach (self::PREFIXES as $prefix) {
+        foreach ($prefixes as $prefix) {
             if (str_starts_with($name, $prefix)
                 && strlen($name) > strlen($prefix)
                 && ctype_upper($name[strlen($prefix)])
@@ -183,6 +203,18 @@ final readonly class HungarianNotationRule implements RuleInterface
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $prefixes Configured type prefixes.
+     * @return list<string> Lowercase type prefixes.
+     */
+    private function normalisedPrefixes(array $prefixes): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (string $prefix): string => strtolower($prefix),
+            $prefixes,
+        )));
     }
 
     /**

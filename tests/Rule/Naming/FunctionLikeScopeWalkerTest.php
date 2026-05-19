@@ -19,7 +19,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Verify nested closures keep parameter and local-variable names isolated by scope.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testScopesIsolateNestedClosuresAndShadowedParameters(): void
     {
@@ -61,7 +61,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Verify arrow functions inside foreach bodies become separate scopes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testArrowFunctionsInsideForeachAreSeparateScopes(): void
     {
@@ -96,7 +96,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Verify class methods are yielded before closures declared in their bodies.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMethodsAreYieldedBeforeBodyClosures(): void
     {

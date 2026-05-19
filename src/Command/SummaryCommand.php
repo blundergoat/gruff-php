@@ -155,6 +155,7 @@ final class SummaryCommand extends Command
     private function topLimit(InputInterface $input, OutputInterface $output): ?int
     {
         $topRaw = $input->getOption('top');
+        // Accept only unsigned decimal digits for the summary row limit.
         if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
             return (int) $topRaw;
         }
@@ -505,14 +506,14 @@ final class SummaryCommand extends Command
     }
 
     /**
-     * @param list<string> $values
+     * @param list<string> $columnTexts
      * @return int Width needed for aligned summary columns.
      */
-    private function columnWidth(array $values, int $minimum): int
+    private function columnWidth(array $columnTexts, int $minimum): int
     {
         $maximum = $minimum;
-        foreach ($values as $value) {
-            $length = strlen($value);
+        foreach ($columnTexts as $columnText) {
+            $length = strlen($columnText);
             if ($length > $maximum) {
                 $maximum = $length;
             }

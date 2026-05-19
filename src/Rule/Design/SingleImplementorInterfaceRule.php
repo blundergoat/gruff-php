@@ -159,7 +159,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
-     * @return void No return value.
+     * @return void
      */
     private function collectUnitTypes(AnalysisUnit $analysisUnit, array $statements, array &$projectTypes): void
     {
@@ -184,7 +184,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
-     * @return void No return value.
+     * @return void
      */
     private function recordInterface(Interface_ $interface, AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
@@ -218,9 +218,9 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
-     * @return void No return value.
+     * @return void
      */
-    private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, NodeFinder $finder, array &$projectTypes): void
+    private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, NodeFinder $nodeFinder, array &$projectTypes): void
     {
         if ($class->name === null) {
             return;
@@ -239,7 +239,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             ];
         }
 
-        foreach ($this->collectClassTypeReferences($class, $classFqn, $finder) as $reference) {
+        foreach ($this->collectClassTypeReferences($class, $classFqn, $nodeFinder) as $reference) {
             $projectTypes['typeReferences'][$reference['targetFqn']][] = [
                 'classFqn' => $reference['classFqn'],
                 'unit' => $analysisUnit,
@@ -444,11 +444,11 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     /**
      * @return list<array{targetFqn: string, classFqn: string, line: int}>
      */
-    private function collectClassTypeReferences(Class_ $class, string $classFqn, NodeFinder $finder): array
+    private function collectClassTypeReferences(Class_ $class, string $classFqn, NodeFinder $nodeFinder): array
     {
         $references = [];
 
-        foreach ($finder->find([$class], static fn (Node $node): bool => $node instanceof Param || $node instanceof ClassMethod || $node instanceof Property) as $node) {
+        foreach ($nodeFinder->find([$class], static fn (Node $node): bool => $node instanceof Param || $node instanceof ClassMethod || $node instanceof Property) as $node) {
             if ($node instanceof Param) {
                 $type = $node->type;
             } elseif ($node instanceof ClassMethod) {

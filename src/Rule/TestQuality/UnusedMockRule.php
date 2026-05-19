@@ -80,11 +80,11 @@ final readonly class UnusedMockRule implements RuleInterface
      */
     private function mockAssignments(
         TestQualityScope $scope,
-        NodeFinder $finder,
+        NodeFinder $nodeFinder,
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
-        $assignments     = $finder->find(
+        $assignments     = $nodeFinder->find(
             $scope->statements,
             static fn (Node $node): bool => $node instanceof Expr\Assign,
         );
@@ -118,11 +118,11 @@ final readonly class UnusedMockRule implements RuleInterface
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, true>
      */
-    private function variableReads(TestQualityScope $scope, NodeFinder $finder, array $assignedVarObjectIds): array
+    private function variableReads(TestQualityScope $scope, NodeFinder $nodeFinder, array $assignedVarObjectIds): array
     {
         $reads = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
             if (!$var instanceof Expr\Variable || !is_string($var->name)) {
                 continue;
             }

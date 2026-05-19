@@ -128,10 +128,10 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      * @param Class_|Trait_|Enum_ $classLike
      * @return array<string, true>
      */
-    private function calledPrivateMethodNames(NodeFinder $finder, Class_|Trait_|Enum_ $classLike): array
+    private function calledPrivateMethodNames(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike): array
     {
         $calledNames = [];
-        $allNodes    = $finder->find($classLike->stmts, static fn (): bool => true);
+        $allNodes    = $nodeFinder->find($classLike->stmts, static fn (): bool => true);
 
         foreach ($allNodes as $node) {
             $name = $this->calledMethodName($node) ?? $this->callableArrayName($node);
@@ -181,9 +181,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return null;
         }
 
-        foreach ($node->items as $item) {
-            if ($this->isCallableReference($item->value)) {
-                return $this->extractCallableName($item->value);
+        foreach ($node->items as $arrayItem) {
+            if ($this->isCallableReference($arrayItem->value)) {
+                return $this->extractCallableName($arrayItem->value);
             }
         }
 
@@ -206,7 +206,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
         $findings  = [];
         $className = $this->resolveClassName($classLike);
 
-        foreach ($privateMethods as $name => $method) {
+        foreach ($privateMethods as $name => $classMethod) {
             if (isset($calledNames[$name])) {
                 continue;
             }
@@ -216,12 +216,12 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 ruleId:      $definition->id,
                 message:     sprintf('Private method %s is never called.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
-                line:        $method->getStartLine(),
+                line:        $classMethod->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
-                endLine:     $method->getEndLine() > 0 ? $method->getEndLine() : null,
+                endLine:     $classMethod->getEndLine() > 0 ? $classMethod->getEndLine() : null,
                 symbol:      $symbol,
                 remediation: 'Remove the unused private method.',
             );

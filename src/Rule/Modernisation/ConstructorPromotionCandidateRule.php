@@ -72,11 +72,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * @return list<Stmt\Class_>
      */
-    private function candidateClasses(AnalysisUnit $analysisUnit, NodeFinder $finder): array
+    private function candidateClasses(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
         $classes = [];
 
-        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
             if ($this->canPromoteClass($class)) {
                 $classes[] = $class;
@@ -179,9 +179,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function constructor(Stmt\Class_ $class): ?Stmt\ClassMethod
     {
-        foreach ($class->getMethods() as $method) {
-            if (strtolower($method->name->toString()) === '__construct') {
-                return $method;
+        foreach ($class->getMethods() as $classMethod) {
+            if (strtolower($classMethod->name->toString()) === '__construct') {
+                return $classMethod;
             }
         }
 
@@ -215,12 +215,12 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
         $assignments = [];
         $nodeFinder  = new NodeFinder();
 
-        foreach ($class->getMethods() as $method) {
-            if (strtolower($method->name->toString()) === '__construct') {
+        foreach ($class->getMethods() as $classMethod) {
+            if (strtolower($classMethod->name->toString()) === '__construct') {
                 continue;
             }
 
-            foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
+            foreach ($nodeFinder->findInstanceOf($classMethod->stmts ?? [], Expr\Assign::class) as $assign) {
                 $name = ModernisationNodeHelper::propertyFetchName($assign->var);
                 if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                     $assignments[$name] = true;

@@ -188,6 +188,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         foreach ($lines as $offset => $rawLine) {
             $stripped = $this->stripDocPrefix($rawLine);
 
+            // Split a PHPDoc line into the tag name and remaining tag body.
             if (preg_match('/^@([A-Za-z][A-Za-z0-9_-]*)\b\s*(.*)$/', $stripped, $matches) === 1) {
                 if ($current !== null) {
                     $blocks[] = $current;
@@ -237,6 +238,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             ? $this->extractTypeAliasExpression($body)
             : $this->extractTypeExpression($body);
 
+        // Find standalone `mixed` tokens without matching substrings inside class names.
         if ($type === null || preg_match('/(?<![\\\\\w])mixed(?!\w)/i', $type) !== 1) {
             return ['hasMixed' => false, 'isStandalone' => false];
         }
@@ -268,10 +270,12 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function isArrayBagType(string $type): bool
     {
+        // Capture the value side of array-key/string/int keyed generic array types.
         if (preg_match('/^array<(?:array-key|string|int),(.+)>$/', $type, $matches) === 1) {
             return $this->isArrayBagValueType($matches[1]);
         }
 
+        // Capture the element type from list generics.
         if (preg_match('/^list<(.+)>$/', $type, $matches) === 1) {
             return $this->isArrayBagValueType($matches[1]);
         }
@@ -337,6 +341,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         $body = trim($body);
 
+        // Remove the alias name and optional equals sign before parsing the aliased type.
         if (preg_match('/^\S+\s+(?:=\s*)?(?<type>.+)$/s', $body, $matches) !== 1) {
             return null;
         }
@@ -351,6 +356,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function extractParamName(string $body): ?string
     {
+        // Capture the first PHPDoc parameter variable name in the tag body.
         if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)/', $body, $matches) === 1) {
             return $matches[1];
         }

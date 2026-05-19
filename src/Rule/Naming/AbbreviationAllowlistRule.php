@@ -162,6 +162,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $name      = $identifier['name'];
         $symbol    = $identifier['symbol'];
         $lowerName = strtolower($name);
+        // Only lowercase alphabetic identifiers can contain unapproved short abbreviations.
         if ($lowerName !== $name || !preg_match('/^[a-z]+$/', $name)) {
             return null;
         }
@@ -205,13 +206,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * @return array<string, true>
      */
-    private function exemptLocalNames(ClassMethod|Function_|Closure|ArrowFunction $node, NodeFinder $finder): array
+    private function exemptLocalNames(ClassMethod|Function_|Closure|ArrowFunction $node, NodeFinder $nodeFinder): array
     {
         $names = [];
 
         foreach ($this->bodyNodes($node) as $bodyNode) {
-            foreach ($finder->find([$bodyNode], static fn (Node $candidate): bool => $candidate instanceof For_ || $candidate instanceof Foreach_ || $candidate instanceof Catch_) as $scopeNode) {
-                $this->collectExemptLocalNames($scopeNode, $finder, $names);
+            foreach ($nodeFinder->find([$bodyNode], static fn (Node $candidate): bool => $candidate instanceof For_ || $candidate instanceof Foreach_ || $candidate instanceof Catch_) as $scopeNode) {
+                $this->collectExemptLocalNames($scopeNode, $nodeFinder, $names);
             }
         }
 
@@ -222,12 +223,12 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * Add loop and catch variables that are conventional enough to skip abbreviation findings.
      *
      * @param array<string, true> $names
-     * @return void No return value.
+     * @return void
      */
-    private function collectExemptLocalNames(Node $node, NodeFinder $finder, array &$names): void
+    private function collectExemptLocalNames(Node $node, NodeFinder $nodeFinder, array &$names): void
     {
         if ($node instanceof For_) {
-            foreach ($finder->findInstanceOf($node->init, Variable::class) as $variable) {
+            foreach ($nodeFinder->findInstanceOf($node->init, Variable::class) as $variable) {
                 if (is_string($variable->name)) {
                     $names[$variable->name] = true;
                 }

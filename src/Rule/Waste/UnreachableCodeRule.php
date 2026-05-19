@@ -75,7 +75,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
      * @param array<Node\Stmt> $stmts
      * @param list<Finding>    &$findings
      *
-     * @return void No return value.
+     * @return void
      */
     private function checkBlock(array $stmts, AnalysisUnit $analysisUnit, array &$findings): void
     {
@@ -111,7 +111,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * @param list<Finding> &$findings
      *
-     * @return void No return value.
+     * @return void
      */
     private function walkChildren(Node\Stmt $node, AnalysisUnit $analysisUnit, array &$findings): void
     {

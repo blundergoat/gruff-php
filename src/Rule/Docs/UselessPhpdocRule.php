@@ -145,10 +145,12 @@ final readonly class UselessPhpdocRule implements RuleInterface
      */
     private function isBareSignatureRestatement(string $line): bool
     {
+        // Match @param tags that contain only a type and variable name.
         if (preg_match('/^@param\s+(\S+)\s+\$\w+\s*$/', $line, $matches) === 1) {
             return $this->isSimpleDocType($matches[1]);
         }
 
+        // Match @return tags that contain only a type.
         if (preg_match('/^@return\s+(\S+)\s*$/', $line, $matches) === 1) {
             return $this->isSimpleDocType($matches[1]);
         }
@@ -163,6 +165,7 @@ final readonly class UselessPhpdocRule implements RuleInterface
      */
     private function isSimpleDocType(string $type): bool
     {
+        // Reject complex PHPDoc type syntax that cannot be represented as a simple native type.
         if (preg_match('/[<>{}\\[\\]|&]/', $type) === 1) {
             return false;
         }

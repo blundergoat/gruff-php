@@ -150,6 +150,7 @@ final readonly class AnalyseCommandSetupBuilder
             return null;
         }
 
+        // Accept only unsigned decimal digits for the optional mutation budget flag.
         return is_string($optionValue) && preg_match('/^\d+$/', $optionValue) === 1 ? (int) $optionValue : false;
     }
 

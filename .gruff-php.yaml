@@ -120,6 +120,9 @@ rules:
     # Throws docs make failure modes visible to callers.
     docs.missing-throws-tag:
         enabled: true
+    # Regex calls need local context because patterns are easy to misread.
+    docs.regex-comment:
+        enabled: true
     # Stale parameter docs are worse than missing docs.
     docs.stale-param-tag:
         enabled: true
@@ -201,6 +204,12 @@ rules:
     # Hungarian notation duplicates types and obscures meaning.
     naming.hungarian-notation:
         enabled: true
+        options:
+            typePrefixes:
+                - arr
+                - obj
+                - fn
+                - cls
     # Placeholder and generic names hide the role an identifier plays.
     naming.identifier-quality:
         enabled: true
@@ -241,8 +250,8 @@ rules:
             loopBodyThreshold: 4
     # Class-typed parameters should carry their object role in the variable name.
     # The ignoredParameterNames list exempts gruff's own AST-walker, visitor, and
-    # framework conventions (Stmt $stmt, NodeFinder $finder, ClassMethod $method,
-    # RuleRegistry $registry, AnalysisConfig $config, RuleDefinition $definition,
+    # framework conventions (Stmt $stmt, Expr $expr, RuleRegistry $registry,
+    # AnalysisConfig $config, RuleDefinition $definition,
     # TextReporter $report, etc.). The list is project-specific - downstream
     # projects should review and pick their own list rather than inheriting
     # gruff's vocabulary verbatim.
@@ -253,8 +262,6 @@ rules:
                 - node
                 - stmt
                 - expr
-                - finder
-                - method
                 - call
                 - registry
                 - config
@@ -336,16 +343,12 @@ rules:
         enabled: true
         options:
             typeSuffixes:
-                - String
                 - Array
                 - List
                 - Map
                 - Set
                 - Hash
                 - Object
-                - Integer
-                - Float
-                - Boolean
     # Consistent test names make failures easier to triage.
     naming.test-naming-consistency:
         enabled: true

@@ -122,9 +122,9 @@ final readonly class LoopInTestRule implements RuleInterface
      *
      * @return bool True when a PHPUnit/Pest assertion is inside the loop body.
      */
-    private function hasLoopAssertion(NodeFinder $finder, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
+    private function hasLoopAssertion(NodeFinder $nodeFinder, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
     {
-        return $finder->findFirst(
+        return $nodeFinder->findFirst(
             $loop->stmts,
             static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isAssertionCall($node),

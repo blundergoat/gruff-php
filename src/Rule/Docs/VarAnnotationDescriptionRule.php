@@ -149,6 +149,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                 continue;
             }
 
+            // Capture the asserted variable and any trailing explanation on local @var tags.
             if (preg_match('/^@var\b.*?\$(?<variable>[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*)(?<description>.*)$/u', $line, $matches) !== 1) {
                 continue;
             }

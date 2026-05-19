@@ -153,6 +153,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
         set_error_handler(static fn (): bool => true);
 
         try {
+            // Apply the configured test-name regex while suppressing invalid-pattern warnings.
             return preg_match($pattern, $methodName) === 1;
         } finally {
             restore_error_handler();

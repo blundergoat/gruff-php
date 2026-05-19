@@ -31,7 +31,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify generic method names detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGenericMethodNamesDetected(): void
     {
@@ -48,7 +48,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify qualified method names not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testQualifiedMethodNamesNotFlagged(): void
     {
@@ -63,7 +63,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify symfony console execute override not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSymfonyConsoleExecuteOverrideNotFlagged(): void
     {
@@ -76,7 +76,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify single char variables detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSingleCharVariablesDetected(): void
     {
@@ -90,7 +90,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify loop counters excluded.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoopCountersExcluded(): void
     {
@@ -104,7 +104,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify catch variable excluded.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCatchVariableExcluded(): void
     {
@@ -117,7 +117,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify boolean prefix missing.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBooleanPrefixMissing(): void
     {
@@ -135,7 +135,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify good boolean prefix not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGoodBooleanPrefixNotFlagged(): void
     {
@@ -155,7 +155,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify non bool method not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNonBoolMethodNotFlagged(): void
     {
@@ -168,7 +168,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify hungarian notation detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHungarianNotationDetected(): void
     {
@@ -185,7 +185,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify clean variables not flagged as hungarian.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanVariablesNotFlaggedAsHungarian(): void
     {
@@ -200,7 +200,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify confusing standalone class names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfusingStandaloneClassNames(): void
     {
@@ -214,7 +214,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify domain specific class names not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDomainSpecificClassNamesNotFlagged(): void
     {
@@ -228,7 +228,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify mixed test naming detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMixedTestNamingDetected(): void
     {
@@ -241,7 +241,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify consistent test naming not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConsistentTestNamingNotFlagged(): void
     {
@@ -254,7 +254,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify class file mismatch.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClassFileMismatch(): void
     {
@@ -267,7 +267,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify class file mismatch skips non classlike config filenames.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClassFileMismatchSkipsNonClasslikeConfigFilenames(): void
     {
@@ -291,7 +291,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier tokenizer splits common identifier shapes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
     {
@@ -305,7 +305,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality finds placeholder generic and numbered names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityFindsPlaceholderGenericAndNumberedNames(): void
     {
@@ -340,7 +340,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality exempts common noise sources.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityExemptsCommonNoiseSources(): void
     {
@@ -359,7 +359,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify identifier quality metadata is specific.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityMetadataIsSpecific(): void
     {
@@ -380,7 +380,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify generic foreach variables report only once the configured body threshold is reached.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIdentifierQualityFlagsGenericLoopVariablesAtConfiguredBodyThreshold(): void
     {
@@ -402,7 +402,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify closure and arrow scopes are checked without leaking into the parent method.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClosureAndArrowScopesAreCoveredByNamingRules(): void
     {
@@ -422,7 +422,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify suffix-Hungarian notation is detected while conversion idioms stay clear.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSuffixHungarianDetectsTrailingTypeTokens(): void
     {
@@ -438,7 +438,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Verify clean fixture has no naming findings except file mismatch.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanFixtureHasNoNamingFindingsExceptFileMismatch(): void
     {

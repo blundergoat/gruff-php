@@ -24,7 +24,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects missing host.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsMissingHost(): void
     {
@@ -36,7 +36,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects mismatched host.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsMismatchedHost(): void
     {
@@ -48,7 +48,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects oversized request line.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsOversizedRequestLine(): void
     {
@@ -60,7 +60,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects oversized headers.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsOversizedHeaders(): void
     {
@@ -77,7 +77,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects oversized header block by bytes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsOversizedHeaderBlockByBytes(): void
     {
@@ -89,7 +89,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify allows dashboard health scan head and rejects post.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAllowsDashboardHealthScanHeadAndRejectsPost(): void
     {

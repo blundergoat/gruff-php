@@ -126,14 +126,14 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
      * @param list<Node> $statements Parsed statements to inspect.
      * @return array<string, true> Lowercase variadic method names.
      */
-    private function variadicMethodNames(array $statements, NodeFinder $finder): array
+    private function variadicMethodNames(array $statements, NodeFinder $nodeFinder): array
     {
         $names = [];
 
-        foreach ($finder->findInstanceOf($statements, ClassMethod::class) as $method) {
-            foreach ($method->params as $param) {
+        foreach ($nodeFinder->findInstanceOf($statements, ClassMethod::class) as $classMethod) {
+            foreach ($classMethod->params as $param) {
                 if ($param->variadic) {
-                    $names[strtolower($method->name->toString())] = true;
+                    $names[strtolower($classMethod->name->toString())] = true;
                     break;
                 }
             }

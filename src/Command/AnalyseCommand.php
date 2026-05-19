@@ -55,7 +55,7 @@ final class AnalyseCommand extends Command
     /**
      * Configure the analyse command arguments and options.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function configure(): void
     {
@@ -290,7 +290,7 @@ final class AnalyseCommand extends Command
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
      * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs Timed analyse phase durations in nanoseconds.
-     * @return void No return value.
+     * @return void
      */
     private function emitRuntimePayload(
         OutputInterface $output,
@@ -466,7 +466,7 @@ final class AnalyseCommand extends Command
     /**
      * Render the report with the reporter selected by output format.
      *
-     * @return void No return value.
+     * @return void
      */
     private function renderReport(
         AnalysisReport $report,

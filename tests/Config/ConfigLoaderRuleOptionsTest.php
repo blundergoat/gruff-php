@@ -29,7 +29,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify honours default enabled from rule definition.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHonoursDefaultEnabledFromRuleDefinition(): void
     {
@@ -43,7 +43,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify can enable default disabled rule via config.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCanEnableDefaultDisabledRuleViaConfig(): void
     {
@@ -61,7 +61,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify loads rule options.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoadsRuleOptions(): void
     {
@@ -85,7 +85,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify rejects unknown rule option key.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsUnknownRuleOptionKey(): void
     {
@@ -104,7 +104,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify rejects invalid rule option type.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsInvalidRuleOptionType(): void
     {
@@ -157,7 +157,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      *
      * @param string $configTemplate  Config JSON template.
      * @param string $messageTemplate Expected exception message template.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('invalidRuleOptionTypeProvider')]
     public function testRejectsInvalidRuleOptionTypeVariants(string $configTemplate, string $messageTemplate): void

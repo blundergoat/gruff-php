@@ -70,9 +70,9 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * @return list<ClassMethod|Function_>
      */
-    private function analysableNodes(AnalysisUnit $analysisUnit, NodeFinder $finder): array
+    private function analysableNodes(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
-        $foundNodes = $finder->find($analysisUnit->statements, static function (Node $node): bool {
+        $foundNodes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Function_ || $node instanceof ClassMethod;
         });
         $nodes = [];
@@ -99,17 +99,17 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return bool True when the method body is in scope and not bound to an external interface contract.
      */
-    private function isAnalysableMethod(ClassMethod $method): bool
+    private function isAnalysableMethod(ClassMethod $classMethod): bool
     {
-        if ($method->isAbstract() || $this->isMagicContractMethod($method)) {
+        if ($classMethod->isAbstract() || $this->isMagicContractMethod($classMethod)) {
             return false;
         }
 
-        if ($method->isPrivate()) {
+        if ($classMethod->isPrivate()) {
             return true;
         }
 
-        return !$this->hasExternalMethodContract($method);
+        return !$this->hasExternalMethodContract($classMethod);
     }
 
     /**
@@ -117,9 +117,9 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return bool True when the name begins with `__` and is not `__construct`.
      */
-    private function isMagicContractMethod(ClassMethod $method): bool
+    private function isMagicContractMethod(ClassMethod $classMethod): bool
     {
-        $name = strtolower($method->name->toString());
+        $name = strtolower($classMethod->name->toString());
 
         return str_starts_with($name, '__') && $name !== '__construct';
     }
@@ -129,13 +129,13 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return bool True when an Override attribute, inheritDoc marker, or `extends` / `implements` ancestor exists.
      */
-    private function hasExternalMethodContract(ClassMethod $method): bool
+    private function hasExternalMethodContract(ClassMethod $classMethod): bool
     {
-        if ($this->hasOverrideAttribute($method) || $this->hasInheritDoc($method)) {
+        if ($this->hasOverrideAttribute($classMethod) || $this->hasInheritDoc($classMethod)) {
             return true;
         }
 
-        $parent = $method->getAttribute('parent');
+        $parent = $classMethod->getAttribute('parent');
 
         if ($parent instanceof Node\Stmt\Class_) {
             return $parent->extends !== null || $parent->implements !== [];
@@ -153,9 +153,9 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return bool
      */
-    private function hasOverrideAttribute(ClassMethod $method): bool
+    private function hasOverrideAttribute(ClassMethod $classMethod): bool
     {
-        foreach ($method->attrGroups as $attributeGroup) {
+        foreach ($classMethod->attrGroups as $attributeGroup) {
             foreach ($attributeGroup->attrs as $attribute) {
                 if (strtolower($attribute->name->getLast()) === 'override') {
                     return true;
@@ -171,11 +171,12 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return bool
      */
-    private function hasInheritDoc(ClassMethod $method): bool
+    private function hasInheritDoc(ClassMethod $classMethod): bool
     {
-        $docComment = $method->getDocComment();
+        $docComment = $classMethod->getDocComment();
 
         return $docComment !== null
+            // Match both block `@inheritdoc` and inline `{@inheritdoc}` inheritance markers.
             && preg_match('/\\{?@inheritdoc\\b\\}?/i', $docComment->getText()) === 1;
     }
 
@@ -186,10 +187,10 @@ final readonly class UnusedParameterRule implements RuleInterface
     private function findingsForNode(
         AnalysisUnit $analysisUnit,
         RuleDefinition $definition,
-        NodeFinder $finder,
+        NodeFinder $nodeFinder,
         ClassMethod|Function_ $node,
     ): array {
-        $usedNames = $this->usedVariableNames($node, $finder);
+        $usedNames = $this->usedVariableNames($node, $nodeFinder);
         $findings  = [];
 
         foreach ($this->parameterNames($node) as $name => $param) {
@@ -232,10 +233,10 @@ final readonly class UnusedParameterRule implements RuleInterface
      * @param ClassMethod|Function_ $node
      * @return array<string, true>
      */
-    private function usedVariableNames(ClassMethod|Function_ $node, NodeFinder $finder): array
+    private function usedVariableNames(ClassMethod|Function_ $node, NodeFinder $nodeFinder): array
     {
         $usedNames = [];
-        $usedVars  = $finder->find($node->stmts ?? [], static function (Node $child): bool {
+        $usedVars  = $nodeFinder->find($node->stmts ?? [], static function (Node $child): bool {
             return $child instanceof Variable
                 && is_string($child->name)
                 && self::isVariableUse($child);

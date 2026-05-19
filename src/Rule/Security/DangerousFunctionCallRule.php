@@ -108,10 +108,10 @@ final class DangerousFunctionCallRule implements RuleInterface
      * @param list<Node\Stmt> $statements
      * @return array<string, true>
      */
-    private function callableParameterNames(array $statements, NodeFinder $finder): array
+    private function callableParameterNames(array $statements, NodeFinder $nodeFinder): array
     {
         $names     = [];
-        $functions = $finder->find($statements, static fn (Node $node): bool => $node instanceof Function_ || $node instanceof ClassMethod);
+        $functions = $nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Function_ || $node instanceof ClassMethod);
 
         foreach ($functions as $function) {
             if (!$function instanceof Function_ && !$function instanceof ClassMethod) {
@@ -134,11 +134,11 @@ final class DangerousFunctionCallRule implements RuleInterface
      * @param list<Node\Stmt> $statements
      * @return array<string, true>
      */
-    private function callablePropertyNames(array $statements, NodeFinder $finder): array
+    private function callablePropertyNames(array $statements, NodeFinder $nodeFinder): array
     {
         $names = [];
 
-        foreach ($finder->findInstanceOf($statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($statements, Property::class) as $property) {
             if (!$this->isCallableType($property->type)) {
                 continue;
             }
@@ -148,9 +148,9 @@ final class DangerousFunctionCallRule implements RuleInterface
             }
         }
 
-        foreach ($finder->findInstanceOf($statements, Class_::class) as $class) {
-            foreach ($class->getMethods() as $method) {
-                foreach ($method->params as $param) {
+        foreach ($nodeFinder->findInstanceOf($statements, Class_::class) as $class) {
+            foreach ($class->getMethods() as $classMethod) {
+                foreach ($classMethod->params as $param) {
                     if (
                         $param->flags === 0
                         || !$param->var instanceof Expr\Variable

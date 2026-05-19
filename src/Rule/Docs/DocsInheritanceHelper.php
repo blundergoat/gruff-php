@@ -18,19 +18,19 @@ use PhpParser\NodeFinder;
 final readonly class DocsInheritanceHelper
 {
     /**
-     * @param ClassMethod     $method     Method node whose inherited contract should be inspected.
-     * @param list<Node\Stmt> $statements Parsed statements used to find ancestor declarations.
-     * @param NodeFinder      $finder     Node finder used to search inherited method candidates.
+     * @param ClassMethod     $classMethod Method node whose inherited contract should be inspected.
+     * @param list<Node\Stmt> $statements  Parsed statements used to find ancestor declarations.
+     * @param NodeFinder      $nodeFinder  Node finder used to search inherited method candidates.
      *
      * @return bool True when inheritance or override metadata provides the contract docs.
      */
-    public function hasInheritedContractDoc(ClassMethod $method, array $statements, NodeFinder $finder): bool
+    public function hasInheritedContractDoc(ClassMethod $classMethod, array $statements, NodeFinder $nodeFinder): bool
     {
-        if ($this->hasInheritDoc($method) || $this->hasOverrideAttribute($method)) {
+        if ($this->hasInheritDoc($classMethod) || $this->hasOverrideAttribute($classMethod)) {
             return true;
         }
 
-        $class = $this->enclosingClass($method);
+        $class = $this->enclosingClass($classMethod);
         if (!$class instanceof Class_) {
             return false;
         }
@@ -39,9 +39,9 @@ final readonly class DocsInheritanceHelper
 
         return $ancestorNames !== [] && $this->hasDocumentedAncestorMethod(
             ancestorNames: $ancestorNames,
-            methodName:    strtolower($method->name->toString()),
+            methodName:    strtolower($classMethod->name->toString()),
             statements:    $statements,
-            finder:        $finder,
+            nodeFinder:    $nodeFinder,
         );
     }
 
@@ -70,7 +70,7 @@ final readonly class DocsInheritanceHelper
      * @param list<string>    $ancestorNames Short names of direct ancestors.
      * @param string          $methodName    Lowercase method name to find.
      * @param list<Node\Stmt> $statements    Parsed statements used to find ancestor declarations.
-     * @param NodeFinder      $finder        Node finder used to search inherited method candidates.
+     * @param NodeFinder      $nodeFinder    Node finder used to search inherited method candidates.
      *
      * @return bool True when a same-file ancestor method has a docblock.
      */
@@ -78,9 +78,9 @@ final readonly class DocsInheritanceHelper
         array $ancestorNames,
         string $methodName,
         array $statements,
-        NodeFinder $finder,
+        NodeFinder $nodeFinder,
     ): bool {
-        foreach ($finder->findInstanceOf($statements, ClassLike::class) as $candidate) {
+        foreach ($nodeFinder->findInstanceOf($statements, ClassLike::class) as $candidate) {
             if (!$this->isNamedAncestorCandidate($candidate, $ancestorNames)) {
                 continue;
             }
@@ -129,10 +129,11 @@ final readonly class DocsInheritanceHelper
      *
      * @return bool True when inheritdoc is present.
      */
-    private function hasInheritDoc(ClassMethod $method): bool
+    private function hasInheritDoc(ClassMethod $classMethod): bool
     {
-        $doc = $method->getDocComment();
+        $doc = $classMethod->getDocComment();
 
+        // Match both block `@inheritdoc` and inline `{@inheritdoc}` inheritance markers.
         return $doc !== null && preg_match('/@inheritdoc|{@inheritdoc}/i', $doc->getText()) === 1;
     }
 
@@ -141,9 +142,9 @@ final readonly class DocsInheritanceHelper
      *
      * @return bool True when an Override attribute is present.
      */
-    private function hasOverrideAttribute(ClassMethod $method): bool
+    private function hasOverrideAttribute(ClassMethod $classMethod): bool
     {
-        foreach ($method->attrGroups as $group) {
+        foreach ($classMethod->attrGroups as $group) {
             foreach ($group->attrs as $attribute) {
                 $shortName = strtolower($this->shortName($attribute->name));
                 if ($shortName === 'override') {
@@ -160,9 +161,9 @@ final readonly class DocsInheritanceHelper
      *
      * @return Class_|null Enclosing class node, or null outside a class.
      */
-    private function enclosingClass(ClassMethod $method): ?Class_
+    private function enclosingClass(ClassMethod $classMethod): ?Class_
     {
-        $parent = $method->getAttribute('parent');
+        $parent = $classMethod->getAttribute('parent');
 
         while ($parent instanceof Node) {
             if ($parent instanceof Class_) {

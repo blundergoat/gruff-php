@@ -25,6 +25,7 @@ use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
+use GruffPhp\Rule\Docs\RegexCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
@@ -279,6 +280,7 @@ final class RuleRegistry
             new MissingReadmeRule(),
             new MissingReturnTagRule(),
             new MissingThrowsTagRule(),
+            new RegexCommentRule(),
             new StaleParamTagRule(),
             new TodoDensityRule(),
             new UselessPhpdocRule(),

@@ -10,6 +10,7 @@ use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
 use GruffPhp\Rule\Docs\MissingPropertyPhpdocRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingThrowsTagRule;
+use GruffPhp\Rule\Docs\RegexCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
 use GruffPhp\Rule\Docs\UselessPhpdocRule;
@@ -150,6 +151,35 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('$attributedMethodResult', $symbols);
+    }
+
+    /**
+     * Verify preg_match calls require immediate explanatory comments.
+     *
+     * @return void
+     */
+    public function testRegexCommentRequiresImmediatePurposeComment(): void
+    {
+        $findings = $this->analyseRule('regex-comment.php', RegexCommentRule::ID);
+
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        sort($symbols);
+
+        self::assertSame(
+            [
+                'RegexCommentFixture::isSeparatedRegexMatch()',
+                'RegexCommentFixture::isUndocumentedRegexMatch()',
+            ],
+            $symbols,
+        );
+        self::assertSame(
+            ['preg_match', 'preg_match'],
+            array_map(static function ($finding): ?string {
+                $functionName = $finding->metadata['function'] ?? null;
+
+                return is_string($functionName) ? $functionName : null;
+            }, $findings),
+        );
     }
 
     /**

@@ -188,6 +188,7 @@ abstract class CliTestCase extends TestCase
         $name = stream_socket_get_name($server, false);
         fclose($server);
 
+        // Extract the assigned TCP port from the bound socket name.
         if (!is_string($name) || !preg_match('/:(\d+)$/', $name, $matches)) {
             throw new RuntimeException('Unable to read allocated test port.');
         }

@@ -15,7 +15,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Verify parse paths drops option prefixed entries.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParsePathsDropsOptionPrefixedEntries(): void
     {
@@ -29,7 +29,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Verify analyse command separates owned options from user paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSeparatesOwnedOptionsFromUserPaths(): void
     {
@@ -46,7 +46,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Verify option like path cannot reach produced argument vector.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOptionLikePathCannotReachProducedArgumentVector(): void
     {

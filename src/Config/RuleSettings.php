@@ -131,16 +131,16 @@ final readonly class RuleSettings
             throw new LogicException(sprintf('Option "%s" must be an array of strings.', $name));
         }
 
-        $result = [];
+        $stringOptions = [];
 
-        foreach ($optionValue as $item) {
-            if (!is_string($item)) {
+        foreach ($optionValue as $optionItem) {
+            if (!is_string($optionItem)) {
                 throw new LogicException(sprintf('Option "%s" must contain only strings.', $name));
             }
 
-            $result[] = $item;
+            $stringOptions[] = $optionItem;
         }
 
-        return $result;
+        return $stringOptions;
     }
 }

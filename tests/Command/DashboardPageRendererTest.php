@@ -18,7 +18,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard HTML preserves shell structure and escaped form state.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDashboardHtmlRendersEscapedControlsInOrder(): void
     {
@@ -52,7 +52,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify include-ignored checkbox state is rendered when selected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDashboardHtmlMarksIncludeIgnoredWhenSelected(): void
     {
@@ -64,7 +64,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is injected after the body tag with a complete payload.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInjectDashboardMetadataEmbedsPayloadAfterBodyTag(): void
     {
@@ -91,7 +91,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify scan metadata is prepended when a report body tag is unavailable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInjectDashboardMetadataPrependsPayloadWithoutBodyTag(): void
     {
@@ -111,7 +111,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify invalid metadata strings fall back to the minimal completion payload.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInjectDashboardMetadataFallsBackWhenJsonEncodingFails(): void
     {
@@ -130,7 +130,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Verify dashboard error HTML escapes untrusted message and detail text.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorHtmlEscapesMessageDetailAndReportsTiming(): void
     {
@@ -184,6 +184,7 @@ final class DashboardPageRendererTest extends TestCase
     private function metadataPayload(string $html): array
     {
         $pattern = '~<script id="gruff-dashboard-meta" type="application/json">(?P<payload>.*?)</script>~';
+        // Extract the dashboard metadata JSON payload from the rendered script tag.
         $matched = preg_match($pattern, $html, $matches);
 
         self::assertSame(1, $matched);

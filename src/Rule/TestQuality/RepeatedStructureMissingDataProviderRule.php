@@ -80,23 +80,23 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
 
             $groups = [];
 
-            foreach ($class->getMethods() as $method) {
-                if (!TestQualityNodeHelper::isTestMethod($method)) {
+            foreach ($class->getMethods() as $classMethod) {
+                if (!TestQualityNodeHelper::isTestMethod($classMethod)) {
                     continue;
                 }
 
-                if ($this->usesDataProvider($method)) {
+                if ($this->usesDataProvider($classMethod)) {
                     continue;
                 }
 
-                $stmts = array_values($method->stmts ?? []);
+                $stmts = array_values($classMethod->stmts ?? []);
                 if (count($stmts) < 2) {
                     continue;
                 }
 
                 $shape = $this->fingerprint($stmts, $nodeFinder);
                 $groups[$shape] ??= [];
-                $groups[$shape][] = $method;
+                $groups[$shape][] = $classMethod;
             }
 
             foreach ($groups as $methods) {
@@ -104,7 +104,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                     continue;
                 }
 
-                $names = array_map(static fn (Stmt\ClassMethod $method): string => $method->name->toString(), $methods);
+                $names = array_map(static fn (Stmt\ClassMethod $classMethod): string => $classMethod->name->toString(), $methods);
                 $first = $methods[0];
 
                 $findings[] = new Finding(
@@ -155,9 +155,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      *
      * @return bool True when an attribute or docblock data provider is present.
      */
-    private function usesDataProvider(Stmt\ClassMethod $method): bool
+    private function usesDataProvider(Stmt\ClassMethod $classMethod): bool
     {
-        foreach ($method->attrGroups as $group) {
+        foreach ($classMethod->attrGroups as $group) {
             foreach ($group->attrs as $attr) {
                 if (strtolower($attr->name->getLast()) === 'dataprovider') {
                     return true;
@@ -165,7 +165,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             }
         }
 
-        return str_contains($method->getDocComment()?->getText() ?? '', '@dataProvider');
+        return str_contains($classMethod->getDocComment()?->getText() ?? '', '@dataProvider');
     }
 
     /**
@@ -173,11 +173,11 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      *
      * @return string Structure fingerprint for comparison across tests.
      */
-    private function fingerprint(array $stmts, NodeFinder $finder): string
+    private function fingerprint(array $stmts, NodeFinder $nodeFinder): string
     {
         $tokens = [];
 
-        foreach ($finder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\New_
+        foreach ($nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\New_
             || $node instanceof Expr\FuncCall
             || $node instanceof Expr\MethodCall
             || $node instanceof Expr\StaticCall

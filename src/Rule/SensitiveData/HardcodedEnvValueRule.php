@@ -131,14 +131,17 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
      */
     private function isCommonNonSecretValue(string $secretValue): bool
     {
+        // Treat short lowercase kebab-case literals as ordinary labels, not secrets.
         if (preg_match('/^[a-z][a-z0-9-]{1,24}$/', $secretValue) === 1) {
             return true;
         }
 
+        // Treat short lowercase snake-case literals as ordinary labels, not secrets.
         if (preg_match('/^[a-z][a-z0-9_]{1,40}$/', $secretValue) === 1) {
             return true;
         }
 
+        // Treat dotted or dashed values ending in punctuation as path-ish or prefix-ish tokens.
         if (preg_match('/^[a-z][a-z0-9_.-]+[._-]$/', $secretValue) === 1) {
             return true;
         }

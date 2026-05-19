@@ -126,20 +126,21 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Report whether a source line contains a named argument.
      *
-     * @param string $line Finding line number.
+     * @param string $line Source line to inspect.
      * @return bool True when the assertion condition is met.
      */
     private function isNamedArgumentLine(string $line): bool
     {
         $namedArgumentPattern = '/^[ \t]+[A-Za-z_][A-Za-z0-9_]*\s*:(?!:)\s*\S.*(?:,)?\R?$/';
 
+        // Match an indented named argument line without confusing `::` for an argument separator.
         return preg_match($namedArgumentPattern, $line) === 1;
     }
 
     /**
      * @param list<string> $lines
      * @param list<int>    $group
-     * @return void No return value.
+     * @return void
      */
     private function alignGroup(array &$lines, array $group): void
     {
@@ -151,6 +152,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
         $maxNameLength = 0;
 
         foreach ($group as $index) {
+            // Capture indentation, argument name, value, and line ending before aligning the group.
             if (preg_match('/^(?<indent>[ \t]+)(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)\s*(?<value>\S.*?)(?<eol>\R?)$/', $lines[$index], $matches) !== 1) {
                 return;
             }

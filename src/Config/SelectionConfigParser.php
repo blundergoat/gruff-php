@@ -136,17 +136,17 @@ final readonly class SelectionConfigParser
             throw new ConfigException('Config key "selection" must be an object.');
         }
 
-        $result = [];
+        $normalizedSelection = [];
 
-        foreach ($decodedValue as $key => $item) {
+        foreach ($decodedValue as $key => $decodedItem) {
             if (!is_string($key)) {
                 throw new ConfigException('Config key "selection" must be an object.');
             }
 
-            $result[$key] = $this->configValue($item);
+            $normalizedSelection[$key] = $this->configValue($decodedItem);
         }
 
-        return $result;
+        return $normalizedSelection;
     }
 
     /**
@@ -178,66 +178,66 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
-    private function configArray(array $values): array
+    private function configArray(array $decodedSelectionValues): array
     {
-        $result = [];
+        $normalizedSelectionValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        foreach ($decodedSelectionValues as $key => $decodedItem) {
+            $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedSelectionValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
-    private function configArrayDepth2(array $values): array
+    private function configArrayDepth2(array $decodedSelectionValues): array
     {
-        $result = [];
+        $normalizedSelectionValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        foreach ($decodedSelectionValues as $key => $decodedItem) {
+            $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedSelectionValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
-    private function configArrayDepth3(array $values): array
+    private function configArrayDepth3(array $decodedSelectionValues): array
     {
-        $result = [];
+        $normalizedSelectionValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        foreach ($decodedSelectionValues as $key => $decodedItem) {
+            $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedSelectionValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar>
      */
-    private function configArrayDepth4(array $values): array
+    private function configArrayDepth4(array $decodedSelectionValues): array
     {
-        $result = [];
+        $normalizedSelectionValues = [];
 
-        foreach ($values as $key => $item) {
-            if (is_array($item)) {
+        foreach ($decodedSelectionValues as $key => $decodedItem) {
+            if (is_array($decodedItem)) {
                 throw new ConfigException('Config value nesting is deeper than supported.');
             }
 
-            $result[$key] = $this->configScalar($item);
+            $normalizedSelectionValues[$key] = $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedSelectionValues;
     }
 }

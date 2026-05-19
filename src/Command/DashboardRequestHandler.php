@@ -45,7 +45,7 @@ final readonly class DashboardRequestHandler
      *
      * @param resource $client
      *
-     * @return void No return value.
+     * @return void
      */
     public function handleRequest($client): void
     {
@@ -86,6 +86,7 @@ final readonly class DashboardRequestHandler
             return $this->tooLargeResponse();
         }
 
+        // Parse the HTTP request line into method, target, and protocol version.
         if (!preg_match('/^([A-Z]+)\s+(\S+)\s+HTTP\/\d(?:\.\d)?\r?\n$/', $requestLine, $matches)) {
             return null;
         }
@@ -158,12 +159,12 @@ final readonly class DashboardRequestHandler
         parse_str($rawQuery, $query);
         $clean = [];
 
-        foreach ($query as $key => $value) {
-            if (!is_string($key) || !is_scalar($value)) {
+        foreach ($query as $key => $queryValue) {
+            if (!is_string($key) || !is_scalar($queryValue)) {
                 continue;
             }
 
-            $clean[$key] = (string) $value;
+            $clean[$key] = (string) $queryValue;
         }
 
         return $clean;
@@ -221,15 +222,19 @@ final readonly class DashboardRequestHandler
         $host = strtolower($hostHeader);
         $port = $this->dashboardRequestContext->bindPort;
 
+        // Parse bracketed IPv6 host headers with optional ports.
         if (preg_match('/^\[(?<host>[^\]]+)\](?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = '[' . $matches['host'] . ']';
             if (isset($matches['port'])) {
                 $port = (int) $matches['port'];
             }
-        } elseif (preg_match('/^(?<host>[^:]+)(?::(?<port>\d+))?$/', $host, $matches) === 1) {
-            $host = $matches['host'];
-            if (isset($matches['port'])) {
-                $port = (int) $matches['port'];
+        } else {
+            // Parse non-IPv6 host headers with optional ports.
+            if (preg_match('/^(?<host>[^:]+)(?::(?<port>\d+))?$/', $host, $matches) === 1) {
+                $host = $matches['host'];
+                if (isset($matches['port'])) {
+                    $port = (int) $matches['port'];
+                }
             }
         }
 

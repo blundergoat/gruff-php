@@ -105,11 +105,11 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * @return array<string, string>
      */
-    private function collectLocalAssignmentTypes(TestQualityScope $scope, NodeFinder $finder): array
+    private function collectLocalAssignmentTypes(TestQualityScope $scope, NodeFinder $nodeFinder): array
     {
         $types = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
             if (!$assign instanceof Expr\Assign) {
                 continue;
             }

@@ -163,7 +163,7 @@ final readonly class ConfigLoader
      *
      * @param ConfigObject $rootConfig
      *
-     * @return void No return value.
+     * @return void
      */
     private function assertKnownRootKeys(array $rootConfig): void
     {
@@ -291,6 +291,7 @@ final readonly class ConfigLoader
             ? (new StringListConfigParser())->parse($this->configValue($allowlists['acceptedAbbreviations']), 'allowlists.acceptedAbbreviations', false, false)
             : [];
         foreach ($acceptedAbbreviations as $abbreviation) {
+            // Allow only PHP identifier-shaped abbreviations in the naming allowlist.
             if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $abbreviation)) {
                 throw new ConfigException(sprintf(
                     'Config value "allowlists.acceptedAbbreviations" contains invalid identifier "%s".',
@@ -345,17 +346,17 @@ final readonly class ConfigLoader
             throw new ConfigException($message);
         }
 
-        $result = [];
+        $normalizedConfig = [];
 
-        foreach ($decodedValue as $key => $item) {
+        foreach ($decodedValue as $key => $decodedItem) {
             if (!is_string($key)) {
                 throw new ConfigException($message);
             }
 
-            $result[$key] = $this->configValue($item);
+            $normalizedConfig[$key] = $this->configValue($decodedItem);
         }
 
-        return $result;
+        return $normalizedConfig;
     }
 
     /**
@@ -387,66 +388,66 @@ final readonly class ConfigLoader
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
-    private function configArray(array $values): array
+    private function configArray(array $decodedConfigValues): array
     {
-        $result = [];
+        $normalizedConfigValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth2($item) : $this->configScalar($item);
+        foreach ($decodedConfigValues as $key => $decodedItem) {
+            $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedConfigValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
-    private function configArrayDepth2(array $values): array
+    private function configArrayDepth2(array $decodedConfigValues): array
     {
-        $result = [];
+        $normalizedConfigValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth3($item) : $this->configScalar($item);
+        foreach ($decodedConfigValues as $key => $decodedItem) {
+            $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedConfigValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
-    private function configArrayDepth3(array $values): array
+    private function configArrayDepth3(array $decodedConfigValues): array
     {
-        $result = [];
+        $normalizedConfigValues = [];
 
-        foreach ($values as $key => $item) {
-            $result[$key] = is_array($item) ? $this->configArrayDepth4($item) : $this->configScalar($item);
+        foreach ($decodedConfigValues as $key => $decodedItem) {
+            $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedConfigValues;
     }
 
     /**
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar>
      */
-    private function configArrayDepth4(array $values): array
+    private function configArrayDepth4(array $decodedConfigValues): array
     {
-        $result = [];
+        $normalizedConfigValues = [];
 
-        foreach ($values as $key => $item) {
-            if (is_array($item)) {
+        foreach ($decodedConfigValues as $key => $decodedItem) {
+            if (is_array($decodedItem)) {
                 throw new ConfigException('Config value nesting is deeper than supported.');
             }
 
-            $result[$key] = $this->configScalar($item);
+            $normalizedConfigValues[$key] = $this->configScalar($decodedItem);
         }
 
-        return $result;
+        return $normalizedConfigValues;
     }
 }

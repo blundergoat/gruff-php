@@ -67,8 +67,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
             }
 
             $methodsByName = [];
-            foreach ($class->getMethods() as $method) {
-                $methodsByName[strtolower($method->name->toString())] = $method;
+            foreach ($class->getMethods() as $classMethod) {
+                $methodsByName[strtolower($classMethod->name->toString())] = $classMethod;
             }
 
             foreach ($class->getMethods() as $testMethod) {
@@ -114,11 +114,11 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * @return list<string>
      */
-    private function dataProviderNames(Stmt\ClassMethod $method): array
+    private function dataProviderNames(Stmt\ClassMethod $classMethod): array
     {
         $names = [];
 
-        foreach ($method->attrGroups as $group) {
+        foreach ($classMethod->attrGroups as $group) {
             foreach ($group->attrs as $attr) {
                 if (strtolower($attr->name->getLast()) !== 'dataprovider') {
                     continue;
@@ -131,7 +131,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
             }
         }
 
-        $doc = $method->getDocComment()?->getText() ?? '';
+        $doc = $classMethod->getDocComment()?->getText() ?? '';
         if (preg_match_all('/@dataProvider\s+(\w+)/', $doc, $matches) > 0) {
             foreach ($matches[1] as $name) {
                 $names[] = $name;
@@ -146,9 +146,9 @@ final readonly class EmptyDataProviderRule implements RuleInterface
      *
      * @return bool True when the provider is empty by simple AST inspection.
      */
-    private function isProvablyEmpty(Stmt\ClassMethod $method): bool
+    private function isProvablyEmpty(Stmt\ClassMethod $classMethod): bool
     {
-        $stmts = $method->stmts ?? [];
+        $stmts = $classMethod->stmts ?? [];
 
         if ($stmts === []) {
             return true;

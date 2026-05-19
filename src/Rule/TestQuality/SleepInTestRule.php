@@ -132,11 +132,11 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function dateTimeFindings(NodeFinder $finder, AnalysisUnit $analysisUnit, TestQualityScope $scope): array
+    private function dateTimeFindings(NodeFinder $nodeFinder, AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $newExpression) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $newExpression) {
             if ($newExpression instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($newExpression)) {
                 $findings[] = $this->dateTimeFinding($analysisUnit, $scope, $newExpression);
             }

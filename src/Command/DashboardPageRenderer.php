@@ -194,6 +194,7 @@ JS;
         $display = ['php', 'bin/gruff-php', ...array_slice($command, 2)];
 
         return implode(' ', array_map(
+            // Leave shell-safe dashboard arguments unquoted when they contain only portable token characters.
             static fn (string $argument): string => preg_match('~^[A-Za-z0-9_@%+=:,./-]+$~', $argument) === 1 ? $argument : escapeshellarg($argument),
             $display,
         ));

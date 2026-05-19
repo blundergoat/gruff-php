@@ -40,7 +40,7 @@ final class FunctionLikeScopeWalker
      * Recursively collect function-like scopes, descending only into scope bodies.
      *
      * @param list<FunctionLikeScope> $scopes
-     * @return void No return value.
+     * @return void
      */
     private function discoverScopes(Node $node, array &$scopes): void
     {
@@ -100,7 +100,7 @@ final class FunctionLikeScopeWalker
     /**
      * @param array<string, Variable> $variables
      * @param array<string, true>     $excludedNames
-     * @return void No return value.
+     * @return void
      */
     private function collectLocalVariables(Node $node, array &$variables, array $excludedNames): void
     {
@@ -147,7 +147,7 @@ final class FunctionLikeScopeWalker
     }
     /**
      * @param list<Node> $children
-     * @return void No return value.
+     * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
@@ -158,8 +158,8 @@ final class FunctionLikeScopeWalker
         if (!is_array($subNode)) {
             return;
         }
-        foreach ($subNode as $item) {
-            $this->collectChildNodes($item, $children);
+        foreach ($subNode as $childSubNode) {
+            $this->collectChildNodes($childSubNode, $children);
         }
     }
 }

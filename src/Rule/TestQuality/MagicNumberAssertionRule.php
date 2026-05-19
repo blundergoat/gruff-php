@@ -161,19 +161,19 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
      */
     private function loadAllowedLiterals(RuleContext $ruleContext): array
     {
-        $raw = $ruleContext->settingsFor($this->definition())->option('allowedLiterals');
-        if (!is_array($raw)) {
+        $configuredLiterals = $ruleContext->settingsFor($this->definition())->option('allowedLiterals');
+        if (!is_array($configuredLiterals)) {
             return self::DEFAULT_ALLOWED_LITERALS;
         }
 
-        $values = [];
-        foreach ($raw as $value) {
-            if (is_int($value)) {
-                $values[] = $value;
+        $allowedLiterals = [];
+        foreach ($configuredLiterals as $configuredLiteral) {
+            if (is_int($configuredLiteral)) {
+                $allowedLiterals[] = $configuredLiteral;
             }
         }
 
-        return $values;
+        return $allowedLiterals;
     }
 
     /**

@@ -263,7 +263,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * @param array<Node>        $nodes
      * @param array<string,true> $variables
-     * @return void No return value.
+     * @return void
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
     {
@@ -304,7 +304,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * @param callable(Node): bool $predicate
      * @param list<Node>           $matches
-     * @return void No return value.
+     * @return void
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
@@ -349,7 +349,7 @@ final readonly class ShortVariableRule implements RuleInterface
 
     /**
      * @param list<Node> $children
-     * @return void No return value.
+     * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
@@ -362,8 +362,8 @@ final readonly class ShortVariableRule implements RuleInterface
             return;
         }
 
-        foreach ($subNode as $item) {
-            $this->collectChildNodes($item, $children);
+        foreach ($subNode as $childSubNode) {
+            $this->collectChildNodes($childSubNode, $children);
         }
     }
 

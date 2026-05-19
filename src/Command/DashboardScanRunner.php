@@ -180,7 +180,7 @@ final class DashboardScanRunner
      * Add a file, directory, or missing-path marker to a cache fingerprint.
      *
      * @param list<string> $parts Fingerprint parts collected so far.
-     * @return void No return value.
+     * @return void
      */
     private function appendPathFingerprint(array &$parts, string $scanRoot, string $path): void
     {
@@ -208,7 +208,7 @@ final class DashboardScanRunner
      * Add recursive file metadata for a directory to a cache fingerprint.
      *
      * @param list<string> $parts Fingerprint parts collected so far.
-     * @return void No return value.
+     * @return void
      */
     private function appendDirectoryFingerprint(array &$parts, string $scanRoot, string $directory): void
     {

@@ -121,6 +121,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return false;
         }
 
+        // Recognize common source/config/documentation file extensions in path-like literals.
         return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $candidateSecret) === 1;
     }
 }

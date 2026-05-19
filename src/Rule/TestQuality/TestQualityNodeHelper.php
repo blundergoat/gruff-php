@@ -59,22 +59,22 @@ final class TestQualityNodeHelper
         $nodeFinder = new NodeFinder();
         $scopes     = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\ClassMethod::class) as $method) {
-            if (!self::isTestMethod($method)) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\ClassMethod::class) as $classMethod) {
+            if (!self::isTestMethod($classMethod)) {
                 continue;
             }
 
-            $class      = self::parentClass($method);
+            $class      = self::parentClass($classMethod);
             $className  = $class?->name?->toString();
-            $methodName = $method->name->toString();
+            $methodName = $classMethod->name->toString();
 
             $scopes[] = new TestQualityScope(
                 symbol:     ($className === null ? 'anonymous' : $className) . '::' . $methodName . '()',
                 name:       $methodName,
-                line:       $method->getStartLine(),
-                endLine:    $method->getEndLine(),
-                statements: array_values($method->stmts ?? []),
-                node:       $method,
+                line:       $classMethod->getStartLine(),
+                endLine:    $classMethod->getEndLine(),
+                statements: array_values($classMethod->stmts ?? []),
+                node:       $classMethod,
                 isPest:     false,
                 className:  $className,
             );
@@ -115,20 +115,20 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
      *
-     * @param Stmt\ClassMethod $method Method node to classify.
+     * @param Stmt\ClassMethod $classMethod Method node to classify.
      * @return bool True when the method should be analysed as a test body.
      */
-    public static function isTestMethod(Stmt\ClassMethod $method): bool
+    public static function isTestMethod(Stmt\ClassMethod $classMethod): bool
     {
-        if (self::hasAttribute($method, 'Test')) {
+        if (self::hasAttribute($classMethod, 'Test')) {
             return true;
         }
 
-        if (self::hasTestAnnotation($method)) {
+        if (self::hasTestAnnotation($classMethod)) {
             return true;
         }
 
-        $name = $method->name->toString();
+        $name = $classMethod->name->toString();
 
         if (!str_starts_with($name, 'test')) {
             return false;
@@ -137,7 +137,7 @@ final class TestQualityNodeHelper
         // The bare `test*` prefix only counts as a PHPUnit test method when the enclosing
         // class extends a *TestCase base. This stops library code with method names like
         // testScopes()/testCandidate() being analysed as test bodies.
-        return self::extendsTestCase(self::parentClass($method));
+        return self::extendsTestCase(self::parentClass($classMethod));
     }
 
     /**
@@ -145,10 +145,11 @@ final class TestQualityNodeHelper
      *
      * @return bool True when the method docblock declares `@test` as a tag.
      */
-    private static function hasTestAnnotation(Stmt\ClassMethod $method): bool
+    private static function hasTestAnnotation(Stmt\ClassMethod $classMethod): bool
     {
-        $docText = $method->getDocComment()?->getText() ?? '';
+        $docText = $classMethod->getDocComment()?->getText() ?? '';
 
+        // Detect PHPUnit's @test tag inside a method docblock line.
         return preg_match('/^\s*\*\s*@test\b/m', $docText) === 1;
     }
 

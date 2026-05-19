@@ -60,7 +60,7 @@ final class ReportCommand extends Command
     /**
      * Configure the report command arguments and options.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function configure(): void
     {
@@ -182,7 +182,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendStringOptions(array &$command, InputInterface $input): void
     {
@@ -203,7 +203,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendReportEditorLinkOption(array &$command, InputInterface $input): void
     {
@@ -219,7 +219,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendBaselineOption(array &$command, InputInterface $input): void
     {
@@ -238,7 +238,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendBooleanOptions(array &$command, InputInterface $input): void
     {
@@ -254,7 +254,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendRepeatedOptions(array &$command, InputInterface $input): void
     {
@@ -279,7 +279,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendReportInteractiveOption(array &$command, InputInterface $input): void
     {
@@ -299,7 +299,7 @@ final class ReportCommand extends Command
      *
      * @param list<string> $command Analyse command arguments built so far.
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendDiffOption(array &$command, InputInterface $input): void
     {
@@ -352,7 +352,7 @@ final class ReportCommand extends Command
     /**
      * Forward child process stderr to the most appropriate output stream.
      *
-     * @return void No return value.
+     * @return void
      */
     private function writeStderr(OutputInterface $output, string $stderr): void
     {
