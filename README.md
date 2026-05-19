@@ -10,8 +10,9 @@ for type checking or tests.
 
 ## Release Status
 
-The current application version is `0.1.0-dev`. This repository is being
-prepared for a public `0.1.0` release.
+This repository is prepared for the public `0.1.0` tag. Development checkouts
+may report `0.1.0-dev`; the release script updates the binary version to
+`0.1.0` before tagging.
 
 Current package facts:
 
@@ -19,7 +20,7 @@ Current package facts:
 - Binary: `bin/gruff-php`
 - PHP requirement: `^8.3`
 - Runtime dependencies: `nikic/php-parser`, Symfony Console/Finder/Process/Yaml
-- Rule catalogue: 113 registry rules across 11 pillars
+- Rule catalogue: 114 registry rules across 11 pillars
 - Config format: YAML only (`.yaml`)
 - License: MIT (see [`LICENSE`](LICENSE))
 
@@ -194,6 +195,12 @@ rules:
     severity: error
   complexity.cyclomatic:
     enabled: false
+  size.parameter-count:
+    threshold: 10
+    severity: error
+    options:
+      constructorMaxParameters: 0
+      promotedConstructorMaxParameters: 25
   test-quality.magic-number-assertion:
     options:
       allowedLiterals: [200, 201, 404, 500]
@@ -211,7 +218,12 @@ Supported top-level keys:
 | `rules.<id>` | Per-rule `enabled`, `threshold`, `severity`, `thresholds`, or `options`. |
 
 Unknown keys are rejected. Threshold and option names must match the rule's
-definition.
+definition. Use `php bin/gruff-php list-rules --format json` to inspect the
+available defaults and option names. For `size.parameter-count`,
+`constructorMaxParameters: 0` means constructors inherit the main threshold;
+set it above zero only when non-exempt constructors should use a separate cap.
+Promoted final readonly value-object constructors are bounded separately by
+`promotedConstructorMaxParameters`.
 
 ## Baselines
 
@@ -342,13 +354,17 @@ CI runs on PHP 8.3 and 8.4 via [`.github/workflows/ci.yml`](.github/workflows/ci
 
 Before tagging `0.1.0`:
 
+- Confirm `CHANGELOG.md` has `## 0.1.0 - Unreleased`; the release script will
+  stamp the date.
 - Run `scripts/bump-version.sh 0.1.0` to update `src/Console/Application.php`
   and stamp the `CHANGELOG.md` entry.
 - Confirm Packagist metadata and repository URL.
-- Run `composer validate --strict`, `composer check`, and `composer test`.
+- Run `composer validate --strict`, `composer check`, `composer test`, and
+  `composer format:check`.
 - Run `php bin/gruff-php analyse` and confirm the default self-scan exits 0.
 - Review [`CHANGELOG.md`](CHANGELOG.md).
-- Review [`SECURITY.md`](SECURITY.md) and replace any private-contact placeholder with the real reporting channel.
+- Review [`SECURITY.md`](SECURITY.md) and confirm the private reporting path is
+  enabled for the public repository.
 - Confirm generated artifacts such as `history.json`, `infection-report.json`, and local caches are not part of the release archive.
 
 ## More Documentation

@@ -3,11 +3,12 @@
 All notable changes to `gruff-php` are documented here.
 
 This project follows the spirit of [Keep a Changelog](https://keepachangelog.com/)
-and uses semantic versioning once public tags begin. The current binary reports
-`0.1.0-dev`; the release notes below are the public `0.1.0` preparation notes
-and will be stamped onto the tagged release by `scripts/bump-version.sh`.
+and uses semantic versioning once public tags begin. Before tagging, development
+binaries report `0.1.0-dev`; the release notes below are the public `0.1.0`
+release-candidate notes and will be stamped onto the tagged release by
+`scripts/bump-version.sh`.
 
-## 0.1.0 - 2026-05-19
+## 0.1.0 - Unreleased
 
 First public release of `gruff-php`.
 
@@ -53,6 +54,10 @@ First public release of `gruff-php`.
   `excludePillars` and `excludeRules`.
 - Per-rule overrides for `enabled`, single-threshold `threshold` + `severity`
   shorthand, named `thresholds` tuning values, and rule `options`.
+- `size.parameter-count` exposes `constructorMaxParameters` for opt-in
+  constructor-specific caps while keeping the default strict, plus
+  `promotedConstructorMaxParameters` for promoted final readonly value-object
+  constructors.
 - `allowlists.acceptedAbbreviations` for naming-rule vocabulary and
   `allowlists.secretPreviews` for reviewed sensitive-data previews.
 
@@ -134,7 +139,7 @@ First public release of `gruff-php`.
 
 ### Rule Catalogue
 
-The v0.1 catalogue includes **113** registry rules across 11 pillars:
+The v0.1 catalogue includes **114** registry rules across 11 pillars:
 
 | Pillar | Rules |
 | --- | ---: |
@@ -143,7 +148,7 @@ The v0.1 catalogue includes **113** registry rules across 11 pillars:
 | `maintainability` | 2 |
 | `dead-code` | 9 |
 | `naming` | 12 |
-| `documentation` | 13 |
+| `documentation` | 14 |
 | `modernisation` | 10 |
 | `security` | 11 |
 | `sensitive-data` | 9 |

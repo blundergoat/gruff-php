@@ -8,7 +8,7 @@ Treat analyzer output as sensitive when scanning private code.
 
 | Version | Supported |
 | --- | --- |
-| `0.1.x` | Supported after the first public tag. |
+| `0.1.x` | Supported. |
 | `<0.1.0` | Development snapshots only. |
 
 ## Reporting A Vulnerability
@@ -17,16 +17,18 @@ Do not open a public issue for a vulnerability that could expose secrets,
 execute commands, bypass path boundaries, corrupt files, or leak private source
 content.
 
-Preferred reporting path for a public GitHub repository:
+Preferred reporting path for the public GitHub repository:
 
-1. Use GitHub private vulnerability reporting or a private security advisory.
+1. Use GitHub private vulnerability reporting for
+   `https://github.com/blundergoat/gruff-php` or a private security advisory.
 2. Include the affected version or commit.
 3. Include a minimal reproduction.
 4. State whether the issue affects normal local use, CI use, dashboard use, or
    report generation.
 
-Before public release, the maintainer should replace this section with the real
-security contact if GitHub private reporting is not enabled.
+If private reporting is unavailable in the repository UI, open a public issue
+that asks for a private security contact and do not include exploit details,
+private source, or secret values.
 
 ## Scope
 

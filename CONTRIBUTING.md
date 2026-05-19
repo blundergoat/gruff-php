@@ -2,8 +2,9 @@
 
 Thanks for taking the time to improve `gruff-php`.
 
-This project is preparing its first public release. Keep contributions focused,
-grounded in the current CLI surface, and covered by tests.
+Keep contributions focused, grounded in the current CLI surface, and covered by
+tests. Public rule ids, schemas, and command flags should be treated as
+compatibility-sensitive once `0.1.0` is tagged.
 
 ## Requirements
 

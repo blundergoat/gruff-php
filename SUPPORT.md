@@ -1,6 +1,7 @@
 # Support
 
-This project is preparing for a public `0.1.0` release.
+Support for the `0.1.x` release line is best effort and focused on local CLI,
+CI, reporting, and rule-calibration workflows.
 
 ## Getting Help
 

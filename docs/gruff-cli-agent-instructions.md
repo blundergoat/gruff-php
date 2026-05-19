@@ -165,6 +165,23 @@ rules:
 
 Use `threshold` + `severity` for rules with warning/error metric defaults. Keep `thresholds` for named tuning values such as `minPositionalArguments` or `entropy`.
 
+Tune rule options only with names listed by `list-rules --format=json`. For
+example, `size.parameter-count` supports a constructor-specific cap while
+leaving ordinary methods/functions/closures on the main threshold:
+
+```yaml
+rules:
+    size.parameter-count:
+        threshold: 10
+        severity: error
+        options:
+            constructorMaxParameters: 0
+            promotedConstructorMaxParameters: 25
+```
+
+`constructorMaxParameters: 0` means constructors inherit the main threshold.
+Set it above zero only when non-exempt constructors should use a separate cap.
+
 Skip config for one run:
 
 ```bash
