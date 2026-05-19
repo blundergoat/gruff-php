@@ -72,18 +72,18 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Find tests that reach external files or databases from inside the test body.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for hidden external test dependencies.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\New_) as $node) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\New_) as $node) {
                 $guest = $this->mysteryGuest($node);
                 if ($guest === null) {
                     continue;
@@ -96,7 +96,7 @@ final readonly class MysteryGuestRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s reaches out to %s from inside the test body.', $scope->symbol, $guest),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $node->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,
@@ -154,8 +154,8 @@ final readonly class MysteryGuestRule implements RuleInterface
         }
 
         $readerLine = $node->getStartLine();
-        $finder     = new NodeFinder();
-        foreach ($finder->find($scope->statements, static fn (Node $candidate): bool => $candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall || $candidate instanceof Expr\New_) as $candidate) {
+        $nodeFinder = new NodeFinder();
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $candidate): bool => $candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall || $candidate instanceof Expr\New_) as $candidate) {
             if (!$candidate instanceof Expr\FuncCall && !$candidate instanceof Expr\MethodCall && !$candidate instanceof Expr\StaticCall && !$candidate instanceof Expr\New_) {
                 continue;
             }

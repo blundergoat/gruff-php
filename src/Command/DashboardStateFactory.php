@@ -104,8 +104,8 @@ final class DashboardStateFactory
      */
     public function optionalStringOption(InputInterface $input, string $name): ?string
     {
-        $value = $input->getOption($name);
+        $optionValue = $input->getOption($name);
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 }

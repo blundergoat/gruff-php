@@ -72,16 +72,16 @@ final class DashboardScanRunner
     /**
      * Run a dashboard scan request and return HTML for the iframe.
      *
-     * @param DashboardRequestContext $context Dashboard request context.
+     * @param DashboardRequestContext $dashboardRequestContext Dashboard request context.
      * @param array<string, string>   $query   Request query values from the dashboard form.
      * @return string Dashboard HTML for either scan results or an error panel.
      */
-    public function scanHtml(DashboardRequestContext $context, array $query): string
+    public function scanHtml(DashboardRequestContext $dashboardRequestContext, array $query): string
     {
-        $state          = $this->stateFactory->state($context->input, $context->projectRoot, $query);
-        $renderer       = $this->renderer;
-        $commandBuilder = new DashboardScanCommandBuilder($this->gruffBinary);
-        $scanRoot       = $this->stateFactory->resolveProjectRoot($state['project'], $context->launchRoot);
+        $state                       = $this->stateFactory->state($dashboardRequestContext->input, $dashboardRequestContext->projectRoot, $query);
+        $renderer                    = $this->renderer;
+        $dashboardScanCommandBuilder = new DashboardScanCommandBuilder($this->gruffBinary);
+        $scanRoot                    = $this->stateFactory->resolveProjectRoot($state['project'], $dashboardRequestContext->launchRoot);
 
         if ($scanRoot === null) {
             return $renderer->errorHtml(
@@ -92,8 +92,8 @@ final class DashboardScanRunner
             );
         }
 
-        $paths     = $commandBuilder->parsePaths($state['paths']);
-        $command   = $commandBuilder->analyseCommand($paths, $state);
+        $paths     = $dashboardScanCommandBuilder->parsePaths($state['paths']);
+        $command   = $dashboardScanCommandBuilder->analyseCommand($paths, $state);
         $startedAt = microtime(true);
 
         if ($state['scanScope'] !== 'diff' && $state['includeIgnored'] !== '1') {
@@ -116,7 +116,7 @@ final class DashboardScanRunner
         }
 
         $process = new Process($command, $scanRoot);
-        $process->setTimeout($context->scanTimeout);
+        $process->setTimeout($dashboardRequestContext->scanTimeout);
         $stderr   = '';
         $exitCode = Command::SUCCESS;
 
@@ -215,14 +215,14 @@ final class DashboardScanRunner
         $entries = [];
 
         try {
-            $iterator = new RecursiveIteratorIterator(
+            $recursiveIteratorIterator = new RecursiveIteratorIterator(
                 new RecursiveCallbackFilterIterator(
                     new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
                     fn (SplFileInfo $file): bool => !$file->isDir() || !$this->isIgnoredDirectory($scanRoot, $file->getPathname()),
                 ),
             );
 
-            foreach ($iterator as $file) {
+            foreach ($recursiveIteratorIterator as $file) {
                 if (!$file instanceof SplFileInfo || !$file->isFile()) {
                     continue;
                 }

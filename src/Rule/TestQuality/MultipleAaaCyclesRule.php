@@ -35,13 +35,13 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Multiple arrange-act-assert cycles',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Low,
-            defaultThresholds: ['minCycles' => 2],
+            id:                 self::ID,
+            name:               'Multiple arrange-act-assert cycles',
+            pillar:             Pillar::TestQuality,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Low,
+            defaultThresholds:  ['minCycles' => 2],
             isEnabledByDefault: false,
         );
     }
@@ -49,17 +49,17 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Find tests that appear to repeat act/assert cycles in one method.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for repeated AAA cycles.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minCycles');
+        $threshold = (int) $ruleContext->settingsFor($this->definition())->numericThreshold('minCycles');
         $findings  = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $cycles = $this->countActAssertCycles($scope);
 
             if ($cycles < $threshold) {
@@ -73,7 +73,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                     $scope->symbol,
                     $cycles,
                 ),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
@@ -97,13 +97,13 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     {
         $cycles              = 0;
         $sawNonAssertionCall = false;
-        $finder              = new NodeFinder();
+        $nodeFinder          = new NodeFinder();
 
         foreach ($scope->statements as $stmt) {
             $hasAssertion        = false;
             $hasNonAssertionCall = false;
 
-            foreach ($finder->find([$stmt], static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+            foreach ($nodeFinder->find([$stmt], static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
                 if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }

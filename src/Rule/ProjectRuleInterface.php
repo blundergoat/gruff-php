@@ -21,8 +21,8 @@ interface ProjectRuleInterface
 
     /**
      * @param list<AnalysisUnit> $units   Parsed units available to the project-level rule.
-     * @param RuleContext        $context Project-level rule context for this analysis pass.
+     * @param RuleContext        $ruleContext Project-level rule context for this analysis pass.
      * @return list<Finding>
      */
-    public function analyseProject(array $units, RuleContext $context): array;
+    public function analyseProject(array $units, RuleContext $ruleContext): array;
 }

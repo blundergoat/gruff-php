@@ -323,12 +323,12 @@ final readonly class HtmlReporter
      *
      * @return string HTML for one meta row.
      */
-    private function metaRow(string $label, string $value): string
+    private function metaRow(string $label, string $displayText): string
     {
         return sprintf(
             '<div><span class="label">%s</span><span class="val">%s</span></div>',
             $this->escape($label),
-            $this->escape($value),
+            $this->escape($displayText),
         );
     }
 
@@ -395,9 +395,9 @@ final readonly class HtmlReporter
      *
      * @return string The integer as a decimal string, or "n/a".
      */
-    private function optionalInt(?int $value): string
+    private function optionalInt(?int $integer): string
     {
-        return $value === null ? 'n/a' : (string) $value;
+        return $integer === null ? 'n/a' : (string) $integer;
     }
 
     /**
@@ -596,9 +596,9 @@ final readonly class HtmlReporter
      *
      * @return string The escaped value.
      */
-    private function escape(string $value): string
+    private function escape(string $text): string
     {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /**

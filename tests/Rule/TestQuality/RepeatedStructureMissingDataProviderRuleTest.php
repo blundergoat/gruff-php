@@ -31,7 +31,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
      */
     protected function setUp(): void
     {
-        $this->rule = new RepeatedStructureMissingDataProviderRule();
+        $this->rule   = new RepeatedStructureMissingDataProviderRule();
         $this->parser = new PhpFileParser();
     }
 
@@ -43,7 +43,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     public function testRepeatedStructuresAreFoundAfterNonCandidates(): void
     {
         $findings = $this->analyse('repeated-structure-mutation-cases.php');
-        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertSame([
             'ContinuePastNonTestMethodTest::testAlpha()',
@@ -82,12 +82,12 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
      */
     private function analyse(string $fixture): array
     {
-        $unit = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config = AnalysisConfig::fromRegistry($registry);
-        $context = new RuleContext(__DIR__ . '/../../..', $config);
+        $unit        = $this->parseFixture($fixture);
+        $registry    = RuleRegistry::defaults();
+        $config      = AnalysisConfig::fromRegistry($registry);
+        $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
-        return $this->rule->analyse($unit, $context);
+        return $this->rule->analyse($unit, $ruleContext);
     }
 
     /**

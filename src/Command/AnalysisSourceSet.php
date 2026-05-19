@@ -34,7 +34,7 @@ final readonly class AnalysisSourceSet
     {
         return count(array_filter(
             $this->analysisUnits,
-            static fn (AnalysisUnit $unit): bool => !$unit->hasParseErrors(),
+            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors(),
         ));
     }
 }

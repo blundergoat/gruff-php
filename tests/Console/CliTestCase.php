@@ -113,8 +113,8 @@ abstract class CliTestCase extends TestCase
     {
         self::assertTrue(mkdir($destination, 0777, true));
 
-        $source   = rtrim($source, '/');
-        $iterator = new \RecursiveIteratorIterator(
+        $source                    = rtrim($source, '/');
+        $recursiveIteratorIterator = new \RecursiveIteratorIterator(
             new \RecursiveCallbackFilterIterator(
                 new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
                 static function (\SplFileInfo $file) use ($source): bool {
@@ -139,7 +139,7 @@ abstract class CliTestCase extends TestCase
             \RecursiveIteratorIterator::SELF_FIRST,
         );
 
-        foreach ($iterator as $sourceEntry) {
+        foreach ($recursiveIteratorIterator as $sourceEntry) {
             self::assertInstanceOf(\SplFileInfo::class, $sourceEntry);
             $relativePath = substr($sourceEntry->getPathname(), strlen($source) + 1);
             $targetPath   = $destination . '/' . $relativePath;

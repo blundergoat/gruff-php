@@ -58,16 +58,16 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify nesting depth matches expected.
      *
-     * @param string $methodName Fixture method name.
+     * @param string $methodName    Fixture method name.
      * @param int    $expectedDepth Expected nesting depth.
      * @return void No return value.
      */
     #[DataProvider('methodDepthProvider')]
     public function testNestingDepthMatchesExpected(string $methodName, int $expectedDepth): void
     {
-        $unit    = $this->parseFixture('nesting.php');
-        $finder  = new NodeFinder();
-        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+        $unit       = $this->parseFixture('nesting.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
 

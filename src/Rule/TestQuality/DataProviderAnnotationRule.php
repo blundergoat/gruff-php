@@ -45,16 +45,16 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     /**
      * Find legacy data provider annotations in PHPUnit tests.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for data provider annotation usage.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             if (!$scope->node instanceof Stmt\ClassMethod) {
                 continue;
             }
@@ -67,7 +67,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s uses @dataProvider instead of the PHPUnit attribute form.', $scope->symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

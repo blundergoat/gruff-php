@@ -172,9 +172,9 @@ final class HalsteadVolumeRuleTest extends TestCase
      */
     private function fixtureMethod(string $methodName): ClassMethod
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        foreach ($finder->findInstanceOf($this->parseFixture()->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($this->parseFixture()->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
                 return $method;
             }

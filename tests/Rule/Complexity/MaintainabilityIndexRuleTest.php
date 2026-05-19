@@ -140,15 +140,15 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Return a named method from the cognitive fixture.
      *
-     * @param AnalysisUnit $unit       Parsed fixture.
+     * @param AnalysisUnit $analysisUnit       Parsed fixture.
      * @param string       $methodName Fixture method name.
      * @return ClassMethod Fixture method node.
      */
-    private function fixtureMethod(AnalysisUnit $unit, string $methodName): ClassMethod
+    private function fixtureMethod(AnalysisUnit $analysisUnit, string $methodName): ClassMethod
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
                 return $method;
             }

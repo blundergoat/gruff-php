@@ -33,13 +33,13 @@ final readonly class MutationAnalysisBuilder
             return null;
         }
 
-        $parser = new InfectionReportParser($projectRoot);
+        $infectionReportParser = new InfectionReportParser($projectRoot);
 
         try {
-            $report         = $parser->parse($options->infectionReportPath);
+            $report         = $infectionReportParser->parse($options->infectionReportPath);
             $baselineReport = $options->mutationBaselinePath === null
                 ? null
-                : $parser->parse($options->mutationBaselinePath);
+                : $infectionReportParser->parse($options->mutationBaselinePath);
         } catch (MutationReportException $exception) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'mutation-report-error',

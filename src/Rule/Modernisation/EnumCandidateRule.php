@@ -47,21 +47,21 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Find string or integer constant groups that could become enums.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for enum candidate classes.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             $constants = $class->getConstants();
             if (count($constants) < 2 || $class->getProperties() !== [] || $class->getMethods() !== [] || $class->extends !== null) {
                 continue;
@@ -75,7 +75,7 @@ final readonly class EnumCandidateRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('Class %s only contains scalar constants and may be an enum candidate.', $className),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $class->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::Modernisation,

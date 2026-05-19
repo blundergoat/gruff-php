@@ -60,7 +60,7 @@ final class ListRulesCliTest extends CliTestCase
         try {
             $this->copyPackageTree(self::PROJECT_ROOT, $checkout);
 
-            $install = new Process([
+            $installProcess = new Process([
                 $composerPath,
                 'install',
                 '--no-dev',
@@ -68,16 +68,16 @@ final class ListRulesCliTest extends CliTestCase
                 '--prefer-dist',
                 '--no-progress',
             ], $checkout);
-            $install->setTimeout(120);
-            $install->run();
+            $installProcess->setTimeout(120);
+            $installProcess->run();
 
-            self::assertSame(0, $install->getExitCode(), $install->getErrorOutput() . $install->getOutput());
+            self::assertSame(0, $installProcess->getExitCode(), $installProcess->getErrorOutput() . $installProcess->getOutput());
 
-            $help = new Process([PHP_BINARY, $checkout . '/bin/gruff-php', '--help'], $checkout);
-            $help->run();
+            $helpProcess = new Process([PHP_BINARY, $checkout . '/bin/gruff-php', '--help'], $checkout);
+            $helpProcess->run();
 
-            self::assertSame(0, $help->getExitCode(), $help->getErrorOutput());
-            self::assertStringContainsString('Description:', $help->getOutput());
+            self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());
+            self::assertStringContainsString('Description:', $helpProcess->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }

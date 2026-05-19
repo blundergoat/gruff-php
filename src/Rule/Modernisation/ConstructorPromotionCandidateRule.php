@@ -48,22 +48,22 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Find constructor assignments that can likely use property promotion.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for promotable constructor assignments.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($this->candidateClasses($unit, $finder) as $class) {
-            array_push($findings, ...$this->findingsForClass($unit, $class));
+        foreach ($this->candidateClasses($analysisUnit, $nodeFinder) as $class) {
+            array_push($findings, ...$this->findingsForClass($analysisUnit, $class));
         }
 
         return $findings;
@@ -72,11 +72,11 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * @return list<Stmt\Class_>
      */
-    private function candidateClasses(AnalysisUnit $unit, NodeFinder $finder): array
+    private function candidateClasses(AnalysisUnit $analysisUnit, NodeFinder $finder): array
     {
         $classes = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
             if ($this->canPromoteClass($class)) {
                 $classes[] = $class;
@@ -101,7 +101,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function findingsForClass(AnalysisUnit $unit, Stmt\Class_ $class): array
+    private function findingsForClass(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
     {
         $constructor = $this->constructor($class);
         if (!$constructor instanceof Stmt\ClassMethod) {
@@ -116,7 +116,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             $property = $this->promotableProperty($assign, $constructor, $properties, $lateAssignments);
 
             if ($property !== null) {
-                $findings[] = $this->finding($unit, $assign, $property);
+                $findings[] = $this->finding($analysisUnit, $assign, $property);
             }
         }
 
@@ -213,14 +213,14 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     private function lateAssignments(Stmt\Class_ $class): array
     {
         $assignments = [];
-        $finder      = new NodeFinder();
+        $nodeFinder  = new NodeFinder();
 
         foreach ($class->getMethods() as $method) {
             if (strtolower($method->name->toString()) === '__construct') {
                 continue;
             }
 
-            foreach ($finder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
+            foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
                 $name = ModernisationNodeHelper::propertyFetchName($assign->var);
                 if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                     $assignments[$name] = true;
@@ -252,12 +252,12 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      *
      * @return Finding Constructor promotion finding.
      */
-    private function finding(AnalysisUnit $unit, Node $node, string $property): Finding
+    private function finding(AnalysisUnit $analysisUnit, Node $node, string $property): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Property $%s is assigned directly from the same constructor parameter; PHP 8 property promotion may reduce boilerplate.', $property),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    Severity::Advisory,
             pillar:      Pillar::Modernisation,

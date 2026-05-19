@@ -39,40 +39,40 @@ final class SecretScannerHelper
     /**
      * Build a redacted preview of a sensitive value (first 4 + last 4 chars for values longer than 8 chars).
      *
-     * @param string $value Sensitive value to redact for reporting.
+     * @param string $secretValue Sensitive value to redact for reporting.
      * @return string The redacted preview safe for inclusion in findings and reports.
      */
-    public static function redactedPreview(string $value): string
+    public static function redactedPreview(string $secretValue): string
     {
-        $length = strlen($value);
+        $length = strlen($secretValue);
         if ($length <= 8) {
             return sprintf('<redacted:%d chars>', $length);
         }
 
-        return sprintf('%s...%s (redacted, %d chars)', substr($value, 0, 4), substr($value, -4), $length);
+        return sprintf('%s...%s (redacted, %d chars)', substr($secretValue, 0, 4), substr($secretValue, -4), $length);
     }
 
     /**
      * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
-     * @param string $key   Environment-style key name.
-     * @param string $value Sensitive value associated with the key.
+     * @param string $key        Environment-style key name.
+     * @param string $secretValue Sensitive value associated with the key.
      * @return string
      */
-    public static function redactedKeyValue(string $key, string $value): string
+    public static function redactedKeyValue(string $key, string $secretValue): string
     {
-        return sprintf('%s=<redacted:%d chars>', $key, strlen($value));
+        return sprintf('%s=<redacted:%d chars>', $key, strlen($secretValue));
     }
 
     /**
      * Detect whether the value looks like a placeholder rather than a real secret (changeme / dummy / example / etc.).
      *
-     * @param string $value Candidate sensitive value.
+     * @param string $secretValue Candidate sensitive value.
      * @return bool True when the value is empty, low-cardinality, or matches a known placeholder marker.
      */
-    public static function isLikelyDummyValue(string $value): bool
+    public static function isLikelyDummyValue(string $secretValue): bool
     {
-        $normalized = strtolower(trim($value, "\"' \t\r\n"));
+        $normalized = strtolower(trim($secretValue, "\"' \t\r\n"));
         if ($normalized === '') {
             return true;
         }
@@ -137,17 +137,17 @@ final class SecretScannerHelper
     /**
      * Compute the Shannon entropy of a string in bits-per-character.
      *
-     * @param string $value Candidate secret value.
+     * @param string $secretValue Candidate secret value.
      * @return float The entropy; higher values indicate more random / secret-shaped content.
      */
-    public static function entropy(string $value): float
+    public static function entropy(string $secretValue): float
     {
-        $length = strlen($value);
+        $length = strlen($secretValue);
         if ($length === 0) {
             return 0.0;
         }
 
-        $counts  = count_chars($value, 1);
+        $counts  = count_chars($secretValue, 1);
         $entropy = 0.0;
 
         foreach ($counts as $count) {
@@ -161,7 +161,7 @@ final class SecretScannerHelper
     /**
      * Build a sensitive-data Finding with redacted preview / detector metadata.
      *
-     * @param AnalysisUnit $unit        Parsed unit that owns the finding.
+     * @param AnalysisUnit $analysisUnit        Parsed unit that owns the finding.
      * @param string       $ruleId      Sensitive-data rule identifier.
      * @param string       $message     Human-readable finding message.
      * @param int          $line        Source line for the detected secret.
@@ -172,7 +172,7 @@ final class SecretScannerHelper
      * @return Finding
      */
     public static function finding(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         string $ruleId,
         string $message,
         int $line,
@@ -184,7 +184,7 @@ final class SecretScannerHelper
         return new Finding(
             ruleId:      $ruleId,
             message:     $message,
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    Severity::Warning,
             pillar:      Pillar::SensitiveData,

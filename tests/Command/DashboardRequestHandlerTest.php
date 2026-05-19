@@ -131,8 +131,8 @@ final class DashboardRequestHandlerTest extends TestCase
      */
     private function handler(): DashboardRequestHandler
     {
-        $stateFactory = new DashboardStateFactory();
-        $renderer     = new DashboardPageRenderer();
+        $dashboardStateFactory = new DashboardStateFactory();
+        $dashboardPageRenderer = new DashboardPageRenderer();
 
         return new DashboardRequestHandler(
             new DashboardRequestContext(
@@ -143,8 +143,8 @@ final class DashboardRequestHandlerTest extends TestCase
                 '127.0.0.1',
                 8765,
             ),
-            $stateFactory,
-            new DashboardScanRunner($this->fakeGruffBinary(), $stateFactory, $renderer),
+            $dashboardStateFactory,
+            new DashboardScanRunner($this->fakeGruffBinary(), $dashboardStateFactory, $dashboardPageRenderer),
             new DashboardHttpResponder(),
         );
     }

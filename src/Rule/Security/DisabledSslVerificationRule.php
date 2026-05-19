@@ -47,24 +47,24 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Find cURL calls that disable peer or hostname verification.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for disabled SSL verification.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === 'curl_setopt' && $this->isDisabledCurlSetopt($call)) {
-                $findings[] = $this->finding($unit, $call);
+                $findings[] = $this->finding($analysisUnit, $call);
             }
 
             if ($name === 'curl_setopt_array' && $this->isDisabledCurlSetoptArray($call)) {
-                $findings[] = $this->finding($unit, $call);
+                $findings[] = $this->finding($analysisUnit, $call);
             }
         }
 
@@ -136,12 +136,12 @@ final class DisabledSslVerificationRule implements RuleInterface
      *
      * @return Finding Security finding.
      */
-    private function finding(AnalysisUnit $unit, Node $node): Finding
+    private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     'cURL SSL verification is disabled.',
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::Security,

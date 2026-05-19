@@ -13,22 +13,22 @@ namespace GruffPhp\Config;
 final readonly class StringListConfigParser
 {
     /**
-     * @param ConfigValue $value           Raw config value to normalize.
+     * @param ConfigValue $configValue      Raw config value to normalize.
      * @param string      $path            Config path used in validation messages.
      * @param bool        $hasPathPatterns Whether values are interpreted as path patterns.
      * @param bool        $allowsGlobs     Whether glob-like wildcard patterns are accepted.
      * @return list<string>
      * @throws ConfigException When the config value is not a valid string list.
      */
-    public function parse(object|array|string|int|float|bool|null $value, string $path, bool $hasPathPatterns, bool $allowsGlobs): array
+    public function parse(object|array|string|int|float|bool|null $configValue, string $path, bool $hasPathPatterns, bool $allowsGlobs): array
     {
-        if (!is_array($value) || !array_is_list($value)) {
+        if (!is_array($configValue) || !array_is_list($configValue)) {
             throw new ConfigException(sprintf('Config key "%s" must be a list of strings.', $path));
         }
 
         $strings = [];
 
-        foreach ($value as $index => $rawConfigValue) {
+        foreach ($configValue as $index => $rawConfigValue) {
             $strings[] = $this->normalizedString($rawConfigValue, $path, $index, hasPathPatterns: $hasPathPatterns, allowsGlobs: $allowsGlobs);
         }
 

@@ -46,17 +46,17 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Find unserialize calls that can deserialize untrusted data.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unsafe unserialize calls.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             if (SecurityNodeHelper::globalFunctionName($call) !== 'unserialize') {
                 continue;
             }
@@ -69,7 +69,7 @@ final class UnsafeUnserializeRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Heuristic unsafe unserialize() input detected.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $call->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Security,

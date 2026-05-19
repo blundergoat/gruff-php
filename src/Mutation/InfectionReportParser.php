@@ -95,12 +95,12 @@ final readonly class InfectionReportParser
         }
 
         $stats = [];
-        foreach ($rawStats as $key => $value) {
-            if (!is_string($key) || (!is_int($value) && !is_float($value))) {
+        foreach ($rawStats as $key => $statValue) {
+            if (!is_string($key) || (!is_int($statValue) && !is_float($statValue))) {
                 throw new MutationReportException(sprintf('Infection report "%s" contains a non-numeric stats value.', $path));
             }
 
-            $stats[$key] = $value;
+            $stats[$key] = $statValue;
         }
 
         foreach (['totalMutantsCount', 'msi', 'coveredCodeMsi', 'mutationCodeCoverage'] as $requiredKey) {
@@ -151,14 +151,14 @@ final readonly class InfectionReportParser
      *
      * @return JsonObject
      */
-    private function requireJsonObject(mixed $value, string $message): array
+    private function requireJsonObject(mixed $decodedValue, string $message): array
     {
-        if (!is_array($value) || array_is_list($value)) {
+        if (!is_array($decodedValue) || array_is_list($decodedValue)) {
             throw new MutationReportException($message);
         }
 
         $result = [];
-        foreach ($value as $key => $item) {
+        foreach ($decodedValue as $key => $item) {
             if (!is_string($key)) {
                 throw new MutationReportException($message);
             }
@@ -174,13 +174,13 @@ final readonly class InfectionReportParser
      *
      * @return JsonValue
      */
-    private function jsonValue(mixed $value): array|bool|float|int|string|null
+    private function jsonValue(mixed $decodedValue): array|bool|float|int|string|null
     {
-        if (is_array($value)) {
-            return $this->jsonArray($value);
+        if (is_array($decodedValue)) {
+            return $this->jsonArray($decodedValue);
         }
 
-        return $this->jsonScalar($value);
+        return $this->jsonScalar($decodedValue);
     }
 
     /**
@@ -188,10 +188,10 @@ final readonly class InfectionReportParser
      *
      * @return JsonScalar
      */
-    private function jsonScalar(mixed $value): bool|float|int|string|null
+    private function jsonScalar(mixed $decodedValue): bool|float|int|string|null
     {
-        if (is_bool($value) || is_float($value) || is_int($value) || is_string($value) || $value === null) {
-            return $value;
+        if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
+            return $decodedValue;
         }
 
         throw new MutationReportException('Infection report contains a non-JSON value.');
@@ -268,12 +268,12 @@ final readonly class InfectionReportParser
      */
     private function requireMutatorString(array $mutator, string $field, string $location, string $path): string
     {
-        $value = $mutator[$field] ?? null;
-        if (!is_string($value) || $value === '') {
+        $fieldValue = $mutator[$field] ?? null;
+        if (!is_string($fieldValue) || $fieldValue === '') {
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.%s.', $path, $location, $field));
         }
 
-        return $value;
+        return $fieldValue;
     }
 
     /**

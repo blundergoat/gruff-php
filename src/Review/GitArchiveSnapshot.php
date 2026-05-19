@@ -46,21 +46,21 @@ final readonly class GitArchiveSnapshot
                 array_push($archiveCommand, ...$archivePaths);
             }
 
-            $archive = new Process($archiveCommand, $projectRoot);
-            $archive->run();
+            $archiveProcess = new Process($archiveCommand, $projectRoot);
+            $archiveProcess->run();
 
-            if (!$archive->isSuccessful()) {
-                throw new DiffException(trim($archive->getErrorOutput()) !== ''
-                    ? trim($archive->getErrorOutput())
+            if (!$archiveProcess->isSuccessful()) {
+                throw new DiffException(trim($archiveProcess->getErrorOutput()) !== ''
+                    ? trim($archiveProcess->getErrorOutput())
                     : sprintf('Unable to archive base ref "%s".', $ref));
             }
 
-            $extract = new Process(['tar', '-xf', $archivePath, '-C', $tempRoot]);
-            $extract->run();
+            $extractProcess = new Process(['tar', '-xf', $archivePath, '-C', $tempRoot]);
+            $extractProcess->run();
 
-            if (!$extract->isSuccessful()) {
-                throw new DiffException(trim($extract->getErrorOutput()) !== ''
-                    ? trim($extract->getErrorOutput())
+            if (!$extractProcess->isSuccessful()) {
+                throw new DiffException(trim($extractProcess->getErrorOutput()) !== ''
+                    ? trim($extractProcess->getErrorOutput())
                     : sprintf('Unable to extract base ref "%s".', $ref));
             }
 
@@ -91,12 +91,12 @@ final readonly class GitArchiveSnapshot
             return;
         }
 
-        $iterator = new \RecursiveIteratorIterator(
+        $recursiveIteratorIterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST,
         );
 
-        foreach ($iterator as $file) {
+        foreach ($recursiveIteratorIterator as $file) {
             if (!$file instanceof \SplFileInfo) {
                 continue;
             }

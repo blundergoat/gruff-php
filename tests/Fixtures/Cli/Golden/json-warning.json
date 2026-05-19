@@ -27,10 +27,10 @@
         "missingPaths": 0,
         "parseErrors": 0,
         "findings": {
-            "advisory": 0,
+            "advisory": 1,
             "warning": 2,
             "error": 0,
-            "total": 2
+            "total": 3
         },
         "exitCode": 0
     },
@@ -75,11 +75,36 @@
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
             "fingerprint": "1e6a244048103717",
             "metadata": {}
+        },
+        {
+            "ruleId": "naming.identifier-quality",
+            "message": "Method name \"value\" is generic and does not communicate clear intent.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 19,
+            "endLine": null,
+            "column": null,
+            "symbol": "Alpha::value()",
+            "severity": "advisory",
+            "pillar": "naming",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "medium",
+            "remediation": "Rename the identifier to describe its domain role or action.",
+            "fingerprint": "5b67722a1c71ff6c",
+            "metadata": {
+                "identifierKind": "method",
+                "identifierName": "value",
+                "variant": "generic",
+                "tokens": [
+                    "value"
+                ],
+                "matchedToken": "value"
+            }
         }
     ],
     "score": {
         "composite": {
-            "score": 96.8,
+            "score": 96.5,
             "grade": "A"
         },
         "pillars": [
@@ -130,13 +155,13 @@
             {
                 "pillar": "naming",
                 "applicable": true,
-                "score": 84,
+                "score": 81,
                 "grade": "B",
-                "findings": 1,
-                "advisories": 0,
+                "findings": 2,
+                "advisories": 1,
                 "warnings": 1,
                 "errors": 0,
-                "penalty": 16
+                "penalty": 19
             },
             {
                 "pillar": "documentation",
@@ -197,13 +222,13 @@
         "topOffenders": [
             {
                 "file": "tests/Fixtures/Source/mixed/alpha.php",
-                "score": 60,
-                "grade": "D",
-                "findings": 2,
-                "advisories": 0,
+                "score": 56.25,
+                "grade": "F",
+                "findings": 3,
+                "advisories": 1,
                 "warnings": 2,
                 "errors": 0,
-                "penalty": 40,
+                "penalty": 43.75,
                 "maxCyclomatic": null,
                 "maxCognitive": null,
                 "maxLines": 27,

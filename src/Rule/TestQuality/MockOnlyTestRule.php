@@ -44,16 +44,16 @@ final readonly class MockOnlyTestRule implements RuleInterface
     /**
      * Find tests that exercise only mocks without a concrete subject.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mock-only tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $hasMock         = false;
             $hasVerification = false;
 
@@ -69,7 +69,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s verifies mock interactions without a real assertion.', $scope->symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Warning,
                 pillar:      Pillar::TestQuality,

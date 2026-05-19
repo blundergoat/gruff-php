@@ -57,16 +57,16 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify cyclomatic count matches expected.
      *
-     * @param string $methodName Fixture method name.
+     * @param string $methodName  Fixture method name.
      * @param int    $expectedCcn Expected cyclomatic complexity.
      * @return void No return value.
      */
     #[DataProvider('methodCcnProvider')]
     public function testCyclomaticCountMatchesExpected(string $methodName, int $expectedCcn): void
     {
-        $unit    = $this->parseFixture('cyclomatic.php');
-        $finder  = new NodeFinder();
-        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+        $unit       = $this->parseFixture('cyclomatic.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
 
@@ -105,8 +105,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $ruleIds = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
-        $complexities = array_map(static fn ($finding): mixed => $finding->metadata['complexity'] ?? null, $findings);
+        $ruleIds             = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $complexities        = array_map(static fn ($finding): mixed => $finding->metadata['complexity'] ?? null, $findings);
         $invalidComplexities = array_values(array_filter(
             $complexities,
             static fn (mixed $complexity): bool => !is_int($complexity) || $complexity <= 3,

@@ -204,11 +204,11 @@ final class SecurityRulesTest extends TestCase
     /**
      * @return list<Finding>
      */
-    private function findingsForRule(AnalysisUnit $unit, string $ruleId): array
+    private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId): array
     {
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings = $registry->analyse([$analysisUnit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
             $findings,
@@ -310,7 +310,7 @@ PHP,
     /**
      * Parse inline source into an analysis unit.
      *
-     * @param string $source Source directory.
+     * @param string $source      Source directory.
      * @param string $displayPath Fixture display path.
      * @return AnalysisUnit Fixture value.
      */
@@ -324,10 +324,10 @@ PHP,
             self::fail(sprintf('Inline fixture did not parse: %s', $error->getRawMessage()));
         }
 
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor(new ParentConnectingVisitor());
+        $nodeTraverser = new NodeTraverser();
+        $nodeTraverser->addVisitor(new ParentConnectingVisitor());
         /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
-        $traversed = $traverser->traverse($statements);
+        $traversed = $nodeTraverser->traverse($statements);
 
         return new AnalysisUnit(
             new SourceFile(__FILE__, $displayPath),

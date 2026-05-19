@@ -218,6 +218,7 @@ rules:
                 - entry
                 - helper
                 - info
+                - input
                 - item
                 - row
                 - stuff
@@ -234,8 +235,8 @@ rules:
                 - k
                 - idx
                 - index
+                - input
                 - key
-                - value
             minScopeReferences: 1
             loopBodyThreshold: 4
     # Class-typed parameters should carry their object role in the variable name.
@@ -249,8 +250,6 @@ rules:
         enabled: true
         options:
             ignoredParameterNames:
-                - unit
-                - context
                 - node
                 - stmt
                 - expr

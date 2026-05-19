@@ -22,19 +22,19 @@ final class GitArchiveSnapshotTest extends TestCase
     public function testCreateArchivesOnlyRequestedBasePaths(): void
     {
         $this->skipWhenGitIsUnavailable();
-        $repo         = $this->repoWithBaseFiles();
-        $snapshot     = new GitArchiveSnapshot();
-        $snapshotRoot = null;
+        $repo               = $this->repoWithBaseFiles();
+        $gitArchiveSnapshot = new GitArchiveSnapshot();
+        $snapshotRoot       = null;
 
         try {
-            $snapshotRoot = $snapshot->create($repo, 'HEAD', ['src/Target.php']);
+            $snapshotRoot = $gitArchiveSnapshot->create($repo, 'HEAD', ['src/Target.php']);
 
             self::assertFileExists($snapshotRoot . '/src/Target.php');
             self::assertFileDoesNotExist($snapshotRoot . '/src/Unrelated.php');
             self::assertDirectoryDoesNotExist($snapshotRoot . '/big');
         } finally {
             if ($snapshotRoot !== null) {
-                $snapshot->remove($snapshotRoot);
+                $gitArchiveSnapshot->remove($snapshotRoot);
             }
 
             $this->removeDir($repo);
@@ -49,18 +49,18 @@ final class GitArchiveSnapshotTest extends TestCase
     public function testCreateReturnsEmptySnapshotWhenRequestedPathsDoNotExistInBase(): void
     {
         $this->skipWhenGitIsUnavailable();
-        $repo         = $this->repoWithBaseFiles();
-        $snapshot     = new GitArchiveSnapshot();
-        $snapshotRoot = null;
+        $repo               = $this->repoWithBaseFiles();
+        $gitArchiveSnapshot = new GitArchiveSnapshot();
+        $snapshotRoot       = null;
 
         try {
-            $snapshotRoot = $snapshot->create($repo, 'HEAD', ['src/NewRisk.php']);
+            $snapshotRoot = $gitArchiveSnapshot->create($repo, 'HEAD', ['src/NewRisk.php']);
 
             self::assertDirectoryExists($snapshotRoot);
             self::assertSame([], $this->filesBelow($snapshotRoot));
         } finally {
             if ($snapshotRoot !== null) {
-                $snapshot->remove($snapshotRoot);
+                $gitArchiveSnapshot->remove($snapshotRoot);
             }
 
             $this->removeDir($repo);
@@ -162,12 +162,12 @@ final class GitArchiveSnapshotTest extends TestCase
      */
     private function filesBelow(string $path): array
     {
-        $files    = [];
-        $iterator = new \RecursiveIteratorIterator(
+        $files                     = [];
+        $recursiveIteratorIterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
         );
 
-        foreach ($iterator as $file) {
+        foreach ($recursiveIteratorIterator as $file) {
             if (!$file instanceof \SplFileInfo || !$file->isFile()) {
                 continue;
             }
@@ -210,7 +210,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd Working directory.
+     * @param string $cwd  Working directory.
      * @param string $args Command arguments.
      * @return void No return value.
      */

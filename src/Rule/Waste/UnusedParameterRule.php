@@ -50,18 +50,18 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Flag function and method parameters that are declared but never read in the body.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding>
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($this->analysableNodes($unit, $finder) as $node) {
-            array_push($findings, ...$this->findingsForNode($unit, $definition, $finder, $node));
+        foreach ($this->analysableNodes($analysisUnit, $nodeFinder) as $node) {
+            array_push($findings, ...$this->findingsForNode($analysisUnit, $definition, $nodeFinder, $node));
         }
 
         return $findings;
@@ -70,9 +70,9 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * @return list<ClassMethod|Function_>
      */
-    private function analysableNodes(AnalysisUnit $unit, NodeFinder $finder): array
+    private function analysableNodes(AnalysisUnit $analysisUnit, NodeFinder $finder): array
     {
-        $foundNodes = $finder->find($unit->statements, static function (Node $node): bool {
+        $foundNodes = $finder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Function_ || $node instanceof ClassMethod;
         });
         $nodes = [];
@@ -184,7 +184,7 @@ final readonly class UnusedParameterRule implements RuleInterface
      * @return list<Finding>
      */
     private function findingsForNode(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleDefinition $definition,
         NodeFinder $finder,
         ClassMethod|Function_ $node,
@@ -195,7 +195,7 @@ final readonly class UnusedParameterRule implements RuleInterface
         foreach ($this->parameterNames($node) as $name => $param) {
             if (!isset($usedNames[$name])) {
                 $findings[] = $this->findingForParameter(
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     definition: $definition,
                     node:       $node,
                     name:       $name,
@@ -270,7 +270,7 @@ final readonly class UnusedParameterRule implements RuleInterface
      * @return Finding
      */
     private function findingForParameter(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleDefinition $definition,
         ClassMethod|Function_ $node,
         string $name,
@@ -281,9 +281,9 @@ final readonly class UnusedParameterRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Parameter $%s in %s is never used.', $name, $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $param->getStartLine(),
-            column:      $this->startColumn($unit, $param),
+            column:      $this->startColumn($analysisUnit, $param),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
             tier:        $definition->tier,
@@ -299,7 +299,7 @@ final readonly class UnusedParameterRule implements RuleInterface
      *
      * @return int|null
      */
-    private function startColumn(AnalysisUnit $unit, Node\Param $param): ?int
+    private function startColumn(AnalysisUnit $analysisUnit, Node\Param $param): ?int
     {
         $startFilePosition = $param->getStartFilePos();
 
@@ -307,7 +307,7 @@ final readonly class UnusedParameterRule implements RuleInterface
             return null;
         }
 
-        $sourceBeforeParameter = substr($unit->source, 0, $startFilePosition);
+        $sourceBeforeParameter = substr($analysisUnit->source, 0, $startFilePosition);
         $lineStartPosition     = strrpos($sourceBeforeParameter, "\n");
 
         return $startFilePosition - ($lineStartPosition === false ? -1 : $lineStartPosition);

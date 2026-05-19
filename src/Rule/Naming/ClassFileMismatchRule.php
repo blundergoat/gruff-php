@@ -50,16 +50,16 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Find primary class names that do not match their file names.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for class and file name mismatches.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return ($node instanceof Class_ && !$node->isAnonymous())
                 || $node instanceof Interface_
                 || $node instanceof Trait_
@@ -78,7 +78,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
             return [];
         }
 
-        $filePath = $unit->file->displayPath;
+        $filePath = $analysisUnit->file->displayPath;
         $fileName = pathinfo($filePath, PATHINFO_FILENAME);
 
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileName) !== 1) {

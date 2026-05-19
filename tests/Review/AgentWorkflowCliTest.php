@@ -67,13 +67,13 @@ final class AgentWorkflowCliTest extends TestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        $report    = $this->decodeJson($process);
-        $summary   = $this->arrayValue($report, 'summary');
-        $findings  = $this->arrayValue($summary, 'findings');
+        $report      = $this->decodeJson($process);
+        $summary     = $this->arrayValue($report, 'summary');
+        $findings    = $this->arrayValue($summary, 'findings');
         $runMetadata = $this->arrayValue($report, 'run');
         $filters     = $this->arrayValue($runMetadata, 'filters');
-        $score     = $this->arrayValue($report, 'score');
-        $composite = $this->arrayValue($score, 'composite');
+        $score       = $this->arrayValue($report, 'score');
+        $composite   = $this->arrayValue($score, 'composite');
 
         self::assertSame(0, $this->intValue($findings, 'total'));
         self::assertTrue($filters['active'] ?? null);
@@ -200,7 +200,7 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertContains('Example::newRisk()', $introducedSymbols);
             self::assertContains('Example::calculate()', $unchangedSymbols);
 
-            $markdown = new Process([
+            $process = new Process([
                 PHP_BINARY,
                 self::PROJECT_ROOT . '/bin/gruff-php',
                 'analyse',
@@ -212,12 +212,12 @@ final class AgentWorkflowCliTest extends TestCase
                 '--diff-vs=HEAD',
                 '--changed-only',
             ], $repo);
-            $markdown->run();
+            $process->run();
 
-            self::assertSame(0, $markdown->getExitCode(), $markdown->getOutput() . $markdown->getErrorOutput());
-            self::assertStringContainsString('**Branch review:** base `HEAD`, 1 introduced, 0 removed', $markdown->getOutput());
-            self::assertStringContainsString('### Introduced findings', $markdown->getOutput());
-            self::assertStringContainsString('Example::newRisk()', $markdown->getOutput());
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('**Branch review:** base `HEAD`, 1 introduced, 0 removed', $process->getOutput());
+            self::assertStringContainsString('### Introduced findings', $process->getOutput());
+            self::assertStringContainsString('Example::newRisk()', $process->getOutput());
         } finally {
             $this->removeDir($repo);
         }
@@ -554,18 +554,18 @@ final class AgentWorkflowCliTest extends TestCase
      */
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {
-        $changedOnly = new Process([
+        $changedOnlyProcess = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             '--changed-only',
         ], self::PROJECT_ROOT);
-        $changedOnly->run();
+        $changedOnlyProcess->run();
 
-        self::assertSame(2, $changedOnly->getExitCode(), $changedOnly->getOutput() . $changedOnly->getErrorOutput());
-        self::assertStringContainsString('--changed-only requires --diff-vs.', $changedOnly->getOutput());
+        self::assertSame(2, $changedOnlyProcess->getExitCode(), $changedOnlyProcess->getOutput() . $changedOnlyProcess->getErrorOutput());
+        self::assertStringContainsString('--changed-only requires --diff-vs.', $changedOnlyProcess->getOutput());
 
-        $diffConflict = new Process([
+        $diffConflictProcess = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
@@ -573,10 +573,10 @@ final class AgentWorkflowCliTest extends TestCase
             'working-tree',
             '--diff-vs=HEAD',
         ], self::PROJECT_ROOT);
-        $diffConflict->run();
+        $diffConflictProcess->run();
 
-        self::assertSame(2, $diffConflict->getExitCode(), $diffConflict->getOutput() . $diffConflict->getErrorOutput());
-        self::assertStringContainsString('--diff and --diff-vs are mutually exclusive.', $diffConflict->getOutput());
+        self::assertSame(2, $diffConflictProcess->getExitCode(), $diffConflictProcess->getOutput() . $diffConflictProcess->getErrorOutput());
+        self::assertStringContainsString('--diff and --diff-vs are mutually exclusive.', $diffConflictProcess->getOutput());
     }
 
     /**
@@ -605,10 +605,10 @@ final class AgentWorkflowCliTest extends TestCase
      */
     private function intValue(array $payload, string $key): int
     {
-        $value = $payload[$key] ?? null;
-        self::assertIsInt($value);
+        $payloadValue = $payload[$key] ?? null;
+        self::assertIsInt($payloadValue);
 
-        return $value;
+        return $payloadValue;
     }
 
     /**
@@ -626,10 +626,10 @@ final class AgentWorkflowCliTest extends TestCase
      */
     private function stringValue(array $payload, string $key): string
     {
-        $value = $payload[$key] ?? null;
-        self::assertIsString($value);
+        $payloadValue = $payload[$key] ?? null;
+        self::assertIsString($payloadValue);
 
-        return $value;
+        return $payloadValue;
     }
 
     /**
@@ -666,22 +666,22 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * @return list<mixed>
      */
-    private function mixedList(mixed $value): array
+    private function mixedList(mixed $payload): array
     {
-        self::assertIsArray($value);
+        self::assertIsArray($payload);
 
-        return array_values($value);
+        return array_values($payload);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function stringKeyedArray(mixed $value): array
+    private function stringKeyedArray(mixed $payload): array
     {
-        self::assertIsArray($value);
+        self::assertIsArray($payload);
 
         $result = [];
-        foreach ($value as $key => $entryValue) {
+        foreach ($payload as $key => $entryValue) {
             self::assertIsString($key);
             $result[$key] = $entryValue;
         }

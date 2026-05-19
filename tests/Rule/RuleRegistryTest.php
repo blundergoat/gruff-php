@@ -210,10 +210,10 @@ final class RuleRegistryTest extends TestCase
      */
     public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
     {
-        $registry = new RuleRegistry([$this->duplicateProjectRule()]);
-        $config   = AnalysisConfig::fromRegistry($registry);
+        $ruleRegistry = new RuleRegistry([$this->duplicateProjectRule()]);
+        $config       = AnalysisConfig::fromRegistry($ruleRegistry);
 
-        $findings = $registry->analyse(
+        $findings = $ruleRegistry->analyse(
             [
                 $this->parseFixture('tests/Fixtures/Source/mixed/alpha.php'),
                 $this->parseFixture('tests/Fixtures/Source/mixed/nested/beta.php'),
@@ -295,7 +295,7 @@ final class RuleRegistryTest extends TestCase
 
         self::assertCount(113, $definitions);
         self::assertSame(
-            '8452b6b275909574b41' . 'a637903ee1d74637849aba14498fb5748a046fa40f253',
+            'a3853679d5b1bd895b' . '1ebd5c25e0bbed38d77be91ab957548048da4a6dbe54ee',
             hash('sha256', $json),
         );
     }
@@ -351,17 +351,17 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $unit    Analysis unit.
-             * @param RuleContext  $context Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit    Analysis unit.
+             * @param RuleContext  $ruleContext Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
-            public function analyse(AnalysisUnit $unit, RuleContext $context): array
+            public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
                 return [
                     new Finding(
                         ruleId:     $this->id,
                         message:    'Fake finding.',
-                        filePath:   $unit->file->displayPath,
+                        filePath:   $analysisUnit->file->displayPath,
                         line:       1,
                         severity:   Severity::Advisory,
                         pillar:     Pillar::Maintainability,
@@ -401,11 +401,11 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $unit    Analysis unit.
-             * @param RuleContext  $context Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit    Analysis unit.
+             * @param RuleContext  $ruleContext Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
-            public function analyse(AnalysisUnit $unit, RuleContext $context): array
+            public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
                 return [
                     new Finding(

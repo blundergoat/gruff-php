@@ -50,18 +50,18 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Find assertions inside loops that lack a context-bearing message.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for loop assertions without messages.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $loops = $finder->find(
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            $loops = $nodeFinder->find(
                 $scope->statements,
                 static fn (Node $node): bool => $node instanceof Stmt\For_
                     || $node instanceof Stmt\Foreach_
@@ -78,7 +78,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                     continue;
                 }
 
-                $assertions = $finder->find(
+                $assertions = $nodeFinder->find(
                     $loop->stmts,
                     static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
                         && TestQualityNodeHelper::isAssertionCall($node),
@@ -102,7 +102,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
                             $scope->symbol,
                             $name,
                         ),
-                        filePath:    $unit->file->displayPath,
+                        filePath:    $analysisUnit->file->displayPath,
                         line:        $assertion->getStartLine(),
                         severity:    Severity::Advisory,
                         pillar:      Pillar::TestQuality,

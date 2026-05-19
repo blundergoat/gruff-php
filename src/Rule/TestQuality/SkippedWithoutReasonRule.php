@@ -44,16 +44,16 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     /**
      * Find skipped or incomplete tests without an explanatory reason.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unexplained skipped tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 if (TestQualityNodeHelper::callName($call) !== 'marktestskipped') {
                     continue;
@@ -67,7 +67,7 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s skips without an explanatory reason.', $scope->symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Warning,
                     pillar:      Pillar::TestQuality,

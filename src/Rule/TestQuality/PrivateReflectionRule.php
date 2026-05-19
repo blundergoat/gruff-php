@@ -53,19 +53,19 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Find tests that use reflection or binding to reach private implementation details.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for private-reflection test access.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $reflectionNode = null;
-            foreach ($finder->find(
+            foreach ($nodeFinder->find(
                 $scope->statements,
                 static fn (Node $node): bool => $node instanceof Expr\New_
                     || $node instanceof Expr\MethodCall
@@ -84,7 +84,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s uses reflection to reach implementation details.', $scope->symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $reflectionNode->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::TestQuality,

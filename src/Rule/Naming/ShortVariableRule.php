@@ -63,20 +63,20 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Find short variable names outside accepted local conventions.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for overly short variable names.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
-                ...$this->parameterFindings($definition, $unit, $context, $scope),
-                ...$this->localVariableFindings($definition, $unit, $context, $scope),
+                ...$this->parameterFindings($definition, $analysisUnit, $ruleContext, $scope),
+                ...$this->localVariableFindings($definition, $analysisUnit, $ruleContext, $scope),
             );
         }
 
@@ -90,8 +90,8 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function parameterFindings(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
-        RuleContext $context,
+        AnalysisUnit $analysisUnit,
+        RuleContext $ruleContext,
         FunctionLikeScope $scope,
     ): array
     {
@@ -105,8 +105,8 @@ final readonly class ShortVariableRule implements RuleInterface
 
             $finding = $this->finding(
                 definition: $definition,
-                unit:       $unit,
-                context:    $context,
+                analysisUnit:       $analysisUnit,
+                ruleContext:    $ruleContext,
                 node:       $param,
                 kind:       $param->flags === 0 ? 'parameter' : 'property',
                 name:       $param->var->name,
@@ -128,8 +128,8 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function localVariableFindings(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
-        RuleContext $context,
+        AnalysisUnit $analysisUnit,
+        RuleContext $ruleContext,
         FunctionLikeScope $scope,
     ): array
     {
@@ -149,8 +149,8 @@ final readonly class ShortVariableRule implements RuleInterface
 
             $finding = $this->finding(
                 definition: $definition,
-                unit:       $unit,
-                context:    $context,
+                analysisUnit:       $analysisUnit,
+                ruleContext:    $ruleContext,
                 node:       $variable,
                 kind:       'variable',
                 name:       $name,
@@ -172,8 +172,8 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function finding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
-        RuleContext $context,
+        AnalysisUnit $analysisUnit,
+        RuleContext $ruleContext,
         Node $node,
         string $kind,
         string $name,
@@ -183,20 +183,20 @@ final readonly class ShortVariableRule implements RuleInterface
             return null;
         }
 
-        if (in_array($name, $context->config->acceptedAbbreviations(), true)) {
+        if (in_array($name, $ruleContext->config->acceptedAbbreviations(), true)) {
             return null;
         }
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s in %s is a single character.', ucfirst($kind), $name, $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
             tier:        $definition->tier,
             confidence:  $definition->confidence,
-            column:      $this->columnForName($unit, $node, $name),
+            column:      $this->columnForName($analysisUnit, $node, $name),
             symbol:      $symbol,
             remediation: 'Use a descriptive name that communicates the variable\'s purpose.',
             metadata:    ['variable' => $name, 'identifierKind' => $kind],
@@ -208,9 +208,9 @@ final readonly class ShortVariableRule implements RuleInterface
      *
      * @return int|null Source column, or null when the name cannot be found on the node line.
      */
-    private function columnForName(AnalysisUnit $unit, Node $node, string $name): ?int
+    private function columnForName(AnalysisUnit $analysisUnit, Node $node, string $name): ?int
     {
-        $lines = preg_split('/\R/', $unit->source);
+        $lines = preg_split('/\R/', $analysisUnit->source);
 
         if (!is_array($lines)) {
             return null;
@@ -351,18 +351,18 @@ final readonly class ShortVariableRule implements RuleInterface
      * @param list<Node> $children
      * @return void No return value.
      */
-    private function collectChildNodes(mixed $value, array &$children): void
+    private function collectChildNodes(mixed $subNode, array &$children): void
     {
-        if ($value instanceof Node) {
-            $children[] = $value;
+        if ($subNode instanceof Node) {
+            $children[] = $subNode;
             return;
         }
 
-        if (!is_array($value)) {
+        if (!is_array($subNode)) {
             return;
         }
 
-        foreach ($value as $item) {
+        foreach ($subNode as $item) {
             $this->collectChildNodes($item, $children);
         }
     }

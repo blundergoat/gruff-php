@@ -19,11 +19,11 @@ final class DashboardScanCommandBuilderTest extends TestCase
      */
     public function testParsePathsDropsOptionPrefixedEntries(): void
     {
-        $builder = new DashboardScanCommandBuilder('/tmp/gruff');
+        $dashboardScanCommandBuilder = new DashboardScanCommandBuilder('/tmp/gruff');
 
-        self::assertSame(['.'], $builder->parsePaths('--evil'));
-        self::assertSame(['.'], $builder->parsePaths('. --evil'));
-        self::assertSame(['src', 'tests'], $builder->parsePaths('src tests'));
+        self::assertSame(['.'], $dashboardScanCommandBuilder->parsePaths('--evil'));
+        self::assertSame(['.'], $dashboardScanCommandBuilder->parsePaths('. --evil'));
+        self::assertSame(['src', 'tests'], $dashboardScanCommandBuilder->parsePaths('src tests'));
     }
 
     /**
@@ -33,9 +33,9 @@ final class DashboardScanCommandBuilderTest extends TestCase
      */
     public function testAnalyseCommandSeparatesOwnedOptionsFromUserPaths(): void
     {
-        $builder        = new DashboardScanCommandBuilder('/tmp/gruff');
-        $command        = $builder->analyseCommand(['src', 'tests'], $this->state());
-        $separatorIndex = array_search('--', $command, true);
+        $dashboardScanCommandBuilder = new DashboardScanCommandBuilder('/tmp/gruff');
+        $command                     = $dashboardScanCommandBuilder->analyseCommand(['src', 'tests'], $this->state());
+        $separatorIndex              = array_search('--', $command, true);
 
         self::assertIsInt($separatorIndex);
         self::assertSame(['src', 'tests'], array_slice($command, $separatorIndex + 1));
@@ -50,9 +50,9 @@ final class DashboardScanCommandBuilderTest extends TestCase
      */
     public function testOptionLikePathCannotReachProducedArgumentVector(): void
     {
-        $builder = new DashboardScanCommandBuilder('/tmp/gruff');
-        $paths   = $builder->parsePaths('--generate-baseline /tmp/leak.json --config evil.yaml');
-        $command = $builder->analyseCommand($paths, $this->state());
+        $dashboardScanCommandBuilder = new DashboardScanCommandBuilder('/tmp/gruff');
+        $paths                       = $dashboardScanCommandBuilder->parsePaths('--generate-baseline /tmp/leak.json --config evil.yaml');
+        $command                     = $dashboardScanCommandBuilder->analyseCommand($paths, $this->state());
 
         self::assertSame(['/tmp/leak.json', 'evil.yaml'], $paths);
         self::assertNotContains('--generate-baseline', $command);

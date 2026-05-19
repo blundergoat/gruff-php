@@ -70,8 +70,8 @@ final class SensitiveDataRulesTest extends TestCase
      */
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
-        $discovery = new SourceDiscovery(self::PROJECT_ROOT);
-        $result    = $discovery->discover(['tests/Fixtures/SensitiveData/config-secrets.json']);
+        $sourceDiscovery = new SourceDiscovery(self::PROJECT_ROOT);
+        $result          = $sourceDiscovery->discover(['tests/Fixtures/SensitiveData/config-secrets.json']);
 
         self::assertCount(1, $result->files);
         self::assertSame(SourceFile::TYPE_TEXT, $result->files[0]->type);

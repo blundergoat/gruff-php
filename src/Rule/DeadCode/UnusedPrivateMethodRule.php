@@ -61,16 +61,16 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Find private methods that are not referenced inside their class-like scope.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused private methods.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
                 || $node instanceof Enum_;
@@ -86,11 +86,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
                 continue;
             }
 
-            $calledNames = $this->calledPrivateMethodNames($finder, $classLike);
+            $calledNames = $this->calledPrivateMethodNames($nodeFinder, $classLike);
             $findings    = array_merge(
                 $findings,
                 $this->findingsForUnusedMethods(
-                    unit:           $unit,
+                    analysisUnit:           $analysisUnit,
                     definition:     $definition,
                     classLike:      $classLike,
                     privateMethods: $privateMethods,
@@ -197,7 +197,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      * @return list<Finding>
      */
     private function findingsForUnusedMethods(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleDefinition $definition,
         Class_|Trait_|Enum_ $classLike,
         array $privateMethods,
@@ -215,7 +215,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('Private method %s is never called.', $symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $method->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

@@ -168,9 +168,9 @@ final readonly class SourceDiscovery
         array $configuredIgnorePatterns,
         array &$ignoredPaths,
     ): iterable {
-        $inner  = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
-        $filter = new RecursiveCallbackFilterIterator(
-            $inner,
+        $recursiveDirectoryIterator      = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
+        $recursiveCallbackFilterIterator = new RecursiveCallbackFilterIterator(
+            $recursiveDirectoryIterator,
             function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($shouldIncludeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
                 $path  = $file->getPathname();
                 $isDir = $file->isDir();
@@ -191,9 +191,9 @@ final readonly class SourceDiscovery
             },
         );
 
-        $iterator = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::SELF_FIRST);
+        $recursiveIteratorIterator = new RecursiveIteratorIterator($recursiveCallbackFilterIterator, RecursiveIteratorIterator::SELF_FIRST);
 
-        foreach ($iterator as $file) {
+        foreach ($recursiveIteratorIterator as $file) {
             if (!$file instanceof SplFileInfo) {
                 continue;
             }

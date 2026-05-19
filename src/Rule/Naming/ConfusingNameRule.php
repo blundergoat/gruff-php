@@ -54,16 +54,16 @@ final readonly class ConfusingNameRule implements RuleInterface
     /**
      * Find identifiers whose names are ambiguous or visually confusing.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for confusing identifiers.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $classes    = $finder->findInstanceOf($unit->statements, Class_::class);
+        $nodeFinder = new NodeFinder();
+        $classes    = $nodeFinder->findInstanceOf($analysisUnit->statements, Class_::class);
 
         $findings = [];
 
@@ -82,7 +82,7 @@ final readonly class ConfusingNameRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('Class %s is a vague standalone name that does not communicate responsibility.', $name),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $class->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

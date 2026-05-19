@@ -50,17 +50,17 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Find tests linked to data providers that cannot yield any rows.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for empty data providers.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();
             if ($className === null) {
                 continue;
@@ -94,7 +94,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
                             $testMethod->name->toString(),
                             $providerName,
                         ),
-                        filePath:    $unit->file->displayPath,
+                        filePath:    $analysisUnit->file->displayPath,
                         line:        $testMethod->getStartLine(),
                         severity:    Severity::Error,
                         pillar:      Pillar::TestQuality,
@@ -154,14 +154,14 @@ final readonly class EmptyDataProviderRule implements RuleInterface
             return true;
         }
 
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        $yields = $finder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\Yield_ || $node instanceof Expr\YieldFrom);
+        $yields = $nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Expr\Yield_ || $node instanceof Expr\YieldFrom);
         if ($yields !== []) {
             return false;
         }
 
-        $returns = $finder->find($stmts, static fn (Node $node): bool => $node instanceof Stmt\Return_);
+        $returns = $nodeFinder->find($stmts, static fn (Node $node): bool => $node instanceof Stmt\Return_);
 
         if ($returns === []) {
             return true;

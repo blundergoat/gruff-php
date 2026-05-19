@@ -38,12 +38,12 @@ final readonly class ClassLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'Class length',
-            pillar:                   Pillar::Size,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::High,
+            id:                self::ID,
+            name:              'Class length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::High,
             severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }
@@ -51,18 +51,18 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose physical line length exceeds thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized classes, traits, or enums.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        $finder = new NodeFinder();
-        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
                 || $node instanceof Enum_;
@@ -96,7 +96,7 @@ final readonly class ClassLengthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $startLine,
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -144,12 +144,12 @@ final readonly class ClassLengthRule implements RuleInterface
      *
      * @return string Human-readable threshold value.
      */
-    private function formatNumber(int|float $value): string
+    private function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

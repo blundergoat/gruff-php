@@ -74,9 +74,9 @@ final class CognitiveComplexityRuleTest extends TestCase
     #[DataProvider('methodCcProvider')]
     public function testCognitiveCountMatchesExpected(string $methodName, int $expectedCc): void
     {
-        $unit    = $this->parseFixture('cognitive.php');
-        $finder  = new NodeFinder();
-        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+        $unit       = $this->parseFixture('cognitive.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $method = null;
 
@@ -153,9 +153,9 @@ final class CognitiveComplexityRuleTest extends TestCase
      */
     public function testBooleanChainCollapsing(): void
     {
-        $unit    = $this->parseFixture('cognitive.php');
-        $finder  = new NodeFinder();
-        $methods = $finder->findInstanceOf($unit->statements, ClassMethod::class);
+        $unit       = $this->parseFixture('cognitive.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
 
         $sameChain  = null;
         $mixedChain = null;

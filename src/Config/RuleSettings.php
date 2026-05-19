@@ -35,36 +35,36 @@ final readonly class RuleSettings
      */
     public function numericThreshold(string $name): int|float
     {
-        $value = $this->thresholds[$name] ?? null;
+        $thresholdValue = $this->thresholds[$name] ?? null;
 
-        if (!is_int($value) && !is_float($value)) {
+        if (!is_int($thresholdValue) && !is_float($thresholdValue)) {
             throw new LogicException(sprintf('Missing numeric threshold "%s".', $name));
         }
 
-        return $value;
+        return $thresholdValue;
     }
 
     /**
      * Match a value where higher numbers are worse against configured thresholds.
      *
-     * @param int|float $value Measured rule value to compare.
+     * @param int|float $measuredValue Measured rule value to compare.
      * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
      */
-    public function highValueThresholdMatch(int|float $value): ?ThresholdMatch
+    public function highValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
-            return $value > $this->severityThreshold->threshold
+            return $measuredValue > $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
         }
 
         $warningThreshold = $this->numericThreshold('warning');
-        if ($value <= $warningThreshold) {
+        if ($measuredValue <= $warningThreshold) {
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
-        $severity       = $value > $errorThreshold ? Severity::Error : Severity::Warning;
+        $severity       = $measuredValue > $errorThreshold ? Severity::Error : Severity::Warning;
 
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
@@ -75,24 +75,24 @@ final readonly class RuleSettings
     /**
      * Match a value where lower numbers are worse against configured thresholds.
      *
-     * @param int|float $value Measured rule value to compare.
+     * @param int|float $measuredValue Measured rule value to compare.
      * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
      */
-    public function lowValueThresholdMatch(int|float $value): ?ThresholdMatch
+    public function lowValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
-            return $value < $this->severityThreshold->threshold
+            return $measuredValue < $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
         }
 
         $warningThreshold = $this->numericThreshold('warning');
-        if ($value >= $warningThreshold) {
+        if ($measuredValue >= $warningThreshold) {
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
-        $severity       = $value < $errorThreshold ? Severity::Error : Severity::Warning;
+        $severity       = $measuredValue < $errorThreshold ? Severity::Error : Severity::Warning;
 
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
@@ -125,15 +125,15 @@ final readonly class RuleSettings
      */
     public function stringListOption(string $name): array
     {
-        $value = $this->options[$name] ?? [];
+        $optionValue = $this->options[$name] ?? [];
 
-        if (!is_array($value)) {
+        if (!is_array($optionValue)) {
             throw new LogicException(sprintf('Option "%s" must be an array of strings.', $name));
         }
 
         $result = [];
 
-        foreach ($value as $item) {
+        foreach ($optionValue as $item) {
             if (!is_string($item)) {
                 throw new LogicException(sprintf('Option "%s" must contain only strings.', $name));
             }

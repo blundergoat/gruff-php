@@ -43,30 +43,30 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble AWS access key IDs.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for AWS key-like literals.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
         foreach ($matches[0] as $match) {
-            [$value, $offset] = $match;
-            if (SecretScannerHelper::isLikelyDummyValue($value)) {
+            [$candidateSecret, $offset] = $match;
+            if (SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }
 
             $findings[] = SecretScannerHelper::finding(
-                unit:        $unit,
+                analysisUnit:        $analysisUnit,
                 ruleId:      self::ID,
-                message:     sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($value)),
-                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                message:     sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
+                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:  Confidence::High,
                 detector:    'aws-access-key',
-                preview:     SecretScannerHelper::redactedPreview($value),
+                preview:     SecretScannerHelper::redactedPreview($candidateSecret),
                 remediation: 'Remove the key from source and rotate it if it was real.',
             );
         }

@@ -40,12 +40,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'Halstead volume',
-            pillar:                   Pillar::Complexity,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::Medium,
+            id:                self::ID,
+            name:              'Halstead volume',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(8000, Severity::Error),
         );
     }
@@ -53,18 +53,18 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Detect functions and methods whose Halstead volume exceeds configured thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Halstead-volume findings for the analysed unit.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        $finder = new NodeFinder();
-        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -92,7 +92,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -123,13 +123,13 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      */
     public static function computeHalsteadMetrics(Node $node): array
     {
-        static $cache = null;
-        if (!$cache instanceof \WeakMap) {
-            $cache = new \WeakMap();
+        static $metricsCache = null;
+        if (!$metricsCache instanceof \WeakMap) {
+            $metricsCache = new \WeakMap();
         }
 
-        if (isset($cache[$node])) {
-            $cached = self::validatedMetrics($cache[$node]);
+        if (isset($metricsCache[$node])) {
+            $cached = self::validatedMetrics($metricsCache[$node]);
             if ($cached !== null) {
                 return $cached;
             }
@@ -140,8 +140,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $totalOperators = 0;
         $totalOperands  = 0;
 
-        $finder          = new NodeFinder();
-        $descendantNodes = $finder->find($node->stmts ?? [], static fn (): bool => true);
+        $nodeFinder      = new NodeFinder();
+        $descendantNodes = $nodeFinder->find($node->stmts ?? [], static fn (): bool => true);
 
         foreach ($descendantNodes as $childNode) {
             $operatorKey = self::operatorKey($childNode);
@@ -157,8 +157,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             }
         }
 
-        $metrics      = self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
-        $cache[$node] = $metrics;
+        $metrics             = self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
+        $metricsCache[$node] = $metrics;
 
         return $metrics;
     }
@@ -166,17 +166,17 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null
      */
-    private static function validatedMetrics(mixed $value): ?array
+    private static function validatedMetrics(mixed $rawMetrics): ?array
     {
-        if (!is_array($value)) {
+        if (!is_array($rawMetrics)) {
             return null;
         }
 
-        $volume     = $value['volume'] ?? null;
-        $difficulty = $value['difficulty'] ?? null;
-        $effort     = $value['effort'] ?? null;
-        $vocabulary = $value['vocabulary'] ?? null;
-        $length     = $value['length'] ?? null;
+        $volume     = $rawMetrics['volume'] ?? null;
+        $difficulty = $rawMetrics['difficulty'] ?? null;
+        $effort     = $rawMetrics['effort'] ?? null;
+        $vocabulary = $rawMetrics['vocabulary'] ?? null;
+        $length     = $rawMetrics['length'] ?? null;
 
         if (!is_float($volume) || !is_float($difficulty) || !is_float($effort) || !is_int($vocabulary) || !is_int($length)) {
             return null;
@@ -272,12 +272,12 @@ final readonly class HalsteadVolumeRule implements RuleInterface
      *
      * @return string The threshold without unnecessary decimal places.
      */
-    private static function formatNumber(int|float $value): string
+    private static function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

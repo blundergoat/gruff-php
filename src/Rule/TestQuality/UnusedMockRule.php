@@ -47,19 +47,19 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Find mock variables that are assigned but never read.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused mock assignments.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $assignedVarObjectIds = [];
-            $mockAssignments      = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
+            $mockAssignments      = $this->mockAssignments($scope, $nodeFinder, $assignedVarObjectIds);
 
             if ($mockAssignments === []) {
                 continue;
@@ -67,7 +67,7 @@ final readonly class UnusedMockRule implements RuleInterface
 
             $findings = array_merge(
                 $findings,
-                $this->findingsForUnreadMocks($unit, $scope, $mockAssignments, $this->variableReads($scope, $finder, $assignedVarObjectIds)),
+                $this->findingsForUnreadMocks($analysisUnit, $scope, $mockAssignments, $this->variableReads($scope, $nodeFinder, $assignedVarObjectIds)),
             );
         }
 
@@ -143,7 +143,7 @@ final readonly class UnusedMockRule implements RuleInterface
      * @return list<Finding>
      */
     private function findingsForUnreadMocks(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         TestQualityScope $scope,
         array $mockAssignments,
         array $reads,
@@ -158,7 +158,7 @@ final readonly class UnusedMockRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s creates mock $%s but never reads it.', $scope->symbol, $varName),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $assignment['line'],
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
@@ -180,9 +180,9 @@ final readonly class UnusedMockRule implements RuleInterface
      */
     private function isMockCreationExpression(Expr $expr): bool
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        $matches = $finder->find(
+        $matches = $nodeFinder->find(
             [$expr],
             static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isMockCreationCall($node),

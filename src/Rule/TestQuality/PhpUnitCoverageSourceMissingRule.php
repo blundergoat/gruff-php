@@ -63,18 +63,18 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Report a project once when its PHPUnit config lacks coverage source configuration.
      *
-     * @param AnalysisUnit $unit    Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $context Rule context carrying project root.
+     * @param AnalysisUnit $analysisUnit    Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext Rule context carrying project root.
      * @return list<Finding> Findings for missing PHPUnit coverage source settings.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $root = $context->projectRoot;
+        $root = $ruleContext->projectRoot;
         if (isset($this->emittedRoots[$root])) {
             return [];
         }
 
-        if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($unit)) {
+        if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
             return [];
         }
 

@@ -22,9 +22,9 @@ interface RuleInterface
     /**
      * Analyse one parsed source file with this rule.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      * @return list<Finding>
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array;
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array;
 }

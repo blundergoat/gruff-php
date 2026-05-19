@@ -68,11 +68,11 @@ final class SarifReporterTest extends TestCase
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
         $report   = $this->report($findings, $score);
 
-        $payload = $this->decode((new SarifReporter())->render($report));
+        $payload  = $this->decode((new SarifReporter())->render($report));
         $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
         $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
-        $rules   = $this->listValue($driver, 'rules');
-        $ruleIds = array_map(
+        $rules    = $this->listValue($driver, 'rules');
+        $ruleIds  = array_map(
             fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
             $rules,
         );
@@ -140,7 +140,7 @@ final class SarifReporterTest extends TestCase
      */
     public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
     {
-        $payload = $this->decode((new SarifReporter())->render($this->report([])));
+        $payload  = $this->decode((new SarifReporter())->render($this->report([])));
         $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
         $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
 
@@ -193,7 +193,7 @@ final class SarifReporterTest extends TestCase
      */
     public function testSarifReporterEmitsFallbackRuleForMutationFinding(): void
     {
-        $mutationResult = new MutationAnalysisResult(new InfectionReport(
+        $mutationAnalysisResult = new MutationAnalysisResult(new InfectionReport(
             reportPath: 'infection.json',
             stats:      [
                 'totalMutantsCount' => 1,
@@ -212,7 +212,7 @@ final class SarifReporterTest extends TestCase
                 ),
             ],
         ));
-        $finding   = (new MutationFindingFactory())->findingsFor($mutationResult)[0];
+        $finding   = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
         $payload   = $this->decode((new SarifReporter())->render($this->report([$finding])));
         $sarifRun  = $this->sarifRun($payload);
         $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
@@ -274,8 +274,8 @@ final class SarifReporterTest extends TestCase
             $this->finding(ruleId: 'fixture.warning', severity: Severity::Warning),
             $this->finding(ruleId: 'fixture.advisory', severity: Severity::Advisory),
         ]);
-        $json  = $this->decode((new JsonReporter())->render($report));
-        $sarif = $this->decode((new SarifReporter())->render($report));
+        $json     = $this->decode((new JsonReporter())->render($report));
+        $sarif    = $this->decode((new SarifReporter())->render($report));
         $sarifRun = $this->sarifRun($sarif);
 
         self::assertSame('gruff.analysis.v1', $this->stringValue($json, 'schemaVersion'));
@@ -367,18 +367,18 @@ final class SarifReporterTest extends TestCase
      */
     private function decode(string $json): array
     {
-        $value = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        $decodedJson = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        return $this->stringKeyedArray($value);
+        return $this->stringKeyedArray($decodedJson);
     }
 
     /**
-     * @param JsonArray $value Source array.
+     * @param JsonArray $payload Source array.
      * @return list<JsonValue>
      */
-    private function listValue(array $value, string $key): array
+    private function listValue(array $payload, string $key): array
     {
-        $payloadValue = $value[$key] ?? null;
+        $payloadValue = $payload[$key] ?? null;
         self::assertIsArray($payloadValue);
 
         return array_values($payloadValue);
@@ -389,23 +389,23 @@ final class SarifReporterTest extends TestCase
      *
      * @return JsonArray String-keyed payload.
      */
-    private function stringKeyedArray(mixed $value, ?string $key = null): array
+    private function stringKeyedArray(mixed $payload, ?string $key = null): array
     {
-        $payloadValue = $key === null && is_array($value) ? $value : (is_array($value) ? ($value[$key] ?? null) : null);
+        $payloadValue = $key === null && is_array($payload) ? $payload : (is_array($payload) ? ($payload[$key] ?? null) : null);
         $this->assertJsonArray($payloadValue);
 
         return $payloadValue;
     }
 
     /**
-     * @phpstan-assert JsonArray $value
+     * @phpstan-assert JsonArray $payload
      * @return void No return value.
      */
-    private function assertJsonArray(mixed $value): void
+    private function assertJsonArray(mixed $payload): void
     {
-        self::assertIsArray($value);
+        self::assertIsArray($payload);
 
-        foreach ($value as $payloadValue) {
+        foreach ($payload as $payloadValue) {
             if (is_array($payloadValue)) {
                 $this->assertJsonArray($payloadValue);
 
@@ -424,12 +424,12 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $value Source array.
+     * @param JsonArray $payload Source array.
      * @return string String value.
      */
-    private function stringValue(array $value, string $key): string
+    private function stringValue(array $payload, string $key): string
     {
-        $payloadValue = $value[$key] ?? null;
+        $payloadValue = $payload[$key] ?? null;
         self::assertIsString($payloadValue);
 
         return $payloadValue;

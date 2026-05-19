@@ -55,24 +55,24 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Find repeated test bodies that look like data-provider candidates.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for repeated test structures.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        if ($this->isPathIgnored($unit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+        if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();
             if ($className === null) {
                 continue;
@@ -94,7 +94,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                     continue;
                 }
 
-                $shape = $this->fingerprint($stmts, $finder);
+                $shape = $this->fingerprint($stmts, $nodeFinder);
                 $groups[$shape] ??= [];
                 $groups[$shape][] = $method;
             }
@@ -115,7 +115,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                         count($methods),
                         implode(', ', $names),
                     ),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $first->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,

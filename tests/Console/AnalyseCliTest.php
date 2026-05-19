@@ -59,7 +59,7 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-        $report  = $this->decodeJsonOutput($process);
+        $report      = $this->decodeJsonOutput($process);
         $runMetadata = $report['run'] ?? null;
         $summary     = $report['summary'] ?? null;
 
@@ -198,7 +198,7 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(2, $findings);
+        self::assertCount(3, $findings);
 
         $sizeFinding = null;
         foreach ($findings as $finding) {
@@ -550,7 +550,7 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('class="finding-filters"', $process->getOutput());
         self::assertStringContainsString('<script type="module">', $process->getOutput());
 
-        $static = new Process([
+        $process = new Process([
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff-php',
             'analyse',
@@ -562,11 +562,11 @@ final class AnalyseCliTest extends CliTestCase
             '--report-interactive=false',
             '--no-config',
         ], __DIR__ . '/../..');
-        $static->run();
+        $process->run();
 
-        self::assertSame(0, $static->getExitCode(), $static->getErrorOutput());
-        self::assertStringNotContainsString('class="finding-filters"', $static->getOutput());
-        self::assertStringNotContainsString('<script type="module">', $static->getOutput());
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringNotContainsString('class="finding-filters"', $process->getOutput());
+        self::assertStringNotContainsString('<script type="module">', $process->getOutput());
     }
 
     /**
@@ -576,7 +576,7 @@ final class AnalyseCliTest extends CliTestCase
      */
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
-        $editor = new Process([
+        $editorProcess = new Process([
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff-php',
             'analyse',
@@ -588,13 +588,13 @@ final class AnalyseCliTest extends CliTestCase
             '--report-editor-link=bad',
             '--no-config',
         ], __DIR__ . '/../..');
-        $editor->run();
+        $editorProcess->run();
 
-        self::assertSame(2, $editor->getExitCode());
-        self::assertStringContainsString('<section class="diagnostics">', $editor->getOutput());
-        self::assertStringContainsString('--report-editor-link must be one of: vscode, phpstorm, none.', $editor->getOutput());
+        self::assertSame(2, $editorProcess->getExitCode());
+        self::assertStringContainsString('<section class="diagnostics">', $editorProcess->getOutput());
+        self::assertStringContainsString('--report-editor-link must be one of: vscode, phpstorm, none.', $editorProcess->getOutput());
 
-        $interactive = new Process([
+        $interactiveProcess = new Process([
             PHP_BINARY,
             __DIR__ . '/../../bin/gruff-php',
             'analyse',
@@ -606,11 +606,11 @@ final class AnalyseCliTest extends CliTestCase
             '--report-interactive=maybe',
             '--no-config',
         ], __DIR__ . '/../..');
-        $interactive->run();
+        $interactiveProcess->run();
 
-        self::assertSame(2, $interactive->getExitCode());
-        self::assertStringContainsString('<section class="diagnostics">', $interactive->getOutput());
-        self::assertStringContainsString('--report-interactive must be true or false.', $interactive->getOutput());
+        self::assertSame(2, $interactiveProcess->getExitCode());
+        self::assertStringContainsString('<section class="diagnostics">', $interactiveProcess->getOutput());
+        self::assertStringContainsString('--report-interactive must be true or false.', $interactiveProcess->getOutput());
     }
 
     /**

@@ -58,27 +58,27 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Find tests that mutate global state without detected cleanup hooks.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unscoped global state mutation.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder        = new NodeFinder();
+        $nodeFinder    = new NodeFinder();
         $findings      = [];
         $cleanupCache  = [];
-        $classesByName = $this->classesByName($unit, $finder);
+        $classesByName = $this->classesByName($analysisUnit, $nodeFinder);
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             if (!$this->shouldCheckScopeCleanup($scope, $cleanupCache, $classesByName)) {
                 continue;
             }
 
             $findings = array_merge(
                 $findings,
-                $this->superglobalFindings($unit, $scope, $finder),
-                $this->stateFunctionFindings($unit, $scope),
+                $this->superglobalFindings($analysisUnit, $scope, $nodeFinder),
+                $this->stateFunctionFindings($analysisUnit, $scope),
             );
         }
 
@@ -113,7 +113,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function superglobalFindings(AnalysisUnit $unit, TestQualityScope $scope, NodeFinder $finder): array
+    private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $finder): array
     {
         $findings = [];
 
@@ -128,7 +128,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                unit:     $unit,
+                analysisUnit:     $analysisUnit,
                 scope:    $scope,
                 line:     $assign->getStartLine(),
                 message:  sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
@@ -142,7 +142,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function stateFunctionFindings(AnalysisUnit $unit, TestQualityScope $scope): array
+    private function stateFunctionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
@@ -157,7 +157,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                unit:     $unit,
+                analysisUnit:     $analysisUnit,
                 scope:    $scope,
                 line:     $call->getStartLine(),
                 message:  sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
@@ -242,11 +242,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return array<string, Stmt\Class_>
      */
-    private function classesByName(AnalysisUnit $unit, NodeFinder $finder): array
+    private function classesByName(AnalysisUnit $analysisUnit, NodeFinder $finder): array
     {
         $classes = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             if (!$class->name instanceof Node\Identifier) {
                 continue;
             }
@@ -281,7 +281,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      * @return Finding Global state mutation finding.
      */
     private function finding(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         TestQualityScope $scope,
         int $line,
         string $message,
@@ -290,7 +290,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         return new Finding(
             ruleId:      self::ID,
             message:     $message,
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    Severity::Warning,
             pillar:      Pillar::TestQuality,

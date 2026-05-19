@@ -69,8 +69,8 @@ final class DashboardCommand extends Command
             return Command::FAILURE;
         }
 
-        $stateFactory = new DashboardStateFactory();
-        $projectRoot  = $stateFactory->initialProjectRoot($input, $cwd);
+        $dashboardStateFactory = new DashboardStateFactory();
+        $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
         if ($projectRoot === null) {
             $output->writeln('<error>Initial --project must resolve to an existing directory.</error>');
@@ -90,11 +90,11 @@ final class DashboardCommand extends Command
             return Command::INVALID;
         }
 
-        $host    = $stateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
-        $context = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
-        $server  = new DashboardServer($stateFactory, $this->gruffBinary());
+        $host                    = $dashboardStateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;
+        $dashboardRequestContext = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
+        $dashboardServer         = new DashboardServer($dashboardStateFactory, $this->gruffBinary());
 
-        return $server->serve($output, $host, $port, $context);
+        return $dashboardServer->serve($output, $host, $port, $dashboardRequestContext);
     }
 
     /**

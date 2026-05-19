@@ -471,12 +471,12 @@ final class InfectionReportParserTest extends TestCase
             return;
         }
 
-        $iterator = new RecursiveIteratorIterator(
+        $recursiveIteratorIterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST,
         );
 
-        foreach ($iterator as $item) {
+        foreach ($recursiveIteratorIterator as $item) {
             if (!$item instanceof SplFileInfo) {
                 continue;
             }

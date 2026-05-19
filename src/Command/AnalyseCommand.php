@@ -233,7 +233,7 @@ final class AnalyseCommand extends Command
         $displayFilter   = $options->displayFilter();
         $displayFindings = $displayFilter->apply($findings);
         $displayReview   = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
-        $report          = new AnalysisReport(
+        $analysisReport  = new AnalysisReport(
             toolVersion:     Application::VERSION,
             requestedPaths:  $options->paths,
             format:          $format->value,
@@ -257,11 +257,11 @@ final class AnalyseCommand extends Command
 
         $reportStart = hrtime(true);
         $this->renderReport(
-            report:            $report,
-            format:            $format,
-            output:            $output,
-            projectRoot:       $projectRoot,
-            reportEditorLink:  $options->reportEditorLink,
+            report:              $analysisReport,
+            format:              $format,
+            output:              $output,
+            projectRoot:         $projectRoot,
+            reportEditorLink:    $options->reportEditorLink,
                 isReportInteractive: $options->isReportInteractive,
         );
         $reportNs = hrtime(true) - $reportStart;
@@ -529,26 +529,26 @@ final class AnalyseCommand extends Command
             return null;
         }
 
-        $snapshot            = new GitArchiveSnapshot();
-        $baseRoot            = null;
+        $gitArchiveSnapshot       = new GitArchiveSnapshot();
+        $baseRoot                 = null;
         $shouldLoadProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
-        $baseAnalysisPaths   = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
+        $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
         if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
             $baseScore = (new ScoreCalculator())->calculate([], null, null);
 
             return (new BranchReviewComparator())->compare(
-                current:     $currentFindings,
-                base:        [],
-                baseRef:     $options->diffVs,
+                current:       $currentFindings,
+                base:          [],
+                baseRef:       $options->diffVs,
                 isChangedOnly: true,
-                deltaScore:  $currentScore - $baseScore->composite->score,
+                deltaScore:    $currentScore - $baseScore->composite->score,
             );
         }
 
         try {
-            $baseRoot     = $snapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
+            $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
             $basePaths    = $this->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
             $baseFindings = [];
 
@@ -575,11 +575,11 @@ final class AnalyseCommand extends Command
             $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null);
 
             return (new BranchReviewComparator())->compare(
-                current:     $currentFindings,
-                base:        $baseFindings,
-                baseRef:     $options->diffVs,
+                current:       $currentFindings,
+                base:          $baseFindings,
+                baseRef:       $options->diffVs,
                 isChangedOnly: $options->isChangedOnly,
-                deltaScore:  $currentScore - $baseScore->composite->score,
+                deltaScore:    $currentScore - $baseScore->composite->score,
             );
         } catch (DiffException | RuntimeException $exception) {
             $diagnostics[] = new RunDiagnostic(
@@ -590,7 +590,7 @@ final class AnalyseCommand extends Command
             return null;
         } finally {
             if ($baseRoot !== null) {
-                $snapshot->remove($baseRoot);
+                $gitArchiveSnapshot->remove($baseRoot);
             }
         }
     }

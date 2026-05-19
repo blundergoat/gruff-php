@@ -47,18 +47,18 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Find long tests that appear to exercise only one SUT call.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for tests with disproportionate setup/assertion size.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition   = $this->definition();
-        $minTestLines = (int) $context->settingsFor($definition)->numericThreshold('minTestLines');
+        $minTestLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minTestLines');
         $findings     = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $sutCalls = $this->sutCalls($scope);
             if ($scope->lineCount() < $minTestLines || count($sutCalls) > 1 || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
@@ -71,7 +71,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s is long while exercising only %d apparent SUT call.', $scope->symbol, count($sutCalls)),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

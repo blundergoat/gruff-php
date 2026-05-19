@@ -366,19 +366,19 @@ final class RuleRegistry
      * Run all enabled file and project rules against parsed units.
      *
      * @param list<AnalysisUnit>      $units              Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $context            Rule execution context.
+     * @param RuleContext             $ruleContext        Rule execution context.
      * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
      * @return list<Finding> Findings produced by enabled rules.
      */
     public function analyse(
         array $units,
-        RuleContext $context,
+        RuleContext $ruleContext,
         ?array $projectUnits = null,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
         $findings     = [];
-        $enabledRules = $this->enabledRules($context->config);
+        $enabledRules = $this->enabledRules($ruleContext->config);
 
         foreach ($units as $unit) {
             if ($unit->hasParseErrors()) {
@@ -397,13 +397,13 @@ final class RuleRegistry
                 }
 
                 if ($ruleRunnerObserver === null) {
-                    array_push($findings, ...$rule->analyse($unit, $context));
+                    array_push($findings, ...$rule->analyse($unit, $ruleContext));
                     continue;
                 }
 
                 $ruleId       = $rule->definition()->id;
                 $started      = hrtime(true);
-                $ruleFindings = $rule->analyse($unit, $context);
+                $ruleFindings = $rule->analyse($unit, $ruleContext);
                 $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
                 array_push($findings, ...$ruleFindings);
             }
@@ -412,7 +412,7 @@ final class RuleRegistry
         $projectUnits ??= $units;
         $analyseableUnits = array_values(array_filter(
             $projectUnits,
-            static fn (AnalysisUnit $unit): bool => !$unit->hasParseErrors() && $unit->file->isPhp(),
+            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
         ));
 
         if ($analyseableUnits !== []) {
@@ -422,13 +422,13 @@ final class RuleRegistry
                 }
 
                 if ($ruleRunnerObserver === null) {
-                    array_push($findings, ...$rule->analyseProject($analyseableUnits, $context));
+                    array_push($findings, ...$rule->analyseProject($analyseableUnits, $ruleContext));
                     continue;
                 }
 
                 $ruleId          = $rule->definition()->id;
                 $started         = hrtime(true);
-                $projectFindings = $rule->analyseProject($analyseableUnits, $context);
+                $projectFindings = $rule->analyseProject($analyseableUnits, $ruleContext);
                 $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
                 array_push($findings, ...$projectFindings);
             }
@@ -553,9 +553,9 @@ final class RuleRegistry
     private function findingIdentifierName(Finding $finding): ?string
     {
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
-            $value = $finding->metadata[$metadataKey] ?? null;
-            if (is_string($value)) {
-                return $value;
+            $metadataValue = $finding->metadata[$metadataKey] ?? null;
+            if (is_string($metadataValue)) {
+                return $metadataValue;
             }
         }
 

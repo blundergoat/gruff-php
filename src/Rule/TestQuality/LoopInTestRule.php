@@ -49,25 +49,25 @@ final readonly class LoopInTestRule implements RuleInterface
     /**
      * Find tests with loops that can obscure individual cases.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for loop constructs in tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        if ($this->isPathIgnored($unit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+        if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_ || $node instanceof Stmt\While_ || $node instanceof Stmt\Do_) as $loop) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_ || $node instanceof Stmt\While_ || $node instanceof Stmt\Do_) as $loop) {
                 if (!$loop instanceof Stmt\For_
                     && !$loop instanceof Stmt\Foreach_
                     && !$loop instanceof Stmt\While_
@@ -76,14 +76,14 @@ final readonly class LoopInTestRule implements RuleInterface
                     continue;
                 }
 
-                if (!$this->hasLoopAssertion($finder, $loop)) {
+                if (!$this->hasLoopAssertion($nodeFinder, $loop)) {
                     continue;
                 }
 
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains a loop; looping assertions often hide multiple scenarios.', $scope->symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $loop->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,

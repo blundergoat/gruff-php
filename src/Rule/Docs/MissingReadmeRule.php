@@ -52,18 +52,18 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Emit one finding when the project root has no README.md file.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Missing README finding, or an empty list.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if ($this->emitted) {
             return [];
         }
 
-        $root          = $context->projectRoot;
+        $root          = $ruleContext->projectRoot;
         $readmePresent = $this->readmePresenceByRoot[$root]
             ??= file_exists($root . '/README.md');
 

@@ -47,19 +47,19 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Find setup methods that exceed the configured size threshold.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized setup methods.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition    = $this->definition();
-        $minSetupLines = (int) $context->settingsFor($definition)->numericThreshold('minSetupLines');
-        $finder        = new NodeFinder();
+        $minSetupLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minSetupLines');
+        $nodeFinder    = new NodeFinder();
         $findings      = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             $setup          = null;
             $testLineCounts = [];
 
@@ -88,7 +88,7 @@ final readonly class SetupBloatRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s::setUp() is longer than the average test method.', $className),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $setup->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

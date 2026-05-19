@@ -45,18 +45,18 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     /**
      * Find tests that create more mocks than the configured threshold.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for heavily mocked tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $maxMocks   = (int) $context->settingsFor($definition)->numericThreshold('maxMocks');
+        $maxMocks   = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxMocks');
         $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $mockCount = 0;
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 if (TestQualityNodeHelper::isMockCreationCall($call)) {
@@ -71,7 +71,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s creates %d mocks; more than %d usually signals over-specified collaborators.', $scope->symbol, $mockCount, $maxMocks),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

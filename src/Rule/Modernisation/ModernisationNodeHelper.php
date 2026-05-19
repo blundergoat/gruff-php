@@ -19,13 +19,13 @@ final class ModernisationNodeHelper
     /**
      * Determine whether the configured target PHP version supports a syntax feature.
      *
-     * @param RuleContext $context Rule context carrying effective config.
+     * @param RuleContext $ruleContext Rule context carrying effective config.
      * @param float       $version PHP version required by the syntax feature.
      * @return bool True when the project target is at least the requested version.
      */
-    public static function supportsPhp(RuleContext $context, float $version): bool
+    public static function supportsPhp(RuleContext $ruleContext, float $version): bool
     {
-        return $context->config->minimumPhpVersion() >= $version;
+        return $ruleContext->config->minimumPhpVersion() >= $version;
     }
 
     /**

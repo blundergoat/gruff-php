@@ -27,14 +27,14 @@ final readonly class SelectionConfigParser
     }
 
     /**
-     * @param ConfigValue  $value    Raw selection config value.
-     * @param RuleRegistry $registry Registry used to validate selected rule ids.
+     * @param ConfigValue  $decodedValue Raw selection config value.
+     * @param RuleRegistry $registry   Registry used to validate selected rule ids.
      * @return RuleSelection Parsed rule selection filters.
      * @throws ConfigException When the selection config has unknown keys or invalid values.
      */
-    public function parse(object|array|string|int|float|bool|null $value, RuleRegistry $registry): RuleSelection
+    public function parse(object|array|string|int|float|bool|null $decodedValue, RuleRegistry $registry): RuleSelection
     {
-        $selection = $this->requireObject($value);
+        $selection = $this->requireObject($decodedValue);
         $this->assertKnownKeys($selection);
 
         return new RuleSelection(
@@ -127,18 +127,18 @@ final readonly class SelectionConfigParser
     /**
      * Validate that the selection config is an object-like array.
      *
-     * @param ConfigValue $value
+     * @param ConfigValue $decodedValue
      * @return ConfigObject
      */
-    private function requireObject(object|array|string|int|float|bool|null $value): array
+    private function requireObject(object|array|string|int|float|bool|null $decodedValue): array
     {
-        if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+        if (!is_array($decodedValue) || ($decodedValue !== [] && array_is_list($decodedValue))) {
             throw new ConfigException('Config key "selection" must be an object.');
         }
 
         $result = [];
 
-        foreach ($value as $key => $item) {
+        foreach ($decodedValue as $key => $item) {
             if (!is_string($key)) {
                 throw new ConfigException('Config key "selection" must be an object.');
             }
@@ -154,13 +154,13 @@ final readonly class SelectionConfigParser
      *
      * @return ConfigValue
      */
-    private function configValue(mixed $value): array|bool|float|int|object|string|null
+    private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
-        if (is_array($value)) {
-            return $this->configArray($value);
+        if (is_array($decodedValue)) {
+            return $this->configArray($decodedValue);
         }
 
-        return $this->configScalar($value);
+        return $this->configScalar($decodedValue);
     }
 
     /**
@@ -168,10 +168,10 @@ final readonly class SelectionConfigParser
      *
      * @return ConfigScalar
      */
-    private function configScalar(mixed $value): bool|float|int|object|string|null
+    private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
-        if (is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
-            return $value;
+        if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
+            return $decodedValue;
         }
 
         throw new ConfigException('Config value must be YAML/JSON-compatible.');

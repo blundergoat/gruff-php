@@ -39,12 +39,12 @@ final readonly class ParameterCountRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'Parameter count',
-            pillar:                   Pillar::Size,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::High,
+            id:                self::ID,
+            name:              'Parameter count',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::High,
             severityThreshold: new SeverityThreshold(10, Severity::Error),
         );
     }
@@ -52,18 +52,18 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Find functions, methods, and closures with too many parameters.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for callables above configured thresholds.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        $finder = new NodeFinder();
-        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_
                 || $node instanceof Closure
@@ -96,7 +96,7 @@ final readonly class ParameterCountRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -174,12 +174,12 @@ final readonly class ParameterCountRule implements RuleInterface
      *
      * @return string Human-readable threshold value.
      */
-    private function formatNumber(int|float $value): string
+    private function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

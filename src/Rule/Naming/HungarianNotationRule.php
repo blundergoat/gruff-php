@@ -54,20 +54,20 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find local variables that use type-prefix naming.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding> Findings for Hungarian notation variables.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             array_push(
                 $findings,
-                ...$this->parameterFindings($definition, $unit, $scope),
-                ...$this->localVariableFindings($definition, $unit, $scope),
+                ...$this->parameterFindings($definition, $analysisUnit, $scope),
+                ...$this->localVariableFindings($definition, $analysisUnit, $scope),
             );
         }
 
@@ -79,7 +79,7 @@ final readonly class HungarianNotationRule implements RuleInterface
      *
      * @return list<Finding> Findings for prefixed parameters.
      */
-    private function parameterFindings(RuleDefinition $definition, AnalysisUnit $unit, FunctionLikeScope $scope): array
+    private function parameterFindings(RuleDefinition $definition, AnalysisUnit $analysisUnit, FunctionLikeScope $scope): array
     {
         $findings = [];
         $symbol   = $this->symbol($scope);
@@ -91,7 +91,7 @@ final readonly class HungarianNotationRule implements RuleInterface
 
             $finding = $this->finding(
                 definition: $definition,
-                unit:       $unit,
+                analysisUnit:       $analysisUnit,
                 node:       $param,
                 kind:       'parameter',
                 name:       $param->var->name,
@@ -110,7 +110,7 @@ final readonly class HungarianNotationRule implements RuleInterface
      *
      * @return list<Finding> Findings for prefixed local variables.
      */
-    private function localVariableFindings(RuleDefinition $definition, AnalysisUnit $unit, FunctionLikeScope $scope): array
+    private function localVariableFindings(RuleDefinition $definition, AnalysisUnit $analysisUnit, FunctionLikeScope $scope): array
     {
         $findings = [];
         $symbol   = $this->symbol($scope);
@@ -118,7 +118,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         foreach ($scope->localVariables as $name => $variable) {
             $finding = $this->finding(
                 definition: $definition,
-                unit:       $unit,
+                analysisUnit:       $analysisUnit,
                 node:       $variable,
                 kind:       'variable',
                 name:       $name,
@@ -139,7 +139,7 @@ final readonly class HungarianNotationRule implements RuleInterface
      */
     private function finding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         Node $node,
         string $kind,
         string $name,
@@ -154,7 +154,7 @@ final readonly class HungarianNotationRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s in %s uses Hungarian notation prefix "%s".', ucfirst($kind), $name, $symbol, $prefix),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

@@ -47,20 +47,20 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Count TODO-style markers in comments and report files above threshold.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for excessive TODO density.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
         $count     = 0;
         $firstLine = null;
 
-        foreach ($unit->tokens as $token) {
+        foreach ($analysisUnit->tokens as $token) {
             if (!$this->isCommentToken($token)) {
                 continue;
             }
@@ -84,7 +84,7 @@ final readonly class TodoDensityRule implements RuleInterface
             new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('File has %d TODO/FIXME markers, above the %s threshold of %s.', $count, $thresholdMatch->severity->value, (string) (int) $thresholdMatch->threshold),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $firstLine,
                 severity:    $thresholdMatch->severity,
                 pillar:      $definition->pillar,

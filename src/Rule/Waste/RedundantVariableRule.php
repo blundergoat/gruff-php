@@ -51,16 +51,16 @@ final readonly class RedundantVariableRule implements RuleInterface
     /**
      * Find temporary variables that are immediately returned.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding> Findings for redundant return variables.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
-        $functions  = $finder->find($unit->statements, static function (Node $node): bool {
+        $functions  = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Stmt\ClassMethod
                 || $node instanceof Stmt\Function_
                 || $node instanceof Closure;
@@ -68,7 +68,7 @@ final readonly class RedundantVariableRule implements RuleInterface
 
         foreach ($functions as $function) {
             /** @var Stmt\ClassMethod|Stmt\Function_|Closure $function Finder predicate restricts results to function-like nodes. */
-            $this->checkBlock($function->stmts ?? [], $unit, $definition, $findings);
+            $this->checkBlock($function->stmts ?? [], $analysisUnit, $definition, $findings);
         }
 
         return $findings;
@@ -79,7 +79,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      * @param list<Finding> &$findings
      * @return void
      */
-    private function checkBlock(array $statements, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
+    private function checkBlock(array $statements, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
         $statements = array_values($statements);
 
@@ -87,14 +87,14 @@ final readonly class RedundantVariableRule implements RuleInterface
             $this->flagRedundantPair(
                 assignment:      $statements[0],
                 returnStatement: $statements[1],
-                unit:            $unit,
+                analysisUnit:            $analysisUnit,
                 definition:      $definition,
                 findings:        $findings,
             );
         }
 
         foreach ($statements as $statement) {
-            $this->checkChildBlocks($statement, $unit, $definition, $findings);
+            $this->checkChildBlocks($statement, $analysisUnit, $definition, $findings);
         }
     }
 
@@ -102,7 +102,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      * @param list<Finding> &$findings
      * @return void
      */
-    private function flagRedundantPair(Stmt $assignment, Stmt $returnStatement, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
+    private function flagRedundantPair(Stmt $assignment, Stmt $returnStatement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
         if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
             return;
@@ -125,7 +125,7 @@ final readonly class RedundantVariableRule implements RuleInterface
         $findings[] = new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $assignment->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
@@ -142,17 +142,17 @@ final readonly class RedundantVariableRule implements RuleInterface
      * @param list<Finding> &$findings
      * @return void
      */
-    private function checkChildBlocks(Stmt $statement, AnalysisUnit $unit, RuleDefinition $definition, array &$findings): void
+    private function checkChildBlocks(Stmt $statement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
         if ($statement instanceof Stmt\If_) {
-            $this->checkBlock($statement->stmts, $unit, $definition, $findings);
+            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
 
             foreach ($statement->elseifs as $elseif) {
-                $this->checkBlock($elseif->stmts, $unit, $definition, $findings);
+                $this->checkBlock($elseif->stmts, $analysisUnit, $definition, $findings);
             }
 
             if ($statement->else !== null) {
-                $this->checkBlock($statement->else->stmts, $unit, $definition, $findings);
+                $this->checkBlock($statement->else->stmts, $analysisUnit, $definition, $findings);
             }
 
             return;
@@ -163,28 +163,28 @@ final readonly class RedundantVariableRule implements RuleInterface
             || $statement instanceof Stmt\While_
             || $statement instanceof Stmt\Do_
         ) {
-            $this->checkBlock($statement->stmts, $unit, $definition, $findings);
+            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
 
             return;
         }
 
         if ($statement instanceof Stmt\Switch_) {
             foreach ($statement->cases as $case) {
-                $this->checkBlock($case->stmts, $unit, $definition, $findings);
+                $this->checkBlock($case->stmts, $analysisUnit, $definition, $findings);
             }
 
             return;
         }
 
         if ($statement instanceof Stmt\TryCatch) {
-            $this->checkBlock($statement->stmts, $unit, $definition, $findings);
+            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
 
             foreach ($statement->catches as $catch) {
-                $this->checkBlock($catch->stmts, $unit, $definition, $findings);
+                $this->checkBlock($catch->stmts, $analysisUnit, $definition, $findings);
             }
 
             if ($statement->finally !== null) {
-                $this->checkBlock($statement->finally->stmts, $unit, $definition, $findings);
+                $this->checkBlock($statement->finally->stmts, $analysisUnit, $definition, $findings);
             }
         }
     }

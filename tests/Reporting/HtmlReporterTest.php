@@ -44,8 +44,8 @@ final class HtmlReporterTest extends TestCase
                 confidence: Confidence::High,
             ),
         ];
-        $score  = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
-        $report = new AnalysisReport(
+        $score          = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src/<bad>.php'],
             format:          'html',
@@ -61,7 +61,7 @@ final class HtmlReporterTest extends TestCase
             diff:            DiffResult::inactive(),
         );
 
-        $html = (new HtmlReporter())->render($report);
+        $html = (new HtmlReporter())->render($analysisReport);
 
         self::assertStringContainsString('<section class="verdict">', $html);
         self::assertStringContainsString('pillar grades', $html);
@@ -84,8 +84,8 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
-        $score  = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
-        $report = new AnalysisReport(
+        $score          = (new ScoreCalculator())->calculate([], null, DiffResult::inactive());
+        $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],
             format:          'html',
@@ -101,7 +101,7 @@ final class HtmlReporterTest extends TestCase
             diff:            DiffResult::inactive(),
         );
 
-        $html = (new HtmlReporter())->render($report);
+        $html = (new HtmlReporter())->render($analysisReport);
 
         self::assertStringContainsString('cyclomatic complexity · flagged methods', $html);
         self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $html);
@@ -274,7 +274,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterHandlesMissingScoreDefaultPathAndActiveDiffScope(): void
     {
-        $report = new AnalysisReport(
+        $analysisReport = new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  [],
             format:          'html',
@@ -290,7 +290,7 @@ final class HtmlReporterTest extends TestCase
             diff:            new DiffResult(true, 'diff', 'main', [], ['src/A.php', 'src/B.php'], 'Diff active.'),
         );
 
-        $html = (new HtmlReporter())->render($report);
+        $html = (new HtmlReporter())->render($analysisReport);
 
         self::assertStringContainsString('<title>gruff-php inspection report - n/a</title>', $html);
         self::assertStringContainsString('<div class="grade-letter">n/a</div>', $html);
@@ -346,7 +346,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
-        $score = new ScoreReport(
+        $scoreReport = new ScoreReport(
             composite: new Grade(88.25, 'B'),
             pillars:   [
                 new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
@@ -357,7 +357,7 @@ final class HtmlReporterTest extends TestCase
             scope:                  'fixture',
             explanation:            'custom score',
         );
-        $report = $this->report([], [], $score);
+        $report = $this->report([], [], $scoreReport);
 
         $html = (new HtmlReporter())->render($report);
 
@@ -377,7 +377,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
-        $score = new ScoreReport(
+        $scoreReport = new ScoreReport(
             composite:    new Grade(72.0, 'C'),
             pillars:      [],
             topOffenders: [
@@ -388,7 +388,7 @@ final class HtmlReporterTest extends TestCase
             explanation:            'custom score',
         );
 
-        $html = (new HtmlReporter())->render($this->report([], [], $score));
+        $html = (new HtmlReporter())->render($this->report([], [], $scoreReport));
 
         self::assertStringContainsString(
             '<td class="file-path"><span class="loc-link" tabindex="0" data-path="src/Metrics.php">src/Metrics.php</span></td><td class="num">3</td><td class="num">5</td><td class="num">8</td><td class="num">4</td>',
@@ -406,7 +406,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
     {
-        $singlePillar = new Finding(
+        $finding = new Finding(
             ruleId:     'docs.missing-public-phpdoc',
             message:    'Public method has no PHPDoc.',
             filePath:   'src/Example.php',
@@ -417,7 +417,7 @@ final class HtmlReporterTest extends TestCase
             confidence: Confidence::High,
         );
         $manyPillars = [
-            $singlePillar,
+            $finding,
             new Finding('complexity.cyclomatic', 'Complex.', 'src/A.php', 1, Severity::Warning, Pillar::Complexity, RuleTier::V01, Confidence::High),
             new Finding('security.eval', 'Security.', 'src/B.php', 1, Severity::Warning, Pillar::Security, RuleTier::V01, Confidence::High),
             new Finding('naming.short-variable', 'Naming.', 'src/C.php', 1, Severity::Warning, Pillar::Naming, RuleTier::V01, Confidence::High),
@@ -426,7 +426,7 @@ final class HtmlReporterTest extends TestCase
             new Finding('modernisation.final-class', 'Modern.', 'src/F.php', 1, Severity::Warning, Pillar::Modernisation, RuleTier::V01, Confidence::High),
         ];
 
-        $singleHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report([$singlePillar]));
+        $singleHtml = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report([$finding]));
         $manyHtml   = (new HtmlReporter('/workspace/project', 'none', true))->render($this->report($manyPillars));
 
         self::assertStringContainsString('<label>Pillar<select name="pillar" multiple size="2">', $singleHtml);

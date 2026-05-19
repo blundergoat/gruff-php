@@ -48,18 +48,18 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Find files that lack a file-level docblock or a documented sole class-like declaration.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for missing file-level documentation.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if ($unit->statements === []) {
+        if ($analysisUnit->statements === []) {
             return [];
         }
 
-        $topLevel = $this->topLevelStatements($unit);
+        $topLevel = $this->topLevelStatements($analysisUnit);
 
         if ($topLevel === []) {
             return [];
@@ -73,17 +73,17 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             return [];
         }
 
-        return $this->buildFinding($unit, $topLevel[0]);
+        return $this->buildFinding($analysisUnit, $topLevel[0]);
     }
 
     /**
      * @return list<Node\Stmt>
      */
-    private function topLevelStatements(AnalysisUnit $unit): array
+    private function topLevelStatements(AnalysisUnit $analysisUnit): array
     {
         $effective = [];
 
-        foreach ($unit->statements as $statement) {
+        foreach ($analysisUnit->statements as $statement) {
             if ($statement instanceof Namespace_) {
                 foreach ($statement->stmts as $inner) {
                     $effective[] = $inner;
@@ -135,21 +135,21 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function buildFinding(AnalysisUnit $unit, Node\Stmt $first): array
+    private function buildFinding(AnalysisUnit $analysisUnit, Node\Stmt $first): array
     {
         $definition = $this->definition();
 
         return [
             new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('File %s has no file-level docblock.', $unit->file->displayPath),
-                filePath:    $unit->file->displayPath,
+                message:     sprintf('File %s has no file-level docblock.', $analysisUnit->file->displayPath),
+                filePath:    $analysisUnit->file->displayPath,
                 line:        1,
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
-                symbol:      $unit->file->displayPath,
+                symbol:      $analysisUnit->file->displayPath,
                 remediation: 'Add a file-level docblock describing the file\'s purpose, or document the file\'s single declared type with a class-level docblock.',
                 metadata:    [
                     'firstStatementKind' => $this->statementKind($first),

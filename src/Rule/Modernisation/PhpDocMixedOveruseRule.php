@@ -83,19 +83,19 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     /**
      * Detect PHPDoc tags that use `mixed` where a narrower type would carry more meaning.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding>
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        $targets = $finder->find(
-            $unit->statements,
+        $targets = $nodeFinder->find(
+            $analysisUnit->statements,
             static fn (Node $node): bool => $node instanceof ClassMethod
                 || $node instanceof Function_
                 || $node instanceof Property
@@ -140,7 +140,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                         $symbol,
                         $tagKind,
                     ),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $block['line'],
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,

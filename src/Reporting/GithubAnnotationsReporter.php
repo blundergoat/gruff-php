@@ -62,12 +62,12 @@ final readonly class GithubAnnotationsReporter
      *
      * @return string Escaped property value.
      */
-    private function escapeProperty(string $value): string
+    private function escapeProperty(string $text): string
     {
         return str_replace(
             ['%', "\r", "\n", ':', ','],
             ['%25', '%0D', '%0A', '%3A', '%2C'],
-            $value,
+            $text,
         );
     }
 
@@ -76,12 +76,12 @@ final readonly class GithubAnnotationsReporter
      *
      * @return string Escaped data value.
      */
-    private function escapeData(string $value): string
+    private function escapeData(string $text): string
     {
         return str_replace(
             ['%', "\r", "\n"],
             ['%25', '%0D', '%0A'],
-            $value,
+            $text,
         );
     }
 }

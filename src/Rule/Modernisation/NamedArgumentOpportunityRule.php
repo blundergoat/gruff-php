@@ -49,24 +49,24 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find calls with many positional arguments that would read better named.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for named argument opportunities.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             return [];
         }
 
         $definition             = $this->definition();
-        $minPositionalArguments = (int) $context->settingsFor($definition)->numericThreshold('minPositionalArguments');
-        $finder                 = new NodeFinder();
-        $variadicMethodNames    = $this->variadicMethodNames($unit->statements, $finder);
+        $minPositionalArguments = (int) $ruleContext->settingsFor($definition)->numericThreshold('minPositionalArguments');
+        $nodeFinder             = new NodeFinder();
+        $variadicMethodNames    = $this->variadicMethodNames($analysisUnit->statements, $nodeFinder);
         $findings               = [];
 
-        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+        foreach ($nodeFinder->find($analysisUnit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
             if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                 continue;
             }
@@ -83,7 +83,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('Call with %s may be clearer with PHP 8 named arguments.', $reason),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $call->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::Modernisation,

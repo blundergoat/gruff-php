@@ -43,6 +43,30 @@ abstract class NamingRuleTestCase extends TestCase
     }
 
     /**
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-naming-');
+        self::assertIsString($path);
+
+        try {
+            file_put_contents($path, $source);
+
+            $unit     = $this->parser->parse(new SourceFile($path, $displayPath));
+            $registry = RuleRegistry::defaults();
+            $config   = AnalysisConfig::fromRegistry($registry);
+            $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+
+            return array_values(array_filter($findings, static fn ($finding): bool => $finding->ruleId === $ruleId));
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    /**
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.

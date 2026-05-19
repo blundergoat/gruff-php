@@ -295,11 +295,11 @@ final class NamingRulesTest extends NamingRuleTestCase
      */
     public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
     {
-        $tokenizer = new IdentifierTokenizer();
+        $identifierTokenizer = new IdentifierTokenizer();
 
-        self::assertSame(['http', 'response', 'code'], $tokenizer->tokenize('HTTPResponseCode'));
-        self::assertSame(['order', 'item', '2'], $tokenizer->tokenize('order_item2'));
-        self::assertSame(['temp'], $tokenizer->tokenize('_temp'));
+        self::assertSame(['http', 'response', 'code'], $identifierTokenizer->tokenize('HTTPResponseCode'));
+        self::assertSame(['order', 'item', '2'], $identifierTokenizer->tokenize('order_item2'));
+        self::assertSame(['temp'], $identifierTokenizer->tokenize('_temp'));
     }
 
     /**
@@ -329,6 +329,7 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertSame('generic', $reported['property:stuff'] ?? null);
         self::assertSame('generic', $reported['variable:item'] ?? null);
         self::assertSame('numbered', $reported['variable:item2'] ?? null);
+        self::assertSame('generic', $reported['variable:value'] ?? null);
         self::assertSame('generic', $reported['interface:Data'] ?? null);
         self::assertSame('generic', $reported['trait:HelperThing'] ?? null);
         self::assertSame('placeholder', $reported['function:bar'] ?? null);
@@ -349,7 +350,6 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('provideThings', $names);
         self::assertNotContains('userName', $names);
         self::assertNotContains('api', $names);
-        self::assertNotContains('value', $names);
         self::assertNotContains('i', $names);
         self::assertNotContains('e', $names);
         self::assertNotContains('calculateInvoiceTotal', $names);

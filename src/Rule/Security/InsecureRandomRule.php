@@ -51,17 +51,17 @@ final class InsecureRandomRule implements RuleInterface
     /**
      * Find random APIs that are unsuitable for security-sensitive values.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for insecure random usage.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === null || !in_array($name, self::INSECURE_RANDOM_FUNCTIONS, true)) {
                 continue;
@@ -70,7 +70,7 @@ final class InsecureRandomRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('Insecure random source detected: %s().', $name),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $call->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Security,

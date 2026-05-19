@@ -47,21 +47,21 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Find uses of PHP error suppression that can hide failures.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for suppressed expressions.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\ErrorSuppress::class) as $node) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\ErrorSuppress::class) as $node) {
             $findings[] = new Finding(
                 ruleId:           self::ID,
                 message:          'Error suppression operator hides failures.',
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         Severity::Warning,
                 pillar:           Pillar::Security,

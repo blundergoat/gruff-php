@@ -39,12 +39,12 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'Maintainability index',
-            pillar:                   Pillar::Maintainability,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::Medium,
+            id:                self::ID,
+            name:              'Maintainability index',
+            pillar:            Pillar::Maintainability,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::Medium,
             severityThreshold: new SeverityThreshold(35, Severity::Error),
         );
     }
@@ -52,17 +52,17 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Find function-like declarations whose maintainability index falls below thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context carrying thresholds.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context carrying thresholds.
      * @return list<Finding> Findings for low maintainability index scores.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        $finder = new NodeFinder();
-        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -71,7 +71,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            $mi             = self::computeMaintainabilityIndex($node, $unit);
+            $mi             = self::computeMaintainabilityIndex($node, $analysisUnit);
             $thresholdMatch = $settings->lowValueThresholdMatch($mi);
 
             if ($thresholdMatch === null) {
@@ -89,7 +89,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -112,11 +112,11 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
     /**
      * @param ClassMethod|Function_ $node Function-like node to score.
-     * @param AnalysisUnit          $unit Parsed unit that owns the node.
+     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the node.
      *
      * @return float Maintainability index score.
      */
-    public static function computeMaintainabilityIndex(Node $node, AnalysisUnit $unit): float
+    public static function computeMaintainabilityIndex(Node $node, AnalysisUnit $analysisUnit): float
     {
         $startLine = $node->getStartLine();
         $endLine   = $node->getEndLine();
@@ -142,10 +142,10 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      */
     private static function logicalLineCount(Node $node): int
     {
-        $finder = new NodeFinder();
-        $lines  = [];
+        $nodeFinder = new NodeFinder();
+        $lines      = [];
 
-        foreach ($finder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
+        foreach ($nodeFinder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
             $line = $statement->getStartLine();
 
             if ($line > 0) {
@@ -161,12 +161,12 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      *
      * @return string Human-readable threshold value.
      */
-    private static function formatNumber(int|float $value): string
+    private static function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

@@ -30,8 +30,8 @@ final class ComplexityIntegrationTest extends TestCase
      */
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
-        $parser = new PhpFileParser();
-        $unit   = $parser->parse(new SourceFile(
+        $phpFileParser = new PhpFileParser();
+        $unit          = $phpFileParser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
             'tests/Fixtures/Complexity/cyclomatic.php',
         ));
@@ -65,8 +65,8 @@ final class ComplexityIntegrationTest extends TestCase
      */
     public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
-        $parser = new PhpFileParser();
-        $unit   = $parser->parse(new SourceFile(
+        $phpFileParser = new PhpFileParser();
+        $unit          = $phpFileParser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/simple.php',
             'tests/Fixtures/Complexity/simple.php',
         ));
@@ -86,8 +86,8 @@ final class ComplexityIntegrationTest extends TestCase
      */
     public function testConfigOverrideChangesComplexityFindings(): void
     {
-        $parser = new PhpFileParser();
-        $unit   = $parser->parse(new SourceFile(
+        $phpFileParser = new PhpFileParser();
+        $unit          = $phpFileParser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/cyclomatic.php',
             'tests/Fixtures/Complexity/cyclomatic.php',
         ));
@@ -123,8 +123,8 @@ final class ComplexityIntegrationTest extends TestCase
      */
     public function testNpathCapIsExplicitInMetadataAndMessage(): void
     {
-        $parser = new PhpFileParser();
-        $unit   = $parser->parse(new SourceFile(
+        $phpFileParser = new PhpFileParser();
+        $unit          = $phpFileParser->parse(new SourceFile(
             __DIR__ . '/../../Fixtures/Complexity/npath-cap.php',
             'tests/Fixtures/Complexity/npath-cap.php',
         ));

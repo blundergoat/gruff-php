@@ -64,21 +64,21 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding>
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings = [];
-        $finder   = new NodeFinder();
+        $findings   = [];
+        $nodeFinder = new NodeFinder();
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             array_push(
                 $findings,
-                ...$this->functionFindings($unit, $scope),
-                ...$this->dateTimeFindings($finder, $unit, $scope),
+                ...$this->functionFindings($analysisUnit, $scope),
+                ...$this->dateTimeFindings($nodeFinder, $analysisUnit, $scope),
             );
         }
 
@@ -88,7 +88,7 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function functionFindings(AnalysisUnit $unit, TestQualityScope $scope): array
+    private function functionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
@@ -102,7 +102,7 @@ final readonly class SleepInTestRule implements RuleInterface
                 continue;
             }
 
-            $finding = $this->functionFinding($unit, $scope, $call, $name);
+            $finding = $this->functionFinding($analysisUnit, $scope, $call, $name);
             if ($finding !== null) {
                 $findings[] = $finding;
             }
@@ -116,14 +116,14 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return Finding|null
      */
-    private function functionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): ?Finding
+    private function functionFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): ?Finding
     {
         if (in_array($name, self::SLEEP_FUNCTIONS, true)) {
-            return $this->sleepFinding($unit, $scope, $call, $name);
+            return $this->sleepFinding($analysisUnit, $scope, $call, $name);
         }
 
         if (in_array($name, self::WALL_CLOCK_FUNCTIONS, true)) {
-            return $this->wallClockFunctionFinding($unit, $scope, $call, $name);
+            return $this->wallClockFunctionFinding($analysisUnit, $scope, $call, $name);
         }
 
         return null;
@@ -132,13 +132,13 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function dateTimeFindings(NodeFinder $finder, AnalysisUnit $unit, TestQualityScope $scope): array
+    private function dateTimeFindings(NodeFinder $finder, AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
         foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $newExpression) {
             if ($newExpression instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($newExpression)) {
-                $findings[] = $this->dateTimeFinding($unit, $scope, $newExpression);
+                $findings[] = $this->dateTimeFinding($analysisUnit, $scope, $newExpression);
             }
         }
 
@@ -178,9 +178,9 @@ final readonly class SleepInTestRule implements RuleInterface
             return false;
         }
 
-        $value = TestQualityNodeHelper::literalValue($first->value);
+        $literalValue = TestQualityNodeHelper::literalValue($first->value);
 
-        return is_string($value) && strtolower($value) === 'now';
+        return is_string($literalValue) && strtolower($literalValue) === 'now';
     }
 
     /**
@@ -188,12 +188,12 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return Finding
      */
-    private function sleepFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
+    private function sleepFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $call->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::TestQuality,
@@ -210,12 +210,12 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return Finding
      */
-    private function wallClockFunctionFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
+    private function wallClockFunctionFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $call->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::TestQuality,
@@ -232,7 +232,7 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @return Finding
      */
-    private function dateTimeFinding(AnalysisUnit $unit, TestQualityScope $scope, Expr\New_ $newExpression): Finding
+    private function dateTimeFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\New_ $newExpression): Finding
     {
         if (!$newExpression->class instanceof Name) {
             throw new \LogicException('DateTime finding requires a named class.');
@@ -243,7 +243,7 @@ final readonly class SleepInTestRule implements RuleInterface
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $newExpression->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::TestQuality,

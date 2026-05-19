@@ -137,16 +137,16 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Find tests whose name implies a SUT call that is absent from the body.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mismatched test names and calls.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $candidates = $this->candidateSutNames($scope->name);
             if ($scope->isPest || $candidates === [] || TestQualityNodeHelper::assertionCalls($scope) === []) {
                 continue;
@@ -163,7 +163,7 @@ final readonly class SutNotCalledRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
@@ -208,9 +208,9 @@ final readonly class SutNotCalledRule implements RuleInterface
      */
     private function invokesSubprocess(TestQualityScope $scope): bool
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        $hasProcessNew = $finder->find(
+        $hasProcessNew = $nodeFinder->find(
             $scope->statements,
             static function (Node $node): bool {
                 if (!$node instanceof Expr\New_ || !$node->class instanceof Name) {
@@ -281,9 +281,9 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * @return list<string>
      */
-    private function camelCaseTokens(string $value): array
+    private function camelCaseTokens(string $identifierName): array
     {
-        if (preg_match_all('/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/', $value, $matches) < 1) {
+        if (preg_match_all('/[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+/', $identifierName, $matches) < 1) {
             return [];
         }
 

@@ -58,7 +58,7 @@ final class ReportCliTest extends CliTestCase
         self::assertStringContainsString('href="vscode://file/', $process->getOutput());
         self::assertStringContainsString('class="finding-filters"', $process->getOutput());
 
-        $static = new Process([
+        $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'report',
@@ -68,10 +68,10 @@ final class ReportCliTest extends CliTestCase
             '--report-interactive=false',
             '--no-config',
         ], self::PROJECT_ROOT);
-        $static->run();
+        $process->run();
 
-        self::assertSame(0, $static->getExitCode(), $static->getErrorOutput());
-        self::assertStringNotContainsString('class="finding-filters"', $static->getOutput());
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringNotContainsString('class="finding-filters"', $process->getOutput());
     }
 
     /**
@@ -176,7 +176,7 @@ final class ReportCliTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -187,10 +187,10 @@ final class ReportCliTest extends CliTestCase
                 'none',
                 '--generate-baseline',
             ], $project);
-            $generate->run();
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            $generateProcess->run();
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
 
-            $report = new Process([
+            $reportProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'report',
@@ -201,10 +201,10 @@ final class ReportCliTest extends CliTestCase
                 'none',
                 '--baseline=gruff-baseline.json',
             ], $project);
-            $report->run();
+            $reportProcess->run();
 
-            self::assertSame(0, $report->getExitCode(), $report->getErrorOutput());
-            $decoded  = $this->decodeJsonOutput($report);
+            self::assertSame(0, $reportProcess->getExitCode(), $reportProcess->getErrorOutput());
+            $decoded  = $this->decodeJsonOutput($reportProcess);
             $baseline = $decoded['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame(1, $baseline['suppressedFindings'] ?? null);

@@ -51,18 +51,18 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Find class-like declarations that do not have a PHPDoc block.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented class-like declarations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $node) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassLike::class) as $node) {
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
@@ -81,7 +81,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('%s %s has no PHPDoc.', ucfirst($kind), $name),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

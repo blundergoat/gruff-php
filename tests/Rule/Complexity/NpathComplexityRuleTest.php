@@ -149,11 +149,11 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Analyse a fixture with custom NPath thresholds.
      *
-     * @param AnalysisUnit             $unit       Parsed fixture.
+     * @param AnalysisUnit             $analysisUnit Parsed fixture.
      * @param array<string, int|float> $thresholds Rule thresholds.
      * @return list<\GruffPhp\Finding\Finding>
      */
-    private function analyse(AnalysisUnit $unit, array $thresholds): array
+    private function analyse(AnalysisUnit $analysisUnit, array $thresholds): array
     {
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
@@ -161,7 +161,7 @@ final class NpathComplexityRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
-        return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
+        return $this->rule->analyse($analysisUnit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
     /**
@@ -173,9 +173,9 @@ final class NpathComplexityRuleTest extends TestCase
      */
     private function fixtureMethod(string $fixture, string $methodName): ClassMethod
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        foreach ($finder->findInstanceOf($this->parseFixture($fixture)->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($this->parseFixture($fixture)->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
                 return $method;
             }

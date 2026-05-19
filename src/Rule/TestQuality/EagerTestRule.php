@@ -92,18 +92,18 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Find tests that assert many times across multiple apparent SUT calls.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for eager tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition    = $this->definition();
-        $minAssertions = (int) $context->settingsFor($definition)->numericThreshold('minAssertions');
+        $minAssertions = (int) $ruleContext->settingsFor($definition)->numericThreshold('minAssertions');
         $findings      = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $assertionCount = count(TestQualityNodeHelper::assertionCalls($scope));
             $sutCalls       = $this->distinctSutCalls($scope);
 
@@ -114,7 +114,7 @@ final readonly class EagerTestRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s asserts %d times across multiple apparent SUT calls.', $scope->symbol, $assertionCount),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,
@@ -358,10 +358,10 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function collectResultVariables(TestQualityScope $scope): array
     {
-        $finder    = new NodeFinder();
-        $variables = [];
+        $nodeFinder = new NodeFinder();
+        $variables  = [];
 
-        foreach ($finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
+        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
             if (!$assign instanceof Expr\Assign) {
                 continue;
             }

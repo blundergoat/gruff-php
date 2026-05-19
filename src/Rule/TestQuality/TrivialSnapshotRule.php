@@ -45,18 +45,18 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Find snapshot assertions that lack supporting behavioral assertions.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for trivial snapshot tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $maxLength  = (int) $context->settingsFor($definition)->numericThreshold('maxLiteralLength');
+        $maxLength  = (int) $ruleContext->settingsFor($definition)->numericThreshold('maxLiteralLength');
         $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
                 if ($name === null || !str_contains($name, 'snapshot')) {
@@ -75,7 +75,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s snapshots a tiny literal; a direct assertion is clearer.', $scope->symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,

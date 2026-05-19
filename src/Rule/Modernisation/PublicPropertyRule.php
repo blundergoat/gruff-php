@@ -46,17 +46,17 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Find mutable public properties that expose object state directly.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for public property declarations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             if (ModernisationNodeHelper::isDtoClass($class)) {
                 continue;
             }
@@ -71,7 +71,7 @@ final readonly class PublicPropertyRule implements RuleInterface
                     $findings[] = new Finding(
                         ruleId:      self::ID,
                         message:     sprintf('Public mutable property $%s exposes state directly.', $name),
-                        filePath:    $unit->file->displayPath,
+                        filePath:    $analysisUnit->file->displayPath,
                         line:        $propertyProperty->getStartLine(),
                         severity:    Severity::Warning,
                         pillar:      Pillar::Modernisation,

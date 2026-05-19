@@ -114,14 +114,14 @@ final class DashboardStateFactoryTest extends TestCase
      */
     public function testProjectRootResolution(): void
     {
-        $factory = new DashboardStateFactory();
-        $base    = dirname(__DIR__, 2);
+        $dashboardStateFactory = new DashboardStateFactory();
+        $base                  = dirname(__DIR__, 2);
 
-        self::assertSame($base, $factory->initialProjectRoot($this->input(), $base));
-        self::assertSame($base . '/src', $factory->resolveProjectRoot('src', $base));
-        self::assertSame($base . '/tests', $factory->resolveProjectRoot($base . '/tests', '/tmp'));
-        self::assertNull($factory->resolveProjectRoot('missing-project-root', $base));
-        self::assertNull($factory->initialProjectRoot($this->input(['--project' => 'missing-project-root']), $base));
+        self::assertSame($base, $dashboardStateFactory->initialProjectRoot($this->input(), $base));
+        self::assertSame($base . '/src', $dashboardStateFactory->resolveProjectRoot('src', $base));
+        self::assertSame($base . '/tests', $dashboardStateFactory->resolveProjectRoot($base . '/tests', '/tmp'));
+        self::assertNull($dashboardStateFactory->resolveProjectRoot('missing-project-root', $base));
+        self::assertNull($dashboardStateFactory->initialProjectRoot($this->input(['--project' => 'missing-project-root']), $base));
     }
 
     /**
@@ -131,10 +131,10 @@ final class DashboardStateFactoryTest extends TestCase
      */
     public function testOptionalStringOptionRejectsEmptyValues(): void
     {
-        $factory = new DashboardStateFactory();
+        $dashboardStateFactory = new DashboardStateFactory();
 
-        self::assertNull($factory->optionalStringOption($this->input(['--config' => '']), 'config'));
-        self::assertSame('custom.yaml', $factory->optionalStringOption($this->input(['--config' => 'custom.yaml']), 'config'));
+        self::assertNull($dashboardStateFactory->optionalStringOption($this->input(['--config' => '']), 'config'));
+        self::assertSame('custom.yaml', $dashboardStateFactory->optionalStringOption($this->input(['--config' => 'custom.yaml']), 'config'));
     }
 
     /**

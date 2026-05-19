@@ -44,16 +44,16 @@ final readonly class TrivialAssertionRule implements RuleInterface
     /**
      * Find assertions that can pass without checking meaningful behavior.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for trivial assertions.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 if (!TestQualityNodeHelper::isTrivialAssertion($call)) {
                     continue;
@@ -62,7 +62,7 @@ final readonly class TrivialAssertionRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains an assertion that passes by construction.', $scope->symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Warning,
                     pillar:      Pillar::TestQuality,

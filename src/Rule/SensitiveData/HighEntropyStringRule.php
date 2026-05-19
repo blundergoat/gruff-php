@@ -47,41 +47,41 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Find long high-entropy string literals that may be secrets.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious high-entropy literals.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $settings         = $context->settingsFor($this->definition());
+        $settings         = $ruleContext->settingsFor($this->definition());
         $minLength        = (int) $settings->numericThreshold('minLength');
         $entropyThreshold = (float) $settings->numericThreshold('entropy');
 
-        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/["\'](?<value>[A-Za-z0-9_+\/=.-]{32,})["\']/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
         foreach ($matches['value'] as $match) {
-            [$value, $offset] = $match;
-            if (strlen($value) < $minLength) {
+            [$candidateSecret, $offset] = $match;
+            if (strlen($candidateSecret) < $minLength) {
                 continue;
             }
 
-            if ($this->shouldSkipKnownSecretPattern($value) || $this->isPathLikeLiteral($value) || SecretScannerHelper::isLikelyDummyValue($value)) {
+            if ($this->shouldSkipKnownSecretPattern($candidateSecret) || $this->isPathLikeLiteral($candidateSecret) || SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
                 continue;
             }
 
-            $entropy = SecretScannerHelper::entropy($value);
-            if ($entropy < $entropyThreshold && !(strlen($value) >= 64 && ctype_xdigit($value))) {
+            $entropy = SecretScannerHelper::entropy($candidateSecret);
+            if ($entropy < $entropyThreshold && !(strlen($candidateSecret) >= 64 && ctype_xdigit($candidateSecret))) {
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedPreview($value);
+            $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
             $findings[] = SecretScannerHelper::finding(
-                unit:        $unit,
+                analysisUnit:        $analysisUnit,
                 ruleId:      self::ID,
                 message:     sprintf('High-entropy string literal detected: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:  Confidence::Medium,
                 detector:    'high-entropy-string',
                 preview:     $preview,
@@ -97,17 +97,17 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      *
      * @return bool True when another rule should handle the literal.
      */
-    private function shouldSkipKnownSecretPattern(string $value): bool
+    private function shouldSkipKnownSecretPattern(string $candidateSecret): bool
     {
-        return str_starts_with($value, 'AKIA')
-            || str_starts_with($value, 'ASIA')
-            || str_starts_with($value, 'sk_live_')
-            || str_starts_with($value, 'sk-proj-')
-            || str_starts_with($value, 'sk-ant-')
-            || str_starts_with($value, 'ghp_')
-            || str_starts_with($value, 'xox')
-            || substr_count($value, '.') === 2
-            || (strlen($value) <= 48 && ctype_alpha($value));
+        return str_starts_with($candidateSecret, 'AKIA')
+            || str_starts_with($candidateSecret, 'ASIA')
+            || str_starts_with($candidateSecret, 'sk_live_')
+            || str_starts_with($candidateSecret, 'sk-proj-')
+            || str_starts_with($candidateSecret, 'sk-ant-')
+            || str_starts_with($candidateSecret, 'ghp_')
+            || str_starts_with($candidateSecret, 'xox')
+            || substr_count($candidateSecret, '.') === 2
+            || (strlen($candidateSecret) <= 48 && ctype_alpha($candidateSecret));
     }
 
     /**
@@ -115,12 +115,12 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      *
      * @return bool True when the literal looks like a file path.
      */
-    private function isPathLikeLiteral(string $value): bool
+    private function isPathLikeLiteral(string $candidateSecret): bool
     {
-        if (!str_contains($value, '/') && !str_contains($value, '\\')) {
+        if (!str_contains($candidateSecret, '/') && !str_contains($candidateSecret, '\\')) {
             return false;
         }
 
-        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $value) === 1;
+        return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $candidateSecret) === 1;
     }
 }

@@ -81,28 +81,28 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Find bool-returning functions and methods without a boolean-style prefix.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for poorly named boolean callables.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition      = $this->definition();
-        $settings        = $context->settingsFor($definition);
+        $settings        = $ruleContext->settingsFor($definition);
         $prefixes        = $settings->stringListOption('allowedPrefixes');
         $stateAdjectives = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateAdjectiveAllowlist'));
-        $finder          = new NodeFinder();
+        $nodeFinder      = new NodeFinder();
 
         $findings = [];
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             $node                 = $scope->node;
             $symbol               = $this->symbol($scope);
             $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
                 ? $this->functionLikeFindings(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $node,
                     symbol:     $symbol,
                     prefixes:   $prefixes,
@@ -114,7 +114,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 ...$functionLikeFindings,
                 ...$this->parameterFindings(
                     definition:      $definition,
-                    unit:            $unit,
+                    analysisUnit:            $analysisUnit,
                     scope:           $scope,
                     symbol:          $symbol,
                     prefixes:        $prefixes,
@@ -123,7 +123,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
             );
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
             if (!$this->isBoolType($property->type)) {
                 continue;
             }
@@ -136,7 +136,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
                 $findings[] = $this->identifierFinding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $prop,
                     kind:       'property',
                     name:       $name,
@@ -156,7 +156,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function functionLikeFindings(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         ClassMethod|Function_ $node,
         string $symbol,
         array $prefixes,
@@ -175,7 +175,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
             new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('%s returns bool but does not use a boolean prefix (is, has, can, should, will).', $symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
@@ -196,7 +196,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function parameterFindings(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         FunctionLikeScope $scope,
         string $symbol,
         array $prefixes,
@@ -216,7 +216,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
 
             $findings[] = $this->identifierFinding(
                 definition: $definition,
-                unit:       $unit,
+                analysisUnit:       $analysisUnit,
                 node:       $param,
                 kind:       $param->flags === 0 ? 'parameter' : 'property',
                 name:       $name,
@@ -234,7 +234,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function identifierFinding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         Node $node,
         string $kind,
         string $name,
@@ -243,7 +243,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s "$%s" is typed bool but does not use a boolean prefix or approved state adjective.', ucfirst($kind), $name),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

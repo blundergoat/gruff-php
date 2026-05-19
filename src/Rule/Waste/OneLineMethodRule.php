@@ -87,33 +87,33 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find trivial methods that only wrap a single call expression.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for one-line wrapper methods.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition         = $this->definition();
-        $settings           = $context->settingsFor($definition);
+        $settings           = $ruleContext->settingsFor($definition);
         $minParameterOption = $settings->option('minParameters');
         $minParameters      = is_int($minParameterOption) ? max(0, $minParameterOption) : 1;
         $minCallersOption   = $settings->option('minInFileCallers');
         $minInFileCallers   = is_int($minCallersOption) ? max(0, $minCallersOption) : 0;
         $factoryExempt      = $settings->option('namedAlternativeFactoryExempt') === true;
         $allowedSymbols     = array_fill_keys($settings->stringListOption('allowedSymbols'), true);
-        $finder             = new NodeFinder();
-        $methodCallCounts   = $this->methodCallCounts($unit->statements, $finder);
-        $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($unit->statements, $finder) : [];
+        $nodeFinder         = new NodeFinder();
+        $methodCallCounts   = $this->methodCallCounts($analysisUnit->statements, $nodeFinder);
+        $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit->statements, $nodeFinder) : [];
         $findings           = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             if ($this->shouldSkip(
-                method:            $method,
-                minParameters:     $minParameters,
-                minInFileCallers:  $minInFileCallers,
-                methodCallCounts:  $methodCallCounts,
-                factoryMethodIds:  $factoryMethodIds,
+                method:           $method,
+                minParameters:    $minParameters,
+                minInFileCallers: $minInFileCallers,
+                methodCallCounts: $methodCallCounts,
+                factoryMethodIds: $factoryMethodIds,
             )) {
                 continue;
             }
@@ -128,7 +128,7 @@ final readonly class OneLineMethodRule implements RuleInterface
             }
 
             $expression = $statement instanceof Return_ ? $statement->expr : $statement->expr;
-            if (!$expression instanceof Expr || !$this->containsCall($expression, $finder)) {
+            if (!$expression instanceof Expr || !$this->containsCall($expression, $nodeFinder)) {
                 continue;
             }
 
@@ -140,7 +140,7 @@ final readonly class OneLineMethodRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('%s only wraps a one-line call expression.', $symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $method->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

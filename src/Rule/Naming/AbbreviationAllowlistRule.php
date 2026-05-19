@@ -63,25 +63,25 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Find undeclared lowercase abbreviations on properties, parameters, and locals.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for undeclared abbreviations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $ignored    = $this->lowercaseList($context->settingsFor($definition)->stringListOption('ignoredNames'));
-        $minLength  = $this->lengthOption($context, $definition, 'minLength', 2);
-        $maxLength  = $this->lengthOption($context, $definition, 'maxLength', 3);
-        $accepted   = $this->lowercaseList($context->config->acceptedAbbreviations());
-        $finder     = new NodeFinder();
+        $ignored    = $this->lowercaseList($ruleContext->settingsFor($definition)->stringListOption('ignoredNames'));
+        $minLength  = $this->lengthOption($ruleContext, $definition, 'minLength', 2);
+        $maxLength  = $this->lengthOption($ruleContext, $definition, 'maxLength', 3);
+        $accepted   = $this->lowercaseList($ruleContext->config->acceptedAbbreviations());
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $prop,
                     identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
                     ignored:    $ignored,
@@ -95,7 +95,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             }
         }
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             $symbol = $this->symbol($scope);
             foreach ($scope->node->params as $param) {
                 if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -104,7 +104,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $param,
                     identifier: ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
                     ignored:    $ignored,
@@ -117,7 +117,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
             }
 
-            $exemptLocals = $this->exemptLocalNames($scope->node, $finder);
+            $exemptLocals = $this->exemptLocalNames($scope->node, $nodeFinder);
             foreach ($scope->localVariables as $name => $variable) {
                 if (isset($exemptLocals[$name])) {
                     continue;
@@ -125,7 +125,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
 
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $variable,
                     identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
                     ignored:    $ignored,
@@ -150,7 +150,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function finding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         Node $node,
         array $identifier,
         array $ignored,
@@ -178,7 +178,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s "$%s" is a short lowercase name not declared in acceptedAbbreviations.', ucfirst($kind), $name),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
@@ -195,11 +195,11 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      *
      * @return int Option value clamped to at least 1.
      */
-    private function lengthOption(RuleContext $context, RuleDefinition $definition, string $name, int $default): int
+    private function lengthOption(RuleContext $ruleContext, RuleDefinition $definition, string $name, int $default): int
     {
-        $value = $context->settingsFor($definition)->option($name);
+        $optionValue = $ruleContext->settingsFor($definition)->option($name);
 
-        return is_int($value) ? max(1, $value) : $default;
+        return is_int($optionValue) ? max(1, $optionValue) : $default;
     }
 
     /**
@@ -279,6 +279,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function lowercaseList(array $values): array
     {
-        return array_map(static fn (string $value): string => strtolower($value), $values);
+        return array_map(static fn (string $optionValue): string => strtolower($optionValue), $values);
     }
 }

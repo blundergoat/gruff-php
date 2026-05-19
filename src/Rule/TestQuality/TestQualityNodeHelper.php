@@ -25,18 +25,18 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the unit looks like a PHPUnit test file by path or filename.
      *
-     * @param AnalysisUnit $unit Parsed unit whose path should be classified.
+     * @param AnalysisUnit $analysisUnit Parsed unit whose path should be classified.
      * @return bool True when the file lives under tests/ or has a Test/TestCase basename suffix.
      */
-    public static function looksLikePhpUnitTestFile(AnalysisUnit $unit): bool
+    public static function looksLikePhpUnitTestFile(AnalysisUnit $analysisUnit): bool
     {
-        $displayPath = '/' . str_replace('\\', '/', $unit->file->displayPath);
+        $displayPath = '/' . str_replace('\\', '/', $analysisUnit->file->displayPath);
 
         if (str_contains($displayPath, '/tests/') || str_contains($displayPath, '/Tests/')) {
             return true;
         }
 
-        $basename = basename($unit->file->displayPath);
+        $basename = basename($analysisUnit->file->displayPath);
 
         return str_ends_with($basename, 'Test.php') || str_ends_with($basename, 'TestCase.php');
     }
@@ -44,22 +44,22 @@ final class TestQualityNodeHelper
     /**
      * Discover PHPUnit and Pest test scopes in an analysis unit.
      *
-     * @param AnalysisUnit $unit Parsed unit to inspect for test scopes.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect for test scopes.
      * @return list<TestQualityScope> Test scopes discovered in source order.
      */
-    public static function testScopes(AnalysisUnit $unit): array
+    public static function testScopes(AnalysisUnit $analysisUnit): array
     {
         // 18 test-quality rules each call this for every PHP unit; cache so the AST walks once per unit.
         $cache = self::$scopeCache ??= new \WeakMap();
 
-        if ($cache->offsetExists($unit)) {
-            return $cache->offsetGet($unit);
+        if ($cache->offsetExists($analysisUnit)) {
+            return $cache->offsetGet($analysisUnit);
         }
 
-        $finder = new NodeFinder();
-        $scopes = [];
+        $nodeFinder = new NodeFinder();
+        $scopes     = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\ClassMethod::class) as $method) {
             if (!self::isTestMethod($method)) {
                 continue;
             }
@@ -80,7 +80,7 @@ final class TestQualityNodeHelper
             );
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             $name = self::functionName($call);
             if (($name !== 'it' && $name !== 'test') || count($call->args) < 2) {
                 continue;
@@ -107,7 +107,7 @@ final class TestQualityNodeHelper
             );
         }
 
-        $cache->offsetSet($unit, $scopes);
+        $cache->offsetSet($analysisUnit, $scopes);
 
         return $scopes;
     }
@@ -177,10 +177,10 @@ final class TestQualityNodeHelper
      */
     public static function calls(TestQualityScope $scope): array
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
         return array_values(array_filter(
-            $finder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall),
+            $nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall),
             static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall,
         ));
     }
@@ -529,9 +529,9 @@ final class TestQualityNodeHelper
             ? self::firstArgValue($call)
             : self::argValue($call, 0);
 
-        $value = self::literalValue($candidate);
+        $literalValue = self::literalValue($candidate);
 
-        return is_int($value) && !in_array($value, [-1, 0, 1], true) ? $value : null;
+        return is_int($literalValue) && !in_array($literalValue, [-1, 0, 1], true) ? $literalValue : null;
     }
 
 }

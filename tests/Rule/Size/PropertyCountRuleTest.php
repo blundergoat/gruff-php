@@ -103,9 +103,9 @@ final class PropertyCountRuleTest extends TestCase
             PropertyCountRule::ID,
             new RuleSettings(true, $thresholds),
         );
-        $context = new RuleContext(__DIR__ . '/../../..', $config);
+        $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
-        return $this->rule->analyse($unit, $context);
+        return $this->rule->analyse($unit, $ruleContext);
     }
 
     /**

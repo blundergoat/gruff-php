@@ -46,17 +46,17 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Find include and require expressions using dynamic paths.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for variable include paths.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\Include_::class) as $include) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Include_::class) as $include) {
             if (SecurityNodeHelper::isStringLiteral($include->expr)) {
                 continue;
             }
@@ -64,7 +64,7 @@ final class VariableIncludeRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Variable include/require path detected.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $include->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Security,

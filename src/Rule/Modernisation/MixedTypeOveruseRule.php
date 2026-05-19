@@ -47,21 +47,21 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * Find parameters and returns that overuse explicit mixed types.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for broad type usage.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->find($unit->statements, static fn (Node $node): bool => $node instanceof Stmt\ClassMethod || $node instanceof Stmt\Function_) as $functionLike) {
+        foreach ($nodeFinder->find($analysisUnit->statements, static fn (Node $node): bool => $node instanceof Stmt\ClassMethod || $node instanceof Stmt\Function_) as $functionLike) {
             if ($functionLike instanceof Stmt\ClassMethod && !$functionLike->isPublic()) {
                 continue;
             }
@@ -78,7 +78,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('Public API uses mixed type in %s.', implode(', ', $locations)),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $functionLike->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::Modernisation,

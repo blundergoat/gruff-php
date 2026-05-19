@@ -47,17 +47,17 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Find test names that produce hard-to-read TestDox output.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unreadable TestDox names.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $threshold = (int) $context->settingsFor($this->definition())->numericThreshold('minWords');
+        $threshold = (int) $ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
         $findings  = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             if ($scope->isPest || !$scope->node instanceof ClassMethod) {
                 continue;
             }
@@ -78,7 +78,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                     count($words),
                     $threshold,
                 ),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

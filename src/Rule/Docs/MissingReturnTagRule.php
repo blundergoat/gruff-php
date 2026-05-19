@@ -50,16 +50,16 @@ final readonly class MissingReturnTagRule implements RuleInterface
     /**
      * Find documented function-like declarations that lack an @return tag.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for missing return tags.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
@@ -88,7 +88,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('%s has a docblock but no @return tag.', $symbol),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

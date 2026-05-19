@@ -49,7 +49,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Generic tokens that need enough scope usage to be acceptable.
      */
-    private const DEFAULT_GENERIC_TOKENS = ['data', 'entry', 'info', 'item', 'row', 'thing', 'stuff', 'helper', 'util', 'value'];
+    private const DEFAULT_GENERIC_TOKENS = ['data', 'entry', 'info', 'input', 'item', 'row', 'thing', 'stuff', 'helper', 'util', 'value'];
 
     /**
      * Short conventional names ignored by the identifier quality rule.
@@ -64,8 +64,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
         'k',
         'idx',
         'index',
+        'input',
         'key',
-        'value',
     ];
 
     /**
@@ -133,25 +133,25 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find placeholder, generic, and numbered identifiers across declarations and locals.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for low-quality identifiers.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition     = $this->definition();
-        $finder         = new NodeFinder();
-        $findingContext = $this->findingContext($unit, $context, $definition);
+        $nodeFinder     = new NodeFinder();
+        $findingContext = $this->findingContext($analysisUnit, $ruleContext, $definition);
 
         return [
-            ...$this->classLikeFindings($findingContext, $finder),
+            ...$this->classLikeFindings($findingContext, $nodeFinder),
             ...$this->functionLikeFindings(
                 findingContext:     $findingContext,
-                minScopeReferences: $this->minScopeReferences($context, $definition),
-                loopBodyThreshold:  $this->loopBodyThreshold($context, $definition),
+                minScopeReferences: $this->minScopeReferences($ruleContext, $definition),
+                loopBodyThreshold:  $this->loopBodyThreshold($ruleContext, $definition),
             ),
-            ...$this->propertyFindings($findingContext, $finder),
+            ...$this->propertyFindings($findingContext, $nodeFinder),
         ];
     }
 
@@ -161,20 +161,20 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @return IdentifierFindingContext Shared context for identifier finding checks.
      */
     private function findingContext(
-        AnalysisUnit $unit,
-        RuleContext $context,
+        AnalysisUnit $analysisUnit,
+        RuleContext $ruleContext,
         RuleDefinition $definition,
     ): IdentifierFindingContext {
-        $settings = $context->settingsFor($definition);
+        $settings = $ruleContext->settingsFor($definition);
 
         return new IdentifierFindingContext(
             definition:            $definition,
-            unit:                  $unit,
+            analysisUnit:          $analysisUnit,
             tokenizer:             new IdentifierTokenizer(),
             placeholderNames:      $this->lowercaseList($settings->stringListOption('placeholderNames')),
             genericTokens:         $this->lowercaseList($settings->stringListOption('genericTokens')),
             ignoredNames:          $this->lowercaseList($settings->stringListOption('ignoredNames')),
-            acceptedAbbreviations: $this->lowercaseList($context->config->acceptedAbbreviations()),
+            acceptedAbbreviations: $this->lowercaseList($ruleContext->config->acceptedAbbreviations()),
         );
     }
 
@@ -183,9 +183,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return int Minimum number of local variable reads.
      */
-    private function minScopeReferences(RuleContext $context, RuleDefinition $definition): int
+    private function minScopeReferences(RuleContext $ruleContext, RuleDefinition $definition): int
     {
-        $minScopeOption = $context->settingsFor($definition)->option('minScopeReferences');
+        $minScopeOption = $ruleContext->settingsFor($definition)->option('minScopeReferences');
 
         return is_int($minScopeOption) ? max(1, $minScopeOption) : 1;
     }
@@ -195,9 +195,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return int Minimum statement count for generic foreach loop-variable findings.
      */
-    private function loopBodyThreshold(RuleContext $context, RuleDefinition $definition): int
+    private function loopBodyThreshold(RuleContext $ruleContext, RuleDefinition $definition): int
     {
-        $thresholdOption = $context->settingsFor($definition)->option('loopBodyThreshold');
+        $thresholdOption = $ruleContext->settingsFor($definition)->option('loopBodyThreshold');
 
         return is_int($thresholdOption) ? max(1, $thresholdOption) : 4;
     }
@@ -211,7 +211,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     {
         $findings = [];
 
-        foreach ($finder->findInstanceOf($findingContext->unit->statements, ClassLike::class) as $node) {
+        foreach ($finder->findInstanceOf($findingContext->analysisUnit->statements, ClassLike::class) as $node) {
             if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
                 continue;
             }
@@ -222,7 +222,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                context: $findingContext,
+                identifierFindingContext: $findingContext,
                 node:    $node,
                 kind:    $this->classLikeKind($node),
                 name:    $name,
@@ -249,7 +249,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     ): array {
         $findings = [];
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($findingContext->unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($findingContext->analysisUnit->statements) as $scope) {
             $function         = $scope->node;
             $functionFindings = $function instanceof ClassMethod || $function instanceof Function_
                 ? $this->functionNameFindings($findingContext, $function)
@@ -278,7 +278,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         $finding = $this->finding(
-            context: $findingContext,
+            identifierFindingContext: $findingContext,
             node:    $function,
             kind:    $function instanceof ClassMethod ? 'method' : 'function',
             name:    $function->name->toString(),
@@ -304,7 +304,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                context: $findingContext,
+                identifierFindingContext: $findingContext,
                 node:    $param,
                 kind:    $param->flags === 0 ? 'parameter' : 'property',
                 name:    $param->var->name,
@@ -337,7 +337,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
         foreach ($this->localVariableNames($scope, $minScopeReferences, $loopVars + $catchVars) as $name => $variable) {
             $finding = $this->finding(
-                context: $findingContext,
+                identifierFindingContext: $findingContext,
                 node:    $variable,
                 kind:    'variable',
                 name:    $name,
@@ -352,7 +352,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $loopIgnoredNames = array_values(array_diff($findingContext->ignoredNames, $findingContext->genericTokens));
         foreach ($this->reportableLoopVariableNames($scope, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
             $finding = $this->finding(
-                context:              $findingContext,
+                identifierFindingContext:              $findingContext,
                 node:                 $variable,
                 kind:                 'variable',
                 name:                 $name,
@@ -377,11 +377,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
     {
         $findings = [];
 
-        foreach ($finder->findInstanceOf($findingContext->unit->statements, Property::class) as $property) {
+        foreach ($finder->findInstanceOf($findingContext->analysisUnit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $name    = $prop->name->toString();
                 $finding = $this->finding(
-                    context: $findingContext,
+                    identifierFindingContext: $findingContext,
                     node:    $prop,
                     kind:    'property',
                     name:    $name,
@@ -402,19 +402,19 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
-        IdentifierFindingContext $context,
+        IdentifierFindingContext $identifierFindingContext,
         Node $node,
         string $kind,
         string $name,
         ?string $symbol,
         ?array $ignoredNamesOverride = null,
     ): ?Finding {
-        $ignoredNames = $ignoredNamesOverride ?? $context->ignoredNames;
-        if ($this->isIgnored($name, $ignoredNames, $context->acceptedAbbreviations)) {
+        $ignoredNames = $ignoredNamesOverride ?? $identifierFindingContext->ignoredNames;
+        if ($this->isIgnored($name, $ignoredNames, $identifierFindingContext->acceptedAbbreviations)) {
             return null;
         }
 
-        $tokens = $context->tokenizer->tokenize($name);
+        $tokens = $identifierFindingContext->tokenizer->tokenize($name);
         if ($tokens === []) {
             return null;
         }
@@ -423,18 +423,18 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $matchedToken = null;
         $lowerName    = strtolower(ltrim($name, '$'));
 
-        if (in_array($lowerName, $context->placeholderNames, true)) {
+        if (in_array($lowerName, $identifierFindingContext->placeholderNames, true)) {
             $variant      = 'placeholder';
             $matchedToken = $lowerName;
-        } elseif ($this->allTokensMatch($tokens, $context->genericTokens)) {
+        } elseif ($this->allTokensMatch($tokens, $identifierFindingContext->genericTokens)) {
             $variant      = 'generic';
             $matchedToken = implode(' ', $tokens);
         } elseif ($this->isNumberedIdentifier(
             name:                  $name,
             tokens:                $tokens,
-            genericTokens:         $context->genericTokens,
-            placeholderNames:      $context->placeholderNames,
-            acceptedAbbreviations: $context->acceptedAbbreviations,
+            genericTokens:         $identifierFindingContext->genericTokens,
+            placeholderNames:      $identifierFindingContext->placeholderNames,
+            acceptedAbbreviations: $identifierFindingContext->acceptedAbbreviations,
         )) {
             $variant      = 'numbered';
             $matchedToken = $tokens[array_key_last($tokens)];
@@ -445,14 +445,14 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         return new Finding(
-            ruleId:      $context->definition->id,
+            ruleId:      $identifierFindingContext->definition->id,
             message:     sprintf('%s name "%s" is %s and does not communicate clear intent.', ucfirst($kind), $name, $variant),
-            filePath:    $context->unit->file->displayPath,
+            filePath:    $identifierFindingContext->analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
-            severity:    $context->definition->defaultSeverity,
-            pillar:      $context->definition->pillar,
-            tier:        $context->definition->tier,
-            confidence:  $context->definition->confidence,
+            severity:    $identifierFindingContext->definition->defaultSeverity,
+            pillar:      $identifierFindingContext->definition->pillar,
+            tier:        $identifierFindingContext->definition->tier,
+            confidence:  $identifierFindingContext->definition->confidence,
             symbol:      $symbol,
             remediation: 'Rename the identifier to describe its domain role or action.',
             metadata:    [
@@ -775,18 +775,18 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * @param list<Node> $children
      * @return void No return value.
      */
-    private function collectChildNodes(mixed $value, array &$children): void
+    private function collectChildNodes(mixed $subNode, array &$children): void
     {
-        if ($value instanceof Node) {
-            $children[] = $value;
+        if ($subNode instanceof Node) {
+            $children[] = $subNode;
             return;
         }
 
-        if (!is_array($value)) {
+        if (!is_array($subNode)) {
             return;
         }
 
-        foreach ($value as $item) {
+        foreach ($subNode as $item) {
             $this->collectChildNodes($item, $children);
         }
     }
@@ -827,7 +827,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     private function lowercaseList(array $values): array
     {
         return array_values(array_unique(array_map(
-            static fn (string $value): string => strtolower($value),
+            static fn (string $name): string => strtolower($name),
             $values,
         )));
     }

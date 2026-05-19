@@ -100,13 +100,13 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * Analyse all project units for interfaces with exactly one concrete implementor.
      *
      * @param list<AnalysisUnit> $units   Parsed project units to analyse together.
-     * @param RuleContext        $context Rule context carrying config and settings.
+     * @param RuleContext        $ruleContext Rule context carrying config and settings.
      *
      * @return list<Finding> Findings for interfaces that lack substitutability value.
      */
-    public function analyseProject(array $units, RuleContext $context): array
+    public function analyseProject(array $units, RuleContext $ruleContext): array
     {
-        $settings                   = $context->settingsFor($this->definition());
+        $settings                   = $ruleContext->settingsFor($this->definition());
         $externalPrefixes           = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('externalNamespacePrefixes'));
         $frameworkAttributePrefixes = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('frameworkAttributePrefixes'));
         $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
@@ -161,18 +161,18 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * } $projectTypes
      * @return void No return value.
      */
-    private function collectUnitTypes(AnalysisUnit $unit, array $statements, array &$projectTypes): void
+    private function collectUnitTypes(AnalysisUnit $analysisUnit, array $statements, array &$projectTypes): void
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        foreach ($finder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
+        foreach ($nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
             if ($node instanceof Interface_) {
-                $this->recordInterface($node, $unit, $projectTypes);
+                $this->recordInterface($node, $analysisUnit, $projectTypes);
                 continue;
             }
 
             if ($node instanceof Class_) {
-                $this->recordClass($node, $unit, $finder, $projectTypes);
+                $this->recordClass($node, $analysisUnit, $nodeFinder, $projectTypes);
             }
         }
     }
@@ -186,7 +186,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * } $projectTypes
      * @return void No return value.
      */
-    private function recordInterface(Interface_ $interface, AnalysisUnit $unit, array &$projectTypes): void
+    private function recordInterface(Interface_ $interface, AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
         if ($interface->name === null) {
             return;
@@ -200,7 +200,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $extends                          = $this->resolveNameList($interface->extends);
         $projectTypes['interfaces'][$fqn] = [
             'fqn' => $fqn,
-            'unit' => $unit,
+            'unit' => $analysisUnit,
             'line' => $interface->getStartLine(),
             'extends' => $extends,
             'attributes' => $this->resolveAttributes(array_values($interface->attrGroups)),
@@ -220,7 +220,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * } $projectTypes
      * @return void No return value.
      */
-    private function recordClass(Class_ $class, AnalysisUnit $unit, NodeFinder $finder, array &$projectTypes): void
+    private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, NodeFinder $finder, array &$projectTypes): void
     {
         if ($class->name === null) {
             return;
@@ -234,7 +234,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         foreach ($this->resolveNameList($class->implements) as $implementedFqn) {
             $projectTypes['implementations'][$implementedFqn][] = [
                 'classFqn' => $classFqn,
-                'unit' => $unit,
+                'unit' => $analysisUnit,
                 'line' => $class->getStartLine(),
             ];
         }
@@ -242,7 +242,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         foreach ($this->collectClassTypeReferences($class, $classFqn, $finder) as $reference) {
             $projectTypes['typeReferences'][$reference['targetFqn']][] = [
                 'classFqn' => $reference['classFqn'],
-                'unit' => $unit,
+                'unit' => $analysisUnit,
                 'line' => $reference['line'],
             ];
         }
@@ -339,8 +339,8 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     {
         return array_values(array_filter(
             $units,
-            static function (AnalysisUnit $unit) use ($excludedPaths): bool {
-                $display = $unit->file->displayPath;
+            static function (AnalysisUnit $analysisUnit) use ($excludedPaths): bool {
+                $display = $analysisUnit->file->displayPath;
 
                 if (str_starts_with($display, 'vendor/')) {
                     return false;
@@ -366,10 +366,10 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $resolved = [];
 
         foreach ($units as $unit) {
-            $traverser = new NodeTraverser();
-            $traverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
+            $nodeTraverser = new NodeTraverser();
+            $nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
             /** @var list<Node\Stmt> $resolvedStatements NameResolver preserves the statement list shape. */
-            $resolvedStatements = $traverser->traverse($unit->statements);
+            $resolvedStatements = $nodeTraverser->traverse($unit->statements);
             $resolved[]         = ['unit' => $unit, 'statements' => $resolvedStatements];
         }
 

@@ -292,12 +292,12 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            $value = $finding->metadata[$key] ?? null;
-            if (!is_int($value)) {
+            $metricValue = $finding->metadata[$key] ?? null;
+            if (!is_int($metricValue)) {
                 continue;
             }
 
-            $maximumValue = $maximumValue === null ? $value : max($maximumValue, $value);
+            $maximumValue = $maximumValue === null ? $metricValue : max($maximumValue, $metricValue);
         }
 
         return $maximumValue;
@@ -316,12 +316,12 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            $value = $finding->metadata['lines'] ?? null;
-            if (!is_int($value)) {
+            $lineCount = $finding->metadata['lines'] ?? null;
+            if (!is_int($lineCount)) {
                 continue;
             }
 
-            $maximumLines = $maximumLines === null ? $value : max($maximumLines, $value);
+            $maximumLines = $maximumLines === null ? $lineCount : max($maximumLines, $lineCount);
         }
 
         return $maximumLines;

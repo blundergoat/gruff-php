@@ -55,12 +55,12 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Find local @var assertions that do not explain why the assertion is needed.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for bare local @var annotations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // AST-driven detection: PhpParser attaches each docblock to the immediately following
         // statement/declaration. A `@var` docblock on a property/method declaration documents
@@ -71,10 +71,10 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         // footgun documented at `.goat-flow/footguns/rules.md`.
         $definition = $this->definition();
         $findings   = [];
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        $candidates = $finder->find(
-            $unit->statements,
+        $candidates = $nodeFinder->find(
+            $analysisUnit->statements,
             static fn (Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
@@ -97,7 +97,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     sprintf('@var assertion for $%s must explain why the asserted type is needed.', $variable),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $doc->getStartLine(),
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,

@@ -10,7 +10,7 @@ Files
   Parse errors: 0
 
 Score
-  Composite: A (96.80/100)
+  Composite: A (96.50/100)
   Scope: full-project
   Score drivers: Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
   Pillars:
@@ -18,7 +18,7 @@ Score
     complexity: A (100.00) findings=0
     maintainability: A (100.00) findings=0
     dead-code: A (100.00) findings=0
-    naming: B (84.00) findings=1
+    naming: B (81.00) findings=2
     documentation: A (100.00) findings=0
     modernisation: A (100.00) findings=0
     security: A (100.00) findings=0
@@ -32,7 +32,10 @@ Findings
   [warning] naming.class-file-mismatch
     tests/Fixtures/Source/mixed/alpha.php:12
     Class Alpha does not match file name alpha.php.
+  [advisory] naming.identifier-quality
+    tests/Fixtures/Source/mixed/alpha.php:19
+    Method name "value" is generic and does not communicate clear intent.
 
 Summary
-  Findings: 2 (advisory: 0, warning: 2, error: 0)
+  Findings: 3 (advisory: 1, warning: 2, error: 0)
   Exit code: 0

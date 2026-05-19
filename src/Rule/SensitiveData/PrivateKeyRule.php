@@ -43,23 +43,23 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that appear to contain private key material.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $unit->source, $matches, PREG_OFFSET_CAPTURE);
+        preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];
         foreach ($matches[0] as $match) {
             [$header, $offset] = $match;
             $findings[]        = SecretScannerHelper::finding(
-                unit:        $unit,
+                analysisUnit:        $analysisUnit,
                 ruleId:      self::ID,
                 message:     'Private key block header detected; key body is redacted.',
-                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:  Confidence::High,
                 detector:    'private-key-header',
                 preview:     $header,

@@ -126,7 +126,7 @@ final class ReportCommand extends Command
             return $process->getExitCode() ?? Command::FAILURE;
         }
 
-        $exitCode  = $process->getExitCode() ?? Command::FAILURE;
+        $exitCode = $process->getExitCode() ?? Command::FAILURE;
 
         if ($report === '' && $exitCode !== Command::SUCCESS) {
             $output->writeln(sprintf('<error>Analyse exited with code %d before producing a report; %s was not written.</error>', $exitCode, $outputPath));
@@ -187,14 +187,14 @@ final class ReportCommand extends Command
     private function appendStringOptions(array &$command, InputInterface $input): void
     {
         foreach (self::STRING_OPTIONS as $option) {
-            $value = $this->optionalStringOption($input, $option);
+            $optionValue = $this->optionalStringOption($input, $option);
 
-            if ($value === null) {
+            if ($optionValue === null) {
                 continue;
             }
 
             $command[] = '--' . $option;
-            $command[] = $value;
+            $command[] = $optionValue;
         }
     }
 
@@ -224,11 +224,11 @@ final class ReportCommand extends Command
     private function appendBaselineOption(array &$command, InputInterface $input): void
     {
         if ($input->hasParameterOption('--baseline', true)) {
-            $value     = $this->optionalStringOption($input, 'baseline');
-            $command[] = '--baseline';
+            $optionValue = $this->optionalStringOption($input, 'baseline');
+            $command[]  = '--baseline';
 
-            if ($value !== null) {
-                $command[] = $value;
+            if ($optionValue !== null) {
+                $command[] = $optionValue;
             }
         }
     }
@@ -265,10 +265,10 @@ final class ReportCommand extends Command
                 continue;
             }
 
-            foreach ($values as $value) {
-                if (is_string($value) && $value !== '') {
+            foreach ($values as $optionValue) {
+                if (is_string($optionValue) && $optionValue !== '') {
                     $command[] = '--' . $option;
-                    $command[] = $value;
+                    $command[] = $optionValue;
                 }
             }
         }
@@ -320,9 +320,9 @@ final class ReportCommand extends Command
      */
     private function optionalStringOption(InputInterface $input, string $name): ?string
     {
-        $value = $input->getOption($name);
+        $optionValue = $input->getOption($name);
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
     /**

@@ -47,29 +47,29 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Find test cases that hide behavior behind conditionals.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for conditional logic inside tests.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        if ($this->isPathIgnored($unit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+        if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            foreach ($finder->findInstanceOf($scope->statements, Stmt\If_::class) as $conditional) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            foreach ($nodeFinder->findInstanceOf($scope->statements, Stmt\If_::class) as $conditional) {
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains conditional logic; tests should usually be linear.', $scope->symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $conditional->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,

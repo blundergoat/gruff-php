@@ -49,21 +49,21 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Find array-callable expressions that may use first-class callable syntax.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8.1 callable syntax candidates.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\Array_::class) as $array) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Array_::class) as $array) {
             if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {
                 continue;
             }
@@ -71,7 +71,7 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Array callable syntax may be replaceable with PHP 8.1 first-class callable syntax.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $array->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::Modernisation,

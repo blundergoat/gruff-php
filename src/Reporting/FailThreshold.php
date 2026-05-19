@@ -34,12 +34,12 @@ enum FailThreshold: string
     /**
      * Convert a CLI fail threshold string into the matching enum case.
      *
-     * @param string $value CLI fail-on value to parse.
+     * @param string $rawInput CLI fail-on value to parse.
      * @return self|null Matching threshold, or null for unsupported input.
      */
-    public static function fromInput(string $value): ?self
+    public static function fromInput(string $rawInput): ?self
     {
-        return match ($value) {
+        return match ($rawInput) {
             self::None->value => self::None,
             self::Advisory->value => self::Advisory,
             self::Warning->value => self::Warning,

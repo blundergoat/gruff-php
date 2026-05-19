@@ -47,21 +47,21 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Find constructor-assigned properties that could be readonly.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for readonly property candidates.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.1)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             if (!$class->isFinal() || $class->extends !== null || $class->getTraitUses() !== []) {
                 continue;
             }
@@ -87,7 +87,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
                     $findings[] = new Finding(
                         ruleId:      self::ID,
                         message:     sprintf('Property $%s is only assigned in a final class constructor and may be a readonly candidate.', $name),
-                        filePath:    $unit->file->displayPath,
+                        filePath:    $analysisUnit->file->displayPath,
                         line:        $propertyProperty->getStartLine(),
                         severity:    Severity::Advisory,
                         pillar:      Pillar::Modernisation,
@@ -124,8 +124,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             return [];
         }
 
-        $finder = new NodeFinder();
-        foreach ($finder->findInstanceOf($constructor->stmts ?? [], Expr\Assign::class) as $assign) {
+        $nodeFinder = new NodeFinder();
+        foreach ($nodeFinder->findInstanceOf($constructor->stmts ?? [], Expr\Assign::class) as $assign) {
             $name = ModernisationNodeHelper::propertyFetchName($assign->var);
             if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                 $assignments[$name] = true;
@@ -141,14 +141,14 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     private function lateAssignments(Stmt\Class_ $class): array
     {
         $assignments = [];
-        $finder      = new NodeFinder();
+        $nodeFinder  = new NodeFinder();
 
         foreach ($class->getMethods() as $method) {
             if (strtolower($method->name->toString()) === '__construct') {
                 continue;
             }
 
-            foreach ($finder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
+            foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
                 $name = ModernisationNodeHelper::propertyFetchName($assign->var);
                 if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
                     $assignments[$name] = true;

@@ -48,14 +48,14 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * Find statements that appear after a terminating statement in function-like bodies.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding> Findings for unreachable statements.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder    = new NodeFinder();
-        $functions = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $functions  = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Stmt\ClassMethod
                 || $node instanceof Stmt\Function_
                 || $node instanceof Expr\Closure;
@@ -65,7 +65,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
 
         foreach ($functions as $fn) {
             /** @var Stmt\ClassMethod|Stmt\Function_|Expr\Closure $fn Finder predicate restricts results to executable function-like nodes. */
-            $this->checkBlock($fn->stmts ?? [], $unit, $findings);
+            $this->checkBlock($fn->stmts ?? [], $analysisUnit, $findings);
         }
 
         return $findings;
@@ -77,7 +77,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
      *
      * @return void No return value.
      */
-    private function checkBlock(array $stmts, AnalysisUnit $unit, array &$findings): void
+    private function checkBlock(array $stmts, AnalysisUnit $analysisUnit, array &$findings): void
     {
         $definition = $this->definition();
         $terminated = false;
@@ -87,7 +87,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     'Unreachable code after terminating statement.',
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $stmt->getStartLine(),
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,
@@ -104,7 +104,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
                 $terminated = true;
             }
 
-            $this->walkChildren($stmt, $unit, $findings);
+            $this->walkChildren($stmt, $analysisUnit, $findings);
         }
     }
 
@@ -113,17 +113,17 @@ final readonly class UnreachableCodeRule implements RuleInterface
      *
      * @return void No return value.
      */
-    private function walkChildren(Node\Stmt $node, AnalysisUnit $unit, array &$findings): void
+    private function walkChildren(Node\Stmt $node, AnalysisUnit $analysisUnit, array &$findings): void
     {
         if ($node instanceof Stmt\If_) {
-            $this->checkBlock($node->stmts, $unit, $findings);
+            $this->checkBlock($node->stmts, $analysisUnit, $findings);
 
             foreach ($node->elseifs as $elseif) {
-                $this->checkBlock($elseif->stmts, $unit, $findings);
+                $this->checkBlock($elseif->stmts, $analysisUnit, $findings);
             }
 
             if ($node->else !== null) {
-                $this->checkBlock($node->else->stmts, $unit, $findings);
+                $this->checkBlock($node->else->stmts, $analysisUnit, $findings);
             }
 
             return;
@@ -134,28 +134,28 @@ final readonly class UnreachableCodeRule implements RuleInterface
             || $node instanceof Stmt\While_
             || $node instanceof Stmt\Do_
         ) {
-            $this->checkBlock($node->stmts, $unit, $findings);
+            $this->checkBlock($node->stmts, $analysisUnit, $findings);
 
             return;
         }
 
         if ($node instanceof Stmt\Switch_) {
             foreach ($node->cases as $case) {
-                $this->checkBlock($case->stmts, $unit, $findings);
+                $this->checkBlock($case->stmts, $analysisUnit, $findings);
             }
 
             return;
         }
 
         if ($node instanceof Stmt\TryCatch) {
-            $this->checkBlock($node->stmts, $unit, $findings);
+            $this->checkBlock($node->stmts, $analysisUnit, $findings);
 
             foreach ($node->catches as $catch) {
-                $this->checkBlock($catch->stmts, $unit, $findings);
+                $this->checkBlock($catch->stmts, $analysisUnit, $findings);
             }
 
             if ($node->finally !== null) {
-                $this->checkBlock($node->finally->stmts, $unit, $findings);
+                $this->checkBlock($node->finally->stmts, $analysisUnit, $findings);
             }
         }
     }

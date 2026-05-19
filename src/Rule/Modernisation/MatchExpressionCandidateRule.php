@@ -46,21 +46,21 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Find switch statements whose direct-return branches may become match expressions.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8 match-expression candidates.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!ModernisationNodeHelper::supportsPhp($context, 8.0)) {
+        if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Switch_::class) as $switch) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Switch_::class) as $switch) {
             if (count($switch->cases) < 3 || !$this->allCasesReturnDirectly($switch)) {
                 continue;
             }
@@ -68,7 +68,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Switch with direct return branches may be a PHP 8 match expression candidate.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $switch->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::Modernisation,

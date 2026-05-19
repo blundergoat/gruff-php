@@ -48,18 +48,18 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Find `assertInstanceOf` calls where the value type is already proven locally.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for redundant type assertions.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $localTypes = $this->collectLocalAssignmentTypes($scope, $finder);
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            $localTypes = $this->collectLocalAssignmentTypes($scope, $nodeFinder);
 
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
@@ -86,7 +86,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
                         $this->describeValue($valueArg),
                         $expected,
                     ),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Warning,
                     pillar:      Pillar::TestQuality,
@@ -132,15 +132,15 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      *
      * @return string|null Proven class name, or null when it cannot be inferred.
      */
-    private function provenClass(Expr $value, array $localTypes): ?string
+    private function provenClass(Expr $expr, array $localTypes): ?string
     {
-        $direct = $this->newClassName($value);
+        $direct = $this->newClassName($expr);
         if ($direct !== null) {
             return $direct;
         }
 
-        if ($value instanceof Expr\Variable && is_string($value->name)) {
-            return $localTypes[$value->name] ?? null;
+        if ($expr instanceof Expr\Variable && is_string($expr->name)) {
+            return $localTypes[$expr->name] ?? null;
         }
 
         return null;
@@ -167,17 +167,17 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
-        $value = TestQualityNodeHelper::argValue($call, $index);
-        if (!$value instanceof Expr\ClassConstFetch || !$value->class instanceof Name) {
+        $classConstFetch = TestQualityNodeHelper::argValue($call, $index);
+        if (!$classConstFetch instanceof Expr\ClassConstFetch || !$classConstFetch->class instanceof Name) {
             return null;
         }
 
-        $name = $value->name;
+        $name = $classConstFetch->name;
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
             return null;
         }
 
-        return $value->class->toString();
+        return $classConstFetch->class->toString();
     }
 
     /**
@@ -185,10 +185,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      *
      * @return string Variable name or a generic value label.
      */
-    private function describeValue(Expr $value): string
+    private function describeValue(Expr $expr): string
     {
-        if ($value instanceof Expr\Variable && is_string($value->name)) {
-            return $value->name;
+        if ($expr instanceof Expr\Variable && is_string($expr->name)) {
+            return $expr->name;
         }
 
         return 'value';

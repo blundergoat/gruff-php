@@ -30,10 +30,10 @@ final readonly class DashboardServer
      * @param OutputInterface         $output  Console output for the dashboard URL and errors.
      * @param string                  $host    Hostname or address to bind.
      * @param int                     $port    Port to bind.
-     * @param DashboardRequestContext $context Request context shared with handlers.
+     * @param DashboardRequestContext $dashboardRequestContext Request context shared with handlers.
      * @return int Symfony command exit code.
      */
-    public function serve(OutputInterface $output, string $host, int $port, DashboardRequestContext $context): int
+    public function serve(OutputInterface $output, string $host, int $port, DashboardRequestContext $dashboardRequestContext): int
     {
         $server = $this->createServer($host, $port, $errorCode, $errorMessage);
 
@@ -43,10 +43,10 @@ final readonly class DashboardServer
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Serving gruff-php dashboard at %s</info>', $this->url($host, $port, $context)));
+        $output->writeln(sprintf('<info>Serving gruff-php dashboard at %s</info>', $this->url($host, $port, $dashboardRequestContext)));
         $output->writeln('<comment>Use the form to refresh the scan or point gruff-php at another project. Press Ctrl+C to stop.</comment>');
 
-        $handler = $this->handler($context);
+        $handler = $this->handler($dashboardRequestContext);
 
         while (is_resource($server)) {
             $client = $this->acceptClient($server);
@@ -72,13 +72,13 @@ final readonly class DashboardServer
      *
      * @return string Dashboard URL with default query state.
      */
-    private function url(string $host, int $port, DashboardRequestContext $context): string
+    private function url(string $host, int $port, DashboardRequestContext $dashboardRequestContext): string
     {
         return sprintf(
             'http://%s:%d/?%s',
             $host,
             $port,
-            http_build_query($this->stateFactory->defaultQuery($context->input, $context->projectRoot), '', '&', PHP_QUERY_RFC3986),
+            http_build_query($this->stateFactory->defaultQuery($dashboardRequestContext->input, $dashboardRequestContext->projectRoot), '', '&', PHP_QUERY_RFC3986),
         );
     }
 
@@ -87,12 +87,12 @@ final readonly class DashboardServer
      *
      * @return DashboardRequestHandler HTTP request handler.
      */
-    private function handler(DashboardRequestContext $context): DashboardRequestHandler
+    private function handler(DashboardRequestContext $dashboardRequestContext): DashboardRequestHandler
     {
-        $renderer   = new DashboardPageRenderer();
-        $scanRunner = new DashboardScanRunner($this->gruffBinary, $this->stateFactory, $renderer);
+        $dashboardPageRenderer = new DashboardPageRenderer();
+        $dashboardScanRunner   = new DashboardScanRunner($this->gruffBinary, $this->stateFactory, $dashboardPageRenderer);
 
-        return new DashboardRequestHandler($context, $this->stateFactory, $scanRunner, new DashboardHttpResponder());
+        return new DashboardRequestHandler($dashboardRequestContext, $this->stateFactory, $dashboardScanRunner, new DashboardHttpResponder());
     }
 
     /**

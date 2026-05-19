@@ -53,35 +53,35 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Find query method calls whose first argument uses concatenation or interpolation.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for heuristic SQL concatenation.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\MethodCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\MethodCall::class) as $call) {
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
             if ($firstArg !== null
                 && $call->name instanceof Identifier
                 && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
                 && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)
             ) {
-                $findings[] = $this->finding($unit, $call);
+                $findings[] = $this->finding($analysisUnit, $call);
             }
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\StaticCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\StaticCall::class) as $call) {
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
             if ($firstArg !== null
                 && $call->name instanceof Identifier
                 && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
                 && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)
             ) {
-                $findings[] = $this->finding($unit, $call);
+                $findings[] = $this->finding($analysisUnit, $call);
             }
         }
 
@@ -93,12 +93,12 @@ final class SqlConcatenationRule implements RuleInterface
      *
      * @return Finding Security finding.
      */
-    private function finding(AnalysisUnit $unit, Node $node): Finding
+    private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     'Heuristic SQL query string concatenation detected.',
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::Security,

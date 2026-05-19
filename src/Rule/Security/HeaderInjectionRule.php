@@ -46,17 +46,17 @@ final class HeaderInjectionRule implements RuleInterface
     /**
      * Find header calls that may receive unsanitized user input.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for possible header injection.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             if (SecurityNodeHelper::globalFunctionName($call) !== 'header') {
                 continue;
             }
@@ -69,7 +69,7 @@ final class HeaderInjectionRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Heuristic header() call with request-controlled data detected.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $call->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Security,

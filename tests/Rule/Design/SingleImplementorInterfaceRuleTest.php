@@ -268,8 +268,8 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
      */
     private function fixtureUnits(): array
     {
-        $parser = new PhpFileParser();
-        $paths  = [
+        $phpFileParser = new PhpFileParser();
+        $paths         = [
             'mutation-cases/MutationCases.php',
             'psr/AuditPsrLogger.php',
             'symfony-tagged/SymfonyTaggedListener.php',
@@ -282,7 +282,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $units = [];
         foreach ($paths as $relative) {
             $absolute = self::PROJECT_ROOT . '/' . self::FIXTURE_DIR . '/' . $relative;
-            $units[]  = $parser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
+            $units[]  = $phpFileParser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
         }
 
         return $units;

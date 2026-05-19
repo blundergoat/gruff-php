@@ -70,12 +70,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'Cyclomatic complexity',
-            pillar:                   Pillar::Complexity,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::High,
+            id:                self::ID,
+            name:              'Cyclomatic complexity',
+            pillar:            Pillar::Complexity,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::High,
             severityThreshold: new SeverityThreshold(20, Severity::Error),
         );
     }
@@ -83,17 +83,17 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context carrying thresholds.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context carrying thresholds.
      * @return list<Finding> Findings for complex function-like declarations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $settings   = $context->settingsFor($definition);
+        $settings   = $ruleContext->settingsFor($definition);
 
-        $finder = new NodeFinder();
-        $nodes  = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod
                 || $node instanceof Function_;
         });
@@ -120,7 +120,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     self::formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -148,13 +148,13 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function computeCyclomaticComplexity(Node $node): int
     {
-        static $cache = null;
-        if (!$cache instanceof \WeakMap) {
-            $cache = new \WeakMap();
+        static $cyclomaticCache = null;
+        if (!$cyclomaticCache instanceof \WeakMap) {
+            $cyclomaticCache = new \WeakMap();
         }
 
-        if (isset($cache[$node])) {
-            $cached = $cache[$node];
+        if (isset($cyclomaticCache[$node])) {
+            $cached = $cyclomaticCache[$node];
             if (is_int($cached)) {
                 return $cached;
             }
@@ -162,14 +162,14 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
-        $finder = new NodeFinder();
-        $body   = $node->stmts ?? [];
+        $nodeFinder = new NodeFinder();
+        $body       = $node->stmts ?? [];
 
-        $decisionNodes = $finder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
+        $decisionNodes = $nodeFinder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
 
         $ccn += count($decisionNodes);
 
-        foreach ($finder->findInstanceOf($body, Expr\Match_::class) as $match) {
+        foreach ($nodeFinder->findInstanceOf($body, Expr\Match_::class) as $match) {
             foreach ($match->arms as $arm) {
                 if ($arm->conds !== null) {
                     $ccn += count($arm->conds);
@@ -177,7 +177,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             }
         }
 
-        $cache[$node] = $ccn;
+        $cyclomaticCache[$node] = $ccn;
 
         return $ccn;
     }
@@ -241,12 +241,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      *
      * @return string Human-readable threshold value.
      */
-    private static function formatNumber(int|float $value): string
+    private static function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

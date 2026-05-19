@@ -27,13 +27,13 @@ final readonly class DashboardRequestHandler
     /**
      * Create a request handler for one dashboard server context.
      *
-     * @param DashboardRequestContext $context      Request context shared by dashboard routes.
+     * @param DashboardRequestContext $dashboardRequestContext      Request context shared by dashboard routes.
      * @param DashboardStateFactory   $stateFactory Factory used to build dashboard state.
      * @param DashboardScanRunner     $scanRunner   Runner used for scan requests.
      * @param DashboardHttpResponder  $responder    Responder used to write HTTP responses.
      */
     public function __construct(
-        private DashboardRequestContext $context,
+        private DashboardRequestContext $dashboardRequestContext,
         private DashboardStateFactory $stateFactory,
         private DashboardScanRunner $scanRunner,
         private DashboardHttpResponder $responder,
@@ -127,7 +127,7 @@ final readonly class DashboardRequestHandler
             '/health' => new DashboardHttpResponse(200, 'OK', 'ok', 'text/plain; charset=UTF-8'),
             '/favicon.ico' => new DashboardHttpResponse(204, 'No Content', '', 'text/plain; charset=UTF-8'),
             '/' => new DashboardHttpResponse(200, 'OK', $this->dashboardHtml($query), 'text/html; charset=UTF-8'),
-            '/scan' => new DashboardHttpResponse(200, 'OK', $this->scanRunner->scanHtml($this->context, $query), 'text/html; charset=UTF-8'),
+            '/scan' => new DashboardHttpResponse(200, 'OK', $this->scanRunner->scanHtml($this->dashboardRequestContext, $query), 'text/html; charset=UTF-8'),
             default => new DashboardHttpResponse(404, 'Not Found', 'Not Found', 'text/plain; charset=UTF-8'),
         };
     }
@@ -139,7 +139,7 @@ final readonly class DashboardRequestHandler
      */
     private function dashboardHtml(array $query): string
     {
-        $state = $this->stateFactory->state($this->context->input, $this->context->projectRoot, $query);
+        $state = $this->stateFactory->state($this->dashboardRequestContext->input, $this->dashboardRequestContext->projectRoot, $query);
 
         return (new DashboardPageRenderer())->dashboardHtml($state);
     }
@@ -219,7 +219,7 @@ final readonly class DashboardRequestHandler
         }
 
         $host = strtolower($hostHeader);
-        $port = $this->context->bindPort;
+        $port = $this->dashboardRequestContext->bindPort;
 
         if (preg_match('/^\[(?<host>[^\]]+)\](?::(?<port>\d+))?$/', $host, $matches) === 1) {
             $host = '[' . $matches['host'] . ']';
@@ -233,7 +233,7 @@ final readonly class DashboardRequestHandler
             }
         }
 
-        if ($port !== $this->context->bindPort) {
+        if ($port !== $this->dashboardRequestContext->bindPort) {
             return false;
         }
 
@@ -245,7 +245,7 @@ final readonly class DashboardRequestHandler
             return true;
         }
 
-        $bindHost = strtolower($this->context->bindHost);
+        $bindHost = strtolower($this->dashboardRequestContext->bindHost);
 
         if (str_contains($bindHost, ':') && !str_starts_with($bindHost, '[')) {
             $bindHost = '[' . $bindHost . ']';
@@ -261,7 +261,7 @@ final readonly class DashboardRequestHandler
      */
     private function isBindHostLoopback(): bool
     {
-        return in_array(strtolower($this->context->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
+        return in_array(strtolower($this->dashboardRequestContext->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
     }
 
     /**
@@ -271,7 +271,7 @@ final readonly class DashboardRequestHandler
      */
     private function isBindHostWildcard(): bool
     {
-        return in_array(strtolower($this->context->bindHost), ['0.0.0.0', '::', '[::]'], true);
+        return in_array(strtolower($this->dashboardRequestContext->bindHost), ['0.0.0.0', '::', '[::]'], true);
     }
 
     /**

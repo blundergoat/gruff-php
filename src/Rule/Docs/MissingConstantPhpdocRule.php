@@ -52,26 +52,26 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Find class constants and enum cases without PHPDoc.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented constants.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassLike::class) as $classLike) {
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
 
             array_push(
                 $findings,
-                ...$this->classConstantFindings($classLike, $classLike->name->toString(), $definition, $unit),
-                ...$this->enumCaseFindings($classLike, $classLike->name->toString(), $definition, $unit),
+                ...$this->classConstantFindings($classLike, $classLike->name->toString(), $definition, $analysisUnit),
+                ...$this->enumCaseFindings($classLike, $classLike->name->toString(), $definition, $analysisUnit),
             );
         }
 
@@ -100,7 +100,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         ClassLike $classLike,
         string $className,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): array {
         $findings = [];
 
@@ -115,7 +115,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                     className:    $className,
                     line:         $statement->getStartLine(),
                     definition:   $definition,
-                    unit:         $unit,
+                    analysisUnit:         $analysisUnit,
                 );
             }
         }
@@ -133,14 +133,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         string $className,
         int $line,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): Finding {
         $symbol = sprintf('%s::%s', $className, $constantName);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Constant %s has no PHPDoc.', $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
@@ -165,7 +165,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         ClassLike $classLike,
         string $className,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): array {
         if (!$classLike instanceof Enum_ || $classLike->getDocComment() !== null) {
             return [];
@@ -182,7 +182,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 className:  $className,
                 line:       $statement->getStartLine(),
                 definition: $definition,
-                unit:       $unit,
+                analysisUnit:       $analysisUnit,
             );
         }
 
@@ -199,14 +199,14 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         string $className,
         int $line,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): Finding {
         $symbol = sprintf('%s::%s', $className, $caseName);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

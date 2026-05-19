@@ -46,24 +46,24 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Find test methods whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized test methods.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition  = $this->definition();
-        $settings    = $context->settingsFor($definition);
+        $settings    = $ruleContext->settingsFor($definition);
         $threshold   = $this->thresholdForPath(
-            $unit->file->displayPath,
+            $analysisUnit->file->displayPath,
             (int) $settings->numericThreshold('maxMeaningfulLines'),
             $settings->option('pathOverrides'),
         );
-        $sourceLines = explode("\n", $unit->source);
+        $sourceLines = explode("\n", $analysisUnit->source);
         $findings    = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             if ($scope->endLine === null) {
                 continue;
             }
@@ -82,7 +82,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
                     $count,
                     $threshold,
                 ),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

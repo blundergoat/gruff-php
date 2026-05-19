@@ -46,17 +46,17 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Find catch blocks that only contain no-op statements.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for swallowed exceptions.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Catch_::class) as $catch) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Catch_::class) as $catch) {
             if (!$this->isSilent($catch)) {
                 continue;
             }
@@ -64,7 +64,7 @@ final class SilentCatchRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Catch block swallows exceptions without handling or reporting them.',
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $catch->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Security,

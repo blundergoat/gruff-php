@@ -28,10 +28,10 @@ final readonly class BaselineApplication
         ?DiffResult $diff,
         array &$diagnostics,
     ): ?BaselineReport {
-        $store = new BaselineStore($projectRoot);
+        $baselineStore = new BaselineStore($projectRoot);
 
         if ($options->generateBaselinePath !== null) {
-            return $this->generate($store, $options->generateBaselinePath, $findings, $diagnostics);
+            return $this->generate($baselineStore, $options->generateBaselinePath, $findings, $diagnostics);
         }
 
         if ($options->baselinePath === null) {
@@ -39,7 +39,7 @@ final readonly class BaselineApplication
         }
 
         return $this->applyExistingBaseline(
-            store:       $store,
+            store:       $baselineStore,
             options:     $options,
             findings:    $findings,
             diff:        $diff,

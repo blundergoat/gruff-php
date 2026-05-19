@@ -55,35 +55,35 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Find realistic PII-like values inside test fixture files.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious fixture values.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (!SecretScannerHelper::isTestPath($unit->file->displayPath)) {
+        if (!SecretScannerHelper::isTestPath($analysisUnit->file->displayPath)) {
             return [];
         }
 
         $findings = [];
         foreach ($this->patterns() as $definition) {
-            preg_match_all($definition['pattern'], $unit->source, $matches, PREG_OFFSET_CAPTURE);
+            preg_match_all($definition['pattern'], $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
             foreach ($matches[0] as $match) {
-                [$value, $offset] = $match;
-                if ($this->isAllowedExample($value)) {
+                [$candidateFixture, $offset] = $match;
+                if ($this->isAllowedExample($candidateFixture)) {
                     continue;
                 }
 
-                if ($definition['name'] === 'email' && $this->isAttributionEmail($unit->source, $offset)) {
+                if ($definition['name'] === 'email' && $this->isAttributionEmail($analysisUnit->source, $offset)) {
                     continue;
                 }
 
-                $line       = SecretScannerHelper::lineNumberForOffset($unit->source, $offset);
-                $preview    = SecretScannerHelper::redactedPreview($value);
+                $line       = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
+                $preview    = SecretScannerHelper::redactedPreview($candidateFixture);
                 $findings[] = SecretScannerHelper::finding(
-                    unit:        $unit,
+                    analysisUnit:        $analysisUnit,
                     ruleId:      self::ID,
                     message:     sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
                     line:        $line,
@@ -103,9 +103,9 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      *
      * @return bool True when the matched value is an accepted example fixture.
      */
-    private function isAllowedExample(string $value): bool
+    private function isAllowedExample(string $candidateFixture): bool
     {
-        $normalized = strtolower($value);
+        $normalized = strtolower($candidateFixture);
 
         return str_contains($normalized, '@example.')
             || str_contains($normalized, '@example-')

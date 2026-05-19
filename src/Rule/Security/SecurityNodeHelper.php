@@ -106,9 +106,9 @@ final class SecurityNodeHelper
      */
     public static function containsUserInput(Node $node): bool
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        return $finder->findFirst($node, static function (Node $candidate): bool {
+        return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
             return $candidate instanceof Expr\Variable
                 && is_string($candidate->name)
                 && in_array($candidate->name, self::userInputSuperglobals(), true);
@@ -123,9 +123,9 @@ final class SecurityNodeHelper
      */
     public static function containsConcatOrInterpolation(Node $node): bool
     {
-        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
 
-        return $finder->findFirst($node, static function (Node $candidate): bool {
+        return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
             return $candidate instanceof Expr\BinaryOp\Concat
                 || $candidate instanceof Scalar\Encapsed;
         }) instanceof Node;

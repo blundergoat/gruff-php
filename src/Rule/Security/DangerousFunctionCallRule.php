@@ -65,40 +65,40 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find dynamic execution, eval, assert-string, and dangerous shell calls.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for dangerous execution patterns.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder             = new NodeFinder();
+        $nodeFinder         = new NodeFinder();
         $findings           = [];
-        $callableParameters = $this->callableParameterNames($unit->statements, $finder);
-        $callableProperties = $this->callablePropertyNames($unit->statements, $finder);
+        $callableParameters = $this->callableParameterNames($analysisUnit->statements, $nodeFinder);
+        $callableProperties = $this->callablePropertyNames($analysisUnit->statements, $nodeFinder);
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\FuncCall::class) as $call) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === null) {
                 if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call->name, $callableParameters, $callableProperties)) {
-                    $findings[] = $this->finding($unit, $call, 'dynamic function call');
+                    $findings[] = $this->finding($analysisUnit, $call, 'dynamic function call');
                 }
 
                 continue;
             }
 
             if (in_array($name, self::DANGEROUS_FUNCTIONS, true)) {
-                $findings[] = $this->finding($unit, $call, $name);
+                $findings[] = $this->finding($analysisUnit, $call, $name);
             }
 
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
             if ($name === 'assert' && $firstArg !== null && SecurityNodeHelper::isStringLiteral($firstArg)) {
-                $findings[] = $this->finding($unit, $call, 'assert string evaluation');
+                $findings[] = $this->finding($analysisUnit, $call, 'assert string evaluation');
             }
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\Eval_::class) as $eval) {
-            $findings[] = $this->finding($unit, $eval, 'eval');
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Eval_::class) as $eval) {
+            $findings[] = $this->finding($analysisUnit, $eval, 'eval');
         }
 
         return $findings;
@@ -220,12 +220,12 @@ final class DangerousFunctionCallRule implements RuleInterface
      *
      * @return Finding Security finding.
      */
-    private function finding(AnalysisUnit $unit, Node $node, string $function): Finding
+    private function finding(AnalysisUnit $analysisUnit, Node $node, string $function): Finding
     {
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Dangerous PHP execution pattern detected: %s.', $function),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    Severity::Warning,
             pillar:      Pillar::Security,

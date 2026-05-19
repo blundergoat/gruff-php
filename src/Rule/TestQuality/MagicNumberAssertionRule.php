@@ -120,17 +120,17 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     /**
      * Find assertions that compare against unexplained numeric literals.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for magic numbers in assertions.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $allowed  = $this->loadAllowedLiterals($context);
+        $allowed  = $this->loadAllowedLiterals($ruleContext);
         $findings = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
                 $number = TestQualityNodeHelper::isAssertionMagicNumber($call);
                 if ($number === null || in_array($number, $allowed, true) || $this->hasContextualNumericTarget($call)) {
@@ -140,7 +140,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s asserts the unexplained literal %d.', $scope->symbol, $number),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,
@@ -159,9 +159,9 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     /**
      * @return list<int>
      */
-    private function loadAllowedLiterals(RuleContext $context): array
+    private function loadAllowedLiterals(RuleContext $ruleContext): array
     {
-        $raw = $context->settingsFor($this->definition())->option('allowedLiterals');
+        $raw = $ruleContext->settingsFor($this->definition())->option('allowedLiterals');
         if (!is_array($raw)) {
             return self::DEFAULT_ALLOWED_LITERALS;
         }

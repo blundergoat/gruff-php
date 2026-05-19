@@ -18,26 +18,26 @@ use Symfony\Component\Console\Input\InputInterface;
 final readonly class AnalyseCommandOptions
 {
     /**
-     * @param list<string>               $paths             Paths requested for analysis.
+     * @param list<string>               $paths                Paths requested for analysis.
      * @param bool                       $shouldIncludeIgnored Whether ignored files should be included.
-     * @param string|null                $configPath        Explicit config path supplied by the CLI.
-     * @param bool                       $noConfig          Whether config loading is disabled.
-     * @param MutationAnalysisOptions    $mutation          Parsed mutation-analysis options.
-     * @param string|null                $diffMode          Requested diff mode, when diff analysis is enabled.
-     * @param string|null                $diffVs            Comparison ref used for diff and changed-only analysis.
-     * @param bool                       $isChangedOnly     Whether analysis should be restricted to changed files.
-     * @param string|null                $historyFile       Trend history file path, when configured.
-     * @param bool                       $noBaseline        Whether baseline loading and application are disabled.
-     * @param BaselineApplicationOptions $baseline          Parsed baseline application options.
-     * @param string                     $reportEditorLink  Editor-link style requested for reports.
-     * @param bool                       $isReportInteractive Whether interactive report behavior is enabled.
-     * @param string|null                $pathsRelativeTo   Base path used to normalize reported paths.
-     * @param string|null                $minSeverity       Minimum severity filter requested for output.
-     * @param list<string>               $includePillars    Pillars explicitly included in report output.
-     * @param list<string>               $excludePillars    Pillars explicitly excluded from report output.
-     * @param list<string>               $includeRules      Rule IDs explicitly included in report output.
-     * @param list<string>               $excludeRules      Rule IDs explicitly excluded from report output.
-     * @param string|null                $optionError       First usage error discovered while parsing options.
+     * @param string|null                $configPath           Explicit config path supplied by the CLI.
+     * @param bool                       $noConfig             Whether config loading is disabled.
+     * @param MutationAnalysisOptions    $mutation             Parsed mutation-analysis options.
+     * @param string|null                $diffMode             Requested diff mode, when diff analysis is enabled.
+     * @param string|null                $diffVs               Comparison ref used for diff and changed-only analysis.
+     * @param bool                       $isChangedOnly        Whether analysis should be restricted to changed files.
+     * @param string|null                $historyFile          Trend history file path, when configured.
+     * @param bool                       $noBaseline           Whether baseline loading and application are disabled.
+     * @param BaselineApplicationOptions $baseline             Parsed baseline application options.
+     * @param string                     $reportEditorLink     Editor-link style requested for reports.
+     * @param bool                       $isReportInteractive  Whether interactive report behavior is enabled.
+     * @param string|null                $pathsRelativeTo      Base path used to normalize reported paths.
+     * @param string|null                $minSeverity          Minimum severity filter requested for output.
+     * @param list<string>               $includePillars       Pillars explicitly included in report output.
+     * @param list<string>               $excludePillars       Pillars explicitly excluded from report output.
+     * @param list<string>               $includeRules         Rule IDs explicitly included in report output.
+     * @param list<string>               $excludeRules         Rule IDs explicitly excluded from report output.
+     * @param string|null                $optionError          First usage error discovered while parsing options.
      */
     public function __construct(
         public array $paths,
@@ -115,13 +115,13 @@ final readonly class AnalyseCommandOptions
                 mutationBaselinePath:          self::optionalStringOption($input, 'mutation-baseline'),
                 mutationBudget:                null,
             ),
-            diffMode:     self::diffMode($input),
-            diffVs:       self::optionalStringOption($input, 'diff-vs'),
+            diffMode:      self::diffMode($input),
+            diffVs:        self::optionalStringOption($input, 'diff-vs'),
             isChangedOnly: (bool) $input->getOption('changed-only'),
-            historyFile:  self::optionalStringOption($input, 'history-file'),
-            noBaseline:   (bool) $input->getOption('no-baseline'),
-            baseline:     new BaselineApplicationOptions(
-                baselinePath: $baselineFlagPresent
+            historyFile:   self::optionalStringOption($input, 'history-file'),
+            noBaseline:    (bool) $input->getOption('no-baseline'),
+            baseline:      new BaselineApplicationOptions(
+                baselinePath:  $baselineFlagPresent
                     ? (self::optionalStringOption($input, 'baseline') ?? BaselineStore::DEFAULT_FILENAME)
                     : null,
                 isBaselineExplicit:   $baselineFlagPresent,
@@ -129,15 +129,15 @@ final readonly class AnalyseCommandOptions
                     ? (self::optionalStringOption($input, 'generate-baseline') ?? BaselineStore::DEFAULT_FILENAME)
                     : null,
             ),
-            reportEditorLink:  $reportEditorLink,
+            reportEditorLink:    $reportEditorLink,
             isReportInteractive: $isReportInteractive,
-            pathsRelativeTo:   self::optionalStringOption($input, 'paths-relative-to'),
-            minSeverity:       self::optionalStringOption($input, 'min-severity'),
-            includePillars:    self::stringListOption($input, 'include-pillar'),
-            excludePillars:    self::stringListOption($input, 'exclude-pillar'),
-            includeRules:      self::stringListOption($input, 'include-rule'),
-            excludeRules:      self::stringListOption($input, 'exclude-rule'),
-            optionError:       $optionError,
+            pathsRelativeTo:     self::optionalStringOption($input, 'paths-relative-to'),
+            minSeverity:         self::optionalStringOption($input, 'min-severity'),
+            includePillars:      self::stringListOption($input, 'include-pillar'),
+            excludePillars:      self::stringListOption($input, 'exclude-pillar'),
+            includeRules:        self::stringListOption($input, 'include-rule'),
+            excludeRules:        self::stringListOption($input, 'exclude-rule'),
+            optionError:         $optionError,
         );
     }
 
@@ -163,21 +163,21 @@ final readonly class AnalyseCommandOptions
                 mutationBaselinePath:          $this->mutation->mutationBaselinePath,
                 mutationBudget:                $mutationBudget,
             ),
-            diffMode:          $this->diffMode,
-            diffVs:            $this->diffVs,
-            isChangedOnly:     $this->isChangedOnly,
-            historyFile:       $this->historyFile,
-            noBaseline:        $this->noBaseline,
-            baseline:          $this->baseline,
-            reportEditorLink:  $this->reportEditorLink,
+            diffMode:            $this->diffMode,
+            diffVs:              $this->diffVs,
+            isChangedOnly:       $this->isChangedOnly,
+            historyFile:         $this->historyFile,
+            noBaseline:          $this->noBaseline,
+            baseline:            $this->baseline,
+            reportEditorLink:    $this->reportEditorLink,
             isReportInteractive: $this->isReportInteractive,
-            pathsRelativeTo:   $this->pathsRelativeTo,
-            minSeverity:       $this->minSeverity,
-            includePillars:    $this->includePillars,
-            excludePillars:    $this->excludePillars,
-            includeRules:      $this->includeRules,
-            excludeRules:      $this->excludeRules,
-            optionError:       $this->optionError,
+            pathsRelativeTo:     $this->pathsRelativeTo,
+            minSeverity:         $this->minSeverity,
+            includePillars:      $this->includePillars,
+            excludePillars:      $this->excludePillars,
+            includeRules:        $this->includeRules,
+            excludeRules:        $this->excludeRules,
+            optionError:         $this->optionError,
         );
     }
 
@@ -214,15 +214,15 @@ final readonly class AnalyseCommandOptions
                 isBaselineExplicit:   false,
                 generateBaselinePath: null,
             ),
-            reportEditorLink:  $this->reportEditorLink,
+            reportEditorLink:    $this->reportEditorLink,
             isReportInteractive: $this->isReportInteractive,
-            pathsRelativeTo:   $this->pathsRelativeTo,
-            minSeverity:       $this->minSeverity,
-            includePillars:    $this->includePillars,
-            excludePillars:    $this->excludePillars,
-            includeRules:      $this->includeRules,
-            excludeRules:      $this->excludeRules,
-            optionError:       $this->optionError,
+            pathsRelativeTo:     $this->pathsRelativeTo,
+            minSeverity:         $this->minSeverity,
+            includePillars:      $this->includePillars,
+            excludePillars:      $this->excludePillars,
+            includeRules:        $this->includeRules,
+            excludeRules:        $this->excludeRules,
+            optionError:         $this->optionError,
         );
     }
 
@@ -251,8 +251,8 @@ final readonly class AnalyseCommandOptions
     {
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
-            includePillars: array_map(static fn (string $value): Pillar => Pillar::from($value), $this->includePillars),
-            excludePillars: array_map(static fn (string $value): Pillar => Pillar::from($value), $this->excludePillars),
+            includePillars: array_map(static fn (string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
+            excludePillars: array_map(static fn (string $optionValue): Pillar => Pillar::from($optionValue), $this->excludePillars),
             includeRules:   $this->includeRules,
             excludeRules:   $this->excludeRules,
         );
@@ -269,21 +269,21 @@ final readonly class AnalyseCommandOptions
             return false;
         }
 
-        $value = $input->getOption('report-interactive');
+        $optionValue = $input->getOption('report-interactive');
 
-        if ($value === null || $value === true || $value === '') {
+        if ($optionValue === null || $optionValue === true || $optionValue === '') {
             return true;
         }
 
-        if (is_bool($value)) {
-            return $value;
+        if (is_bool($optionValue)) {
+            return $optionValue;
         }
 
-        if (!is_string($value)) {
+        if (!is_string($optionValue)) {
             return '--report-interactive must be true or false.';
         }
 
-        return match (strtolower($value)) {
+        return match (strtolower($optionValue)) {
             '1', 'true', 'yes', 'on' => true,
             '0', 'false', 'no', 'off' => false,
             default => '--report-interactive must be true or false.',
@@ -297,9 +297,9 @@ final readonly class AnalyseCommandOptions
      */
     private static function optionalStringOption(InputInterface $input, string $name): ?string
     {
-        $value = $input->getOption($name);
+        $optionValue = $input->getOption($name);
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
     /**
@@ -317,12 +317,12 @@ final readonly class AnalyseCommandOptions
 
         $items = [];
 
-        foreach ($values as $value) {
-            if (!is_string($value) || $value === '') {
+        foreach ($values as $optionValue) {
+            if (!is_string($optionValue) || $optionValue === '') {
                 return sprintf('--%s requires a non-empty value.', $name);
             }
 
-            $items[] = $value;
+            $items[] = $optionValue;
         }
 
         return $items;
@@ -341,12 +341,12 @@ final readonly class AnalyseCommandOptions
 
         $items = [];
 
-        foreach ($values as $value) {
-            if (!is_string($value) || $value === '') {
+        foreach ($values as $optionValue) {
+            if (!is_string($optionValue) || $optionValue === '') {
                 continue;
             }
 
-            foreach (explode(',', $value) as $item) {
+            foreach (explode(',', $optionValue) as $item) {
                 $trimmed = trim($item);
                 if ($trimmed !== '') {
                     $items[] = $trimmed;
@@ -368,9 +368,9 @@ final readonly class AnalyseCommandOptions
             return null;
         }
 
-        $value = $input->getOption('diff');
+        $optionValue = $input->getOption('diff');
 
-        return is_string($value) && $value !== '' ? $value : 'working-tree';
+        return is_string($optionValue) && $optionValue !== '' ? $optionValue : 'working-tree';
     }
 
     /**
@@ -455,9 +455,9 @@ final readonly class AnalyseCommandOptions
         }
 
         foreach (['--include-pillar' => $this->includePillars, '--exclude-pillar' => $this->excludePillars] as $option => $values) {
-            foreach ($values as $value) {
-                if (Pillar::tryFrom($value) === null) {
-                    return sprintf('Unsupported pillar "%s" for %s.', $value, $option);
+            foreach ($values as $optionValue) {
+                if (Pillar::tryFrom($optionValue) === null) {
+                    return sprintf('Unsupported pillar "%s" for %s.', $optionValue, $option);
                 }
             }
         }

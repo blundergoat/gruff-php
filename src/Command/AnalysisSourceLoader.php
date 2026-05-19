@@ -27,7 +27,7 @@ final readonly class AnalysisSourceLoader
         array $ignoredPathPatterns,
     ): AnalysisSourceSet {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
-        $parser          = new PhpFileParser();
+        $phpFileParser   = new PhpFileParser();
         $diagnostics     = [];
         $analysisUnits   = [];
 
@@ -40,7 +40,7 @@ final readonly class AnalysisSourceLoader
         }
 
         foreach ($discoveryResult->files as $file) {
-            $unit            = $parser->parse($file);
+            $unit            = $phpFileParser->parse($file);
             $analysisUnits[] = $unit;
 
             foreach ($unit->diagnostics as $diagnostic) {

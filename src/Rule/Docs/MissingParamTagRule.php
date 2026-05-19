@@ -50,15 +50,15 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Find documented public function-like declarations with undocumented parameters.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding> Findings for missing parameter tags.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $nodes      = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof ClassMethod || $node instanceof Function_;
         });
 
@@ -99,7 +99,7 @@ final readonly class MissingParamTagRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     sprintf('Parameter $%s in %s has no @param tag.', $paramName, $symbol),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $param->getStartLine(),
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,

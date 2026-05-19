@@ -33,9 +33,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      */
     public function testHonoursDefaultEnabledFromRuleDefinition(): void
     {
-        $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
+        $ruleRegistry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
 
-        $config = (new ConfigLoader(__DIR__))->load(null, $registry);
+        $config = (new ConfigLoader(__DIR__))->load(null, $ruleRegistry);
 
         self::assertFalse($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
     }
@@ -47,13 +47,13 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      */
     public function testCanEnableDefaultDisabledRuleViaConfig(): void
     {
-        $registry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
-        $path     = $this->writeTempConfig(sprintf(
+        $ruleRegistry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
+        $path         = $this->writeTempConfig(sprintf(
             '{"rules":{"%s":{"enabled":true}}}',
             FixtureDefaultDisabledRule::ID,
         ));
 
-        $config = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
 
         self::assertTrue($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
     }
@@ -65,13 +65,13 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      */
     public function testLoadsRuleOptions(): void
     {
-        $registry = new RuleRegistry([new FixtureOptionsRule()]);
-        $path     = $this->writeTempConfig(sprintf(
+        $ruleRegistry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path         = $this->writeTempConfig(sprintf(
             '{"rules":{"%s":{"options":{"patterns":["foo","bar"],"ratio":0.75,"flag":false,"label":"custom","names":["alpha"],"levels":[1,2]}}}}',
             FixtureOptionsRule::ID,
         ));
 
-        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
         $settings = $config->ruleSettings(FixtureOptionsRule::ID);
 
         self::assertSame(['foo', 'bar'], $settings->stringListOption('patterns'));
@@ -89,8 +89,8 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      */
     public function testRejectsUnknownRuleOptionKey(): void
     {
-        $registry = new RuleRegistry([new FixtureOptionsRule()]);
-        $path     = $this->writeTempConfig(sprintf(
+        $ruleRegistry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path         = $this->writeTempConfig(sprintf(
             '{"rules":{"%s":{"options":{"unknown":[]}}}}',
             FixtureOptionsRule::ID,
         ));
@@ -98,7 +98,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
         $this->expectException(ConfigException::class);
         $this->expectExceptionMessage(sprintf('Unknown option "rules.%s.options.unknown".', FixtureOptionsRule::ID));
 
-        (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
     }
 
     /**
@@ -162,13 +162,13 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     #[DataProvider('invalidRuleOptionTypeProvider')]
     public function testRejectsInvalidRuleOptionTypeVariants(string $configTemplate, string $messageTemplate): void
     {
-        $registry = new RuleRegistry([new FixtureOptionsRule()]);
-        $path     = $this->writeTempConfig(sprintf($configTemplate, FixtureOptionsRule::ID));
+        $ruleRegistry = new RuleRegistry([new FixtureOptionsRule()]);
+        $path         = $this->writeTempConfig(sprintf($configTemplate, FixtureOptionsRule::ID));
 
         $this->expectException(ConfigException::class);
         $this->expectExceptionMessage(sprintf($messageTemplate, FixtureOptionsRule::ID));
 
-        (new ConfigLoader(dirname($path)))->load(basename($path), $registry);
+        (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
     }
 }
 
@@ -188,12 +188,12 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Fixture default-disabled rule',
-            pillar:          Pillar::Naming,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Low,
+            id:                 self::ID,
+            name:               'Fixture default-disabled rule',
+            pillar:             Pillar::Naming,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Low,
             isEnabledByDefault: false,
         );
     }
@@ -201,11 +201,11 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $unit    Analysis unit.
-     * @param RuleContext  $context Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit    Analysis unit.
+     * @param RuleContext  $ruleContext Rule context for the fixture.
      * @return list<\GruffPhp\Finding\Finding> Fixture findings.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         return [];
     }
@@ -247,11 +247,11 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $unit    Analysis unit.
-     * @param RuleContext  $context Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit    Analysis unit.
+     * @param RuleContext  $ruleContext Rule context for the fixture.
      * @return list<\GruffPhp\Finding\Finding> Fixture findings.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         return [];
     }

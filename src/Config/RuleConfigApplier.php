@@ -467,15 +467,15 @@ final readonly class RuleConfigApplier
      *
      * @return ConfigObject
      */
-    private function requireObject(mixed $value, string $message): array
+    private function requireObject(mixed $decodedValue, string $message): array
     {
-        if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+        if (!is_array($decodedValue) || ($decodedValue !== [] && array_is_list($decodedValue))) {
             throw new ConfigException($message);
         }
 
         $result = [];
 
-        foreach ($value as $key => $item) {
+        foreach ($decodedValue as $key => $item) {
             if (!is_string($key)) {
                 throw new ConfigException($message);
             }
@@ -491,13 +491,13 @@ final readonly class RuleConfigApplier
      *
      * @return ConfigValue
      */
-    private function configValue(mixed $value): array|bool|float|int|object|string|null
+    private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
-        if (is_array($value)) {
-            return $this->configArray($value);
+        if (is_array($decodedValue)) {
+            return $this->configArray($decodedValue);
         }
 
-        return $this->configScalar($value);
+        return $this->configScalar($decodedValue);
     }
 
     /**
@@ -505,10 +505,10 @@ final readonly class RuleConfigApplier
      *
      * @return ConfigScalar
      */
-    private function configScalar(mixed $value): bool|float|int|object|string|null
+    private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
-        if (is_bool($value) || is_float($value) || is_int($value) || is_object($value) || is_string($value) || $value === null) {
-            return $value;
+        if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
+            return $decodedValue;
         }
 
         throw new ConfigException('Config value must be YAML/JSON-compatible.');

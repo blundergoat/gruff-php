@@ -33,12 +33,12 @@ final readonly class FileLengthRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'File length',
-            pillar:                   Pillar::Size,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::High,
+            id:                self::ID,
+            name:              'File length',
+            pillar:            Pillar::Size,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::High,
             severityThreshold: new SeverityThreshold(1000, Severity::Error),
         );
     }
@@ -46,16 +46,16 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Find files whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized files.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition     = $this->definition();
-        $settings       = $context->settingsFor($definition);
-        $lineCount      = $unit->lineCount();
+        $settings       = $ruleContext->settingsFor($definition);
+        $lineCount      = $analysisUnit->lineCount();
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
         if ($thresholdMatch === null) {
@@ -71,7 +71,7 @@ final readonly class FileLengthRule implements RuleInterface
                     $thresholdMatch->severity->value,
                     $this->formatNumber($thresholdMatch->threshold),
                 ),
-                filePath:         $unit->file->displayPath,
+                filePath:         $analysisUnit->file->displayPath,
                 line:             1,
                 severity:         $thresholdMatch->severity,
                 pillar:           $definition->pillar,
@@ -94,12 +94,12 @@ final readonly class FileLengthRule implements RuleInterface
      *
      * @return string Human-readable threshold value.
      */
-    private function formatNumber(int|float $value): string
+    private function formatNumber(int|float $number): string
     {
-        if (is_float($value) && floor($value) !== $value) {
-            return (string) $value;
+        if (is_float($number) && floor($number) !== $number) {
+            return (string) $number;
         }
 
-        return (string) (int) $value;
+        return (string) (int) $number;
     }
 }

@@ -37,37 +37,37 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Mocking a domain object',
-            pillar:          Pillar::TestQuality,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
-            confidence:      Confidence::Low,
+            id:                 self::ID,
+            name:               'Mocking a domain object',
+            pillar:             Pillar::TestQuality,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Low,
             isEnabledByDefault: false,
-            defaultOptions:  ['domainNamespaces' => []],
+            defaultOptions:     ['domainNamespaces' => []],
         );
     }
 
     /**
      * Find mock creations for classes that match configured domain-object patterns.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mocked domain objects.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $patterns = $context->settingsFor($this->definition())->stringListOption('domainNamespaces');
+        $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('domainNamespaces');
         if ($patterns === []) {
             return [];
         }
 
-        $finder     = new NodeFinder();
-        $useAliases = $this->collectUseAliases($unit, $finder);
+        $nodeFinder = new NodeFinder();
+        $useAliases = $this->collectUseAliases($analysisUnit, $nodeFinder);
         $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 if (!TestQualityNodeHelper::isMockCreationCall($call)) {
                     continue;
@@ -93,7 +93,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
                         $resolved,
                         $matched,
                     ),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
                     severity:    Severity::Advisory,
                     pillar:      Pillar::TestQuality,
@@ -112,18 +112,18 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * @return array<string, string>
      */
-    private function collectUseAliases(AnalysisUnit $unit, NodeFinder $finder): array
+    private function collectUseAliases(AnalysisUnit $analysisUnit, NodeFinder $finder): array
     {
         $useAliases = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Use_::class) as $use) {
+        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\Use_::class) as $use) {
             foreach ($use->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();
                 $useAliases[$alias] = $useUse->name->toString();
             }
         }
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\GroupUse::class) as $group) {
+        foreach ($finder->findInstanceOf($analysisUnit->statements, Stmt\GroupUse::class) as $group) {
             $prefix = $group->prefix->toString();
             foreach ($group->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();
@@ -141,17 +141,17 @@ final readonly class MockingDomainObjectRule implements RuleInterface
      */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
-        $value = TestQualityNodeHelper::argValue($call, $index);
-        if (!$value instanceof Expr\ClassConstFetch || !$value->class instanceof Name) {
+        $classConstFetch = TestQualityNodeHelper::argValue($call, $index);
+        if (!$classConstFetch instanceof Expr\ClassConstFetch || !$classConstFetch->class instanceof Name) {
             return null;
         }
 
-        $name = $value->name;
+        $name = $classConstFetch->name;
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
             return null;
         }
 
-        return $value->class->toString();
+        return $classConstFetch->class->toString();
     }
 
     /**

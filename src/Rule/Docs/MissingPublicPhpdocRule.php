@@ -47,24 +47,24 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Find method declarations that do not have a local PHPDoc block.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented methods.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassMethod::class) as $method) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             /** @var ClassMethod $method Finder predicate restricts results to method declarations. */
             if ($method->getDocComment() !== null) {
                 continue;
             }
 
-            $findings[] = $this->findingForMethod($unit, $definition, $method);
+            $findings[] = $this->findingForMethod($analysisUnit, $definition, $method);
         }
 
         return $findings;
@@ -75,14 +75,14 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
      *
      * @return Finding Documentation finding.
      */
-    private function findingForMethod(AnalysisUnit $unit, RuleDefinition $definition, ClassMethod $method): Finding
+    private function findingForMethod(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod $method): Finding
     {
         $symbol = CyclomaticComplexityRule::resolveSymbol($method);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Method %s has no PHPDoc.', $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $method->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

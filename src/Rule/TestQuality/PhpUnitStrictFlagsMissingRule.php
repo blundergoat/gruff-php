@@ -75,18 +75,18 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Report a project once when PHPUnit strict-mode attributes are missing.
      *
-     * @param AnalysisUnit $unit    Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $context Rule context carrying project root.
+     * @param AnalysisUnit $analysisUnit    Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext Rule context carrying project root.
      * @return list<Finding> Findings for missing strict PHPUnit flags.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $root = $context->projectRoot;
+        $root = $ruleContext->projectRoot;
         if (isset($this->emittedRoots[$root])) {
             return [];
         }
 
-        if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($unit)) {
+        if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
             return [];
         }
 
@@ -133,8 +133,8 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         $missing    = [];
 
         foreach (self::STRICT_FLAGS as $flag) {
-            $value = $attributes !== null ? $attributes->{$flag} : null;
-            if ($value === null || $value->__toString() === '' || strtolower($value->__toString()) === 'false') {
+            $flagValue = $attributes !== null ? $attributes->{$flag} : null;
+            if ($flagValue === null || $flagValue->__toString() === '' || strtolower($flagValue->__toString()) === 'false') {
                 $missing[] = $flag;
             }
         }

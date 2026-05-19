@@ -124,13 +124,13 @@ final readonly class DashboardPageRenderer
      *
      * @return string Escaped label and input HTML.
      */
-    private function field(string $label, string $name, string $value, string $placeholder = ''): string
+    private function field(string $label, string $name, string $fieldValue, string $placeholder = ''): string
     {
         return sprintf(
             '<label>%s<input name="%s" value="%s" placeholder="%s"></label>',
             $this->escape($label),
             $this->escape($name),
-            $this->escape($value),
+            $this->escape($fieldValue),
             $this->escape($placeholder),
         );
     }
@@ -140,13 +140,13 @@ final readonly class DashboardPageRenderer
      *
      * @return string Escaped option HTML.
      */
-    private function option(string $value, string $selected, ?string $label = null): string
+    private function option(string $optionValue, string $selected, ?string $label = null): string
     {
         return sprintf(
             '<option value="%s"%s>%s</option>',
-            $this->escape($value),
-            $value === $selected ? ' selected' : '',
-            $this->escape($label ?? $value),
+            $this->escape($optionValue),
+            $optionValue === $selected ? ' selected' : '',
+            $this->escape($label ?? $optionValue),
         );
     }
 
@@ -204,8 +204,8 @@ JS;
      *
      * @return string HTML-escaped value.
      */
-    private function escape(string $value): string
+    private function escape(string $text): string
     {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }

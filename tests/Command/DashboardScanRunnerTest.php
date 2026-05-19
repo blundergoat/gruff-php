@@ -42,10 +42,10 @@ final class DashboardScanRunnerTest extends TestCase
     public function testFullScanUsesCacheUntilSourceFingerprintChanges(): void
     {
         $project = $this->projectDir();
-        $runner = $this->runner($this->fakeGruffBinary('counter'));
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
         $context = $this->context($project);
 
-        $first = $runner->scanHtml($context, ['paths' => 'src']);
+        $first  = $runner->scanHtml($context, ['paths' => 'src']);
         $second = $runner->scanHtml($context, ['paths' => 'src']);
         file_put_contents($project . '/src/Example.php', "<?php\nfinal class ExampleChanged {}\n");
         $third = $runner->scanHtml($context, ['paths' => 'src']);
@@ -65,7 +65,7 @@ final class DashboardScanRunnerTest extends TestCase
     public function testDiffAndIncludeIgnoredScansBypassCache(): void
     {
         $project = $this->projectDir();
-        $runner = $this->runner($this->fakeGruffBinary('counter'));
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
         $context = $this->context($project);
 
         $runner->scanHtml($context, ['paths' => 'src', 'scanScope' => 'diff']);
@@ -89,7 +89,7 @@ final class DashboardScanRunnerTest extends TestCase
 
         file_put_contents($project . '/.gruff-php.yaml', "rules: {}\n");
 
-        $first = $runner->scanHtml($context, ['paths' => 'src']);
+        $first  = $runner->scanHtml($context, ['paths' => 'src']);
         $second = $runner->scanHtml($context, ['paths' => 'src']);
         file_put_contents($project . '/.gruff-php.yaml', "rules:\n  size.file-length:\n    enabled: false\n");
         $third = $runner->scanHtml($context, ['paths' => 'src']);
@@ -133,8 +133,8 @@ final class DashboardScanRunnerTest extends TestCase
     public function testInvalidProjectRootRendersError(): void
     {
         $project = $this->projectDir();
-        $runner = $this->runner($this->fakeGruffBinary('counter'));
-        $html = $runner->scanHtml($this->context($project), ['project' => $project . '/missing']);
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
+        $html    = $runner->scanHtml($this->context($project), ['project' => $project . '/missing']);
 
         self::assertStringContainsString('Project root is not an existing directory.', $html);
         self::assertStringContainsString('Exit code: 2', $html);
@@ -148,8 +148,8 @@ final class DashboardScanRunnerTest extends TestCase
     public function testEmptyScanOutputRendersErrorDetail(): void
     {
         $project = $this->projectDir();
-        $runner = $this->runner($this->fakeGruffBinary('empty'));
-        $html = $runner->scanHtml($this->context($project), ['paths' => 'src']);
+        $runner  = $this->runner($this->fakeGruffBinary('empty'));
+        $html    = $runner->scanHtml($this->context($project), ['paths' => 'src']);
 
         self::assertStringContainsString('The scan did not produce HTML output.', $html);
         self::assertStringContainsString('empty-output', $html);
@@ -162,10 +162,10 @@ final class DashboardScanRunnerTest extends TestCase
      */
     public function testTimedOutScanRendersErrorDetail(): void
     {
-        $project = $this->projectDir();
-        $runner  = $this->runner($this->fakeGruffBinary('slow'));
-        $context = new DashboardRequestContext($this->input(), $project, $project, 0.01, '127.0.0.1', 8765);
-        $html    = $runner->scanHtml($context, ['paths' => 'src']);
+        $project                 = $this->projectDir();
+        $runner                  = $this->runner($this->fakeGruffBinary('slow'));
+        $dashboardRequestContext = new DashboardRequestContext($this->input(), $project, $project, 0.01, '127.0.0.1', 8765);
+        $html                    = $runner->scanHtml($dashboardRequestContext, ['paths' => 'src']);
 
         self::assertStringContainsString('The scan did not produce HTML output.', $html);
         self::assertStringContainsString('exceeded the timeout', $html);

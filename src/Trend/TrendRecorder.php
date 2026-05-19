@@ -112,12 +112,12 @@ final readonly class TrendRecorder
         }
 
         $normalisedEntry = [];
-        foreach ($trendEntry as $key => $value) {
+        foreach ($trendEntry as $key => $trendValue) {
             if (!is_string($key)) {
                 throw new RuntimeException(sprintf('History file contains a non-string entry key: %s', $path));
             }
 
-            $normalisedEntry[$key] = $this->normaliseEntryValue($value, $path);
+            $normalisedEntry[$key] = $this->normaliseEntryValue($trendValue, $path);
         }
 
         return $normalisedEntry;
@@ -126,10 +126,10 @@ final readonly class TrendRecorder
     /**
      * @return bool|float|int|string|null Scalar trend entry value.
      */
-    private function normaliseEntryValue(mixed $value, string $path): bool|float|int|string|null
+    private function normaliseEntryValue(mixed $trendValue, string $path): bool|float|int|string|null
     {
-        if (is_bool($value) || is_float($value) || is_int($value) || is_string($value) || $value === null) {
-            return $value;
+        if (is_bool($trendValue) || is_float($trendValue) || is_int($trendValue) || is_string($trendValue) || $trendValue === null) {
+            return $trendValue;
         }
 
         throw new RuntimeException(sprintf('History file contains a non-scalar entry value: %s', $path));

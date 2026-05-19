@@ -45,17 +45,17 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Find comment tokens that appear to contain disabled executable code.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for suspicious comment blocks.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $findings   = [];
 
-        foreach ($unit->tokens as $token) {
+        foreach ($analysisUnit->tokens as $token) {
             if (!$this->isCommentToken($token)) {
                 continue;
             }
@@ -73,7 +73,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     'Comment appears to contain commented-out code.',
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $line,
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,

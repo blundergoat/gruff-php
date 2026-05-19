@@ -149,16 +149,16 @@ final class FunctionLikeScopeWalker
      * @param list<Node> $children
      * @return void No return value.
      */
-    private function collectChildNodes(mixed $value, array &$children): void
+    private function collectChildNodes(mixed $subNode, array &$children): void
     {
-        if ($value instanceof Node) {
-            $children[] = $value;
+        if ($subNode instanceof Node) {
+            $children[] = $subNode;
             return;
         }
-        if (!is_array($value)) {
+        if (!is_array($subNode)) {
             return;
         }
-        foreach ($value as $item) {
+        foreach ($subNode as $item) {
             $this->collectChildNodes($item, $children);
         }
     }

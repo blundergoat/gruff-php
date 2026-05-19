@@ -53,8 +53,8 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testScopesDiscoversPhpUnitAndPestTestsInSourceOrder(): void
     {
-        $unit = $this->parseFixture();
-        $scopes = TestQualityNodeHelper::testScopes($unit);
+        $unit         = $this->parseFixture();
+        $scopes       = TestQualityNodeHelper::testScopes($unit);
         $cachedScopes = TestQualityNodeHelper::testScopes($unit);
 
         self::assertSame($scopes, $cachedScopes);
@@ -88,11 +88,11 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testMethodClassificationHandlesAttributesAnnotationsParentsAndDetachedNodes(): void
     {
-        $scopes = $this->scopesByName();
-        $attributeMethod = $this->methodNode($scopes['attributeStyle']);
+        $scopes           = $this->scopesByName();
+        $attributeMethod  = $this->methodNode($scopes['attributeStyle']);
         $annotationMethod = $this->methodNode($scopes['annotationStyle']);
         $testPrefixMethod = $this->methodNode($scopes['testPrefixStyle']);
-        $detachedMethod = new Stmt\ClassMethod('testDetached');
+        $classMethod      = new Stmt\ClassMethod('testDetached');
 
         self::assertTrue(TestQualityNodeHelper::hasAttribute($attributeMethod, 'test'));
         self::assertFalse(TestQualityNodeHelper::hasAttribute($attributeMethod, 'dataProvider'));
@@ -101,8 +101,8 @@ final class TestQualityNodeHelperTest extends TestCase
         self::assertTrue(TestQualityNodeHelper::isTestMethod($testPrefixMethod));
         self::assertSame('HelperEdgeCaseTest', TestQualityNodeHelper::parentClass($testPrefixMethod)?->name?->toString());
         self::assertTrue(TestQualityNodeHelper::extendsTestCase(TestQualityNodeHelper::parentClass($testPrefixMethod)));
-        self::assertFalse(TestQualityNodeHelper::isTestMethod($detachedMethod));
-        self::assertNull(TestQualityNodeHelper::parentClass($detachedMethod));
+        self::assertFalse(TestQualityNodeHelper::isTestMethod($classMethod));
+        self::assertNull(TestQualityNodeHelper::parentClass($classMethod));
         self::assertFalse(TestQualityNodeHelper::extendsTestCase(null));
     }
 
@@ -113,8 +113,8 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testCallsAndAssertionCallsClassifyNames(): void
     {
-        $scope = $this->scopesByName()['testPrefixStyle'];
-        $calls = TestQualityNodeHelper::calls($scope);
+        $scope          = $this->scopesByName()['testPrefixStyle'];
+        $calls          = TestQualityNodeHelper::calls($scope);
         $assertionCalls = TestQualityNodeHelper::assertionCalls($scope);
 
         self::assertSame(['helper', 'asserttrue', 'assertequals', 'assertsame', 'fail'], array_map(
@@ -135,7 +135,7 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testTrivialAssertionDetectionCoversPhpUnitAndPestLiterals(): void
     {
-        $scope = $this->scopesByName()['testTrivialAssertions'];
+        $scope   = $this->scopesByName()['testTrivialAssertions'];
         $results = [];
 
         foreach (TestQualityNodeHelper::assertionCalls($scope) as $call) {
@@ -171,9 +171,9 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testArgumentLiteralPestAndMagicNumberHelpers(): void
     {
-        $scope = $this->scopesByName()['testLiteralAndMagicNumbers'];
-        $calls = TestQualityNodeHelper::calls($scope);
-        $helperCall = $this->firstNamedCall($calls, 'helper');
+        $scope       = $this->scopesByName()['testLiteralAndMagicNumbers'];
+        $calls       = TestQualityNodeHelper::calls($scope);
+        $helperCall  = $this->firstNamedCall($calls, 'helper');
         $dynamicCall = array_values(array_filter(
             $calls,
             static fn (Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => $call instanceof Expr\FuncCall
@@ -215,7 +215,7 @@ final class TestQualityNodeHelperTest extends TestCase
         $magicNumbers = array_values(array_filter(array_map(
             static fn (Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int => TestQualityNodeHelper::isAssertionMagicNumber($call),
             TestQualityNodeHelper::assertionCalls($scope),
-        ), static fn (?int $value): bool => $value !== null));
+        ), static fn (?int $magicNumber): bool => $magicNumber !== null));
 
         self::assertSame([2, 4, 3], $magicNumbers);
 
@@ -237,9 +237,9 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     public function testMockCreationAndVerificationHelpers(): void
     {
-        $scope = $this->scopesByName()['testMockApi'];
-        $calls = TestQualityNodeHelper::calls($scope);
-        $mockCreations = [];
+        $scope             = $this->scopesByName()['testMockApi'];
+        $calls             = TestQualityNodeHelper::calls($scope);
+        $mockCreations     = [];
         $mockVerifications = [];
 
         foreach ($calls as $call) {

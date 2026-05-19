@@ -106,7 +106,7 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error, filePath: 'src/B.php', line: 2),
             $this->finding('mutation.survived', Pillar::Mutation, Severity::Warning, filePath: 'src/A.php', line: 20),
         ];
-        $mutation = new MutationAnalysisResult(new InfectionReport(
+        $mutationAnalysisResult = new MutationAnalysisResult(new InfectionReport(
             reportPath: 'infection-report.json',
             stats:      [
                 'totalMutantsCount' => 3,
@@ -121,7 +121,7 @@ final class ScoreCalculatorTest extends TestCase
             ],
         ));
 
-        $score = (new ScoreCalculator())->calculate($findings, $mutation, new DiffResult(
+        $score = (new ScoreCalculator())->calculate($findings, $mutationAnalysisResult, new DiffResult(
             active:       true,
             mode:         'unstaged',
             base:         null,

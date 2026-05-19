@@ -59,10 +59,10 @@ final readonly class PhpFileParser
         try {
             $statements = array_values($this->parser->parse($source) ?? []);
 
-            $traverser = new NodeTraverser();
-            $traverser->addVisitor(new ParentConnectingVisitor());
+            $nodeTraverser = new NodeTraverser();
+            $nodeTraverser->addVisitor(new ParentConnectingVisitor());
             /** @var list<\PhpParser\Node\Stmt> $traversed ParentConnectingVisitor preserves the parsed statement list shape. */
-            $traversed = $traverser->traverse($statements);
+            $traversed = $nodeTraverser->traverse($statements);
 
             return new AnalysisUnit($file, $source, $traversed, array_values($this->parser->getTokens()), []);
         } catch (Error $error) {

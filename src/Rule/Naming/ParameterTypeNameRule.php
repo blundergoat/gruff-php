@@ -15,6 +15,10 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Assign;
+use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -24,7 +28,7 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\UnionType;
 
 /**
- * Detects class-typed parameters whose names do not match their type.
+ * Detects class-typed parameters and direct object locals whose names do not match their type.
  */
 final readonly class ParameterTypeNameRule implements RuleInterface
 {
@@ -51,9 +55,11 @@ final readonly class ParameterTypeNameRule implements RuleInterface
         'parent',
         'self',
         'static',
+        'stdclass',
         'string',
         'true',
         'void',
+        'weakmap',
     ];
 
     /**
@@ -65,7 +71,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     {
         return new RuleDefinition(
             id:              self::ID,
-            name:            'Parameter type name',
+            name:            'Parameter and variable type name',
             pillar:          Pillar::Naming,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
@@ -74,28 +80,28 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                 'typeSuffixesToTrim' => ['Interface'],
                 'ignoredParameterNames' => [],
             ],
-            description: 'Flags class-typed parameters whose variable name does not match the lower-camel type name. Configure ignoredParameterNames to exempt project-specific parameter names (e.g., AST-walker conventions like $node or $context).',
+            description: 'Flags class-typed parameters and direct object locals whose variable name does not match the lower-camel type name. Configure ignoredParameterNames to exempt project-specific parameter names (e.g., AST-walker conventions like $node or $context).',
         );
     }
 
     /**
-     * Find class-typed parameters whose names do not match their type names.
+     * Find class-typed parameters and direct object locals whose names do not match their type names.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for mismatched parameter/type names.
+     * @return list<Finding> Findings for mismatched variable/type names.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition            = $this->definition();
-        $settings              = $context->settingsFor($definition);
+        $settings              = $ruleContext->settingsFor($definition);
         $typeSuffixesToTrim    = $settings->stringListOption('typeSuffixesToTrim');
         $ignoredParameterNames = $settings->stringListOption('ignoredParameterNames');
-        $tokenizer             = new IdentifierTokenizer();
+        $identifierTokenizer   = new IdentifierTokenizer();
         $findings              = [];
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             $symbol             = $this->symbol($scope);
             $expectedByPosition = [];
             $expectedCounts     = [];
@@ -114,7 +120,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                     continue;
                 }
 
-                $expectedName = $this->expectedParameterName($typeName, $tokenizer, $typeSuffixesToTrim);
+                $expectedName = $this->expectedVariableName($typeName, $identifierTokenizer, $typeSuffixesToTrim);
                 if ($expectedName === null) {
                     continue;
                 }
@@ -130,7 +136,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
 
                 if (
                     $parameterName === $expectedName
-                    || $this->isSpecificDuplicateName($parameterName, $expectedName, $expectedCounts[$expectedName], $tokenizer)
+                    || $this->isSpecificDuplicateName($parameterName, $expectedName, $expectedCounts[$expectedName], $identifierTokenizer)
                 ) {
                     continue;
                 }
@@ -144,7 +150,7 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                         $expectedName,
                         $typeName,
                     ),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $param->getStartLine(),
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,
@@ -159,9 +165,193 @@ final readonly class ParameterTypeNameRule implements RuleInterface
                     ],
                 );
             }
+
+            array_push(
+                $findings,
+                ...$this->localObjectFindings(
+                    definition:          $definition,
+                    analysisUnit:        $analysisUnit,
+                    scope:               $scope,
+                    symbol:              $symbol,
+                    identifierTokenizer: $identifierTokenizer,
+                    typeSuffixesToTrim:  $typeSuffixesToTrim,
+                ),
+            );
         }
 
         return $findings;
+    }
+
+    /**
+     * Find direct `new Type()` assignments whose variable name does not match the type.
+     *
+     * @param list<string> $typeSuffixesToTrim
+     * @return list<Finding>
+     */
+    private function localObjectFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        string $symbol,
+        IdentifierTokenizer $identifierTokenizer,
+        array $typeSuffixesToTrim,
+    ): array {
+        $expectedByVariableName = [];
+        $expectedCounts         = [];
+
+        foreach ($this->localObjectAssignments($scope) as [$variable, $typeName]) {
+            $variableName = $variable->name;
+            if (!is_string($variableName) || isset($expectedByVariableName[$variableName])) {
+                continue;
+            }
+
+            $expectedName = $this->expectedVariableName($typeName, $identifierTokenizer, $typeSuffixesToTrim);
+            if ($expectedName === null) {
+                continue;
+            }
+
+            $expectedByVariableName[$variableName] = [$variable, $typeName, $expectedName];
+            $expectedCounts[$expectedName]         = ($expectedCounts[$expectedName] ?? 0) + 1;
+        }
+
+        $findings = [];
+
+        foreach ($expectedByVariableName as $variableName => [$variable, $typeName, $expectedName]) {
+            if (
+                $variableName === $expectedName
+                || $this->isSpecificDuplicateName($variableName, $expectedName, $expectedCounts[$expectedName], $identifierTokenizer)
+            ) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId:  $definition->id,
+                message: sprintf(
+                    'Variable $%s in %s should be named $%s to match %s.',
+                    $variableName,
+                    $symbol,
+                    $expectedName,
+                    $typeName,
+                ),
+                filePath:    $analysisUnit->file->displayPath,
+                line:        $variable->getStartLine(),
+                severity:    $definition->defaultSeverity,
+                pillar:      $definition->pillar,
+                tier:        $definition->tier,
+                confidence:  $definition->confidence,
+                symbol:      $symbol,
+                remediation: sprintf('Rename $%s to $%s.', $variableName, $expectedName),
+                metadata:    [
+                    'identifierKind' => 'variable',
+                    'variable' => $variableName,
+                    'type' => $typeName,
+                    'expectedName' => $expectedName,
+                ],
+            );
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @return list<array{0: Variable, 1: string}>
+     */
+    private function localObjectAssignments(FunctionLikeScope $scope): array
+    {
+        $assignments = [];
+
+        foreach ($this->nodesInScope($scope) as $node) {
+            if (!$node instanceof Assign || !$node->var instanceof Variable || !$node->expr instanceof New_) {
+                continue;
+            }
+
+            $typeName = $this->shortNewTypeName($node->expr);
+            if ($typeName === null) {
+                continue;
+            }
+
+            $assignments[] = [$node->var, $typeName];
+        }
+
+        return $assignments;
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function nodesInScope(FunctionLikeScope $scope): array
+    {
+        $nodes = [];
+
+        foreach ($this->bodyNodes($scope->node) as $bodyNode) {
+            $this->collectScopeNode($bodyNode, $nodes);
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * @param list<Node> $nodes
+     * @return void No return value.
+     */
+    private function collectScopeNode(Node $node, array &$nodes): void
+    {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            return;
+        }
+
+        $nodes[] = $node;
+
+        foreach ($node->getSubNodeNames() as $name) {
+            $this->collectChildNodes($node->{$name}, $nodes);
+        }
+    }
+
+    /**
+     * @param list<Node> $nodes
+     * @return void No return value.
+     */
+    private function collectChildNodes(mixed $subNode, array &$nodes): void
+    {
+        if ($subNode instanceof Node) {
+            $this->collectScopeNode($subNode, $nodes);
+
+            return;
+        }
+
+        if (!is_array($subNode)) {
+            return;
+        }
+
+        foreach ($subNode as $item) {
+            $this->collectChildNodes($item, $nodes);
+        }
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        if ($node instanceof ArrowFunction) {
+            return [$node->expr];
+        }
+
+        return array_values($node->stmts ?? []);
+    }
+
+    /**
+     * @return string|null Short class name, or null for unsupported `new` expressions.
+     */
+    private function shortNewTypeName(New_ $newExpression): ?string
+    {
+        if (!$newExpression->class instanceof Name) {
+            return null;
+        }
+
+        $parts = $newExpression->class->getParts();
+
+        return $parts[array_key_last($parts)] ?? null;
     }
 
     /**
@@ -267,9 +457,9 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     /**
      * @param list<string> $typeSuffixesToTrim
      *
-     * @return string|null Expected lower-camel parameter name, or null for builtin types.
+     * @return string|null Expected lower-camel variable name, or null for builtin types.
      */
-    private function expectedParameterName(string $typeName, IdentifierTokenizer $tokenizer, array $typeSuffixesToTrim): ?string
+    private function expectedVariableName(string $typeName, IdentifierTokenizer $tokenizer, array $typeSuffixesToTrim): ?string
     {
         if (in_array(strtolower($typeName), self::BUILTIN_TYPES, true)) {
             return null;

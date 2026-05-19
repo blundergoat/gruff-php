@@ -54,26 +54,26 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find declared and promoted properties that lack local documentation.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented properties.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, ClassLike::class) as $classLike) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassLike::class) as $classLike) {
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }
 
             array_push(
                 $findings,
-                ...$this->declaredPropertyFindings($classLike, $classLike->name->toString(), $definition, $unit),
-                ...$this->promotedPropertyFindings($classLike, $classLike->name->toString(), $definition, $unit),
+                ...$this->declaredPropertyFindings($classLike, $classLike->name->toString(), $definition, $analysisUnit),
+                ...$this->promotedPropertyFindings($classLike, $classLike->name->toString(), $definition, $analysisUnit),
             );
         }
 
@@ -102,7 +102,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         ClassLike $classLike,
         string $className,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): array {
         $findings = [];
 
@@ -117,7 +117,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                     className:    $className,
                     line:         $property->getStartLine(),
                     definition:   $definition,
-                    unit:         $unit,
+                    analysisUnit:         $analysisUnit,
                 );
             }
         }
@@ -135,14 +135,14 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         string $className,
         int $line,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): Finding {
         $symbol = sprintf('%s::$%s', $className, $propertyName);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Property %s has no PHPDoc.', $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,
@@ -167,7 +167,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         ClassLike $classLike,
         string $className,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): array {
         $constructor = $this->findConstructor($classLike);
         if ($constructor === null) {
@@ -188,7 +188,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                 className:    $className,
                 line:         $param->getStartLine(),
                 definition:   $definition,
-                unit:         $unit,
+                analysisUnit:         $analysisUnit,
             );
         }
 
@@ -219,14 +219,14 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
         string $className,
         int $line,
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
     ): Finding {
         $symbol = sprintf('%s::__construct($%s)', $className, $propertyName);
 
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

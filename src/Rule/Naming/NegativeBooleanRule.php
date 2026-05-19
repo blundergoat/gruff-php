@@ -67,18 +67,18 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Find bool properties and parameters that use negative flag names.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for CLI mirror allowlist.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for CLI mirror allowlist.
      * @return list<Finding> Findings for negative boolean flags.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $allowlist  = $context->settingsFor($definition)->stringListOption('cliMirrorAllowlist');
-        $finder     = new NodeFinder();
+        $allowlist  = $ruleContext->settingsFor($definition)->stringListOption('cliMirrorAllowlist');
+        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
             if (!$this->isBoolType($property->type)) {
                 continue;
             }
@@ -86,7 +86,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
             foreach ($property->props as $prop) {
                 $finding = $this->propertyFinding(
                     definition:       $definition,
-                    unit:             $unit,
+                    analysisUnit:             $analysisUnit,
                     propertyProperty: $prop,
                     allowlist:        $allowlist,
                 );
@@ -96,11 +96,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
             }
         }
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             foreach ($scope->node->params as $param) {
                 $finding = $this->parameterFinding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     scope:      $scope,
                     param:      $param,
                     allowlist:  $allowlist,
@@ -120,7 +120,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
      */
     private function propertyFinding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         PropertyProperty $propertyProperty,
         array $allowlist,
     ): ?Finding {
@@ -134,7 +134,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
         return $this->finding(
             definition:   $definition,
-            unit:         $unit,
+            analysisUnit:         $analysisUnit,
             node:         $propertyProperty,
             kind:         'property',
             name:         $name,
@@ -150,7 +150,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
      */
     private function parameterFinding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         FunctionLikeScope $scope,
         Param $param,
         array $allowlist,
@@ -169,7 +169,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
         return $this->finding(
             definition:   $definition,
-            unit:         $unit,
+            analysisUnit:         $analysisUnit,
             node:         $param,
             kind:         $param->flags === 0 ? 'parameter' : 'property',
             name:         $name,
@@ -186,7 +186,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
      */
     private function finding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         Node $node,
         string $kind,
         string $name,
@@ -197,7 +197,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s "$%s" is a negative boolean flag.', ucfirst($kind), $name),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

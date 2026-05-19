@@ -52,16 +52,16 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Find private properties that are never read, never written, or unused entirely.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused private properties.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $classLikes = $finder->find($unit->statements, static function (Node $node): bool {
+        $nodeFinder = new NodeFinder();
+        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
             return $node instanceof Class_
                 || $node instanceof Trait_
                 || $node instanceof Enum_;
@@ -77,11 +77,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
                 continue;
             }
 
-            $usage    = $this->propertyUsage($finder, $classLike, $privateProps);
+            $usage    = $this->propertyUsage($nodeFinder, $classLike, $privateProps);
             $findings = array_merge(
                 $findings,
                 $this->findingsForProperties(
-                    unit:         $unit,
+                    analysisUnit:         $analysisUnit,
                     definition:   $definition,
                     classLike:    $classLike,
                     privateProps: $privateProps,
@@ -198,7 +198,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @return list<Finding>
      */
     private function findingsForProperties(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleDefinition $definition,
         Class_|Trait_|Enum_ $classLike,
         array $privateProps,
@@ -219,7 +219,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     $this->propertyMessage($symbol, $isRead, $isWritten),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $property['line'],
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,

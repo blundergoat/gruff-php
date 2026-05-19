@@ -65,7 +65,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $baselinePath = $tempDir . '/gruff-baseline.json';
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -78,18 +78,18 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 $baselinePath,
                 '--no-config',
             ], __DIR__ . '/../..');
-            $generate->run();
+            $generateProcess->run();
 
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
             self::assertFileExists($baselinePath);
 
-            $generatedReport   = $this->decodeJsonOutput($generate);
+            $generatedReport   = $this->decodeJsonOutput($generateProcess);
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame(true, $generatedBaseline['generated'] ?? null);
             self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
 
-            $apply = new Process([
+            $applyProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -102,10 +102,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 $baselinePath,
                 '--no-config',
             ], __DIR__ . '/../..');
-            $apply->run();
+            $applyProcess->run();
 
-            self::assertSame(0, $apply->getExitCode(), $apply->getErrorOutput());
-            $appliedReport   = $this->decodeJsonOutput($apply);
+            self::assertSame(0, $applyProcess->getExitCode(), $applyProcess->getErrorOutput());
+            $appliedReport   = $this->decodeJsonOutput($applyProcess);
             $appliedBaseline = $appliedReport['baseline'] ?? null;
             $summary         = $appliedReport['summary'] ?? null;
             self::assertIsArray($appliedBaseline);
@@ -163,7 +163,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -174,12 +174,12 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--generate-baseline',
             ], $project);
-            $generate->run();
+            $generateProcess->run();
 
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
             self::assertFileExists($project . '/gruff-baseline.json');
 
-            $generatedReport   = $this->decodeJsonOutput($generate);
+            $generatedReport   = $this->decodeJsonOutput($generateProcess);
             $generatedBaseline = $generatedReport['baseline'] ?? null;
             self::assertIsArray($generatedBaseline);
             self::assertSame('gruff-baseline.json', $generatedBaseline['path'] ?? null);
@@ -187,7 +187,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
             self::assertSame(1, $generatedBaseline['totalEntries'] ?? null);
             self::assertSame('default', $generatedBaseline['source'] ?? null);
 
-            $autoApply = new Process([
+            $autoApplyProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -197,10 +197,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--fail-on',
                 'none',
             ], $project);
-            $autoApply->run();
+            $autoApplyProcess->run();
 
-            self::assertSame(0, $autoApply->getExitCode(), $autoApply->getErrorOutput());
-            $autoReport   = $this->decodeJsonOutput($autoApply);
+            self::assertSame(0, $autoApplyProcess->getExitCode(), $autoApplyProcess->getErrorOutput());
+            $autoReport   = $this->decodeJsonOutput($autoApplyProcess);
             $autoBaseline = $autoReport['baseline'] ?? null;
             self::assertIsArray($autoBaseline);
             self::assertSame('gruff-baseline.json', $autoBaseline['path'] ?? null);
@@ -228,7 +228,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -239,10 +239,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--generate-baseline',
             ], $project);
-            $generate->run();
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            $generateProcess->run();
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
 
-            $skipped = new Process([
+            $skippedProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -253,10 +253,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--no-baseline',
             ], $project);
-            $skipped->run();
+            $skippedProcess->run();
 
-            self::assertSame(0, $skipped->getExitCode(), $skipped->getErrorOutput());
-            $report = $this->decodeJsonOutput($skipped);
+            self::assertSame(0, $skippedProcess->getExitCode(), $skippedProcess->getErrorOutput());
+            $report = $this->decodeJsonOutput($skippedProcess);
             self::assertArrayNotHasKey('baseline', $report);
             $skippedSummary = $report['summary'] ?? null;
             self::assertIsArray($skippedSummary);
@@ -279,7 +279,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -290,15 +290,15 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--generate-baseline',
             ], $project);
-            $generate->run();
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            $generateProcess->run();
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
 
             file_put_contents(
                 $project . '/src/Newcomer.php',
                 "<?php\n\ndeclare(strict_types=1);\n\nfinal readonly class Newcomer\n{\n    public function arrive(int \$x): int\n    {\n        return \$x;\n    }\n}\n",
             );
 
-            $rerun = new Process([
+            $rerunProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -308,10 +308,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--fail-on',
                 'none',
             ], $project);
-            $rerun->run();
+            $rerunProcess->run();
 
-            self::assertSame(0, $rerun->getExitCode(), $rerun->getErrorOutput());
-            $report   = $this->decodeJsonOutput($rerun);
+            self::assertSame(0, $rerunProcess->getExitCode(), $rerunProcess->getErrorOutput());
+            $report   = $this->decodeJsonOutput($rerunProcess);
             $baseline = $report['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame(1, $baseline['suppressedFindings'] ?? null);
@@ -340,7 +340,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $project = $this->createBaselineProject();
 
         try {
-            $generate = new Process([
+            $generateProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -351,15 +351,15 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 'none',
                 '--generate-baseline',
             ], $project);
-            $generate->run();
-            self::assertSame(0, $generate->getExitCode(), $generate->getErrorOutput());
+            $generateProcess->run();
+            self::assertSame(0, $generateProcess->getExitCode(), $generateProcess->getErrorOutput());
 
             file_put_contents(
                 $project . '/src/OrderCalculator.php',
                 "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Documents the public surface so the docs.missing-public-phpdoc finding goes away.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
             );
 
-            $rerun = new Process([
+            $rerunProcess = new Process([
                 PHP_BINARY,
                 __DIR__ . '/../../bin/gruff-php',
                 'analyse',
@@ -369,10 +369,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
                 '--fail-on',
                 'none',
             ], $project);
-            $rerun->run();
+            $rerunProcess->run();
 
-            self::assertSame(0, $rerun->getExitCode(), $rerun->getErrorOutput());
-            $report   = $this->decodeJsonOutput($rerun);
+            self::assertSame(0, $rerunProcess->getExitCode(), $rerunProcess->getErrorOutput());
+            $report   = $this->decodeJsonOutput($rerunProcess);
             $baseline = $report['baseline'] ?? null;
             self::assertIsArray($baseline);
             self::assertSame('full-project', $baseline['staleEvaluation'] ?? null);

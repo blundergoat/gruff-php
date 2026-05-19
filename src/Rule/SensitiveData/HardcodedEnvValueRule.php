@@ -43,39 +43,39 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Find env-style assignments that look like committed secrets.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious env-style values.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if (SecretScannerHelper::isEnvFile($unit->file->displayPath)) {
+        if (SecretScannerHelper::isEnvFile($analysisUnit->file->displayPath)) {
             return [];
         }
 
         preg_match_all(
             '/\b(?<key>[A-Z0-9_]*(?:API_KEY|PASSWORD|PASS|SECRET|TOKEN|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*["\']?(?<value>[A-Za-z0-9_+\/=.-]{8,})["\']?/',
-            $unit->source,
+            $analysisUnit->source,
             $matches,
             PREG_OFFSET_CAPTURE,
         );
 
         $findings = [];
         foreach ($matches[0] as $index => $match) {
-            $key    = $matches['key'][$index][0];
-            $value  = $matches['value'][$index][0];
-            $offset = $match[1];
-            if (SecretScannerHelper::isLikelyDummyValue($value) || !$this->hasSecretValueEvidence($key, $value)) {
+            $key        = $matches['key'][$index][0];
+            $secretValue = $matches['value'][$index][0];
+            $offset     = $match[1];
+            if (SecretScannerHelper::isLikelyDummyValue($secretValue) || !$this->hasSecretValueEvidence($key, $secretValue)) {
                 continue;
             }
 
-            $preview    = SecretScannerHelper::redactedKeyValue($key, $value);
+            $preview    = SecretScannerHelper::redactedKeyValue($key, $secretValue);
             $findings[] = SecretScannerHelper::finding(
-                unit:        $unit,
+                analysisUnit:        $analysisUnit,
                 ruleId:      self::ID,
                 message:     sprintf('Hardcoded env-style secret value detected: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($unit->source, $offset),
+                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
                 confidence:  Confidence::Medium,
                 detector:    'env-style-secret',
                 preview:     $preview,
@@ -91,9 +91,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
      *
      * @return bool True when the value shape is strong enough for the key.
      */
-    private function hasSecretValueEvidence(string $key, string $value): bool
+    private function hasSecretValueEvidence(string $key, string $secretValue): bool
     {
-        $normalizedValue = trim($value, "\"' \t\r\n");
+        $normalizedValue = trim($secretValue, "\"' \t\r\n");
         $upperKey        = strtoupper($key);
         $strongShape     = strlen($normalizedValue) >= 20 && SecretScannerHelper::entropy($normalizedValue) >= 3.5;
 
@@ -129,17 +129,17 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
      *
      * @return bool True when the value looks like a common non-secret token.
      */
-    private function isCommonNonSecretValue(string $value): bool
+    private function isCommonNonSecretValue(string $secretValue): bool
     {
-        if (preg_match('/^[a-z][a-z0-9-]{1,24}$/', $value) === 1) {
+        if (preg_match('/^[a-z][a-z0-9-]{1,24}$/', $secretValue) === 1) {
             return true;
         }
 
-        if (preg_match('/^[a-z][a-z0-9_]{1,40}$/', $value) === 1) {
+        if (preg_match('/^[a-z][a-z0-9_]{1,40}$/', $secretValue) === 1) {
             return true;
         }
 
-        if (preg_match('/^[a-z][a-z0-9_.-]+[._-]$/', $value) === 1) {
+        if (preg_match('/^[a-z][a-z0-9_.-]+[._-]$/', $secretValue) === 1) {
             return true;
         }
 

@@ -55,18 +55,18 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find mixed test naming styles and weakly descriptive test names.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for inconsistent or poor test names.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
-        $patterns = $context->settingsFor($this->definition())->stringListOption('poorNamePatterns');
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
+        $patterns   = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
-        foreach ($finder->findInstanceOf($unit->statements, Stmt\Class_::class) as $class) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
             $camelCount = 0;
             $snakeCount = 0;
             $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());
@@ -92,7 +92,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                     $findings[] = new Finding(
                         ruleId:      self::ID,
                         message:     sprintf('%s::%s() has a poorly descriptive test name (matches %s).', $className, $methodName, $matchedPattern),
-                        filePath:    $unit->file->displayPath,
+                        filePath:    $analysisUnit->file->displayPath,
                         line:        $method->getStartLine(),
                         severity:    Severity::Advisory,
                         pillar:      Pillar::TestQuality,
@@ -112,7 +112,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('%s mixes camelCase (%d) and snake_case (%d) test method naming.', $className, $camelCount, $snakeCount),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $class->getStartLine(),
                 severity:    Severity::Advisory,
                 pillar:      Pillar::TestQuality,

@@ -57,18 +57,18 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Find mocks that are read without any verification call.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mock variables that lack expectations.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $finder   = new NodeFinder();
-        $findings = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
 
-        foreach (TestQualityNodeHelper::testScopes($unit) as $scope) {
-            $findings = array_merge($findings, $this->findingsForScope($unit, $scope, $finder));
+        foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
+            $findings = array_merge($findings, $this->findingsForScope($analysisUnit, $scope, $nodeFinder));
         }
 
         return $findings;
@@ -77,7 +77,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function findingsForScope(AnalysisUnit $unit, TestQualityScope $scope, NodeFinder $finder): array
+    private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $finder): array
     {
         $assignedVarObjectIds = [];
         $mockAssignments      = $this->mockAssignments($scope, $finder, $assignedVarObjectIds);
@@ -91,7 +91,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
 
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
-                unit:       $unit,
+                analysisUnit:       $analysisUnit,
                 scope:      $scope,
                 finder:     $finder,
                 varName:    $varName,
@@ -175,7 +175,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      * @return Finding|null Finding for the mock assignment, or null when verified.
      */
     private function findingForMock(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         TestQualityScope $scope,
         NodeFinder $finder,
         string $varName,
@@ -197,7 +197,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         return new Finding(
             ruleId:      self::ID,
             message:     $this->mockMessage($scope->symbol, $varName, $hasStub),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $assignment['line'],
             severity:    $hasStub ? Severity::Advisory : Severity::Warning,
             pillar:      Pillar::TestQuality,

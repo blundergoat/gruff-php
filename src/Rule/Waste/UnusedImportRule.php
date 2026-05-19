@@ -46,15 +46,15 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      * @return list<Finding> Findings for unused import statements.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $finder     = new NodeFinder();
-        $uses       = $finder->findInstanceOf($unit->statements, Use_::class);
+        $nodeFinder = new NodeFinder();
+        $uses       = $nodeFinder->findInstanceOf($analysisUnit->statements, Use_::class);
 
         if ($uses === []) {
             return [];
@@ -62,7 +62,7 @@ final readonly class UnusedImportRule implements RuleInterface
 
         /** @var list<Use_> $useStatements NodeFinder returns only use statement nodes for this query. */
         $useStatements     = $uses;
-        $sourceWithoutUses = $this->removeUseStatements($unit->source, $useStatements);
+        $sourceWithoutUses = $this->removeUseStatements($analysisUnit->source, $useStatements);
         $findings          = [];
 
         foreach ($useStatements as $use) {
@@ -78,7 +78,7 @@ final readonly class UnusedImportRule implements RuleInterface
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
                     message:     sprintf('Import %s is unused.', $fullName),
-                    filePath:    $unit->file->displayPath,
+                    filePath:    $analysisUnit->file->displayPath,
                     line:        $use->getStartLine(),
                     severity:    $definition->defaultSeverity,
                     pillar:      $definition->pillar,

@@ -135,6 +135,93 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify interface method parameters use the lower-camel class name.
+     *
+     * @return void No return value.
+     */
+    public function testParameterTypeNameFlagsRuleStyleInterfaceParameters(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+declare(strict_types=1);
+namespace GruffPhp\Tests\Fixtures\Naming;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\RuleContext;
+interface RuleLike
+{
+    public function analyse(AnalysisUnit $unit, RuleContext $context): array;
+    public function clean(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array;
+}
+PHP, ParameterTypeNameRule::ID);
+
+        $reported = array_column(
+            array_map(
+                static fn ($finding): array => [
+                    'parameter' => $finding->metadata['parameter'] ?? null,
+                    'expectedName' => $finding->metadata['expectedName'] ?? null,
+                ],
+                $findings,
+            ),
+            'expectedName',
+            'parameter',
+        );
+
+        self::assertSame('analysisUnit', $reported['unit'] ?? null);
+        self::assertSame('ruleContext', $reported['context'] ?? null);
+        self::assertArrayNotHasKey('analysisUnit', $reported);
+        self::assertArrayNotHasKey('ruleContext', $reported);
+    }
+
+    /**
+     * Verify local variables assigned direct object instances use the lower-camel class name.
+     *
+     * @return void No return value.
+     */
+    public function testParameterTypeNameFlagsDirectObjectLocalVariables(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+declare(strict_types=1);
+namespace GruffPhp\Tests\Fixtures\Naming;
+use GruffPhp\Parser\PhpFileParser;
+use PhpParser\NodeFinder;
+final class LocalObjectNames
+{
+    public function scan(): void
+    {
+        $finder = new NodeFinder();
+        $nodeFinder = new NodeFinder();
+        $primaryNodeFinder = new NodeFinder();
+        $secondaryNodeFinder = new NodeFinder();
+        $parser = new PhpFileParser();
+        $phpFileParser = new PhpFileParser();
+        $object = new \stdClass();
+    }
+}
+PHP, ParameterTypeNameRule::ID);
+
+        $reported = array_column(
+            array_map(
+                static fn ($finding): array => [
+                    'variable' => $finding->metadata['variable'] ?? null,
+                    'expectedName' => $finding->metadata['expectedName'] ?? null,
+                ],
+                $findings,
+            ),
+            'expectedName',
+            'variable',
+        );
+
+        self::assertSame('nodeFinder', $reported['finder'] ?? null);
+        self::assertSame('phpFileParser', $reported['parser'] ?? null);
+        self::assertArrayNotHasKey('nodeFinder', $reported);
+        self::assertArrayNotHasKey('primaryNodeFinder', $reported);
+        self::assertArrayNotHasKey('secondaryNodeFinder', $reported);
+        self::assertArrayNotHasKey('phpFileParser', $reported);
+        self::assertArrayNotHasKey('object', $reported);
+    }
+
+    /**
      * Verify identifier quality can be tuned with config and accepted abbreviations.
      *
      * @return void No return value.
@@ -172,6 +259,47 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify plain value parameters are not hidden behind the generic-name ignore list.
+     *
+     * @return void No return value.
+     */
+    public function testIdentifierQualityFlagsGenericValueParameters(): void
+    {
+        $findings = $this->analyseSourceRule(<<<'PHP'
+<?php
+declare(strict_types=1);
+namespace GruffPhp\Tests\Fixtures\Naming;
+final class Formatter
+{
+    private function formatNumber(int|float $value): string
+    {
+        return (string) $value;
+    }
+
+    private function formatInputNumber(int|float $inputValue): string
+    {
+        return (string) $inputValue;
+    }
+}
+PHP, IdentifierQualityRule::ID);
+
+        $reported = [];
+        foreach ($findings as $index => $finding) {
+            $kind    = $finding->metadata['identifierKind'] ?? null;
+            $name    = $finding->metadata['identifierName'] ?? null;
+            $variant = $finding->metadata['variant'] ?? null;
+
+            self::assertIsString($kind, "finding #{$index} is missing string metadata.identifierKind");
+            self::assertIsString($name, "finding #{$index} is missing string metadata.identifierName");
+
+            $reported[sprintf('%s:%s', $kind, $name)] = $variant;
+        }
+
+        self::assertSame('generic', $reported['parameter:value'] ?? null);
+        self::assertSame('generic', $reported['parameter:inputValue'] ?? null);
+    }
+
+    /**
      * Verify identifier quality mutation fixture reports stable kinds and messages.
      *
      * @return void No return value.
@@ -200,6 +328,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
             ['Temp::temp()', 'parameter', 'obj', 'placeholder', 'obj', 'Parameter name "obj" is placeholder and does not communicate clear intent.'],
             ['Temp::temp()', 'variable', 'item', 'generic', 'item', 'Variable name "item" is generic and does not communicate clear intent.'],
             ['Temp::temp()', 'variable', 'item2', 'numbered', '2', 'Variable name "item2" is numbered and does not communicate clear intent.'],
+            ['Temp::loopAndCatchVariables()', 'variable', 'value', 'generic', 'value', 'Variable name "value" is generic and does not communicate clear intent.'],
             ['Temp::countedVariables()', 'variable', 'item', 'generic', 'item', 'Variable name "item" is generic and does not communicate clear intent.'],
             ['Temp::countedVariables()', 'variable', 'thing', 'generic', 'thing', 'Variable name "thing" is generic and does not communicate clear intent.'],
             ['Data', 'interface', 'Data', 'generic', 'data', 'Interface name "Data" is generic and does not communicate clear intent.'],
@@ -246,6 +375,7 @@ final class NamingAdvancedRulesTest extends NamingRuleTestCase
 
         self::assertContains('Temp::temp():item', $reported);
         self::assertContains('Temp::temp():item2', $reported);
+        self::assertContains('Temp::loopAndCatchVariables():value', $reported);
         self::assertContains('Temp::countedVariables():item', $reported);
         self::assertContains('bar():tmp', $reported);
         self::assertNotContains('Temp::countedVariables():thing', $reported);

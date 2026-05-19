@@ -81,27 +81,27 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Find properties, parameters, and locals that encode type suffixes.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for configured suffixes.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for configured suffixes.
      * @return list<Finding> Findings for suffix-Hungarian identifiers.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
-        $suffixes   = $this->normalisedSuffixes($context->settingsFor($definition)->stringListOption('typeSuffixes'));
-        $tokenizer  = new IdentifierTokenizer();
-        $finder     = new NodeFinder();
-        $findings   = [];
+        $definition          = $this->definition();
+        $suffixes            = $this->normalisedSuffixes($ruleContext->settingsFor($definition)->stringListOption('typeSuffixes'));
+        $identifierTokenizer = new IdentifierTokenizer();
+        $nodeFinder          = new NodeFinder();
+        $findings            = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Property::class) as $property) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $prop,
                     identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
                     suffixes:   $suffixes,
-                    tokenizer:  $tokenizer,
+                    tokenizer:  $identifierTokenizer,
                     type:       $property->type,
                 );
 
@@ -111,7 +111,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             }
         }
 
-        foreach ((new FunctionLikeScopeWalker())->scopes($unit->statements) as $scope) {
+        foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             $symbol = $this->symbol($scope);
 
             foreach ($scope->node->params as $param) {
@@ -121,11 +121,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
 
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $param,
                     identifier: ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
                     suffixes:   $suffixes,
-                    tokenizer:  $tokenizer,
+                    tokenizer:  $identifierTokenizer,
                     type:       $param->type,
                 );
 
@@ -135,18 +135,18 @@ final readonly class SuffixHungarianRule implements RuleInterface
             }
 
             foreach ($scope->localVariables as $name => $variable) {
-                $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+                $suffixToken = $this->suffixToken($name, $suffixes, $identifierTokenizer);
                 if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
                     continue;
                 }
 
                 $finding = $this->finding(
                     definition: $definition,
-                    unit:       $unit,
+                    analysisUnit:       $analysisUnit,
                     node:       $variable,
                     identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
                     suffixes:   $suffixes,
-                    tokenizer:  $tokenizer,
+                    tokenizer:  $identifierTokenizer,
                     type:       null,
                 );
 
@@ -166,7 +166,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     private function finding(
         RuleDefinition $definition,
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         Node $node,
         array $identifier,
         array $suffixes,
@@ -189,7 +189,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s encodes the type suffix "%s".', ucfirst($kind), $name, $suffix),
-            filePath:    $unit->file->displayPath,
+            filePath:    $analysisUnit->file->displayPath,
             line:        $node->getStartLine(),
             severity:    $definition->defaultSeverity,
             pillar:      $definition->pillar,

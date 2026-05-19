@@ -51,22 +51,22 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Find direct superglobal access outside controller boundaries.
      *
-     * @param AnalysisUnit $unit    Parsed unit to inspect.
-     * @param RuleContext  $context Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
+     * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for forbidden global reads.
      */
-    public function analyse(AnalysisUnit $unit, RuleContext $context): array
+    public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        if ($this->isControllerPath($unit->file->displayPath)) {
+        if ($this->isControllerPath($analysisUnit->file->displayPath)) {
             return [];
         }
 
-        $finder   = new NodeFinder();
-        $findings = [];
-        $seen     = [];
+        $nodeFinder = new NodeFinder();
+        $findings   = [];
+        $seen       = [];
 
-        foreach ($finder->findInstanceOf($unit->statements, Expr\Variable::class) as $variable) {
+        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Variable::class) as $variable) {
             if (!is_string($variable->name) || !in_array($variable->name, self::FORBIDDEN_GLOBALS, true)) {
                 continue;
             }
@@ -80,7 +80,7 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     sprintf('Direct access to $%s outside a controller boundary.', $variable->name),
-                filePath:    $unit->file->displayPath,
+                filePath:    $analysisUnit->file->displayPath,
                 line:        $variable->getStartLine(),
                 severity:    Severity::Warning,
                 pillar:      Pillar::Modernisation,

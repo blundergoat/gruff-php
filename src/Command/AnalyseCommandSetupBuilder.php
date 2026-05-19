@@ -116,9 +116,9 @@ final readonly class AnalyseCommandSetupBuilder
      *
      * @return OutputFormat|string Parsed format, or a formatted usage error string.
      */
-    private function format(mixed $value): OutputFormat|string
+    private function format(mixed $optionValue): OutputFormat|string
     {
-        $rawValue = is_string($value) ? $value : OutputFormat::Text->value;
+        $rawValue = is_string($optionValue) ? $optionValue : OutputFormat::Text->value;
         $format   = OutputFormat::fromInput($rawValue);
 
         return $format ?? sprintf(
@@ -132,9 +132,9 @@ final readonly class AnalyseCommandSetupBuilder
      *
      * @return FailThreshold|string Parsed threshold, or the unsupported raw value.
      */
-    private function failThreshold(mixed $value): FailThreshold|string
+    private function failThreshold(mixed $optionValue): FailThreshold|string
     {
-        $rawValue = is_string($value) ? $value : FailThreshold::Error->value;
+        $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Error->value;
 
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
@@ -144,13 +144,13 @@ final readonly class AnalyseCommandSetupBuilder
      *
      * @return int|false|null Non-negative budget, false for invalid input, or null when omitted.
      */
-    private function mutationBudget(mixed $value): int|false|null
+    private function mutationBudget(mixed $optionValue): int|false|null
     {
-        if ($value === null) {
+        if ($optionValue === null) {
             return null;
         }
 
-        return is_string($value) && preg_match('/^\d+$/', $value) === 1 ? (int) $value : false;
+        return is_string($optionValue) && preg_match('/^\d+$/', $optionValue) === 1 ? (int) $optionValue : false;
     }
 
     /**

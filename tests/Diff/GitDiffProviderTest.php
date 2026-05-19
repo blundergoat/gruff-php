@@ -29,7 +29,7 @@ final class GitDiffProviderTest extends TestCase
      */
     public function testDiffFindingFilterKeepsOnlyTouchedChangedLineFindings(): void
     {
-        $diff = new DiffResult(
+        $diffResult = new DiffResult(
             active:       true,
             mode:         'unstaged',
             base:         null,
@@ -43,7 +43,7 @@ final class GitDiffProviderTest extends TestCase
             $this->finding('src/Other.php', 11),
         ];
 
-        $filtered = (new DiffFindingFilter())->filter($findings, $diff);
+        $filtered = (new DiffFindingFilter())->filter($findings, $diffResult);
 
         self::assertCount(1, $filtered);
         self::assertSame(11, $filtered[0]->line);
@@ -132,7 +132,7 @@ final class GitDiffProviderTest extends TestCase
      */
     public function testDiffFindingFilterFallsBackToChangedFiles(): void
     {
-        $diff = new DiffResult(
+        $diffResult = new DiffResult(
             active:       true,
             mode:         'staged',
             base:         null,
@@ -145,7 +145,7 @@ final class GitDiffProviderTest extends TestCase
             $this->finding('src/Other.php', 20),
         ];
 
-        $filtered = (new DiffFindingFilter())->filter($findings, $diff);
+        $filtered = (new DiffFindingFilter())->filter($findings, $diffResult);
 
         self::assertCount(1, $filtered);
         self::assertSame('src/Example.php', $filtered[0]->filePath);
