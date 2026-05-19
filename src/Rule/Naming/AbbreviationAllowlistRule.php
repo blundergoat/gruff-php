@@ -228,23 +228,34 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     private function collectExemptLocalNames(Node $node, NodeFinder $nodeFinder, array &$names): void
     {
         if ($node instanceof For_) {
-            foreach ($nodeFinder->findInstanceOf($node->init, Variable::class) as $variable) {
-                if (is_string($variable->name)) {
-                    $names[$variable->name] = true;
-                }
-            }
+            $this->collectVariableNames($node->init, $nodeFinder, $names);
         }
 
         if ($node instanceof Foreach_) {
-            foreach ([$node->keyVar, $node->valueVar] as $variable) {
-                if ($variable instanceof Variable && is_string($variable->name)) {
-                    $names[$variable->name] = true;
-                }
+            $foreachVariables = [$node->valueVar];
+            if ($node->keyVar instanceof Node) {
+                $foreachVariables[] = $node->keyVar;
             }
+
+            $this->collectVariableNames($foreachVariables, $nodeFinder, $names);
         }
 
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
             $names[$node->var->name] = true;
+        }
+    }
+
+    /**
+     * @param array<Node>          $nodes
+     * @param array<string, true>  $names
+     * @return void
+     */
+    private function collectVariableNames(array $nodes, NodeFinder $nodeFinder, array &$names): void
+    {
+        foreach ($nodeFinder->findInstanceOf($nodes, Variable::class) as $variable) {
+            if (is_string($variable->name)) {
+                $names[$variable->name] = true;
+            }
         }
     }
 

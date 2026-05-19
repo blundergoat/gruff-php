@@ -29,6 +29,10 @@ class AbbreviationAllowlistFixture
             echo $key . $row;
         }
 
+        foreach ($rows as [$start, $end]) {
+            echo $start . $end;
+        }
+
         try {
             echo 'ok';
         } catch (\RuntimeException $ex) {

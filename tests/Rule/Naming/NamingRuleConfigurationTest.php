@@ -60,6 +60,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertNotContains('uri', $names);
         self::assertNotContains('key', $names);
         self::assertNotContains('row', $names);
+        self::assertNotContains('end', $names);
         self::assertNotContains('ex', $names);
     }
 
