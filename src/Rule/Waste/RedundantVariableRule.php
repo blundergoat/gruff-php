@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\Closure;
@@ -144,48 +145,8 @@ final readonly class RedundantVariableRule implements RuleInterface
      */
     private function checkChildBlocks(Stmt $statement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
-        if ($statement instanceof Stmt\If_) {
-            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
-
-            foreach ($statement->elseifs as $elseif) {
-                $this->checkBlock($elseif->stmts, $analysisUnit, $definition, $findings);
-            }
-
-            if ($statement->else !== null) {
-                $this->checkBlock($statement->else->stmts, $analysisUnit, $definition, $findings);
-            }
-
-            return;
-        }
-
-        if ($statement instanceof Stmt\For_
-            || $statement instanceof Stmt\Foreach_
-            || $statement instanceof Stmt\While_
-            || $statement instanceof Stmt\Do_
-        ) {
-            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
-
-            return;
-        }
-
-        if ($statement instanceof Stmt\Switch_) {
-            foreach ($statement->cases as $case) {
-                $this->checkBlock($case->stmts, $analysisUnit, $definition, $findings);
-            }
-
-            return;
-        }
-
-        if ($statement instanceof Stmt\TryCatch) {
-            $this->checkBlock($statement->stmts, $analysisUnit, $definition, $findings);
-
-            foreach ($statement->catches as $catch) {
-                $this->checkBlock($catch->stmts, $analysisUnit, $definition, $findings);
-            }
-
-            if ($statement->finally !== null) {
-                $this->checkBlock($statement->finally->stmts, $analysisUnit, $definition, $findings);
-            }
+        foreach (StmtChildVisitor::childBlocks($statement) as $block) {
+            $this->checkBlock($block->statements, $analysisUnit, $definition, $findings);
         }
     }
 }

@@ -13,6 +13,7 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
@@ -115,48 +116,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
      */
     private function walkChildren(Node\Stmt $node, AnalysisUnit $analysisUnit, array &$findings): void
     {
-        if ($node instanceof Stmt\If_) {
-            $this->checkBlock($node->stmts, $analysisUnit, $findings);
-
-            foreach ($node->elseifs as $elseif) {
-                $this->checkBlock($elseif->stmts, $analysisUnit, $findings);
-            }
-
-            if ($node->else !== null) {
-                $this->checkBlock($node->else->stmts, $analysisUnit, $findings);
-            }
-
-            return;
-        }
-
-        if ($node instanceof Stmt\For_
-            || $node instanceof Stmt\Foreach_
-            || $node instanceof Stmt\While_
-            || $node instanceof Stmt\Do_
-        ) {
-            $this->checkBlock($node->stmts, $analysisUnit, $findings);
-
-            return;
-        }
-
-        if ($node instanceof Stmt\Switch_) {
-            foreach ($node->cases as $case) {
-                $this->checkBlock($case->stmts, $analysisUnit, $findings);
-            }
-
-            return;
-        }
-
-        if ($node instanceof Stmt\TryCatch) {
-            $this->checkBlock($node->stmts, $analysisUnit, $findings);
-
-            foreach ($node->catches as $catch) {
-                $this->checkBlock($catch->stmts, $analysisUnit, $findings);
-            }
-
-            if ($node->finally !== null) {
-                $this->checkBlock($node->finally->stmts, $analysisUnit, $findings);
-            }
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            $this->checkBlock($block->statements, $analysisUnit, $findings);
         }
     }
 

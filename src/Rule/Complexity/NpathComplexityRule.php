@@ -14,6 +14,8 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\StmtChildBlock;
+use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\BinaryOp;
@@ -151,16 +153,28 @@ final readonly class NpathComplexityRule implements RuleInterface
      */
     private static function walkStatement(Node $node): int
     {
-        return match (true) {
-            $node instanceof Stmt\If_ => self::walkIf($node),
-            $node instanceof Stmt\Switch_ => self::walkSwitch($node),
-            $node instanceof Stmt\For_ => self::walkBlock($node->stmts) + 1,
-            $node instanceof Stmt\Foreach_ => self::walkBlock($node->stmts) + 1,
-            $node instanceof Stmt\While_ => self::walkBlock($node->stmts) + 1,
-            $node instanceof Stmt\Do_ => self::walkBlock($node->stmts) + 1,
-            $node instanceof Stmt\TryCatch => self::walkTryCatch($node),
-            default => 1,
-        };
+        if (!StmtChildVisitor::isControlFlowStmt($node)) {
+            return 1;
+        }
+
+        if ($node instanceof Stmt\If_) {
+            return self::walkIf($node);
+        }
+
+        if ($node instanceof Stmt\Switch_) {
+            return self::walkSwitch($node);
+        }
+
+        if ($node instanceof Stmt\TryCatch) {
+            return self::walkTryCatch($node);
+        }
+
+        // For / Foreach / While / Do: one loop-body block at +1.
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            return self::walkBlock($block->statements) + 1;
+        }
+
+        return 1;
     }
 
     /**
@@ -170,17 +184,28 @@ final readonly class NpathComplexityRule implements RuleInterface
      */
     private static function walkIf(Stmt\If_ $node): int
     {
-        $paths = self::walkBlock($node->stmts) + self::countConditionPaths($node->cond);
+        $paths   = self::countConditionPaths($node->cond);
+        $hasElse = false;
 
-        foreach ($node->elseifs as $elseif) {
-            $paths += self::walkBlock($elseif->stmts) + self::countConditionPaths($elseif->cond);
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            $paths += self::walkBlock($block->statements);
+
+            if ($block->kind === StmtChildBlock::KIND_ELSEIF_BODY) {
+                /** @var Stmt\ElseIf_ $owner Block kind discriminator narrows the owner so ->cond is accessible. */
+                $owner = $block->owner;
+                $paths += self::countConditionPaths($owner->cond);
+            }
+
+            if ($block->kind === StmtChildBlock::KIND_ELSE_BODY) {
+                $hasElse = true;
+            }
         }
 
-        if ($node->else !== null) {
-            return $paths + self::walkBlock($node->else->stmts);
+        if (!$hasElse) {
+            $paths += 1;
         }
 
-        return $paths + 1;
+        return $paths;
     }
 
     /**
@@ -193,10 +218,12 @@ final readonly class NpathComplexityRule implements RuleInterface
         $paths      = 0;
         $hasDefault = false;
 
-        foreach ($node->cases as $case) {
-            $paths += max(1, self::walkBlock($case->stmts));
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            $paths += max(1, self::walkBlock($block->statements));
 
-            if ($case->cond === null) {
+            /** @var Stmt\Case_ $owner Block kind discriminator narrows the owner so ->cond is accessible. */
+            $owner = $block->owner;
+            if ($owner->cond === null) {
                 $hasDefault = true;
             }
         }
@@ -215,10 +242,14 @@ final readonly class NpathComplexityRule implements RuleInterface
      */
     private static function walkTryCatch(Stmt\TryCatch $node): int
     {
-        $paths = self::walkBlock($node->stmts);
+        $paths = 0;
 
-        foreach ($node->catches as $catch) {
-            $paths += self::walkBlock($catch->stmts);
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            if ($block->kind === StmtChildBlock::KIND_TRY_BODY
+                || $block->kind === StmtChildBlock::KIND_CATCH_BODY
+            ) {
+                $paths += self::walkBlock($block->statements);
+            }
         }
 
         return max(1, $paths);

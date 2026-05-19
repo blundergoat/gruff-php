@@ -14,6 +14,8 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\StmtChildBlock;
+use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\BinaryOp;
@@ -180,17 +182,20 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     private static function walkIf(Stmt\If_ $node, int $nesting): int
     {
         $total = 1 + $nesting + self::walkBooleanOperators($node->cond);
-        $total += self::walkStatements($node->stmts, $nesting + 1);
 
-        foreach ($node->elseifs as $elseif) {
-            $total += 1; // elseif: +1, no nesting penalty
-            $total += self::walkBooleanOperators($elseif->cond);
-            $total += self::walkStatements($elseif->stmts, $nesting + 1);
-        }
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            if ($block->kind === StmtChildBlock::KIND_ELSEIF_BODY) {
+                $total += 1; // elseif: +1, no nesting penalty
+                /** @var Stmt\ElseIf_ $owner Block kind discriminator narrows the owner so ->cond is accessible. */
+                $owner = $block->owner;
+                $total += self::walkBooleanOperators($owner->cond);
+            }
 
-        if ($node->else !== null) {
-            $total += 1; // else: +1, no nesting penalty
-            $total += self::walkStatements($node->else->stmts, $nesting + 1);
+            if ($block->kind === StmtChildBlock::KIND_ELSE_BODY) {
+                $total += 1; // else: +1, no nesting penalty
+            }
+
+            $total += self::walkStatements($block->statements, $nesting + 1);
         }
 
         return $total;
@@ -205,8 +210,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $total = 1 + $nesting;
 
-        foreach ($node->cases as $case) {
-            $total += self::walkStatements($case->stmts, $nesting + 1);
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            $total += self::walkStatements($block->statements, $nesting + 1);
         }
 
         return $total;
@@ -234,15 +239,18 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      */
     private static function walkTryCatch(Stmt\TryCatch $node, int $nesting): int
     {
-        $total = self::walkStatements($node->stmts, $nesting);
+        $total = 0;
 
-        foreach ($node->catches as $catch) {
-            $total += 1 + $nesting;
-            $total += self::walkStatements($catch->stmts, $nesting + 1);
-        }
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            if ($block->kind === StmtChildBlock::KIND_CATCH_BODY) {
+                $total += 1 + $nesting;
+                $total += self::walkStatements($block->statements, $nesting + 1);
 
-        if ($node->finally !== null) {
-            $total += self::walkStatements($node->finally->stmts, $nesting);
+                continue;
+            }
+
+            // try-body and finally-body both score at the outer nesting level.
+            $total += self::walkStatements($block->statements, $nesting);
         }
 
         return $total;

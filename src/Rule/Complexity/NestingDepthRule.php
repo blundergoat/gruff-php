@@ -14,6 +14,8 @@ use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use GruffPhp\Rule\StmtChildBlock;
+use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Closure;
@@ -143,71 +145,23 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     private static function walkNode(Node $node, int $depth): int
     {
-        return match (true) {
-            $node instanceof Stmt\If_ => self::walkIf($node, $depth),
-            $node instanceof Stmt\For_ => self::walkStatements($node->stmts, $depth + 1),
-            $node instanceof Stmt\Foreach_ => self::walkStatements($node->stmts, $depth + 1),
-            $node instanceof Stmt\While_ => self::walkStatements($node->stmts, $depth + 1),
-            $node instanceof Stmt\Do_ => self::walkStatements($node->stmts, $depth + 1),
-            $node instanceof Stmt\Switch_ => self::walkSwitch($node, $depth),
-            $node instanceof Stmt\TryCatch => self::walkTryCatch($node, $depth),
-            $node instanceof Stmt\Expression => self::walkExprNesting($node->expr, $depth),
-            default => $depth,
-        };
-    }
-
-    /**
-     * Measure the deepest branch inside an if/elseif/else chain.
-     *
-     * @return int The maximum branch nesting depth.
-     */
-    private static function walkIf(Stmt\If_ $node, int $depth): int
-    {
-        $inner        = $depth + 1;
-        $maximumDepth = self::walkStatements($node->stmts, $inner);
-
-        foreach ($node->elseifs as $elseif) {
-            $maximumDepth = max($maximumDepth, self::walkStatements($elseif->stmts, $inner));
+        if ($node instanceof Stmt\Expression) {
+            return self::walkExprNesting($node->expr, $depth);
         }
 
-        if ($node->else !== null) {
-            $maximumDepth = max($maximumDepth, self::walkStatements($node->else->stmts, $inner));
+        if (!StmtChildVisitor::isControlFlowStmt($node)) {
+            return $depth;
         }
 
-        return $maximumDepth;
-    }
+        // A switch construct contributes one nesting level even when it has no cases.
+        $maximumDepth = $node instanceof Stmt\Switch_ ? $depth + 1 : $depth;
 
-    /**
-     * Measure the deepest branch inside a switch statement.
-     *
-     * @return int The maximum switch-case nesting depth.
-     */
-    private static function walkSwitch(Stmt\Switch_ $node, int $depth): int
-    {
-        $maximumDepth = $depth + 1;
-
-        foreach ($node->cases as $case) {
-            $maximumDepth = max($maximumDepth, self::walkStatements($case->stmts, $depth + 1));
-        }
-
-        return $maximumDepth;
-    }
-
-    /**
-     * Measure try/catch/finally nesting without penalising the try body itself.
-     *
-     * @return int The maximum exception-handling nesting depth.
-     */
-    private static function walkTryCatch(Stmt\TryCatch $node, int $depth): int
-    {
-        $maximumDepth = self::walkStatements($node->stmts, $depth);
-
-        foreach ($node->catches as $catch) {
-            $maximumDepth = max($maximumDepth, self::walkStatements($catch->stmts, $depth + 1));
-        }
-
-        if ($node->finally !== null) {
-            $maximumDepth = max($maximumDepth, self::walkStatements($node->finally->stmts, $depth));
+        foreach (StmtChildVisitor::childBlocks($node) as $block) {
+            $blockDepth = match ($block->kind) {
+                StmtChildBlock::KIND_TRY_BODY, StmtChildBlock::KIND_FINALLY_BODY => $depth,
+                default => $depth + 1,
+            };
+            $maximumDepth = max($maximumDepth, self::walkStatements($block->statements, $blockDepth));
         }
 
         return $maximumDepth;

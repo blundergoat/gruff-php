@@ -330,6 +330,13 @@ rules:
                 - scanRunner
                 - stateFactory
                 - tokenizer
+                # `owner` names the parent node of a StmtChildBlock; renaming
+                # to `$node` would conflict with the surrounding visitor's
+                # parameter and lose the role information.
+                - owner
+                # `block` names a `StmtChildBlock` value at iteration sites
+                # where the role (child block) reads cleaner than the type.
+                - block
     # Negative boolean flags create double-negative call sites unless they mirror CLI flags.
     naming.negative-boolean:
         enabled: true
