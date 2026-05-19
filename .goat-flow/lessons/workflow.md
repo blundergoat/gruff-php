@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-05-16
+last_reviewed: 2026-05-20
 ---
 
 # Workflow Lessons
@@ -28,6 +28,16 @@ last_reviewed: 2026-05-16
 **Root cause:** Treating the top-of-file `Status:` line as the single source of truth for milestone completion. The status line is a summary; the per-task checkboxes are the audit trail. Skipping them leaves a future reader unable to tell which individual tasks were done, deferred, or silently dropped — and it falsely signals that the plan was never executed even when the work shipped.
 
 **Prevention:** Whenever a plan's `Status:` field flips to `complete` (or any task's status changes), tick every `- [ ]` line in `## Assumptions`, `## Tasks`, and `## Testing Gate` that the work actually covered before claiming the milestone done. If a checkbox cannot be ticked, leave it unchecked and add a one-line note explaining why — `Status: complete` with mixed checkboxes is still valid, but only when the unticked items are deliberate. Use `sed -i 's|^- \[ \]|- [x]|g' <plan>` for whole-plan completion or edit individual lines for partial progress. Verify with `grep -c '^- \[x\]' <plan>` before claiming done.
+
+## Lesson: Reconcile shipped work back into task checkboxes immediately
+
+**Created:** 2026-05-20
+
+**What happened:** Several v0.1 milestone files (`.goat-flow/tasks/0.1/M54-pest-expectation-allowlist-expansion.md`, `M56-size-rubric-metric-semantics.md`, `M57-statement-dispatch-visitor-consolidation.md`, and `M58-parameter-count-exemption-ceiling.md`) had already shipped in live source/tests, but their task files still said `Status: not-started` and every checklist item remained unchecked. The user had to ask whether the plans were still worth doing and then explicitly ask for completed boxes to be ticked.
+
+**Root cause:** Treating the implementation and verification as finished once code passed, while leaving the local coordination artifacts stale. The earlier lesson covered the case where a status line said `complete` but checkboxes were blank; this failure was the inverse: source truth moved on while the plan files still advertised unstarted work.
+
+**Prevention:** When a plan audit determines work is already implemented, immediately reconcile the task file in the same turn: set `Status:` to `complete` only when every required checkbox is true, set `Status: in-progress` when any task remains, tick only boxes backed by live file or command evidence, and add a short `## Completion Evidence` or `## Progress Notes` section naming the checked anchors. Do not end with a recommendation like "mark this complete later" when the evidence is already in hand.
 
 ## Lesson: Adding a rule cascades through fixtures, goldens, and existing tests
 

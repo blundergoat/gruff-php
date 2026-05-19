@@ -295,7 +295,7 @@ final class RuleRegistryTest extends TestCase
 
         self::assertCount(114, $definitions);
         self::assertSame(
-            'c3702fb41a55ef8da7' . 'e782e616fd7b81abb1ee0e41a9605746d300b87f5de6d3',
+            '4a7d340fe4728fc4527' . 'f92bd6c6a531df1641eb920e2477a03792cc74fcabf23',
             hash('sha256', $json),
         );
     }

@@ -144,6 +144,82 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
+     * Verify constructor-specific threshold can allow constructors while ordinary methods still fire.
+     *
+     * @return void No return value.
+     */
+    public function testConfiguredConstructorThresholdAllowsConstructorWhileKeepingMethodFindings(): void
+    {
+        $findings = $this->analyse(
+            'many-params.php',
+            ['warning' => 5, 'error' => 8],
+            ['constructorMaxParameters' => 6],
+        );
+
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertContains('ManyParamsFixture::sixParams()', $symbols);
+        self::assertContains('ManyParamsFixture::nineParams()', $symbols);
+        self::assertNotContains('ManyParamsFixture::__construct()', $symbols);
+    }
+
+    /**
+     * Verify constructor-specific threshold emits dedicated metadata under legacy thresholds.
+     *
+     * @return void No return value.
+     */
+    public function testConfiguredConstructorThresholdFiresWithMetadata(): void
+    {
+        $constructorMax        = 5;
+        $constructorParamCount = 6;
+
+        $findings = $this->analyse(
+            'many-params.php',
+            ['warning' => 5, 'error' => 8],
+            ['constructorMaxParameters' => $constructorMax],
+        );
+
+        $constructorFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
+        ));
+
+        self::assertCount(1, $constructorFindings);
+        self::assertSame(Severity::Warning, $constructorFindings[0]->severity);
+        self::assertSame($constructorParamCount, $constructorFindings[0]->metadata['parameters']);
+        self::assertSame($constructorMax, $constructorFindings[0]->metadata['threshold']);
+        self::assertSame($constructorMax, $constructorFindings[0]->metadata['constructorMaxParameters']);
+        self::assertSame('constructor-threshold', $constructorFindings[0]->metadata['findingKind']);
+        self::assertStringContainsString(
+            sprintf('constructor threshold of %d', $constructorMax),
+            $constructorFindings[0]->message,
+        );
+    }
+
+    /**
+     * Verify constructor-specific threshold uses the single-threshold severity shape.
+     *
+     * @return void No return value.
+     */
+    public function testConfiguredConstructorThresholdUsesDefaultSeverityThreshold(): void
+    {
+        $constructorMax = 5;
+        $findings       = $this->analyseWithDefaultSettings(
+            'many-params.php',
+            ['constructorMaxParameters' => $constructorMax],
+        );
+
+        $constructorFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
+        ));
+
+        self::assertCount(1, $constructorFindings);
+        self::assertSame(Severity::Error, $constructorFindings[0]->severity);
+        self::assertSame($constructorMax, $constructorFindings[0]->metadata['constructorMaxParameters']);
+    }
+
+    /**
      * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
      * @return void No return value.
@@ -195,6 +271,23 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
+     * Verify constructor threshold does not override promoted value-object exemption.
+     *
+     * @return void No return value.
+     */
+    public function testConstructorThresholdDoesNotOverridePromotedValueObjectExemption(): void
+    {
+        $findings = $this->analyse(
+            'promoted-payload.php',
+            ['warning' => 5, 'error' => 8],
+            ['constructorMaxParameters' => 5],
+        );
+
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
+    }
+
+    /**
      * Verify interface parameters counted.
      *
      * @return void No return value.
@@ -224,6 +317,28 @@ final class ParameterCountRuleTest extends TestCase
         $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
         return $this->rule->analyse($unit, $ruleContext);
+    }
+
+    /**
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @return list<\GruffPhp\Finding\Finding>
+     */
+    private function analyseWithDefaultSettings(string $fixture, array $options): array
+    {
+        $unit     = $this->parseFixture($fixture);
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ParameterCountRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            ParameterCountRule::ID,
+            new RuleSettings(
+                true,
+                $settings->thresholds,
+                array_merge($settings->options, $options),
+                $settings->severityThreshold,
+            ),
+        );
+
+        return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
     /**

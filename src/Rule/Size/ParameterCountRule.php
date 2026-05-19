@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\Size;
 
+use GruffPhp\Config\RuleSettings;
 use GruffPhp\Config\SeverityThreshold;
+use GruffPhp\Config\ThresholdMatch;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
@@ -27,6 +29,8 @@ use PhpParser\NodeFinder;
  * Final readonly classes whose constructor has every parameter promoted with a
  * type are exempt from the main threshold; they fire only when the parameter
  * count also exceeds the `promotedConstructorMaxParameters` option (default 25).
+ * Non-exempt constructors inherit the main threshold unless
+ * `constructorMaxParameters` is set above zero.
  */
 final readonly class ParameterCountRule implements RuleInterface
 {
@@ -49,7 +53,7 @@ final readonly class ParameterCountRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
-            defaultOptions:    ['promotedConstructorMaxParameters' => 25],
+            defaultOptions:    ['promotedConstructorMaxParameters' => 25, 'constructorMaxParameters' => 0],
             severityThreshold: new SeverityThreshold(10, Severity::Error),
         );
     }
@@ -66,8 +70,8 @@ final readonly class ParameterCountRule implements RuleInterface
     {
         $definition      = $this->definition();
         $settings        = $ruleContext->settingsFor($definition);
-        $ceilingOption   = $settings->options['promotedConstructorMaxParameters'] ?? 25;
-        $promotedCeiling = is_int($ceilingOption) ? max(0, $ceilingOption) : 25;
+        $promotedCeiling = $this->integerOption($settings->options, 'promotedConstructorMaxParameters', 25);
+        $constructorMax  = $this->integerOption($settings->options, 'constructorMaxParameters', 0);
 
         $nodeFinder = new NodeFinder();
         $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
@@ -118,23 +122,41 @@ final readonly class ParameterCountRule implements RuleInterface
                 continue;
             }
 
-            $thresholdMatch = $settings->highValueThresholdMatch($paramCount);
+            $thresholdMatch = $this->thresholdMatch($node, $paramCount, $constructorMax, $settings);
 
             if ($thresholdMatch === null) {
                 continue;
             }
 
-            $symbol = $this->resolveSymbol($node);
+            $symbol               = $this->resolveSymbol($node);
+            $constructorThreshold = $this->usesConstructorThreshold($node, $paramCount, $constructorMax);
+            $metadata             = [
+                'parameters' => $paramCount,
+                'threshold' => $thresholdMatch->threshold,
+                'thresholdType' => $thresholdMatch->severity->value,
+            ];
+
+            if ($constructorThreshold) {
+                $metadata['constructorMaxParameters'] = $constructorMax;
+                $metadata['findingKind']              = 'constructor-threshold';
+            }
 
             $findings[] = new Finding(
                 ruleId:  $definition->id,
-                message: sprintf(
-                    '%s has %d parameters, above the %s threshold of %s.',
-                    $symbol,
-                    $paramCount,
-                    $thresholdMatch->severity->value,
-                    $this->formatNumber($thresholdMatch->threshold),
-                ),
+                message: $constructorThreshold
+                    ? sprintf(
+                        'Constructor %s has %d parameters, above the constructor threshold of %s.',
+                        $symbol,
+                        $paramCount,
+                        $this->formatNumber($thresholdMatch->threshold),
+                    )
+                    : sprintf(
+                        '%s has %d parameters, above the %s threshold of %s.',
+                        $symbol,
+                        $paramCount,
+                        $thresholdMatch->severity->value,
+                        $this->formatNumber($thresholdMatch->threshold),
+                    ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
@@ -145,15 +167,55 @@ final readonly class ParameterCountRule implements RuleInterface
                 symbol:           $symbol,
                 remediation:      'Group related parameters into a value object or configuration class.',
                 secondaryPillars: $definition->secondaryPillars,
-                metadata:         [
-                    'parameters' => $paramCount,
-                    'threshold' => $thresholdMatch->threshold,
-                    'thresholdType' => $thresholdMatch->severity->value,
-                ],
+                metadata:         $metadata,
             );
         }
 
         return $findings;
+    }
+
+    /**
+     * Pick the threshold that applies to a callable.
+     *
+     * Constructor-specific configuration is opt-in: zero means the constructor
+     * inherits the main rule threshold.
+     *
+     * @return ThresholdMatch|null Matched threshold, or null when allowed.
+     */
+    private function thresholdMatch(
+        ClassMethod|Function_|Closure|ArrowFunction $node,
+        int $paramCount,
+        int $constructorMax,
+        RuleSettings $settings,
+    ): ?ThresholdMatch {
+        if ($this->usesConstructorThreshold($node, $paramCount, $constructorMax)) {
+            return new ThresholdMatch(
+                $constructorMax,
+                $this->constructorThresholdSeverity($settings, $constructorMax),
+            );
+        }
+
+        if ($node instanceof ClassMethod && $this->isConstructor($node) && $constructorMax > 0) {
+            return null;
+        }
+
+        return $settings->highValueThresholdMatch($paramCount);
+    }
+
+    /**
+     * Use the configured rule severity for constructor-specific threshold hits.
+     *
+     * @return Severity Severity selected from the effective rule settings.
+     */
+    private function constructorThresholdSeverity(RuleSettings $settings, int $constructorMax): Severity
+    {
+        if ($settings->severityThreshold instanceof SeverityThreshold) {
+            return $settings->severityThreshold->severity;
+        }
+
+        $thresholdMatch = $settings->highValueThresholdMatch($constructorMax + 1);
+
+        return $thresholdMatch instanceof ThresholdMatch ? $thresholdMatch->severity : Severity::Error;
     }
 
     /**
@@ -163,7 +225,7 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     private function isPromotedValueObjectConstructor(ClassMethod $node): bool
     {
-        if ($node->name->toString() !== '__construct' || $node->params === []) {
+        if (!$this->isConstructor($node) || $node->params === []) {
             return false;
         }
 
@@ -179,6 +241,39 @@ final readonly class ParameterCountRule implements RuleInterface
         }
 
         return true;
+    }
+
+    /**
+     * @return bool True when the node is a PHP constructor.
+     */
+    private function isConstructor(ClassMethod $node): bool
+    {
+        return $node->name->toString() === '__construct';
+    }
+
+    /**
+     * @return bool True when the constructor-specific option caused the finding.
+     */
+    private function usesConstructorThreshold(
+        ClassMethod|Function_|Closure|ArrowFunction $node,
+        int $paramCount,
+        int $constructorMax,
+    ): bool {
+        return $node instanceof ClassMethod
+            && $this->isConstructor($node)
+            && $constructorMax > 0
+            && $paramCount > $constructorMax;
+    }
+
+    /**
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @return int Non-negative integer option value.
+     */
+    private function integerOption(array $options, string $name, int $default): int
+    {
+        $optionValue = $options[$name] ?? $default;
+
+        return is_int($optionValue) ? max(0, $optionValue) : $default;
     }
 
     /**
