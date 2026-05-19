@@ -17,6 +17,9 @@ use GruffPhp\Rule\RuleInterface;
 
 /**
  * Detects source files that exceed the configured line threshold.
+ *
+ * Measures raw source lines (newline count). File length is a container
+ * measure aligned with how reviewers navigate files. See ADR-012.
  */
 final readonly class FileLengthRule implements RuleInterface
 {

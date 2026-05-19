@@ -77,9 +77,13 @@ rules:
     # Deep nesting hides control flow and edge cases.
     complexity.nesting-depth:
         enabled: true
-        threshold: 6
+        threshold: 5
         severity: error
     # Too many execution paths make testing unreliable.
+    # Deliberate looser override: ADR-010 default is 200, but this codebase
+    # currently has ~9 methods in the 200-435 range, several of which are
+    # statement-type dispatchers slated for consolidation in M57. Tightening
+    # to 200 belongs to a follow-up after that refactor.
     complexity.npath:
         enabled: true
         threshold: 500
@@ -415,31 +419,36 @@ rules:
     # Private keys in source can compromise systems immediately.
     sensitive-data.private-key:
         enabled: true
-    # Long average methods make classes harder to reason about.
+    # Long average methods make classes harder to reason about (logical lines).
     size.average-method-length:
         enabled: true
         threshold: 50
         severity: error
-    # Large classes often mix too many responsibilities.
+    # Large classes often mix too many responsibilities (raw lines).
     size.class-length:
         enabled: true
         threshold: 800
         severity: error
-    # Very large files slow navigation and review.
+    # Very large files slow navigation and review (raw lines).
     size.file-length:
         enabled: true
         threshold: 1000
         severity: error
-    # Long methods are harder to test and safely modify.
+    # Long methods are harder to test and safely modify (logical lines; see ADR-012).
     size.method-length:
         enabled: true
         threshold: 70
         severity: error
     # Too many parameters make calls error-prone.
+    # Final readonly promoted-DTO constructors are exempt from the base threshold
+    # until they exceed `promotedConstructorMaxParameters` — keeps legitimate
+    # value-object aggregations clean while bounding the exemption.
     size.parameter-count:
         enabled: true
         threshold: 8
         severity: error
+        options:
+            promotedConstructorMaxParameters: 25
     # Too many properties suggest unfocused state.
     size.property-count:
         enabled: true
@@ -537,10 +546,12 @@ rules:
         options:
             domainNamespaces: []
     # Multiple arrange-act-assert cycles blur test intent.
+    # Disabled to match the rule's own default until a meaningful project
+    # threshold (e.g. 2-4 cycles) and the test-suite cleanup that implies
+    # are scoped together. The previous `minCycles: 999` was a kill switch
+    # masquerading as enabled and produced no signal.
     test-quality.multiple-aaa-cycles:
-        enabled: true
-        thresholds:
-            minCycles: 999
+        enabled: false
     # Mystery guests make tests depend on hidden fixtures.
     test-quality.mystery-guest:
         enabled: true

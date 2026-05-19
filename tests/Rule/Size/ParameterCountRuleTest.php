@@ -12,6 +12,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\ParameterCountRule;
 use GruffPhp\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -84,16 +85,42 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * Verify variadic counts as one.
+     * Provide fixture/symbol pairs that must remain exempt from parameter-count findings.
      *
+     * @return iterable<string, array{fixture: string, symbol: string}>
+     */
+    public static function exemptCallableProvider(): iterable
+    {
+        yield 'variadic function exempt' => [
+            'fixture' => 'many-params.php',
+            'symbol'  => 'ManyParamsFixture::variadicParams()',
+        ];
+
+        yield 'promoted readonly DTO exempt' => [
+            'fixture' => 'promoted-payload.php',
+            'symbol'  => 'PromotedPayloadFixture::__construct()',
+        ];
+
+        yield 'promoted DTO at ceiling stays exempt' => [
+            'fixture' => 'promoted-payload-at-ceiling.php',
+            'symbol'  => 'PromotedPayloadAtCeilingFixture::__construct()',
+        ];
+    }
+
+    /**
+     * Verify exempt callables are not reported under the standard threshold.
+     *
+     * @param string $fixture Fixture filename to parse.
+     * @param string $symbol  Symbol whose absence from findings is asserted.
      * @return void No return value.
      */
-    public function testVariadicCountsAsOne(): void
+    #[DataProvider('exemptCallableProvider')]
+    public function testExemptCallableDoesNotFire(string $fixture, string $symbol): void
     {
-        $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
+        $findings = $this->analyse($fixture, ['warning' => 5, 'error' => 8]);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        self::assertNotContains('ManyParamsFixture::variadicParams()', $symbols);
+        self::assertNotContains($symbol, $symbols);
     }
 
     /**
@@ -103,6 +130,8 @@ final class ParameterCountRuleTest extends TestCase
      */
     public function testPromotedConstructorParametersCounted(): void
     {
+        $expectedPromotedCount = 6;
+
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
         $constructorFindings = array_values(array_filter(
@@ -111,20 +140,58 @@ final class ParameterCountRuleTest extends TestCase
         ));
 
         self::assertCount(1, $constructorFindings);
-        self::assertSame(6, $constructorFindings[0]->metadata['parameters']);
+        self::assertSame($expectedPromotedCount, $constructorFindings[0]->metadata['parameters']);
     }
 
     /**
-     * Verify promoted readonly payload constructor is exempt.
+     * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
      * @return void No return value.
      */
-    public function testPromotedReadonlyPayloadConstructorIsExempt(): void
+    public function testPromotedConstructorAboveDefaultCeilingFires(): void
     {
-        $findings = $this->analyse('promoted-payload.php', ['warning' => 5, 'error' => 8]);
+        $defaultCeiling = 25;
+        $expectedParams = 26;
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
+        $findings = $this->analyse('promoted-payload-above-ceiling.php', ['warning' => 5, 'error' => 8]);
+
+        $ceilingFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding) => $finding->symbol === 'PromotedPayloadAboveCeilingFixture::__construct()',
+        ));
+
+        self::assertCount(1, $ceilingFindings);
+        self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
+        self::assertSame($defaultCeiling, $ceilingFindings[0]->metadata['promotedConstructorMaxParameters']);
+        self::assertSame('promoted-ctor-ceiling', $ceilingFindings[0]->metadata['findingKind']);
+        self::assertStringContainsString(sprintf('value-object ceiling of %d', $defaultCeiling), $ceilingFindings[0]->message);
+    }
+
+    /**
+     * Verify a project override of the ceiling fires earlier on a smaller promoted DTO.
+     *
+     * @return void No return value.
+     */
+    public function testPromotedConstructorCeilingHonoursOptionOverride(): void
+    {
+        $overrideCeiling = 5;
+        $expectedParams  = 9;
+
+        $findings = $this->analyse(
+            'promoted-payload.php',
+            ['warning' => 5, 'error' => 8],
+            ['promotedConstructorMaxParameters' => $overrideCeiling],
+        );
+
+        $ceilingFindings = array_values(array_filter(
+            $findings,
+            static fn ($finding) => $finding->symbol === 'PromotedPayloadFixture::__construct()',
+        ));
+
+        self::assertCount(1, $ceilingFindings);
+        self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
+        self::assertSame($overrideCeiling, $ceilingFindings[0]->metadata['promotedConstructorMaxParameters']);
+        self::assertSame('promoted-ctor-ceiling', $ceilingFindings[0]->metadata['findingKind']);
     }
 
     /**
@@ -141,16 +208,18 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * @param array<string, int> $thresholds
+     * @param array<string, int>                                                        $thresholds
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
      * @return list<\GruffPhp\Finding\Finding>
      */
-    private function analyse(string $fixture, array $thresholds): array
+    private function analyse(string $fixture, array $thresholds, array $options = []): array
     {
-        $unit     = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $unit           = $this->parseFixture($fixture);
+        $registry       = RuleRegistry::defaults();
+        $defaultOptions = $registry->get(ParameterCountRule::ID)->definition()->defaultOptions;
+        $config         = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             ParameterCountRule::ID,
-            new RuleSettings(true, $thresholds),
+            new RuleSettings(true, $thresholds, array_merge($defaultOptions, $options)),
         );
         $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 

@@ -165,6 +165,48 @@ final class TestQualityNodeHelperTest extends TestCase
     }
 
     /**
+     * Verify the assertion detector recognises the expanded Pest expectation API.
+     *
+     * @return void No return value.
+     */
+    public function testAssertionCallDetectionCoversExpandedPestExpectations(): void
+    {
+        $path   = __DIR__ . '/../../Fixtures/TestQuality/pest-expanded-expectations.php';
+        $unit   = $this->parser->parse(new SourceFile($path, 'tests/Fixtures/TestQuality/pest-expanded-expectations.php'));
+        $scopes = TestQualityNodeHelper::testScopes($unit);
+
+        self::assertCount(1, $scopes, 'fixture should contain exactly one Pest scope');
+
+        $detected = [];
+        $missed   = [];
+
+        foreach (TestQualityNodeHelper::calls($scopes[0]) as $call) {
+            $name = TestQualityNodeHelper::callName($call);
+            if ($name === null || $name === 'expect') {
+                continue;
+            }
+
+            if (TestQualityNodeHelper::isAssertionCall($call)) {
+                $detected[] = $name;
+
+                continue;
+            }
+
+            $missed[] = $name;
+        }
+
+        self::assertSame([], $missed, 'every Pest expectation in the fixture should be recognised as an assertion');
+        self::assertGreaterThanOrEqual(40, count($detected), 'fixture should exercise a broad set of expanded Pest expectations');
+        self::assertContains('tobenull', $detected);
+        self::assertContains('tobeinstanceof', $detected);
+        self::assertContains('tohavekey', $detected);
+        self::assertContains('tomatch', $detected);
+        self::assertContains('tostartwith', $detected);
+        self::assertContains('toendwith', $detected);
+        self::assertContains('tothrowif', $detected);
+    }
+
+    /**
      * Verify argument, literal, Pest-chain, and magic-number helpers.
      *
      * @return void No return value.

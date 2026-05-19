@@ -53,3 +53,11 @@ After the size pillar migrated to single-threshold defaults, six complexity rule
 Two-way door per rule. Reversing a single threshold requires a new ADR-amend with evidence that the chosen cutoff is wrong on at least one external corpus (not just this project). Reverting the whole table back to tiered shape requires superseding this ADR plus ADR-009 plus ADR-008, since the shape contract is the precondition.
 
 The rollback path is to restore each rule's previous `defaultThresholds: ['warning' => X, 'error' => Y]` block and the previous `Severity::Warning` default. Tests covering the old shape are preserved in git history.
+
+## Project-specific overrides
+
+The defaults in this ADR are framework-level. `.gruff-php.yaml` may override per-rule and historically does so in both directions. As of the audit-driven config honesty pass:
+
+- `complexity.cyclomatic`, `complexity.cognitive`, `complexity.maintainability-index`, `complexity.nesting-depth` match the ADR defaults exactly.
+- `complexity.halstead-volume` is stricter than the ADR default (project 2000, ADR 8000).
+- **`complexity.npath` is intentionally looser** than the ADR default (project 500, ADR 200). The codebase currently has ~9 methods in the 200-435 npath range, several of which are statement-type dispatchers (`RedundantVariableRule::checkChildBlocks`, `UnreachableCodeRule::walkChildren`, complexity walkers) scheduled for consolidation under the shared-visitor refactor. Tightening `npath` to match the ADR is a follow-up after that refactor reduces the deduplicated walker count.

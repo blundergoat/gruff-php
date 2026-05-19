@@ -23,6 +23,10 @@ use PhpParser\NodeFinder;
 
 /**
  * Detects callables whose parameter lists exceed the configured size threshold.
+ *
+ * Final readonly classes whose constructor has every parameter promoted with a
+ * type are exempt from the main threshold; they fire only when the parameter
+ * count also exceeds the `promotedConstructorMaxParameters` option (default 25).
  */
 final readonly class ParameterCountRule implements RuleInterface
 {
@@ -45,6 +49,7 @@ final readonly class ParameterCountRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
+            defaultOptions:    ['promotedConstructorMaxParameters' => 25],
             severityThreshold: new SeverityThreshold(10, Severity::Error),
         );
     }
@@ -59,8 +64,10 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
-        $settings   = $ruleContext->settingsFor($definition);
+        $definition      = $this->definition();
+        $settings        = $ruleContext->settingsFor($definition);
+        $ceilingOption   = $settings->options['promotedConstructorMaxParameters'] ?? 25;
+        $promotedCeiling = is_int($ceilingOption) ? max(0, $ceilingOption) : 25;
 
         $nodeFinder = new NodeFinder();
         $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
@@ -74,11 +81,43 @@ final readonly class ParameterCountRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_|Closure|ArrowFunction $node Finder predicate restricts results to parameter-bearing function-like nodes. */
+            $paramCount = count($node->params);
+
             if ($node instanceof ClassMethod && $this->isPromotedValueObjectConstructor($node)) {
+                if ($paramCount <= $promotedCeiling) {
+                    continue;
+                }
+
+                $symbol = $this->resolveSymbol($node);
+
+                $findings[] = new Finding(
+                    ruleId:  $definition->id,
+                    message: sprintf(
+                        'Promoted value-object constructor %s has %d parameters, above the value-object ceiling of %d.',
+                        $symbol,
+                        $paramCount,
+                        $promotedCeiling,
+                    ),
+                    filePath:         $analysisUnit->file->displayPath,
+                    line:             $node->getStartLine(),
+                    severity:         $definition->defaultSeverity,
+                    pillar:           $definition->pillar,
+                    tier:             $definition->tier,
+                    confidence:       $definition->confidence,
+                    endLine:          $node->getEndLine() > 0 ? $node->getEndLine() : null,
+                    symbol:           $symbol,
+                    remediation:      'Split the value object, or group related parameters into nested value objects.',
+                    secondaryPillars: $definition->secondaryPillars,
+                    metadata:         [
+                        'parameters' => $paramCount,
+                        'promotedConstructorMaxParameters' => $promotedCeiling,
+                        'findingKind' => 'promoted-ctor-ceiling',
+                    ],
+                );
+
                 continue;
             }
 
-            $paramCount     = count($node->params);
             $thresholdMatch = $settings->highValueThresholdMatch($paramCount);
 
             if ($thresholdMatch === null) {
