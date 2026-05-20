@@ -474,7 +474,7 @@ final class RuleRegistry
                 (string) ($finding->column ?? ''),
                 $finding->symbol ?? '',
                 $finding->message,
-                json_encode($finding->metadata) ?: '',
+                $finding->metadata === [] ? '' : serialize($finding->metadata),
             ]);
 
             if (isset($seen[$key])) {

@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -21,7 +22,6 @@ use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
-use PhpParser\NodeFinder;
 
 /**
  * Detects calls to execution and evaluation functions with high security risk.
@@ -72,12 +72,11 @@ final class DangerousFunctionCallRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder         = new NodeFinder();
         $findings           = [];
-        $callableParameters = $this->callableParameterNames($analysisUnit->statements, $nodeFinder);
-        $callableProperties = $this->callablePropertyNames($analysisUnit->statements, $nodeFinder);
+        $callableParameters = $this->callableParameterNames($analysisUnit);
+        $callableProperties = $this->callablePropertyNames($analysisUnit);
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === null) {
                 if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call->name, $callableParameters, $callableProperties)) {
@@ -97,7 +96,7 @@ final class DangerousFunctionCallRule implements RuleInterface
             }
         }
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Eval_::class) as $eval) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\Eval_::class) as $eval) {
             $findings[] = $this->finding($analysisUnit, $eval, 'eval');
         }
 
@@ -105,15 +104,13 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * @param list<Node\Stmt> $statements
      * @return array<string, true>
      */
-    private function callableParameterNames(array $statements, NodeFinder $nodeFinder): array
+    private function callableParameterNames(AnalysisUnit $analysisUnit): array
     {
-        $names     = [];
-        $functions = $nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Function_ || $node instanceof ClassMethod);
+        $names = [];
 
-        foreach ($functions as $function) {
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [Function_::class, ClassMethod::class]) as $function) {
             if (!$function instanceof Function_ && !$function instanceof ClassMethod) {
                 continue;
             }
@@ -131,14 +128,13 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
-     * @param list<Node\Stmt> $statements
      * @return array<string, true>
      */
-    private function callablePropertyNames(array $statements, NodeFinder $nodeFinder): array
+    private function callablePropertyNames(AnalysisUnit $analysisUnit): array
     {
         $names = [];
 
-        foreach ($nodeFinder->findInstanceOf($statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             if (!$this->isCallableType($property->type)) {
                 continue;
             }
@@ -148,7 +144,7 @@ final class DangerousFunctionCallRule implements RuleInterface
             }
         }
 
-        foreach ($nodeFinder->findInstanceOf($statements, Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
             foreach ($class->getMethods() as $classMethod) {
                 foreach ($classMethod->params as $param) {
                     if (

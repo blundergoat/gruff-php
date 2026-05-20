@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -20,7 +21,6 @@ use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Class_;
-use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\For_;
@@ -29,7 +29,6 @@ use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects placeholder, generic, and numbered identifiers that obscure intent.
@@ -141,17 +140,16 @@ final readonly class IdentifierQualityRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition     = $this->definition();
-        $nodeFinder     = new NodeFinder();
         $findingContext = $this->findingContext($analysisUnit, $ruleContext, $definition);
 
         return [
-            ...$this->classLikeFindings($findingContext, $nodeFinder),
+            ...$this->classLikeFindings($findingContext),
             ...$this->functionLikeFindings(
                 findingContext:     $findingContext,
                 minScopeReferences: $this->minScopeReferences($ruleContext, $definition),
                 loopBodyThreshold:  $this->loopBodyThreshold($ruleContext, $definition),
             ),
-            ...$this->propertyFindings($findingContext, $nodeFinder),
+            ...$this->propertyFindings($findingContext),
         ];
     }
 
@@ -207,15 +205,17 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return list<Finding> Findings for class-like identifiers.
      */
-    private function classLikeFindings(IdentifierFindingContext $findingContext, NodeFinder $nodeFinder): array
+    private function classLikeFindings(IdentifierFindingContext $findingContext): array
     {
         $findings = [];
 
-        foreach ($nodeFinder->findInstanceOf($findingContext->analysisUnit->statements, ClassLike::class) as $node) {
-            if (!$node instanceof Class_ && !$node instanceof Interface_ && !$node instanceof Trait_ && !$node instanceof Enum_) {
-                continue;
-            }
+        $classLikes = NodeIndex::nodesOfAny(
+            $findingContext->analysisUnit,
+            [Class_::class, Interface_::class, Trait_::class, Enum_::class],
+        );
 
+        foreach ($classLikes as $node) {
+            /** @var Class_|Interface_|Trait_|Enum_ $node NodeIndex query is constrained to class-like classes. */
             $name = $node->name?->toString();
             if ($name === null) {
                 continue;
@@ -373,11 +373,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @return list<Finding> Findings for property identifiers.
      */
-    private function propertyFindings(IdentifierFindingContext $findingContext, NodeFinder $nodeFinder): array
+    private function propertyFindings(IdentifierFindingContext $findingContext): array
     {
         $findings = [];
 
-        foreach ($nodeFinder->findInstanceOf($findingContext->analysisUnit->statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($findingContext->analysisUnit, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $name    = $prop->name->toString();
                 $finding = $this->finding(

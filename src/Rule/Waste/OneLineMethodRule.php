@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -103,11 +104,11 @@ final readonly class OneLineMethodRule implements RuleInterface
         $factoryExempt      = $settings->option('namedAlternativeFactoryExempt') === true;
         $allowedSymbols     = array_fill_keys($settings->stringListOption('allowedSymbols'), true);
         $nodeFinder         = new NodeFinder();
-        $methodCallCounts   = $this->methodCallCounts($analysisUnit->statements, $nodeFinder);
-        $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit->statements, $nodeFinder) : [];
+        $methodCallCounts   = $this->methodCallCounts($analysisUnit);
+        $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit) : [];
         $findings           = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $classMethod) {
+        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
             if ($this->shouldSkip(
                 classMethod:      $classMethod,
                 minParameters:    $minParameters,
@@ -215,18 +216,14 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Count method and static-call names inside the current file.
      *
-     * @param list<Node> $statements Parsed statements to inspect.
      * @return array<string, int> Counts keyed by lowercase method name.
      */
-    private function methodCallCounts(array $statements, NodeFinder $nodeFinder): array
+    private function methodCallCounts(AnalysisUnit $analysisUnit): array
     {
         $counts = [];
 
-        foreach ($nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
-            if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
-                continue;
-            }
-
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]) as $call) {
+            /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query is constrained to call classes. */
             if (!$call->name instanceof Node\Identifier) {
                 continue;
             }
@@ -241,14 +238,13 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find public static self-factory methods when a class exposes multiple named alternatives.
      *
-     * @param list<Node> $statements Parsed statements to inspect.
      * @return array<int, true> Method object ids that are exempt.
      */
-    private function namedAlternativeFactoryMethodIds(array $statements, NodeFinder $nodeFinder): array
+    private function namedAlternativeFactoryMethodIds(AnalysisUnit $analysisUnit): array
     {
         $factoryIds = [];
 
-        foreach ($nodeFinder->findInstanceOf($statements, Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
             $factories = [];
 
             foreach ($class->getMethods() as $classMethod) {

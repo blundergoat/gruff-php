@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -77,7 +78,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
                     definition: $definition,
