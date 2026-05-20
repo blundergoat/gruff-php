@@ -63,6 +63,15 @@ State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly a
 ### VERIFY
 Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
 
+**Hallucination red-flags:**
+1. **Checks passed.** Do not claim tests pass or any check passed (composer check, shellcheck, audit) without showing the literal pass/fail line copied verbatim from this session's run. Paraphrase, cached output, or prior-session results do not count.
+2. **Completion.** Do not claim completion without listing the specific files changed in this turn. If no files were changed, say so explicitly.
+3. **Fix verification.** Do not claim a fix works without running the reproduction steps that originally demonstrated the bug. "Looks correct" is not verification.
+4. **Hedged claims.** Do not use "should work", "probably fine", "looks good" as verification. These are guesses, not evidence.
+5. **Rule paraphrase.** Do not weaken a rule by restating it with different words. Spirit over letter — paraphrases count as the same constraint.
+
+Rationalisations to reject: see the Excuse / Reality table in `.goat-flow/skill-reference/skill-preamble.md`. If you catch yourself thinking the Excuse, run the proof or mark the claim **UNVERIFIED**.
+
 ## Definition of Done
 
 - Changed files are listed.

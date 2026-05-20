@@ -1,10 +1,9 @@
 # ADR-004 - Public method PHPDoc templates
 
-Status: accepted
-Date: 2026-05-12
-Supersedes: -
-Superseded by: -
-Related milestones: M31 (rule introduction), M33 (this sweep), M34 (structural docblocks), M35 (tag completeness), M37 (rule policy / calibration)
+**Status:** accepted
+**Date:** 2026-05-12
+**Supersedes:** -
+**Superseded by:** -
 
 ## Context
 

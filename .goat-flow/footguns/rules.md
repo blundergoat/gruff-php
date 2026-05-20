@@ -11,7 +11,7 @@ last_reviewed: 2026-05-19
 
 Five rules (`NestingDepthRule`, `NpathComplexityRule`, `CognitiveComplexityRule`, `RedundantVariableRule`, `UnreachableCodeRule`) share `src/Rule/StmtChildVisitor.php` (search: `childBlocks`) for child-block enumeration. If PHP adds a new control-flow construct (a future statement-form of `match`, an `using`-style block, etc.) and the helper is not updated, all five rules silently miss the new shape — their per-kind logic just never runs on the unknown statement type. The pre-consolidation pattern was to copy a 4-block `instanceof` chain into each rule; the helper exists precisely so that mistake can't be made one rule at a time.
 
-**Evidence:** `src/Rule/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testIsControlFlowStmtCoversSupportedTypes`) asserts the set, so adding a new statement type without updating the helper fails the test.
+**Evidence:** `src/Rule/StmtChildVisitor.php` (search: `isControlFlowStmt`) — the supported statement-type set is fixed in one place. `tests/Rule/StmtChildVisitorTest.php` (search: `testControlFlowStatementIsRecognised`) asserts the set, so adding a new statement type without updating the helper fails the test.
 
 **Prevention:** When a new control-flow statement type lands in this codebase, extend `StmtChildVisitor::isControlFlowStmt` and `StmtChildVisitor::childBlocks`, then add a kind constant on `StmtChildBlock` and the matching dispatch in any rule that needs per-kind math. Never re-introduce a per-rule `instanceof Stmt\X || Stmt\Y || ...` chain — the duplication that the helper exists to prevent.
 
