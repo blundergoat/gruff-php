@@ -141,6 +141,10 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
                 '{"rules":{"%s":{"options":{"patterns":"foo"}}}}',
                 'Option "rules.%s.options.patterns" must be a list.',
             ],
+            'empty default list option item' => [
+                '{"rules":{"%s":{"options":{"patterns":[123]}}}}',
+                'Option "rules.%s.options.patterns.0" must be a string.',
+            ],
             'string list item' => [
                 '{"rules":{"%s":{"options":{"names":["alpha",2]}}}}',
                 'Option "rules.%s.options.names.1" must be a string.',

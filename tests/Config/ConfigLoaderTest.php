@@ -341,6 +341,10 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
                 '{"paths":{"ignore":["../outside"]}}',
                 'Config key "paths.ignore.0" must be a relative project path pattern.',
             ],
+            'windows absolute path ignore pattern' => [
+                '{"paths":{"ignore":["C:\\\\repo\\\\generated"]}}',
+                'Config key "paths.ignore.0" must be a relative project path pattern.',
+            ],
             'unknown selection pillar' => [
                 '{"selection":{"pillars":["quality"]}}',
                 'Unknown pillar "selection.pillars.quality".',

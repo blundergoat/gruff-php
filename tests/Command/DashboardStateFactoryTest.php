@@ -69,6 +69,39 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
+     * Verify bare baseline flags seed the dashboard with the default baseline file.
+     *
+     * @return void
+     */
+    public function testDefaultQueryPreservesBareBaselineFlag(): void
+    {
+        $state = (new DashboardStateFactory())->defaultQuery($this->input(['--baseline' => null]), '/repo');
+
+        self::assertSame('gruff-baseline.json', $state['baseline']);
+    }
+
+    /**
+     * Verify missing submitted checkboxes are treated as unchecked.
+     *
+     * @return void
+     */
+    public function testStateTreatsMissingSubmittedCheckboxesAsUnchecked(): void
+    {
+        $state = (new DashboardStateFactory())->state($this->input([
+            '--no-baseline' => true,
+            '--no-config' => true,
+            '--include-ignored' => true,
+        ]), '/repo', [
+            'project' => '/repo',
+            'paths' => '.',
+        ]);
+
+        self::assertSame('0', $state['noBaseline']);
+        self::assertSame('0', $state['noConfig']);
+        self::assertSame('0', $state['includeIgnored']);
+    }
+
+    /**
      * Verify request state overrides defaults and coerces checkbox-like values.
      *
      * @return void

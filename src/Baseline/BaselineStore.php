@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Baseline;
 
 use GruffPhp\Finding\Finding;
+use GruffPhp\Support\PathHelper;
 use JsonException;
 
 /**
@@ -220,6 +221,21 @@ final readonly class BaselineStore
             fclose($handle);
         }
 
+        $this->replaceBaselineFile($tempPath, $absolutePath, $displayPath);
+    }
+
+    /**
+     * Move the temporary baseline into place, handling existing Windows targets.
+     *
+     * @return void No return value.
+     */
+    private function replaceBaselineFile(string $tempPath, string $absolutePath, string $displayPath): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\' && is_file($absolutePath) && !unlink($absolutePath)) {
+            $this->removeTemporaryFile($tempPath, $displayPath);
+            throw new BaselineException(sprintf('Unable to replace baseline file: %s', $displayPath));
+        }
+
         if (!rename($tempPath, $absolutePath)) {
             $this->removeTemporaryFile($tempPath, $displayPath);
             throw new BaselineException(sprintf('Unable to replace baseline file: %s', $displayPath));
@@ -249,10 +265,6 @@ final readonly class BaselineStore
      */
     private function absolutePath(string $path): string
     {
-        if ($path !== '' && $path[0] === '/') {
-            return $path;
-        }
-
-        return rtrim($this->projectRoot, '/') . '/' . $path;
+        return PathHelper::resolveAgainst($this->projectRoot, $path);
     }
 }

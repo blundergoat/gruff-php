@@ -104,13 +104,13 @@ final class SourceDiscoveryTest extends TestCase
             '.codex/config.toml',
             '.github/workflows/ci.yml',
             '.gitignore',
-            '.goat-flow/tasks/.gitignore',
-            '.goat-flow/tasks/README.md',
             'src/Tracked.php',
             'src/Untracked.php',
         ], $paths);
         self::assertNotContains('.claude/settings.local.json', $paths);
         self::assertNotContains('.goat-flow/dashboard-state.json', $paths);
+        self::assertNotContains('.goat-flow/tasks/.gitignore', $paths);
+        self::assertNotContains('.goat-flow/tasks/README.md', $paths);
         self::assertNotContains('.goat-flow/tasks/M41.md', $paths);
         self::assertSame([], $result->missingPaths);
     }

@@ -14,6 +14,20 @@ use GruffPhp\Finding\Finding;
 final readonly class BaselineApplication
 {
     /**
+     * Apply an existing baseline file without building report metadata.
+     *
+     * @param list<Finding> $findings Findings to filter.
+     * @throws BaselineException When the baseline cannot be read or validated.
+     * @return list<Finding> Filtered findings.
+     */
+    public function filterExisting(string $projectRoot, string $baselinePath, array $findings): array
+    {
+        $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
+
+        return (new BaselineFilter())->apply($baseline, $findings, false)['findings'];
+    }
+
+    /**
      * @param string                     $projectRoot Project root used to resolve baseline paths.
      * @param BaselineApplicationOptions $options     Baseline application options selected for this run.
      * @param list<Finding>              $findings    Findings to generate from or filter in place.

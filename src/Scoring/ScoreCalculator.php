@@ -37,9 +37,10 @@ final readonly class ScoreCalculator
      * @param list<Finding>               $findings               Findings included in the score calculation.
      * @param MutationAnalysisResult|null $mutationAnalysisResult Optional mutation result included in scoring.
      * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
+     * @param int                         $fileScoreLimit         Maximum file offender rows to retain.
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
-    public function calculate(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?DiffResult $diffResult): ScoreReport
+    public function calculate(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?DiffResult $diffResult, int $fileScoreLimit = 10): ScoreReport
     {
         $pillars    = $this->pillarScores($findings, $mutationAnalysisResult);
         $scoreTotal = 0.0;
@@ -61,7 +62,7 @@ final readonly class ScoreCalculator
         return new ScoreReport(
             composite:              Grade::fromScore($averageScore),
             pillars:                $pillars,
-            topOffenders:           $this->fileScores($findings, $mutationAnalysisResult),
+            topOffenders:           $this->fileScores($findings, $mutationAnalysisResult, $fileScoreLimit),
             complexityDistribution: $this->complexityDistribution($findings),
             scope:                  $scope,
             explanation:            $this->scoreExplanation($mutationAnalysisResult),
@@ -153,7 +154,7 @@ final readonly class ScoreCalculator
      * @param list<Finding> $findings
      * @return list<FileScore>
      */
-    private function fileScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult): array
+    private function fileScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, int $limit): array
     {
         /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
@@ -199,7 +200,7 @@ final readonly class ScoreCalculator
                 ?: strcmp($leftFileScore->filePath, $rightFileScore->filePath);
         });
 
-        return array_slice($scores, 0, 10);
+        return array_slice($scores, 0, $limit);
     }
 
     /**

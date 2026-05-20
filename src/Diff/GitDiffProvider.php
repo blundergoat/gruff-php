@@ -66,10 +66,10 @@ final readonly class GitDiffProvider
     private function diffCommand(string $mode): array
     {
         return match ($mode) {
-            'staged' => ['git', 'diff', '--cached', '--unified=0', '--no-ext-diff', '--'],
-            'unstaged' => ['git', 'diff', '--unified=0', '--no-ext-diff', '--'],
-            'working-tree' => ['git', 'diff', '--unified=0', '--no-ext-diff', 'HEAD', '--'],
-            default => ['git', 'diff', '--unified=0', '--no-ext-diff', $this->validatedRef($mode), '--'],
+            'staged' => ['git', 'diff', '--cached', '--unified=0', '--no-ext-diff', '--find-renames', '--'],
+            'unstaged' => ['git', 'diff', '--unified=0', '--no-ext-diff', '--find-renames', '--'],
+            'working-tree' => ['git', 'diff', '--unified=0', '--no-ext-diff', '--find-renames', 'HEAD', '--'],
+            default => ['git', 'diff', '--merge-base', '--unified=0', '--no-ext-diff', '--find-renames', $this->validatedRef($mode), '--'],
         };
     }
 
@@ -108,10 +108,13 @@ final readonly class GitDiffProvider
                 $currentFile = $this->parseNewFilePath($line) ?? $oldFile;
                 $oldFile     = null;
 
-                if ($currentFile !== null && !in_array($currentFile, $changedFiles, true)) {
-                    $changedFiles[]             = $currentFile;
-                    $changedLines[$currentFile] = [];
-                }
+                $this->appendChangedFile($currentFile, $changedFiles, $changedLines);
+
+                continue;
+            }
+
+            if (str_starts_with($line, 'rename to ')) {
+                $this->appendChangedFile($this->normaliseHeaderPath(substr($line, 10)), $changedFiles, $changedLines);
 
                 continue;
             }
@@ -123,6 +126,10 @@ final readonly class GitDiffProvider
 
             $startLine = (int) $matches[1];
             $length    = isset($matches[2]) ? (int) $matches[2] : 1;
+            if ($length === 0) {
+                continue;
+            }
+
             $endLine   = $startLine + $length - 1;
 
             $changedLines[$currentFile][] = new ChangedLineRange($startLine, $endLine);
@@ -135,6 +142,24 @@ final readonly class GitDiffProvider
             'files' => $changedFiles,
             'lines' => $changedLines,
         ];
+    }
+
+    /**
+     * Add a changed file once and prepare its range bucket.
+     *
+     * @param string|null                              $filePath     Project-relative changed path.
+     * @param list<string>                             $changedFiles Changed files collected so far.
+     * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     * @return void No return value.
+     */
+    private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
+    {
+        if ($filePath === null || in_array($filePath, $changedFiles, true)) {
+            return;
+        }
+
+        $changedFiles[]             = $filePath;
+        $changedLines[$filePath] = [];
     }
 
     /**
@@ -187,14 +212,14 @@ final readonly class GitDiffProvider
      */
     private function normaliseHeaderPath(string $rawPath): string
     {
-        if (strlen($rawPath) >= 2 && $rawPath[0] === '"' && $rawPath[strlen($rawPath) - 1] === '"') {
-            return stripcslashes(substr($rawPath, 1, -1));
-        }
-
         $tabIndex = strpos($rawPath, "\t");
 
         if ($tabIndex !== false) {
-            return substr($rawPath, 0, $tabIndex);
+            $rawPath = substr($rawPath, 0, $tabIndex);
+        }
+
+        if (strlen($rawPath) >= 2 && $rawPath[0] === '"' && $rawPath[strlen($rawPath) - 1] === '"') {
+            return stripcslashes(substr($rawPath, 1, -1));
         }
 
         return $rawPath;

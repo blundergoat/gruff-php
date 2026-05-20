@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Review;
 
 use GruffPhp\Diff\DiffException;
+use GruffPhp\Support\PathHelper;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -153,16 +154,16 @@ final readonly class GitArchiveSnapshot
      */
     private function normaliseArchivePaths(string $projectRoot, array $paths): array
     {
-        $root       = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
+        $root       = rtrim(PathHelper::canonical($projectRoot), '/');
         $normalised = [];
 
         foreach ($paths as $path) {
-            $candidate = $this->normalisePath($path);
+            $candidate = PathHelper::normalizeSeparators($path);
             if ($candidate === '') {
                 continue;
             }
 
-            if (str_starts_with($candidate, '/')) {
+            if (PathHelper::isAbsolute($candidate)) {
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {
@@ -184,22 +185,6 @@ final readonly class GitArchiveSnapshot
         sort($paths, SORT_STRING);
 
         return $paths;
-    }
-
-    /**
-     * Normalise path separators and duplicate slashes for Git path comparisons.
-     *
-     * @return string Normalised path.
-     */
-    private function normalisePath(string $path): string
-    {
-        $path = str_replace('\\', '/', trim($path));
-
-        while (str_contains($path, '//')) {
-            $path = str_replace('//', '/', $path);
-        }
-
-        return $path;
     }
 
     /**

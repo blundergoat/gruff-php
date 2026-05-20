@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Config;
 
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -78,7 +79,7 @@ final readonly class ConfigLoader
     public function resolveConfigPath(?string $configPath): ?string
     {
         if ($configPath !== null && $configPath !== '') {
-            $path = $configPath[0] === '/' ? $configPath : $this->projectRoot . '/' . $configPath;
+            $path = PathHelper::resolveAgainst($this->projectRoot, $configPath);
 
             if (!is_file($path)) {
                 throw new ConfigException(sprintf('Config file not found: %s', $configPath));

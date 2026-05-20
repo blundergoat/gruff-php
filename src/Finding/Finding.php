@@ -106,6 +106,7 @@ final readonly class Finding
             'endLine' => $this->endLine,
             'column' => $this->column,
             'symbol' => $this->symbol,
+            'message' => $this->message,
         ], JSON_THROW_ON_ERROR);
 
         return substr(hash('sha256', $encoded), 0, 16);

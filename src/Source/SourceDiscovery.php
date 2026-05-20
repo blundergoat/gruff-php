@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Source;
 
+use GruffPhp\Support\PathHelper;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIterator;
@@ -211,15 +212,7 @@ final readonly class SourceDiscovery
      */
     private function absolutePath(string $path): string
     {
-        if ($path === '') {
-            return $this->projectRoot;
-        }
-
-        if ($path[0] === '/') {
-            return $path;
-        }
-
-        return $this->projectRoot . '/' . $path;
+        return PathHelper::resolveAgainst($this->projectRoot, $path);
     }
 
     /**
@@ -229,9 +222,7 @@ final readonly class SourceDiscovery
      */
     private function canonicalPath(string $path): string
     {
-        $realPath = realpath($path);
-
-        return $realPath === false ? $path : $realPath;
+        return PathHelper::canonical($path);
     }
 
     /**
@@ -241,18 +232,7 @@ final readonly class SourceDiscovery
      */
     private function displayPath(string $path): string
     {
-        $canonicalPath = $this->canonicalPath($path);
-        $root          = rtrim($this->canonicalPath($this->projectRoot), '/');
-
-        if ($canonicalPath === $root) {
-            return '.';
-        }
-
-        if (str_starts_with($canonicalPath, $root . '/')) {
-            return substr($canonicalPath, strlen($root) + 1);
-        }
-
-        return $canonicalPath;
+        return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 
     /**
@@ -388,6 +368,11 @@ final readonly class SourceDiscovery
                 continue;
             }
 
+            if ($this->isDefaultIgnoredPath($absolutePath)) {
+                $ignoredPaths[] = $this->displayPath($absolutePath);
+                continue;
+            }
+
             $pathspec = $this->gitPathspec($absolutePath);
             if ($pathspec === null) {
                 return null;
@@ -487,6 +472,11 @@ final readonly class SourceDiscovery
 
         if ($this->isConfiguredIgnoredPath($absolutePath, $configuredIgnorePatterns)) {
             $ignoredPaths[] = $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns);
+            return;
+        }
+
+        if ($this->isDefaultIgnoredPath($absolutePath)) {
+            $ignoredPaths[] = $this->displayPath($absolutePath);
             return;
         }
 

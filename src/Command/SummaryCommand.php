@@ -254,7 +254,7 @@ final class SummaryCommand extends Command
         );
         $findings = $registry->analyse($sources->analysisUnits, new RuleContext($projectRoot, $config));
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit);
 
         return new SummaryReportData(
             paths:             $paths,

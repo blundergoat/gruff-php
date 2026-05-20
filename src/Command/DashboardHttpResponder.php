@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use RuntimeException;
+
 /**
  * Writes dashboard HTTP responses to an accepted socket client.
  */
@@ -27,10 +29,30 @@ final class DashboardHttpResponder
             '',
         ];
 
-        fwrite($client, implode("\r\n", $headers));
+        $this->writeAll($client, implode("\r\n", $headers));
 
         if (!$isHeadRequest) {
-            fwrite($client, $response->body);
+            $this->writeAll($client, $response->body);
+        }
+    }
+
+    /**
+     * @param resource $client Socket client receiving the payload.
+     * @return void
+     */
+    private function writeAll($client, string $payload): void
+    {
+        $offset = 0;
+        $length = strlen($payload);
+
+        while ($offset < $length) {
+            $written = fwrite($client, substr($payload, $offset));
+
+            if ($written === false || $written === 0) {
+                throw new RuntimeException('Unable to write complete dashboard HTTP response.');
+            }
+
+            $offset += $written;
         }
     }
 }

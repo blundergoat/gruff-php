@@ -51,13 +51,14 @@ final class NodeIndex
      * relies on a shared per-unit cache so repeat queries do no extra work.
      *
      * @template T of Node
+     * @param AnalysisUnit    $analysisUnit Parsed unit whose AST is indexed.
      * @param class-string<T> $class
      * @return list<T>
      */
     public static function nodesOf(AnalysisUnit $analysisUnit, string $class): array
     {
         $byClass = self::index($analysisUnit);
-        /** @var list<T> $nodes */
+        /** @var list<T> $nodes Cached entries are keyed by the exact requested class-string. */
         $nodes = $byClass[$class] ?? [];
 
         return $nodes;
@@ -66,6 +67,7 @@ final class NodeIndex
     /**
      * Return nodes that match any of the supplied classes in preorder.
      *
+     * @param AnalysisUnit              $analysisUnit Parsed unit whose AST is indexed.
      * @param list<class-string<Node>> $classes
      * @return list<Node>
      */
@@ -93,15 +95,23 @@ final class NodeIndex
     /**
      * Return every descendant below a function or method body in preorder.
      *
+     * @param Node $node Function-like node whose statements should be walked.
      * @return list<Node>
      */
     public static function bodyDescendants(Node $node): array
     {
+        if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
+            return [];
+        }
+
         return self::bodyIndex($node);
     }
 
     /**
      * Count distinct non-Nop statement start lines below a function-like body.
+     *
+     * @param Node $node Function-like node whose logical lines should be counted.
+     * @return int Distinct logical statement line count.
      */
     public static function logicalStatementLineCount(Node $node): int
     {
@@ -143,23 +153,39 @@ final class NodeIndex
 
         $visitor = new class extends NodeVisitorAbstract {
             /** @var array<class-string<Node>, list<Node>> */
-            public array $byClass = [];
+            private array $nodesByClass = [];
 
+            /**
+             * Add a node to the concrete-class index.
+             *
+             * @param Node $node Node currently being traversed.
+             * @return null Keeps traversal running.
+             */
             public function enterNode(Node $node): null
             {
-                $this->byClass[$node::class][] = $node;
+                $this->nodesByClass[$node::class][] = $node;
 
                 return null;
             }
+
+            /**
+             * Return nodes collected by concrete class.
+             *
+             * @return array<class-string<Node>, list<Node>>
+             */
+            public function nodesByClass(): array
+            {
+                return $this->nodesByClass;
+            }
         };
 
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor($visitor);
-        $traverser->traverse($analysisUnit->statements);
+        $nodeTraverser = new NodeTraverser();
+        $nodeTraverser->addVisitor($visitor);
+        $nodeTraverser->traverse($analysisUnit->statements);
 
-        self::$cache[$analysisUnit] = $visitor->byClass;
+        self::$cache[$analysisUnit] = $visitor->nodesByClass();
 
-        return $visitor->byClass;
+        return $visitor->nodesByClass();
     }
 
     /**
@@ -175,13 +201,29 @@ final class NodeIndex
 
         $visitor = new class extends NodeVisitorAbstract {
             /** @var list<Node> */
-            public array $all = [];
+            private array $nodes = [];
 
+            /**
+             * Add a body descendant to the source-order list.
+             *
+             * @param Node $node Node currently being traversed.
+             * @return null Keeps traversal running.
+             */
             public function enterNode(Node $node): null
             {
-                $this->all[] = $node;
+                $this->nodes[] = $node;
 
                 return null;
+            }
+
+            /**
+             * Return body descendants in source order.
+             *
+             * @return list<Node>
+             */
+            public function nodes(): array
+            {
+                return $this->nodes;
             }
         };
 
@@ -190,12 +232,12 @@ final class NodeIndex
             $statements = $node->stmts ?? [];
         }
 
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor($visitor);
-        $traverser->traverse($statements);
+        $nodeTraverser = new NodeTraverser();
+        $nodeTraverser->addVisitor($visitor);
+        $nodeTraverser->traverse($statements);
 
-        self::$bodyCache[$node] = $visitor->all;
+        self::$bodyCache[$node] = $visitor->nodes();
 
-        return $visitor->all;
+        return $visitor->nodes();
     }
 }

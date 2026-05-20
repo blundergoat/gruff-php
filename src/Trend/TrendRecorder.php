@@ -6,6 +6,7 @@ namespace GruffPhp\Trend;
 
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Scoring\ScoreReport;
+use GruffPhp\Support\PathHelper;
 use RuntimeException;
 
 /**
@@ -28,7 +29,7 @@ final readonly class TrendRecorder
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
-        $resolvedPath  = $this->absolutePath($projectRoot, $path);
+        $resolvedPath  = PathHelper::resolveAgainst($projectRoot, $path);
         $entries       = $this->readEntries($resolvedPath);
         $previous      = $entries === [] ? null : $entries[array_key_last($entries)];
         $previousScore = $this->scoreFromEntry($previous);
@@ -49,12 +50,12 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('Unable to create history directory: %s', $directory));
         }
 
-        if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL) === false) {
+        if (file_put_contents($resolvedPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL, LOCK_EX) === false) {
             throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
         }
 
         return new TrendReport(
-            path:          $this->displayPath($projectRoot, $resolvedPath),
+            path:          PathHelper::relativeToRoot($resolvedPath, $projectRoot) ?? PathHelper::canonical($resolvedPath),
             currentScore:  $score->composite->score,
             previousScore: $previousScore,
             delta:         $previousScore === null ? null : round($score->composite->score - $previousScore, 2),
@@ -93,7 +94,11 @@ final readonly class TrendRecorder
         }
 
         $contents = file_get_contents($path);
-        if ($contents === false || trim($contents) === '') {
+        if ($contents === false) {
+            throw new RuntimeException(sprintf('Unable to read history file: %s', $path));
+        }
+
+        if (trim($contents) === '') {
             return null;
         }
 
@@ -147,34 +152,4 @@ final readonly class TrendRecorder
         return is_int($score) || is_float($score) ? (float) $score : null;
     }
 
-    /**
-     * Resolve a history path relative to the project root when needed.
-     *
-     * @return string Absolute history file path.
-     */
-    private function absolutePath(string $projectRoot, string $path): string
-    {
-        if ($path !== '' && $path[0] === '/') {
-            return $path;
-        }
-
-        return rtrim($projectRoot, '/') . '/' . $path;
-    }
-
-    /**
-     * Convert a history path to a project-relative display path when possible.
-     *
-     * @return string Display path for report output.
-     */
-    private function displayPath(string $projectRoot, string $path): string
-    {
-        $root           = rtrim(str_replace('\\', '/', realpath($projectRoot) ?: $projectRoot), '/');
-        $normalisedPath = str_replace('\\', '/', realpath($path) ?: $path);
-
-        if (str_starts_with($normalisedPath, $root . '/')) {
-            return substr($normalisedPath, strlen($root) + 1);
-        }
-
-        return $normalisedPath;
-    }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Command;
 
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Support\PathHelper;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -19,6 +20,11 @@ use UnexpectedValueException;
  */
 final class DashboardScanRunner
 {
+    /**
+     * Maximum number of dashboard scan results retained in memory.
+     */
+    private const MAX_CACHE_ENTRIES = 12;
+
     /**
      * Default ignored directory names skipped by dashboard cache invalidation.
      */
@@ -137,6 +143,7 @@ final class DashboardScanRunner
         }
 
         if (isset($cacheKey, $fingerprint)) {
+            $this->evictCacheEntryIfNeeded($cacheKey);
             $this->cache[$cacheKey] = [
                 'fingerprint' => $fingerprint,
                 'html' => $html,
@@ -184,7 +191,7 @@ final class DashboardScanRunner
      */
     private function appendPathFingerprint(array &$parts, string $scanRoot, string $path): void
     {
-        $absolutePath = str_starts_with($path, '/') ? $path : $scanRoot . '/' . $path;
+        $absolutePath = PathHelper::resolveAgainst($scanRoot, $path);
         $realPath     = realpath($absolutePath);
 
         if (!is_string($realPath)) {
@@ -262,6 +269,29 @@ final class DashboardScanRunner
      */
     private function fileFingerprint(string $path): string
     {
-        return sprintf('file:%s:%d:%d', $path, filemtime($path) ?: 0, filesize($path) ?: 0);
+        $hash = hash_file('sha256', $path);
+
+        return sprintf('file:%s:%d:%d:%s', $path, filemtime($path) ?: 0, filesize($path) ?: 0, is_string($hash) ? $hash : '');
+    }
+
+    /**
+     * Keep the in-process dashboard result cache bounded.
+     *
+     * @return void
+     */
+    private function evictCacheEntryIfNeeded(string $cacheKey): void
+    {
+        if (array_key_exists($cacheKey, $this->cache)) {
+            unset($this->cache[$cacheKey]);
+        }
+
+        while (count($this->cache) >= self::MAX_CACHE_ENTRIES) {
+            $oldestKey = array_key_first($this->cache);
+            if (!is_string($oldestKey)) {
+                return;
+            }
+
+            unset($this->cache[$oldestKey]);
+        }
     }
 }

@@ -10,6 +10,7 @@ use GruffPhp\Command\DashboardRequestContext;
 use GruffPhp\Command\DashboardRequestHandler;
 use GruffPhp\Command\DashboardScanRunner;
 use GruffPhp\Command\DashboardStateFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;
@@ -22,27 +23,29 @@ use Symfony\Component\Console\Input\InputOption;
 final class DashboardRequestHandlerTest extends TestCase
 {
     /**
-     * Verify rejects missing host.
+     * Verify rejects malformed or disallowed host headers.
      *
      * @return void
      */
-    public function testRejectsMissingHost(): void
+    #[DataProvider('rejectedHostRequestProvider')]
+    public function testRejectsMalformedOrDisallowedHostHeaders(string $request, string $statusLine, bool $shouldCloseWrite = false): void
     {
-        $response = $this->responseFor("GET / HTTP/1.1\r\n\r\n");
+        $response = $this->responseFor($request, $shouldCloseWrite);
 
-        self::assertStringContainsString('HTTP/1.1 421 Misdirected Request', $response);
+        self::assertStringContainsString($statusLine, $response);
     }
 
     /**
-     * Verify rejects mismatched host.
-     *
-     * @return void
+     * @return array<string, array{string, string, 2?: bool}>
      */
-    public function testRejectsMismatchedHost(): void
+    public static function rejectedHostRequestProvider(): array
     {
-        $response = $this->responseFor("GET /scan HTTP/1.1\r\nHost: evil.example\r\n\r\n");
-
-        self::assertStringContainsString('HTTP/1.1 421 Misdirected Request', $response);
+        return [
+            'missing host' => ["GET / HTTP/1.1\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
+            'mismatched host' => ["GET /scan HTTP/1.1\r\nHost: evil.example\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
+            'duplicate host' => ["GET / HTTP/1.1\r\nHost: evil.example\r\nHost: 127.0.0.1:8765\r\n\r\n", 'HTTP/1.1 400 Bad Request'],
+            'truncated headers' => ["GET / HTTP/1.1\r\nHost: 127.0.0.1:8765\r\n", 'HTTP/1.1 400 Bad Request', true],
+        ];
     }
 
     /**
@@ -106,13 +109,16 @@ final class DashboardRequestHandlerTest extends TestCase
      * @param string $request Raw HTTP request.
      * @return string Fixture value.
      */
-    private function responseFor(string $request): string
+    private function responseFor(string $request, bool $shouldCloseWrite = false): string
     {
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
         self::assertIsArray($pair);
 
         [$client, $server] = $pair;
         fwrite($client, $request);
+        if ($shouldCloseWrite) {
+            stream_socket_shutdown($client, STREAM_SHUT_WR);
+        }
         $this->handler()->handleRequest($server);
         fclose($server);
         $response = stream_get_contents($client);

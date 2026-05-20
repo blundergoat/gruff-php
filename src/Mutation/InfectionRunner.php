@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Mutation;
 
 use GruffPhp\Analysis\RunDiagnostic;
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
@@ -103,10 +104,6 @@ final readonly class InfectionRunner
      */
     private function absolutePath(string $projectRoot, string $path): string
     {
-        if ($path !== '' && $path[0] === '/') {
-            return $path;
-        }
-
-        return rtrim($projectRoot, '/') . '/' . $path;
+        return PathHelper::resolveAgainst($projectRoot, $path);
     }
 }

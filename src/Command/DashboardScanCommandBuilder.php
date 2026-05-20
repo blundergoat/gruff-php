@@ -23,23 +23,27 @@ final readonly class DashboardScanCommandBuilder
     /**
      * Parse a dashboard paths string into command arguments.
      *
-     * @param string $paths Space-separated paths from the dashboard form.
+     * @param string $paths Space-separated paths from the dashboard form, with double quotes for paths containing spaces.
      * @return list<string>
      */
     public function parsePaths(string $paths): array
     {
-        $parts = preg_split('/\s+/', trim($paths));
-
-        if ($parts === false || $parts === ['']) {
+        if (trim($paths) === '') {
             return ['.'];
         }
 
-        $paths = array_values(array_filter(
-            $parts,
-            static fn (string $path): bool => $path !== '' && !str_starts_with($path, '-'),
-        ));
+        $parsedPaths = [];
+        preg_match_all('/"((?:\\\\.|[^"\\\\])*)"|(\S+)/', $paths, $matches, PREG_SET_ORDER);
 
-        return $paths === [] ? ['.'] : $paths;
+        foreach ($matches as $match) {
+            $quotedPath = $match[1] ?? '';
+            $path       = $quotedPath !== '' ? stripcslashes($quotedPath) : ($match[2] ?? '');
+            if ($path !== '') {
+                $parsedPaths[] = $path;
+            }
+        }
+
+        return $parsedPaths === [] ? ['.'] : $parsedPaths;
     }
 
     /**

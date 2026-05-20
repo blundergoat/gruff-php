@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Mutation;
 
 use GruffPhp\Analysis\RunDiagnostic;
-use Symfony\Component\Console\Command\Command;
+use GruffPhp\Support\PathHelper;
 
 /**
  * Builds mutation analysis results from Infection execution and reports.
@@ -66,13 +66,8 @@ final readonly class MutationAnalysisBuilder
             return true;
         }
 
-        $reportPath  = $this->absolutePath($projectRoot, $options->infectionReportPath ?? '');
-        $preRunMtime = null;
-
-        if (is_file($reportPath)) {
-            $mtime       = filemtime($reportPath);
-            $preRunMtime = $mtime === false ? null : $mtime;
-        }
+        $reportPath      = PathHelper::resolveAgainst($projectRoot, $options->infectionReportPath ?? '');
+        $preRunSignature = $this->reportSignature($reportPath);
 
         $runResult = (new InfectionRunner())->runInfection(
             $projectRoot,
@@ -89,14 +84,14 @@ final readonly class MutationAnalysisBuilder
 
         clearstatcache(true, $reportPath);
 
-        if ($runResult->exitCode === Command::SUCCESS || $this->isReportFresh($reportPath, $preRunMtime)) {
+        if ($this->isReportFresh($reportPath, $preRunSignature)) {
             return true;
         }
 
         $diagnostics[] = new RunDiagnostic(
             type:    'mutation-run-error',
             message: sprintf(
-                'Infection exited with code %d before producing the requested report.',
+                'Infection exited with code %d before producing or rewriting the requested report.',
                 $runResult->exitCode,
             ),
             path: $options->infectionReportPath,
@@ -150,39 +145,57 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
-     * Resolve a configured mutation path against the analysed project root.
+     * Capture the report state before an Infection run.
      *
-     * @return string Absolute path for the supplied mutation-related file.
+     * @return array{mtime: int, size: int, hash: string}|null Existing report signature, or null when absent.
      */
-    private function absolutePath(string $projectRoot, string $path): string
+    private function reportSignature(string $reportPath): ?array
     {
-        if ($path !== '' && $path[0] === '/') {
-            return $path;
+        if (!is_file($reportPath)) {
+            return null;
         }
 
-        return rtrim($projectRoot, '/') . '/' . $path;
+        $mtime = filemtime($reportPath);
+        $size  = filesize($reportPath);
+        $hash  = hash_file('sha256', $reportPath);
+
+        if (!is_int($mtime) || !is_int($size) || !is_string($hash)) {
+            return null;
+        }
+
+        return [
+            'mtime' => $mtime,
+            'size' => $size,
+            'hash' => $hash,
+        ];
     }
 
     /**
-     * Decide whether the report on disk was produced by this Infection invocation.
+     * Decide whether the report on disk was produced or rewritten by this Infection invocation.
      *
-     * A pre-existing report whose mtime has not advanced is treated as stale to avoid
+     * A pre-existing report whose mtime, size, and hash have not changed is treated as stale to avoid
      * surfacing outdated mutation results when Infection exits before rewriting it.
      *
-     * @return bool True when the report file was (re)written after $preRunMtime.
+     * @param array{mtime: int, size: int, hash: string}|null $preRunSignature Report state before running Infection.
+     * @return bool True when the report file was created or changed by this run.
      */
-    private function isReportFresh(string $reportPath, ?int $preRunMtime): bool
+    private function isReportFresh(string $reportPath, ?array $preRunSignature): bool
     {
         if (!is_file($reportPath)) {
             return false;
         }
 
-        if ($preRunMtime === null) {
+        if ($preRunSignature === null) {
             return true;
         }
 
-        $currentMtime = filemtime($reportPath);
+        $currentSignature = $this->reportSignature($reportPath);
+        if ($currentSignature === null) {
+            return false;
+        }
 
-        return is_int($currentMtime) && $currentMtime > $preRunMtime;
+        return $currentSignature['mtime'] > $preRunSignature['mtime']
+            || $currentSignature['size'] !== $preRunSignature['size']
+            || $currentSignature['hash'] !== $preRunSignature['hash'];
     }
 }

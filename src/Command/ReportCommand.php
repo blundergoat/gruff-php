@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -128,13 +129,13 @@ final class ReportCommand extends Command
 
         $exitCode = $process->getExitCode() ?? Command::FAILURE;
 
-        if ($report === '' && $exitCode !== Command::SUCCESS) {
-            $output->writeln(sprintf('<error>Analyse exited with code %d before producing a report; %s was not written.</error>', $exitCode, $outputPath));
+        if ($exitCode === Command::INVALID || ($report === '' && $exitCode !== Command::SUCCESS)) {
+            $output->writeln(sprintf('<error>Analyse exited with code %d; %s was not written.</error>', $exitCode, $outputPath));
 
             return $exitCode;
         }
 
-        $path      = $this->absolutePath($outputPath, $projectRoot);
+        $path      = PathHelper::resolveAgainst($projectRoot, $outputPath);
         $directory = dirname($path);
 
         if (!is_dir($directory)) {
@@ -159,9 +160,7 @@ final class ReportCommand extends Command
      */
     private function analyseCommand(InputInterface $input): array
     {
-        /** @var list<string> $paths The command definition declares a variadic paths argument. */
-        $paths     = $input->getArgument('paths');
-        $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', ...$paths, '--format'];
+        $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', '--format'];
         $command[] = $this->optionalStringOption($input, 'format') ?? 'html';
         $command[] = '--fail-on';
         $command[] = $this->optionalStringOption($input, 'fail-on') ?? 'none';
@@ -173,8 +172,28 @@ final class ReportCommand extends Command
         $this->appendRepeatedOptions($command, $input);
         $this->appendReportInteractiveOption($command, $input);
         $this->appendDiffOption($command, $input);
+        $this->appendPaths($command, $input);
 
         return $command;
+    }
+
+    /**
+     * Append user paths after an option separator so dash-prefixed paths stay positional.
+     *
+     * @param list<string> $command Analyse command arguments built so far.
+     * @return void
+     */
+    private function appendPaths(array &$command, InputInterface $input): void
+    {
+        /** @var list<string> $paths The command definition declares a variadic paths argument. */
+        $paths = $input->getArgument('paths');
+
+        if ($paths === []) {
+            return;
+        }
+
+        $command[] = '--';
+        array_push($command, ...$paths);
     }
 
     /**
@@ -333,20 +352,6 @@ final class ReportCommand extends Command
     private function gruffBinary(): string
     {
         return dirname(__DIR__, 2) . '/bin/gruff-php';
-    }
-
-    /**
-     * Resolve a path relative to the project root when needed.
-     *
-     * @return string Absolute path.
-     */
-    private function absolutePath(string $path, string $projectRoot): string
-    {
-        if (str_starts_with($path, '/')) {
-            return $path;
-        }
-
-        return $projectRoot . '/' . $path;
     }
 
     /**

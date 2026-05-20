@@ -13,17 +13,17 @@ use PHPUnit\Framework\TestCase;
 final class DashboardScanCommandBuilderTest extends TestCase
 {
     /**
-     * Verify parse paths drops option prefixed entries.
+     * Verify parse paths preserves dash-prefixed and quoted path entries.
      *
      * @return void
      */
-    public function testParsePathsDropsOptionPrefixedEntries(): void
+    public function testDashboardPathTokensPreserveDashPrefixedAndQuotedEntries(): void
     {
         $dashboardScanCommandBuilder = new DashboardScanCommandBuilder('/tmp/gruff');
 
-        self::assertSame(['.'], $dashboardScanCommandBuilder->parsePaths('--evil'));
-        self::assertSame(['.'], $dashboardScanCommandBuilder->parsePaths('. --evil'));
-        self::assertSame(['src', 'tests'], $dashboardScanCommandBuilder->parsePaths('src tests'));
+        self::assertSame(['--fixture.php'], $dashboardScanCommandBuilder->parsePaths('--fixture.php'));
+        self::assertSame(['.', '--fixture.php'], $dashboardScanCommandBuilder->parsePaths('. --fixture.php'));
+        self::assertSame(['src', 'tests/Feature Cases'], $dashboardScanCommandBuilder->parsePaths('src "tests/Feature Cases"'));
     }
 
     /**
@@ -54,9 +54,8 @@ final class DashboardScanCommandBuilderTest extends TestCase
         $paths                       = $dashboardScanCommandBuilder->parsePaths('--generate-baseline /tmp/leak.json --config evil.yaml');
         $command                     = $dashboardScanCommandBuilder->analyseCommand($paths, $this->state());
 
-        self::assertSame(['/tmp/leak.json', 'evil.yaml'], $paths);
-        self::assertNotContains('--generate-baseline', $command);
-        self::assertNotContains('--config', array_slice($command, array_search('--', $command, true) ?: 0));
+        self::assertSame(['--generate-baseline', '/tmp/leak.json', '--config', 'evil.yaml'], $paths);
+        self::assertSame($paths, array_slice($command, (array_search('--', $command, true) ?: 0) + 1));
         self::assertContains('--', $command);
     }
 

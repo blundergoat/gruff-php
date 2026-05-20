@@ -29,6 +29,7 @@ final class BaselineStoreTest extends TestCase
         try {
             $baselineStore = new BaselineStore($root);
             $baselineData  = $baselineStore->write('baselines/gruff-baseline.json', [$this->finding()]);
+            $baselineData  = $baselineStore->write('baselines/gruff-baseline.json', [$this->finding()]);
 
             self::assertCount(1, $baselineData->entries);
             self::assertFileExists($root . '/baselines/gruff-baseline.json');

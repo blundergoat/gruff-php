@@ -357,6 +357,10 @@ final readonly class RuleConfigApplier
                 throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a scalar value.', $ruleId, $optionName, $index));
             }
 
+            if ($sample === null && !is_string($optionItem)) {
+                throw new ConfigException(sprintf('Option "rules.%s.options.%s.%d" must be a string.', $ruleId, $optionName, $index));
+            }
+
             if ($sample !== null) {
                 $this->assertListItemType(
                     ruleId:     $ruleId,

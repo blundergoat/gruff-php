@@ -101,9 +101,7 @@ final class GitDiffProviderTest extends TestCase
             self::assertSame('staged', $staged->mode);
             self::assertNull($staged->base);
             self::assertSame(['Added.php', 'DeleteMe.php', 'Example.php'], $staged->changedFiles);
-            self::assertSame(0, $staged->rangesFor('DeleteMe.php')[0]->startLine);
-            self::assertSame(-1, $staged->rangesFor('DeleteMe.php')[0]->endLine);
-            self::assertFalse($staged->rangesFor('DeleteMe.php')[0]->touches(startLine: 1, endLine: 1000));
+            self::assertSame([], $staged->rangesFor('DeleteMe.php'));
             self::assertNotSame([], $staged->rangesFor('Added.php'));
             self::assertNotSame([], $staged->rangesFor('Example.php'));
 
@@ -120,6 +118,94 @@ final class GitDiffProviderTest extends TestCase
             self::assertContains('Added.php', $baseRef->changedFiles);
             self::assertContains('DeleteMe.php', $baseRef->changedFiles);
             self::assertContains('Example.php', $baseRef->changedFiles);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify Git diff provider parses paths with spaces.
+     *
+     * @return void No return value.
+     */
+    public function testGitDiffProviderParsesPathsWithSpaces(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->runGit($tempDir, 'init');
+            $this->runGit($tempDir, 'config', 'user.email', 'test@example.com');
+            $this->runGit($tempDir, 'config', 'user.name', 'Gruff Test');
+            file_put_contents($tempDir . '/a b.php', "<?php\nfinal class SpacePath { public function value(): int { return 1; } }\n");
+            $this->runGit($tempDir, 'add', 'a b.php');
+            $this->runGit($tempDir, 'commit', '-m', 'initial');
+            file_put_contents($tempDir . '/a b.php', "<?php\nfinal class SpacePath { public function value(): int { return 2; } }\n");
+
+            $diff = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
+
+            self::assertSame(['a b.php'], $diff->changedFiles);
+            self::assertNotSame([], $diff->rangesFor('a b.php'));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify Git diff provider includes rename-only changed files.
+     *
+     * @return void No return value.
+     */
+    public function testGitDiffProviderIncludesRenameOnlyFiles(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->initialiseRepository($tempDir);
+            $this->runGit($tempDir, 'mv', 'Example.php', 'Renamed.php');
+
+            $diff = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
+
+            self::assertSame(['Renamed.php'], $diff->changedFiles);
+            self::assertSame([], $diff->rangesFor('Renamed.php'));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify base-ref diffs use merge-base scope instead of base tip scope.
+     *
+     * @return void No return value.
+     */
+    public function testGitDiffProviderUsesMergeBaseForBaseRefs(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->runGit($tempDir, 'init');
+            $this->runGit($tempDir, 'config', 'user.email', 'test@example.com');
+            $this->runGit($tempDir, 'config', 'user.name', 'Gruff Test');
+            $this->runGit($tempDir, 'branch', '-M', 'main');
+            file_put_contents($tempDir . '/Common.php', "<?php\nfinal class Common {}\n");
+            $this->runGit($tempDir, 'add', 'Common.php');
+            $this->runGit($tempDir, 'commit', '-m', 'base');
+            $this->runGit($tempDir, 'checkout', '-b', 'feature');
+            file_put_contents($tempDir . '/Feature.php', "<?php\nfinal class Feature {}\n");
+            $this->runGit($tempDir, 'add', 'Feature.php');
+            $this->runGit($tempDir, 'commit', '-m', 'feature');
+            $this->runGit($tempDir, 'checkout', 'main');
+            file_put_contents($tempDir . '/MainOnly.php', "<?php\nfinal class MainOnly {}\n");
+            $this->runGit($tempDir, 'add', 'MainOnly.php');
+            $this->runGit($tempDir, 'commit', '-m', 'main only');
+            $this->runGit($tempDir, 'checkout', 'feature');
+
+            $diff = (new GitDiffProvider())->changedLines($tempDir, 'main');
+
+            self::assertContains('Feature.php', $diff->changedFiles);
+            self::assertNotContains('MainOnly.php', $diff->changedFiles);
         } finally {
             $this->removeDir($tempDir);
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Command;
 
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Input\InputInterface;
 
 /**
@@ -24,7 +25,7 @@ final class DashboardStateFactory
         /** @var list<string> $paths The command definition declares a variadic paths argument. */
         $paths    = $input->getArgument('paths');
         $baseline = $input->hasParameterOption('--baseline', true)
-            ? ($this->optionalStringOption($input, 'baseline') ?? '')
+            ? ($this->optionalStringOption($input, 'baseline') ?? 'gruff-baseline.json')
             : '';
 
         return [
@@ -63,8 +64,9 @@ final class DashboardStateFactory
      */
     public function state(InputInterface $input, string $projectRoot, array $query): array
     {
-        $defaults  = $this->defaultQuery($input, $projectRoot);
-        $scanScope = $query['scanScope'] ?? $defaults['scanScope'];
+        $defaults       = $this->defaultQuery($input, $projectRoot);
+        $scanScope      = $query['scanScope'] ?? $defaults['scanScope'];
+        $isSubmittedForm = $query !== [];
 
         return [
             'project' => $query['project'] ?? $defaults['project'],
@@ -73,11 +75,31 @@ final class DashboardStateFactory
             'failOn' => $query['failOn'] ?? $defaults['failOn'],
             'config' => $query['config'] ?? $defaults['config'],
             'baseline' => $query['baseline'] ?? $defaults['baseline'],
-            'noBaseline' => ($query['noBaseline'] ?? $defaults['noBaseline']) === '1' ? '1' : '0',
-            'noConfig' => ($query['noConfig'] ?? $defaults['noConfig']) === '1' ? '1' : '0',
-            'includeIgnored' => ($query['includeIgnored'] ?? $defaults['includeIgnored']) === '1' ? '1' : '0',
-            'reportInteractive' => ($query['reportInteractive'] ?? $defaults['reportInteractive']) === '1' ? '1' : '0',
+            'noBaseline' => $this->checkboxState('noBaseline', $query, $defaults, $isSubmittedForm),
+            'noConfig' => $this->checkboxState('noConfig', $query, $defaults, $isSubmittedForm),
+            'includeIgnored' => $this->checkboxState('includeIgnored', $query, $defaults, $isSubmittedForm),
+            'reportInteractive' => $this->checkboxState('reportInteractive', $query, $defaults, $isSubmittedForm),
         ];
+    }
+
+    /**
+     * Resolve a submitted dashboard checkbox value.
+     *
+     * @param array<string, string> $query
+     * @param array<string, string> $defaults
+     * @return string "1" when checked, otherwise "0".
+     */
+    private function checkboxState(string $key, array $query, array $defaults, bool $isSubmittedForm): string
+    {
+        if (array_key_exists($key, $query)) {
+            return $query[$key] === '1' ? '1' : '0';
+        }
+
+        if ($isSubmittedForm) {
+            return '0';
+        }
+
+        return $defaults[$key] === '1' ? '1' : '0';
     }
 
     /**
@@ -89,7 +111,7 @@ final class DashboardStateFactory
      */
     public function resolveProjectRoot(string $project, string $baseRoot): ?string
     {
-        $path     = str_starts_with($project, '/') ? $project : $baseRoot . '/' . $project;
+        $path     = PathHelper::resolveAgainst($baseRoot, $project);
         $realPath = realpath($path);
 
         return is_string($realPath) && is_dir($realPath) ? $realPath : null;

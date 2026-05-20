@@ -162,17 +162,23 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     {
         $visitor = new class extends NodeVisitorAbstract {
             /** @var list<Interface_> */
-            public array $interfaces = [];
+            private array $interfaces = [];
 
             /** @var list<Class_> */
-            public array $classes = [];
+            private array $classes = [];
 
             /** @var list<array{class: Class_, type: Identifier|Name|ComplexType|null, line: int}> */
-            public array $typeReferences = [];
+            private array $typeReferences = [];
 
             /** @var list<Class_> */
             private array $classStack = [];
 
+            /**
+             * Collect declarations and class-local type references during traversal.
+             *
+             * @param Node $node Node currently being traversed.
+             * @return null Keeps traversal running.
+             */
             public function enterNode(Node $node): null
             {
                 if ($node instanceof Interface_) {
@@ -214,6 +220,12 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 return null;
             }
 
+            /**
+             * Leave the current class scope when traversal exits it.
+             *
+             * @param Node $node Node currently being left.
+             * @return null Keeps traversal running.
+             */
             public function leaveNode(Node $node): null
             {
                 if ($node instanceof Class_ && $node->name !== null) {
@@ -223,6 +235,41 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 return null;
             }
 
+            /**
+             * Return interface declarations collected in this unit.
+             *
+             * @return list<Interface_>
+             */
+            public function interfaces(): array
+            {
+                return $this->interfaces;
+            }
+
+            /**
+             * Return named class declarations collected in this unit.
+             *
+             * @return list<Class_>
+             */
+            public function classes(): array
+            {
+                return $this->classes;
+            }
+
+            /**
+             * Return class-local type references collected in this unit.
+             *
+             * @return list<array{class: Class_, type: Identifier|Name|ComplexType|null, line: int}>
+             */
+            public function typeReferences(): array
+            {
+                return $this->typeReferences;
+            }
+
+            /**
+             * Return the class scope currently being traversed.
+             *
+             * @return Class_|null Current class node, or null outside class scope.
+             */
             private function currentClass(): ?Class_
             {
                 if ($this->classStack === []) {
@@ -238,16 +285,22 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $nodeTraverser->addVisitor($visitor);
         $nodeTraverser->traverse($analysisUnit->statements);
 
-        foreach ($visitor->interfaces as $interface) {
+        foreach ($visitor->interfaces() as $interface) {
             $this->recordInterface($interface, $analysisUnit, $projectTypes);
         }
 
-        foreach ($visitor->classes as $class) {
+        foreach ($visitor->classes() as $class) {
             $this->recordClass($class, $analysisUnit, $projectTypes);
         }
 
-        foreach ($visitor->typeReferences as $reference) {
-            $this->recordClassTypeReference($reference['class'], $reference['type'], $reference['line'], $analysisUnit, $projectTypes);
+        foreach ($visitor->typeReferences() as $reference) {
+            $this->recordClassTypeReference(
+                class:        $reference['class'],
+                type:         $reference['type'],
+                line:         $reference['line'],
+                analysisUnit: $analysisUnit,
+                projectTypes: $projectTypes,
+            );
         }
     }
 

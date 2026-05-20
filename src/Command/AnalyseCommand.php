@@ -7,6 +7,7 @@ namespace GruffPhp\Command;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Baseline\BaselineApplication;
+use GruffPhp\Baseline\BaselineException;
 use GruffPhp\Baseline\BaselineStore;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Console\Application;
@@ -37,6 +38,7 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
 use GruffPhp\Source\SourceDiscoveryResult;
+use GruffPhp\Support\PathHelper;
 use GruffPhp\Trend\TrendRecorder;
 use JsonException;
 use RuntimeException;
@@ -398,6 +400,10 @@ final class AnalyseCommand extends Command
      */
     private function currentAnalysisPaths(AnalyseCommandOptions $options, ?DiffResult $reviewDiff): ?array
     {
+        if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
+            return null;
+        }
+
         if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
             return $options->paths;
         }
@@ -559,16 +565,29 @@ final class AnalyseCommand extends Command
                     $options->shouldIncludeIgnored,
                     $config->ignoredPathPatterns(),
                 );
+                $baseRegistry            = RuleRegistry::defaults();
                 $baseProjectContextUnits = $shouldLoadProjectContext
                     ? $this->baseProjectContextUnits($baseRoot, $options, $config)
                     : $baseSources->analysisUnits;
-                $baseFindings = $registry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
+                $baseFindings = $baseRegistry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
                 $baseFindings = array_merge($baseFindings, (new CompositeFindingFactory())->build($baseFindings));
                 $baseFindings = $this->filterAllowedSecretPreviews($baseFindings, $config);
             }
 
             if ($options->isChangedOnly) {
                 $baseFindings = $this->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
+            }
+
+            if ($options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null) {
+                try {
+                    $baseFindings = (new BaselineApplication())->filterExisting($projectRoot, $options->baseline->baselinePath, $baseFindings);
+                } catch (BaselineException $exception) {
+                    $diagnostics[] = new RunDiagnostic(
+                        type:    'baseline-error',
+                        message: $exception->getMessage(),
+                        path:    $options->baseline->baselinePath,
+                    );
+                }
             }
 
             $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
@@ -661,9 +680,9 @@ final class AnalyseCommand extends Command
         $existing  = [];
 
         foreach ($requested as $path) {
-            $absolute = str_starts_with($path, '/') ? $path : rtrim($baseRoot, '/') . '/' . $path;
+            $absolute = PathHelper::resolveAgainst($baseRoot, $path);
             if (file_exists($absolute)) {
-                $existing[] = $path;
+                $existing[] = PathHelper::relativeToRoot($absolute, $baseRoot) ?? $path;
             }
         }
 
@@ -727,16 +746,16 @@ final class AnalyseCommand extends Command
      */
     private function normaliseRequestedPaths(string $projectRoot, array $paths): array
     {
-        $root       = $this->normalisePath(realpath($projectRoot) ?: $projectRoot);
+        $root       = rtrim(PathHelper::canonical($projectRoot), '/');
         $normalised = [];
 
         foreach ($paths as $path) {
-            $candidate = $this->normalisePath($path);
+            $candidate = PathHelper::normalizeSeparators($path);
             if ($candidate === '') {
                 continue;
             }
 
-            if (str_starts_with($candidate, '/')) {
+            if (PathHelper::isAbsolute($candidate)) {
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {
@@ -767,7 +786,7 @@ final class AnalyseCommand extends Command
      */
     private function matchesRequestedPath(string $changedFile, array $requestedPaths): bool
     {
-        $changedFile = $this->normalisePath($changedFile);
+        $changedFile = PathHelper::normalizeSeparators($changedFile);
 
         foreach ($requestedPaths as $requestedPath) {
             if ($requestedPath === '.') {
@@ -783,22 +802,6 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * Normalise path separators and duplicate slashes for path comparisons.
-     *
-     * @return string Normalised path.
-     */
-    private function normalisePath(string $path): string
-    {
-        $path = str_replace('\\', '/', trim($path));
-
-        while (str_contains($path, '//')) {
-            $path = str_replace('//', '/', $path);
-        }
-
-        return $path;
-    }
-
-    /**
      * @param list<Finding> $findings
      * @return list<Finding>
      */
@@ -808,17 +811,17 @@ final class AnalyseCommand extends Command
             return $findings;
         }
 
-        $root = realpath($pathsRelativeTo);
-        if ($root === false) {
+        $realRoot = realpath($pathsRelativeTo);
+        if ($realRoot === false) {
             return $findings;
         }
 
-        $root       = rtrim(str_replace('\\', '/', $root), '/');
+        $root       = rtrim(PathHelper::normalizeSeparators($realRoot), '/');
         $normalized = [];
 
         foreach ($findings as $finding) {
-            $path = str_replace('\\', '/', $finding->filePath);
-            if (!str_starts_with($path, '/')) {
+            $path = PathHelper::normalizeSeparators($finding->filePath);
+            if (!PathHelper::isAbsolute($path)) {
                 $normalized[] = $finding;
                 continue;
             }

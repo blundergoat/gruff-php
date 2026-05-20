@@ -9,6 +9,7 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Scoring\FileScore;
 use GruffPhp\Scoring\PillarScore;
+use GruffPhp\Support\PathHelper;
 
 /**
  * Builds the interactive HTML inspection report.
@@ -502,7 +503,7 @@ final readonly class HtmlReporter
      */
     private function absolutePath(string $filePath): string
     {
-        if (str_starts_with($filePath, '/')) {
+        if (PathHelper::isAbsolute($filePath)) {
             return $filePath;
         }
 

@@ -57,6 +57,8 @@ final readonly class DashboardServer
 
             try {
                 $handler->handleRequest($client);
+            } catch (\RuntimeException $exception) {
+                $output->writeln(sprintf('<comment>Dashboard client response failed: %s</comment>', $exception->getMessage()));
             } finally {
                 fclose($client);
             }
@@ -76,10 +78,24 @@ final readonly class DashboardServer
     {
         return sprintf(
             'http://%s:%d/?%s',
-            $host,
+            $this->urlHost($host),
             $port,
             http_build_query($this->stateFactory->defaultQuery($dashboardRequestContext->input, $dashboardRequestContext->projectRoot), '', '&', PHP_QUERY_RFC3986),
         );
+    }
+
+    /**
+     * Format a host for use in a browser URL.
+     *
+     * @return string Host, bracketed when it is an IPv6 literal.
+     */
+    private function urlHost(string $host): string
+    {
+        if (str_contains($host, ':') && !str_starts_with($host, '[')) {
+            return '[' . $host . ']';
+        }
+
+        return $host;
     }
 
     /**
@@ -105,7 +121,7 @@ final readonly class DashboardServer
         set_error_handler(static fn (): bool => true);
 
         try {
-            return stream_socket_server(sprintf('tcp://%s:%d', $host, $port), $errorCode, $errorMessage);
+            return stream_socket_server(sprintf('tcp://%s:%d', $this->urlHost($host), $port), $errorCode, $errorMessage);
         } finally {
             restore_error_handler();
         }

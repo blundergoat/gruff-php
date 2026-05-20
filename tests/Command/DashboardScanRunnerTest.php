@@ -104,6 +104,30 @@ final class DashboardScanRunnerTest extends TestCase
     }
 
     /**
+     * Verify same-size same-mtime file edits invalidate cached full scans.
+     *
+     * @return void
+     */
+    public function testContentHashInvalidatesSameSizeSameMtimeChanges(): void
+    {
+        $project = $this->projectDir();
+        $runner  = $this->runner($this->fakeGruffBinary('counter'));
+        $context = $this->context($project);
+        $file    = $project . '/src/Example.php';
+        $mtime   = filemtime($file);
+        self::assertIsInt($mtime);
+
+        $first = $runner->scanHtml($context, ['paths' => 'src']);
+        file_put_contents($file, "<?php\nfinal class Samplex {}\n");
+        touch($file, $mtime);
+        $second = $runner->scanHtml($context, ['paths' => 'src']);
+
+        self::assertStringContainsString('scan 1', $first);
+        self::assertStringContainsString('scan 2', $second);
+        self::assertSame('2', trim((string) file_get_contents($project . '/scan-count.txt')));
+    }
+
+    /**
      * Verify no-config and no-baseline remove those files from cache invalidation.
      *
      * @return void

@@ -19,10 +19,19 @@ final readonly class FindingReviewIdentity
      */
     public function key(Finding $finding): string
     {
+        $location = $finding->symbol !== null && $finding->symbol !== ''
+            ? $finding->symbol
+            : implode(':', [
+                (string) ($finding->line ?? 0),
+                (string) ($finding->endLine ?? 0),
+                (string) ($finding->column ?? 0),
+            ]);
+
         return implode("\0", [
             $finding->filePath,
             $finding->ruleId,
-            $finding->symbol ?? $finding->message,
+            $location,
+            $finding->message,
         ]);
     }
 }

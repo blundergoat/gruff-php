@@ -93,6 +93,10 @@ final readonly class DashboardRequestHandler
 
         $headers = $this->headers($client);
 
+        if ($headers === null) {
+            return null;
+        }
+
         if ($headers instanceof DashboardHttpResponse) {
             return $headers;
         }
@@ -172,9 +176,9 @@ final readonly class DashboardRequestHandler
 
     /**
      * @param resource $client
-     * @return array<string, string>|DashboardHttpResponse
+     * @return array<string, string>|DashboardHttpResponse|null
      */
-    private function headers($client): array|DashboardHttpResponse
+    private function headers($client): array|DashboardHttpResponse|null
     {
         $headers   = [];
         $lineCount = 0;
@@ -202,10 +206,14 @@ final readonly class DashboardRequestHandler
                 continue;
             }
 
+            if ($name === 'host' && array_key_exists('host', $headers)) {
+                return new DashboardHttpResponse(400, 'Bad Request', 'Bad Request', 'text/plain; charset=UTF-8');
+            }
+
             $headers[$name] = trim(substr($line, $separator + 1));
         }
 
-        return $headers;
+        return null;
     }
 
     /**

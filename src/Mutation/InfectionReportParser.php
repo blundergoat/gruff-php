@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Mutation;
 
+use GruffPhp\Support\PathHelper;
 use JsonException;
 
 /**
@@ -72,7 +73,7 @@ final readonly class InfectionReportParser
      */
     private function resolvePath(string $path): string
     {
-        $candidate = $path[0] === '/' ? $path : $this->projectRoot . '/' . $path;
+        $candidate = PathHelper::resolveAgainst($this->projectRoot, $path);
 
         if (!is_file($candidate)) {
             throw new MutationReportException(sprintf('Infection report not found: %s', $path));
@@ -315,14 +316,6 @@ final readonly class InfectionReportParser
      */
     private function displayPath(string $path): string
     {
-        $normalizedPath  = str_replace('\\', '/', $path);
-        $realProjectRoot = realpath($this->projectRoot);
-        $normalizedRoot  = rtrim(str_replace('\\', '/', is_string($realProjectRoot) ? $realProjectRoot : $this->projectRoot), '/');
-
-        if (str_starts_with($normalizedPath, $normalizedRoot . '/')) {
-            return substr($normalizedPath, strlen($normalizedRoot) + 1);
-        }
-
-        return ltrim($normalizedPath, './');
+        return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 }

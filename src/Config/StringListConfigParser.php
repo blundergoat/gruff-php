@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use GruffPhp\Support\PathHelper;
+
 /**
  * Normalises scalar and list configuration values into validated string lists.
  *
@@ -67,7 +69,7 @@ final readonly class StringListConfigParser
      */
     private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowsGlobs): void
     {
-        if (str_starts_with($normalized, '/') || str_contains($normalized, '../') || $normalized === '..') {
+        if (PathHelper::isAbsolute($normalized) || str_contains($normalized, '../') || $normalized === '..') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a relative project path pattern.', $path, $index));
         }
 
