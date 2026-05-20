@@ -62,9 +62,16 @@ final class FunctionLikeScopeWalker
      */
     private function scopeFor(ClassMethod|Function_|Closure|ArrowFunction $node): FunctionLikeScope
     {
-        $parameterNames = $this->parameterNames($node);
+        $parameterNames  = $this->parameterNames($node);
+        $bodyDescendants = $this->bodyDescendants($node);
 
-        return new FunctionLikeScope($node, $this->kind($node), $parameterNames, $this->localVariables($node, $parameterNames));
+        return new FunctionLikeScope(
+            $node,
+            $this->kind($node),
+            $parameterNames,
+            $this->localVariables($bodyDescendants, $parameterNames, $node),
+            $bodyDescendants,
+        );
     }
     /** @return array<string, true> */
     private function parameterNames(ClassMethod|Function_|Closure|ArrowFunction $node): array
@@ -78,10 +85,11 @@ final class FunctionLikeScopeWalker
         return $names;
     }
     /**
+     * @param list<Node>            $bodyDescendants Descendant nodes in this scope body.
      * @param array<string, true> $parameterNames
      * @return array<string, Variable>
      */
-    private function localVariables(ClassMethod|Function_|Closure|ArrowFunction $node, array $parameterNames): array
+    private function localVariables(array $bodyDescendants, array $parameterNames, ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
         $variables = [];
         $excluded  = $parameterNames;
@@ -92,26 +100,42 @@ final class FunctionLikeScopeWalker
                 }
             }
         }
-        foreach ($this->bodyNodes($node) as $child) {
-            $this->collectLocalVariables($child, $variables, $excluded);
+        foreach ($bodyDescendants as $child) {
+            if ($child instanceof Variable && is_string($child->name) && !isset($excluded[$child->name])) {
+                $variables[$child->name] ??= $child;
+            }
         }
         return $variables;
     }
+
     /**
-     * @param array<string, Variable> $variables
-     * @param array<string, true>     $excludedNames
+     * @return list<Node>
+     */
+    private function bodyDescendants(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    {
+        $descendants = [];
+
+        foreach ($this->bodyNodes($node) as $child) {
+            $this->collectBodyDescendants($child, $descendants);
+        }
+
+        return $descendants;
+    }
+
+    /**
+     * @param list<Node> $descendants
      * @return void
      */
-    private function collectLocalVariables(Node $node, array &$variables, array $excludedNames): void
+    private function collectBodyDescendants(Node $node, array &$descendants): void
     {
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
             return;
         }
-        if ($node instanceof Variable && is_string($node->name) && !isset($excludedNames[$node->name])) {
-            $variables[$node->name] ??= $node;
-        }
+
+        $descendants[] = $node;
+
         foreach ($this->childNodes($node) as $child) {
-            $this->collectLocalVariables($child, $variables, $excludedNames);
+            $this->collectBodyDescendants($child, $descendants);
         }
     }
     /** @return list<Node> */

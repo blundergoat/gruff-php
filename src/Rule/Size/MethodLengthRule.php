@@ -11,16 +11,14 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Closure;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\Node\Stmt\Nop;
-use PhpParser\NodeFinder;
 
 /**
  * Detects method and function bodies that exceed the configured line threshold.
@@ -67,12 +65,7 @@ final readonly class MethodLengthRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod
-                || $node instanceof Function_
-                || $node instanceof Closure;
-        });
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class, Closure::class]);
 
         $findings = [];
 
@@ -88,7 +81,7 @@ final readonly class MethodLengthRule implements RuleInterface
                 continue;
             }
 
-            $length         = $this->logicalLineCount($node);
+            $length         = NodeIndex::logicalStatementLineCount($node);
             $thresholdMatch = $settings->highValueThresholdMatch($length);
 
             if ($thresholdMatch === null) {
@@ -125,27 +118,6 @@ final readonly class MethodLengthRule implements RuleInterface
         }
 
         return $findings;
-    }
-
-    /**
-     * Count non-empty statement lines inside a callable body.
-     *
-     * @return int Logical statement line count.
-     */
-    private function logicalLineCount(ClassMethod|Function_|Closure $node): int
-    {
-        $nodeFinder = new NodeFinder();
-        $lines      = [];
-
-        foreach ($nodeFinder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
-            $line = $statement->getStartLine();
-
-            if ($line > 0) {
-                $lines[$line] = true;
-            }
-        }
-
-        return count($lines);
     }
 
     /**

@@ -11,17 +11,15 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
-use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt\Trait_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects types whose methods are long on average, even if no single method dominates.
@@ -67,12 +65,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Class_
-                || $node instanceof Trait_
-                || $node instanceof Enum_;
-        });
+        $classLikes = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]);
 
         $findings = [];
 
@@ -90,7 +83,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             $totalLines = 0;
 
             foreach ($methods as $method) {
-                $totalLines += $this->logicalLineCount($method);
+                $totalLines += NodeIndex::logicalStatementLineCount($method);
             }
 
             $average        = $totalLines / count($methods);
@@ -133,27 +126,6 @@ final readonly class AverageMethodLengthRule implements RuleInterface
         }
 
         return $findings;
-    }
-
-    /**
-     * Count non-empty statement lines inside a class method.
-     *
-     * @return int Logical statement line count.
-     */
-    private function logicalLineCount(ClassMethod $classMethod): int
-    {
-        $nodeFinder = new NodeFinder();
-        $lines      = [];
-
-        foreach ($nodeFinder->find($classMethod->stmts ?? [], static fn (Node $node): bool => $node instanceof Stmt && !$node instanceof Nop) as $statement) {
-            $line = $statement->getStartLine();
-
-            if ($line > 0) {
-                $lines[$line] = true;
-            }
-        }
-
-        return count($lines);
     }
 
     /**

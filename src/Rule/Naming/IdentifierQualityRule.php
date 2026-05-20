@@ -707,7 +707,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function nodesInScope(FunctionLikeScope $scope, callable $predicate): array
     {
-        return $this->nodesMatching($this->bodyNodes($scope->node), $predicate);
+        $matches = [];
+
+        foreach ($scope->bodyDescendants as $node) {
+            if ($predicate($node)) {
+                $matches[] = $node;
+            }
+        }
+
+        return $matches;
     }
 
     /**
@@ -744,18 +752,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
         foreach ($this->childNodes($node) as $child) {
             $this->collectMatchingNodes($child, $predicate, $matches);
         }
-    }
-
-    /**
-     * @return list<Node>
-     */
-    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
-    {
-        if ($node instanceof ArrowFunction) {
-            return [$node->expr];
-        }
-
-        return array_values($node->stmts ?? []);
     }
 
     /**

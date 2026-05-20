@@ -258,6 +258,16 @@ filtering by pillar.
   `complexity.cyclomatic` 325 ms -> 250 ms (-23%),
   `complexity.halstead-volume` 119 ms -> 53 ms (-55%), and
   `complexity.maintainability-index` 86 ms -> 17 ms (-80%).
+- Additional large-corpus full measurement (PHP 8.3.30, 323 parsed files)
+  after caching callable logical statement counts and reusing function-like
+  scope descendants across naming rules: wall time dropped from 8,718 ms to
+  8,213 ms (-5.8%), total rule execution time dropped from 8,053 ms to
+  7,568 ms (-6.0%), and peak memory moved from 180.4 MB to 184.5 MB.
+  Per-rule wins on the same corpus: `size.average-method-length` 157 ms ->
+  3 ms (-98%), `size.method-length` 154 ms -> 3 ms (-98%),
+  `naming.identifier-quality` 330 ms -> 82 ms (-75%),
+  `naming.short-variable` 153 ms -> 27 ms (-82%), and
+  `naming.abbreviation-allowlist` 237 ms -> 170 ms (-28%).
 
 ### Fixed
 

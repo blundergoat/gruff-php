@@ -16,8 +16,6 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
-use PhpParser\Node\Expr\ArrowFunction;
-use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -25,7 +23,6 @@ use PhpParser\Node\Stmt\For_;
 use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
-use PhpParser\NodeFinder;
 
 /**
  * Requires short lowercase abbreviations to be declared in project config.
@@ -75,7 +72,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $minLength  = $this->lengthOption($ruleContext, $definition, 'minLength', 2);
         $maxLength  = $this->lengthOption($ruleContext, $definition, 'maxLength', 3);
         $accepted   = $this->lowercaseList($ruleContext->config->acceptedAbbreviations());
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
@@ -118,7 +114,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
             }
 
-            $exemptLocals = $this->exemptLocalNames($scope->node, $nodeFinder);
+            $exemptLocals = $this->exemptLocalNames($scope);
             foreach ($scope->localVariables as $name => $variable) {
                 if (isset($exemptLocals[$name])) {
                     continue;
@@ -207,13 +203,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * @return array<string, true>
      */
-    private function exemptLocalNames(ClassMethod|Function_|Closure|ArrowFunction $node, NodeFinder $nodeFinder): array
+    private function exemptLocalNames(FunctionLikeScope $scope): array
     {
         $names = [];
 
-        foreach ($this->bodyNodes($node) as $bodyNode) {
-            foreach ($nodeFinder->find([$bodyNode], static fn (Node $candidate): bool => $candidate instanceof For_ || $candidate instanceof Foreach_ || $candidate instanceof Catch_) as $scopeNode) {
-                $this->collectExemptLocalNames($scopeNode, $nodeFinder, $names);
+        foreach ($scope->bodyDescendants as $scopeNode) {
+            if ($scopeNode instanceof For_ || $scopeNode instanceof Foreach_ || $scopeNode instanceof Catch_) {
+                $this->collectExemptLocalNames($scopeNode, $names);
             }
         }
 
@@ -226,10 +222,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param array<string, true> $names
      * @return void
      */
-    private function collectExemptLocalNames(Node $node, NodeFinder $nodeFinder, array &$names): void
+    private function collectExemptLocalNames(Node $node, array &$names): void
     {
         if ($node instanceof For_) {
-            $this->collectVariableNames($node->init, $nodeFinder, $names);
+            $this->collectVariableNames($node->init, $names);
         }
 
         if ($node instanceof Foreach_) {
@@ -238,7 +234,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 $foreachVariables[] = $node->keyVar;
             }
 
-            $this->collectVariableNames($foreachVariables, $nodeFinder, $names);
+            $this->collectVariableNames($foreachVariables, $names);
         }
 
         if ($node instanceof Catch_ && $node->var instanceof Variable && is_string($node->var->name)) {
@@ -251,25 +247,60 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      * @param array<string, true>  $names
      * @return void
      */
-    private function collectVariableNames(array $nodes, NodeFinder $nodeFinder, array &$names): void
+    private function collectVariableNames(array $nodes, array &$names): void
     {
-        foreach ($nodeFinder->findInstanceOf($nodes, Variable::class) as $variable) {
-            if (is_string($variable->name)) {
-                $names[$variable->name] = true;
-            }
+        foreach ($nodes as $node) {
+            $this->collectVariableName($node, $names);
+        }
+    }
+
+    /**
+     * @param array<string, true> $names
+     * @return void
+     */
+    private function collectVariableName(Node $node, array &$names): void
+    {
+        if ($node instanceof Variable && is_string($node->name)) {
+            $names[$node->name] = true;
+        }
+
+        foreach ($this->childNodes($node) as $child) {
+            $this->collectVariableName($child, $names);
         }
     }
 
     /**
      * @return list<Node>
      */
-    private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
+    private function childNodes(Node $node): array
     {
-        if ($node instanceof ArrowFunction) {
-            return [$node->expr];
+        $children = [];
+
+        foreach ($node->getSubNodeNames() as $name) {
+            $this->collectChildNodes($node->{$name}, $children);
         }
 
-        return array_values($node->stmts ?? []);
+        return $children;
+    }
+
+    /**
+     * @param list<Node> $children
+     * @return void
+     */
+    private function collectChildNodes(mixed $subNode, array &$children): void
+    {
+        if ($subNode instanceof Node) {
+            $children[] = $subNode;
+            return;
+        }
+
+        if (!is_array($subNode)) {
+            return;
+        }
+
+        foreach ($subNode as $childSubNode) {
+            $this->collectChildNodes($childSubNode, $children);
+        }
     }
 
     /**

@@ -16,10 +16,8 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
-use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\Node\Stmt\Nop;
 
 /**
  * Measures maintainability by combining complexity, volume, and length signals.
@@ -121,7 +119,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             return 100.0;
         }
 
-        $lloc     = max(1, self::logicalLineCount($node));
+        $lloc     = max(1, NodeIndex::logicalStatementLineCount($node));
         $ccn      = CyclomaticComplexityRule::computeCyclomaticComplexity($node);
         $halstead = HalsteadVolumeRule::computeHalsteadMetrics($node);
         $volume   = max(1.0, $halstead['volume']);
@@ -129,30 +127,6 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;
 
         return max(0.0, $mi);
-    }
-
-    /**
-     * @param ClassMethod|Function_ $node
-     *
-     * @return int Logical statement line count.
-     */
-    private static function logicalLineCount(Node $node): int
-    {
-        $lines = [];
-
-        foreach (NodeIndex::bodyDescendants($node) as $child) {
-            if (!$child instanceof Stmt || $child instanceof Nop) {
-                continue;
-            }
-
-            $line = $child->getStartLine();
-
-            if ($line > 0) {
-                $lines[$line] = true;
-            }
-        }
-
-        return count($lines);
     }
 
     /**

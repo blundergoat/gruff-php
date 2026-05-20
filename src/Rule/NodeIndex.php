@@ -6,8 +6,11 @@ namespace GruffPhp\Rule;
 
 use GruffPhp\Parser\AnalysisUnit;
 use PhpParser\Node;
+use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\Node\Stmt\Nop;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use WeakMap;
@@ -33,6 +36,13 @@ final class NodeIndex
      * @var WeakMap<Node, list<Node>>|null
      */
     private static ?WeakMap $bodyCache = null;
+
+    /**
+     * Cache keyed on function-like nodes for logical statement line counts.
+     *
+     * @var WeakMap<Node, int>|null
+     */
+    private static ?WeakMap $logicalLineCountCache = null;
 
     /**
      * Return every node of the given concrete class in preorder.
@@ -91,6 +101,36 @@ final class NodeIndex
     }
 
     /**
+     * Count distinct non-Nop statement start lines below a function-like body.
+     */
+    public static function logicalStatementLineCount(Node $node): int
+    {
+        self::$logicalLineCountCache ??= new WeakMap();
+        $cached = self::$logicalLineCountCache[$node] ?? null;
+        if (is_int($cached)) {
+            return $cached;
+        }
+
+        $lines = [];
+        foreach (self::bodyDescendants($node) as $child) {
+            if (!$child instanceof Stmt || $child instanceof Nop) {
+                continue;
+            }
+
+            $line = $child->getStartLine();
+            if ($line > 0) {
+                $lines[$line] = true;
+            }
+        }
+
+        $count = count($lines);
+
+        self::$logicalLineCountCache[$node] = $count;
+
+        return $count;
+    }
+
+    /**
      * @return array<class-string<Node>, list<Node>>
      */
     private static function index(AnalysisUnit $analysisUnit): array
@@ -146,7 +186,7 @@ final class NodeIndex
         };
 
         $statements = [];
-        if ($node instanceof ClassMethod || $node instanceof Function_) {
+        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure) {
             $statements = $node->stmts ?? [];
         }
 

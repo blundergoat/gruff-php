@@ -22,12 +22,14 @@ final readonly class FunctionLikeScope
      * @param string                                      $kind           Scope kind: method, function, closure, or arrow.
      * @param array<string, true>                         $parameterNames Parameter names declared directly by this scope.
      * @param array<string, Variable>                     $localVariables First local variable node per name in this scope body.
+     * @param list<\PhpParser\Node>                       $bodyDescendants Descendant nodes in this scope body, excluding nested function-like scopes.
      */
     public function __construct(
         public ClassMethod|Function_|Closure|ArrowFunction $node,
         public string $kind,
         public array $parameterNames,
         public array $localVariables,
+        public array $bodyDescendants,
     ) {
     }
 }
