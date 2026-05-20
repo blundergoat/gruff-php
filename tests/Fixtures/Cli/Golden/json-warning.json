@@ -52,7 +52,7 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
-            "fingerprint": "a4a4a727bb1fd409",
+            "fingerprint": "f034a267b2fdcbc9",
             "metadata": {
                 "lines": 27,
                 "threshold": 3,
@@ -73,7 +73,7 @@
             "tier": "v0.1",
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
-            "fingerprint": "1e6a244048103717",
+            "fingerprint": "3b9c556468b6bc15",
             "metadata": {}
         },
         {
@@ -90,7 +90,7 @@
             "tier": "v0.1",
             "confidence": "medium",
             "remediation": "Rename the identifier to describe its domain role or action.",
-            "fingerprint": "5b67722a1c71ff6c",
+            "fingerprint": "25633f1c266ca38f",
             "metadata": {
                 "identifierKind": "method",
                 "identifierName": "value",

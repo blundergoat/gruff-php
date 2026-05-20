@@ -25,6 +25,9 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects malformed or disallowed host headers.
      *
+     * @param string $request          Raw request bytes to send.
+     * @param string $statusLine       Expected HTTP status line.
+     * @param bool   $shouldCloseWrite Whether to close the client write side after sending.
      * @return void
      */
     #[DataProvider('rejectedHostRequestProvider')]

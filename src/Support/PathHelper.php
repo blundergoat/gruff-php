@@ -39,8 +39,10 @@ final class PathHelper
         }
 
         // Match Windows drive-letter roots such as C:/repo without accepting C:relative.
+        $hasDriveLetterRoot = preg_match('/^[A-Za-z]:($|\/)/', $path) === 1;
+
         return str_starts_with($path, '/')
-            || preg_match('/^[A-Za-z]:($|\/)/', $path) === 1;
+            || $hasDriveLetterRoot;
     }
 
     /**

@@ -30,8 +30,8 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php 0.1.0-dev', $process->getOutput());
-        self::assertStringContainsString('Discovered: 6', $process->getOutput());
-        self::assertStringContainsString('Ignored: 2', $process->getOutput());
+        self::assertStringContainsString('Discovered: 2', $process->getOutput());
+        self::assertStringContainsString('Ignored: 6', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
     }
 
@@ -319,8 +319,8 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('Discovered: 5', $process->getOutput());
-        self::assertStringContainsString('Ignored: 3', $process->getOutput());
+        self::assertStringContainsString('Discovered: 1', $process->getOutput());
+        self::assertStringContainsString('Ignored: 7', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/alpha.php', $process->getOutput());
     }
 

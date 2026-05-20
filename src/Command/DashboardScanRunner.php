@@ -287,10 +287,6 @@ final class DashboardScanRunner
 
         while (count($this->cache) >= self::MAX_CACHE_ENTRIES) {
             $oldestKey = array_key_first($this->cache);
-            if (!is_string($oldestKey)) {
-                return;
-            }
-
             unset($this->cache[$oldestKey]);
         }
     }
