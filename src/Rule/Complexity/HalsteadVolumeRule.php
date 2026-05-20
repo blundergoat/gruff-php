@@ -21,7 +21,6 @@ use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Measures function-like information density with Halstead metrics.
@@ -137,10 +136,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $totalOperators = 0;
         $totalOperands  = 0;
 
-        $nodeFinder      = new NodeFinder();
-        $descendantNodes = $nodeFinder->find($node->stmts ?? [], static fn (): bool => true);
-
-        foreach ($descendantNodes as $childNode) {
+        foreach (NodeIndex::bodyDescendants($node) as $childNode) {
             $operatorKey = self::operatorKey($childNode);
             if ($operatorKey !== null) {
                 $operators[$operatorKey] = true;

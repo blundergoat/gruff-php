@@ -20,7 +20,6 @@ use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Nop;
-use PhpParser\NodeFinder;
 
 /**
  * Measures maintainability by combining complexity, volume, and length signals.
@@ -139,11 +138,14 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      */
     private static function logicalLineCount(Node $node): int
     {
-        $nodeFinder = new NodeFinder();
-        $lines      = [];
+        $lines = [];
 
-        foreach ($nodeFinder->find($node->stmts ?? [], static fn (Node $child): bool => $child instanceof Stmt && !$child instanceof Nop) as $statement) {
-            $line = $statement->getStartLine();
+        foreach (NodeIndex::bodyDescendants($node) as $child) {
+            if (!$child instanceof Stmt || $child instanceof Nop) {
+                continue;
+            }
+
+            $line = $child->getStartLine();
 
             if ($line > 0) {
                 $lines[$line] = true;

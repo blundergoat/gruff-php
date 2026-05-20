@@ -26,9 +26,9 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\NodeVisitorAbstract;
 
 /**
  * Detects project interfaces that have only one concrete implementation.
@@ -112,9 +112,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
 
         $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);
-        $resolvedUnits = $this->resolveNames($eligibleUnits);
-
-        $projectTypes = $this->collectProjectTypes($resolvedUnits);
+        $projectTypes  = $this->collectProjectTypes($eligibleUnits);
 
         return $this->buildFindings(
             interfaces:                 $projectTypes['interfaces'],
@@ -127,7 +125,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     }
 
     /**
-     * @param list<array{unit: AnalysisUnit, statements: list<Node\Stmt>}> $resolvedUnits
+     * @param list<AnalysisUnit> $units
      * @return array{
      *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
@@ -135,7 +133,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      *     extendedInterfaces: array<string, true>
      * }
      */
-    private function collectProjectTypes(array $resolvedUnits): array
+    private function collectProjectTypes(array $units): array
     {
         $projectTypes = [
             'interfaces' => [],
@@ -144,15 +142,14 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
             'extendedInterfaces' => [],
         ];
 
-        foreach ($resolvedUnits as $resolved) {
-            $this->collectUnitTypes($resolved['unit'], $resolved['statements'], $projectTypes);
+        foreach ($units as $unit) {
+            $this->collectUnitTypes($unit, $projectTypes);
         }
 
         return $projectTypes;
     }
 
     /**
-     * @param list<Node\Stmt> $statements
      * @param array{
      *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
@@ -161,19 +158,96 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * } $projectTypes
      * @return void
      */
-    private function collectUnitTypes(AnalysisUnit $analysisUnit, array $statements, array &$projectTypes): void
+    private function collectUnitTypes(AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
-        $nodeFinder = new NodeFinder();
+        $visitor = new class extends NodeVisitorAbstract {
+            /** @var list<Interface_> */
+            public array $interfaces = [];
 
-        foreach ($nodeFinder->find($statements, static fn (Node $node): bool => $node instanceof Interface_ || $node instanceof Class_) as $node) {
-            if ($node instanceof Interface_) {
-                $this->recordInterface($node, $analysisUnit, $projectTypes);
-                continue;
+            /** @var list<Class_> */
+            public array $classes = [];
+
+            /** @var list<array{class: Class_, type: Identifier|Name|ComplexType|null, line: int}> */
+            public array $typeReferences = [];
+
+            /** @var list<Class_> */
+            private array $classStack = [];
+
+            public function enterNode(Node $node): null
+            {
+                if ($node instanceof Interface_) {
+                    $this->interfaces[] = $node;
+
+                    return null;
+                }
+
+                if ($node instanceof Class_) {
+                    if ($node->name !== null) {
+                        $this->classes[]     = $node;
+                        $this->classStack[] = $node;
+                    }
+
+                    return null;
+                }
+
+                $class = $this->currentClass();
+                if ($class === null) {
+                    return null;
+                }
+
+                if ($node instanceof Param) {
+                    $type = $node->type;
+                } elseif ($node instanceof ClassMethod) {
+                    $type = $node->returnType;
+                } elseif ($node instanceof Property) {
+                    $type = $node->type;
+                } else {
+                    return null;
+                }
+
+                $this->typeReferences[] = [
+                    'class' => $class,
+                    'type' => $type,
+                    'line' => $node->getStartLine(),
+                ];
+
+                return null;
             }
 
-            if ($node instanceof Class_) {
-                $this->recordClass($node, $analysisUnit, $nodeFinder, $projectTypes);
+            public function leaveNode(Node $node): null
+            {
+                if ($node instanceof Class_ && $node->name !== null) {
+                    array_pop($this->classStack);
+                }
+
+                return null;
             }
+
+            private function currentClass(): ?Class_
+            {
+                if ($this->classStack === []) {
+                    return null;
+                }
+
+                return $this->classStack[array_key_last($this->classStack)];
+            }
+        };
+
+        $nodeTraverser = new NodeTraverser();
+        $nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true, 'replaceNodes' => false]));
+        $nodeTraverser->addVisitor($visitor);
+        $nodeTraverser->traverse($analysisUnit->statements);
+
+        foreach ($visitor->interfaces as $interface) {
+            $this->recordInterface($interface, $analysisUnit, $projectTypes);
+        }
+
+        foreach ($visitor->classes as $class) {
+            $this->recordClass($class, $analysisUnit, $projectTypes);
+        }
+
+        foreach ($visitor->typeReferences as $reference) {
+            $this->recordClassTypeReference($reference['class'], $reference['type'], $reference['line'], $analysisUnit, $projectTypes);
         }
     }
 
@@ -220,7 +294,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      * } $projectTypes
      * @return void
      */
-    private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, NodeFinder $nodeFinder, array &$projectTypes): void
+    private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
         if ($class->name === null) {
             return;
@@ -236,14 +310,6 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                 'classFqn' => $classFqn,
                 'unit' => $analysisUnit,
                 'line' => $class->getStartLine(),
-            ];
-        }
-
-        foreach ($this->collectClassTypeReferences($class, $classFqn, $nodeFinder) as $reference) {
-            $projectTypes['typeReferences'][$reference['targetFqn']][] = [
-                'classFqn' => $reference['classFqn'],
-                'unit' => $analysisUnit,
-                'line' => $reference['line'],
             ];
         }
     }
@@ -358,25 +424,6 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     }
 
     /**
-     * @param list<AnalysisUnit> $units
-     * @return list<array{unit: AnalysisUnit, statements: list<Node\Stmt>}>
-     */
-    private function resolveNames(array $units): array
-    {
-        $resolved = [];
-
-        foreach ($units as $unit) {
-            $nodeTraverser = new NodeTraverser();
-            $nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true]));
-            /** @var list<Node\Stmt> $resolvedStatements NameResolver preserves the statement list shape. */
-            $resolvedStatements = $nodeTraverser->traverse($unit->statements);
-            $resolved[]         = ['unit' => $unit, 'statements' => $resolvedStatements];
-        }
-
-        return $resolved;
-    }
-
-    /**
      * Resolve the fully qualified declaration name for a class or interface.
      *
      * @return string|null Fully qualified name, or null for anonymous declarations.
@@ -442,33 +489,34 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
     }
 
     /**
-     * @return list<array{targetFqn: string, classFqn: string, line: int}>
+     * @param array{
+     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * } $projectTypes
+     * @return void
      */
-    private function collectClassTypeReferences(Class_ $class, string $classFqn, NodeFinder $nodeFinder): array
+    private function recordClassTypeReference(
+        Class_ $class,
+        Identifier|Name|ComplexType|null $type,
+        int $line,
+        AnalysisUnit $analysisUnit,
+        array &$projectTypes,
+    ): void
     {
-        $references = [];
-
-        foreach ($nodeFinder->find([$class], static fn (Node $node): bool => $node instanceof Param || $node instanceof ClassMethod || $node instanceof Property) as $node) {
-            if ($node instanceof Param) {
-                $type = $node->type;
-            } elseif ($node instanceof ClassMethod) {
-                $type = $node->returnType;
-            } elseif ($node instanceof Property) {
-                $type = $node->type;
-            } else {
-                continue;
-            }
-
-            foreach ($this->namesFromType($type) as $name) {
-                $references[] = [
-                    'targetFqn' => $this->resolveName($name),
-                    'classFqn' => $classFqn,
-                    'line' => $node->getStartLine(),
-                ];
-            }
+        $classFqn = $this->declarationFqn($class);
+        if ($classFqn === null) {
+            return;
         }
 
-        return $references;
+        foreach ($this->namesFromType($type) as $name) {
+            $projectTypes['typeReferences'][$this->resolveName($name)][] = [
+                'classFqn' => $classFqn,
+                'unit' => $analysisUnit,
+                'line' => $line,
+            ];
+        }
     }
 
     /**

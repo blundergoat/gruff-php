@@ -6,6 +6,8 @@ namespace GruffPhp\Rule;
 
 use GruffPhp\Parser\AnalysisUnit;
 use PhpParser\Node;
+use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Function_;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use WeakMap;
@@ -23,6 +25,14 @@ final class NodeIndex
      * @var WeakMap<AnalysisUnit, array<class-string<Node>, list<Node>>>|null
      */
     private static ?WeakMap $cache = null;
+
+    /**
+     * Cache keyed on function-like nodes. Each value stores the node's body
+     * descendants only, matching the previous NodeFinder calls over stmts.
+     *
+     * @var WeakMap<Node, list<Node>>|null
+     */
+    private static ?WeakMap $bodyCache = null;
 
     /**
      * Return every node of the given concrete class in preorder.
@@ -71,6 +81,16 @@ final class NodeIndex
     }
 
     /**
+     * Return every descendant below a function or method body in preorder.
+     *
+     * @return list<Node>
+     */
+    public static function bodyDescendants(Node $node): array
+    {
+        return self::bodyIndex($node);
+    }
+
+    /**
      * @return array<class-string<Node>, list<Node>>
      */
     private static function index(AnalysisUnit $analysisUnit): array
@@ -100,5 +120,42 @@ final class NodeIndex
         self::$cache[$analysisUnit] = $visitor->byClass;
 
         return $visitor->byClass;
+    }
+
+    /**
+     * @return list<Node>
+     */
+    private static function bodyIndex(Node $node): array
+    {
+        self::$bodyCache ??= new WeakMap();
+        $cached = self::$bodyCache[$node] ?? null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $visitor = new class extends NodeVisitorAbstract {
+            /** @var list<Node> */
+            public array $all = [];
+
+            public function enterNode(Node $node): null
+            {
+                $this->all[] = $node;
+
+                return null;
+            }
+        };
+
+        $statements = [];
+        if ($node instanceof ClassMethod || $node instanceof Function_) {
+            $statements = $node->stmts ?? [];
+        }
+
+        $traverser = new NodeTraverser();
+        $traverser->addVisitor($visitor);
+        $traverser->traverse($statements);
+
+        self::$bodyCache[$node] = $visitor->all;
+
+        return $visitor->all;
     }
 }

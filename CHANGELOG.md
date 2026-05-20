@@ -220,6 +220,44 @@ filtering by pillar.
   rule according to the documented naming deferral order.
 - The project dogfood baseline now runs with zero error and zero warning
   findings under the default `php bin/gruff-php analyse` command.
+- Composer is configured to emit an optimized, classmap-authoritative
+  autoloader (`composer.json` `config`), removing PSR-4 disk lookups for
+  application classes on every CLI invocation.
+
+#### Performance
+
+- New `GruffPhp\Rule\NodeIndex` walks each `AnalysisUnit` once and caches
+  nodes by concrete class in a `WeakMap`. Rules that previously each spun up
+  their own `NodeFinder` traversal now share a single preorder walk per file.
+- Refactored to use `NodeIndex` and avoid redundant per-unit AST walks:
+  `naming.identifier-quality`, `naming.abbreviation-allowlist`,
+  `complexity.cyclomatic`, `complexity.halstead-volume`,
+  `complexity.maintainability-index`, `security.dangerous-function-call`,
+  `waste.one-line-method`, and `dead-code.unused-private-method`.
+- `RuleRegistry::deduplicateFindings()` now skips `json_encode` when the
+  finding has no metadata and uses `serialize` for the rest, lowering the
+  per-finding dedupe cost.
+- Measured on the `large` self-scan corpus (PHP 8.3.30, 322 files):
+  wall time dropped from 10,407 ms to 9,761 ms (-6.2%) and total rule
+  execution time dropped from 9,460 ms to 8,885 ms (-6.1%).
+  Per-rule wins on the same corpus: `security.dangerous-function-call`
+  404 ms → 7 ms (-98%), `waste.one-line-method` 247 ms → 9 ms (-96%),
+  `dead-code.unused-private-method` 167 ms → 89 ms (-46%),
+  `complexity.maintainability-index` 166 ms → 91 ms (-45%),
+  `complexity.halstead-volume` 200 ms → 126 ms (-37%),
+  `naming.identifier-quality` 494 ms → 354 ms (-28%),
+  `naming.abbreviation-allowlist` 312 ms → 247 ms (-21%).
+- Follow-up large self-scan measurement (PHP 8.3.30, 323 parsed files) after
+  consolidating `design.single-implementor-interface` collection into one
+  name-resolution traversal per unit and sharing cached function-body
+  descendants across the cyclomatic, Halstead, and maintainability-index
+  calculations: wall time dropped from 9,171 ms to 8,718 ms (-4.9%),
+  total rule execution time dropped from 8,468 ms to 8,053 ms (-4.9%), and
+  peak memory moved from 182.5 MB to 180.4 MB. Per-rule wins on the same
+  corpus: `design.single-implementor-interface` 426 ms -> 267 ms (-37%),
+  `complexity.cyclomatic` 325 ms -> 250 ms (-23%),
+  `complexity.halstead-volume` 119 ms -> 53 ms (-55%), and
+  `complexity.maintainability-index` 86 ms -> 17 ms (-80%).
 
 ### Fixed
 

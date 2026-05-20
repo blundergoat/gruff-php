@@ -21,7 +21,6 @@ use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Measures function-like branch count using cyclomatic complexity.
@@ -159,17 +158,16 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $ccn = 1;
 
-        $nodeFinder = new NodeFinder();
-        $body       = $node->stmts ?? [];
+        foreach (NodeIndex::bodyDescendants($node) as $child) {
+            if (self::isDecisionNode($child)) {
+                $ccn++;
+            }
 
-        $decisionNodes = $nodeFinder->find($body, static fn (Node $child): bool => self::isDecisionNode($child));
-
-        $ccn += count($decisionNodes);
-
-        foreach ($nodeFinder->findInstanceOf($body, Expr\Match_::class) as $match) {
-            foreach ($match->arms as $arm) {
-                if ($arm->conds !== null) {
-                    $ccn += count($arm->conds);
+            if ($child instanceof Expr\Match_) {
+                foreach ($child->arms as $arm) {
+                    if ($arm->conds !== null) {
+                        $ccn += count($arm->conds);
+                    }
                 }
             }
         }
