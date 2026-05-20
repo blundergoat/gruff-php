@@ -152,7 +152,7 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
-     * Verify Git diff provider includes rename-only changed files.
+     * Verify Git diff provider includes rename-only source and destination files.
      *
      * @return void No return value.
      */
@@ -167,7 +167,8 @@ final class GitDiffProviderTest extends TestCase
 
             $diff = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
 
-            self::assertSame(['Renamed.php'], $diff->changedFiles);
+            self::assertSame(['Example.php', 'Renamed.php'], $diff->changedFiles);
+            self::assertSame([], $diff->rangesFor('Example.php'));
             self::assertSame([], $diff->rangesFor('Renamed.php'));
         } finally {
             $this->removeDir($tempDir);

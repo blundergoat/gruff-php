@@ -113,6 +113,12 @@ final readonly class GitDiffProvider
                 continue;
             }
 
+            if (str_starts_with($line, 'rename from ')) {
+                $this->appendChangedFile($this->normaliseHeaderPath(substr($line, 12)), $changedFiles, $changedLines);
+
+                continue;
+            }
+
             if (str_starts_with($line, 'rename to ')) {
                 $this->appendChangedFile($this->normaliseHeaderPath(substr($line, 10)), $changedFiles, $changedLines);
 

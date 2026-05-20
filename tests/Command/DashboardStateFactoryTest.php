@@ -24,7 +24,7 @@ final class DashboardStateFactoryTest extends TestCase
     public function testDefaultQueryUsesConsoleInputAndFlags(): void
     {
         $state = (new DashboardStateFactory())->defaultQuery($this->input([
-            'paths' => ['src', 'tests'],
+            'paths' => ['src', 'tests/Feature Cases', 'fixtures/A "quoted" Case'],
             '--fail-on' => 'error',
             '--config' => 'custom.yaml',
             '--baseline' => 'baseline.json',
@@ -36,7 +36,7 @@ final class DashboardStateFactoryTest extends TestCase
 
         self::assertSame([
             'project' => '/repo',
-            'paths' => 'src tests',
+            'paths' => 'src "tests/Feature Cases" "fixtures/A \\"quoted\\" Case"',
             'scanScope' => 'diff',
             'failOn' => 'error',
             'config' => 'custom.yaml',

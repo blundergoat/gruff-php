@@ -27,10 +27,11 @@ final class DashboardStateFactory
         $baseline = $input->hasParameterOption('--baseline', true)
             ? ($this->optionalStringOption($input, 'baseline') ?? 'gruff-baseline.json')
             : '';
+        $pathState = implode(' ', array_map($this->pathToken(...), $paths === [] ? ['.'] : $paths));
 
         return [
             'project' => $projectRoot,
-            'paths' => implode(' ', $paths === [] ? ['.'] : $paths),
+            'paths' => $pathState,
             'scanScope' => $input->hasParameterOption('--diff', true) ? 'diff' : 'full',
             'failOn' => $this->optionalStringOption($input, 'fail-on') ?? 'none',
             'config' => $this->optionalStringOption($input, 'config') ?? ConfigLoader::DEFAULT_CONFIG_FILE,
@@ -40,6 +41,21 @@ final class DashboardStateFactory
             'includeIgnored' => (bool) $input->getOption('include-ignored') ? '1' : '0',
             'reportInteractive' => '0',
         ];
+    }
+
+    /**
+     * Quote a dashboard path token when the parser needs help preserving it.
+     *
+     * @param string $path Console path argument.
+     * @return string Token suitable for DashboardScanCommandBuilder::parsePaths().
+     */
+    private function pathToken(string $path): string
+    {
+        if ($path !== '' && strpbrk($path, " \t\r\n\"\\") === false) {
+            return $path;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $path) . '"';
     }
 
     /**
