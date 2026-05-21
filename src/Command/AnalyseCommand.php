@@ -37,7 +37,6 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
-use GruffPhp\Source\SourceDiscoveryResult;
 use GruffPhp\Support\PathHelper;
 use GruffPhp\Trend\TrendRecorder;
 use JsonException;
@@ -144,36 +143,38 @@ final class AnalyseCommand extends Command
         $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
         $discoverStart = hrtime(true);
 
-        $sources = $analysisPaths === null
-            ? new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], [])
-            : (new AnalysisSourceLoader())->load(
-                $projectRoot,
-                $analysisPaths,
-                $options->shouldIncludeIgnored,
-                $config->ignoredPathPatterns(),
-            );
-        $discoverParseNs = hrtime(true) - $discoverStart;
-        $diagnostics     = array_merge(
+        $ruleContext = new RuleContext($projectRoot, $config);
+        $pipeline    = new AnalysisPipeline(
+            $registry,
+            fn (string $root, AnalyseCommandOptions $opts, AnalysisConfig $cfg, RuleRegistry $reg, ?DiffResult $diff, AnalysisSourceSet $set): array
+                => $this->projectContextUnits(
+                    projectRoot:       $root,
+                    options:           $opts,
+                    config:            $cfg,
+                    registry:          $reg,
+                    reviewDiff:        $diff,
+                    analysisSourceSet: $set,
+                ),
+        );
+        $analysisRun = $pipeline->run(
+            projectRoot:     $projectRoot,
+            options:         $options,
+            config:          $config,
+            ruleContext:     $ruleContext,
+            reviewDiff:      $reviewDiff,
+            analysisPaths:   $analysisPaths,
+            discoverStart:   $discoverStart,
+            runtimeObserver: $runtimeTimingObserver,
+        );
+        $sources             = $analysisRun['sources'];
+        $findings            = $analysisRun['findings'];
+        $discoverParseNs     = $analysisRun['discoverParseNs'];
+        $analyseNs           = $analysisRun['analyseNs'];
+        $projectContextUnits = $analysisRun['projectContextUnits'];
+        $diagnostics         = array_merge(
             $diagnostics,
             $this->filterSourceDiagnostics($sources->diagnostics, $projectRoot, $options, $reviewDiff),
         );
-        $projectContextUnits = $this->projectContextUnits(
-            projectRoot:       $projectRoot,
-            options:           $options,
-            config:            $config,
-            registry:          $registry,
-            reviewDiff:        $reviewDiff,
-            analysisSourceSet: $sources,
-        );
-
-        $analyseStart = hrtime(true);
-        $findings     = $registry->analyse(
-            $sources->analysisUnits,
-            new RuleContext($projectRoot, $config),
-            $projectContextUnits,
-            $runtimeTimingObserver,
-        );
-        $analyseNs        = hrtime(true) - $analyseStart;
         $mutationAnalysis = (new MutationAnalysisBuilder())->build(
             $projectRoot,
             $options->mutation,

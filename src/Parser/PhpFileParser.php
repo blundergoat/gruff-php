@@ -66,7 +66,17 @@ final readonly class PhpFileParser
             /** @var list<\PhpParser\Node\Stmt> $traversed Visitors preserve the parsed statement list shape. */
             $traversed = $nodeTraverser->traverse($statements);
 
-            return new AnalysisUnit($file, $source, $traversed, array_values($this->parser->getTokens()), []);
+            // Only comment tokens are consumed by rules (TODO density, commented-out code, secret
+            // scanner comment ranges). Keeping the full token stream is the dominant per-file
+            // memory cost at scale (~4-5GB peak on healthkit-sized projects).
+            $commentTokens = [];
+            foreach ($this->parser->getTokens() as $token) {
+                if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {
+                    $commentTokens[] = $token;
+                }
+            }
+
+            return new AnalysisUnit($file, $source, $traversed, $commentTokens, []);
         } catch (Error $error) {
             return new AnalysisUnit(
                 $file,

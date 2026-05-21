@@ -17,7 +17,6 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects tests that mutate shared process state without cleanup.
@@ -66,10 +65,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder    = new NodeFinder();
         $findings      = [];
         $cleanupCache  = [];
-        $classesByName = $this->classesByName($analysisUnit, $nodeFinder);
+        $classesByName = $this->classesByName($analysisUnit);
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             if (!$this->shouldCheckScopeCleanup($scope, $cleanupCache, $classesByName)) {
@@ -78,7 +76,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
 
             $findings = array_merge(
                 $findings,
-                $this->superglobalFindings($analysisUnit, $scope, $nodeFinder),
+                $this->superglobalFindings($analysisUnit, $scope),
                 $this->stateFunctionFindings($analysisUnit, $scope),
             );
         }
@@ -114,7 +112,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $nodeFinder): array
+    private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
@@ -239,7 +237,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * @return array<string, Stmt\Class_>
      */
-    private function classesByName(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
+    private function classesByName(AnalysisUnit $analysisUnit): array
     {
         $classes = [];
 

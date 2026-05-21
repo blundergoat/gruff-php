@@ -53,6 +53,21 @@ final class NodeIndex
     private static array $hierarchyCache = [];
 
     /**
+     * Evict every cache entry whose key transitively depends on the given
+     * analysis unit. Use this from streaming flows that release the unit's
+     * AST immediately after analysis so the index does not pin already-
+     * unreachable nodes until the unit itself is garbage collected.
+     *
+     * @return void
+     */
+    public static function evictUnit(AnalysisUnit $analysisUnit): void
+    {
+        if (self::$cache !== null) {
+            unset(self::$cache[$analysisUnit]);
+        }
+    }
+
+    /**
      * Return every node of the given concrete class in preorder.
      *
      * Matches NodeFinder::findInstanceOf semantics for a single class but
@@ -128,21 +143,12 @@ final class NodeIndex
      */
     public static function descendantsOfAny(Node $node, array $classes): array
     {
-        if ($classes === []) {
-            /** @var list<T> $empty */
-            $empty = [];
-            return $empty;
-        }
-
-        $descendants = self::bodyDescendants($node);
-        if ($descendants === []) {
-            /** @var list<T> $empty */
-            $empty = [];
-            return $empty;
+        if ($classes === [] || self::bodyDescendants($node) === []) {
+            return [];
         }
 
         $matches = [];
-        foreach ($descendants as $descendant) {
+        foreach (self::bodyDescendants($node) as $descendant) {
             foreach ($classes as $class) {
                 if ($descendant instanceof $class) {
                     $matches[] = $descendant;
@@ -151,7 +157,6 @@ final class NodeIndex
             }
         }
 
-        /** @var list<T> $matches */
         return $matches;
     }
 
@@ -223,9 +228,9 @@ final class NodeIndex
             {
                 $concrete = $node::class;
                 if (!isset($this->hierarchyCache[$concrete])) {
-                    /** @var list<class-string<Node>> $hierarchy */
+                    /** @var list<class-string<Node>> $hierarchy class-string list for index keys; PHPStan cannot narrow the dynamic ::class expression on its own. */
                     $hierarchy = [$concrete];
-                    /** @var array<string, class-string<Node>> $parents */
+                    /** @var array<string, class-string<Node>> $parents class_parents() returns string=>string but every entry here is a Node subclass under our traversal. */
                     $parents = class_parents($concrete) ?: [];
                     foreach ($parents as $parent) {
                         if ($parent === 'PhpParser\NodeAbstract') {
@@ -233,7 +238,7 @@ final class NodeIndex
                         }
                         $hierarchy[] = $parent;
                     }
-                    /** @var array<string, class-string<Node>> $implements */
+                    /** @var array<string, class-string<Node>> $implements class_implements() returns string=>string but every entry here is a Node interface under our traversal. */
                     $implements = class_implements($concrete) ?: [];
                     foreach ($implements as $interface) {
                         if ($interface === 'PhpParser\Node') {

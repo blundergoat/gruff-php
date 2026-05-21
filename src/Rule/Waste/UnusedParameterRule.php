@@ -61,7 +61,7 @@ final readonly class UnusedParameterRule implements RuleInterface
         $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($this->analysableNodes($analysisUnit, $nodeFinder) as $node) {
+        foreach ($this->analysableNodes($analysisUnit) as $node) {
             array_push($findings, ...$this->findingsForNode($analysisUnit, $definition, $nodeFinder, $node));
         }
 
@@ -71,7 +71,7 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * @return list<ClassMethod|Function_>
      */
-    private function analysableNodes(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
+    private function analysableNodes(AnalysisUnit $analysisUnit): array
     {
         $foundNodes = NodeIndex::nodesOfAny($analysisUnit, [Function_::class, ClassMethod::class]);
         $nodes = [];

@@ -18,7 +18,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects mocks for domain objects where real values keep tests clearer.
@@ -64,8 +63,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $useAliases = $this->collectUseAliases($analysisUnit, $nodeFinder);
+        $useAliases = $this->collectUseAliases($analysisUnit);
         $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
@@ -113,7 +111,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * @return array<string, string>
      */
-    private function collectUseAliases(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
+    private function collectUseAliases(AnalysisUnit $analysisUnit): array
     {
         $useAliases = [];
 

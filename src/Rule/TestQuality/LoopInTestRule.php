@@ -67,7 +67,6 @@ final readonly class LoopInTestRule implements RuleInterface
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\For_::class, Stmt\Foreach_::class, Stmt\While_::class, Stmt\Do_::class]) as $loop) {
-                /** @var Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop */
                 if (!$this->hasLoopAssertion($loop)) {
                     continue;
                 }
@@ -117,7 +116,7 @@ final readonly class LoopInTestRule implements RuleInterface
     private function hasLoopAssertion(Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
     {
         foreach ($loop->stmts as $stmt) {
-            if ($this->statementContainsAssertion($stmt)) {
+            if ($this->hasAssertionDescendant($stmt)) {
                 return true;
             }
         }
@@ -130,7 +129,7 @@ final readonly class LoopInTestRule implements RuleInterface
      *
      * @return bool True when a PHPUnit/Pest assertion call is reachable from the statement.
      */
-    private function statementContainsAssertion(Node $node): bool
+    private function hasAssertionDescendant(Node $node): bool
     {
         if (($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
             && TestQualityNodeHelper::isAssertionCall($node)
@@ -139,13 +138,13 @@ final readonly class LoopInTestRule implements RuleInterface
         }
 
         foreach ($node->getSubNodeNames() as $subNodeName) {
-            $value = $node->{$subNodeName};
-            if ($value instanceof Node && $this->statementContainsAssertion($value)) {
+            $subTree = $node->{$subNodeName};
+            if ($subTree instanceof Node && $this->hasAssertionDescendant($subTree)) {
                 return true;
             }
-            if (is_array($value)) {
-                foreach ($value as $item) {
-                    if ($item instanceof Node && $this->statementContainsAssertion($item)) {
+            if (is_array($subTree)) {
+                foreach ($subTree as $item) {
+                    if ($item instanceof Node && $this->hasAssertionDescendant($item)) {
                         return true;
                     }
                 }

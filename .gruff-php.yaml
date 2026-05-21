@@ -2,6 +2,7 @@ minimumPhpVersion: 8.3
 paths:
     ignore:
         - '.agents/**'
+        - '.antigravitycli/**'
         - '.claude/**'
         - '.codex/**'
         - '.github/**'
@@ -669,6 +670,7 @@ rules:
                 - RuleContext::settingsFor()
                 - SecretScannerHelper::lineNumberForOffset()
                 - SecretScannerHelper::redactedKeyValue()
+                - TestQualityNodeHelper::calls()
     # Variables assigned only to be returned add noise without naming value.
     waste.redundant-variable:
         enabled: true

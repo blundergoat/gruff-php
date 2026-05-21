@@ -14,9 +14,7 @@ use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
-use PhpParser\Node;
 use PhpParser\Node\Expr;
-use PhpParser\NodeFinder;
 
 /**
  * Detects mock objects that are used without verification expectations.
@@ -65,11 +63,10 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            $findings = array_merge($findings, $this->findingsForScope($analysisUnit, $scope, $nodeFinder));
+            $findings = array_merge($findings, $this->findingsForScope($analysisUnit, $scope));
         }
 
         return $findings;
@@ -78,23 +75,22 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope, NodeFinder $nodeFinder): array
+    private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $assignedVarObjectIds = [];
-        $mockAssignments      = $this->mockAssignments($scope, $nodeFinder, $assignedVarObjectIds);
+        $mockAssignments      = $this->mockAssignments($scope, $assignedVarObjectIds);
 
         if ($mockAssignments === []) {
             return [];
         }
 
-        $reads    = $this->variableReads($scope, $nodeFinder, $assignedVarObjectIds);
+        $reads    = $this->variableReads($scope, $assignedVarObjectIds);
         $findings = [];
 
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
                 analysisUnit:       $analysisUnit,
                 scope:              $scope,
-                nodeFinder:         $nodeFinder,
                 varName:            $varName,
                 assignment:         $assignment,
                 reads:              $reads,
@@ -114,7 +110,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     private function mockAssignments(
         TestQualityScope $scope,
-        NodeFinder $nodeFinder,
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
@@ -145,7 +140,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, list<Expr\Variable>>
      */
-    private function variableReads(TestQualityScope $scope, NodeFinder $nodeFinder, array $assignedVarObjectIds): array
+    private function variableReads(TestQualityScope $scope, array $assignedVarObjectIds): array
     {
         $reads = [];
 
@@ -174,7 +169,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     private function findingForMock(
         AnalysisUnit $analysisUnit,
         TestQualityScope $scope,
-        NodeFinder $nodeFinder,
         string $varName,
         array $assignment,
         array $reads,
@@ -183,7 +177,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             return null;
         }
 
-        $methodNames = $this->methodNamesCalledOnVariable($scope, $nodeFinder, $varName);
+        $methodNames = $this->methodNamesCalledOnVariable($scope, $varName);
         if ($this->hasAnyIntersection($methodNames, self::VERIFICATION_METHODS)) {
             return null;
         }
@@ -265,7 +259,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * @return list<string>
      */
-    private function methodNamesCalledOnVariable(TestQualityScope $scope, NodeFinder $nodeFinder, string $varName): array
+    private function methodNamesCalledOnVariable(TestQualityScope $scope, string $varName): array
     {
         $names = [];
 

@@ -54,6 +54,7 @@ final readonly class TodoDensityRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast bail: most files have zero deferred-work markers; skip the per-token scan for them.
         if (preg_match('/\b(?:TODO|FIXME|HACK|XXX)\b/i', $analysisUnit->source) !== 1) {
             return [];
         }

@@ -17,7 +17,6 @@ use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
-use PhpParser\NodeFinder;
 
 /**
  * Detects type assertions that restate guarantees already made by the subject.
@@ -56,11 +55,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            $localTypes = $this->collectLocalAssignmentTypes($scope, $nodeFinder);
+            $localTypes = $this->collectLocalAssignmentTypes($scope);
 
             foreach (TestQualityNodeHelper::calls($scope) as $call) {
                 $name = TestQualityNodeHelper::callName($call);
@@ -106,7 +104,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * @return array<string, string>
      */
-    private function collectLocalAssignmentTypes(TestQualityScope $scope, NodeFinder $nodeFinder): array
+    private function collectLocalAssignmentTypes(TestQualityScope $scope): array
     {
         $types = [];
 

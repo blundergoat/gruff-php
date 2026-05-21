@@ -60,10 +60,9 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
-        foreach ($this->candidateClasses($analysisUnit, $nodeFinder) as $class) {
+        foreach ($this->candidateClasses($analysisUnit) as $class) {
             array_push($findings, ...$this->findingsForClass($analysisUnit, $class));
         }
 
@@ -73,7 +72,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * @return list<Stmt\Class_>
      */
-    private function candidateClasses(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
+    private function candidateClasses(AnalysisUnit $analysisUnit): array
     {
         $classes = [];
 

@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\NodeIndex;
+use GruffPhp\Rule\ProjectRuleAccumulator;
 use GruffPhp\Rule\ProjectRuleInterface;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -30,9 +31,34 @@ use PhpParser\Node\UnionType;
 
 /**
  * Detects project interfaces that have only one concrete implementation.
+ *
+ * Implements ProjectRuleAccumulator so RuleRegistry can extract project-level
+ * type data from each unit incrementally and release each unit's AST as the
+ * per-unit phase advances. This keeps peak memory close to one unit's worth
+ * rather than the whole project, which matters on large codebases.
  */
-final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterface
+final class SingleImplementorInterfaceRule implements ProjectRuleInterface, ProjectRuleAccumulator
 {
+    /**
+     * @var array{
+     *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     extendedInterfaces: array<string, true>
+     * }
+     */
+    private array $accumulated = [
+        'interfaces' => [],
+        'implementations' => [],
+        'typeReferences' => [],
+        'extendedInterfaces' => [],
+    ];
+
+    /**
+     * @var list<string>|null Excluded display path prefixes captured at startProject().
+     */
+    private ?array $accumulationExcludedPaths = null;
+
     /**
      * Stable identifier for the single-implementor interface rule.
      */
@@ -104,54 +130,108 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      */
     public function analyseProject(array $units, RuleContext $ruleContext): array
     {
-        $settings                   = $ruleContext->settingsFor($this->definition());
-        $externalPrefixes           = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('externalNamespacePrefixes'));
-        $frameworkAttributePrefixes = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('frameworkAttributePrefixes'));
-        $excludedPaths              = $settings->stringListOption('additionalExcludedPaths');
+        $this->startProject($ruleContext);
+        foreach ($units as $unit) {
+            $this->accumulate($unit, $ruleContext);
+        }
 
-        $eligibleUnits = $this->filterEligibleUnits($units, $excludedPaths);
-        $projectTypes  = $this->collectProjectTypes($eligibleUnits);
-
-        return $this->buildFindings(
-            interfaces:                 $projectTypes['interfaces'],
-            implementations:            $projectTypes['implementations'],
-            typeReferences:             $projectTypes['typeReferences'],
-            extendedInterfaces:         $projectTypes['extendedInterfaces'],
-            externalPrefixes:           $externalPrefixes,
-            frameworkAttributePrefixes: $frameworkAttributePrefixes,
-        );
+        return $this->finishProject($ruleContext);
     }
 
     /**
-     * @param list<AnalysisUnit> $units
-     * @return array{
-     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
-     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     extendedInterfaces: array<string, true>
-     * }
+     * Reset accumulated state at the start of a streaming project pass.
+     *
+     * @return void
      */
-    private function collectProjectTypes(array $units): array
+    public function startProject(RuleContext $ruleContext): void
     {
-        $projectTypes = [
+        $settings                        = $ruleContext->settingsFor($this->definition());
+        $this->accumulationExcludedPaths = $settings->stringListOption('additionalExcludedPaths');
+        $this->accumulated               = [
             'interfaces' => [],
             'implementations' => [],
             'typeReferences' => [],
             'extendedInterfaces' => [],
         ];
+    }
 
-        foreach ($units as $unit) {
-            $this->collectUnitTypes($unit, $projectTypes);
+    /**
+     * Extract interfaces, implementations, and type references from one unit.
+     *
+     * Stores the per-unit summary on `$this->accumulated`; the AST may be
+     * released by the orchestrator as soon as this call returns.
+     *
+     * @return void
+     */
+    public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
+    {
+        if ($this->isExcludedUnit($analysisUnit)) {
+            return;
         }
 
-        return $projectTypes;
+        $this->collectUnitTypes($analysisUnit, $this->accumulated);
+    }
+
+    /**
+     * Produce single-implementor findings from the accumulated state and reset.
+     *
+     * @return list<Finding>
+     */
+    public function finishProject(RuleContext $ruleContext): array
+    {
+        $settings                   = $ruleContext->settingsFor($this->definition());
+        $externalPrefixes           = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('externalNamespacePrefixes'));
+        $frameworkAttributePrefixes = array_map(static fn (string $prefix): string => strtolower($prefix), $settings->stringListOption('frameworkAttributePrefixes'));
+
+        $findings = $this->buildFindings(
+            interfaces:                 $this->accumulated['interfaces'],
+            implementations:            $this->accumulated['implementations'],
+            typeReferences:             $this->accumulated['typeReferences'],
+            extendedInterfaces:         $this->accumulated['extendedInterfaces'],
+            externalPrefixes:           $externalPrefixes,
+            frameworkAttributePrefixes: $frameworkAttributePrefixes,
+        );
+
+        // Drop accumulated references so the previous project pass does not
+        // pin objects after we are done.
+        $this->accumulated = [
+            'interfaces' => [],
+            'implementations' => [],
+            'typeReferences' => [],
+            'extendedInterfaces' => [],
+        ];
+        $this->accumulationExcludedPaths = null;
+
+        return $findings;
+    }
+
+    /**
+     * Apply path exclusions that previously gated filterEligibleUnits.
+     *
+     * @return bool True when the unit should be skipped from accumulation.
+     */
+    private function isExcludedUnit(AnalysisUnit $analysisUnit): bool
+    {
+        $display = $analysisUnit->file->displayPath;
+
+        if (str_starts_with($display, 'vendor/')) {
+            return true;
+        }
+
+        foreach ($this->accumulationExcludedPaths ?? [] as $excluded) {
+            if (str_starts_with($display, $excluded)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
      * @param array{
-     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
-     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
      * @return void
@@ -214,9 +294,9 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
 
     /**
      * @param array{
-     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
-     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
      * @return void
@@ -235,7 +315,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         $extends                          = $this->resolveNameList($interface->extends);
         $projectTypes['interfaces'][$fqn] = [
             'fqn' => $fqn,
-            'unit' => $analysisUnit,
+            'displayPath' => $analysisUnit->file->displayPath,
             'line' => $interface->getStartLine(),
             'extends' => $extends,
             'attributes' => $this->resolveAttributes(array_values($interface->attrGroups)),
@@ -248,9 +328,9 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
 
     /**
      * @param array{
-     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
-     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
      * @return void
@@ -269,16 +349,16 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         foreach ($this->resolveNameList($class->implements) as $implementedFqn) {
             $projectTypes['implementations'][$implementedFqn][] = [
                 'classFqn' => $classFqn,
-                'unit' => $analysisUnit,
+                'displayPath' => $analysisUnit->file->displayPath,
                 'line' => $class->getStartLine(),
             ];
         }
     }
 
     /**
-     * @param array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}> $interfaces
-     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>                                       $implementations
-     * @param array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>                                       $typeReferences
+     * @param array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}> $interfaces
+     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $implementations
+     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $typeReferences
      * @param array<string, true>                                                                                               $extendedInterfaces
      * @param list<string>                                                                                                      $externalPrefixes
      * @param list<string>                                                                                                      $frameworkAttributePrefixes
@@ -336,7 +416,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
                     $fqn,
                     $implementorFqn,
                 ),
-                filePath:    $interface['unit']->file->displayPath,
+                filePath:    $interface['displayPath'],
                 line:        $interface['line'],
                 severity:    $definition->defaultSeverity,
                 pillar:      $definition->pillar,
@@ -357,32 +437,6 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         return $findings;
     }
 
-    /**
-     * @param list<AnalysisUnit> $units
-     * @param list<string>       $excludedPaths
-     * @return list<AnalysisUnit>
-     */
-    private function filterEligibleUnits(array $units, array $excludedPaths): array
-    {
-        return array_values(array_filter(
-            $units,
-            static function (AnalysisUnit $analysisUnit) use ($excludedPaths): bool {
-                $display = $analysisUnit->file->displayPath;
-
-                if (str_starts_with($display, 'vendor/')) {
-                    return false;
-                }
-
-                foreach ($excludedPaths as $excluded) {
-                    if (str_starts_with($display, $excluded)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            },
-        ));
-    }
 
     /**
      * Resolve the fully qualified declaration name for a class or interface.
@@ -451,9 +505,9 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
 
     /**
      * @param array{
-     *     interfaces: array<string, array{fqn: string, unit: AnalysisUnit, line: int, extends: list<string>, attributes: list<string>}>,
-     *     implementations: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
-     *     typeReferences: array<string, list<array{classFqn: string, unit: AnalysisUnit, line: int}>>,
+     *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
+     *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
+     *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
      * } $projectTypes
      * @return void
@@ -474,7 +528,7 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
         foreach ($this->namesFromType($type) as $name) {
             $projectTypes['typeReferences'][$this->resolveName($name)][] = [
                 'classFqn' => $classFqn,
-                'unit' => $analysisUnit,
+                'displayPath' => $analysisUnit->file->displayPath,
                 'line' => $line,
             ];
         }

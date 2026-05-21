@@ -365,77 +365,167 @@ final class RuleRegistry
     }
 
     /**
-     * Run all enabled file and project rules against parsed units.
+     * Determine whether the enabled rule set is fully streaming-capable.
      *
-     * @param list<AnalysisUnit>      $units              Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
-     * @return list<Finding> Findings produced by enabled rules.
+     * A rule set is streaming-capable when every enabled project rule
+     * implements ProjectRuleAccumulator. Per-unit rules are always
+     * streaming-friendly.
      */
-    public function analyse(
-        array $units,
+    public function supportsStreaming(RuleContext $ruleContext): bool
+    {
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Initialise project-rule accumulators before a streaming analysis pass.
+     *
+     * @return void
+     */
+    public function beginStreaming(RuleContext $ruleContext): void
+    {
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if ($rule instanceof ProjectRuleAccumulator) {
+                $rule->startProject($ruleContext);
+            }
+        }
+    }
+
+    /**
+     * Run every enabled per-unit rule and accumulator against a single unit.
+     *
+     * Use together with beginStreaming() and endStreaming() to drive a
+     * parse → analyse → release pipeline that keeps peak memory close to
+     * one unit's worth on large codebases.
+     *
+     * @return list<Finding> Findings produced for this unit only.
+     */
+    public function analyseUnit(
+        AnalysisUnit $unit,
         RuleContext $ruleContext,
-        ?array $projectUnits = null,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
-        $findings     = [];
-        $enabledRules = $this->enabledRules($ruleContext->config);
+        $findings = $this->runPerUnitRules($unit, $ruleContext, $ruleRunnerObserver);
+        $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
+        return $findings;
+    }
 
-        foreach ($units as $unit) {
-            if ($unit->hasParseErrors()) {
+    /**
+     * Run only the per-unit (file-scoped) rules against a single unit.
+     *
+     * @return list<Finding>
+     */
+    private function runPerUnitRules(
+        AnalysisUnit $unit,
+        RuleContext $ruleContext,
+        ?RuleRunnerObserver $ruleRunnerObserver,
+    ): array {
+        if ($unit->hasParseErrors()) {
+            return [];
+        }
+
+        $findings = [];
+        $isPhp    = $unit->file->isPhp();
+
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if (!$rule instanceof RuleInterface) {
+                continue;
+            }
+            if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
                 continue;
             }
 
-            $isPhp = $unit->file->isPhp();
-
-            foreach ($enabledRules as $rule) {
-                if (!$rule instanceof RuleInterface) {
-                    continue;
-                }
-
-                if (!$isPhp && !$rule instanceof SourceTextRuleInterface) {
-                    continue;
-                }
-
-                if ($ruleRunnerObserver === null) {
-                    array_push($findings, ...$rule->analyse($unit, $ruleContext));
-                    continue;
-                }
-
-                $ruleId       = $rule->definition()->id;
-                $started      = hrtime(true);
-                $ruleFindings = $rule->analyse($unit, $ruleContext);
-                $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
-                array_push($findings, ...$ruleFindings);
+            if ($ruleRunnerObserver === null) {
+                array_push($findings, ...$rule->analyse($unit, $ruleContext));
+                continue;
             }
+
+            $ruleId       = $rule->definition()->id;
+            $started      = hrtime(true);
+            $ruleFindings = $rule->analyse($unit, $ruleContext);
+            $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
+            array_push($findings, ...$ruleFindings);
         }
 
-        $projectUnits ??= $units;
-        $analyseableUnits = array_values(array_filter(
-            $projectUnits,
-            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
-        ));
+        return $findings;
+    }
 
-        if ($analyseableUnits !== []) {
-            foreach ($enabledRules as $rule) {
-                if (!$rule instanceof ProjectRuleInterface) {
-                    continue;
-                }
-
-                if ($ruleRunnerObserver === null) {
-                    array_push($findings, ...$rule->analyseProject($analyseableUnits, $ruleContext));
-                    continue;
-                }
-
-                $ruleId          = $rule->definition()->id;
-                $started         = hrtime(true);
-                $projectFindings = $rule->analyseProject($analyseableUnits, $ruleContext);
-                $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
-                array_push($findings, ...$projectFindings);
-            }
+    /**
+     * Push one unit through every enabled streaming project rule.
+     */
+    private function accumulateForUnit(
+        AnalysisUnit $unit,
+        RuleContext $ruleContext,
+        ?RuleRunnerObserver $ruleRunnerObserver,
+    ): void {
+        if ($unit->hasParseErrors() || !$unit->file->isPhp()) {
+            return;
         }
 
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if (!$rule instanceof ProjectRuleAccumulator) {
+                continue;
+            }
+
+            if ($ruleRunnerObserver === null) {
+                $rule->accumulate($unit, $ruleContext);
+                continue;
+            }
+
+            $ruleId  = $rule->definition()->id;
+            $started = hrtime(true);
+            $rule->accumulate($unit, $ruleContext);
+            $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
+        }
+    }
+
+    /**
+     * Finalise project-rule accumulators after streaming analysis completes.
+     *
+     * @return list<Finding> Project-level findings from accumulated state.
+     */
+    public function endStreaming(
+        RuleContext $ruleContext,
+        ?RuleRunnerObserver $ruleRunnerObserver = null,
+    ): array {
+        $findings = [];
+
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if (!$rule instanceof ProjectRuleAccumulator) {
+                continue;
+            }
+
+            if ($ruleRunnerObserver === null) {
+                array_push($findings, ...$rule->finishProject($ruleContext));
+                continue;
+            }
+
+            $ruleId          = $rule->definition()->id;
+            $started         = hrtime(true);
+            $projectFindings = $rule->finishProject($ruleContext);
+            $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
+            array_push($findings, ...$projectFindings);
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Apply the canonical ordering and dedupe pass to a streaming run's
+     * collected findings. Callers that drive analyseUnit() / endStreaming()
+     * themselves should call this once at the end so the output matches
+     * the non-streaming analyse() flow byte-for-byte.
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    public function finalizeFindings(array $findings): array
+    {
         $findings = $this->deduplicateNamingFindings($this->deduplicateFindings($findings));
 
         usort(
@@ -452,6 +542,111 @@ final class RuleRegistry
                 $rightFinding->message,
             ],
         );
+
+        return $findings;
+    }
+
+    /**
+     * Run all enabled file and project rules against parsed units.
+     *
+     * @param list<AnalysisUnit>      $units              Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
+     * @return list<Finding> Findings produced by enabled rules.
+     */
+    public function analyse(
+        array $units,
+        RuleContext $ruleContext,
+        ?array $projectUnits = null,
+        ?RuleRunnerObserver $ruleRunnerObserver = null,
+        bool $releaseUnitsAfterAnalysis = false,
+    ): array {
+        $legacyProjectRules = $this->legacyProjectRules($ruleContext);
+        $canReleaseUnits    = $releaseUnitsAfterAnalysis
+            && $legacyProjectRules === []
+            && $projectUnits === null;
+
+        $this->beginStreaming($ruleContext);
+
+        $findings = [];
+        foreach ($units as $unit) {
+            array_push($findings, ...$this->runPerUnitRules($unit, $ruleContext, $ruleRunnerObserver));
+            if ($projectUnits === null) {
+                $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
+            }
+            if ($canReleaseUnits) {
+                $unit->release();
+            }
+        }
+
+        if ($projectUnits !== null) {
+            foreach ($projectUnits as $contextUnit) {
+                $this->accumulateForUnit($contextUnit, $ruleContext, $ruleRunnerObserver);
+            }
+        }
+
+        array_push($findings, ...$this->endStreaming($ruleContext, $ruleRunnerObserver));
+
+        if ($legacyProjectRules !== []) {
+            array_push($findings, ...$this->runLegacyProjectRules(
+                $legacyProjectRules,
+                $projectUnits ?? $units,
+                $ruleContext,
+                $ruleRunnerObserver,
+            ));
+        }
+
+        return $this->finalizeFindings($findings);
+    }
+
+    /**
+     * @return list<ProjectRuleInterface> Enabled non-accumulator project rules.
+     */
+    private function legacyProjectRules(RuleContext $ruleContext): array
+    {
+        $rules = [];
+        foreach ($this->enabledRules($ruleContext->config) as $rule) {
+            if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
+                $rules[] = $rule;
+            }
+        }
+        return $rules;
+    }
+
+    /**
+     * @param list<ProjectRuleInterface> $rules
+     * @param list<AnalysisUnit>         $contextUnits
+     * @return list<Finding>
+     */
+    private function runLegacyProjectRules(
+        array $rules,
+        array $contextUnits,
+        RuleContext $ruleContext,
+        ?RuleRunnerObserver $ruleRunnerObserver,
+    ): array {
+        $analyseableUnits = array_values(array_filter(
+            $contextUnits,
+            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
+        ));
+
+        if ($analyseableUnits === []) {
+            return [];
+        }
+
+        $findings = [];
+        foreach ($rules as $rule) {
+            if ($ruleRunnerObserver === null) {
+                array_push($findings, ...$rule->analyseProject($analyseableUnits, $ruleContext));
+                continue;
+            }
+
+            $ruleId          = $rule->definition()->id;
+            $started         = hrtime(true);
+            $projectFindings = $rule->analyseProject($analyseableUnits, $ruleContext);
+            $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
+            array_push($findings, ...$projectFindings);
+        }
 
         return $findings;
     }
