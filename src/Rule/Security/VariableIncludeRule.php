@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
-use PhpParser\NodeFinder;
 
 /**
  * Detects include and require paths built from variables.
@@ -53,10 +53,9 @@ final class VariableIncludeRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Include_::class) as $include) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\Include_::class) as $include) {
             if (SecurityNodeHelper::isStringLiteral($include->expr)) {
                 continue;
             }

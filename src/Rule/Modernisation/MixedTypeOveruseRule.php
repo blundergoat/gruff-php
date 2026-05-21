@@ -10,12 +10,12 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects signatures that rely on mixed where narrower types would improve contracts.
@@ -58,10 +58,9 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->find($analysisUnit->statements, static fn (Node $node): bool => $node instanceof Stmt\ClassMethod || $node instanceof Stmt\Function_) as $functionLike) {
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class]) as $functionLike) {
             if ($functionLike instanceof Stmt\ClassMethod && !$functionLike->isPublic()) {
                 continue;
             }

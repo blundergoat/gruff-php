@@ -54,6 +54,13 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             return [];
         }
 
+        // Fast bail: the regex only matches keys containing one of these
+        // tokens. Skipping the expensive alternation when no token appears
+        // makes the rule near-free for the common case.
+        if (preg_match('/(?:API_KEY|PASSWORD|PASS|SECRET|TOKEN|PRIVATE_KEY)/', $analysisUnit->source) !== 1) {
+            return [];
+        }
+
         preg_match_all(
             '/\b(?<key>[A-Z0-9_]*(?:API_KEY|PASSWORD|PASS|SECRET|TOKEN|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*["\']?(?<value>[A-Za-z0-9_+\/=.-]{8,})["\']?/',
             $analysisUnit->source,

@@ -11,6 +11,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -18,7 +19,6 @@ use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects classes with public APIs large enough to dilute their responsibility.
@@ -61,10 +61,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Class_ || $node instanceof Enum_;
-        });
+        $classLikes = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Enum_::class]);
 
         $findings = [];
 

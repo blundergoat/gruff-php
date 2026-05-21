@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\Class_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects concrete classes that declare no members and are not marker exceptions.
@@ -54,8 +54,7 @@ final readonly class EmptyClassRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
-        $classes    = $nodeFinder->findInstanceOf($analysisUnit->statements, Class_::class);
+        $classes    = NodeIndex::nodesOf($analysisUnit, Class_::class);
 
         $findings = [];
 

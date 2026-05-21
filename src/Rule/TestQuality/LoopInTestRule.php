@@ -10,13 +10,13 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects loop constructs in tests that obscure individual cases.
@@ -63,20 +63,12 @@ final readonly class LoopInTestRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Stmt\For_ || $node instanceof Stmt\Foreach_ || $node instanceof Stmt\While_ || $node instanceof Stmt\Do_) as $loop) {
-                if (!$loop instanceof Stmt\For_
-                    && !$loop instanceof Stmt\Foreach_
-                    && !$loop instanceof Stmt\While_
-                    && !$loop instanceof Stmt\Do_
-                ) {
-                    continue;
-                }
-
-                if (!$this->hasLoopAssertion($nodeFinder, $loop)) {
+            foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\For_::class, Stmt\Foreach_::class, Stmt\While_::class, Stmt\Do_::class]) as $loop) {
+                /** @var Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop */
+                if (!$this->hasLoopAssertion($loop)) {
                     continue;
                 }
 
@@ -122,12 +114,44 @@ final readonly class LoopInTestRule implements RuleInterface
      *
      * @return bool True when a PHPUnit/Pest assertion is inside the loop body.
      */
-    private function hasLoopAssertion(NodeFinder $nodeFinder, Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
+    private function hasLoopAssertion(Stmt\For_|Stmt\Foreach_|Stmt\While_|Stmt\Do_ $loop): bool
     {
-        return $nodeFinder->findFirst(
-            $loop->stmts,
-            static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
-                && TestQualityNodeHelper::isAssertionCall($node),
-        ) !== null;
+        foreach ($loop->stmts as $stmt) {
+            if ($this->statementContainsAssertion($stmt)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Recursively check whether a statement subtree contains an assertion call.
+     *
+     * @return bool True when a PHPUnit/Pest assertion call is reachable from the statement.
+     */
+    private function statementContainsAssertion(Node $node): bool
+    {
+        if (($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
+            && TestQualityNodeHelper::isAssertionCall($node)
+        ) {
+            return true;
+        }
+
+        foreach ($node->getSubNodeNames() as $subNodeName) {
+            $value = $node->{$subNodeName};
+            if ($value instanceof Node && $this->statementContainsAssertion($value)) {
+                return true;
+            }
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if ($item instanceof Node && $this->statementContainsAssertion($item)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }

@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -20,7 +21,6 @@ use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\EnumCase;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects class constants and enum cases that lack local PHPDoc.
@@ -60,10 +60,9 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassLike::class) as $classLike) {
+        foreach (NodeIndex::nodesOf($analysisUnit, ClassLike::class) as $classLike) {
             if (!$this->isSupportedClassLike($classLike) || $classLike->name === null) {
                 continue;
             }

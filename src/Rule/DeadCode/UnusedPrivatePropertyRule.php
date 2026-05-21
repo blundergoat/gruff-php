@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -61,11 +62,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     {
         $definition = $this->definition();
         $nodeFinder = new NodeFinder();
-        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Class_
-                || $node instanceof Trait_
-                || $node instanceof Enum_;
-        });
+        $classLikes = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]);
 
         $findings = [];
 

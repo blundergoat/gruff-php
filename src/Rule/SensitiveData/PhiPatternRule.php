@@ -64,6 +64,14 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast bail: a PHI finding requires a context keyword on the same
+        // line as the matched identifier. If the file has no PHI context
+        // keyword anywhere, none of the per-pattern matches can ever pass
+        // hasPhiContext().
+        if (preg_match('/\b(?:health|medicare|mrn|nhi|patient|ssn|tax_file_number|tfn)\b/i', $analysisUnit->source) !== 1) {
+            return [];
+        }
+
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 

@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -18,7 +19,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects @param tags whose names no longer match the callable signature.
@@ -58,10 +58,7 @@ final readonly class StaleParamTagRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
-        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod || $node instanceof Function_;
-        });
+        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 

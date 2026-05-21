@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -17,7 +18,6 @@ use GruffPhp\Rule\StmtChildVisitor;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects statements that cannot run after a terminating control-flow statement.
@@ -55,12 +55,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $functions  = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Stmt\ClassMethod
-                || $node instanceof Stmt\Function_
-                || $node instanceof Expr\Closure;
-        });
+        $functions  = NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class, Expr\Closure::class]);
 
         $findings = [];
 

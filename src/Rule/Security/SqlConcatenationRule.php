@@ -10,13 +10,13 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Identifier;
-use PhpParser\NodeFinder;
 
 /**
  * Detects SQL-like strings assembled through concatenation.
@@ -60,21 +60,11 @@ final class SqlConcatenationRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\MethodCall::class) as $call) {
-            $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
-            if ($firstArg !== null
-                && $call->name instanceof Identifier
-                && in_array(strtolower($call->name->toString()), self::QUERY_METHODS, true)
-                && SecurityNodeHelper::containsConcatOrInterpolation($firstArg)
-            ) {
-                $findings[] = $this->finding($analysisUnit, $call);
-            }
-        }
-
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\StaticCall::class) as $call) {
+        $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]);
+        foreach ($calls as $call) {
+            /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
             $firstArg = SecurityNodeHelper::argumentValue($call->args, 0);
             if ($firstArg !== null
                 && $call->name instanceof Identifier

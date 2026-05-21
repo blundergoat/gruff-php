@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects oversized setup methods that make individual tests depend on shared state.
@@ -56,10 +56,9 @@ final readonly class SetupBloatRule implements RuleInterface
     {
         $definition    = $this->definition();
         $minSetupLines = (int) $ruleContext->settingsFor($definition)->numericThreshold('minSetupLines');
-        $nodeFinder    = new NodeFinder();
         $findings      = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $setup          = null;
             $testLineCounts = [];
 

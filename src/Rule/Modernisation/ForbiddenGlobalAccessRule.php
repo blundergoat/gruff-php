@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
-use PhpParser\NodeFinder;
 
 /**
  * Detects direct reads from global request and environment arrays.
@@ -62,11 +62,10 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
         $findings   = [];
         $seen       = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Variable::class) as $variable) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\Variable::class) as $variable) {
             if (!is_string($variable->name) || !in_array($variable->name, self::FORBIDDEN_GLOBALS, true)) {
                 continue;
             }

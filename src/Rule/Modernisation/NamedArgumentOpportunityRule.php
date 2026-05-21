@@ -10,13 +10,13 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Stmt\ClassMethod;
-use PhpParser\NodeFinder;
 
 /**
  * Detects calls whose repeated scalar arguments would be clearer as named arguments.
@@ -62,15 +62,12 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
         $definition             = $this->definition();
         $minPositionalArguments = (int) $ruleContext->settingsFor($definition)->numericThreshold('minPositionalArguments');
-        $nodeFinder             = new NodeFinder();
-        $variadicMethodNames    = $this->variadicMethodNames($analysisUnit->statements, $nodeFinder);
+        $variadicMethodNames    = $this->variadicMethodNames($analysisUnit);
         $findings               = [];
 
-        foreach ($nodeFinder->find($analysisUnit->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
-            if (!$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
-                continue;
-            }
-
+        $calls = NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]);
+        foreach ($calls as $call) {
+            /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query restricts these classes. */
             if ($this->isVariadicMethodCall($call, $variadicMethodNames)) {
                 continue;
             }
@@ -123,14 +120,13 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find method names declared with variadic parameters in the same file.
      *
-     * @param list<Node> $statements Parsed statements to inspect.
      * @return array<string, true> Lowercase variadic method names.
      */
-    private function variadicMethodNames(array $statements, NodeFinder $nodeFinder): array
+    private function variadicMethodNames(AnalysisUnit $analysisUnit): array
     {
         $names = [];
 
-        foreach ($nodeFinder->findInstanceOf($statements, ClassMethod::class) as $classMethod) {
+        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
             foreach ($classMethod->params as $param) {
                 if ($param->variadic) {
                     $names[strtolower($classMethod->name->toString())] = true;

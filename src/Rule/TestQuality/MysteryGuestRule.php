@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -18,7 +19,6 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
-use PhpParser\NodeFinder;
 
 /**
  * Detects tests that reach hidden external fixtures or global state.
@@ -79,11 +79,10 @@ final readonly class MysteryGuestRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\New_) as $node) {
+            foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\New_::class]) as $node) {
                 $guest = $this->mysteryGuest($node);
                 if ($guest === null) {
                     continue;
@@ -154,12 +153,7 @@ final readonly class MysteryGuestRule implements RuleInterface
         }
 
         $readerLine = $node->getStartLine();
-        $nodeFinder = new NodeFinder();
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $candidate): bool => $candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall || $candidate instanceof Expr\New_) as $candidate) {
-            if (!$candidate instanceof Expr\FuncCall && !$candidate instanceof Expr\MethodCall && !$candidate instanceof Expr\StaticCall && !$candidate instanceof Expr\New_) {
-                continue;
-            }
-
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class, Expr\New_::class]) as $candidate) {
             if ($candidate->getStartLine() >= $readerLine) {
                 continue;
             }

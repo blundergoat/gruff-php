@@ -11,6 +11,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -22,7 +23,6 @@ use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Measures the number of independent execution paths through function-like bodies.
@@ -70,11 +70,7 @@ final readonly class NpathComplexityRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod
-                || $node instanceof Function_;
-        });
+        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 

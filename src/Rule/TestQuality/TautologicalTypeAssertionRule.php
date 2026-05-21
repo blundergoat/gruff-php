@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -109,11 +110,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     {
         $types = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
-            if (!$assign instanceof Expr\Assign) {
-                continue;
-            }
-
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }

@@ -45,6 +45,14 @@ final class NodeIndex
     private static ?WeakMap $logicalLineCountCache = null;
 
     /**
+     * Process-wide cache of class hierarchy keys per concrete node class, so
+     * each visitor instance can reuse parent/interface lookups across files.
+     *
+     * @var array<class-string<Node>, list<class-string<Node>>>
+     */
+    private static array $hierarchyCache = [];
+
+    /**
      * Return every node of the given concrete class in preorder.
      *
      * Matches NodeFinder::findInstanceOf semantics for a single class but
@@ -108,6 +116,46 @@ final class NodeIndex
     }
 
     /**
+     * Return body descendants of a function-like node that are instances of any
+     * supplied class, preserving preorder. Use this for scope-bounded rule
+     * scans (e.g. test-method scans) that previously called NodeFinder->find
+     * with a class-disjunction predicate on a function body.
+     *
+     * @template T of Node
+     * @param Node                    $node    Function-like node whose body should be scanned.
+     * @param list<class-string<T>>  $classes Concrete node classes to keep.
+     * @return list<T>
+     */
+    public static function descendantsOfAny(Node $node, array $classes): array
+    {
+        if ($classes === []) {
+            /** @var list<T> $empty */
+            $empty = [];
+            return $empty;
+        }
+
+        $descendants = self::bodyDescendants($node);
+        if ($descendants === []) {
+            /** @var list<T> $empty */
+            $empty = [];
+            return $empty;
+        }
+
+        $matches = [];
+        foreach ($descendants as $descendant) {
+            foreach ($classes as $class) {
+                if ($descendant instanceof $class) {
+                    $matches[] = $descendant;
+                    break;
+                }
+            }
+        }
+
+        /** @var list<T> $matches */
+        return $matches;
+    }
+
+    /**
      * Count distinct non-Nop statement start lines below a function-like body.
      *
      * @param Node $node Function-like node whose logical lines should be counted.
@@ -151,25 +199,61 @@ final class NodeIndex
             return $cached;
         }
 
-        $visitor = new class extends NodeVisitorAbstract {
+        $hierarchyCacheRef = &self::$hierarchyCache;
+        $visitor           = new class ($hierarchyCacheRef) extends NodeVisitorAbstract {
             /** @var array<class-string<Node>, list<Node>> */
             private array $nodesByClass = [];
 
             /**
-             * Add a node to the concrete-class index.
+             * @param array<class-string<Node>, list<class-string<Node>>> $hierarchyCache
+             *     Shared, process-wide cache of class hierarchy keys.
+             */
+            public function __construct(private array &$hierarchyCache)
+            {
+            }
+
+            /**
+             * Add a node to the index under every ancestor class and
+             * implemented interface so abstract base lookups still work.
              *
              * @param Node $node Node currently being traversed.
              * @return null Keeps traversal running.
              */
             public function enterNode(Node $node): null
             {
-                $this->nodesByClass[$node::class][] = $node;
+                $concrete = $node::class;
+                if (!isset($this->hierarchyCache[$concrete])) {
+                    /** @var list<class-string<Node>> $hierarchy */
+                    $hierarchy = [$concrete];
+                    /** @var array<string, class-string<Node>> $parents */
+                    $parents = class_parents($concrete) ?: [];
+                    foreach ($parents as $parent) {
+                        if ($parent === 'PhpParser\NodeAbstract') {
+                            continue;
+                        }
+                        $hierarchy[] = $parent;
+                    }
+                    /** @var array<string, class-string<Node>> $implements */
+                    $implements = class_implements($concrete) ?: [];
+                    foreach ($implements as $interface) {
+                        if ($interface === 'PhpParser\Node') {
+                            continue;
+                        }
+                        $hierarchy[] = $interface;
+                    }
+                    $this->hierarchyCache[$concrete] = $hierarchy;
+                }
+
+                foreach ($this->hierarchyCache[$concrete] as $key) {
+                    $this->nodesByClass[$key][] = $node;
+                }
 
                 return null;
             }
 
             /**
-             * Return nodes collected by concrete class.
+             * Return nodes collected by concrete class, ancestor class, and
+             * implemented interface keys.
              *
              * @return array<class-string<Node>, list<Node>>
              */

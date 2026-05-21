@@ -64,7 +64,15 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings      = [];
+        $findings = [];
+
+        // Fast bail: real API keys for the supported providers all contain one
+        // of these distinctive prefixes. Skipping the per-pattern regex when
+        // none are present makes this rule near-free for the common case.
+        if (preg_match('/sk_live_|ghp_|sk-proj-|sk-ant-|xox[baprs]-/i', $analysisUnit->source) !== 1) {
+            return [];
+        }
+
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
 
         foreach ($this->patterns() as $definition) {

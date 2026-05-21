@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\ProjectRuleInterface;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -26,9 +27,6 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\NodeVisitorAbstract;
 
 /**
  * Detects project interfaces that have only one concrete implementation.
@@ -160,148 +158,58 @@ final readonly class SingleImplementorInterfaceRule implements ProjectRuleInterf
      */
     private function collectUnitTypes(AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
-        $visitor = new class extends NodeVisitorAbstract {
-            /** @var list<Interface_> */
-            private array $interfaces = [];
-
-            /** @var list<Class_> */
-            private array $classes = [];
-
-            /** @var list<array{class: Class_, type: Identifier|Name|ComplexType|null, line: int}> */
-            private array $typeReferences = [];
-
-            /** @var list<Class_> */
-            private array $classStack = [];
-
-            /**
-             * Collect declarations and class-local type references during traversal.
-             *
-             * @param Node $node Node currently being traversed.
-             * @return null Keeps traversal running.
-             */
-            public function enterNode(Node $node): null
-            {
-                if ($node instanceof Interface_) {
-                    $this->interfaces[] = $node;
-
-                    return null;
-                }
-
-                if ($node instanceof Class_) {
-                    if ($node->name !== null) {
-                        $this->classes[]     = $node;
-                        $this->classStack[] = $node;
-                    }
-
-                    return null;
-                }
-
-                $class = $this->currentClass();
-                if ($class === null) {
-                    return null;
-                }
-
-                if ($node instanceof Param) {
-                    $type = $node->type;
-                } elseif ($node instanceof ClassMethod) {
-                    $type = $node->returnType;
-                } elseif ($node instanceof Property) {
-                    $type = $node->type;
-                } else {
-                    return null;
-                }
-
-                $this->typeReferences[] = [
-                    'class' => $class,
-                    'type' => $type,
-                    'line' => $node->getStartLine(),
-                ];
-
-                return null;
-            }
-
-            /**
-             * Leave the current class scope when traversal exits it.
-             *
-             * @param Node $node Node currently being left.
-             * @return null Keeps traversal running.
-             */
-            public function leaveNode(Node $node): null
-            {
-                if ($node instanceof Class_ && $node->name !== null) {
-                    array_pop($this->classStack);
-                }
-
-                return null;
-            }
-
-            /**
-             * Return interface declarations collected in this unit.
-             *
-             * @return list<Interface_>
-             */
-            public function interfaces(): array
-            {
-                return $this->interfaces;
-            }
-
-            /**
-             * Return named class declarations collected in this unit.
-             *
-             * @return list<Class_>
-             */
-            public function classes(): array
-            {
-                return $this->classes;
-            }
-
-            /**
-             * Return class-local type references collected in this unit.
-             *
-             * @return list<array{class: Class_, type: Identifier|Name|ComplexType|null, line: int}>
-             */
-            public function typeReferences(): array
-            {
-                return $this->typeReferences;
-            }
-
-            /**
-             * Return the class scope currently being traversed.
-             *
-             * @return Class_|null Current class node, or null outside class scope.
-             */
-            private function currentClass(): ?Class_
-            {
-                if ($this->classStack === []) {
-                    return null;
-                }
-
-                return $this->classStack[array_key_last($this->classStack)];
-            }
-        };
-
-        $nodeTraverser = new NodeTraverser();
-        $nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true, 'replaceNodes' => false]));
-        $nodeTraverser->addVisitor($visitor);
-        $nodeTraverser->traverse($analysisUnit->statements);
-
-        foreach ($visitor->interfaces() as $interface) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Interface_::class) as $interface) {
             $this->recordInterface($interface, $analysisUnit, $projectTypes);
         }
 
-        foreach ($visitor->classes() as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Class_::class) as $class) {
+            if ($class->name === null) {
+                continue;
+            }
             $this->recordClass($class, $analysisUnit, $projectTypes);
         }
 
-        foreach ($visitor->typeReferences() as $reference) {
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [Param::class, ClassMethod::class, Property::class]) as $node) {
+            $class = $this->enclosingClass($node);
+            if ($class === null) {
+                continue;
+            }
+
+            if ($node instanceof Param) {
+                $type = $node->type;
+            } elseif ($node instanceof ClassMethod) {
+                $type = $node->returnType;
+            } else {
+                /** @var Property $node Filter restricted node classes. */
+                $type = $node->type;
+            }
+
             $this->recordClassTypeReference(
-                class:        $reference['class'],
-                type:         $reference['type'],
-                line:         $reference['line'],
+                class:        $class,
+                type:         $type,
+                line:         $node->getStartLine(),
                 analysisUnit: $analysisUnit,
                 projectTypes: $projectTypes,
             );
         }
+    }
+
+    /**
+     * Walk parent links to find the enclosing named class for a node.
+     *
+     * @return Class_|null Class scope the node is declared inside, or null.
+     */
+    private function enclosingClass(Node $node): ?Class_
+    {
+        $current = $node->getAttribute('parent');
+        while ($current instanceof Node) {
+            if ($current instanceof Class_ && $current->name !== null) {
+                return $current;
+            }
+            $current = $current->getAttribute('parent');
+        }
+
+        return null;
     }
 
     /**

@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects catch blocks that swallow exceptions without handling or reporting them.
@@ -53,10 +53,9 @@ final class SilentCatchRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Catch_::class) as $catch) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Catch_::class) as $catch) {
             if (!$this->isSilent($catch)) {
                 continue;
             }

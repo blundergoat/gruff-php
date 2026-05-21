@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -17,7 +18,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects callable arrays that can use first-class callable syntax.
@@ -60,10 +60,9 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\Array_::class) as $array) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\Array_::class) as $array) {
             if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {
                 continue;
             }

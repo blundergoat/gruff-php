@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -24,7 +25,6 @@ use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeFinder;
 
 /**
  * Detects variable names that encode type suffixes.
@@ -90,10 +90,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $definition          = $this->definition();
         $suffixes            = $this->normalisedSuffixes($ruleContext->settingsFor($definition)->stringListOption('typeSuffixes'));
         $identifierTokenizer = new IdentifierTokenizer();
-        $nodeFinder          = new NodeFinder();
         $findings            = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
                     definition: $definition,

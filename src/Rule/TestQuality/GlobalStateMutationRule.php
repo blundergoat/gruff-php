@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -117,11 +118,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $findings = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign) as $assign) {
-            if (!$assign instanceof Expr\Assign) {
-                continue;
-            }
-
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
             $superglobal = $this->superglobalWriteName($assign->var);
             if ($superglobal === null) {
                 continue;
@@ -246,7 +243,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $classes = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             if (!$class->name instanceof Node\Identifier) {
                 continue;
             }

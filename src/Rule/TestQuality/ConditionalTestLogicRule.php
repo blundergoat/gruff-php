@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects branches in tests that make outcomes depend on local control flow.
@@ -61,11 +61,10 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
-            foreach ($nodeFinder->findInstanceOf($scope->statements, Stmt\If_::class) as $conditional) {
+            foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {
                 $findings[] = new Finding(
                     ruleId:      self::ID,
                     message:     sprintf('%s contains conditional logic; tests should usually be linear.', $scope->symbol),

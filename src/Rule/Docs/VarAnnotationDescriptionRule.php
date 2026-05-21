@@ -62,6 +62,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast bail: nothing to find when the file has no @var tag.
+        if (!str_contains($analysisUnit->source, '@var')) {
+            return [];
+        }
+
         // AST-driven detection: PhpParser attaches each docblock to the immediately following
         // statement/declaration. A `@var` docblock on a property/method declaration documents
         // the declaration itself - not a local variable assertion - even when attribute groups

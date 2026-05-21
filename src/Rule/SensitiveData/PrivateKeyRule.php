@@ -50,6 +50,10 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
+            return [];
+        }
+
         preg_match_all('/-----BEGIN (?:RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings = [];

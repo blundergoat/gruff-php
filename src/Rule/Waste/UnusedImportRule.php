@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -53,8 +54,7 @@ final readonly class UnusedImportRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
-        $uses       = $nodeFinder->findInstanceOf($analysisUnit->statements, Use_::class);
+        $uses       = NodeIndex::nodesOf($analysisUnit, Use_::class);
 
         if ($uses === []) {
             return [];

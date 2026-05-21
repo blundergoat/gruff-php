@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
-use PhpParser\NodeFinder;
 
 /**
  * Detects unserialize calls that can hydrate attacker-controlled payloads.
@@ -53,10 +53,9 @@ final class UnsafeUnserializeRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             if (SecurityNodeHelper::globalFunctionName($call) !== 'unserialize') {
                 continue;
             }

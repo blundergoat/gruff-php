@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -116,14 +117,14 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     {
         $useAliases = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Use_::class) as $use) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Use_::class) as $use) {
             foreach ($use->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();
                 $useAliases[$alias] = $useUse->name->toString();
             }
         }
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\GroupUse::class) as $group) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\GroupUse::class) as $group) {
             $prefix = $group->prefix->toString();
             foreach ($group->uses as $useUse) {
                 $alias              = $useUse->getAlias()->toString();

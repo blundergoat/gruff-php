@@ -11,11 +11,11 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt\ClassMethod;
-use PhpParser\NodeFinder;
 
 /**
  * Detects method declarations that are missing local PHPDoc.
@@ -55,10 +55,9 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $classMethod) {
+        foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
             /** @var ClassMethod $classMethod Finder predicate restricts results to method declarations. */
             if ($classMethod->getDocComment() !== null) {
                 continue;

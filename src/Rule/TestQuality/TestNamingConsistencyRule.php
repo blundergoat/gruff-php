@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects inconsistent or weakly descriptive PHPUnit test names.
@@ -62,11 +62,10 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
         $findings   = [];
         $patterns   = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $camelCount = 0;
             $snakeCount = 0;
             $className  = $class->name?->toString() ?? sprintf('anonymous@%d', $class->getStartLine());

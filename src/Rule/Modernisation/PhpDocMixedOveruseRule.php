@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -20,7 +21,6 @@ use PhpParser\Node\Stmt\ClassConst;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
-use PhpParser\NodeFinder;
 
 /**
  * Detects PHPDoc `mixed` usage that should be narrowed.
@@ -90,16 +90,18 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast bail: nothing to find when no `mixed` literal appears in the
+        // file's source text.
+        if (!str_contains($analysisUnit->source, 'mixed')) {
+            return [];
+        }
+
         $definition = $this->definition();
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        $targets = $nodeFinder->find(
-            $analysisUnit->statements,
-            static fn (Node $node): bool => $node instanceof ClassMethod
-                || $node instanceof Function_
-                || $node instanceof Property
-                || $node instanceof ClassConst,
+        $targets = NodeIndex::nodesOfAny(
+            $analysisUnit,
+            [ClassMethod::class, Function_::class, Property::class, ClassConst::class],
         );
 
         foreach ($targets as $node) {

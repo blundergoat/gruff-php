@@ -56,10 +56,17 @@ ${BOLD}Actions${RESET}
   --yes                 Skip the baseline-overwrite confirmation prompt.
 
 ${BOLD}Selection${RESET}
-  --corpus=NAME         small | medium | large | all. Default: all (full) or medium (quick).
-                        small  = src/Diff               (5 files, warmup-sized)
-                        medium = src                    (production code)
-                        large  = full self-scan         (everything per .gruff.yaml)
+  --corpus=NAME         small | medium | large | external | all. Default: all (full) or medium (quick).
+                        small    = src/Diff               (5 files, warmup-sized)
+                        medium   = src                    (production code)
+                        large    = full self-scan         (everything per .gruff.yaml)
+                        external = scan a third-party path set via
+                                   \$GRUFF_PERF_EXTERNAL_PATH or --external=PATH
+                                   (runs with --no-config so the external project's
+                                   own config or built-in defaults apply).
+  --external=PATH       Absolute path to an external project to scan when
+                        --corpus includes "external". Equivalent to setting
+                        GRUFF_PERF_EXTERNAL_PATH.
 
 ${BOLD}Output${RESET}
   --json                Emit the full result document on stdout instead of a table.
@@ -87,6 +94,7 @@ ACTION="check"
 CORPUS_SELECTION=""
 ASSUME_YES=0
 EMIT_JSON=0
+EXTERNAL_PATH="${GRUFF_PERF_EXTERNAL_PATH:-}"
 
 for arg in "$@"; do
     case "$arg" in
@@ -97,6 +105,7 @@ for arg in "$@"; do
         --yes) ASSUME_YES=1 ;;
         --json) EMIT_JSON=1 ;;
         --corpus=*) CORPUS_SELECTION="${arg#*=}" ;;
+        --external=*) EXTERNAL_PATH="${arg#*=}" ;;
         --help|-h) usage; exit 0 ;;
         *) echo "${RED}Unknown argument: ${arg}${RESET}" >&2; usage >&2; exit 2 ;;
     esac
@@ -117,19 +126,40 @@ fi
 
 declare -a CORPORA
 case "$CORPUS_SELECTION" in
-    small)  CORPORA=(small) ;;
-    medium) CORPORA=(medium) ;;
-    large)  CORPORA=(large) ;;
-    all)    CORPORA=(small medium large) ;;
+    small)    CORPORA=(small) ;;
+    medium)   CORPORA=(medium) ;;
+    large)    CORPORA=(large) ;;
+    external) CORPORA=(external) ;;
+    all)      CORPORA=(small medium large) ;;
     *) echo "${RED}Unknown corpus: ${CORPUS_SELECTION}${RESET}" >&2; exit 2 ;;
 esac
 
+for corpus in "${CORPORA[@]}"; do
+    if [[ "$corpus" != "external" ]]; then continue; fi
+    if [[ -z "$EXTERNAL_PATH" ]]; then
+        echo "${RED}--corpus=external requires GRUFF_PERF_EXTERNAL_PATH or --external=PATH.${RESET}" >&2
+        exit 2
+    fi
+    if [[ ! -d "$EXTERNAL_PATH" ]]; then
+        echo "${RED}External path is not a directory: ${EXTERNAL_PATH}${RESET}" >&2
+        exit 2
+    fi
+done
+
 corpus_paths() {
     case "$1" in
-        small)  echo "src/Diff" ;;
-        medium) echo "src" ;;
-        large)  echo "" ;;
+        small)    echo "src/Diff" ;;
+        medium)   echo "src" ;;
+        large)    echo "" ;;
+        external) echo "$EXTERNAL_PATH" ;;
         *) return 1 ;;
+    esac
+}
+
+corpus_extra_args() {
+    case "$1" in
+        external) printf '%s\n' "--no-config" ;;
+        *) ;;
     esac
 }
 
@@ -150,6 +180,13 @@ run_once() {
         cmd+=($paths)
     fi
     cmd+=(--format=json --fail-on=none --print-runtime "--runtime-mode=${detail_mode}")
+
+    local extra_args
+    extra_args="$(corpus_extra_args "$corpus")"
+    if [[ -n "$extra_args" ]]; then
+        # shellcheck disable=SC2206
+        cmd+=($extra_args)
+    fi
 
     "${cmd[@]}" >/dev/null 2>"$tmpfile"
     local exit_code=$?

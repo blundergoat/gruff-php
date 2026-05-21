@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -72,9 +73,7 @@ final readonly class UnusedParameterRule implements RuleInterface
      */
     private function analysableNodes(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
-        $foundNodes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Function_ || $node instanceof ClassMethod;
-        });
+        $foundNodes = NodeIndex::nodesOfAny($analysisUnit, [Function_::class, ClassMethod::class]);
         $nodes = [];
 
         foreach ($foundNodes as $node) {

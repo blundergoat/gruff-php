@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -76,7 +77,7 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     {
         $classes = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Class_::class) as $class) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             /** @var Stmt\Class_ $class Finder predicate restricts results to class declarations. */
             if ($this->canPromoteClass($class)) {
                 $classes[] = $class;

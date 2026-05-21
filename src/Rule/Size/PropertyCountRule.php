@@ -11,6 +11,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -20,7 +21,6 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects types with enough properties to suggest broad state ownership.
@@ -63,12 +63,7 @@ final readonly class PropertyCountRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof Class_
-                || $node instanceof Trait_
-                || $node instanceof Enum_;
-        });
+        $classLikes = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]);
 
         $findings = [];
 

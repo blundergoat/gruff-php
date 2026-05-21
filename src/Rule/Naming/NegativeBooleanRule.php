@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -27,7 +28,6 @@ use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\PropertyProperty;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeFinder;
 
 /**
  * Detects negative boolean flags that create double-negative call sites.
@@ -75,10 +75,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     {
         $definition = $this->definition();
         $allowlist  = $ruleContext->settingsFor($definition)->stringListOption('cliMirrorAllowlist');
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             if (!$this->isBoolType($property->type)) {
                 continue;
             }

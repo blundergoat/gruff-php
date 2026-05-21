@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -117,13 +118,9 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
-        $assignments     = $nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Assign);
+        $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
 
         foreach ($assignments as $assign) {
-            if (!$assign instanceof Expr\Assign) {
-                continue;
-            }
-
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
@@ -152,8 +149,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $reads = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
-            if (!$var instanceof Expr\Variable || !is_string($var->name)) {
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Variable::class]) as $var) {
+            if (!is_string($var->name)) {
                 continue;
             }
 
@@ -272,11 +269,7 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     {
         $names = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\MethodCall) as $call) {
-            if (!$call instanceof Expr\MethodCall) {
-                continue;
-            }
-
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\MethodCall::class]) as $call) {
             if (!$this->isChainRootedAtVariable($call, $varName)) {
                 continue;
             }

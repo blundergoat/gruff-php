@@ -50,6 +50,10 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        if (!str_contains($analysisUnit->source, 'eyJ')) {
+            return [];
+        }
+
         preg_match_all('/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/', $analysisUnit->source, $matches, PREG_OFFSET_CAPTURE);
 
         $findings      = [];

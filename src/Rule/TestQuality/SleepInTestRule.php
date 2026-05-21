@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -17,7 +18,6 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
-use PhpParser\NodeFinder;
 
 /**
  * Detects tests that depend on sleeps or wall-clock reads.
@@ -71,14 +71,13 @@ final readonly class SleepInTestRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
-        $nodeFinder = new NodeFinder();
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             array_push(
                 $findings,
                 ...$this->functionFindings($analysisUnit, $scope),
-                ...$this->dateTimeFindings($nodeFinder, $analysisUnit, $scope),
+                ...$this->dateTimeFindings($analysisUnit, $scope),
             );
         }
 
@@ -132,12 +131,12 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * @return list<Finding>
      */
-    private function dateTimeFindings(NodeFinder $nodeFinder, AnalysisUnit $analysisUnit, TestQualityScope $scope): array
+    private function dateTimeFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
         $findings = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\New_) as $newExpression) {
-            if ($newExpression instanceof Expr\New_ && $this->isWallClockDateTimeConstructor($newExpression)) {
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\New_::class]) as $newExpression) {
+            if ($this->isWallClockDateTimeConstructor($newExpression)) {
                 $findings[] = $this->dateTimeFinding($analysisUnit, $scope, $newExpression);
             }
         }

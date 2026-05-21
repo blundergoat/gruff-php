@@ -10,11 +10,11 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Detects switch statements that can be expressed more directly as match expressions.
@@ -57,10 +57,9 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
         $findings   = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\Switch_::class) as $switch) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Switch_::class) as $switch) {
             if (count($switch->cases) < 3 || !$this->allCasesReturnDirectly($switch)) {
                 continue;
             }

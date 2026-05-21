@@ -7,6 +7,7 @@ namespace GruffPhp\Parser;
 use GruffPhp\Source\SourceFile;
 use PhpParser\Error;
 use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
@@ -60,8 +61,9 @@ final readonly class PhpFileParser
             $statements = array_values($this->parser->parse($source) ?? []);
 
             $nodeTraverser = new NodeTraverser();
+            $nodeTraverser->addVisitor(new NameResolver(null, ['preserveOriginalNames' => true, 'replaceNodes' => false]));
             $nodeTraverser->addVisitor(new ParentConnectingVisitor());
-            /** @var list<\PhpParser\Node\Stmt> $traversed ParentConnectingVisitor preserves the parsed statement list shape. */
+            /** @var list<\PhpParser\Node\Stmt> $traversed Visitors preserve the parsed statement list shape. */
             $traversed = $nodeTraverser->traverse($statements);
 
             return new AnalysisUnit($file, $source, $traversed, array_values($this->parser->getTokens()), []);

@@ -13,6 +13,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -21,7 +22,6 @@ use PhpParser\Node\Expr\ArrowFunction;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Detects callables whose parameter lists exceed the configured size threshold.
@@ -73,13 +73,7 @@ final readonly class ParameterCountRule implements RuleInterface
         $promotedCeiling = $this->integerOption($settings->options, 'promotedConstructorMaxParameters', 25);
         $constructorMax  = $this->integerOption($settings->options, 'constructorMaxParameters', 0);
 
-        $nodeFinder = new NodeFinder();
-        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod
-                || $node instanceof Function_
-                || $node instanceof Closure
-                || $node instanceof ArrowFunction;
-        });
+        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class, Closure::class, ArrowFunction::class]);
 
         $findings = [];
 

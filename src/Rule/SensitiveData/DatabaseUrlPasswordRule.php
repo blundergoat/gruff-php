@@ -50,6 +50,12 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
+        // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
+        // Skip the alternation when no supported scheme prefix appears.
+        if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
+            return [];
+        }
+
         preg_match_all(
             '#\b(?<scheme>mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://(?<user>[^:\s/@]+):(?<password>[^@\s"\']+)@(?<host>[^"\']+)#i',
             $analysisUnit->source,

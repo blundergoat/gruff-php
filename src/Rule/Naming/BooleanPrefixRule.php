@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -23,7 +24,6 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\UnionType;
-use PhpParser\NodeFinder;
 
 /**
  * Detects bool-returning callables without boolean-style names.
@@ -92,7 +92,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
         $settings        = $ruleContext->settingsFor($definition);
         $prefixes        = $settings->stringListOption('allowedPrefixes');
         $stateAdjectives = array_map(static fn (string $name): string => strtolower($name), $settings->stringListOption('stateAdjectiveAllowlist'));
-        $nodeFinder      = new NodeFinder();
 
         $findings = [];
 
@@ -123,7 +122,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
             );
         }
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Property::class) as $property) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             if (!$this->isBoolType($property->type)) {
                 continue;
             }

@@ -10,6 +10,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -54,12 +55,11 @@ final readonly class UnusedMockRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             $assignedVarObjectIds = [];
-            $mockAssignments      = $this->mockAssignments($scope, $nodeFinder, $assignedVarObjectIds);
+            $mockAssignments      = $this->mockAssignments($scope, $assignedVarObjectIds);
 
             if ($mockAssignments === []) {
                 continue;
@@ -67,7 +67,7 @@ final readonly class UnusedMockRule implements RuleInterface
 
             $findings = array_merge(
                 $findings,
-                $this->findingsForUnreadMocks($analysisUnit, $scope, $mockAssignments, $this->variableReads($scope, $nodeFinder, $assignedVarObjectIds)),
+                $this->findingsForUnreadMocks($analysisUnit, $scope, $mockAssignments, $this->variableReads($scope, $assignedVarObjectIds)),
             );
         }
 
@@ -80,20 +80,12 @@ final readonly class UnusedMockRule implements RuleInterface
      */
     private function mockAssignments(
         TestQualityScope $scope,
-        NodeFinder $nodeFinder,
         array &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
-        $assignments     = $nodeFinder->find(
-            $scope->statements,
-            static fn (Node $node): bool => $node instanceof Expr\Assign,
-        );
+        $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
 
         foreach ($assignments as $assign) {
-            if (!$assign instanceof Expr\Assign) {
-                continue;
-            }
-
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {
                 continue;
             }
@@ -118,12 +110,12 @@ final readonly class UnusedMockRule implements RuleInterface
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, true>
      */
-    private function variableReads(TestQualityScope $scope, NodeFinder $nodeFinder, array $assignedVarObjectIds): array
+    private function variableReads(TestQualityScope $scope, array $assignedVarObjectIds): array
     {
         $reads = [];
 
-        foreach ($nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\Variable) as $var) {
-            if (!$var instanceof Expr\Variable || !is_string($var->name)) {
+        foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Variable::class]) as $var) {
+            if (!is_string($var->name)) {
                 continue;
             }
 

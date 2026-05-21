@@ -11,6 +11,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -23,7 +24,6 @@ use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Measures how hard function-like control flow is to understand.
@@ -65,11 +65,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodeFinder = new NodeFinder();
-        $nodes      = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
-            return $node instanceof ClassMethod
-                || $node instanceof Function_;
-        });
+        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Rule\TestQuality;
 
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\NodeIndex;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
@@ -12,7 +13,6 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt;
-use PhpParser\NodeFinder;
 
 /**
  * Provides shared AST helpers for test-quality rules.
@@ -56,10 +56,9 @@ final class TestQualityNodeHelper
             return $cache->offsetGet($analysisUnit);
         }
 
-        $nodeFinder = new NodeFinder();
         $scopes     = [];
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Stmt\ClassMethod::class) as $classMethod) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Stmt\ClassMethod::class) as $classMethod) {
             if (!self::isTestMethod($classMethod)) {
                 continue;
             }
@@ -80,7 +79,7 @@ final class TestQualityNodeHelper
             );
         }
 
-        foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, Expr\FuncCall::class) as $call) {
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = self::functionName($call);
             if (($name !== 'it' && $name !== 'test') || count($call->args) < 2) {
                 continue;
@@ -102,7 +101,7 @@ final class TestQualityNodeHelper
                 line:       $call->getStartLine(),
                 endLine:    $call->getEndLine(),
                 statements: array_values($closure->stmts),
-                node:       $call,
+                node:       $closure,
                 isPest:     true,
             );
         }
@@ -178,12 +177,7 @@ final class TestQualityNodeHelper
      */
     public static function calls(TestQualityScope $scope): array
     {
-        $nodeFinder = new NodeFinder();
-
-        return array_values(array_filter(
-            $nodeFinder->find($scope->statements, static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall),
-            static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall,
-        ));
+        return NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class]);
     }
 
     /**

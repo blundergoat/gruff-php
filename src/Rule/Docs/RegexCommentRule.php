@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -19,7 +20,6 @@ use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
-use PhpParser\NodeFinder;
 
 /**
  * Requires a one-line explanatory comment before regex matcher calls.
@@ -65,8 +65,7 @@ final readonly class RegexCommentRule implements RuleInterface
         $definition     = $this->definition();
         $functionNames  = $this->normalisedFunctionNames($ruleContext->settingsFor($definition)->stringListOption('functionNames'));
         $sourceLines    = explode("\n", str_replace(["\r\n", "\r"], "\n", $analysisUnit->source));
-        $nodeFinder     = new NodeFinder();
-        $regexCallNodes = $nodeFinder->findInstanceOf($analysisUnit->statements, FuncCall::class);
+        $regexCallNodes = NodeIndex::nodesOf($analysisUnit, FuncCall::class);
         $findings       = [];
 
         foreach ($regexCallNodes as $regexCallNode) {
