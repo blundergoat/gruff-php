@@ -28,7 +28,7 @@ use GruffPhp\Rule\Docs\MissingThrowsTagRule;
 use GruffPhp\Rule\Docs\RegexCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
-use GruffPhp\Rule\Docs\UselessPhpdocRule;
+use GruffPhp\Rule\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
 use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
 use GruffPhp\Rule\Modernisation\EnumCandidateRule;
@@ -295,7 +295,7 @@ final class RuleRegistry
             new RegexCommentRule(),
             new StaleParamTagRule(),
             new TodoDensityRule(),
-            new UselessPhpdocRule(),
+            new BarePhpdocTagsRule(),
             new VarAnnotationDescriptionRule(),
             new AverageMethodLengthRule(),
             new ClassLengthRule(),

@@ -19,17 +19,17 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects PHPDoc blocks that add tags without useful descriptive context.
+ * Detects PHPDoc blocks that list tags without descriptive intent.
  */
-final readonly class UselessPhpdocRule implements RuleInterface
+final readonly class BarePhpdocTagsRule implements RuleInterface
 {
     /**
-     * Stable rule identifier for useless PHPDoc findings.
+     * Stable rule identifier for bare PHPDoc tag findings.
      */
-    public const ID = 'docs.useless-phpdoc';
+    public const ID = 'docs.bare-phpdoc-tags';
 
     /**
-     * Describe the useless PHPDoc rule.
+     * Describe the bare PHPDoc tag rule.
      *
      * @return RuleDefinition Rule metadata and defaults.
      */
@@ -37,7 +37,7 @@ final readonly class UselessPhpdocRule implements RuleInterface
     {
         return new RuleDefinition(
             id:              self::ID,
-            name:            'Useless PHPDoc',
+            name:            'Bare PHPDoc tags',
             pillar:          Pillar::Documentation,
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
@@ -46,12 +46,12 @@ final readonly class UselessPhpdocRule implements RuleInterface
     }
 
     /**
-     * Find docblocks that only restate native parameter or return types.
+     * Find docblocks that only list parameter or return tags.
      *
      * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
      * @param RuleContext  $ruleContext Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for redundant PHPDoc blocks.
+     * @return list<Finding> Findings for bare PHPDoc blocks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -69,10 +69,6 @@ final readonly class UselessPhpdocRule implements RuleInterface
             }
 
             $docText = $docComment->getText();
-            if ($this->containsLoadBearingTypeDoc($docText)) {
-                continue;
-            }
-
             $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
             $stripped = trim($stripped);
 
@@ -99,19 +95,19 @@ final readonly class UselessPhpdocRule implements RuleInterface
                 continue;
             }
 
-            $hasOnlyTypeRestatements = true;
+            $hasOnlyBareTags = true;
 
             foreach ($lines as $line) {
-                if ($this->isBareSignatureRestatement($line)) {
+                if ($this->isBareParamOrReturnTag($line)) {
                     continue;
                 }
 
-                $hasOnlyTypeRestatements = false;
+                $hasOnlyBareTags = false;
 
                 break;
             }
 
-            if (!$hasOnlyTypeRestatements) {
+            if (!$hasOnlyBareTags) {
                 continue;
             }
 
@@ -119,7 +115,7 @@ final readonly class UselessPhpdocRule implements RuleInterface
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s has a PHPDoc that only restates the type signature.', $symbol),
+                message:     sprintf('%s has PHPDoc tags but no descriptive summary or tag descriptions.', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
@@ -127,7 +123,7 @@ final readonly class UselessPhpdocRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Add a description or remove the docblock if it adds no information.',
+                remediation: 'Add a short summary, or describe the parameter and return tags so the docblock states intent.',
             );
         }
 
@@ -135,56 +131,48 @@ final readonly class UselessPhpdocRule implements RuleInterface
     }
 
     /**
-     * Check whether one PHPDoc tag only repeats a native signature type.
+     * Check whether one PHPDoc tag has a type but no description.
      *
-     * @return bool True when the tag is a bare type restatement.
+     * @return bool True when the tag is a bare parameter or return tag.
      */
-    private function isBareSignatureRestatement(string $line): bool
+    private function isBareParamOrReturnTag(string $line): bool
     {
-        // Match @param tags that contain only a type and variable name.
-        if (preg_match('/^@param\s+(\S+)\s+\$\w+\s*$/', $line, $matches) === 1) {
-            return $this->isSimpleDocType($matches[1]);
+        if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
+            return true;
         }
 
-        // Match @return tags that contain only a type.
-        if (preg_match('/^@return\s+(\S+)\s*$/', $line, $matches) === 1) {
-            return $this->isSimpleDocType($matches[1]);
-        }
-
-        return false;
-    }
-
-    /**
-     * Decide whether a PHPDoc type can be represented directly in a PHP signature.
-     *
-     * @return bool True when the type is simple enough to be redundant.
-     */
-    private function isSimpleDocType(string $type): bool
-    {
-        // Reject complex PHPDoc type syntax that cannot be represented as a simple native type.
-        if (preg_match('/[<>{}\\[\\]|&]/', $type) === 1) {
+        if (!str_starts_with($line, '@return ')) {
             return false;
         }
 
-        // `resource` is not a valid PHP signature type, so a `@param resource` docblock is the only
-        // place this type can live - it is never a redundant restatement of the signature.
-        if (strtolower($type) === 'resource') {
-            return false;
-        }
-
-        return true;
+        return !$this->returnTagHasDescription(trim(substr($line, strlen('@return '))));
     }
 
     /**
-     * Detect PHPDoc type syntax that carries information unavailable in native types.
+     * Detect prose after a return type while tolerating spaces inside PHPDoc generic types.
      *
-     * @return bool True when the docblock contains load-bearing type details.
+     * @return bool True when text follows the type.
      */
-    private function containsLoadBearingTypeDoc(string $docText): bool
+    private function returnTagHasDescription(string $body): bool
     {
-        foreach (['array{', 'list<', 'non-empty-array', 'Collection<', 'class-string', '@phpstan-'] as $marker) {
-            if (str_contains($docText, $marker)) {
-                return true;
+        $depth  = 0;
+        $length = strlen($body);
+
+        for ($offset = 0; $offset < $length; $offset++) {
+            $character = $body[$offset];
+
+            if (str_contains('<{[(', $character)) {
+                $depth++;
+                continue;
+            }
+
+            if (str_contains('>}])', $character) && $depth > 0) {
+                $depth--;
+                continue;
+            }
+
+            if ($depth === 0 && ctype_space($character)) {
+                return trim(substr($body, $offset + 1)) !== '';
             }
         }
 

@@ -137,8 +137,8 @@ rules:
         enabled: true
         threshold: 10
         severity: error
-    # Empty or redundant comments make real documentation harder to find.
-    docs.useless-phpdoc:
+    # Bare tag-only docblocks need intent or tag descriptions.
+    docs.bare-phpdoc-tags:
         enabled: true
     # Inline @var type assertions need a reason, not just a restated type.
     docs.var-annotation-description:

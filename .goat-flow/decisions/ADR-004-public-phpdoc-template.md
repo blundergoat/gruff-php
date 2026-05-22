@@ -11,12 +11,12 @@ gruff's own `src/` carried 658 `docs.missing-public-phpdoc` findings entering M3
 
 The adjacent rules and their cascade behaviour against newly-added docblocks:
 
-- **`docs.useless-phpdoc`** - fires when a docblock contains ONLY bare `@param` / `@return` tags. Suppressed by any descriptive (non-tag) line. Skipped automatically for docblocks containing `array{`, `list<`, `non-empty-array`, `Collection<`, `class-string`, or `@phpstan-` markers, and for docblocks that contain at least one `{...}` style line (e.g., `{@inheritDoc}`).
+- **`docs.bare-phpdoc-tags`** - fires when a docblock contains ONLY bare `@param` / `@return` tags with no purpose line or tag descriptions. Suppressed by any descriptive (non-tag) line or by prose after a parameter/return tag.
 - **`docs.missing-return-tag`** - fires when a documented method's docblock omits `@return`. Override-aware via `DocsInheritanceHelper`. Constructors and destructors are exempt by `isReturnlessMagicMethod`.
 - **`docs.missing-param-tag`** - fires when a documented PUBLIC method has parameters but the docblock omits `@param` tags for them. Non-public methods are exempt. Requires `hasContractDoc` (prose OR any docs tag) to fire.
 - **`docs.missing-throws-tag`** - fires when a documented public method's body contains `Throw_` AST nodes but the docblock lacks `@throws`. Override-aware.
 
-This ADR captures the per-archetype template that satisfies `docs.missing-public-phpdoc` without re-firing `docs.useless-phpdoc`, while keeping `@param` / `@throws` work scoped to M35.
+This ADR captures the per-archetype template that satisfies `docs.missing-public-phpdoc` without re-firing the bare-PHPDoc rule, while keeping `@param` / `@throws` work scoped to M35.
 
 ## Decision
 
@@ -27,7 +27,7 @@ M34 extends the same principle to structural PHPDoc. In this codebase every `src
 ### Matcher contract (locked)
 
 - `docs.missing-public-phpdoc` is satisfied by ANY non-null `getDocComment()`. Even a single-line `/** Build the X. */` suffices.
-- `docs.useless-phpdoc` is suppressed by ANY descriptive (non-`@`-starting) line. A docblock with one prose line plus `@return Type Description.` is safe.
+- `docs.bare-phpdoc-tags` is suppressed by ANY descriptive (non-`@`-starting) line or a tag description. A docblock with one prose line plus `@return Type Description.` is safe.
 - `docs.missing-return-tag` is suppressed by ANY `@return` substring in the docblock text. Override-aware.
 - `docs.missing-param-tag` checks documented public methods and functions with parameters. It requires an `@param` line whose final `$name` token matches each signature parameter.
 - `docs.missing-throws-tag` checks documented public methods and functions whose body contains a `throw` expression. It is satisfied by any `@throws` line and skips inherited contract documentation.
@@ -264,8 +264,8 @@ Counter-example: `/** @var list<Node> $nodes */`
 
 ### Rules of thumb
 
-- **Never restate the signature.** `/** Get the name. */` for `getName(): string` is too thin and may legitimately trip `docs.useless-phpdoc` if M37 tightens that rule. Describe the *intent*: `/** Return the rule's stable identifier. */`.
-- **Never use `{@inheritDoc}` alone** for non-void methods - it satisfies `docs.missing-public-phpdoc` and `docs.useless-phpdoc`, but `docs.missing-return-tag` fires because it doesn't contain `@return`. Either inherit from a documented interface (the override-aware path) or add a local `@return` line.
+- **Never restate the signature as the only documentation.** `/** Get the name. */` for `getName(): string` is too thin. Describe the *intent*: `/** Return the rule's stable identifier. */`.
+- **Never use `{@inheritDoc}` alone** for non-void methods - it satisfies `docs.missing-public-phpdoc`, but `docs.missing-return-tag` fires because it doesn't contain `@return`. Either inherit from a documented interface (the override-aware path) or add a local `@return` line.
 - **Magic methods** (`__construct`, `__destruct`, `__toString`, etc.) follow archetype 5 (value object). Constructors get `/** Build the <noun>. */`.
 - **Static factory methods** (`fromArray`, `fromRegistry`) get `/** Build a <noun> from <source>. */ + @return Self.`.
 - **Closure / arrow function bodies** are not method docblocks - the rule only fires on `ClassMethod` nodes.
@@ -277,8 +277,8 @@ Counter-example: `/** @var list<Node> $nodes */`
 - M34 adds structural templates 8-12. In the 2026-05-12 pre-M34 scan, structural findings are: 217 missing file, 217 missing class, 5 declared-property, 201 missing constant, plus 208 promoted-property `@param` gaps deferred to M35.
 - `docs.missing-param-tag` and `docs.missing-throws-tag` will rise because the new docblocks satisfy `hasContractDoc` but omit those tags. M35 owns the bulk tag sweep and closes the new advisories. Expected magnitudes: `+400` `missing-param-tag` (most methods have params); `+50-100` `missing-throws-tag` (only methods that throw); both stay in the advisory bucket so error-fail-on builds are unaffected.
 - `docs.missing-return-tag` stays roughly stable because every non-void method gets an explicit `@return Type Description.` line.
-- `docs.useless-phpdoc` stays stable because every template includes at least one descriptive line.
-- The M33 plan's "any non-target rule's finding count increases by more than 1% net" kill criterion is **explicitly waived** for `docs.missing-param-tag` and `docs.missing-throws-tag` - those rises are the unavoidable consequence of adding stub docblocks without M35's tag sweep. The criterion remains in force for `docs.useless-phpdoc`, `modernisation.phpdoc-mixed-overuse`, and all non-docs rules.
+- The bare-PHPDoc rule stays stable because every template includes at least one descriptive line.
+- The M33 plan's "any non-target rule's finding count increases by more than 1% net" kill criterion is **explicitly waived** for `docs.missing-param-tag` and `docs.missing-throws-tag` - those rises are the unavoidable consequence of adding stub docblocks without M35's tag sweep. The criterion remains in force for the bare-PHPDoc rule, `modernisation.phpdoc-mixed-overuse`, and all non-docs rules.
 - M34 (structural PHPDoc on classes, properties, constants) reuses archetypes 1, 4, 5, 7 verbatim. The "what does this class do?" one-liner mirrors the method "what does this method do?" one-liner.
 - M35 (tag completeness) fills in `@param`, `@throws`, and `@return` (where missing) using descriptions consistent with the one-line purpose statements landed by M33 and M34. The refreshed post-M34 baseline is: 619 `docs.missing-param-tag`, 0 `docs.missing-return-tag`, 17 `docs.missing-throws-tag`, 54 `docs.var-annotation-description`, and 208 promoted-property constructor `@param` gaps.
 

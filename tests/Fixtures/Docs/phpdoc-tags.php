@@ -152,6 +152,14 @@ class PhpdocTagsFixture
     }
 
     /**
+     * @return int The stable count.
+     */
+    public function describedReturnTagDoc(): int
+    {
+        return 1;
+    }
+
+    /**
      * Does not document exceptions.
      */
     public function throwsWithoutTag(int $x): int

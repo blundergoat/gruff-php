@@ -13,7 +13,7 @@ use GruffPhp\Rule\Docs\MissingThrowsTagRule;
 use GruffPhp\Rule\Docs\RegexCommentRule;
 use GruffPhp\Rule\Docs\StaleParamTagRule;
 use GruffPhp\Rule\Docs\TodoDensityRule;
-use GruffPhp\Rule\Docs\UselessPhpdocRule;
+use GruffPhp\Rule\Docs\BarePhpdocTagsRule;
 use GruffPhp\Rule\Docs\VarAnnotationDescriptionRule;
 
 /**
@@ -66,36 +66,35 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify useless phpdoc detected.
+     * Verify bare PHPDoc tags are detected.
      *
      * @return void No return value.
      */
-    public function testUselessPhpdocDetected(): void
+    public function testBarePhpdocTagsDetected(): void
     {
-        $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
+        $findings = $this->analyseRule('phpdoc-tags.php', BarePhpdocTagsRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertContains('PhpdocTagsFixture::uselessDoc()', $symbols);
+        self::assertContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
+        self::assertContains('PhpdocTagsFixture::genericParamDocWithSpaces()', $symbols);
+        self::assertContains('PhpdocTagsFixture::resourceParamDoc()', $symbols);
+        self::assertContains('PhpdocTagsFixture::arrayShapeDoc()', $symbols);
     }
 
     /**
-     * Verify useful tag details are not useless phpdoc.
+     * Verify descriptive PHPDoc tags are not bare PHPDoc.
      *
      * @return void No return value.
      */
-    public function testUsefulTagDetailsAreNotUselessPhpdoc(): void
+    public function testDescriptivePhpdocTagsAreNotBarePhpdoc(): void
     {
-        $findings = $this->analyseRule('phpdoc-tags.php', UselessPhpdocRule::ID);
+        $findings = $this->analyseRule('phpdoc-tags.php', BarePhpdocTagsRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
-        self::assertNotContains('PhpdocTagsFixture::genericParamDoc()', $symbols);
-        self::assertNotContains('PhpdocTagsFixture::arrayShapeDoc()', $symbols);
+        self::assertNotContains('PhpdocTagsFixture::complete()', $symbols);
         self::assertNotContains('PhpdocTagsFixture::describedTagDoc()', $symbols);
-        self::assertNotContains(
-            'PhpdocTagsFixture::resourceParamDoc()',
-            $symbols,
-            '`@param resource` adds type info that PHP cannot express in the signature.',
-        );
+        self::assertNotContains('PhpdocTagsFixture::describedReturnTagDoc()', $symbols);
     }
 
     /**

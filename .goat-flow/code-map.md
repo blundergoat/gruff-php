@@ -147,7 +147,7 @@ src/
 |   |   |-- RegexCommentRule.php              = `docs.regex-comment` (requires an immediate one-line comment explaining configured regex matcher calls, defaulting to `preg_match`)
 |   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
 |   |   |-- TodoDensityRule.php               = `docs.todo-density`
-|   |   |-- UselessPhpdocRule.php             = `docs.useless-phpdoc`
+|   |   |-- BarePhpdocTagsRule.php            = `docs.bare-phpdoc-tags`
 |   |   `-- VarAnnotationDescriptionRule.php  = `docs.var-annotation-description` (flags local `@var` assertions that only restate type/variable without a reason)
 |   |-- Naming/
 |   |   |-- AbbreviationAllowlistRule.php      = `naming.abbreviation-allowlist` (requires 2-3 char lowercase project abbreviations to be declared in `allowlists.acceptedAbbreviations`)
