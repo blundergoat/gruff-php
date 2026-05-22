@@ -128,7 +128,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     }
 
     /**
-     * Verify external type-hint usage through returns properties and composite types does not flag.
+     * Verify external type usage through returns, properties, instanceof, and composite types does not flag.
      *
      * @return void No return value.
      */
@@ -140,6 +140,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
 
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\ReturnUsageInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\PropertyUsageInterface', $symbols);
+        self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\InstanceofUsageInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\NullableUsageInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\UnionUsageInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\IntersectionUsageInterface', $symbols);

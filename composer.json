@@ -33,6 +33,7 @@
     "scripts": {
         "check": [
             "composer validate --strict",
+            "composer audit --locked",
             "bash -n scripts/preflight-checks.sh",
             "bash -n scripts/mutation-test-diff.sh",
             "bash -n scripts/mutation-test-full.sh",

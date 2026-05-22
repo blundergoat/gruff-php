@@ -80,10 +80,10 @@ final readonly class AnalysisSourceLoader
      *
      * @return list<RunDiagnostic>
      */
-    private function missingPathDiagnostics(SourceDiscoveryResult $discoveryResult): array
+    private function missingPathDiagnostics(SourceDiscoveryResult $sourceDiscoveryResult): array
     {
         $diagnostics = [];
-        foreach ($discoveryResult->missingPaths as $missingPath) {
+        foreach ($sourceDiscoveryResult->missingPaths as $missingPath) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'missing-path',
                 message: 'Input path does not exist.',

@@ -174,6 +174,22 @@ test_suite_check() {
     return "$status"
 }
 
+dependency_audit_check() {
+    local output
+    local status
+
+    output=$(composer audit --locked 2>&1)
+    status=$?
+
+    if ((status == 0)); then
+        printf '%s' "$(printf '%s\n' "$output" | tail -1)"
+    else
+        printf '%s\n' "$output"
+    fi
+
+    return "$status"
+}
+
 gruff_report_summary() {
     local report_path=$1
 
@@ -276,6 +292,7 @@ Usage: scripts/preflight-checks.sh [--mutate-diff|--mutate-full]
 Runs the standard preflight gate:
   - PHPStan
   - PHPUnit
+  - Composer dependency audit
   - Gruff full-project scan
 
 Options:
@@ -288,6 +305,7 @@ USAGE
 main() {
     local phpstan_status=0
     local test_status=0
+    local audit_status=0
     local gruff_status=0
     local mutation_status=0
 
@@ -331,6 +349,9 @@ main() {
     run_step "Tests (PHPUnit)" test_suite_check
     test_status=$?
 
+    run_step "Dependency audit (Composer)" dependency_audit_check
+    audit_status=$?
+
     run_step "Gruff full-project scan" gruff_php_check
     gruff_status=$?
 
@@ -348,7 +369,7 @@ main() {
     summary
     local summary_status=$?
 
-    if ((phpstan_status != 0 || test_status != 0 || gruff_status != 0 || mutation_status != 0)); then
+    if ((phpstan_status != 0 || test_status != 0 || audit_status != 0 || gruff_status != 0 || mutation_status != 0)); then
         return 1
     fi
 

@@ -92,13 +92,13 @@ final class AnalysisUnit
     {
         $node->setAttribute('parent', null);
         foreach ($node->getSubNodeNames() as $subNodeName) {
-            $value = $node->{$subNodeName};
-            if ($value instanceof Node) {
-                self::breakParentLinks($value);
+            $subNodeValue = $node->{$subNodeName};
+            if ($subNodeValue instanceof Node) {
+                self::breakParentLinks($subNodeValue);
                 continue;
             }
-            if (is_array($value)) {
-                foreach ($value as $item) {
+            if (is_array($subNodeValue)) {
+                foreach ($subNodeValue as $item) {
                     if ($item instanceof Node) {
                         self::breakParentLinks($item);
                     }

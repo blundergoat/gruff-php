@@ -8,7 +8,12 @@ function inspectRequestData(): void
     unserialize($payload);
 
     header('Location: ' . ($_GET['next'] ?? '/'));
+    $redirect = $_GET['redirect'] ?? '/';
+    header('Location: ' . $redirect);
+
     extract($_REQUEST);
+    $requestFields = $_REQUEST;
+    extract($requestFields);
     compact($_GET);
 
     md5($_COOKIE['token'] ?? '');

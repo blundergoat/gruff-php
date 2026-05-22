@@ -18,6 +18,7 @@ use GruffPhp\Rule\RuleDefinition;
 use PhpParser\Node;
 use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\ComplexType;
+use PhpParser\Node\Expr\Instanceof_;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\IntersectionType;
 use PhpParser\Node\Name;
@@ -141,6 +142,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Reset accumulated state at the start of a streaming project pass.
      *
+     * @param RuleContext $ruleContext Rule context carrying config and settings.
      * @return void
      */
     public function startProject(RuleContext $ruleContext): void
@@ -161,6 +163,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
      * Stores the per-unit summary on `$this->accumulated`; the AST may be
      * released by the orchestrator as soon as this call returns.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit to index.
+     * @param RuleContext  $ruleContext  Rule context carrying config and settings.
      * @return void
      */
     public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
@@ -175,6 +179,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Produce single-implementor findings from the accumulated state and reset.
      *
+     * @param RuleContext $ruleContext Rule context carrying config and settings.
      * @return list<Finding>
      */
     public function finishProject(RuleContext $ruleContext): array
@@ -268,6 +273,25 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
                 class:        $class,
                 type:         $type,
                 line:         $node->getStartLine(),
+                analysisUnit: $analysisUnit,
+                projectTypes: $projectTypes,
+            );
+        }
+
+        foreach (NodeIndex::nodesOf($analysisUnit, Instanceof_::class) as $instanceof) {
+            if (!$instanceof->class instanceof Name) {
+                continue;
+            }
+
+            $class = $this->enclosingClass($instanceof);
+            if ($class === null) {
+                continue;
+            }
+
+            $this->recordClassTypeReference(
+                class:        $class,
+                type:         $instanceof->class,
+                line:         $instanceof->getStartLine(),
                 analysisUnit: $analysisUnit,
                 projectTypes: $projectTypes,
             );

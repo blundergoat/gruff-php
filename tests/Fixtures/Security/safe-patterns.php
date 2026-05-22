@@ -26,6 +26,11 @@ final class SafePatterns
         include 'static-template.php';
         $pdo->query('SELECT * FROM users WHERE id = ?');
         header('Location: /dashboard');
+        $redirect = $_GET['next'] ?? '/';
+        $redirect = '/dashboard';
+        header('Location: ' . $redirect);
+        $fields = ['safe' => 'value'];
+        extract($fields);
 
         random_int(1, 10);
         random_bytes(16);

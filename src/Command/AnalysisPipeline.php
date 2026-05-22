@@ -30,20 +30,35 @@ use GruffPhp\Source\SourceDiscoveryResult;
 final class AnalysisPipeline
 {
     /**
-     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $projectContextUnitsResolver
-     *     Closure that returns the project-rule context unit list for the
-     *     legacy pipeline. Wraps AnalyseCommand::projectContextUnits().
+     * Closure that returns the project-rule context unit list for the legacy pipeline.
+     *
+     * @var Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit>
+     */
+    private readonly Closure $projectContextUnitsResolver;
+
+    /**
+     * @param RuleRegistry $registry Rule registry used to execute enabled rules.
+     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
+     *     Resolves full project context units for legacy review analysis.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
-        private readonly Closure $projectContextUnitsResolver,
+        Closure $closure,
     ) {
+        $this->projectContextUnitsResolver = $closure;
     }
 
     /**
      * Run the right pipeline for this CLI invocation.
      *
-     * @param list<string>|null $analysisPaths
+     * @param string                  $projectRoot        Project root used for discovery and parsing.
+     * @param AnalyseCommandOptions   $options            Effective CLI analysis options.
+     * @param AnalysisConfig          $config             Effective rule and path configuration.
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param DiffResult|null         $reviewDiff         Review diff metadata when branch review is active.
+     * @param list<string>|null       $analysisPaths      Paths to analyse, or null when setup failed.
+     * @param int                     $discoverStart      Monotonic start timestamp for discovery timing.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing observer.
      * @return array{
      *     sources: AnalysisSourceSet,
      *     findings: list<Finding>,
@@ -52,7 +67,7 @@ final class AnalysisPipeline
      *     projectContextUnits: list<AnalysisUnit>
      * }
      */
-    public function run(
+    public function runAnalysis(
         string $projectRoot,
         AnalyseCommandOptions $options,
         AnalysisConfig $config,
@@ -60,16 +75,15 @@ final class AnalysisPipeline
         ?DiffResult $reviewDiff,
         ?array $analysisPaths,
         int $discoverStart,
-        ?RuleRunnerObserver $runtimeObserver,
+        ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         if ($analysisPaths === null) {
-            $sources = new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []);
             return [
-                'sources'             => $sources,
+                'sources'             => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
                 'findings'            => [],
                 'discoverParseNs'     => hrtime(true) - $discoverStart,
                 'analyseNs'           => 0,
-                'projectContextUnits' => $sources->analysisUnits,
+                'projectContextUnits' => [],
             ];
         }
 
@@ -81,7 +95,7 @@ final class AnalysisPipeline
                 ruleContext:     $ruleContext,
                 analysisPaths:   $analysisPaths,
                 discoverStart:   $discoverStart,
-                runtimeObserver: $runtimeObserver,
+                ruleRunnerObserver: $ruleRunnerObserver,
             );
         }
 
@@ -93,12 +107,14 @@ final class AnalysisPipeline
             reviewDiff:      $reviewDiff,
             analysisPaths:   $analysisPaths,
             discoverStart:   $discoverStart,
-            runtimeObserver: $runtimeObserver,
+            ruleRunnerObserver: $ruleRunnerObserver,
         );
     }
 
     /**
      * Decide whether streaming parse → analyse → release is safe for this run.
+     *
+     * @return bool True when each unit can be released immediately after analysis.
      */
     private function canStream(
         AnalyseCommandOptions $options,
@@ -130,7 +146,7 @@ final class AnalysisPipeline
         RuleContext $ruleContext,
         array $analysisPaths,
         int $discoverStart,
-        ?RuleRunnerObserver $runtimeObserver,
+        ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         $discovery       = (new AnalysisSourceLoader())->discover(
             $projectRoot,
@@ -162,13 +178,13 @@ final class AnalysisPipeline
                 );
             }
 
-            array_push($findings, ...$this->registry->analyseUnit($unit, $ruleContext, $runtimeObserver));
+            array_push($findings, ...$this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver));
             NodeIndex::evictUnit($unit);
             $unit->release();
             unset($unit);
         }
 
-        array_push($findings, ...$this->registry->endStreaming($ruleContext, $runtimeObserver));
+        array_push($findings, ...$this->registry->endStreaming($ruleContext, $ruleRunnerObserver));
         $findings  = $this->registry->finalizeFindings($findings);
         $analyseNs = hrtime(true) - $analyseStart;
 
@@ -202,7 +218,7 @@ final class AnalysisPipeline
         ?DiffResult $reviewDiff,
         array $analysisPaths,
         int $discoverStart,
-        ?RuleRunnerObserver $runtimeObserver,
+        ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         $sources = (new AnalysisSourceLoader())->load(
             $projectRoot,
@@ -225,8 +241,8 @@ final class AnalysisPipeline
             $sources->analysisUnits,
             $ruleContext,
             $projectContextUnits,
-            $runtimeObserver,
-            releaseUnitsAfterAnalysis: true,
+            $ruleRunnerObserver,
+            shouldReleaseUnitsAfterAnalysis: true,
         );
         $analyseNs = hrtime(true) - $analyseStart;
 

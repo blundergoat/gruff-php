@@ -58,6 +58,7 @@ final class NodeIndex
      * AST immediately after analysis so the index does not pin already-
      * unreachable nodes until the unit itself is garbage collected.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit to remove from the cache.
      * @return void
      */
     public static function evictUnit(AnalysisUnit $analysisUnit): void

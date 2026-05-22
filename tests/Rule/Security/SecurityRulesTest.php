@@ -93,8 +93,8 @@ final class SecurityRulesTest extends TestCase
         $findings = $this->analyse('data-flow-heuristics.php');
 
         self::assertRuleCount(UnsafeUnserializeRule::ID, 1, $findings);
-        self::assertRuleCount(HeaderInjectionRule::ID, 1, $findings);
-        self::assertRuleCount(ExtractCompactUserInputRule::ID, 2, $findings);
+        self::assertRuleCount(HeaderInjectionRule::ID, 2, $findings);
+        self::assertRuleCount(ExtractCompactUserInputRule::ID, 3, $findings);
         self::assertRuleCount(WeakCryptoRule::ID, 3, $findings);
         self::assertRuleCount(InsecureRandomRule::ID, 3, $findings);
         self::assertRuleCount(ErrorSuppressionRule::ID, 1, $findings);

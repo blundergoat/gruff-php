@@ -370,6 +370,9 @@ final class RuleRegistry
      * A rule set is streaming-capable when every enabled project rule
      * implements ProjectRuleAccumulator. Per-unit rules are always
      * streaming-friendly.
+     *
+     * @param RuleContext $ruleContext Rule execution context.
+     * @return bool True when every enabled project rule supports streaming.
      */
     public function supportsStreaming(RuleContext $ruleContext): bool
     {
@@ -385,6 +388,7 @@ final class RuleRegistry
     /**
      * Initialise project-rule accumulators before a streaming analysis pass.
      *
+     * @param RuleContext $ruleContext Rule execution context.
      * @return void
      */
     public function beginStreaming(RuleContext $ruleContext): void
@@ -403,34 +407,40 @@ final class RuleRegistry
      * parse → analyse → release pipeline that keeps peak memory close to
      * one unit's worth on large codebases.
      *
+     * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
      * @return list<Finding> Findings produced for this unit only.
      */
     public function analyseUnit(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleContext $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
-        $findings = $this->runPerUnitRules($unit, $ruleContext, $ruleRunnerObserver);
-        $this->accumulateForUnit($unit, $ruleContext, $ruleRunnerObserver);
+        $findings = $this->runPerUnitRules($analysisUnit, $ruleContext, $ruleRunnerObserver);
+        $this->accumulateForUnit($analysisUnit, $ruleContext, $ruleRunnerObserver);
         return $findings;
     }
 
     /**
      * Run only the per-unit (file-scoped) rules against a single unit.
      *
-     * @return list<Finding>
+     * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @return list<Finding> Findings produced for this unit only.
      */
     private function runPerUnitRules(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleContext $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
-        if ($unit->hasParseErrors()) {
+        if ($analysisUnit->hasParseErrors()) {
             return [];
         }
 
         $findings = [];
-        $isPhp    = $unit->file->isPhp();
+        $isPhp    = $analysisUnit->file->isPhp();
 
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof RuleInterface) {
@@ -441,13 +451,13 @@ final class RuleRegistry
             }
 
             if ($ruleRunnerObserver === null) {
-                array_push($findings, ...$rule->analyse($unit, $ruleContext));
+                array_push($findings, ...$rule->analyse($analysisUnit, $ruleContext));
                 continue;
             }
 
             $ruleId       = $rule->definition()->id;
             $started      = hrtime(true);
-            $ruleFindings = $rule->analyse($unit, $ruleContext);
+            $ruleFindings = $rule->analyse($analysisUnit, $ruleContext);
             $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
             array_push($findings, ...$ruleFindings);
         }
@@ -457,13 +467,18 @@ final class RuleRegistry
 
     /**
      * Push one unit through every enabled streaming project rule.
+     *
+     * @param AnalysisUnit            $analysisUnit       Parsed unit to accumulate.
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @return void
      */
     private function accumulateForUnit(
-        AnalysisUnit $unit,
+        AnalysisUnit $analysisUnit,
         RuleContext $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
-        if ($unit->hasParseErrors() || !$unit->file->isPhp()) {
+        if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
             return;
         }
 
@@ -473,13 +488,13 @@ final class RuleRegistry
             }
 
             if ($ruleRunnerObserver === null) {
-                $rule->accumulate($unit, $ruleContext);
+                $rule->accumulate($analysisUnit, $ruleContext);
                 continue;
             }
 
             $ruleId  = $rule->definition()->id;
             $started = hrtime(true);
-            $rule->accumulate($unit, $ruleContext);
+            $rule->accumulate($analysisUnit, $ruleContext);
             $ruleRunnerObserver->onRuleExecuted($ruleId, hrtime(true) - $started);
         }
     }
@@ -487,6 +502,8 @@ final class RuleRegistry
     /**
      * Finalise project-rule accumulators after streaming analysis completes.
      *
+     * @param RuleContext             $ruleContext        Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
      * @return list<Finding> Project-level findings from accumulated state.
      */
     public function endStreaming(
@@ -553,6 +570,7 @@ final class RuleRegistry
      * @param RuleContext             $ruleContext        Rule execution context.
      * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
+     * @param bool                    $shouldReleaseUnitsAfterAnalysis Whether units can release AST contents after analysis.
      * @return list<Finding> Findings produced by enabled rules.
      */
     public function analyse(
@@ -560,10 +578,10 @@ final class RuleRegistry
         RuleContext $ruleContext,
         ?array $projectUnits = null,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
-        bool $releaseUnitsAfterAnalysis = false,
+        bool $shouldReleaseUnitsAfterAnalysis = false,
     ): array {
         $legacyProjectRules = $this->legacyProjectRules($ruleContext);
-        $canReleaseUnits    = $releaseUnitsAfterAnalysis
+        $canReleaseUnits    = $shouldReleaseUnitsAfterAnalysis
             && $legacyProjectRules === []
             && $projectUnits === null;
 

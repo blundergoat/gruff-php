@@ -143,20 +143,9 @@ final class AnalyseCommand extends Command
         $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
         $discoverStart = hrtime(true);
 
-        $ruleContext = new RuleContext($projectRoot, $config);
-        $pipeline    = new AnalysisPipeline(
-            $registry,
-            fn (string $root, AnalyseCommandOptions $opts, AnalysisConfig $cfg, RuleRegistry $reg, ?DiffResult $diff, AnalysisSourceSet $set): array
-                => $this->projectContextUnits(
-                    projectRoot:       $root,
-                    options:           $opts,
-                    config:            $cfg,
-                    registry:          $reg,
-                    reviewDiff:        $diff,
-                    analysisSourceSet: $set,
-                ),
-        );
-        $analysisRun = $pipeline->run(
+        $ruleContext      = new RuleContext($projectRoot, $config);
+        $analysisPipeline = new AnalysisPipeline($registry, $this->projectContextUnits(...));
+        $analysisRun = $analysisPipeline->runAnalysis(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
@@ -164,7 +153,7 @@ final class AnalyseCommand extends Command
             reviewDiff:      $reviewDiff,
             analysisPaths:   $analysisPaths,
             discoverStart:   $discoverStart,
-            runtimeObserver: $runtimeTimingObserver,
+            ruleRunnerObserver: $runtimeTimingObserver,
         );
         $sources             = $analysisRun['sources'];
         $findings            = $analysisRun['findings'];

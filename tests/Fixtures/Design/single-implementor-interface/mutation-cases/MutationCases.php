@@ -166,3 +166,43 @@ interface PositiveAfterSkipsInterface
 final class PositiveAfterSkipsImpl implements PositiveAfterSkipsInterface
 {
 }
+
+/**
+ * Contract whose only external use is an instanceof check.
+ */
+interface InstanceofUsageInterface
+{
+}
+
+/**
+ * Sole implementor for the instanceof usage exemption fixture.
+ */
+final class InstanceofUsageImpl implements InstanceofUsageInterface
+{
+    /**
+     * Return a stable value so the fixture class is not empty.
+     *
+     * @return string Non-empty marker value.
+     */
+    public function fixtureMarker(): string
+    {
+        return 'instanceof';
+    }
+}
+
+/**
+ * Consumer that checks the interface without a signature type-hint.
+ */
+final class InstanceofUsageConsumer
+{
+    /**
+     * Check whether the candidate exposes the interface contract.
+     *
+     * @param object $candidate Value to inspect.
+     * @return bool True when the candidate implements InstanceofUsageInterface.
+     */
+    public function matches(object $candidate): bool
+    {
+        return $candidate instanceof InstanceofUsageInterface;
+    }
+}

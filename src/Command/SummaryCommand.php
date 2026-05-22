@@ -255,7 +255,7 @@ final class SummaryCommand extends Command
         $findings = $registry->analyse(
             $sources->analysisUnits,
             new RuleContext($projectRoot, $config),
-            releaseUnitsAfterAnalysis: true,
+            shouldReleaseUnitsAfterAnalysis: true,
         );
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit);
