@@ -9,6 +9,7 @@ paths:
         - '.goat-flow/**'
         - 'history.json'
         - 'infection-report.json'
+        - 'src/Vendor/**'
         - 'tests/Fixtures/**'
 allowlists:
     acceptedAbbreviations:

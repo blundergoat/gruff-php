@@ -135,7 +135,47 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return false;
         }
 
+        if ($this->isUrlOrRoutePathLiteral($candidateSecret)) {
+            return true;
+        }
+
         // Recognize common source/config/documentation file extensions in path-like literals.
         return preg_match('/\\.(?:php|inc|json|xml|neon|ya?ml|txt|md|stub)$/i', $candidateSecret) === 1;
+    }
+
+    /**
+     * Detect URL and route literals that are long because of slugs or numeric IDs, not secret material.
+     *
+     * @return bool True when the literal is shaped like a public URL path.
+     */
+    private function isUrlOrRoutePathLiteral(string $candidateSecret): bool
+    {
+        if (str_starts_with($candidateSecret, 'https://hooks.slack.com/services/')) {
+            return false;
+        }
+
+        $hasScheme = preg_match('#^[a-z][a-z0-9+.-]*://#i', $candidateSecret) === 1;
+        if (!$hasScheme && !str_starts_with($candidateSecret, '/') && !str_starts_with($candidateSecret, './') && !str_starts_with($candidateSecret, '../')) {
+            return false;
+        }
+
+        $withoutScheme = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $candidateSecret);
+        if (!is_string($withoutScheme)) {
+            return false;
+        }
+
+        $slashOffset = strpos($withoutScheme, '/');
+        $path        = $slashOffset === false ? $withoutScheme : substr($withoutScheme, $slashOffset);
+        if ($path === '' || $path[0] !== '/') {
+            return false;
+        }
+
+        if (str_contains($path, '?') || str_contains($path, '#')) {
+            return false;
+        }
+
+        return preg_match('#^/[A-Za-z0-9._~/%:-]+$#', $path) === 1
+            && preg_match('/[A-Za-z]{3,}/', $path) === 1
+            && !preg_match('/[+=]/', $path);
     }
 }

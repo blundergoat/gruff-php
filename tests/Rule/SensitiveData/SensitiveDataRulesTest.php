@@ -147,6 +147,9 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertIsString($path);
         $path .= '.php';
         $source = "<?php\n\n"
+            . 'const QBO_ACCESS_TOKEN_EXPIRES_AT = ' . var_export('accessTokenExpiresAt', true) . ";\n"
+            . 'const QBO_REFRESH_TOKEN_VALID_PERIOD = ' . var_export('refreshTokenValidationPeriod', true) . ";\n"
+            . 'const ACCESS_TOKEN_PAYMENTS_KEY = ' . var_export('AirwallexApiRequester.payments', true) . ";\n"
             . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
             . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
             . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
@@ -162,6 +165,36 @@ final class SensitiveDataRulesTest extends TestCase
 
             self::assertCount(1, $findings);
             self::assertStringContainsString('API_TOKEN', $findings[0]->message);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
+     * Verify route and URL path literals are not treated as high-entropy secrets.
+     *
+     * @return void No return value.
+     */
+    public function testHighEntropyRoutePathsAreNotFlagged(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-route-entropy-');
+        self::assertIsString($path);
+        $path .= '.php';
+        $source = "<?php\n\n"
+            . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
+            . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
+            . '$secret = ' . var_export('M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ', true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-route-entropy.php'));
+            $findings = array_values(array_filter(
+                $this->analyseUnits([$unit]),
+                static fn (Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+            ));
+
+            self::assertCount(1, $findings);
+            self::assertStringContainsString('M7qP', $findings[0]->message);
         } finally {
             self::assertTrue(unlink($path));
         }

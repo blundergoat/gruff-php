@@ -117,6 +117,10 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             return false;
         }
 
+        if ($this->isIdentifierLikeNonSecretValue($upperKey, $normalizedValue)) {
+            return false;
+        }
+
         return $strongShape;
     }
 
@@ -159,5 +163,27 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         }
 
         return false;
+    }
+
+    /**
+     * Detect field names, cache keys, and labels that include secret words but are not secret values.
+     *
+     * @return bool True when the key/value shape is identifier-like instead of credential-like.
+     */
+    private function isIdentifierLikeNonSecretValue(string $key, string $secretValue): bool
+    {
+        if (preg_match('/\\d|[+\\/=]/', $secretValue) === 1) {
+            return false;
+        }
+
+        if (str_ends_with($key, '_EXPIRES_AT') || str_ends_with($key, '_VALID_PERIOD')) {
+            return true;
+        }
+
+        if (str_ends_with($key, '_KEY') && preg_match('/^[A-Za-z][A-Za-z0-9_.:-]{1,80}$/', $secretValue) === 1) {
+            return true;
+        }
+
+        return preg_match('/^[a-z][A-Za-z]{7,40}$/', $secretValue) === 1;
     }
 }

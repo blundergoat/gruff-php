@@ -15,6 +15,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar;
 
 /**
  * Detects include and require paths built from variables.
@@ -56,7 +57,7 @@ final class VariableIncludeRule implements RuleInterface
         $findings   = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Include_::class) as $include) {
-            if (SecurityNodeHelper::isStringLiteral($include->expr)) {
+            if ($this->isFixedIncludeExpression($include->expr)) {
                 continue;
             }
 
@@ -74,5 +75,35 @@ final class VariableIncludeRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Treat literal paths and paths derived only from magic constants as fixed bootstrap includes.
+     *
+     * @return bool True when the include path cannot vary from request or runtime data.
+     */
+    private function isFixedIncludeExpression(Expr $expression): bool
+    {
+        if (SecurityNodeHelper::isStringLiteral($expression) || $expression instanceof Scalar\MagicConst\Dir || $expression instanceof Scalar\MagicConst\File) {
+            return true;
+        }
+
+        if ($expression instanceof Expr\BinaryOp\Concat) {
+            return $this->isFixedIncludeExpression($expression->left)
+                && $this->isFixedIncludeExpression($expression->right);
+        }
+
+        if ($expression instanceof Expr\FuncCall && SecurityNodeHelper::globalFunctionName($expression) === 'dirname') {
+            $path = SecurityNodeHelper::argumentValue($expression->args, 0);
+            if (!$path instanceof Expr || !$this->isFixedIncludeExpression($path)) {
+                return false;
+            }
+
+            $levels = SecurityNodeHelper::argumentValue($expression->args, 1);
+
+            return $levels === null || $levels instanceof Scalar\Int_;
+        }
+
+        return false;
     }
 }

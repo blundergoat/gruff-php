@@ -75,11 +75,12 @@ final class DangerousFunctionCallRule implements RuleInterface
         $findings           = [];
         $callableParameters = $this->callableParameterNames($analysisUnit);
         $callableProperties = $this->callablePropertyNames($analysisUnit);
+        $callableLocals     = $this->callableLocalVariableNames($analysisUnit);
 
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\FuncCall::class) as $call) {
             $name = SecurityNodeHelper::globalFunctionName($call);
             if ($name === null) {
-                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call->name, $callableParameters, $callableProperties)) {
+                if (!$call->name instanceof Node\Name && !$this->isKnownCallableInvocation($call->name, $callableParameters, $callableProperties, $callableLocals)) {
                     $findings[] = $this->finding($analysisUnit, $call, 'dynamic function call');
                 }
 
@@ -101,6 +102,28 @@ final class DangerousFunctionCallRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function callableLocalVariableNames(AnalysisUnit $analysisUnit): array
+    {
+        $names = [];
+
+        foreach (NodeIndex::nodesOf($analysisUnit, Expr\Assign::class) as $assignment) {
+            if (
+                !$assignment->var instanceof Expr\Variable
+                || !is_string($assignment->var->name)
+                || (!$assignment->expr instanceof Expr\Closure && !$assignment->expr instanceof Expr\ArrowFunction)
+            ) {
+                continue;
+            }
+
+            $names[$assignment->var->name] = true;
+        }
+
+        return $names;
     }
 
     /**
@@ -167,13 +190,14 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * @param array<string, true> $callableParameters
      * @param array<string, true> $callableProperties
+     * @param array<string, true> $callableLocals
      *
      * @return bool True when a dynamic call targets a known callable slot.
      */
-    private function isKnownCallableInvocation(Node $name, array $callableParameters, array $callableProperties): bool
+    private function isKnownCallableInvocation(Node $name, array $callableParameters, array $callableProperties, array $callableLocals): bool
     {
         if ($name instanceof Expr\Variable && is_string($name->name)) {
-            return isset($callableParameters[$name->name]);
+            return isset($callableParameters[$name->name]) || isset($callableLocals[$name->name]);
         }
 
         if ($name instanceof Expr\PropertyFetch && $name->name instanceof Identifier) {

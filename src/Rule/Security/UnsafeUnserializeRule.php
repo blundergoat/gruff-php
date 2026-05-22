@@ -15,6 +15,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar;
 
 /**
  * Detects unserialize calls that can hydrate attacker-controlled payloads.
@@ -65,6 +66,10 @@ final class UnsafeUnserializeRule implements RuleInterface
                 continue;
             }
 
+            if ($this->hasAllowedClassesFalse($call)) {
+                continue;
+            }
+
             $findings[] = new Finding(
                 ruleId:      self::ID,
                 message:     'Heuristic unsafe unserialize() input detected.',
@@ -79,5 +84,30 @@ final class UnsafeUnserializeRule implements RuleInterface
         }
 
         return $findings;
+    }
+
+    /**
+     * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
+     *
+     * @return bool True when object deserialization has been disabled by options.
+     */
+    private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
+    {
+        $options = SecurityNodeHelper::argumentValue($call->args, 1);
+        if (!$options instanceof Expr\Array_) {
+            return false;
+        }
+
+        foreach ($options->items as $item) {
+            if (!$item->key instanceof Scalar\String_) {
+                continue;
+            }
+
+            if ($item->key->value === 'allowed_classes' && SecurityNodeHelper::isFalseLike($item->value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
