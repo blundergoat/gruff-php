@@ -20,7 +20,6 @@ use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
 use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
@@ -262,7 +261,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
             NoAssertionsRule::ID,
             TrivialAssertionRule::ID,
             ConditionalTestLogicRule::ID,
-            LoopInTestRule::ID,
             TestLongerThanSutRule::ID,
             EagerTestRule::ID,
             MysteryGuestRule::ID,

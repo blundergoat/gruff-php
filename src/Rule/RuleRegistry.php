@@ -88,7 +88,6 @@ use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
 use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
@@ -246,7 +245,6 @@ final class RuleRegistry
             new ExtendsProductionClassRule(),
             new GlobalStateMutationRule(),
             new LoopAssertionWithoutMessageRule(),
-            new LoopInTestRule(),
             new MagicNumberAssertionRule(),
             new MockOnlyTestRule(),
             new MockWithoutExpectationRule(),

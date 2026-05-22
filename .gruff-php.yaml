@@ -504,16 +504,6 @@ rules:
     # Loop assertions need messages to identify the failing case.
     test-quality.loop-assertion-without-message:
         enabled: true
-    # Loops in tests can hide missing individual cases.
-    test-quality.loop-in-test:
-        enabled: true
-        options:
-            ignoredPathPatterns:
-                - 'tests/Console/AnalyseCliGitDiscoveryTest.php'
-                - 'tests/Console/AnalyseCliRuntimeTest.php'
-                - 'tests/Rule/Naming/NamingAdvancedRulesTest.php'
-                - 'tests/Rule/Naming/NamingRulesTest.php'
-                - 'tests/Rule/TestQuality/TestQualityNodeHelperTest.php'
     # Magic numbers obscure what a test is proving.
     test-quality.magic-number-assertion:
         enabled: true

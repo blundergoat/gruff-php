@@ -69,7 +69,6 @@ use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
 use GruffPhp\Rule\TestQuality\DataProviderAnnotationRule;
 use GruffPhp\Rule\TestQuality\EagerTestRule;
 use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
-use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
@@ -134,9 +133,8 @@ final class RuleRegistryTest extends TestCase
             UnsafeUnserializeRule::ID, VariableIncludeRule::ID,
             WeakCryptoRule::ID, ConditionalTestLogicRule::ID,
             DataProviderAnnotationRule::ID, EagerTestRule::ID,
-            ExcessiveMockingRule::ID, LoopInTestRule::ID,
-            MagicNumberAssertionRule::ID, MockOnlyTestRule::ID,
-            MysteryGuestRule::ID, NoAssertionsRule::ID,
+            ExcessiveMockingRule::ID, MagicNumberAssertionRule::ID,
+            MockOnlyTestRule::ID, MysteryGuestRule::ID, NoAssertionsRule::ID,
             PrivateReflectionRule::ID, SetupBloatRule::ID,
             SkippedWithoutReasonRule::ID, SleepInTestRule::ID,
             SutNotCalledRule::ID, TestLongerThanSutRule::ID,
@@ -293,9 +291,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(114, $definitions);
+        self::assertCount(113, $definitions);
         self::assertSame(
-            '4a7d340fe4728fc4527' . 'f92bd6c6a531df1641eb920e2477a03792cc74fcabf23',
+            '32c45f450516cae6c86' . '1d9d2aec3fea749635dc60b13ed7b86b74d3c6e5b5b2e',
             hash('sha256', $json),
         );
     }

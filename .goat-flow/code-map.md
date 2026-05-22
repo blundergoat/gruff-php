@@ -211,7 +211,6 @@ src/
 |   |   |-- ExtendsProductionClassRule.php    = `test-quality.extends-production-class` (`class FooTest extends Foo` not via `*TestCase`)
 |   |   |-- GlobalStateMutationRule.php       = `test-quality.global-state-mutation` (superglobal/`putenv`/`ini_set`/`error_reporting` writes without tearDown / `#[After]` cleanup)
 |   |   |-- LoopAssertionWithoutMessageRule.php = `test-quality.loop-assertion-without-message`
-|   |   |-- LoopInTestRule.php                = `test-quality.loop-in-test`
 |   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion` (default-allowlists HTTP status codes; configurable `allowedLiterals`)
 |   |   |-- MockingDomainObjectRule.php       = `test-quality.mocking-domain-object` (default-disabled; requires `domainNamespaces` glob list)
 |   |   |-- MockOnlyTestRule.php              = `test-quality.mock-only-test`

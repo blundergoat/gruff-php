@@ -21,7 +21,6 @@ use GruffPhp\Rule\TestQuality\ExcessiveMockingRule;
 use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
 use GruffPhp\Rule\TestQuality\GlobalStateMutationRule;
 use GruffPhp\Rule\TestQuality\LoopAssertionWithoutMessageRule;
-use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MagicNumberAssertionRule;
 use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
 use GruffPhp\Rule\TestQuality\MockOnlyTestRule;
@@ -80,7 +79,6 @@ final class TestQualityRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php');
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $findings);
-        self::assertRuleCount(LoopInTestRule::ID, 1, $findings);
         // sleep + time + microtime + new DateTime('now') + new DateTimeImmutable() — frozen DateTime is not flagged
         self::assertRuleCount(SleepInTestRule::ID, 5, $findings);
     }
@@ -256,22 +254,6 @@ final class TestQualityRulesTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame('MagicNumberHeuristicTest::testOpaqueBusinessNumberIsFlagged()', $findings[0]->symbol);
-    }
-
-    /**
-     * Verify loop-in-test only flags loops that contain assertions.
-     *
-     * @return void No return value.
-     */
-    public function testLoopInTestOnlyFlagsLoopsContainingAssertions(): void
-    {
-        $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/loop-in-test-heuristic.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === LoopInTestRule::ID,
-        ));
-
-        self::assertCount(1, $findings);
-        self::assertSame('LoopInTestHeuristicTest::testAssertionInsideLoopIsFlagged()', $findings[0]->symbol);
     }
 
     /**

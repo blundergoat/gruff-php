@@ -12,7 +12,6 @@ use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\TestQuality\ConditionalTestLogicRule;
-use GruffPhp\Rule\TestQuality\LoopInTestRule;
 use GruffPhp\Rule\TestQuality\MysteryGuestRule;
 use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
@@ -74,27 +73,27 @@ final class TestQualityCalibrationRulesTest extends TestCase
     }
 
     /**
-     * Verify control-flow test rubrics support project-specific path exemptions.
+     * Verify conditional logic rubric supports project-specific path exemptions.
      *
      * @return void No return value.
      */
-    public function testControlFlowRulesSupportIgnoredPathPatterns(): void
+    public function testConditionalLogicRuleSupportsIgnoredPathPatterns(): void
     {
         $registry = RuleRegistry::defaults();
+        $fixture  = 'tests/Fixtures/TestQuality/phpunit-core-smells.php';
+        $baseline = $this->analysePath($fixture);
+
+        self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $baseline);
+
         $config   = AnalysisConfig::fromRegistry($registry)
             ->withRuleSettings(
                 ConditionalTestLogicRule::ID,
                 new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
-            )
-            ->withRuleSettings(
-                LoopInTestRule::ID,
-                new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
             );
 
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php', $config);
+        $findings = $this->analysePath($fixture, $config);
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 0, $findings);
-        self::assertRuleCount(LoopInTestRule::ID, 0, $findings);
     }
 
     /**
