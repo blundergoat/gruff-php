@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-18. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-22. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -10,7 +10,7 @@ Last reviewed 2026-05-18. Captures the v0.1 surface as wired in `composer.json`,
 |-- CHANGELOG.md              = unreleased notes for the v0.1 surface
 |-- CLAUDE.md                 = Claude Code root instruction file
 |-- AGENTS.md                 = Codex peer instruction file
-|-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`test` scripts
+|-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
 |-- composer.lock             = resolved Composer dependency versions
 |-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
 |-- phpunit.xml.dist          = PHPUnit 11 test suite config
@@ -25,7 +25,7 @@ Last reviewed 2026-05-18. Captures the v0.1 surface as wired in `composer.json`,
 |-- .editorconfig             = editor settings
 |-- .gitattributes            = git export/diff rules
 |-- .gitignore                = root ignore rules
-|-- .github/                  = repository-facing guidance and CI workflow
+|-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job
 |-- .idea/                    = JetBrains IDE settings (developer-local)
 |-- .goat-flow/               = goat-flow project memory and reference docs
 |-- .claude/                  = Claude Code config, hooks, and installed skills
@@ -56,7 +56,7 @@ src/
 |   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
 |   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
 |-- Command/
-|   |-- AnalyseCommand.php                    = `analyse` command; loads config, derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
+|   |-- AnalyseCommand.php                    = `analyse` command; loads config, applies optional execution profiles (`--profile=security` selects security + sensitive-data rules), derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
 |   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
 |   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
 |   |-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
@@ -260,7 +260,7 @@ src/
 |   |-- FileScore.php                         = per-file top-offender score value
 |   |-- Grade.php                             = A-F grade helper around 0-100 scores
 |   |-- PillarScore.php                       = per-pillar score/count/penalty value
-|   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, and mutation scoring
+|   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, mutation scoring, and profile-scoped composite scoring for `--profile=security`
 |   `-- ScoreReport.php                       = serialisable score payload for reports
 |-- Source/
 |   |-- SourceDiscovery.php                   = Git-visible or fallback recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/md/neon/sh/toml/xml/yaml/yml + `.env*`, `.editorconfig`, `.gitattributes`, `.gitignore`); deterministic ksort + path canonicalisation; configured ignores and generated lockfile skips
@@ -323,7 +323,7 @@ tests/
 |   `-- Waste/
 |       `-- WasteRulesTest.php
 |-- Scoring/
-|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, design composite findings
+|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring, design composite findings
 `-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
     |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
     |-- Complexity/                           = complexity-rule source fixtures
@@ -407,7 +407,7 @@ tests/
 ## Notes
 
 - `vendor/` and `node_modules/` are generated and gitignored.
-- No CI directory exists yet; verification is local via `composer check`, `composer phpstan`, `composer test`, or `scripts/preflight-checks.sh`.
+- CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

@@ -6,6 +6,7 @@ namespace GruffPhp\Command;
 
 use GruffPhp\Baseline\BaselineApplicationOptions;
 use GruffPhp\Baseline\BaselineStore;
+use GruffPhp\Config\RuleSelection;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\MutationAnalysisOptions;
@@ -18,10 +19,21 @@ use Symfony\Component\Console\Input\InputInterface;
 final readonly class AnalyseCommandOptions
 {
     /**
+     * Normal profile that leaves configured rule selection unchanged.
+     */
+    private const PROFILE_DEFAULT = 'default';
+
+    /**
+     * Security profile that executes only security and sensitive-data rules.
+     */
+    private const PROFILE_SECURITY = 'security';
+
+    /**
      * @param list<string>               $paths                Paths requested for analysis.
      * @param bool                       $shouldIncludeIgnored Whether ignored files should be included.
      * @param string|null                $configPath           Explicit config path supplied by the CLI.
      * @param bool                       $noConfig             Whether config loading is disabled.
+     * @param string                     $profile              Rule execution profile requested for the run.
      * @param MutationAnalysisOptions    $mutation             Parsed mutation-analysis options.
      * @param string|null                $diffMode             Requested diff mode, when diff analysis is enabled.
      * @param string|null                $diffVs               Comparison ref used for diff and changed-only analysis.
@@ -44,6 +56,7 @@ final readonly class AnalyseCommandOptions
         public bool $shouldIncludeIgnored,
         public ?string $configPath,
         public bool $noConfig,
+        public string $profile,
         public MutationAnalysisOptions $mutation,
         public ?string $diffMode,
         public ?string $diffVs,
@@ -106,6 +119,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored:          (bool) $input->getOption('include-ignored'),
             configPath:                    is_string($configPath) ? $configPath : null,
             noConfig:                      (bool) $input->getOption('no-config'),
+            profile:                       self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
             mutation:                      new MutationAnalysisOptions(
                 infectionReportPath:           self::optionalStringOption($input, 'infection-report'),
                 shouldRunInfection:            (bool) $input->getOption('infection-run'),
@@ -154,6 +168,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored:          $this->shouldIncludeIgnored,
             configPath:                    $this->configPath,
             noConfig:                      $this->noConfig,
+            profile:                       $this->profile,
             mutation:                      new MutationAnalysisOptions(
                 infectionReportPath:           $this->mutation->infectionReportPath,
                 shouldRunInfection:            $this->mutation->shouldRunInfection,
@@ -203,6 +218,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored: $this->shouldIncludeIgnored,
             configPath:           $this->configPath,
             noConfig:             $this->noConfig,
+            profile:              $this->profile,
             mutation:             $this->mutation,
             diffMode:             $this->diffMode,
             diffVs:               $this->diffVs,
@@ -235,6 +251,7 @@ final readonly class AnalyseCommandOptions
     {
         return $this->optionError
             ?? $this->configUsageError()
+            ?? $this->profileUsageError()
             ?? $this->baselineUsageError()
             ?? $this->diffUsageError()
             ?? $this->changedOnlyUsageError()
@@ -256,6 +273,37 @@ final readonly class AnalyseCommandOptions
             includeRules:   $this->includeRules,
             excludeRules:   $this->excludeRules,
         );
+    }
+
+    /**
+     * Build the execution selection implied by the requested profile, or null for normal configured selection.
+     *
+     * @return RuleSelection|null Profile rule selection override.
+     */
+    public function profileRuleSelection(): ?RuleSelection
+    {
+        if ($this->profile !== self::PROFILE_SECURITY) {
+            return null;
+        }
+
+        return new RuleSelection(pillars: [
+            Pillar::Security->value,
+            Pillar::SensitiveData->value,
+        ]);
+    }
+
+    /**
+     * Return the pillar set that should contribute to composite scoring for the requested profile.
+     *
+     * @return list<Pillar>|null Profile scoring pillars, or null for default scoring.
+     */
+    public function profileScorePillars(): ?array
+    {
+        if ($this->profile !== self::PROFILE_SECURITY) {
+            return null;
+        }
+
+        return [Pillar::Security, Pillar::SensitiveData];
     }
 
     /**
@@ -385,6 +433,20 @@ final readonly class AnalyseCommandOptions
         }
 
         return '--no-config cannot be combined with --config.';
+    }
+
+    /**
+     * Return the usage error for unsupported rule execution profiles.
+     *
+     * @return string|null Error message, or null when the profile is valid.
+     */
+    private function profileUsageError(): ?string
+    {
+        if (in_array($this->profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
+            return null;
+        }
+
+        return sprintf('Unsupported profile "%s". Use default or security.', $this->profile);
     }
 
     /**

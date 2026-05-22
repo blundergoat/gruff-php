@@ -173,6 +173,29 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
+     * Verify score calculation can scope composite scoring to selected pillars.
+     *
+     * @return void No return value.
+     */
+    public function testScoreReportCanScopeCompositeToSelectedPillars(): void
+    {
+        $score = (new ScoreCalculator())->calculate(
+            [
+                $this->finding('security.dangerous-function-call', Pillar::Security, Severity::Error),
+                $this->finding('security.unsafe-unserialize', Pillar::Security, Severity::Error),
+            ],
+            null,
+            DiffResult::inactive(),
+            scorePillars: [Pillar::Security, Pillar::SensitiveData],
+        );
+
+        $pillars = array_map(static fn ($pillar): string => $pillar->pillar, $score->pillars);
+
+        self::assertSame(['security', 'sensitive-data'], $pillars);
+        self::assertSame('F', $score->composite->letter);
+    }
+
+    /**
      * Build a finding fixture for assertions.
      *
      * @param string                                                                                 $ruleId   Rule identifier.

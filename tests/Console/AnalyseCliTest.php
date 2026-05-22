@@ -300,6 +300,111 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify security profile limits rule execution to security and sensitive-data rules.
+     *
+     * @throws JsonException
+     * @return void No return value.
+     */
+    public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Security/cumulative-security.php',
+            '--no-config',
+            '--profile',
+            'security',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report   = $this->decodeJsonOutput($process);
+        $findings = $report['findings'] ?? null;
+        $score    = $report['score'] ?? null;
+        self::assertIsArray($findings);
+        self::assertIsArray($score);
+        $composite = $score['composite'] ?? null;
+        self::assertIsArray($composite);
+        self::assertNotCount(0, $findings);
+        self::assertSame('F', $composite['grade'] ?? null);
+
+        foreach ($findings as $finding) {
+            self::assertIsArray($finding);
+            $ruleId = $finding['ruleId'] ?? null;
+            self::assertIsString($ruleId);
+            self::assertTrue(
+                str_starts_with($ruleId, 'security.') || str_starts_with($ruleId, 'sensitive-data.'),
+                'Unexpected rule from security profile: ' . $ruleId,
+            );
+        }
+    }
+
+    /**
+     * Verify security profile replaces configured rule selection.
+     *
+     * @throws JsonException
+     * @return void No return value.
+     */
+    public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Security/cumulative-security.php',
+            '--config',
+            'tests/Fixtures/Config/only-size-rules.yaml',
+            '--profile',
+            'security',
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $report   = $this->decodeJsonOutput($process);
+        $findings = $report['findings'] ?? null;
+        self::assertIsArray($findings);
+        $ruleIds = array_map(
+            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+            $findings,
+        );
+
+        self::assertContains('security.dangerous-function-call', $ruleIds);
+        self::assertNotContains('docs.missing-file-phpdoc', $ruleIds);
+    }
+
+    /**
+     * Verify analyse command rejects unknown execution profiles.
+     *
+     * @return void No return value.
+     */
+    public function testAnalyseCommandReportsInvalidProfile(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff-php',
+            'analyse',
+            '--profile',
+            'security-plus',
+            'tests/Fixtures/Source/Code',
+        ], __DIR__ . '/../..');
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        self::assertStringContainsString('[USAGE-ERROR] Unsupported profile "security-plus". Use default or security.', $process->getOutput());
+    }
+
+    /**
      * Verify analyse command applies configured path ignores.
      *
      * @return void No return value.

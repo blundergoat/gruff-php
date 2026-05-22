@@ -99,6 +99,10 @@ final readonly class AnalyseCommandSetupBuilder
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
+        $profileRuleSelection = $options->profileRuleSelection();
+        if ($profileRuleSelection !== null) {
+            $configResult = $configResult->withRuleSelection($profileRuleSelection);
+        }
 
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
             projectRoot:   $projectRoot,

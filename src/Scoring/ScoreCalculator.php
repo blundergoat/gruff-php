@@ -38,11 +38,17 @@ final readonly class ScoreCalculator
      * @param MutationAnalysisResult|null $mutationAnalysisResult Optional mutation result included in scoring.
      * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
      * @param int                         $fileScoreLimit         Maximum file offender rows to retain.
+     * @param list<Pillar>|null           $scorePillars           Optional pillar set included in composite scoring.
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
-    public function calculate(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?DiffResult $diffResult, int $fileScoreLimit = 10): ScoreReport
-    {
-        $pillars    = $this->pillarScores($findings, $mutationAnalysisResult);
+    public function calculate(
+        array $findings,
+        ?MutationAnalysisResult $mutationAnalysisResult,
+        ?DiffResult $diffResult,
+        int $fileScoreLimit = 10,
+        ?array $scorePillars = null,
+    ): ScoreReport {
+        $pillars    = $this->pillarScores($findings, $mutationAnalysisResult, $scorePillars);
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
@@ -85,19 +91,28 @@ final readonly class ScoreCalculator
 
     /**
      * @param list<Finding> $findings
+     * @param list<Pillar>|null $scorePillars
      * @return list<PillarScore>
      */
-    private function pillarScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult): array
+    private function pillarScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
     {
-        $pillarNames = self::STATIC_PILLARS;
+        $pillarNames = $scorePillars === null
+            ? self::STATIC_PILLARS
+            : array_values(array_unique(array_map(static fn (Pillar $pillar): string => $pillar->value, $scorePillars)));
 
-        foreach ($findings as $finding) {
-            if (!in_array($finding->pillar->value, $pillarNames, true)) {
-                $pillarNames[] = $finding->pillar->value;
+        if ($scorePillars === null) {
+            foreach ($findings as $finding) {
+                if (!in_array($finding->pillar->value, $pillarNames, true)) {
+                    $pillarNames[] = $finding->pillar->value;
+                }
             }
         }
 
-        if ($mutationAnalysisResult instanceof MutationAnalysisResult && !in_array(Pillar::Mutation->value, $pillarNames, true)) {
+        if (
+            $scorePillars === null
+            && $mutationAnalysisResult instanceof MutationAnalysisResult
+            && !in_array(Pillar::Mutation->value, $pillarNames, true)
+        ) {
             $pillarNames[] = Pillar::Mutation->value;
         }
 

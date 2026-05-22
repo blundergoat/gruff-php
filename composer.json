@@ -34,6 +34,7 @@
         "check": [
             "composer validate --strict",
             "composer audit --locked",
+            "@security:scan",
             "bash -n scripts/preflight-checks.sh",
             "bash -n scripts/mutation-test-diff.sh",
             "bash -n scripts/mutation-test-full.sh",
@@ -48,6 +49,7 @@
         "format:check": "php-cs-fixer check --config=.php-cs-fixer.dist.php --diff",
         "perf": "scripts/test-performance.sh",
         "phpstan": "phpstan analyse --configuration=phpstan.neon.dist",
+        "security:scan": "php bin/gruff-php analyse src scripts .github composer.json package.json .gitattributes .gitignore .gruff-php.yaml phpunit.xml.dist phpstan.neon.dist infection.json5 --no-config --profile=security --format=text --fail-on=warning --no-baseline",
         "test": "phpunit"
     },
     "config": {

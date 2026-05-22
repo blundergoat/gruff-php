@@ -67,6 +67,7 @@ final class AnalyseCommand extends Command
             ->addOption('file', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'File to analyse. Can be repeated.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
+            ->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Rule execution profile: default or security.', default: 'default')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, hotspot, or sarif.', default: OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', default: FailThreshold::Error->value)
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', default: 'none')
@@ -195,7 +196,7 @@ final class AnalyseCommand extends Command
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
         $scoreStart = hrtime(true);
-        $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff);
+        $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
         $scoreNs    = hrtime(true) - $scoreStart;
         $review     = $this->buildBranchReview(
             projectRoot:     $projectRoot,
@@ -532,7 +533,7 @@ final class AnalyseCommand extends Command
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
         if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
-            $baseScore = (new ScoreCalculator())->calculate([], null, null);
+            $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars());
 
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
@@ -581,7 +582,7 @@ final class AnalyseCommand extends Command
             }
 
             $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null);
+            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null, scorePillars: $options->profileScorePillars());
 
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
