@@ -16,6 +16,7 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr;
+use PhpParser\Node\Scalar;
 
 /**
  * Detects logging or dumping of request-controlled or sensitive-looking data.
@@ -116,9 +117,51 @@ final class SensitiveDataLoggingRule implements RuleInterface
                 continue;
             }
 
+            if ($this->isStaticLogArgument($arg->value)) {
+                continue;
+            }
+
             if (SecurityNodeHelper::containsUserInput($arg->value) || SecurityNodeHelper::containsSensitiveReference($arg->value)) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect logger arguments that contain only static message/context values.
+     *
+     * @return bool True when no runtime value can be leaked.
+     */
+    private function isStaticLogArgument(Expr $expr): bool
+    {
+        if ($expr instanceof Scalar) {
+            return true;
+        }
+
+        if ($expr instanceof Expr\ClassConstFetch) {
+            return true;
+        }
+
+        if ($expr instanceof Expr\ConstFetch) {
+            $name = strtolower($expr->name->toString());
+
+            return in_array($name, ['false', 'null', 'true'], true);
+        }
+
+        if ($expr instanceof Expr\Array_) {
+            foreach ($expr->items as $item) {
+                if ($item->unpack || !$this->isStaticLogArgument($item->value)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if ($expr instanceof Expr\BinaryOp\Concat) {
+            return $this->isStaticLogArgument($expr->left) && $this->isStaticLogArgument($expr->right);
         }
 
         return false;

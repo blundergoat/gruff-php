@@ -84,8 +84,13 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $line                  = $this->lineText($analysisUnit->source, SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset));
+                $lineNumber            = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
+                $line                  = $this->lineText($analysisUnit->source, $lineNumber);
                 if (!$this->hasPhiContext($line, $definition['name'])) {
+                    continue;
+                }
+
+                if ($this->isPlaceholderPhiLine($line, $candidateSecret, $analysisUnit->file->displayPath)) {
                     continue;
                 }
 
@@ -94,7 +99,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                     analysisUnit:        $analysisUnit,
                     ruleId:      self::ID,
                     message:     sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
-                    line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                    line:        $lineNumber,
                     confidence:  Confidence::Medium,
                     detector:    $definition['name'],
                     preview:     $preview,
@@ -124,6 +129,30 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             || str_contains($normalized, 'ssn')
             || str_contains($normalized, 'tax_file_number')
             || str_contains($normalized, 'tfn');
+    }
+
+    /**
+     * Suppress PHI-looking identifiers that are obvious examples or placeholders.
+     *
+     * @return bool True when the line describes non-real sample data.
+     */
+    private function isPlaceholderPhiLine(string $line, string $candidateSecret, string $displayPath): bool
+    {
+        $normalizedLine      = strtolower($line);
+        $normalizedCandidate = preg_replace('/[^a-z0-9]/i', '', $candidateSecret) ?? '';
+
+        if ($normalizedCandidate === '123456789' && str_contains($normalizedLine, 'patientfundmembershipnum')) {
+            return true;
+        }
+
+        if (!str_starts_with($displayPath, 'docs/')) {
+            return false;
+        }
+
+        return str_contains($normalizedLine, 'example')
+            || str_contains($normalizedLine, 'placeholder')
+            || str_contains($normalizedLine, 'sample')
+            || str_contains($normalizedLine, 'source_snippet');
     }
 
     /**

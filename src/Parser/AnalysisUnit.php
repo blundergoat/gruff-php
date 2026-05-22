@@ -71,8 +71,8 @@ final class AnalysisUnit
     {
         // Break ParentConnectingVisitor's back-edges so PHP's reference
         // counter can free each node immediately, rather than waiting for the
-        // cycle collector. This matters at scale (4-5GB peak on healthkit-
-        // sized projects without it) because every AST node holds a `parent`
+        // cycle collector. This matters at scale (4-5GB peak on large-project
+        // scans without it) because every AST node holds a `parent`
         // attribute pointing up the tree.
         foreach ($this->statements as $statement) {
             self::breakParentLinks($statement);

@@ -104,6 +104,42 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify callable collections are not treated like arbitrary dynamic calls.
+     *
+     * @return void No return value.
+     */
+    public function testCallableCollectionInvocationsAreNotDangerousDynamicCalls(): void
+    {
+        $findings = $this->findingsForRule($this->callableCollectionUnit(), DangerousFunctionCallRule::ID);
+
+        self::assertSame([], $findings);
+    }
+
+    /**
+     * Verify static logger text that names sensitive concepts is not treated as leaked data.
+     *
+     * @return void No return value.
+     */
+    public function testStaticSensitiveLoggerMessagesAreNotFlagged(): void
+    {
+        $findings = $this->findingsForRule($this->staticLoggerMessageUnit(), SensitiveDataLoggingRule::ID);
+
+        self::assertSame([], $findings);
+    }
+
+    /**
+     * Verify runtime sensitive log values still produce findings.
+     *
+     * @return void No return value.
+     */
+    public function testSensitiveLoggerRuntimeValuesStillFlagged(): void
+    {
+        $findings = $this->findingsForRule($this->runtimeLoggerValueUnit(), SensitiveDataLoggingRule::ID);
+
+        self::assertCount(2, $findings);
+    }
+
+    /**
      * Verify request data security heuristics detected.
      *
      * @return void No return value.
@@ -389,6 +425,15 @@ final class CallableFixture
         ($this->stored)($command);
         system($command);
     }
+
+    public function retry(callable $operation, ?callable $beforeRetry): void
+    {
+        $operation();
+
+        if ($beforeRetry !== null) {
+            $beforeRetry();
+        }
+    }
 }
 PHP,
             'tests/Fixtures/Security/inline-typed-callable.php',
@@ -408,18 +453,125 @@ PHP,
 
 function invokeLocalClosures(string $command): void
 {
+    $chart = new class {
+        public function renderTo(string $target): void
+        {
+        }
+
+        public function text(string $label): void
+        {
+        }
+    };
     $pager = function (array $page): array {
         return $page;
     };
     $normalizer = static fn (string $value): string => trim($value);
+    $chartRenderTo = [$chart, 'renderTo'];
+    $chartText = [$chart, 'text'];
     $dynamic = 'system';
 
     $pager(['page' => 1]);
     $normalizer($command);
+    $chartRenderTo('chartContainer');
+    $chartText('Chart title');
     $dynamic($command);
 }
 PHP,
             'tests/Fixtures/Security/inline-local-closures.php',
+        );
+    }
+
+    /**
+     * Parse the callable-collection fixture into an analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
+    private function callableCollectionUnit(): AnalysisUnit
+    {
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+
+final class CallableCollectionFixture
+{
+    /** @var array<int, callable(object): void> */
+    private array $binders = [];
+    private object $statement;
+    /** @var callable(): object */
+    private $statementFactory;
+
+    public function __construct(callable $statementFactory)
+    {
+        $this->statementFactory = $statementFactory;
+    }
+
+    public function remember(): void
+    {
+        $this->binders[] = static function (object $statement): void {
+            $statement;
+        };
+    }
+
+    public function replay(): void
+    {
+        $this->statement = ($this->statementFactory)();
+
+        foreach ($this->binders as $binder) {
+            $binder($this->statement);
+        }
+    }
+}
+PHP,
+            'tests/Fixtures/Security/inline-callable-collection.php',
+        );
+    }
+
+    /**
+     * Parse the static logger message fixture into an analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
+    private function staticLoggerMessageUnit(): AnalysisUnit
+    {
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+
+final class StaticLoggerMessageFixture
+{
+    public function record(object $logger): void
+    {
+        $logger->info('flushing PreferenceAuthUser and AuthCredential', ['method' => __METHOD__, 'line' => __LINE__]);
+        $logger->info('user already has a valid AuthCredentialToken', ['method' => __METHOD__, 'line' => __LINE__]);
+        $logger->warning('token refresh skipped for a static branch');
+    }
+}
+PHP,
+            'tests/Fixtures/Security/inline-static-logger-message.php',
+        );
+    }
+
+    /**
+     * Parse the runtime logger value fixture into an analysis unit.
+     *
+     * @return AnalysisUnit Fixture value.
+     */
+    private function runtimeLoggerValueUnit(): AnalysisUnit
+    {
+        return $this->parseSource(
+            <<<'PHP'
+<?php
+
+final class RuntimeLoggerValueFixture
+{
+    public function record(object $logger, string $password, string $token): void
+    {
+        $logger->warning($password);
+        $logger->info('token refresh failed', ['token' => $token]);
+    }
+}
+PHP,
+            'tests/Fixtures/Security/inline-runtime-logger-value.php',
         );
     }
 

@@ -76,6 +76,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
+            $line = $this->lineText($analysisUnit->source, SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset));
+            if ($this->isMedicalStandardsMetadata($candidateSecret, $line)) {
+                continue;
+            }
+
             $entropy = SecretScannerHelper::entropy($candidateSecret);
             if ($entropy < $entropyThreshold && !(strlen($candidateSecret) >= 64 && ctype_xdigit($candidateSecret))) {
                 continue;
@@ -177,5 +182,40 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         return preg_match('#^/[A-Za-z0-9._~/%:-]+$#', $path) === 1
             && preg_match('/[A-Za-z]{3,}/', $path) === 1
             && !preg_match('/[+=]/', $path);
+    }
+
+    /**
+     * Detect public clinical-code metadata whose long tokens are standard identifiers.
+     *
+     * @return bool True when the candidate is medical terminology metadata.
+     */
+    private function isMedicalStandardsMetadata(string $candidateSecret, string $line): bool
+    {
+        if (!preg_match('/(?:CodeSystem|ConceptCode|HL7|OID|ValueSet)/i', $line)) {
+            return false;
+        }
+
+        if (preg_match('/^(?:PH|PHVS)_[A-Za-z0-9_]+_HL7_V\d+$/', $candidateSecret) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^\d+(?:\.\d+){3,}$/', $candidateSecret) === 1) {
+            return true;
+        }
+
+        return str_contains($candidateSecret, 'HL7')
+            && preg_match('/(?:CodeSystemCode|HL7Table|ValueSetCode)/i', $line) === 1;
+    }
+
+    /**
+     * Return source text for a 1-based line number.
+     *
+     * @return string Line text, or an empty string when unavailable.
+     */
+    private function lineText(string $source, int $lineNumber): string
+    {
+        $lines = explode("\n", $source);
+
+        return $lines[$lineNumber - 1] ?? '';
     }
 }

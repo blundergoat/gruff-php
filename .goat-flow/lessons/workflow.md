@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-05-20
+last_reviewed: 2026-05-23
 ---
 
 # Workflow Lessons
@@ -58,7 +58,7 @@ For the dogfood snapshots also expect new findings on the gruff source tree itse
 
 **Created:** 2026-05-11
 
-**What happened:** During healthkit dogfooding, the user asked why private helper docblocks without `@return` were not being flagged. The agent initially pushed back that adding bare `@return string` / `@return bool` tags restated native signatures and created comment noise. The user clarified that gruff's project standard is stricter: `docs.missing-return-tag` must catch every documented method/function without `@return`, including private helpers.
+**What happened:** During external dogfooding, the user asked why private helper docblocks without `@return` were not being flagged. The agent initially pushed back that adding bare `@return string` / `@return bool` tags restated native signatures and created comment noise. The user clarified that gruff's project standard is stricter: `docs.missing-return-tag` must catch every documented method/function without `@return`, including private helpers.
 
 **Root cause:** The agent applied a general PHPDoc minimalism preference instead of treating the user's explicit rule standard as the source of truth for this analyser. gruff is an opinionated scanner; some rules intentionally require documentation that another project might consider redundant.
 

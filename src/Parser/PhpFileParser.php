@@ -68,7 +68,7 @@ final readonly class PhpFileParser
 
             // Only comment tokens are consumed by rules (TODO density, commented-out code, secret
             // scanner comment ranges). Keeping the full token stream is the dominant per-file
-            // memory cost at scale (~4-5GB peak on healthkit-sized projects).
+            // memory cost at scale (~4-5GB peak on large PHP projects).
             $commentTokens = [];
             foreach ($this->parser->getTokens() as $token) {
                 if ($token->id === T_COMMENT || $token->id === T_DOC_COMMENT) {

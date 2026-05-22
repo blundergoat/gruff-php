@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-19
+last_reviewed: 2026-05-23
 ---
 
 # Rule Footguns
@@ -35,7 +35,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`src/Rule/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like healthkit's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
+`src/Rule/Waste/UnusedParameterRule.php` (search: `analysableNodes`) originally checked standalone functions and private methods only, so a concrete public method like an external healthcare target's `VoiceTraceLogger::trace()` could carry an ignored `$detailed` parameter without any `waste.unused-parameter` finding. The same rule also counted direct `unset($detailed)` as a parameter use even though it is only a placeholder/silencer, not a read of the argument.
 
 **Prevention:** For waste/dead-code rules, make the conservative boundary explicit in tests and include at least one locally owned public method fixture plus one contract/override fixture. Treat direct `unset($param)` as non-use when the rule's question is "does the method actually consume this argument?" and use finding columns or metadata when multiple same-line findings can otherwise share a fingerprint.
 
@@ -43,7 +43,7 @@ Rule heuristics that search a whole docblock or AST subtree can attribute nested
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rule/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as healthkit's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
+Constructor-promoted properties are represented as `Node\Param` entries with visibility flags, not as `Stmt\Property` declarations. `src/Rule/DeadCode/UnusedPrivatePropertyRule.php` (search: `privateProperties`) originally collected only `Stmt\Property`, so promoted private readonly fields such as an external healthcare target's `VoiceTraceLogger::$appConfigHelper` and `VoiceTraceLogger::$twilioParams` were invisible to the "written but never read" check.
 
 **Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
 
@@ -51,7 +51,7 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
 
-`design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in the healthkit dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings on healthkit were these vendored copies (43% false-positive rate before configuration).
+`design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
 
 **Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff-php.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. `src/Rule/Design/SingleImplementorInterfaceRule.php` (search: `additionalExcludedPaths when the interface comes from copied vendor/framework code`) now includes the option in remediation text so users see the intended mitigation at the finding site.
 
@@ -61,9 +61,9 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-05-16 | **Evidence:** OBSERVED
 
-`design.single-implementor-interface` is a `ProjectRuleInterface` (M31, see `.goat-flow/decisions/ADR-003-project-rule-seam.md`). It can only count implementations and external type-hint usages from the units it actually receives. Under the old `gruff-php analyse --diff-vs=<base> --changed-only` path, the unit list was the diff's changed files, not the full project. A single-implementor interface whose implementor was in an unchanged file disappeared from the project rule's view, so the rule emitted zero findings on the diff even though a full-project scan would flag the interface. Observed during M31 dogfood: gruff scanned with `--diff-vs=deploy --changed-only` on healthkit's `feat/64272_voice-olb` branch reported `0` design.single-implementor-interface findings; a full `src` scan on the same branch reported 7.
+`design.single-implementor-interface` is a `ProjectRuleInterface` (M31, see `.goat-flow/decisions/ADR-003-project-rule-seam.md`). It can only count implementations and external type-hint usages from the units it actually receives. Under the old `gruff-php analyse --diff-vs=<base> --changed-only` path, the unit list was the diff's changed files, not the full project. A single-implementor interface whose implementor was in an unchanged file disappeared from the project rule's view, so the rule emitted zero findings on the diff even though a full-project scan would flag the interface. Observed during M31 dogfood: gruff scanned with `--diff-vs=deploy --changed-only` on an external healthcare target branch reported `0` design.single-implementor-interface findings; a full `src` scan on the same branch reported 7.
 
-**Resolution:** `src/Command/AnalyseCommand.php` (search: `projectContextUnits`) now loads full current/base project context for enabled project rules in changed-only branch review mode, while `src/Rule/RuleRegistry.php` (search: `$projectUnits ??= $units`) keeps file-scoped rules on the narrowed unit list. The reported findings are still filtered back to changed files. `tests/Review/AgentWorkflowCliTest.php` (search: `testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules`) locks the bug shape where only the interface file changes and its implementor is unchanged.
+**Resolution:** `src/Command/AnalyseCommand.php` (search: `projectContextUnits`) now loads full current/base project context for enabled project rules in changed-only branch review mode, while `src/Rule/RuleRegistry.php` (search: `$projectUnits ?? $units`) keeps file-scoped rules on the narrowed unit list. The reported findings are still filtered back to changed files. `tests/Review/AgentWorkflowCliTest.php` (search: `testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules`) locks the bug shape where only the interface file changes and its implementor is unchanged.
 
 **Prevention:** Keep any future `ProjectRuleInterface` tests paired with a `--diff-vs --changed-only` review fixture where the changed file depends on unchanged project context. Do not route project-level rules through a changed-file-only unit list unless the rule explicitly documents partial-context semantics.
 
@@ -79,6 +79,6 @@ Rules that inspect project-level config files (`test-quality.phpunit-deprecation
 
 **Status:** resolved | **Created:** 2026-05-11 | **Resolved:** 2026-05-11 | **Evidence:** OBSERVED
 
-Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with `.json` or `.yaml` extensions (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`) were classified as text units and scanned by every rule implementing `SourceTextRuleInterface`. On healthkit's `feat/64272_voice-olb` branch diff this produced 1441 `sensitive-data.high-entropy-string` findings on npm integrity hashes (`sha512-aBc...` base64 SHA-512 digests), with literally zero true positives. The rule had no way to distinguish machine-generated lockfile metadata from a real secret in a JSON config.
+Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with `.json` or `.yaml` extensions (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`) were classified as text units and scanned by every rule implementing `SourceTextRuleInterface`. On an external healthcare target branch diff this produced 1441 `sensitive-data.high-entropy-string` findings on npm integrity hashes (`sha512-aBc...` base64 SHA-512 digests), with literally zero true positives. The rule had no way to distinguish machine-generated lockfile metadata from a real secret in a JSON config.
 
 **Prevention:** Lockfile filenames are now hard-coded in `SourceDiscovery::IGNORED_FILENAMES` and treated like the `vendor/` directory: skipped during traversal, skipped when passed as an explicit path, and overridable only with `--include-ignored`. When adding a new `SourceTextRuleInterface` rule in the future, audit which file types it will match against the project state of a realistic open-source PHP project (Symfony, Laravel) and confirm that lockfiles, `.po`/`.mo` translation files, dist bundles, and similar machine-generated text artefacts either fall outside the rule's regex or are already filtered by source discovery. If a new false-positive class surfaces on a class of file, prefer extending `IGNORED_FILENAMES` over carving file-type exceptions into individual rules.

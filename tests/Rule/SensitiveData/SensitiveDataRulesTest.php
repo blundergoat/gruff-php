@@ -201,6 +201,67 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify medical terminology metadata is not treated as embedded secret material.
+     *
+     * @return void No return value.
+     */
+    public function testHighEntropyMedicalStandardMetadataIsNotFlagged(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-medical-entropy-');
+        self::assertIsString($path);
+        $path .= '.php';
+        $source = "<?php\n\n"
+            . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
+            . '$secret = ' . var_export('M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ', true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-medical-entropy.php'));
+            $findings = array_values(array_filter(
+                $this->analyseUnits([$unit]),
+                static fn (Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+            ));
+
+            self::assertCount(1, $findings);
+            self::assertStringContainsString('M7qP', $findings[0]->message);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
+     * Verify placeholder PHI examples are suppressed without muting real-looking values.
+     *
+     * @return void No return value.
+     */
+    public function testPhiPlaceholderExamplesAreNotFlagged(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-phi-placeholder-');
+        self::assertIsString($path);
+        $path .= '.md';
+        $source = implode("\n", [
+            '"medicare_number": { "value": "2345 67890 1", "confidence": "high", "source_snippet": "Medicare: 2345 67890 1" },',
+            '$VOUCHER->set(\'PatientFundMembershipNum\', \'123456789\');',
+            '"patient_medicare": "2123 45678 1"',
+            '',
+        ]);
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'docs/examples/inline-phi-placeholder.md', SourceFile::TYPE_TEXT));
+            $findings = array_values(array_filter(
+                $this->analyseUnits([$unit]),
+                static fn (Finding $finding): bool => $finding->ruleId === PhiPatternRule::ID,
+            ));
+
+            self::assertCount(1, $findings);
+            self::assertSame(3, $findings[0]->line);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
      * Verify secret rules respect detector selection config.
      *
      * @return void No return value.
