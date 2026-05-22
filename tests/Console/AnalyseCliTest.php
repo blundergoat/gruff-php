@@ -334,10 +334,10 @@ final class AnalyseCliTest extends CliTestCase
         self::assertNotCount(0, $findings);
         self::assertSame('F', $composite['grade'] ?? null);
 
-        foreach ($findings as $finding) {
-            self::assertIsArray($finding);
+        foreach ($findings as $index => $finding) {
+            self::assertIsArray($finding, sprintf('Finding %d should be an array.', $index));
             $ruleId = $finding['ruleId'] ?? null;
-            self::assertIsString($ruleId);
+            self::assertIsString($ruleId, sprintf('Finding %d should include a string ruleId.', $index));
             self::assertTrue(
                 str_starts_with($ruleId, 'security.') || str_starts_with($ruleId, 'sensitive-data.'),
                 'Unexpected rule from security profile: ' . $ruleId,
