@@ -110,7 +110,16 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             || str_starts_with($candidateSecret, 'sk-proj-')
             || str_starts_with($candidateSecret, 'sk-ant-')
             || str_starts_with($candidateSecret, 'ghp_')
+            || str_starts_with($candidateSecret, 'gho_')
+            || str_starts_with($candidateSecret, 'ghr_')
+            || str_starts_with($candidateSecret, 'ghs_')
+            || str_starts_with($candidateSecret, 'ghu_')
+            || str_starts_with($candidateSecret, 'github_pat_')
+            || str_starts_with($candidateSecret, 'glpat-')
+            || str_starts_with($candidateSecret, 'npm_')
+            || str_starts_with($candidateSecret, 'AIza')
             || str_starts_with($candidateSecret, 'xox')
+            || str_starts_with($candidateSecret, 'https://hooks.slack.com/services/')
             || substr_count($candidateSecret, '.') === 2
             || (strlen($candidateSecret) <= 48 && ctype_alpha($candidateSecret));
     }

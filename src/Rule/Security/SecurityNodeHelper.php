@@ -8,6 +8,7 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\FunctionLike;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar;
 use PhpParser\NodeFinder;
@@ -320,5 +321,154 @@ final class SecurityNodeHelper
         $name = self::globalFunctionName($call);
 
         return $name ?? 'dynamic function call';
+    }
+
+    /**
+     * Resolve a method name to its lower-case string when statically known.
+     *
+     * @param Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
+     * @return string|null Method name, or null for dynamic method calls.
+     */
+    public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
+    {
+        if (!$call->name instanceof Identifier) {
+            return null;
+        }
+
+        return strtolower($call->name->toString());
+    }
+
+    /**
+     * Resolve a class node to a lower-case class name when statically known.
+     *
+     * @param Node $class Class node from a new/static call.
+     * @return string|null Resolved class name, or null for dynamic/anonymous classes.
+     */
+    public static function className(Node $class): ?string
+    {
+        if (!$class instanceof Name) {
+            return null;
+        }
+
+        $resolvedName = $class->getAttribute('resolvedName');
+        if ($resolvedName instanceof Name) {
+            return strtolower($resolvedName->toString());
+        }
+
+        return strtolower($class->toString());
+    }
+
+    /**
+     * Match a class node against exact FQCNs or short class names.
+     *
+     * @param Node         $class      Class node from a new/static call.
+     * @param list<string> $classNames FQCNs or short class names to match.
+     * @return bool True when the class matches one of the supplied names.
+     */
+    public static function hasMatchingClassName(Node $class, array $classNames): bool
+    {
+        $resolvedName = self::className($class);
+        if ($resolvedName === null) {
+            return false;
+        }
+
+        foreach ($classNames as $className) {
+            $normalized = strtolower(ltrim($className, '\\'));
+            if ($resolvedName === $normalized) {
+                return true;
+            }
+
+            if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect whether a node tree contains an HTTP(S) literal.
+     *
+     * @param Node $node Node tree to inspect.
+     * @return bool True when an HTTP or HTTPS string literal appears.
+     */
+    public static function containsUrlLiteral(Node $node): bool
+    {
+        $nodeFinder = new NodeFinder();
+
+        return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
+            if (!$candidate instanceof Scalar\String_) {
+                return false;
+            }
+
+            // Match literal outbound URL strings for URL-only sinks.
+            return preg_match('/^https?:\/\//i', $candidate->value) === 1;
+        }) instanceof Node;
+    }
+
+    /**
+     * Detect whether an expression references likely sensitive data.
+     *
+     * @param Node $node Node tree to inspect.
+     * @return bool True when variable names, string keys, or env reads carry secret context.
+     */
+    public static function containsSensitiveReference(Node $node): bool
+    {
+        $nodeFinder = new NodeFinder();
+
+        return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
+            if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
+                return self::hasSensitiveContext($candidate->name);
+            }
+
+            if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
+                return self::hasSensitiveContext($candidate->name->toString());
+            }
+
+            if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
+                return self::hasSensitiveContext($candidate->dim->value);
+            }
+
+            if ($candidate instanceof Scalar\String_) {
+                return self::hasSensitiveContext($candidate->value);
+            }
+
+            if ($candidate instanceof Expr\FuncCall) {
+                return self::isSensitiveEnvironmentRead($candidate);
+            }
+
+            return false;
+        }) instanceof Node;
+    }
+
+    /**
+     * Detect env-reader calls that request a sensitive key.
+     *
+     * @return bool True when getenv/env reads a secret-like key.
+     */
+    private static function isSensitiveEnvironmentRead(FuncCall $call): bool
+    {
+        $name = self::globalFunctionName($call);
+        if ($name === null || !in_array($name, ['apache_getenv', 'env', 'getenv'], true)) {
+            return false;
+        }
+
+        $firstArg = self::argumentValue($call->args, 0);
+        if ($firstArg === null) {
+            return true;
+        }
+
+        return $firstArg instanceof Scalar\String_ && self::hasSensitiveContext($firstArg->value);
+    }
+
+    /**
+     * Detect secret-like words in identifiers or string keys.
+     *
+     * @return bool True when the text names likely sensitive data.
+     */
+    private static function hasSensitiveContext(string $contextText): bool
+    {
+        // Match secret-like identifier and string-key fragments without reading values into findings.
+        return preg_match('/(?:api[_-]?key|auth(?:orization)?|cookie|pass(?:word|wd)?|private[_-]?key|secret|token)/i', $contextText) === 1;
     }
 }

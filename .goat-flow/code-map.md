@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-22. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-23. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -178,7 +178,7 @@ src/
 |   |   |-- PublicPropertyRule.php             = `modernisation.public-property`
 |   |   `-- ReadonlyPropertyCandidateRule.php = `modernisation.readonly-property-candidate`
 |   |-- SensitiveData/                        = SensitiveData-pillar SourceTextRuleInterface rules; scan PHP plus config/text/env files
-|   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern`
+|   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern` (common provider token patterns)
 |   |   |-- AwsAccessKeyRule.php              = `sensitive-data.aws-access-key`
 |   |   |-- DatabaseUrlPasswordRule.php       = `sensitive-data.database-url-password`
 |   |   |-- HardcodedEnvValueRule.php         = `sensitive-data.hardcoded-env-value`
@@ -188,16 +188,23 @@ src/
 |   |   |-- PiiTestFixtureRule.php            = `sensitive-data.pii-test-fixture`
 |   |   |-- PrivateKeyRule.php                = `sensitive-data.private-key`
 |   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the sensitive-data pack
-|   |-- Security/                             = AST-driven heuristic rules
+|   |-- Security/                             = AST-driven heuristic rules plus scoped source-text workflow checks
 |   |   |-- DangerousFunctionCallRule.php     = `security.dangerous-function-call`
 |   |   |-- DisabledSslVerificationRule.php   = `security.disabled-ssl-verification`
 |   |   |-- ErrorSuppressionRule.php          = `security.error-suppression`
 |   |   |-- ExtractCompactUserInputRule.php   = `security.extract-compact-user-input`
+|   |   |-- GithubActionsRiskyWorkflowRule.php = `security.github-actions-risky-workflow`
 |   |   |-- HeaderInjectionRule.php           = `security.header-injection`
 |   |   |-- InsecureRandomRule.php            = `security.insecure-random`
+|   |   |-- PathTraversalFileAccessRule.php   = `security.path-traversal-file-access`
+|   |   |-- ProcessCommandConstructionRule.php = `security.process-command-construction`
+|   |   |-- RequestControlledUrlRule.php      = `security.request-controlled-url`
 |   |   |-- SecurityNodeHelper.php            = shared AST traversal helpers for the security pack
+|   |   |-- SensitiveDataLoggingRule.php      = `security.sensitive-data-logging`
 |   |   |-- SilentCatchRule.php               = `security.silent-catch`
 |   |   |-- SqlConcatenationRule.php          = `security.sql-concatenation`
+|   |   |-- UnsafeArchiveExtractionRule.php   = `security.unsafe-archive-extraction`
+|   |   |-- UnsafeXmlLoadingRule.php          = `security.unsafe-xml-loading`
 |   |   |-- UnsafeUnserializeRule.php         = `security.unsafe-unserialize`
 |   |   |-- VariableIncludeRule.php           = `security.variable-include`
 |   |   `-- WeakCryptoRule.php                = `security.weak-crypto`

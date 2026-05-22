@@ -376,17 +376,38 @@ rules:
     # Request-driven extract or compact can create unsafe variables.
     security.extract-compact-user-input:
         enabled: true
+    # Risky workflow controls can make CI execute untrusted automation.
+    security.github-actions-risky-workflow:
+        enabled: true
     # Unsanitized header values can enable response splitting.
     security.header-injection:
         enabled: true
     # Weak randomness undermines tokens and secrets.
     security.insecure-random:
         enabled: true
+    # Request-controlled filesystem paths can expose traversal risk.
+    security.path-traversal-file-access:
+        enabled: true
+    # Request-controlled process commands can execute unintended shell input.
+    security.process-command-construction:
+        enabled: true
+    # Request-controlled URLs can expose SSRF or unsafe outbound requests.
+    security.request-controlled-url:
+        enabled: true
+    # Logs and dumps must not expose request payloads or secret-like values.
+    security.sensitive-data-logging:
+        enabled: true
     # Silent catches hide failures that need handling.
     security.silent-catch:
         enabled: true
     # SQL string concatenation can expose injection paths.
     security.sql-concatenation:
+        enabled: true
+    # Archive extraction needs controlled destinations and entry validation.
+    security.unsafe-archive-extraction:
+        enabled: true
+    # XML loading of request data needs external network/entity controls.
+    security.unsafe-xml-loading:
         enabled: true
     # Untrusted unserialize can create object injection risk.
     security.unsafe-unserialize:

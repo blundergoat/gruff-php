@@ -1,0 +1,17 @@
+name: Risky security workflow fixture
+
+on:
+  pull_request_target:
+
+permissions: write-all
+
+jobs:
+  risky:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: acme/build-action
+      - run: echo "${{ github.event.pull_request.title }}"
+      - env:
+          TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: echo "publishing"

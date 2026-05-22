@@ -16,10 +16,17 @@ use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
+use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rule\Security\HeaderInjectionRule;
 use GruffPhp\Rule\Security\InsecureRandomRule;
+use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rule\Security\RequestControlledUrlRule;
+use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rule\Security\SilentCatchRule;
 use GruffPhp\Rule\Security\SqlConcatenationRule;
+use GruffPhp\Rule\Security\UnsafeArchiveExtractionRule;
+use GruffPhp\Rule\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
@@ -116,13 +123,45 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify expanded security sink patterns detected.
+     *
+     * @return void No return value.
+     */
+    public function testExpandedSecuritySinkPatternsDetected(): void
+    {
+        $findings = $this->analyse('cumulative-security.php');
+
+        self::assertRuleCount(ProcessCommandConstructionRule::ID, 1, $findings);
+        self::assertRuleCount(PathTraversalFileAccessRule::ID, 1, $findings);
+        self::assertRuleCount(RequestControlledUrlRule::ID, 1, $findings);
+        self::assertRuleCount(UnsafeXmlLoadingRule::ID, 1, $findings);
+        self::assertRuleCount(UnsafeArchiveExtractionRule::ID, 1, $findings);
+        self::assertRuleCount(SensitiveDataLoggingRule::ID, 1, $findings);
+    }
+
+    /**
+     * Verify risky GitHub Actions workflow patterns detected.
+     *
+     * @return void No return value.
+     */
+    public function testGithubActionsWorkflowRisksDetected(): void
+    {
+        $findings = $this->analyse('.github/workflows/risky-workflow.yml');
+
+        self::assertRuleCount(GithubActionsRiskyWorkflowRule::ID, 6, $findings);
+    }
+
+    /**
      * Verify safe wrappers and literal patterns are not flagged.
      *
      * @return void No return value.
      */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
-        $findings = $this->analyse('safe-patterns.php');
+        $findings = [
+            ...$this->analyse('safe-patterns.php'),
+            ...$this->analyse('.github/workflows/safe-workflow.yml'),
+        ];
 
         $securityFindings = array_values(array_filter(
             $findings,
@@ -140,13 +179,23 @@ final class SecurityRulesTest extends TestCase
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
         $findings = array_values(array_filter(
-            $this->analyse('cumulative-security.php'),
+            [
+                ...$this->analyse('cumulative-security.php'),
+                ...$this->analyse('.github/workflows/cumulative-workflow.yml'),
+            ],
             static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
         ));
 
         $ruleIds         = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
         $expectedRuleIds = [
             DangerousFunctionCallRule::ID,
+            ProcessCommandConstructionRule::ID,
+            PathTraversalFileAccessRule::ID,
+            RequestControlledUrlRule::ID,
+            UnsafeXmlLoadingRule::ID,
+            UnsafeArchiveExtractionRule::ID,
+            SensitiveDataLoggingRule::ID,
+            GithubActionsRiskyWorkflowRule::ID,
             UnsafeUnserializeRule::ID,
             WeakCryptoRule::ID,
             VariableIncludeRule::ID,
@@ -239,8 +288,9 @@ final class SecurityRulesTest extends TestCase
     private function parseFixture(string $filename): AnalysisUnit
     {
         $path = __DIR__ . '/../../Fixtures/Security/' . $filename;
+        $type = str_ends_with($filename, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
 
-        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename));
+        return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename, $type));
     }
 
     /**

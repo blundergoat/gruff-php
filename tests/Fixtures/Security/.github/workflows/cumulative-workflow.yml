@@ -1,0 +1,10 @@
+name: Cumulative security workflow fixture
+
+on:
+  push:
+
+jobs:
+  risky:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main

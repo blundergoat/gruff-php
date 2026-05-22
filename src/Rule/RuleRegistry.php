@@ -56,10 +56,17 @@ use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
+use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rule\Security\HeaderInjectionRule;
 use GruffPhp\Rule\Security\InsecureRandomRule;
+use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rule\Security\RequestControlledUrlRule;
+use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rule\Security\SilentCatchRule;
 use GruffPhp\Rule\Security\SqlConcatenationRule;
+use GruffPhp\Rule\Security\UnsafeArchiveExtractionRule;
+use GruffPhp\Rule\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
@@ -229,10 +236,17 @@ final class RuleRegistry
             new DisabledSslVerificationRule(),
             new ErrorSuppressionRule(),
             new ExtractCompactUserInputRule(),
+            new GithubActionsRiskyWorkflowRule(),
             new HeaderInjectionRule(),
             new InsecureRandomRule(),
+            new PathTraversalFileAccessRule(),
+            new ProcessCommandConstructionRule(),
+            new RequestControlledUrlRule(),
+            new SensitiveDataLoggingRule(),
             new SilentCatchRule(),
             new SqlConcatenationRule(),
+            new UnsafeArchiveExtractionRule(),
+            new UnsafeXmlLoadingRule(),
             new UnsafeUnserializeRule(),
             new VariableIncludeRule(),
             new WeakCryptoRule(),

@@ -31,9 +31,16 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         return [
             ['name' => 'stripe', 'pattern' => '/\bsk_live_[A-Za-z0-9]{16,}\b/'],
             ['name' => 'github', 'pattern' => '/\bghp_[A-Za-z0-9]{36}\b/'],
+            ['name' => 'github-fine-grained', 'pattern' => '/\bgithub_pat_[A-Za-z0-9_]{22,}\b/'],
+            ['name' => 'github-oauth', 'pattern' => '/\bgh[ours]_[A-Za-z0-9_]{36}\b/'],
             ['name' => 'openai', 'pattern' => '/\bsk-proj-[A-Za-z0-9_-]{20,}\b/'],
             ['name' => 'anthropic', 'pattern' => '/\bsk-ant-[A-Za-z0-9_-]{20,}\b/'],
             ['name' => 'slack', 'pattern' => '/\bxox[baprs]-[A-Za-z0-9-]{10,}\b/'],
+            ['name' => 'slack-webhook', 'pattern' => '#https://hooks\.slack\.com/services/[A-Z0-9]{8,}/[A-Z0-9]{8,}/[A-Za-z0-9]{20,}#'],
+            ['name' => 'npm', 'pattern' => '/\bnpm_[A-Za-z0-9]{20,}\b/'],
+            ['name' => 'google-api-key', 'pattern' => '/\bAIza[A-Za-z0-9_-]{35}\b/'],
+            ['name' => 'azure-sas', 'pattern' => '#\?(?=[^\s\'"]*\bsv=)(?=[^\s\'"]*\bsig=)[^\s\'"]{40,}#i'],
+            ['name' => 'gitlab', 'pattern' => '/\bglpat-[A-Za-z0-9_-]{20,}\b/'],
         ];
     }
 
@@ -69,7 +76,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         // Fast bail: real API keys for the supported providers all contain one
         // of these distinctive prefixes. Skipping the per-pattern regex when
         // none are present makes this rule near-free for the common case.
-        if (preg_match('/sk_live_|ghp_|sk-proj-|sk-ant-|xox[baprs]-/i', $analysisUnit->source) !== 1) {
+        if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
             return [];
         }
 

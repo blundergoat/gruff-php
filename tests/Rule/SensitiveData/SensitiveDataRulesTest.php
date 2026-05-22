@@ -44,7 +44,7 @@ final class SensitiveDataRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/SensitiveData/synthetic-secrets.php');
 
         self::assertRuleCount(AwsAccessKeyRule::ID, 1, $findings);
-        self::assertRuleCount(ApiKeyPatternRule::ID, 5, $findings);
+        self::assertRuleCount(ApiKeyPatternRule::ID, 14, $findings);
         self::assertRuleCount(JwtTokenRule::ID, 1, $findings);
         self::assertRuleCount(DatabaseUrlPasswordRule::ID, 1, $findings);
         self::assertRuleCount(HardcodedEnvValueRule::ID, 1, $findings);
@@ -301,9 +301,20 @@ final class SensitiveDataRulesTest extends TestCase
             'AKIA' . 'Z9Y8X7W6V5U4T3R2',
             'sk_live_' . '51N7uQbP0JZ6r' . 'T9vL3mK8sX2y',
             'ghp_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ0123456789',
+            'github_pat_' . '11AA22BB33CC44DD55' . 'EE66FF77GG88HH99II00',
+            'gho_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ0123456789',
+            'ghu_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ0123456789',
+            'ghs_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ0123456789',
             'sk-proj-' . 'uQ7vR2mN5xP8zL1k' . 'C4bH9sT6wY3aD0fG',
             'sk-ant-api03-' . 'uQ7vR2mN5xP8zL1k' . 'C4bH9sT6wY3aD0fG',
             'xoxb-' . '123456789012-987654321098' . '-AbCdEfGhIjKlMnOpQrSt',
+            'https://hooks.slack.com/services/' . 'T12345678/B12345678/' . 'AbCdEfGhIjKlMnOpQrStUvWxYz',
+            'npm_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ012345',
+            'AIza' . 'SyA1b2C3d4E5f6G7' . 'h8I9j0K1l2M3n4O5p6Q',
+            '?sv=2024-01-01&ss=b&srt=sco&sp=rl&se=2026-01-01T00:00:00Z'
+                . '&st=2025-01-01T00:00:00Z&spr=https&sig='
+                . 'rN7pQ4sV9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ%3D',
+            'glpat-' . 'aBcDeFgHiJkLmNoPq' . 'RsTuVwXyZ',
             'eyJhbGciOiJIUzI1NiJ9.' . 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.' . 'sflKxwRJSMeKKF2Q' . 'T4fwpMeJf36POk6yJV_adQssw5c',
             'mysql://appuser:' . 'rN7pQ4sV9xY2zA5b' . '@db.internal/app',
             'postgres://reporter:' . 'qR8vT3mK6pL9xS2n' . '@db.internal/reporting',

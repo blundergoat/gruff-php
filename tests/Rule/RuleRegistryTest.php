@@ -42,10 +42,17 @@ use GruffPhp\Rule\Security\DangerousFunctionCallRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
+use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rule\Security\HeaderInjectionRule;
 use GruffPhp\Rule\Security\InsecureRandomRule;
+use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rule\Security\RequestControlledUrlRule;
+use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rule\Security\SilentCatchRule;
 use GruffPhp\Rule\Security\SqlConcatenationRule;
+use GruffPhp\Rule\Security\UnsafeArchiveExtractionRule;
+use GruffPhp\Rule\Security\UnsafeXmlLoadingRule;
 use GruffPhp\Rule\Security\UnsafeUnserializeRule;
 use GruffPhp\Rule\Security\VariableIncludeRule;
 use GruffPhp\Rule\Security\WeakCryptoRule;
@@ -128,8 +135,11 @@ final class RuleRegistryTest extends TestCase
             PiiTestFixtureRule::ID, PrivateKeyRule::ID,
             DangerousFunctionCallRule::ID, DisabledSslVerificationRule::ID,
             ErrorSuppressionRule::ID, ExtractCompactUserInputRule::ID,
-            HeaderInjectionRule::ID, InsecureRandomRule::ID,
-            SilentCatchRule::ID, SqlConcatenationRule::ID,
+            GithubActionsRiskyWorkflowRule::ID, HeaderInjectionRule::ID,
+            InsecureRandomRule::ID, PathTraversalFileAccessRule::ID,
+            ProcessCommandConstructionRule::ID, RequestControlledUrlRule::ID,
+            SensitiveDataLoggingRule::ID, SilentCatchRule::ID, SqlConcatenationRule::ID,
+            UnsafeArchiveExtractionRule::ID, UnsafeXmlLoadingRule::ID,
             UnsafeUnserializeRule::ID, VariableIncludeRule::ID,
             WeakCryptoRule::ID, ConditionalTestLogicRule::ID,
             DataProviderAnnotationRule::ID, EagerTestRule::ID,
@@ -291,9 +301,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(113, $definitions);
+        self::assertCount(120, $definitions);
         self::assertSame(
-            '32c45f450516cae6c86' . '1d9d2aec3fea749635dc60b13ed7b86b74d3c6e5b5b2e',
+            '523499dab48ca3d2cde' . '33f22ff53dcd6658694a0091d30772b9c398ea39090d7',
             hash('sha256', $json),
         );
     }
