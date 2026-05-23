@@ -13,8 +13,10 @@ use GruffPhp\Console\Application;
 use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Rule\RuleRegistry;
+use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Builds validated analyse command setup from console input.
@@ -24,11 +26,16 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build the validated analysis setup from console input.
      *
-     * @param InputInterface $input Symfony console input for the analyse command.
+     * @param InputInterface           $input              Symfony console input for the analyse command.
+     * @param OutputInterface          $output             Symfony console output for optional init prompting.
+     * @param SymfonyApplication|null  $symfonyApplication Console application used to dispatch the init command.
      * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
      */
-    public function build(InputInterface $input): AnalyseCommandSetupResult
-    {
+    public function build(
+        InputInterface $input,
+        OutputInterface $output,
+        ?SymfonyApplication $symfonyApplication,
+    ): AnalyseCommandSetupResult {
         $projectRoot = getcwd();
 
         if ($projectRoot === false) {
@@ -38,6 +45,30 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $symfonyApplication,
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $this->explicitConfigPath($input),
+            shouldSkipConfig:   (bool) $input->getOption('no-config'),
+        );
+        if ($promptExitCode !== null) {
+            return AnalyseCommandSetupResult::exitCode($promptExitCode);
+        }
+
+        return $this->buildSetup($input, $projectRoot);
+    }
+
+    /**
+     * Build setup after optional interactive config prompting has completed.
+     *
+     * @param InputInterface $input       Symfony console input for the analyse command.
+     * @param string         $projectRoot Current project root.
+     * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
+     */
+    private function buildSetup(InputInterface $input, string $projectRoot): AnalyseCommandSetupResult
+    {
         $options = AnalyseCommandOptions::fromInput($input);
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
             return AnalyseCommandSetupResult::plainError(
@@ -113,6 +144,19 @@ final readonly class AnalyseCommandSetupBuilder
             configPath:    $this->effectiveConfigPath($options, $configLoader),
             registry:      $registry,
         ));
+    }
+
+    /**
+     * Read the explicit config path from console input before full option parsing.
+     *
+     * @param InputInterface $input Symfony console input for the analyse command.
+     * @return string|null Explicit config path, or null when omitted.
+     */
+    private function explicitConfigPath(InputInterface $input): ?string
+    {
+        $rawConfigPath = $input->getOption('config');
+
+        return is_string($rawConfigPath) && $rawConfigPath !== '' ? $rawConfigPath : null;
     }
 
     /**

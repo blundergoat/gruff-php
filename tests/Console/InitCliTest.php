@@ -40,8 +40,7 @@ final class InitCliTest extends CliTestCase
             self::assertStringContainsString('known debt', $process->getOutput());
             self::assertStringContainsString('gruff-php analyse --no-baseline', $process->getOutput());
 
-            $contents = file_get_contents($configPath);
-            self::assertIsString($contents);
+            $contents = $this->configContents($configPath);
             self::assertStringStartsWith('# .gruff-php.yaml', $contents);
             self::assertStringContainsString('paths.ignore', $contents);
             self::assertStringContainsString('gruff-php analyse --generate-baseline', $contents);
@@ -116,13 +115,26 @@ final class InitCliTest extends CliTestCase
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
-            $contents = file_get_contents($configPath);
-            self::assertIsString($contents);
+            $contents = $this->configContents($configPath);
             self::assertStringStartsWith('# .gruff-php.yaml', $contents);
             self::assertStringNotContainsString('# existing', $contents);
             self::assertStringContainsString('known debt', $process->getOutput());
         } finally {
             $this->removeDir($project);
         }
+    }
+
+    /**
+     * Read generated config file contents for assertions.
+     *
+     * @param string $configPath Generated config file path.
+     * @return string Generated config file contents.
+     */
+    private function configContents(string $configPath): string
+    {
+        $contents = file_get_contents($configPath);
+        self::assertIsString($contents);
+
+        return $contents;
     }
 }

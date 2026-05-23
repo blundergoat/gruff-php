@@ -79,12 +79,12 @@ final class DashboardCommand extends Command
         }
 
         $promptExitCode = MissingConfigPrompt::maybeOffer(
-            $input,
-            $output,
-            $this->getApplication(),
-            $projectRoot,
-            $dashboardStateFactory->optionalStringOption($input, 'config'),
-            (bool) $input->getOption('no-config'),
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $this->getApplication(),
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
+            shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
         if ($promptExitCode !== null) {
             return $promptExitCode;

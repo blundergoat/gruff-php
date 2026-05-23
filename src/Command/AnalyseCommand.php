@@ -126,12 +126,7 @@ final class AnalyseCommand extends Command
         $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
         $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
 
-        $promptExitCode = $this->maybeOfferConfigPrompt($input, $output);
-        if ($promptExitCode !== null) {
-            return $promptExitCode;
-        }
-
-        $setupResult = (new AnalyseCommandSetupBuilder())->build($input);
+        $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
         if (!$setupResult->setup instanceof AnalyseCommandSetup) {
             return $this->renderSetupFailure($setupResult, $output);
@@ -375,31 +370,6 @@ final class AnalyseCommand extends Command
                     || !in_array($preview, $allowedPreviews, true);
             },
         ));
-    }
-
-    /**
-     * Offer to run `gruff-php init` when no project config is present.
-     *
-     * @return int|null Exit code when init was attempted and failed; null when the run should continue.
-     */
-    private function maybeOfferConfigPrompt(InputInterface $input, OutputInterface $output): ?int
-    {
-        $projectRoot = getcwd();
-        if ($projectRoot === false) {
-            return null;
-        }
-
-        $rawConfigPath     = $input->getOption('config');
-        $explicitConfigPath = is_string($rawConfigPath) && $rawConfigPath !== '' ? $rawConfigPath : null;
-
-        return MissingConfigPrompt::maybeOffer(
-            $input,
-            $output,
-            $this->getApplication(),
-            $projectRoot,
-            $explicitConfigPath,
-            (bool) $input->getOption('no-config'),
-        );
     }
 
     /**

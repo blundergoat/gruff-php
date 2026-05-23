@@ -55,6 +55,17 @@ final readonly class AnalyseCommandSetupResult
     }
 
     /**
+     * Build an early exit result after another component already wrote output.
+     *
+     * @param int $exitCode Symfony command exit code for the early exit.
+     * @return self Early exit setup result.
+     */
+    public static function exitCode(int $exitCode): self
+    {
+        return new self(null, null, null, null, $exitCode);
+    }
+
+    /**
      * Build a report-formatted setup error result.
      *
      * @param AnalysisReport $report Report payload describing the setup failure.

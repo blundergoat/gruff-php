@@ -115,12 +115,12 @@ final class ReportCommand extends Command
         }
 
         $promptExitCode = MissingConfigPrompt::maybeOffer(
-            $input,
-            $output,
-            $this->getApplication(),
-            $projectRoot,
-            $this->optionalStringOption($input, 'config'),
-            (bool) $input->getOption('no-config'),
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $this->getApplication(),
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $this->optionalStringOption($input, 'config'),
+            shouldSkipConfig:   (bool) $input->getOption('no-config'),
         );
         if ($promptExitCode !== null) {
             return $promptExitCode;

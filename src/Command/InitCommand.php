@@ -147,21 +147,21 @@ final class InitCommand extends Command
      */
     private static function buildRuleEntry(RuleDefinition $definition): array
     {
-        $entry = ['enabled' => $definition->isEnabledByDefault];
+        $ruleEntry = ['enabled' => $definition->isEnabledByDefault];
 
         if ($definition->severityThreshold instanceof SeverityThreshold) {
-            $entry['threshold'] = $definition->severityThreshold->threshold;
-            $entry['severity']  = $definition->severityThreshold->severity->value;
+            $ruleEntry['threshold'] = $definition->severityThreshold->threshold;
+            $ruleEntry['severity']  = $definition->severityThreshold->severity->value;
         }
 
         if ($definition->defaultThresholds !== []) {
-            $entry['thresholds'] = $definition->defaultThresholds;
+            $ruleEntry['thresholds'] = $definition->defaultThresholds;
         }
 
         if ($definition->defaultOptions !== []) {
-            $entry['options'] = $definition->defaultOptions;
+            $ruleEntry['options'] = $definition->defaultOptions;
         }
 
-        return $entry;
+        return $ruleEntry;
     }
 }

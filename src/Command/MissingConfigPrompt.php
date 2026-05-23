@@ -31,34 +31,34 @@ final readonly class MissingConfigPrompt
      *
      * @param InputInterface          $input              Console input for the calling command.
      * @param OutputInterface         $output             Console output for the calling command.
-     * @param SymfonyApplication|null $application        Console application used to dispatch the init command.
+     * @param SymfonyApplication|null $symfonyApplication Console application used to dispatch the init command.
      * @param string                  $projectRoot        Project root used to look for an existing config.
      * @param string|null             $explicitConfigPath Explicit --config path, when supplied.
-     * @param bool                    $noConfig           Whether the caller passed --no-config.
+     * @param bool                    $shouldSkipConfig   Whether the caller passed --no-config.
      * @return int|null Exit code when init was run and failed; null when the caller may continue.
      */
     public static function maybeOffer(
         InputInterface $input,
         OutputInterface $output,
-        ?SymfonyApplication $application,
+        ?SymfonyApplication $symfonyApplication,
         string $projectRoot,
         ?string $explicitConfigPath,
-        bool $noConfig,
+        bool $shouldSkipConfig,
     ): ?int {
-        if ($noConfig || $explicitConfigPath !== null) {
+        if ($shouldSkipConfig || $explicitConfigPath !== null) {
             return null;
         }
         if (!$input->isInteractive()) {
             return null;
         }
-        if (self::projectConfigExists($projectRoot)) {
+        if (self::hasProjectConfig($projectRoot)) {
             return null;
         }
-        if (!$application instanceof SymfonyApplication) {
+        if (!$symfonyApplication instanceof SymfonyApplication) {
             return null;
         }
 
-        $questionHelper = $application->getHelperSet()->get('question');
+        $questionHelper = $symfonyApplication->getHelperSet()->get('question');
         if (!$questionHelper instanceof QuestionHelper) {
             return null;
         }
@@ -72,7 +72,7 @@ final readonly class MissingConfigPrompt
             return null;
         }
 
-        $initCommand = $application->find('init');
+        $initCommand = $symfonyApplication->find('init');
         $exitCode    = $initCommand->run(new ArrayInput(['command' => 'init']), $output);
 
         return $exitCode === Command::SUCCESS ? null : $exitCode;
@@ -84,7 +84,7 @@ final readonly class MissingConfigPrompt
      * @param string $projectRoot Project root used for config discovery.
      * @return bool True when a project config file already exists.
      */
-    private static function projectConfigExists(string $projectRoot): bool
+    private static function hasProjectConfig(string $projectRoot): bool
     {
         $root = rtrim($projectRoot, '/');
 

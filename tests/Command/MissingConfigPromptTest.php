@@ -25,21 +25,21 @@ final class MissingConfigPromptTest extends TestCase
     public function testAcceptedPromptWritesConfigFile(): void
     {
         $this->withTemporaryProject(function (string $project): void {
-            $input  = $this->interactiveInput("y\n");
-            $output = new BufferedOutput();
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                null,
-                false,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
             );
 
             self::assertNull($result);
             self::assertFileExists($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
-            $promptOutput = $output->fetch() . "\n";
+            $promptOutput = $bufferedOutput->fetch() . "\n";
             self::assertStringContainsString(MissingConfigPrompt::PROMPT_TEXT, $promptOutput);
             self::assertStringContainsString('gruff-php analyse --generate-baseline', $promptOutput);
             self::assertStringContainsString('known debt', $promptOutput);
@@ -54,16 +54,16 @@ final class MissingConfigPromptTest extends TestCase
     public function testDeclinedPromptDoesNotWriteConfigFile(): void
     {
         $this->withTemporaryProject(function (string $project): void {
-            $input  = $this->interactiveInput("n\n");
-            $output = new BufferedOutput();
+            $stringInput    = $this->interactiveInput("n\n");
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                null,
-                false,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
             );
 
             self::assertNull($result);
@@ -79,21 +79,21 @@ final class MissingConfigPromptTest extends TestCase
     public function testNonInteractiveInputSkipsPromptSilently(): void
     {
         $this->withTemporaryProject(function (string $project): void {
-            $input = new StringInput('');
-            $input->setInteractive(false);
-            $output = new BufferedOutput();
+            $stringInput = new StringInput('');
+            $stringInput->setInteractive(false);
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                null,
-                false,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
             );
 
             self::assertNull($result);
-            self::assertSame('', $output->fetch());
+            self::assertSame('', $bufferedOutput->fetch());
             self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
         });
     }
@@ -106,20 +106,20 @@ final class MissingConfigPromptTest extends TestCase
     public function testNoConfigSkipsPromptSilently(): void
     {
         $this->withTemporaryProject(function (string $project): void {
-            $input  = $this->interactiveInput("y\n");
-            $output = new BufferedOutput();
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                null,
-                true,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   true,
             );
 
             self::assertNull($result);
-            self::assertSame('', $output->fetch());
+            self::assertSame('', $bufferedOutput->fetch());
             self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
         });
     }
@@ -132,20 +132,20 @@ final class MissingConfigPromptTest extends TestCase
     public function testExplicitConfigPathSkipsPromptSilently(): void
     {
         $this->withTemporaryProject(function (string $project): void {
-            $input  = $this->interactiveInput("y\n");
-            $output = new BufferedOutput();
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                $project . '/custom.yaml',
-                false,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: $project . '/custom.yaml',
+                shouldSkipConfig:   false,
             );
 
             self::assertNull($result);
-            self::assertSame('', $output->fetch());
+            self::assertSame('', $bufferedOutput->fetch());
             self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
         });
     }
@@ -161,20 +161,20 @@ final class MissingConfigPromptTest extends TestCase
             $existingConfigPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
             file_put_contents($existingConfigPath, "# existing\n");
 
-            $input  = $this->interactiveInput("y\n");
-            $output = new BufferedOutput();
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
 
             $result = MissingConfigPrompt::maybeOffer(
-                $input,
-                $output,
-                new Application(),
-                $project,
-                null,
-                false,
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
             );
 
             self::assertNull($result);
-            self::assertSame('', $output->fetch());
+            self::assertSame('', $bufferedOutput->fetch());
             self::assertSame("# existing\n", file_get_contents($existingConfigPath));
         });
     }
@@ -216,11 +216,11 @@ final class MissingConfigPromptTest extends TestCase
         fwrite($stream, $streamContents);
         rewind($stream);
 
-        $input = new StringInput('');
-        $input->setStream($stream);
-        $input->setInteractive(true);
+        $stringInput = new StringInput('');
+        $stringInput->setStream($stream);
+        $stringInput->setInteractive(true);
 
-        return $input;
+        return $stringInput;
     }
 
     /**
@@ -251,11 +251,11 @@ final class MissingConfigPromptTest extends TestCase
         $items = scandir($path);
         self::assertIsArray($items);
 
-        foreach ($items as $entry) {
-            if ($entry === '.' || $entry === '..') {
+        foreach ($items as $directoryEntry) {
+            if ($directoryEntry === '.' || $directoryEntry === '..') {
                 continue;
             }
-            $child = $path . '/' . $entry;
+            $child = $path . '/' . $directoryEntry;
             if (is_dir($child) && !is_link($child)) {
                 $this->removeTempDirectory($child);
                 continue;
