@@ -90,6 +90,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
+     * Build logger call findings for the security rule.
+     *
      * @return list<Finding>
      */
     private function loggerCallFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array

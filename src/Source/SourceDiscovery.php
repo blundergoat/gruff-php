@@ -159,6 +159,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+     * Yield source files below a directory while applying ignore patterns.
+     *
      * @param list<string> $ignoredPaths
      * @param list<string> $configuredIgnorePatterns
      * @return iterable<SplFileInfo>
@@ -343,6 +345,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+     * Build git discovery request for the source discovery.
+     *
      * @param list<string> $requestedPaths
      * @param list<string> $configuredIgnorePatterns
      * @return array{missingPaths: list<string>, ignoredPaths: list<string>, pathspecs: list<string>, requestedExistingPaths: list<array{absolutePath: string, pathspec: string, isFile: bool}>}|null
@@ -433,6 +437,8 @@ final readonly class SourceDiscovery
     }
 
     /**
+     * Build source file objects from paths reported by git.
+     *
      * @param list<string> $visiblePaths
      * @param list<string> $configuredIgnorePatterns
      * @return array{files: array<string, SourceFile>, ignoredPaths: list<string>}
@@ -453,10 +459,12 @@ final readonly class SourceDiscovery
     }
 
     /**
+     * Append git visible source file details to report output.
+     *
      * @param list<string>              $configuredIgnorePatterns
      * @param array<string, SourceFile> $files
      * @param list<string>              $ignoredPaths
-     * @return void No return value.
+     * @return void
      */
     private function appendGitVisibleSourceFile(
         string $displayPath,

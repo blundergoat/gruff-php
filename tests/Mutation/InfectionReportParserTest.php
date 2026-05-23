@@ -38,7 +38,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify parses full infection JSON report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParsesFullInfectionJsonReport(): void
     {
@@ -65,7 +65,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify parser normalises every Infection status section and optional mutant fields.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParsesStatusSectionsOptionalFieldsAndFileSummaries(): void
     {
@@ -219,7 +219,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify rejects malformed infection JSON report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsMalformedInfectionJsonReport(): void
     {
@@ -232,7 +232,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify missing reports are rejected before decoding.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsMissingInfectionReport(): void
     {
@@ -247,7 +247,7 @@ final class InfectionReportParserTest extends TestCase
      *
      * @param InvalidReportShape $report  Report payload.
      * @param string             $message Expected exception message fragment.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('invalidReportProvider')]
     public function testRejectsInvalidReportShapes(array $report, string $message): void
@@ -267,6 +267,8 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
+     * Provide invalid report cases for parameterized tests.
+     *
      * @return array<string, array{InvalidReportShape, string}>
      */
     public static function invalidReportProvider(): array
@@ -329,7 +331,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify infection runner prefers project vendor binary.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInfectionRunnerPrefersProjectVendorBinary(): void
     {
@@ -354,7 +356,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify infection runner uses project infection config by default.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInfectionRunnerUsesProjectInfectionConfigByDefault(): void
     {
@@ -383,7 +385,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify infection runner passes test framework options.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInfectionRunnerPassesTestFrameworkOptions(): void
     {
@@ -416,7 +418,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -430,6 +432,8 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
+     * Build one infection mutant payload for parser tests.
+     *
      * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string}
      */
     private function mutant(string $filePath, string $mutatorName, ?int $line, string $diff = '', string $processOutput = ''): array
@@ -451,8 +455,10 @@ final class InfectionReportParserTest extends TestCase
     }
 
     /**
+     * Write an Infection report fixture to a temporary file.
+     *
      * @param InvalidReportShape $report
-     * @return void No return value.
+     * @return void
      */
     private function writeReport(string $path, array $report): void
     {
@@ -463,7 +469,7 @@ final class InfectionReportParserTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

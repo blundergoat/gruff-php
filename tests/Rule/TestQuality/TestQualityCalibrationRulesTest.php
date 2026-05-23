@@ -30,7 +30,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Verify mystery guest ignores files created by the test or written by the SUT.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMysteryGuestIgnoresPreparedAndSutOwnedPaths(): void
     {
@@ -42,7 +42,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Verify test-longer-than-SUT ignores command and process integration harness calls.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTestLongerThanSutIgnoresIntegrationHarnessCalls(): void
     {
@@ -54,7 +54,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Verify path overrides can raise the long-test threshold for integration-heavy folders.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTestMethodTooLongSupportsPathOverrides(): void
     {
@@ -75,7 +75,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Verify conditional logic rubric supports project-specific path exemptions.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConditionalLogicRuleSupportsIgnoredPathPatterns(): void
     {
@@ -85,7 +85,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $baseline);
 
-        $config   = AnalysisConfig::fromRegistry($registry)
+        $config = AnalysisConfig::fromRegistry($registry)
             ->withRuleSettings(
                 ConditionalTestLogicRule::ID,
                 new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
@@ -99,7 +99,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Verify repeated-structure rubric supports project-specific path exemptions.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRepeatedStructureRuleSupportsIgnoredPathPatterns(): void
     {
@@ -115,8 +115,10 @@ final class TestQualityCalibrationRulesTest extends TestCase
     }
 
     /**
+     * Assert how many findings one rule emitted.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -128,6 +130,8 @@ final class TestQualityCalibrationRulesTest extends TestCase
     }
 
     /**
+     * Analyse test-quality fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
@@ -145,7 +149,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {

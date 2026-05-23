@@ -63,8 +63,8 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding>
      */
@@ -84,6 +84,8 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
+     * Build function findings for the test-quality rule.
+     *
      * @return list<Finding>
      */
     private function functionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
@@ -128,6 +130,8 @@ final readonly class SleepInTestRule implements RuleInterface
     }
 
     /**
+     * Build date time findings for the test-quality rule.
+     *
      * @return list<Finding>
      */
     private function dateTimeFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array

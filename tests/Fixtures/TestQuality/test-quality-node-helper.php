@@ -90,7 +90,7 @@ final class HelperEdgeCaseTest extends TestCase
     /**
      * Mentions @test annotation prose without declaring the tag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function annotationDocumentationOnly(): void
     {

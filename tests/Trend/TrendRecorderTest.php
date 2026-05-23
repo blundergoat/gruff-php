@@ -23,7 +23,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record appends entry and calculates previous score delta.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRecordAppendsEntryAndCalculatesPreviousScoreDelta(): void
     {
@@ -56,7 +56,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record creates nested history, keeps the newest fifty entries, and persists scalar payloads.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRecordCreatesNestedHistoryAndBoundsPersistedEntries(): void
     {
@@ -78,7 +78,7 @@ final class TrendRecorderTest extends TestCase
             self::assertTrue(mkdir($root . '/var', 0777, true));
             file_put_contents($root . '/var/history.json', json_encode($history, JSON_THROW_ON_ERROR));
 
-            $report = (new TrendRecorder())->record($root, 'var/nested/history.json', $this->score(91.0), 7);
+            $report    = (new TrendRecorder())->record($root, 'var/nested/history.json', $this->score(91.0), 7);
             $persisted = json_decode((string) file_get_contents($root . '/var/nested/history.json'), true);
 
             self::assertSame('var/nested/history.json', $report->path);
@@ -95,7 +95,7 @@ final class TrendRecorderTest extends TestCase
             self::assertSame('full-project', $firstPersisted['scope'] ?? null);
             self::assertSame(7, $firstPersisted['findings'] ?? null);
 
-            $report = (new TrendRecorder())->record($root, 'var/history.json', $this->score(92.0), 8);
+            $report    = (new TrendRecorder())->record($root, 'var/history.json', $this->score(92.0), 8);
             $persisted = json_decode((string) file_get_contents($root . '/var/history.json'), true);
 
             self::assertSame(55.0, $report->previousScore);
@@ -117,7 +117,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record treats missing and empty history files as no prior score.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRecordTreatsMissingAndEmptyHistoryAsNoPriorScore(): void
     {
@@ -142,7 +142,7 @@ final class TrendRecorderTest extends TestCase
      *
      * @param InvalidHistoryPayload $historyPayload Invalid history payload.
      * @param string                $message        Expected exception message.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('invalidHistoryProvider')]
     public function testRecordRejectsInvalidHistoryPayloads(array $historyPayload, string $message): void
@@ -190,8 +190,8 @@ final class TrendRecorderTest extends TestCase
     /**
      * Build a score report fixture for trend assertions.
      *
-     * @param float $score Fixture value.
-     * @return ScoreReport Fixture value.
+     * @param float $score
+     * @return ScoreReport
      */
     private function score(float $score): ScoreReport
     {
@@ -208,7 +208,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -223,7 +223,7 @@ final class TrendRecorderTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

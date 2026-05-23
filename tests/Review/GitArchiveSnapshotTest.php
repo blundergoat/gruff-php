@@ -17,7 +17,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify create archives only requested base paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCreateArchivesOnlyRequestedBasePaths(): void
     {
@@ -44,7 +44,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify absolute snapshot paths are canonicalized before root trimming.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCreateCanonicalizesAbsoluteRequestedPaths(): void
     {
@@ -71,7 +71,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify create returns empty snapshot when requested paths do not exist in base.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCreateReturnsEmptySnapshotWhenRequestedPathsDoNotExistInBase(): void
     {
@@ -97,7 +97,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify create removes temporary snapshot when base ref fails.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCreateRemovesTemporarySnapshotWhenBaseRefFails(): void
     {
@@ -125,6 +125,8 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
+     * Provide unsafe ref cases for parameterized tests.
+     *
      * @return array<string, array{string}>
      */
     public static function unsafeRefProvider(): array
@@ -141,7 +143,7 @@ final class GitArchiveSnapshotTest extends TestCase
      * Verify create rejects unsafe refs before archiving.
      *
      * @param string $ref Unsafe git ref input.
-     * @return void No return value.
+     * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
     public function testCreateRejectsUnsafeRefsBeforeArchiving(string $ref): void
@@ -162,7 +164,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Create a Git repository fixture with committed base files.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function repoWithBaseFiles(): string
     {
@@ -185,6 +187,8 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
+     * List files below a temporary test directory.
+     *
      * @return list<string>
      */
     private function filesBelow(string $path): array
@@ -208,6 +212,8 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
+     * List temporary branch-review directories created by a test.
+     *
      * @return list<string>
      */
     private function reviewTempDirs(): array
@@ -222,7 +228,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void No return value.
+     * @return void
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -239,7 +245,7 @@ final class GitArchiveSnapshotTest extends TestCase
      *
      * @param string $cwd  Working directory.
      * @param string $args Command arguments.
-     * @return void No return value.
+     * @return void
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -253,7 +259,7 @@ final class GitArchiveSnapshotTest extends TestCase
      * Create a temporary directory for filesystem assertions.
      *
      * @param string $prefix Temporary directory prefix.
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(string $prefix): string
     {
@@ -268,7 +274,7 @@ final class GitArchiveSnapshotTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

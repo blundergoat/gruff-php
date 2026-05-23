@@ -28,6 +28,8 @@ final readonly class RunDiagnostic
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null}
      */
     public function toArray(): array

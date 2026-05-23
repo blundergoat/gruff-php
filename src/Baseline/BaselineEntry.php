@@ -84,6 +84,8 @@ final readonly class BaselineEntry
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string}
      */
     public function toArray(): array

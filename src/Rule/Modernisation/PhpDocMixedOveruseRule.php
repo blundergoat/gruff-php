@@ -83,8 +83,8 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     /**
      * Detect PHPDoc tags that use `mixed` where a narrower type would carry more meaning.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding>
      */
@@ -177,6 +177,8 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
+     * Extract PHPDoc tag bodies with their source line numbers.
+     *
      * @return list<array{tag: string, body: string, line: int}>
      */
     private function extractTagBlocks(Doc $doc): array
@@ -232,6 +234,8 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     }
 
     /**
+     * Detect whether a PHPDoc tag contains a standalone mixed type.
+     *
      * @return array{hasMixed: bool, isStandalone: bool}
      */
     private function classifyMixedInBody(string $body, bool $isTypeAlias): array

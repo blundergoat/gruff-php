@@ -30,6 +30,8 @@ final readonly class FindingDisplayFilter
     }
 
     /**
+     * Keep only findings visible under the selected display filter.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */

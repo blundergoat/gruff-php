@@ -120,8 +120,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     /**
      * Find assertions that compare against unexplained numeric literals.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for magic numbers in assertions.
      */
@@ -157,6 +157,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
+     * Load configured assertion literals, falling back to the default self-explanatory values.
+     *
      * @return list<int>
      */
     private function loadAllowedLiterals(RuleContext $ruleContext): array

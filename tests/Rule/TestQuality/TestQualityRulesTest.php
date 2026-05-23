@@ -56,7 +56,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify PHPUnit and pest test scopes support no assertion and trivial assertion checks.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpUnitAndPestTestScopesSupportNoAssertionAndTrivialAssertionChecks(): void
     {
@@ -72,7 +72,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify core control flow and flakiness smells are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCoreControlFlowAndFlakinessSmellsAreDetected(): void
     {
@@ -86,7 +86,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify mechanics smells are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMechanicsSmellsAreDetected(): void
     {
@@ -107,7 +107,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify advanced heuristic smells are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAdvancedHeuristicSmellsAreDetected(): void
     {
@@ -123,7 +123,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify eager test ignores result observation calls after a single act.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEagerTestIgnoresResultObservationCallsAfterSingleAct(): void
     {
@@ -139,7 +139,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify eager-test reports real multi-act cases with stable metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEagerTestReportsRealMultiActCasesWithStableMetadata(): void
     {
@@ -174,7 +174,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify eager-test ignores assertion, harness, and observation noise.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEagerTestIgnoresAssertionHarnessAndObservationNoise(): void
     {
@@ -206,7 +206,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify eager-test treats fractional assertion thresholds as integer minima.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEagerTestCastsFractionalAssertionThreshold(): void
     {
@@ -227,7 +227,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify SUT-not-called only flags leading method-style test names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSutNotCalledOnlyFlagsLeadingMethodStyleTestNames(): void
     {
@@ -243,7 +243,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify magic number assertion ignores contextual numeric contracts.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMagicNumberAssertionIgnoresContextualNumericContracts(): void
     {
@@ -259,7 +259,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify non candidate cases are not flagged by selected rules.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNonCandidateCasesAreNotFlaggedBySelectedRules(): void
     {
@@ -290,7 +290,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify extends production class detected and allows test case descendants.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
     {
@@ -302,7 +302,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify test method too long detected and ignores whitespace lines.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTestMethodTooLongDetectedAndIgnoresWhitespaceLines(): void
     {
@@ -314,7 +314,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify empty data provider detected and yielding provider is allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEmptyDataProviderDetectedAndYieldingProviderIsAllowed(): void
     {
@@ -326,7 +326,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify loop assertion without message detected and assertion with message allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLoopAssertionWithoutMessageDetectedAndAssertionWithMessageAllowed(): void
     {
@@ -338,7 +338,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify unused mock detected and used mocks allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedMockDetectedAndUsedMocksAllowed(): void
     {
@@ -350,7 +350,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify exception type only detected and paired assertions allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testExceptionTypeOnlyDetectedAndPairedAssertionsAllowed(): void
     {
@@ -362,7 +362,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify tautological type assertion detected and cross class assertions allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTautologicalTypeAssertionDetectedAndCrossClassAssertionsAllowed(): void
     {
@@ -374,7 +374,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify global state mutation detected and cleaned up class allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGlobalStateMutationDetectedAndCleanedUpClassAllowed(): void
     {
@@ -387,7 +387,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify mock without expectation detected with variant severities.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMockWithoutExpectationDetectedWithVariantSeverities(): void
     {
@@ -416,7 +416,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify repeated structure missing data provider detected and data provider users ignored.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
@@ -438,7 +438,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify multiple AAA cycles is disabled by default but fires when opted in.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMultipleAaaCyclesIsDisabledByDefaultButFiresWhenOptedIn(): void
     {
@@ -461,7 +461,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify multiple AAA cycles does not double count inline act assert after act statement.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMultipleAaaCyclesDoesNotDoubleCountInlineActAssertAfterActStatement(): void
     {
@@ -484,7 +484,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Verify testdox readability is disabled by default but fires when opted in.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTestdoxReadabilityIsDisabledByDefaultButFiresWhenOptedIn(): void
     {
@@ -505,8 +505,10 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
+     * Assert the expected test-quality finding count for a rule.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -518,6 +520,8 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
+     * Analyse test-quality fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
@@ -526,6 +530,8 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
+     * Build eager mutation findings for the test-quality rule.
+     *
      * @return list<Finding>
      */
     private function eagerMutationFindings(): array
@@ -537,6 +543,8 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
+     * Analyse test-quality fixtures and return findings for assertions.
+     *
      * @param list<string> $paths
      * @return list<Finding>
      */
@@ -555,7 +563,7 @@ final class TestQualityRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {

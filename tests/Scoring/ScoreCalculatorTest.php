@@ -26,7 +26,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify grade boundaries use simple af scale.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGradeBoundariesUseSimpleAFScale(): void
     {
@@ -40,7 +40,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score report omits mutation pillar when infection data is absent.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testScoreReportOmitsMutationPillarWhenInfectionDataIsAbsent(): void
     {
@@ -68,7 +68,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify composite god method finding requires size and complexity on same symbol.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCompositeGodMethodFindingRequiresSizeAndComplexityOnSameSymbol(): void
     {
@@ -94,7 +94,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score report includes mutation pillar, file mutation scores, distribution, and diff scope.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testScoreReportIncludesMutationAndFileMetrics(): void
     {
@@ -175,7 +175,7 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Verify score calculation can scope composite scoring to selected pillars.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testScoreReportCanScopeCompositeToSelectedPillars(): void
     {
@@ -199,13 +199,13 @@ final class ScoreCalculatorTest extends TestCase
      * Build a finding fixture for assertions.
      *
      * @param string                                                                                 $ruleId   Rule identifier.
-     * @param Pillar                                                                                 $pillar   Fixture value.
-     * @param Severity                                                                               $severity Fixture value.
+     * @param Pillar                                                                                 $pillar
+     * @param Severity                                                                               $severity
      * @param string                                                                                 $filePath Finding file path.
      * @param int                                                                                    $line     Finding line number.
-     * @param string|null                                                                            $symbol   Fixture value.
-     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata Fixture value.
-     * @return Finding Fixture value.
+     * @param string|null                                                                            $symbol
+     * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata
+     * @return Finding
      */
     private function finding(
         string $ruleId,

@@ -56,7 +56,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify mocking domain object is disabled by default and requires patterns to fire.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMockingDomainObjectIsDisabledByDefaultAndRequiresPatternsToFire(): void
     {
@@ -79,7 +79,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit strict flags missing fires on lax config and stays silent on strict.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpUnitStrictFlagsMissingFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -100,7 +100,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit deprecations not fatal fires on lax config and stays silent on strict.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpUnitDeprecationsNotFatalFiresOnLaxConfigAndStaysSilentOnStrict(): void
     {
@@ -118,7 +118,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit coverage source missing fires on lax config and allows legacy whitelist.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpUnitCoverageSourceMissingFiresOnLaxConfigAndAllowsLegacyWhitelist(): void
     {
@@ -141,7 +141,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify PHPUnit rules stay silent when no config file is present.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpUnitRulesStaySilentWhenNoConfigFileIsPresent(): void
     {
@@ -155,7 +155,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify test quality rules respect config disables.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTestQualityRulesRespectConfigDisables(): void
     {
@@ -177,7 +177,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify non test class methods with test prefix are not analysed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNonTestClassMethodsWithTestPrefixAreNotAnalysed(): void
     {
@@ -195,7 +195,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Verify cumulative fixture represents every static test quality rule.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
@@ -216,7 +216,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Build a dummy PHPUnit analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
@@ -226,8 +226,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Build a rule context for PHPUnit helper tests.
      *
-     * @param string $relativeRoot Fixture value.
-     * @return RuleContext Fixture value.
+     * @param string $relativeRoot
+     * @return RuleContext
      */
     private function phpUnitContext(string $relativeRoot): RuleContext
     {
@@ -240,8 +240,10 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
+     * Assert the expected test-quality finding count for a rule.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -253,6 +255,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
+     * List rule IDs expected in enabled test-quality scans.
+     *
      * @return list<string>
      */
     private function expectedRuleIds(): array
@@ -289,6 +293,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
+     * Analyse test-quality fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
@@ -297,6 +303,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     }
 
     /**
+     * Analyse test-quality fixtures and return findings for assertions.
+     *
      * @param list<string> $paths
      * @return list<Finding>
      */
@@ -315,7 +323,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {

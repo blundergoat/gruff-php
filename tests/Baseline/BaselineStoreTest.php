@@ -20,7 +20,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Verify write replaces baseline atomically without lingering temp files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWriteReplacesBaselineAtomicallyWithoutLingeringTempFiles(): void
     {
@@ -42,7 +42,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @return Finding Fixture value.
+     * @return Finding
      */
     private function finding(): Finding
     {
@@ -61,7 +61,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -76,7 +76,7 @@ final class BaselineStoreTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

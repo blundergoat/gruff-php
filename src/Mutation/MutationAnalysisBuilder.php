@@ -101,6 +101,8 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
+     * Append diagnostics for invalid or skipped mutation options.
+     *
      * @param list<RunDiagnostic> $diagnostics
      * @return void
      */

@@ -28,7 +28,7 @@ final readonly class SelectionConfigParser
 
     /**
      * @param ConfigValue  $decodedValue Raw selection config value.
-     * @param RuleRegistry $registry   Registry used to validate selected rule ids.
+     * @param RuleRegistry $registry     Registry used to validate selected rule ids.
      * @return RuleSelection Parsed rule selection filters.
      * @throws ConfigException When the selection config has unknown keys or invalid values.
      */
@@ -62,6 +62,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Read included tier names from the selection config.
+     *
      * @param ConfigObject $selection
      * @return list<string>
      */
@@ -83,6 +85,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Read included pillar names from the selection config.
+     *
      * @param ConfigObject $selection
      * @return list<string>
      */
@@ -104,6 +108,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Read included rule identifiers from the selection config.
+     *
      * @param ConfigObject $selection
      * @return list<string>
      */
@@ -178,6 +184,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Keep decoded configuration values within the supported nested scalar shape.
+     *
      * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
@@ -193,6 +201,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Keep second-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
@@ -208,6 +218,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Keep third-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
@@ -223,6 +235,8 @@ final readonly class SelectionConfigParser
     }
 
     /**
+     * Keep fourth-level configuration values as scalar config values.
+     *
      * @param array<array-key, mixed> $decodedSelectionValues
      * @return array<array-key, ConfigScalar>
      */

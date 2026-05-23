@@ -54,8 +54,8 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find declared and promoted properties that lack local documentation.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented properties.
      */
@@ -116,7 +116,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                     className:    $className,
                     line:         $property->getStartLine(),
                     definition:   $definition,
-                    analysisUnit:         $analysisUnit,
+                    analysisUnit: $analysisUnit,
                 );
             }
         }
@@ -187,7 +187,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
                 className:    $className,
                 line:         $param->getStartLine(),
                 definition:   $definition,
-                analysisUnit:         $analysisUnit,
+                analysisUnit: $analysisUnit,
             );
         }
 
@@ -258,6 +258,8 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     }
 
     /**
+     * List promoted constructor parameters that already have property documentation.
+     *
      * @return list<string>
      */
     private function documentedConstructorParams(ClassMethod $constructor): array

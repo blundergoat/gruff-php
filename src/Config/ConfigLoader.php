@@ -256,6 +256,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Parse paths.ignore into the ignore patterns used during discovery.
+     *
      * @return list<string>
      */
     private function parsePathsConfig(mixed $decodedValue): array
@@ -276,6 +278,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Parse naming and secret-preview allowlists from configuration.
+     *
      * @return array{acceptedAbbreviations: list<string>, secretPreviews: list<string>}
      */
     private function parseAllowlistsConfig(mixed $decodedValue): array
@@ -389,6 +393,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Keep decoded configuration values within the supported nested scalar shape.
+     *
      * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
@@ -404,6 +410,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Keep second-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
@@ -419,6 +427,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Keep third-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
@@ -434,6 +444,8 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Keep fourth-level configuration values as scalar config values.
+     *
      * @param array<array-key, mixed> $decodedConfigValues
      * @return array<array-key, ConfigScalar>
      */

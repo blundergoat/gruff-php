@@ -25,7 +25,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify diff finding filter keeps only touched changed line findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDiffFindingFilterKeepsOnlyTouchedChangedLineFindings(): void
     {
@@ -52,7 +52,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses unstaged changed lines.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderParsesUnstagedChangedLines(): void
     {
@@ -82,7 +82,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses staged, working-tree, and base-ref modes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderParsesModesAndDeletedFiles(): void
     {
@@ -126,7 +126,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify working tree mode includes untracked, unignored files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderWorkingTreeIncludesUntrackedFiles(): void
     {
@@ -152,7 +152,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider parses paths with spaces.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderParsesPathsWithSpaces(): void
     {
@@ -180,7 +180,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider includes rename-only source and destination files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderIncludesRenameOnlyFiles(): void
     {
@@ -204,7 +204,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify base-ref diffs use merge-base scope instead of base tip scope.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderUsesMergeBaseForBaseRefs(): void
     {
@@ -241,7 +241,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify diff finding filter uses changed files when line ranges are unavailable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDiffFindingFilterFallsBackToChangedFiles(): void
     {
@@ -267,7 +267,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify inactive diff leaves findings unchanged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDiffFindingFilterLeavesInactiveDiffUnchanged(): void
     {
@@ -279,7 +279,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Verify Git diff provider reports non Git directory.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitDiffProviderReportsNonGitDirectory(): void
     {
@@ -296,6 +296,8 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
+     * Provide unsafe diff mode cases for parameterized tests.
+     *
      * @return array<string, array{string}>
      */
     public static function unsafeDiffModeProvider(): array
@@ -312,7 +314,7 @@ final class GitDiffProviderTest extends TestCase
      * Verify Git diff provider rejects unsafe base refs.
      *
      * @param string $mode Unsafe diff mode argument.
-     * @return void No return value.
+     * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
     public function testGitDiffProviderRejectsUnsafeBaseRefs(string $mode): void
@@ -337,7 +339,7 @@ final class GitDiffProviderTest extends TestCase
      *
      * @param string $filePath Finding file path.
      * @param int    $line     Finding line number.
-     * @return Finding Fixture value.
+     * @return Finding
      */
     private function finding(string $filePath, int $line): Finding
     {
@@ -356,7 +358,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void No return value.
+     * @return void
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -371,7 +373,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -387,7 +389,7 @@ final class GitDiffProviderTest extends TestCase
      *
      * @param string $cwd  Working directory.
      * @param string $args Command arguments.
-     * @return void No return value.
+     * @return void
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -401,7 +403,7 @@ final class GitDiffProviderTest extends TestCase
      * Initialise a repository with two committed PHP files.
      *
      * @param string $tempDir Fixture repository root.
-     * @return void No return value.
+     * @return void
      */
     private function initialiseRepository(string $tempDir): void
     {
@@ -418,7 +420,7 @@ final class GitDiffProviderTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

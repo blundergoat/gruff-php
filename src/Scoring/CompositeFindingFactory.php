@@ -16,6 +16,8 @@ use GruffPhp\Finding\Severity;
 final readonly class CompositeFindingFactory
 {
     /**
+     * Build composite findings from score and mutation inputs.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */

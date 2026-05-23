@@ -92,8 +92,8 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Find tests that assert many times across multiple apparent SUT calls.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for eager tests.
      */
@@ -130,6 +130,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+     * Collect distinct method calls made on likely system-under-test receivers.
+     *
      * @return array<string, string>
      */
     private function distinctSutCalls(TestQualityScope $scope): array
@@ -307,6 +309,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+     * Choose the receiver with the widest distinct call surface.
+     *
      * @param array<string, array<string, string>> $callsByReceiver
      * @return array<string, string>
      */
@@ -354,11 +358,13 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
+     * Collect variables that receive assertion result values.
+     *
      * @return array<string, true>
      */
     private function collectResultVariables(TestQualityScope $scope): array
     {
-        $variables  = [];
+        $variables = [];
 
         foreach (NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]) as $assign) {
             if (!$assign->var instanceof Expr\Variable || !is_string($assign->var->name)) {

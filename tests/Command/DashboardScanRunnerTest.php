@@ -199,7 +199,7 @@ final class DashboardScanRunnerTest extends TestCase
      * Build a runner fixture.
      *
      * @param string $binary Fake gruff-php binary path.
-     * @return DashboardScanRunner Fixture value.
+     * @return DashboardScanRunner
      */
     private function runner(string $binary): DashboardScanRunner
     {
@@ -210,7 +210,7 @@ final class DashboardScanRunnerTest extends TestCase
      * Build a request context for a project.
      *
      * @param string $project Project root.
-     * @return DashboardRequestContext Fixture value.
+     * @return DashboardRequestContext
      */
     private function context(string $project): DashboardRequestContext
     {
@@ -220,7 +220,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build dashboard console input defaults.
      *
-     * @return ArrayInput Fixture value.
+     * @return ArrayInput
      */
     private function input(): ArrayInput
     {

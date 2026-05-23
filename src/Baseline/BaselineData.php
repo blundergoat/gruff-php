@@ -20,6 +20,8 @@ final readonly class BaselineData
     }
 
     /**
+     * Index baseline entries by stable finding fingerprint.
+     *
      * @return array<string, BaselineEntry>
      */
     public function byFingerprint(): array

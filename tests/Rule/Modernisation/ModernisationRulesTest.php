@@ -36,7 +36,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify PHP version gating suppresses PHP eight suggestions.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpVersionGatingSuppressesPhpEightSuggestions(): void
     {
@@ -59,7 +59,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify PHP eight two config enables modernisation candidates.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpEightTwoConfigEnablesModernisationCandidates(): void
     {
@@ -82,7 +82,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify PHP eight candidates are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpEightCandidatesAreDetected(): void
     {
@@ -99,7 +99,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify PHP eight one candidates are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhpEightOneCandidatesAreDetected(): void
     {
@@ -113,7 +113,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify late mutation inheritance DTO and controller cases are not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
@@ -132,7 +132,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify error suppression uses security finding with modernisation secondary pillar.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorSuppressionUsesSecurityFindingWithModernisationSecondaryPillar(): void
     {
@@ -153,8 +153,10 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Assert the expected modernisation finding count for a rule.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -166,6 +168,8 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Analyse modernisation fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
@@ -174,6 +178,8 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Analyse modernisation fixtures and return findings for assertions.
+     *
      * @param list<string> $paths
      * @return list<Finding>
      */
@@ -192,7 +198,7 @@ final class ModernisationRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -205,7 +211,7 @@ final class ModernisationRulesTest extends TestCase
      * Build analysis configuration for modernisation assertions.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisConfig Fixture value.
+     * @return AnalysisConfig
      */
     private function config(string $path): AnalysisConfig
     {

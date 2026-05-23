@@ -53,8 +53,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Detect functions and methods whose Halstead volume exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Halstead-volume findings for the analysed unit.
      */
@@ -114,6 +114,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     }
 
     /**
+     * Compute Halstead volume inputs for one function-like node.
+     *
      * @param ClassMethod|Function_ $node
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
      */
@@ -157,6 +159,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     }
 
     /**
+     * Return Halstead metrics only when enough operands and operators exist.
+     *
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null
      */
     private static function validatedMetrics(mixed $rawMetrics): ?array
@@ -237,6 +241,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     }
 
     /**
+     * Calculate Halstead metrics from operator and operand counts.
+     *
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
      */
     private static function metricsForCounts(int $uniqueOperators, int $uniqueOperands, int $totalOperators, int $totalOperands): array

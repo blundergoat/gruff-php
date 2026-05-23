@@ -48,8 +48,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Find docblocks that only list parameter or return tags.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for bare PHPDoc blocks.
      */
@@ -68,7 +68,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
                 continue;
             }
 
-            $docText = $docComment->getText();
+            $docText  = $docComment->getText();
             $stripped = preg_replace('/\/\*\*|\*\/|\*/', '', $docText) ?? $docText;
             $stripped = trim($stripped);
 
@@ -137,6 +137,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
      */
     private function isBareParamOrReturnTag(string $line): bool
     {
+        // Match @param tags that end at the variable name with no descriptive prose.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
             return true;
         }
@@ -145,7 +146,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             return false;
         }
 
-        return !$this->returnTagHasDescription(trim(substr($line, strlen('@return '))));
+        return !$this->hasReturnTagDescription(trim(substr($line, strlen('@return '))));
     }
 
     /**
@@ -153,7 +154,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
      *
      * @return bool True when text follows the type.
      */
-    private function returnTagHasDescription(string $body): bool
+    private function hasReturnTagDescription(string $body): bool
     {
         $depth  = 0;
         $length = strlen($body);

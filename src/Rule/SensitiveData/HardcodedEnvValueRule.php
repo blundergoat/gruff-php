@@ -43,8 +43,8 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Find env-style assignments that look like committed secrets.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious env-style values.
      */
@@ -71,9 +71,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
         $findings      = [];
         $commentRanges = SecretScannerHelper::commentRanges($analysisUnit);
         foreach ($matches[0] as $index => $match) {
-            $key        = $matches['key'][$index][0];
+            $key         = $matches['key'][$index][0];
             $secretValue = $matches['value'][$index][0];
-            $offset     = $match[1];
+            $offset      = $match[1];
             if (SecretScannerHelper::isInsideComment($offset, $commentRanges)) {
                 continue;
             }
@@ -84,14 +84,14 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
 
             $preview    = SecretScannerHelper::redactedKeyValue($key, $secretValue);
             $findings[] = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     sprintf('Hardcoded env-style secret value detected: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::Medium,
-                detector:    'env-style-secret',
-                preview:     $preview,
-                remediation: 'Move env-style secret values out of committed source files.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      sprintf('Hardcoded env-style secret value detected: %s.', $preview),
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::Medium,
+                detector:     'env-style-secret',
+                preview:      $preview,
+                remediation:  'Move env-style secret values out of committed source files.',
             );
         }
 
@@ -172,6 +172,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
      */
     private function isIdentifierLikeNonSecretValue(string $key, string $secretValue): bool
     {
+        // Match digits or secret-token punctuation that indicate value material, not a label.
         if (preg_match('/\\d|[+\\/=]/', $secretValue) === 1) {
             return false;
         }
@@ -180,10 +181,12 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             return true;
         }
 
+        // Match common identifier characters used by cache keys and external field names.
         if (str_ends_with($key, '_KEY') && preg_match('/^[A-Za-z][A-Za-z0-9_.:-]{1,80}$/', $secretValue) === 1) {
             return true;
         }
 
+        // Match camelCase identifiers such as accessTokenExpiresAt.
         return preg_match('/^[a-z][A-Za-z]{7,40}$/', $secretValue) === 1;
     }
 }

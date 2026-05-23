@@ -24,6 +24,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.phi-pattern';
 
     /**
+     * List the regex patterns enforced by this rule.
+     *
      * @return list<array{name: string, pattern: string}>
      */
     private function patterns(): array
@@ -57,8 +59,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Find health identifier patterns when nearby text gives PHI context.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for contextual PHI-like identifiers.
      */
@@ -84,8 +86,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
                     continue;
                 }
 
-                $lineNumber            = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
-                $line                  = $this->lineText($analysisUnit->source, $lineNumber);
+                $lineNumber = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
+                $line       = $this->lineText($analysisUnit->source, $lineNumber);
                 if (!$this->hasPhiContext($line, $definition['name'])) {
                     continue;
                 }
@@ -96,14 +98,14 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
 
                 $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
                 $findings[] = SecretScannerHelper::finding(
-                    analysisUnit:        $analysisUnit,
-                    ruleId:      self::ID,
-                    message:     sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
-                    line:        $lineNumber,
-                    confidence:  Confidence::Medium,
-                    detector:    $definition['name'],
-                    preview:     $preview,
-                    remediation: 'Use synthetic health identifiers in fixtures and keep real PHI out of source.',
+                    analysisUnit: $analysisUnit,
+                    ruleId:       self::ID,
+                    message:      sprintf('Potential %s identifier detected: %s.', strtoupper($definition['name']), $preview),
+                    line:         $lineNumber,
+                    confidence:   Confidence::Medium,
+                    detector:     $definition['name'],
+                    preview:      $preview,
+                    remediation:  'Use synthetic health identifiers in fixtures and keep real PHI out of source.',
                 );
             }
         }

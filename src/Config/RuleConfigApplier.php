@@ -119,6 +119,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Merge configured thresholds with rule defaults.
+     *
      * @param ConfigObject             $ruleConfig
      * @param array<string, int|float> $defaultThresholds
      * @return array<string, int|float>
@@ -219,6 +221,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Merge configured rule options with rule defaults.
+     *
      * @param ConfigObject                   $ruleConfig
      * @param array<string, RuleOptionValue> $defaultOptions
      * @return array<string, RuleOptionValue>
@@ -519,6 +523,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Keep decoded configuration values within the supported nested scalar shape.
+     *
      * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
      */
@@ -534,6 +540,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Keep second-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>
      */
@@ -549,6 +557,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Keep third-level configuration values within the supported scalar shape.
+     *
      * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>>
      */
@@ -564,6 +574,8 @@ final readonly class RuleConfigApplier
     }
 
     /**
+     * Keep fourth-level configuration values as scalar config values.
+     *
      * @param array<array-key, mixed> $decodedRuleValues
      * @return array<array-key, ConfigScalar>
      */

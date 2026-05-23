@@ -127,6 +127,8 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     }
 
     /**
+     * Build function-like scopes for a test fixture.
+     *
      * @return list<FunctionLikeScope>
      */
     private function scopesFor(string $source): array

@@ -49,8 +49,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     /**
      * Find constructor assignments that can likely use property promotion.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for promotable constructor assignments.
      */
@@ -70,6 +70,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
+     * Find classes with constructors that may support property promotion.
+     *
      * @return list<Stmt\Class_>
      */
     private function candidateClasses(AnalysisUnit $analysisUnit): array
@@ -99,6 +101,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
+     * Build promotion findings for constructor assignments in one class.
+     *
      * @return list<Finding>
      */
     private function findingsForClass(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
@@ -124,6 +128,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
+     * Collect constructor assignments that affect the modernisation rule.
+     *
      * @return list<Expr\Assign>
      */
     private function constructorAssignments(Stmt\ClassMethod $constructor): array
@@ -189,6 +195,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
+     * Index declared property names on the class.
+     *
      * @return array<string, true>
      */
     private function declaredProperties(Stmt\Class_ $class): array
@@ -208,6 +216,8 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
     }
 
     /**
+     * Collect late assignments that affect the modernisation rule.
+     *
      * @return array<string, true>
      */
     private function lateAssignments(Stmt\Class_ $class): array

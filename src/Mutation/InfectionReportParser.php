@@ -85,6 +85,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Parse stats for the mutation report parser.
+     *
      * @param JsonObject $decoded
      * @return array<string, int|float>
      */
@@ -199,6 +201,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Keep decoded mutation-report values within the supported nested JSON shape.
+     *
      * @param array<array-key, mixed> $values
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>>
      */
@@ -214,6 +218,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Keep second-level mutation-report values within the supported JSON shape.
+     *
      * @param array<array-key, mixed> $values
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>
      */
@@ -229,6 +235,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Keep third-level mutation-report values within the supported JSON shape.
+     *
      * @param array<array-key, mixed> $values
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar>>
      */
@@ -244,6 +252,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Keep fourth-level mutation-report values as scalar JSON values.
+     *
      * @param array<array-key, mixed> $values
      * @return array<array-key, JsonScalar>
      */
@@ -293,6 +303,8 @@ final readonly class InfectionReportParser
     }
 
     /**
+     * Map Infection status section keys to normalised mutant statuses.
+     *
      * @return array<string, string>
      */
     private function statusSections(): array

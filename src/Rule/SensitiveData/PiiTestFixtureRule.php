@@ -24,6 +24,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.pii-test-fixture';
 
     /**
+     * List the regex patterns enforced by this rule.
+     *
      * @return list<array{name: string, pattern: string}>
      */
     private function patterns(): array
@@ -55,8 +57,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Find realistic PII-like values inside test fixture files.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious fixture values.
      */
@@ -88,14 +90,14 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
                 $line       = SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset);
                 $preview    = SecretScannerHelper::redactedPreview($candidateFixture);
                 $findings[] = SecretScannerHelper::finding(
-                    analysisUnit:        $analysisUnit,
-                    ruleId:      self::ID,
-                    message:     sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
-                    line:        $line,
-                    confidence:  Confidence::Medium,
-                    detector:    $definition['name'],
-                    preview:     $preview,
-                    remediation: 'Use reserved example domains, obviously synthetic phone numbers, and fake fixture addresses.',
+                    analysisUnit: $analysisUnit,
+                    ruleId:       self::ID,
+                    message:      sprintf('Realistic-looking %s found in a test fixture: %s.', $definition['name'], $preview),
+                    line:         $line,
+                    confidence:   Confidence::Medium,
+                    detector:     $definition['name'],
+                    preview:      $preview,
+                    remediation:  'Use reserved example domains, obviously synthetic phone numbers, and fake fixture addresses.',
                 );
             }
         }

@@ -28,7 +28,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -39,7 +39,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify no findings for few parameters.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForFewParameters(): void
     {
@@ -51,7 +51,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify warning for six parameters.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForSixParameters(): void
     {
@@ -72,7 +72,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify error for nine parameters.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForNineParameters(): void
     {
@@ -93,17 +93,17 @@ final class ParameterCountRuleTest extends TestCase
     {
         yield 'variadic function exempt' => [
             'fixture' => 'many-params.php',
-            'symbol'  => 'ManyParamsFixture::variadicParams()',
+            'symbol' => 'ManyParamsFixture::variadicParams()',
         ];
 
         yield 'promoted readonly DTO exempt' => [
             'fixture' => 'promoted-payload.php',
-            'symbol'  => 'PromotedPayloadFixture::__construct()',
+            'symbol' => 'PromotedPayloadFixture::__construct()',
         ];
 
         yield 'promoted DTO at ceiling stays exempt' => [
             'fixture' => 'promoted-payload-at-ceiling.php',
-            'symbol'  => 'PromotedPayloadAtCeilingFixture::__construct()',
+            'symbol' => 'PromotedPayloadAtCeilingFixture::__construct()',
         ];
     }
 
@@ -112,7 +112,7 @@ final class ParameterCountRuleTest extends TestCase
      *
      * @param string $fixture Fixture filename to parse.
      * @param string $symbol  Symbol whose absence from findings is asserted.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('exemptCallableProvider')]
     public function testExemptCallableDoesNotFire(string $fixture, string $symbol): void
@@ -126,7 +126,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify promoted constructor parameters counted.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedConstructorParametersCounted(): void
     {
@@ -146,7 +146,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor-specific threshold can allow constructors while ordinary methods still fire.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfiguredConstructorThresholdAllowsConstructorWhileKeepingMethodFindings(): void
     {
@@ -166,7 +166,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor-specific threshold emits dedicated metadata under legacy thresholds.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfiguredConstructorThresholdFiresWithMetadata(): void
     {
@@ -199,7 +199,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor-specific threshold uses the single-threshold severity shape.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfiguredConstructorThresholdUsesDefaultSeverityThreshold(): void
     {
@@ -222,7 +222,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify a promoted readonly DTO above the default ceiling fires with the ceiling-bypass message.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedConstructorAboveDefaultCeilingFires(): void
     {
@@ -246,7 +246,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify a project override of the ceiling fires earlier on a smaller promoted DTO.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedConstructorCeilingHonoursOptionOverride(): void
     {
@@ -273,7 +273,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify constructor threshold does not override promoted value-object exemption.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConstructorThresholdDoesNotOverridePromotedValueObjectExemption(): void
     {
@@ -290,7 +290,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify interface parameters counted.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInterfaceParametersCounted(): void
     {
@@ -301,7 +301,9 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
-     * @param array<string, int>                                                        $thresholds
+     * Analyse fixture paths and return findings for assertions.
+     *
+     * @param array<string, int>                                                           $thresholds
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -320,6 +322,8 @@ final class ParameterCountRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -345,7 +349,7 @@ final class ParameterCountRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

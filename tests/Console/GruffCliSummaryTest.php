@@ -20,7 +20,7 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify summary runs and shows digest sections.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSummaryRunsAndShowsDigestSections(): void
     {
@@ -48,7 +48,7 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify summary does not emit per finding lines.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSummaryDoesNotEmitPerFindingLines(): void
     {
@@ -74,7 +74,7 @@ final class GruffCliSummaryTest extends TestCase
      * Verify summary JSON output matches schema.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSummaryJsonOutputMatchesSchema(): void
     {
@@ -131,7 +131,7 @@ final class GruffCliSummaryTest extends TestCase
      *
      * @param list<string> $arguments CLI arguments appended after the base command.
      * @param string       $message   Expected usage error excerpt.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('invalidSummaryOptionProvider')]
     public function testSummaryRejectsInvalidOptions(array $arguments, string $message): void
@@ -152,7 +152,7 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify list includes summary command.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testListIncludesSummaryCommand(): void
     {

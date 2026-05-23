@@ -16,6 +16,8 @@ final class FunctionLikeScopeWalker
     /** @var WeakMap<Node, array{count: int, scopes: list<FunctionLikeScope>}>|null */
     private static ?WeakMap $cache = null;
     /**
+     * Build function-like scopes from top-level statements.
+     *
      * @param list<Node> $statements
      * @return list<FunctionLikeScope>
      */
@@ -73,7 +75,11 @@ final class FunctionLikeScopeWalker
             $bodyDescendants,
         );
     }
-    /** @return array<string, true> */
+    /**
+     * Return parameter names keyed for fast exclusion checks.
+     *
+     * @return array<string, true> Parameter names declared by the node.
+     */
     private function parameterNames(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
         $names = [];
@@ -85,7 +91,7 @@ final class FunctionLikeScopeWalker
         return $names;
     }
     /**
-     * @param list<Node>            $bodyDescendants Descendant nodes in this scope body.
+     * @param list<Node>          $bodyDescendants Descendant nodes in this scope body.
      * @param array<string, true> $parameterNames
      * @return array<string, Variable>
      */
@@ -109,6 +115,8 @@ final class FunctionLikeScopeWalker
     }
 
     /**
+     * List all descendant nodes inside a function-like body.
+     *
      * @return list<Node>
      */
     private function bodyDescendants(ClassMethod|Function_|Closure|ArrowFunction $node): array
@@ -123,6 +131,8 @@ final class FunctionLikeScopeWalker
     }
 
     /**
+     * Append descendant nodes from a function-like body.
+     *
      * @param list<Node> $descendants
      * @return void
      */
@@ -138,7 +148,11 @@ final class FunctionLikeScopeWalker
             $this->collectBodyDescendants($child, $descendants);
         }
     }
-    /** @return list<Node> */
+    /**
+     * Return immediate body nodes for any supported function-like node.
+     *
+     * @return list<Node> Body nodes to scan.
+     */
     private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
         if ($node instanceof ArrowFunction) {
@@ -160,7 +174,11 @@ final class FunctionLikeScopeWalker
             default => 'arrow',
         };
     }
-    /** @return list<Node> */
+    /**
+     * Return direct child nodes for recursive body traversal.
+     *
+     * @return list<Node> Child AST nodes.
+     */
     private function childNodes(Node $node): array
     {
         $children = [];
@@ -170,6 +188,8 @@ final class FunctionLikeScopeWalker
         return $children;
     }
     /**
+     * Append traversable child nodes to the current collection.
+     *
      * @param list<Node> $children
      * @return void
      */

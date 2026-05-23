@@ -25,13 +25,13 @@ final class StmtChildVisitorTest extends TestCase
      */
     public static function controlFlowSampleProvider(): iterable
     {
-        yield 'if'      => ['if ($x) { }'];
-        yield 'for'     => ['for ($i = 0; $i < 1; $i++) { }'];
+        yield 'if' => ['if ($x) { }'];
+        yield 'for' => ['for ($i = 0; $i < 1; $i++) { }'];
         yield 'foreach' => ['foreach ([] as $v) { }'];
-        yield 'while'   => ['while ($x) { }'];
-        yield 'do'      => ['do { } while ($x);'];
-        yield 'switch'  => ['switch ($x) { case 1: break; }'];
-        yield 'try'     => ['try { } catch (\Throwable $e) { }'];
+        yield 'while' => ['while ($x) { }'];
+        yield 'do' => ['do { } while ($x);'];
+        yield 'switch' => ['switch ($x) { case 1: break; }'];
+        yield 'try' => ['try { } catch (\Throwable $e) { }'];
     }
 
     /**
@@ -42,16 +42,16 @@ final class StmtChildVisitorTest extends TestCase
     public static function nonControlFlowSampleProvider(): iterable
     {
         yield 'assignment' => ['$x = 1;'];
-        yield 'return'     => ['return $x;'];
-        yield 'echo'       => ['echo $x;'];
-        yield 'throw'      => ['throw new \RuntimeException();'];
+        yield 'return' => ['return $x;'];
+        yield 'echo' => ['echo $x;'];
+        yield 'throw' => ['throw new \RuntimeException();'];
     }
 
     /**
      * Verify the visitor identifies a control-flow statement type.
      *
      * @param string $source PHP source fragment without the open tag.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('controlFlowSampleProvider')]
     public function testControlFlowStatementIsRecognised(string $source): void
@@ -65,7 +65,7 @@ final class StmtChildVisitorTest extends TestCase
      * Verify the visitor rejects a non-control-flow statement type.
      *
      * @param string $source PHP source fragment without the open tag.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('nonControlFlowSampleProvider')]
     public function testNonControlFlowStatementIsRejected(string $source): void
@@ -78,7 +78,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify an if/elseif/else chain yields one block per branch with the right kinds.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIfChainYieldsBranchBlocks(): void
     {
@@ -102,17 +102,17 @@ final class StmtChildVisitorTest extends TestCase
      */
     public static function loopSampleProvider(): iterable
     {
-        yield 'for'     => ['for ($i = 0; $i < 1; $i++) { $a = 1; }'];
+        yield 'for' => ['for ($i = 0; $i < 1; $i++) { $a = 1; }'];
         yield 'foreach' => ['foreach ([] as $v) { $a = 1; }'];
-        yield 'while'   => ['while ($x) { $a = 1; }'];
-        yield 'do'      => ['do { $a = 1; } while ($x);'];
+        yield 'while' => ['while ($x) { $a = 1; }'];
+        yield 'do' => ['do { $a = 1; } while ($x);'];
     }
 
     /**
      * Verify each loop type yields exactly one loop-body block.
      *
      * @param string $source PHP source fragment without the open tag.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('loopSampleProvider')]
     public function testLoopTypeYieldsSingleBody(string $source): void
@@ -128,7 +128,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify switch statements yield one block per case, all tagged with the SWITCH_CASE kind.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSwitchYieldsCaseBlocks(): void
     {
@@ -155,7 +155,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify try/catch/finally yields one block for try, each catch, and finally.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTryCatchFinallyYieldsAllArms(): void
     {
@@ -173,7 +173,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify try without finally yields try + catches but no finally block.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTryCatchWithoutFinallySkipsFinallyBlock(): void
     {
@@ -189,7 +189,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify non-control-flow nodes yield no blocks.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNonControlFlowYieldsNothing(): void
     {

@@ -10,6 +10,8 @@ namespace GruffPhp\Source;
 final readonly class SourceDiscoveryResult
 {
     /**
+     * Store discovered files plus missing and ignored path diagnostics.
+     *
      * @param list<SourceFile> $files
      * @param list<string>     $missingPaths
      * @param list<string>     $ignoredPaths

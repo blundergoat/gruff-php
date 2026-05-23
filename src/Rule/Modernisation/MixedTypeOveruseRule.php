@@ -47,8 +47,8 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * Find parameters and returns that overuse explicit mixed types.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for broad type usage.
      */
@@ -58,7 +58,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOfAny($analysisUnit, [Stmt\ClassMethod::class, Stmt\Function_::class]) as $functionLike) {
             if ($functionLike instanceof Stmt\ClassMethod && !$functionLike->isPublic()) {
@@ -96,6 +96,8 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     }
 
     /**
+     * List source locations where broad mixed types appear.
+     *
      * @return list<string>
      */
     private function mixedLocations(Stmt\ClassMethod|Stmt\Function_ $functionLike): array

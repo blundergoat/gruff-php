@@ -74,6 +74,8 @@ final class DashboardScanCommandBuilderTest extends TestCase
     }
 
     /**
+     * Build the dashboard scan state used by command-builder tests.
+     *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string}
      */
     private function state(): array

@@ -24,6 +24,8 @@ final class SecretScannerHelper
     private static array $commentRangeCache = [];
 
     /**
+     * List key-name fragments that mark literals as secret-like.
+     *
      * @return list<string>
      */
     public static function sensitiveKeyFragments(): array
@@ -59,8 +61,8 @@ final class SecretScannerHelper
     /**
      * Check whether a source-text byte offset falls inside one of the given comment ranges.
      *
-     * @param int                              $offset Zero-based byte offset of a pattern match.
-     * @param list<array{0:int,1:int}>         $ranges Comment ranges produced by commentRanges().
+     * @param int                      $offset Zero-based byte offset of a pattern match.
+     * @param list<array{0:int,1:int}> $ranges Comment ranges produced by commentRanges().
      * @return bool True when the offset is inside a comment span and should be skipped.
      */
     public static function isInsideComment(int $offset, array $ranges): bool
@@ -105,7 +107,7 @@ final class SecretScannerHelper
     /**
      * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
-     * @param string $key        Environment-style key name.
+     * @param string $key         Environment-style key name.
      * @param string $secretValue Sensitive value associated with the key.
      * @return string
      */
@@ -211,14 +213,14 @@ final class SecretScannerHelper
     /**
      * Build a sensitive-data Finding with redacted preview / detector metadata.
      *
-     * @param AnalysisUnit $analysisUnit        Parsed unit that owns the finding.
-     * @param string       $ruleId      Sensitive-data rule identifier.
-     * @param string       $message     Human-readable finding message.
-     * @param int          $line        Source line for the detected secret.
-     * @param Confidence   $confidence  Confidence level assigned by the detector.
-     * @param string       $detector    Detector name written to finding metadata.
-     * @param string       $preview     Redacted preview written to finding metadata.
-     * @param string       $remediation Suggested remediation text for the finding.
+     * @param AnalysisUnit $analysisUnit Parsed unit that owns the finding.
+     * @param string       $ruleId       Sensitive-data rule identifier.
+     * @param string       $message      Human-readable finding message.
+     * @param int          $line         Source line for the detected secret.
+     * @param Confidence   $confidence   Confidence level assigned by the detector.
+     * @param string       $detector     Detector name written to finding metadata.
+     * @param string       $preview      Redacted preview written to finding metadata.
+     * @param string       $remediation  Suggested remediation text for the finding.
      * @return Finding
      */
     public static function finding(

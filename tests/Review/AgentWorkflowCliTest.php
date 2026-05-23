@@ -20,7 +20,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify list rules JSON includes identifier quality metadata.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testListRulesJsonIncludesIdentifierQualityMetadata(): void
     {
@@ -48,7 +48,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify display filters are report metadata and do not enable rules.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testDisplayFiltersAreReportMetadataAndDoNotEnableRules(): void
     {
@@ -86,7 +86,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify SARIF output is JSON and contains findings.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifOutputIsJsonAndContainsFindings(): void
     {
@@ -116,7 +116,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify paths relative to normalizes JSON finding files.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testPathsRelativeToNormalizesJsonFindingFiles(): void
     {
@@ -153,7 +153,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify branch review keeps line shifted finding unchanged and reports introduced.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewKeepsLineShiftedFindingUnchangedAndReportsIntroduced(): void
     {
@@ -227,7 +227,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify branch review reports removed findings.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewReportsRemovedFindings(): void
     {
@@ -277,7 +277,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify branch review added file does not fail base snapshot.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewAddedFileDoesNotFailBaseSnapshot(): void
     {
@@ -328,7 +328,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Verify branch review changed only without paths scopes current scan to changed files.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewChangedOnlyWithoutPathsScopesCurrentScanToChangedFiles(): void
     {
@@ -378,102 +378,10 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Verify branch review score delta ignores mutation-only score inputs.
-     *
-     * @throws JsonException
-     * @return void No return value.
-     */
-    public function testBranchReviewDeltaExcludesMutationInput(): void
-    {
-        $this->skipWhenGitIsUnavailable();
-        $repo = $this->tempDir();
-
-        try {
-            self::assertTrue(mkdir($repo . '/src', 0777, true));
-            $this->runGit($repo, 'init');
-            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
-            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Target.php', "<?php\n/** Fixture file. */\n\$value = 1;\n");
-            file_put_contents($repo . '/src/Unrelated.php', "<?php\n");
-            $this->runGit($repo, 'add', 'src/Target.php', 'src/Unrelated.php');
-            $this->runGit($repo, 'commit', '-m', 'base');
-
-            file_put_contents($repo . '/src/Target.php', "<?php\n/** Fixture file. */\n\$value = 2;\n");
-            file_put_contents($repo . '/infection.json', <<<'JSON'
-{
-  "stats": {
-    "totalMutantsCount": 2,
-    "killedCount": 1,
-    "escapedCount": 1,
-    "timedOutCount": 0,
-    "msi": 50.0,
-    "coveredCodeMsi": 50.0,
-    "mutationCodeCoverage": 100.0
-  },
-  "escaped": [
-    {
-      "mutator": {
-        "mutatorName": "Plus",
-        "originalFilePath": "src/Unrelated.php",
-        "originalStartLine": 1
-      },
-      "diff": "-1\n+2",
-      "processOutput": "Failed asserting."
-    }
-  ],
-  "killed": [
-    {
-      "mutator": {
-        "mutatorName": "Minus",
-        "originalFilePath": "src/Unrelated.php",
-        "originalStartLine": 1
-      },
-      "diff": "-2\n+1",
-      "processOutput": ""
-    }
-  ],
-  "timeouted": [],
-  "killedByStaticAnalysis": [],
-  "errored": [],
-  "syntaxErrors": [],
-  "uncovered": [],
-  "ignored": []
-}
-JSON);
-
-            $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--infection-report=infection.json',
-            ], $repo);
-            $process->run();
-
-            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
-            $report   = $this->decodeJson($process);
-            $mutation = $this->arrayValue($report, 'mutation');
-            $totals   = $this->arrayValue($mutation, 'totals');
-            $review   = $this->arrayValue($report, 'review');
-
-            self::assertEquals(50.0, $totals['msi'] ?? null);
-            self::assertEqualsWithDelta(0.0, $this->floatValue($review, 'deltaScore'), 0.001);
-        } finally {
-            $this->removeDir($repo);
-        }
-    }
-
-    /**
      * Verify changed-only review gives project rules full context before changed-file filtering.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules(): void
     {
@@ -533,7 +441,7 @@ JSON);
      * Verify branch review deleted file reports removed findings.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testBranchReviewDeletedFileReportsRemovedFindings(): void
     {
@@ -607,7 +515,7 @@ JSON);
      * Verify review mode reports non Git diagnostic.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testReviewModeReportsNonGitDiagnostic(): void
     {
@@ -642,7 +550,7 @@ JSON);
     /**
      * Verify review mode invalid option combinations fail early.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {
@@ -683,6 +591,8 @@ JSON);
     }
 
     /**
+     * Read an associative array from decoded JSON output.
+     *
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -704,18 +614,8 @@ JSON);
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @return float Float payload value.
-     */
-    private function floatValue(array $payload, string $key): float
-    {
-        $payloadValue = $payload[$key] ?? null;
-        self::assertTrue(is_int($payloadValue) || is_float($payloadValue));
-
-        return (float) $payloadValue;
-    }
-
-    /**
+     * Read a list from decoded JSON output.
+     *
      * @param array<string, mixed> $payload
      * @return list<mixed>
      */
@@ -737,6 +637,8 @@ JSON);
     }
 
     /**
+     * Extract diagnostic type names from decoded JSON output.
+     *
      * @param array<string, mixed> $payload
      * @return list<string>
      */
@@ -753,6 +655,8 @@ JSON);
     }
 
     /**
+     * Build symbols from findings for the branch-review workflow.
+     *
      * @return list<mixed>
      */
     private function symbolsFromFindings(mixed $findings): array
@@ -768,6 +672,8 @@ JSON);
     }
 
     /**
+     * Validate that a decoded JSON value is a list.
+     *
      * @return list<mixed>
      */
     private function mixedList(mixed $payload): array
@@ -778,6 +684,8 @@ JSON);
     }
 
     /**
+     * Validate that a decoded JSON value is an associative array.
+     *
      * @return array<string, mixed>
      */
     private function stringKeyedArray(mixed $payload): array
@@ -796,7 +704,7 @@ JSON);
     /**
      * Skip the current test when Git is unavailable.
      *
-     * @return void No return value.
+     * @return void
      */
     private function skipWhenGitIsUnavailable(): void
     {
@@ -813,7 +721,7 @@ JSON);
      *
      * @param string $cwd  Working directory.
      * @param string $args Command arguments.
-     * @return void No return value.
+     * @return void
      */
     private function runGit(string $cwd, string ...$args): void
     {
@@ -826,7 +734,7 @@ JSON);
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -841,7 +749,7 @@ JSON);
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

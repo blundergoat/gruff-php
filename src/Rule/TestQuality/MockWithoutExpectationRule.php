@@ -56,8 +56,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     /**
      * Find mocks that are read without any verification call.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mock variables that lack expectations.
      */
@@ -73,6 +73,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * Build mock-expectation findings for one test scope.
+     *
      * @return list<Finding>
      */
     private function findingsForScope(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
@@ -89,11 +91,11 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
 
         foreach ($mockAssignments as $varName => $assignment) {
             $finding = $this->findingForMock(
-                analysisUnit:       $analysisUnit,
-                scope:              $scope,
-                varName:            $varName,
-                assignment:         $assignment,
-                reads:              $reads,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                varName:      $varName,
+                assignment:   $assignment,
+                reads:        $reads,
             );
 
             if ($finding instanceof Finding) {
@@ -105,6 +107,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * Collect mock variables created in the test scope.
+     *
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, array{line: int, name: string}>
      */
@@ -137,6 +141,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * Collect reads of variables created as mocks.
+     *
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, list<Expr\Variable>>
      */
@@ -257,6 +263,8 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
     }
 
     /**
+     * List method names called on a specific variable.
+     *
      * @return list<string>
      */
     private function methodNamesCalledOnVariable(TestQualityScope $scope, string $varName): array

@@ -137,6 +137,8 @@ final readonly class SarifReporter
     }
 
     /**
+     * Build one SARIF result payload for a finding.
+     *
      * @return array<string, mixed>
      */
     private function result(Finding $finding, int $ruleIndex): array

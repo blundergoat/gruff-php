@@ -62,6 +62,8 @@ final readonly class Grade
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array{score: float, grade: string}
      */
     public function toArray(): array

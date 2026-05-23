@@ -16,7 +16,7 @@ final class PhpFileParserTest extends TestCase
     /**
      * Verify parses valid PHP file into analysis unit.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testParsesValidPhpFileIntoAnalysisUnit(): void
     {
@@ -32,7 +32,7 @@ final class PhpFileParserTest extends TestCase
     /**
      * Verify reports syntax error diagnostic.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportsSyntaxErrorDiagnostic(): void
     {
@@ -50,7 +50,7 @@ final class PhpFileParserTest extends TestCase
      * Resolve a parser fixture path.
      *
      * @param string $path Filesystem path.
-     * @return string Fixture value.
+     * @return string
      */
     private function fixturePath(string $path): string
     {

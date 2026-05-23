@@ -132,8 +132,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find placeholder, generic, and numbered identifiers across declarations and locals.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for low-quality identifiers.
      */
@@ -223,10 +223,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
             $finding = $this->finding(
                 identifierFindingContext: $findingContext,
-                node:    $node,
-                kind:    $this->classLikeKind($node),
-                name:    $name,
-                symbol:  $name,
+                node:                     $node,
+                kind:                     $this->classLikeKind($node),
+                name:                     $name,
+                symbol:                   $name,
             );
 
             if ($finding instanceof Finding) {
@@ -279,10 +279,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
         $finding = $this->finding(
             identifierFindingContext: $findingContext,
-            node:    $function,
-            kind:    $function instanceof ClassMethod ? 'method' : 'function',
-            name:    $function->name->toString(),
-            symbol:  CyclomaticComplexityRule::resolveSymbol($function),
+            node:                     $function,
+            kind:                     $function instanceof ClassMethod ? 'method' : 'function',
+            name:                     $function->name->toString(),
+            symbol:                   CyclomaticComplexityRule::resolveSymbol($function),
         );
 
         return $finding instanceof Finding ? [$finding] : [];
@@ -305,10 +305,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
             $finding = $this->finding(
                 identifierFindingContext: $findingContext,
-                node:    $param,
-                kind:    $param->flags === 0 ? 'parameter' : 'property',
-                name:    $param->var->name,
-                symbol:  $symbol,
+                node:                     $param,
+                kind:                     $param->flags === 0 ? 'parameter' : 'property',
+                name:                     $param->var->name,
+                symbol:                   $symbol,
             );
 
             if ($finding instanceof Finding) {
@@ -338,10 +338,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
         foreach ($this->localVariableNames($scope, $minScopeReferences, $loopVars + $catchVars) as $name => $variable) {
             $finding = $this->finding(
                 identifierFindingContext: $findingContext,
-                node:    $variable,
-                kind:    'variable',
-                name:    $name,
-                symbol:  $symbol,
+                node:                     $variable,
+                kind:                     'variable',
+                name:                     $name,
+                symbol:                   $symbol,
             );
 
             if ($finding instanceof Finding) {
@@ -352,12 +352,12 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $loopIgnoredNames = array_values(array_diff($findingContext->ignoredNames, $findingContext->genericTokens));
         foreach ($this->reportableLoopVariableNames($scope, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
             $finding = $this->finding(
-                identifierFindingContext:              $findingContext,
-                node:                 $variable,
-                kind:                 'variable',
-                name:                 $name,
-                symbol:               $symbol,
-                ignoredNamesOverride: $loopIgnoredNames,
+                identifierFindingContext: $findingContext,
+                node:                     $variable,
+                kind:                     'variable',
+                name:                     $name,
+                symbol:                   $symbol,
+                ignoredNamesOverride:     $loopIgnoredNames,
             );
 
             if ($finding instanceof Finding) {
@@ -382,10 +382,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 $name    = $prop->name->toString();
                 $finding = $this->finding(
                     identifierFindingContext: $findingContext,
-                    node:    $prop,
-                    kind:    'property',
-                    name:    $name,
-                    symbol:  '$' . $name,
+                    node:                     $prop,
+                    kind:                     'property',
+                    name:                     $name,
+                    symbol:                   '$' . $name,
                 );
 
                 if ($finding instanceof Finding) {
@@ -537,11 +537,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return in_array($prefix, $placeholderNames, true) || $this->allTokensMatch($prefixTokens, $genericTokens);
     }
 
-    /**
-     * Skip framework lifecycle and test data-provider function-like declarations.
-     *
-     * @return bool True when the function-like node should not be checked.
-     */
+    /** @return bool True when framework lifecycle or data-provider methods should be skipped. */
     private function shouldSkipFunctionLike(ClassMethod|Function_ $node): bool
     {
         $name = $node->name->toString();
@@ -558,8 +554,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param array<string, true> $excludedNames
-     * @return array<string, Variable>
+     * @param array<string, true> $excludedNames Names already exempted by surrounding rule logic.
+     * @return array<string, Variable> Local variables that should be checked for naming quality.
      */
     private function localVariableNames(FunctionLikeScope $scope, int $minScopeReferences, array $excludedNames): array
     {
@@ -579,9 +575,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return $variables;
     }
 
-    /**
-     * @return array<string, true>
-     */
+    /** @return array<string, true> Variables introduced by loop constructs. */
     private function loopVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
@@ -603,9 +597,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return $variables;
     }
 
-    /**
-     * @return array<string, true>
-     */
+    /** @return array<string, true> Variables introduced by catch clauses. */
     private function catchVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
@@ -624,8 +616,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $genericTokens
-     * @return array<string, Variable>
+     * @param list<string> $genericTokens Lowercase loop variable names treated as generic.
+     * @return array<string, Variable> Loop variables that should be reported.
      */
     private function reportableLoopVariableNames(
         FunctionLikeScope $scope,
@@ -658,9 +650,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         return $variables;
     }
 
-    /**
-     * @return bool True for the conventional key/value map iteration idiom.
-     */
+    /** @return bool True for the conventional key/value map iteration idiom. */
     private function isCanonicalMapLoop(Foreach_ $foreach): bool
     {
         return $foreach->keyVar instanceof Variable
@@ -669,9 +659,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             && $foreach->valueVar->name === 'value';
     }
 
-    /**
-     * @return array<string, int>
-     */
+    /** @return array<string, int> Local variable read counts keyed by variable name. */
     private function localVariableReferenceCounts(FunctionLikeScope $scope): array
     {
         $counts = [];
@@ -686,8 +674,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param array<Node>        $nodes
-     * @param array<string,true> $variables
+     * @param array<Node>        $nodes     AST nodes to scan for variable references.
+     * @param array<string,true> $variables Output set keyed by variable name.
      * @return void
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
@@ -702,8 +690,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param callable(Node): bool $predicate
-     * @return list<Node>
+     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
+     * @return list<Node> Descendant nodes in the current function-like scope.
      */
     private function nodesInScope(FunctionLikeScope $scope, callable $predicate): array
     {
@@ -719,9 +707,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param list<Node>           $nodes
-     * @param callable(Node): bool $predicate
-     * @return list<Node>
+     * @param list<Node>           $nodes     Roots to traverse.
+     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
+     * @return list<Node> Descendant nodes that match the predicate.
      */
     private function nodesMatching(array $nodes, callable $predicate): array
     {
@@ -735,8 +723,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param callable(Node): bool $predicate
-     * @param list<Node>           $matches
+     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
+     * @param list<Node>           $matches   Output list of matching descendant nodes.
      * @return void
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
@@ -755,6 +743,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * List direct child nodes that can be recursively traversed.
+     *
      * @return list<Node>
      */
     private function childNodes(Node $node): array
@@ -769,6 +759,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * Append traversable child nodes to the current collection.
+     *
      * @param list<Node> $children
      * @return void
      */
@@ -818,6 +810,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * Normalize string lists for case-insensitive comparisons.
+     *
      * @param list<string> $values
      * @return list<string>
      */

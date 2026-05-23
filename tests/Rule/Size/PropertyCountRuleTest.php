@@ -27,7 +27,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify no findings for few properties.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForFewProperties(): void
     {
@@ -50,7 +50,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify warning for too many declared properties.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForTooManyDeclaredProperties(): void
     {
@@ -66,7 +66,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify promoted properties counted.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedPropertiesCounted(): void
     {
@@ -80,7 +80,7 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Verify trait properties flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTraitPropertiesFlagged(): void
     {
@@ -92,6 +92,8 @@ final class PropertyCountRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -112,7 +114,7 @@ final class PropertyCountRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

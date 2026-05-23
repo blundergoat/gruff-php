@@ -51,8 +51,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Flag function and method parameters that are declared but never read in the body.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -69,12 +69,14 @@ final readonly class UnusedParameterRule implements RuleInterface
     }
 
     /**
+     * List functions and methods whose parameters can be checked for use.
+     *
      * @return list<ClassMethod|Function_>
      */
     private function analysableNodes(AnalysisUnit $analysisUnit): array
     {
         $foundNodes = NodeIndex::nodesOfAny($analysisUnit, [Function_::class, ClassMethod::class]);
-        $nodes = [];
+        $nodes      = [];
 
         foreach ($foundNodes as $node) {
             if (!$node instanceof ClassMethod && !$node instanceof Function_) {
@@ -180,6 +182,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     }
 
     /**
+     * Build unused-parameter findings for one function or method.
+     *
      * @param ClassMethod|Function_ $node
      * @return list<Finding>
      */
@@ -195,11 +199,11 @@ final readonly class UnusedParameterRule implements RuleInterface
         foreach ($this->parameterNames($node) as $name => $param) {
             if (!isset($usedNames[$name])) {
                 $findings[] = $this->findingForParameter(
-                    analysisUnit:       $analysisUnit,
-                    definition: $definition,
-                    node:       $node,
-                    name:       $name,
-                    param:      $param,
+                    analysisUnit: $analysisUnit,
+                    definition:   $definition,
+                    node:         $node,
+                    name:         $name,
+                    param:        $param,
                 );
             }
         }
@@ -208,6 +212,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     }
 
     /**
+     * Index parameters declared by a function or method.
+     *
      * @param ClassMethod|Function_ $node
      * @return array<string, \PhpParser\Node\Param>
      */
@@ -229,6 +235,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     }
 
     /**
+     * Collect variable names referenced inside a function or method body.
+     *
      * @param ClassMethod|Function_ $node
      * @return array<string, true>
      */

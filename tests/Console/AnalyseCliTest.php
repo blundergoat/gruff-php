@@ -15,7 +15,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command runs as no op.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandRunsAsNoOp(): void
     {
@@ -39,7 +39,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command supports an explicit single-file option.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSupportsSingleFileOption(): void
     {
@@ -74,7 +74,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports syntax errors without aborting.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsSyntaxErrorsWithoutAborting(): void
     {
@@ -97,7 +97,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports warning findings without failing by default.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsWarningFindingsWithoutFailingByDefault(): void
     {
@@ -120,7 +120,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command fails when finding meets default error threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandFailsWhenFindingMeetsDefaultErrorThreshold(): void
     {
@@ -142,7 +142,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command can fail on warning threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandCanFailOnWarningThreshold(): void
     {
@@ -167,7 +167,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command outputs JSON report.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandOutputsJsonReport(): void
     {
@@ -215,7 +215,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command outputs JSON parse errors.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandOutputsJsonParseErrors(): void
     {
@@ -249,7 +249,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command fails invalid config.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandFailsInvalidConfig(): void
     {
@@ -271,7 +271,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command applies configured rule selection.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
     {
@@ -303,7 +303,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify security profile limits rule execution to security and sensitive-data rules.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
     {
@@ -349,7 +349,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify security profile replaces configured rule selection.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
     {
@@ -386,7 +386,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command rejects unknown execution profiles.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsInvalidProfile(): void
     {
@@ -407,7 +407,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command applies configured path ignores.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
     {
@@ -432,7 +432,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports invalid selection config.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
     {
@@ -454,7 +454,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command applies configured secret preview allowlist.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
     {
@@ -488,7 +488,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports missing infection executable in run mode.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
     {
@@ -516,7 +516,7 @@ final class AnalyseCliTest extends CliTestCase
      * Verify analyse command outputs scoring data in JSON report.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
     {
@@ -550,7 +550,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs HTML report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandOutputsHtmlReport(): void
     {
@@ -578,7 +578,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports HTML editor links.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSupportsHtmlEditorLinks(): void
     {
@@ -605,7 +605,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command defaults HTML locations to copyable spans.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
     {
@@ -633,7 +633,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports interactive HTML report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
     {
@@ -677,7 +677,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports invalid HTML report options.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
@@ -721,7 +721,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs github annotations.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandOutputsGithubAnnotations(): void
     {
@@ -746,7 +746,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command reports non Git diff mode clearly.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsNonGitDiffModeClearly(): void
     {

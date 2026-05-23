@@ -19,7 +19,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Remove temporary discovery projects created by tests.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function tearDown(): void
     {
@@ -31,7 +31,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify discovers PHP files deterministically and ignores default directories.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNonGitDiscoveryDiscoversPhpFilesDeterministicallyAndIgnoresDefaultDirectories(): void
     {
@@ -60,7 +60,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify Git worktree discovery follows Git visibility and nested ignore files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGitWorkTreeDiscoveryUsesGitVisibleFilesAndNestedIgnores(): void
     {
@@ -118,7 +118,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify include-ignored opts Git worktrees back into filesystem traversal.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testIncludeIgnoredScansGitIgnoredFilesThroughFilesystem(): void
     {
@@ -141,7 +141,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify can include ignored directories explicitly.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCanIncludeIgnoredDirectoriesExplicitly(): void
     {
@@ -162,7 +162,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify default ignores well known lockfile names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultIgnoresWellKnownLockfileNames(): void
     {
@@ -177,7 +177,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify explicit lockfile path is still ignored without include flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testExplicitLockfilePathIsStillIgnoredWithoutIncludeFlag(): void
     {
@@ -191,7 +191,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify configured ignores use project relative glob patterns.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfiguredIgnoresUseProjectRelativeGlobPatterns(): void
     {
@@ -216,7 +216,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify reports missing paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportsMissingPaths(): void
     {
@@ -230,7 +230,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify source discovery classifies PHP, text config, env, and unsupported files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClassifiesSupportedSourceTypesAndSkipsUnsupportedFiles(): void
     {
@@ -247,7 +247,7 @@ final class SourceDiscoveryTest extends TestCase
         file_put_contents($root . '/notes.txt', "plain text\n");
 
         $result = (new SourceDiscovery($root))->discover(['']);
-        $files = array_map(
+        $files  = array_map(
             static fn ($file): array => [$file->displayPath, $file->type, $file->isPhp()],
             $result->files,
         );
@@ -270,7 +270,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify duplicate absolute and relative requests collapse to canonical files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCanonicalisesDuplicateAbsoluteAndRelativeRequests(): void
     {
@@ -285,7 +285,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Verify default ignores nested root paths and configured question-mark globs.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultAndConfiguredIgnorePatternsAreAppliedToNestedPaths(): void
     {
@@ -308,7 +308,7 @@ final class SourceDiscoveryTest extends TestCase
      * Resolve a source-discovery fixture root.
      *
      * @param string $name Fixture name.
-     * @return string Fixture value.
+     * @return string
      */
     private function fixtureRoot(string $name): string
     {
@@ -322,7 +322,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Create a temporary source-discovery project.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -337,7 +337,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Require the git executable for Git worktree discovery tests.
      *
-     * @return void No return value.
+     * @return void
      */
     private function requireGit(): void
     {
@@ -354,7 +354,7 @@ final class SourceDiscoveryTest extends TestCase
      *
      * @param string       $root Fixture root.
      * @param list<string> $args Git arguments.
-     * @return void No return value.
+     * @return void
      */
     private function runGit(string $root, array $args): void
     {
@@ -370,7 +370,7 @@ final class SourceDiscoveryTest extends TestCase
      * @param string $root     Fixture root.
      * @param string $path     Project-relative file path.
      * @param string $contents File contents.
-     * @return void No return value.
+     * @return void
      */
     private function writeFile(string $root, string $path, string $contents): void
     {
@@ -388,7 +388,7 @@ final class SourceDiscoveryTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Directory path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

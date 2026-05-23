@@ -27,7 +27,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify no findings for short methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForShortMethods(): void
     {
@@ -50,7 +50,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify warning for method above warning threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForMethodAboveWarningThreshold(): void
     {
@@ -66,7 +66,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify error for method above error threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
@@ -82,7 +82,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify multiline call counts as one logical line.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMultilineCallCountsAsOneLogicalLine(): void
     {
@@ -94,7 +94,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify closure counted as method.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClosureCountedAsMethod(): void
     {
@@ -109,7 +109,7 @@ final class MethodLengthRuleTest extends TestCase
     /**
      * Verify disabled rule produces no findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDisabledRuleProducesNoFindings(): void
     {
@@ -127,6 +127,8 @@ final class MethodLengthRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -147,7 +149,7 @@ final class MethodLengthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

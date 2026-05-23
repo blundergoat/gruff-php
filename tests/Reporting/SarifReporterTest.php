@@ -44,7 +44,7 @@ final class SarifReporterTest extends TestCase
      * Verify SARIF output preserves native report identity while exposing code-scanning metadata.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifReporterEmitsRegistryRulesResultIdentityAndRunProperties(): void
     {
@@ -136,7 +136,7 @@ final class SarifReporterTest extends TestCase
      * Verify empty reports stay valid SARIF while omitting absent score data.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
     {
@@ -162,7 +162,7 @@ final class SarifReporterTest extends TestCase
      * @param string   $level    Expected SARIF level.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('severityLevels')]
     public function testSarifReporterMapsSeverityLevels(Severity $severity, string $level): void
@@ -176,6 +176,8 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
+     * Provide SARIF severity examples for reporter tests.
+     *
      * @return iterable<string, array{0: Severity, 1: string}>
      */
     public static function severityLevels(): iterable
@@ -189,7 +191,7 @@ final class SarifReporterTest extends TestCase
      * Verify non-registry mutation findings receive deterministic fallback driver rules.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifReporterEmitsFallbackRuleForMutationFinding(): void
     {
@@ -238,7 +240,7 @@ final class SarifReporterTest extends TestCase
      * Verify optional regions and additional path shapes render without fabricated data.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifReporterHandlesOptionalRegionsAndAdditionalPathShapes(): void
     {
@@ -266,7 +268,7 @@ final class SarifReporterTest extends TestCase
      * Verify SARIF and native JSON preserve the same report identity over one report instance.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testSarifReporterPreservesNativeJsonSchemaAndFindingCount(): void
     {
@@ -398,8 +400,10 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
+     * Assert that decoded SARIF contains an object at the requested key.
+     *
      * @phpstan-assert JsonArray $payload
-     * @return void No return value.
+     * @return void
      */
     private function assertJsonArray(mixed $payload): void
     {

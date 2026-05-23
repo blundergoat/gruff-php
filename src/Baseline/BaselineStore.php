@@ -87,6 +87,8 @@ final readonly class BaselineStore
     }
 
     /**
+     * Read findings list for the baseline workflow.
+     *
      * @return list<BaselineFindingRow>
      */
     private function readFindingsList(mixed $findings): array
@@ -122,6 +124,8 @@ final readonly class BaselineStore
     }
 
     /**
+     * Build entries from findings for the baseline workflow.
+     *
      * @param list<BaselineFindingRow> $findings
      * @return list<BaselineEntry>
      */
@@ -179,7 +183,7 @@ final readonly class BaselineStore
     /**
      * Write a baseline payload via temporary file and atomic rename.
      *
-     * @return void No return value.
+     * @return void
      */
     private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
     {
@@ -227,7 +231,7 @@ final readonly class BaselineStore
     /**
      * Move the temporary baseline into place, handling existing Windows targets.
      *
-     * @return void No return value.
+     * @return void
      */
     private function replaceBaselineFile(string $tempPath, string $absolutePath, string $displayPath): void
     {
@@ -245,7 +249,7 @@ final readonly class BaselineStore
     /**
      * Remove a temporary baseline file after a failed write.
      *
-     * @return void No return value.
+     * @return void
      */
     private function removeTemporaryFile(string $tempPath, string $displayPath): void
     {

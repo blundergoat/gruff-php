@@ -75,8 +75,8 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Report a project once when PHPUnit strict-mode attributes are missing.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext Rule context carrying project root.
+     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext  Rule context carrying project root.
      * @return list<Finding> Findings for missing strict PHPUnit flags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -125,6 +125,8 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     }
 
     /**
+     * List PHPUnit strictness flags missing from configuration.
+     *
      * @return list<string>
      */
     private function missingFlags(PhpUnitConfig $config): array

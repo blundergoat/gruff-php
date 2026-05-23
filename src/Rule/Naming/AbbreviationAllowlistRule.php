@@ -61,8 +61,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Find undeclared lowercase abbreviations on properties, parameters, and locals.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for undeclared abbreviations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -77,14 +77,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $prop,
-                    identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
-                    ignored:    $ignored,
-                    accepted:   $accepted,
-                    minLength:  $minLength,
-                    maxLength:  $maxLength,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $prop,
+                    identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                    ignored:      $ignored,
+                    accepted:     $accepted,
+                    minLength:    $minLength,
+                    maxLength:    $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -100,14 +100,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $param,
-                    identifier: ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
-                    ignored:    $ignored,
-                    accepted:   $accepted,
-                    minLength:  $minLength,
-                    maxLength:  $maxLength,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $param,
+                    identifier:   ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
+                    ignored:      $ignored,
+                    accepted:     $accepted,
+                    minLength:    $minLength,
+                    maxLength:    $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -121,14 +121,14 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $variable,
-                    identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    ignored:    $ignored,
-                    accepted:   $accepted,
-                    minLength:  $minLength,
-                    maxLength:  $maxLength,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $variable,
+                    identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                    ignored:      $ignored,
+                    accepted:     $accepted,
+                    minLength:    $minLength,
+                    maxLength:    $maxLength,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -201,6 +201,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
+     * Collect local names exempt from abbreviation checks.
+     *
      * @return array<string, true>
      */
     private function exemptLocalNames(FunctionLikeScope $scope): array
@@ -243,8 +245,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
-     * @param array<Node>          $nodes
-     * @param array<string, true>  $names
+     * Collect local variable names from a node list.
+     *
+     * @param array<Node>         $nodes
+     * @param array<string, true> $names
      * @return void
      */
     private function collectVariableNames(array $nodes, array &$names): void
@@ -255,6 +259,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
+     * Record a local variable name when the node is a variable reference.
+     *
      * @param array<string, true> $names
      * @return void
      */
@@ -270,6 +276,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
+     * List direct child nodes that can be recursively traversed.
+     *
      * @return list<Node>
      */
     private function childNodes(Node $node): array
@@ -284,6 +292,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
+     * Append traversable child nodes to the current collection.
+     *
      * @param list<Node> $children
      * @return void
      */
@@ -318,6 +328,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     }
 
     /**
+     * Normalize string lists for case-insensitive comparisons.
+     *
      * @param list<string> $values
      * @return list<string>
      */

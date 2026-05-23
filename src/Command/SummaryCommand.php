@@ -316,6 +316,8 @@ final class SummaryCommand extends Command
     }
 
     /**
+     * Group summary findings by rule identifier and severity.
+     *
      * @param list<Finding>         $findings
      * @param array<string, string> $pillarLookup
      * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}>
@@ -354,6 +356,8 @@ final class SummaryCommand extends Command
     }
 
     /**
+     * Count findings by severity for summary output.
+     *
      * @param list<Finding> $findings
      * @return array{advisory: int, warning: int, error: int, total: int}
      */

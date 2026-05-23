@@ -377,6 +377,8 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
+     * Read a repeatable CLI option as a list of strings.
+     *
      * @return list<string>
      */
     private static function stringListOption(InputInterface $input, string $name): array

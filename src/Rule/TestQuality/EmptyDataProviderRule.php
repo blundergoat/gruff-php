@@ -51,8 +51,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Find tests linked to data providers that cannot yield any rows.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for empty data providers.
      */
@@ -113,6 +113,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     }
 
     /**
+     * List data provider method names referenced by test attributes.
+     *
      * @return list<string>
      */
     private function dataProviderNames(Stmt\ClassMethod $classMethod): array

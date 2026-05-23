@@ -14,7 +14,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Verify --print-runtime emits a single JSON line on stderr with the documented summary shape.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPrintRuntimeEmitsSummaryShapeOnStderr(): void
     {
@@ -54,7 +54,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Verify --runtime-mode=detailed adds a sorted per-rule totals array.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPrintRuntimeDetailedAddsPerRuleTotals(): void
     {
@@ -98,7 +98,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Verify the analyse command default behaviour is unchanged when --print-runtime is omitted.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseWithoutPrintRuntimeProducesEmptyStderr(): void
     {

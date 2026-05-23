@@ -39,6 +39,8 @@ final class DashboardRequestHandlerTest extends TestCase
     }
 
     /**
+     * Provide rejected host request cases for parameterized tests.
+     *
      * @return array<string, array{string, string, 2?: bool}>
      */
     public static function rejectedHostRequestProvider(): array
@@ -110,7 +112,7 @@ final class DashboardRequestHandlerTest extends TestCase
      * Return the dashboard response for a raw HTTP request.
      *
      * @param string $request Raw HTTP request.
-     * @return string Fixture value.
+     * @return string
      */
     private function responseFor(string $request, bool $shouldCloseWrite = false): string
     {
@@ -136,7 +138,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Build a dashboard request handler fixture.
      *
-     * @return DashboardRequestHandler Fixture value.
+     * @return DashboardRequestHandler
      */
     private function handler(): DashboardRequestHandler
     {
@@ -161,7 +163,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Build an empty console input fixture.
      *
-     * @return ArrayInput Fixture value.
+     * @return ArrayInput
      */
     private function input(): ArrayInput
     {
@@ -180,7 +182,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Create a fake gruff-php executable for dashboard tests.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function fakeGruffBinary(): string
     {

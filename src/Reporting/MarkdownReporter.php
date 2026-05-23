@@ -35,7 +35,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
-     * @return void No return value.
+     * @return void
      */
     private function appendSummary(array &$lines, AnalysisReport $report): void
     {
@@ -95,7 +95,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
-     * @return void No return value.
+     * @return void
      */
     private function appendMutationSummary(array &$lines, AnalysisReport $report): void
     {
@@ -128,7 +128,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
-     * @return void No return value.
+     * @return void
      */
     private function appendBranchReviewSection(array &$lines, AnalysisReport $report): void
     {
@@ -150,7 +150,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
-     * @return void No return value.
+     * @return void
      */
     private function appendPillarSection(array &$lines, AnalysisReport $report): void
     {
@@ -181,7 +181,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
-     * @return void No return value.
+     * @return void
      */
     private function appendFindingsSection(array &$lines, AnalysisReport $report): void
     {
@@ -217,10 +217,12 @@ final readonly class MarkdownReporter
     }
 
     /**
+     * Append finding groups details to report output.
+     *
      * @param list<string>  $lines
      * @param list<Finding> $findings
      *
-     * @return void No return value.
+     * @return void
      */
     private function appendFindingGroups(array &$lines, string $title, array $findings, bool $hasHeading = true): void
     {

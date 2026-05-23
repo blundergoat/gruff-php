@@ -43,7 +43,7 @@ final class BranchReviewComparatorTest extends TestCase
     /**
      * Build a finding fixture.
      *
-     * @return Finding Fixture value.
+     * @return Finding
      */
     private function finding(string $message): Finding
     {

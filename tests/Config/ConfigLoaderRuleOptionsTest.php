@@ -120,6 +120,8 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Provide invalid rule option type cases for parameterized tests.
+     *
      * @return array<string, array{string, string}>
      */
     public static function invalidRuleOptionTypeProvider(): array
@@ -187,7 +189,7 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return metadata for the fixture rule.
      *
-     * @return RuleDefinition Fixture value.
+     * @return RuleDefinition
      */
     public function definition(): RuleDefinition
     {
@@ -205,8 +207,8 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit    Analysis unit.
-     * @param RuleContext  $ruleContext Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit Analysis unit.
+     * @param RuleContext  $ruleContext  Rule context for the fixture.
      * @return list<\GruffPhp\Finding\Finding> Fixture findings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -226,7 +228,7 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return metadata for the fixture rule.
      *
-     * @return RuleDefinition Fixture value.
+     * @return RuleDefinition
      */
     public function definition(): RuleDefinition
     {
@@ -251,8 +253,8 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit    Analysis unit.
-     * @param RuleContext  $ruleContext Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit Analysis unit.
+     * @param RuleContext  $ruleContext  Rule context for the fixture.
      * @return list<\GruffPhp\Finding\Finding> Fixture findings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array

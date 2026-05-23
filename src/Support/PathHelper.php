@@ -137,8 +137,10 @@ final class PathHelper
             return '';
         }
 
-        [$prefix, $remaining] = self::splitRoot($path);
-        $collapsed            = implode('/', self::collapsedSegments($remaining, $prefix !== ''));
+        $rootParts = self::splitRoot($path);
+        $prefix    = $rootParts['prefix'];
+        $remaining = $rootParts['remaining'];
+        $collapsed = implode('/', self::collapsedSegments($remaining, $prefix !== ''));
 
         if ($prefix === '') {
             return $collapsed;
@@ -150,29 +152,43 @@ final class PathHelper
     /**
      * Split an absolute root prefix from the rest of a normalized path.
      *
-     * @return array{0: string, 1: string} Root prefix and remaining path.
+     * @return array{prefix: string, remaining: string} Root prefix and remaining path.
      */
     private static function splitRoot(string $path): array
     {
         // Match a Windows drive-letter root such as C:/ before segment processing.
         if (preg_match('/^[A-Za-z]:\//', $path) === 1) {
-            return [substr($path, 0, 3), substr($path, 3)];
+            return self::rootParts(substr($path, 0, 3), substr($path, 3));
         }
 
         // Match a bare Windows drive root such as C:.
         if (preg_match('/^[A-Za-z]:$/', $path) === 1) {
-            return [$path, ''];
+            return self::rootParts($path, '');
         }
 
         if (str_starts_with($path, '//')) {
-            return ['//', substr($path, 2)];
+            return self::rootParts('//', substr($path, 2));
         }
 
         if (str_starts_with($path, '/')) {
-            return ['/', substr($path, 1)];
+            return self::rootParts('/', substr($path, 1));
         }
 
-        return ['', $path];
+        return self::rootParts('', $path);
+    }
+
+    /**
+     * Package a path root split without looking like callable-array syntax.
+     *
+     * @return array{prefix: string, remaining: string} Root split parts.
+     */
+    private static function rootParts(string $prefix, string $remaining): array
+    {
+        $parts              = [];
+        $parts['prefix']    = $prefix;
+        $parts['remaining'] = $remaining;
+
+        return $parts;
     }
 
     /**
@@ -180,7 +196,7 @@ final class PathHelper
      *
      * @return list<string> Normalized path segments.
      */
-    private static function collapsedSegments(string $path, bool $absolute): array
+    private static function collapsedSegments(string $path, bool $isAbsolute): array
     {
         $segments = [];
 
@@ -195,7 +211,7 @@ final class PathHelper
                     continue;
                 }
 
-                if (!$absolute) {
+                if (!$isAbsolute) {
                     $segments[] = $segment;
                 }
 

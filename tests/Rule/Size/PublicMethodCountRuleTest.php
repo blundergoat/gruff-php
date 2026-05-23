@@ -28,7 +28,7 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -41,7 +41,7 @@ final class PublicMethodCountRuleTest extends TestCase
      *
      * @param string             $fixture    Fixture filename.
      * @param array<string, int> $thresholds Rule thresholds.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('allowedPublicMethodShapeProvider')]
     public function testAllowedPublicMethodShapesAreNotFlagged(string $fixture, array $thresholds): void
@@ -54,7 +54,7 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Verify warning for too many public methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForTooManyPublicMethods(): void
     {
@@ -68,6 +68,8 @@ final class PublicMethodCountRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -100,7 +102,7 @@ final class PublicMethodCountRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

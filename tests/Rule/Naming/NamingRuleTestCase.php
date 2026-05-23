@@ -30,6 +30,8 @@ abstract class NamingRuleTestCase extends TestCase
     }
 
     /**
+     * Analyse naming fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseRule(string $fixture, string $ruleId): array
@@ -43,6 +45,8 @@ abstract class NamingRuleTestCase extends TestCase
     }
 
     /**
+     * Analyse naming fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
@@ -70,7 +74,7 @@ abstract class NamingRuleTestCase extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     protected function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

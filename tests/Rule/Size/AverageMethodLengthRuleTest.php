@@ -27,7 +27,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Verify no findings for small averages.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForSmallAverages(): void
     {
@@ -50,7 +50,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Verify warning for high average method length.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForHighAverageMethodLength(): void
     {
@@ -67,7 +67,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Verify error for very high average.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForVeryHighAverage(): void
     {
@@ -80,7 +80,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Verify class with no methods skipped.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testClassWithNoMethodsSkipped(): void
     {
@@ -95,6 +95,8 @@ final class AverageMethodLengthRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -115,7 +117,7 @@ final class AverageMethodLengthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

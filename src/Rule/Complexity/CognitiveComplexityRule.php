@@ -56,8 +56,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     /**
      * Flag methods whose cognitive complexity exceeds the configured threshold.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context carrying thresholds.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
      * @return list<Finding>
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -65,7 +65,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 
@@ -357,6 +357,8 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     }
 
     /**
+     * Flatten nested boolean operators into one chain for scoring.
+     *
      * @param list<class-string> $result
      * @return void
      */

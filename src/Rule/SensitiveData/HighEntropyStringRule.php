@@ -47,8 +47,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Find long high-entropy string literals that may be secrets.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for suspicious high-entropy literals.
      */
@@ -88,14 +88,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
             $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
             $findings[] = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     sprintf('High-entropy string literal detected: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::Medium,
-                detector:    'high-entropy-string',
-                preview:     $preview,
-                remediation: 'Confirm this is not a credential; move real secrets out of source.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      sprintf('High-entropy string literal detected: %s.', $preview),
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::Medium,
+                detector:     'high-entropy-string',
+                preview:      $preview,
+                remediation:  'Confirm this is not a credential; move real secrets out of source.',
             );
         }
 
@@ -159,6 +159,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return false;
         }
 
+        // Match URI schemes so absolute URLs can be normalized before path checks.
         $hasScheme = preg_match('#^[a-z][a-z0-9+.-]*://#i', $candidateSecret) === 1;
         if (!$hasScheme && !str_starts_with($candidateSecret, '/') && !str_starts_with($candidateSecret, './') && !str_starts_with($candidateSecret, '../')) {
             return false;
@@ -179,9 +180,14 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             return false;
         }
 
-        return preg_match('#^/[A-Za-z0-9._~/%:-]+$#', $path) === 1
-            && preg_match('/[A-Za-z]{3,}/', $path) === 1
-            && !preg_match('/[+=]/', $path);
+        // Match public route/path characters.
+        $hasPublicPathShape = preg_match('#^/[A-Za-z0-9._~/%:-]+$#', $path) === 1;
+        // Match natural-language path segments rather than opaque tokens.
+        $hasAlphabeticSegment = preg_match('/[A-Za-z]{3,}/', $path) === 1;
+        // Match token separators that are common in credentials but not route paths.
+        $hasTokenSeparator = preg_match('/[+=]/', $path) === 1;
+
+        return $hasPublicPathShape && $hasAlphabeticSegment && !$hasTokenSeparator;
     }
 
     /**
@@ -191,20 +197,25 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
      */
     private function isMedicalStandardsMetadata(string $candidateSecret, string $line): bool
     {
+        // Match clinical terminology field names that carry public standards metadata.
         if (!preg_match('/(?:CodeSystem|ConceptCode|HL7|OID|ValueSet)/i', $line)) {
             return false;
         }
 
+        // Match HL7 value-set codes such as PHVS_ObservationInterpretation_HL7_V3.
         if (preg_match('/^(?:PH|PHVS)_[A-Za-z0-9_]+_HL7_V\d+$/', $candidateSecret) === 1) {
             return true;
         }
 
+        // Match dotted OID identifiers used by medical terminology systems.
         if (preg_match('/^\d+(?:\.\d+){3,}$/', $candidateSecret) === 1) {
             return true;
         }
 
-        return str_contains($candidateSecret, 'HL7')
-            && preg_match('/(?:CodeSystemCode|HL7Table|ValueSetCode)/i', $line) === 1;
+        // Match field names that explicitly identify HL7 code metadata.
+        $hasHl7MetadataField = preg_match('/(?:CodeSystemCode|HL7Table|ValueSetCode)/i', $line) === 1;
+
+        return str_contains($candidateSecret, 'HL7') && $hasHl7MetadataField;
     }
 
     /**

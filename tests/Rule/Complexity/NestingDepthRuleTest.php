@@ -30,7 +30,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -39,6 +39,8 @@ final class NestingDepthRuleTest extends TestCase
     }
 
     /**
+     * Provide method depth cases for parameterized tests.
+     *
      * @return array<string, array{string, int}>
      */
     public static function methodDepthProvider(): array
@@ -60,7 +62,7 @@ final class NestingDepthRuleTest extends TestCase
      *
      * @param string $methodName    Fixture method name.
      * @param int    $expectedDepth Expected nesting depth.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('methodDepthProvider')]
     public function testNestingDepthMatchesExpected(string $methodName, int $expectedDepth): void
@@ -86,7 +88,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify no findings for shallow methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForShallowMethods(): void
     {
@@ -98,7 +100,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify warning for deeply nested method.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForDeeplyNestedMethod(): void
     {
@@ -112,7 +114,7 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify error for very deeply nested method.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForVeryDeeplyNestedMethod(): void
     {
@@ -124,6 +126,8 @@ final class NestingDepthRuleTest extends TestCase
     }
 
     /**
+     * Analyse complexity fixtures and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -143,7 +147,7 @@ final class NestingDepthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

@@ -91,7 +91,7 @@ final class NodeIndex
     /**
      * Return nodes that match any of the supplied classes in preorder.
      *
-     * @param AnalysisUnit              $analysisUnit Parsed unit whose AST is indexed.
+     * @param AnalysisUnit             $analysisUnit Parsed unit whose AST is indexed.
      * @param list<class-string<Node>> $classes
      * @return list<Node>
      */
@@ -138,8 +138,8 @@ final class NodeIndex
      * with a class-disjunction predicate on a function body.
      *
      * @template T of Node
-     * @param Node                    $node    Function-like node whose body should be scanned.
-     * @param list<class-string<T>>  $classes Concrete node classes to keep.
+     * @param Node                  $node    Function-like node whose body should be scanned.
+     * @param list<class-string<T>> $classes Concrete node classes to keep.
      * @return list<T>
      */
     public static function descendantsOfAny(Node $node, array $classes): array
@@ -195,6 +195,8 @@ final class NodeIndex
     }
 
     /**
+     * Index parsed nodes by concrete PhpParser class.
+     *
      * @return array<class-string<Node>, list<Node>>
      */
     private static function index(AnalysisUnit $analysisUnit): array
@@ -212,7 +214,7 @@ final class NodeIndex
 
             /**
              * @param array<class-string<Node>, list<class-string<Node>>> $hierarchyCache
-             *     Shared, process-wide cache of class hierarchy keys.
+             *                                                                            Shared, process-wide cache of class hierarchy keys.
              */
             public function __construct(private array &$hierarchyCache)
             {
@@ -279,6 +281,8 @@ final class NodeIndex
     }
 
     /**
+     * Index nodes that appear inside function-like bodies.
+     *
      * @return list<Node>
      */
     private static function bodyIndex(Node $node): array

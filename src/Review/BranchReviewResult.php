@@ -15,12 +15,12 @@ use GruffPhp\Finding\Finding;
 final readonly class BranchReviewResult
 {
     /**
-     * @param string        $base        Base ref used for the review comparison.
+     * @param string        $base          Base ref used for the review comparison.
      * @param bool          $isChangedOnly Whether the review was restricted to changed files.
-     * @param list<Finding> $introduced  Findings introduced by the branch.
-     * @param list<Finding> $removed     Findings removed by the branch.
-     * @param list<Finding> $unchanged   Findings present in both base and branch.
-     * @param float|null    $deltaScore  Score delta versus the base snapshot, when available.
+     * @param list<Finding> $introduced    Findings introduced by the branch.
+     * @param list<Finding> $removed       Findings removed by the branch.
+     * @param list<Finding> $unchanged     Findings present in both base and branch.
+     * @param float|null    $deltaScore    Score delta versus the base snapshot, when available.
      */
     public function __construct(
         public string $base,
@@ -39,16 +39,18 @@ final readonly class BranchReviewResult
     public function filtered(callable $filter): self
     {
         return new self(
-            base:        $this->base,
+            base:          $this->base,
             isChangedOnly: $this->isChangedOnly,
-            introduced:  $filter($this->introduced),
-            removed:     $filter($this->removed),
-            unchanged:   $filter($this->unchanged),
-            deltaScore:  $this->deltaScore,
+            introduced:    $filter($this->introduced),
+            removed:       $filter($this->removed),
+            unchanged:     $filter($this->unchanged),
+            deltaScore:    $this->deltaScore,
         );
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array<string, ReviewValue>
      */
     public function toArray(): array

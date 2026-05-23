@@ -45,7 +45,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Verify the default rule registry keeps fixture findings stable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultRuleRegistryFindingsStayStableAcrossFixtures(): void
     {
@@ -62,7 +62,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Verify every registered rule has either default-corpus signal or explicit calibration coverage.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
@@ -97,6 +97,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param list<string>        $paths
      * @param AnalysisConfig|null $config
      * @param string              $projectRoot
@@ -128,6 +130,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Build supplemental calibration findings for the test fixture.
+     *
      * @return list<Finding>
      */
     private function supplementalCalibrationFindings(): array
@@ -171,6 +175,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Build missing readme findings for the test fixture.
+     *
      * @return list<Finding>
      */
     private function missingReadmeFindings(): array
@@ -188,6 +194,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Build php unit config calibration findings for the test fixture.
+     *
      * @return list<Finding>
      */
     private function phpUnitConfigCalibrationFindings(): array
@@ -208,6 +216,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * List unique rule identifiers present in finding output.
+     *
      * @param list<Finding> $findings
      * @return list<string>
      */
@@ -223,6 +233,8 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Normalize findings to stable arrays for regression snapshots.
+     *
      * @param list<Finding> $findings
      * @return list<FindingArray>
      */
@@ -278,7 +290,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     private function tempDir(): string
     {
@@ -293,7 +305,7 @@ final class RuleRegressionSnapshotTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     private function removeDir(string $path): void
     {

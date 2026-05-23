@@ -62,6 +62,8 @@ final readonly class InfectionReport
     }
 
     /**
+     * Return mutants that Infection reported as survived.
+     *
      * @return list<InfectionMutant>
      */
     public function survivedMutants(): array
@@ -92,6 +94,8 @@ final readonly class InfectionReport
     }
 
     /**
+     * Return per-file mutant counts from the parsed report.
+     *
      * @return list<MutationFileSummary>
      */
     public function fileSummaries(): array

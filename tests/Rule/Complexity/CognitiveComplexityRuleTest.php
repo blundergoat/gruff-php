@@ -29,7 +29,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,6 +38,8 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
+     * Provide method cc cases for parameterized tests.
+     *
      * @return array<string, array{string, int}>
      */
     public static function methodCcProvider(): array
@@ -69,7 +71,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      *
      * @param string $methodName Fixture method name.
      * @param int    $expectedCc Expected cognitive complexity.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('methodCcProvider')]
     public function testCognitiveCountMatchesExpected(string $methodName, int $expectedCc): void
@@ -95,7 +97,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify no findings for simple methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForSimpleMethods(): void
     {
@@ -107,7 +109,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify warning for high cognitive complexity.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForHighCognitiveComplexity(): void
     {
@@ -134,7 +136,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify default threshold metadata stays stable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -149,7 +151,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Verify boolean chain collapsing.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBooleanChainCollapsing(): void
     {
@@ -177,6 +179,8 @@ final class CognitiveComplexityRuleTest extends TestCase
     }
 
     /**
+     * Analyse complexity fixtures and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -196,7 +200,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

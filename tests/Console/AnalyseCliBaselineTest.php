@@ -16,7 +16,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command writes trend history file.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandWritesTrendHistoryFile(): void
     {
@@ -57,7 +57,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command generates and applies baseline.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
     {
@@ -122,7 +122,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command rejects invalid baseline JSON.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandRejectsInvalidBaselineJson(): void
     {
@@ -156,7 +156,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command writes and auto applies default baseline file.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandWritesAndAutoAppliesDefaultBaselineFile(): void
     {
@@ -221,7 +221,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command skips auto baseline with no baseline flag.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandSkipsAutoBaselineWithNoBaselineFlag(): void
     {
@@ -272,7 +272,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command shows new findings after baseline generation.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandShowsNewFindingsAfterBaselineGeneration(): void
     {
@@ -333,7 +333,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command reports stale baseline entries.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandReportsStaleBaselineEntries(): void
     {
@@ -385,7 +385,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command rejects no baseline combined with baseline.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandRejectsNoBaselineCombinedWithBaseline(): void
     {
@@ -416,7 +416,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Verify analyse command rejects baseline combined with generate baseline.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnalyseCommandRejectsBaselineCombinedWithGenerateBaseline(): void
     {

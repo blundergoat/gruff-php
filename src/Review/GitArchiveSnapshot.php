@@ -84,7 +84,7 @@ final readonly class GitArchiveSnapshot
      * Recursively remove a snapshot directory.
      *
      * @param string $path Snapshot directory path to remove.
-     * @return void No return value.
+     * @return void
      */
     public function remove(string $path): void
     {
@@ -116,6 +116,8 @@ final readonly class GitArchiveSnapshot
     }
 
     /**
+     * List requested paths that exist at a git ref.
+     *
      * @param list<string> $paths
      * @return list<string>
      */
@@ -149,6 +151,8 @@ final readonly class GitArchiveSnapshot
     }
 
     /**
+     * Normalise archive paths for the branch-review workflow.
+     *
      * @param list<string> $paths
      * @return list<string>
      */

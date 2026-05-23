@@ -254,6 +254,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     }
 
     /**
+     * Collect local object assignments that affect the naming rule.
+     *
      * @return list<array{0: Variable, 1: string}>
      */
     private function localObjectAssignments(FunctionLikeScope $scope): array
@@ -277,6 +279,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     }
 
     /**
+     * List descendant nodes in the current function-like scope.
+     *
      * @return list<Node>
      */
     private function nodesInScope(FunctionLikeScope $scope): array
@@ -291,6 +295,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     }
 
     /**
+     * Append a scope node and its descendants to the collection.
+     *
      * @param list<Node> $nodes
      * @return void
      */
@@ -308,6 +314,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     }
 
     /**
+     * Append traversable child nodes to the current collection.
+     *
      * @param list<Node> $nodes
      * @return void
      */
@@ -329,6 +337,8 @@ final readonly class ParameterTypeNameRule implements RuleInterface
     }
 
     /**
+     * List body statements for a function, method, or closure.
+     *
      * @return list<Node>
      */
     private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array

@@ -19,7 +19,7 @@ final class FindingTest extends TestCase
     /**
      * Verify serializes stable finding shape.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSerializesStableFindingShape(): void
     {

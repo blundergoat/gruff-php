@@ -30,7 +30,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify fixture produces expected phpdoc mixed findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFixtureProducesExpectedPhpdocMixedFindings(): void
     {
@@ -76,7 +76,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify unstructured array bags with mixed leaves are allowed.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnstructuredArrayBagsWithMixedLeavesAreAllowed(): void
     {
@@ -101,7 +101,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify standalone mixed param does not double fire with signature rule.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testStandaloneMixedParamDoesNotDoubleFireWithSignatureRule(): void
     {
@@ -129,7 +129,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify untyped signature mixed doc still fires.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUntypedSignatureMixedDocStillFires(): void
     {
@@ -148,7 +148,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify template generic does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTemplateGenericDoesNotFlag(): void
     {
@@ -165,7 +165,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify throws only does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testThrowsOnlyDoesNotFlag(): void
     {
@@ -182,7 +182,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify findings are advisory and modernisation pillar.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFindingsAreAdvisoryAndModernisationPillar(): void
     {
@@ -203,7 +203,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Verify signature mixed rule still fires independently.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSignatureMixedRuleStillFiresIndependently(): void
     {
@@ -224,6 +224,8 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     }
 
     /**
+     * Build phpdoc mixed findings for the modernisation rule.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */
@@ -236,6 +238,8 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     }
 
     /**
+     * Analyse modernisation fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analyseFixture(): array
@@ -253,7 +257,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {

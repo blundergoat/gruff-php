@@ -15,7 +15,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command outputs static HTML report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandOutputsStaticHtmlReport(): void
     {
@@ -36,7 +36,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command forwards HTML report flags.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandForwardsHtmlReportFlags(): void
     {
@@ -78,7 +78,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command outputs JSON report.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandOutputsJsonReport(): void
     {
@@ -102,7 +102,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command forwards repeated rule filters.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandForwardsRepeatedRuleFilters(): void
     {
@@ -135,7 +135,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command writes static HTML report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandWritesStaticHtmlReport(): void
     {
@@ -169,7 +169,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command preserves dash-prefixed path arguments when delegating to analyse.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandPreservesDashPrefixedPaths(): void
     {
@@ -203,7 +203,7 @@ final class ReportCliTest extends CliTestCase
     /**
      * Verify report command does not overwrite output files when analyse exits invalid.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandDoesNotWriteOutputAfterInvalidAnalyseRun(): void
     {
@@ -238,7 +238,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command forwards baseline flag.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testReportCommandForwardsBaselineFlag(): void
     {

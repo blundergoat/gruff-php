@@ -27,7 +27,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify no findings for small class.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForSmallClass(): void
     {
@@ -50,7 +50,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify warning for class above warning threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForClassAboveWarningThreshold(): void
     {
@@ -65,7 +65,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify error for class above error threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForClassAboveErrorThreshold(): void
     {
@@ -78,7 +78,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify interface is not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInterfaceIsNotFlagged(): void
     {
@@ -90,7 +90,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Verify trait is flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTraitIsFlagged(): void
     {
@@ -102,6 +102,8 @@ final class ClassLengthRuleTest extends TestCase
     }
 
     /**
+     * Analyse fixture paths and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -122,7 +124,7 @@ final class ClassLengthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

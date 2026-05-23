@@ -30,7 +30,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify internal one impl flags exactly one interface.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInternalOneImplFlagsExactlyOneInterface(): void
     {
@@ -52,7 +52,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify mock only interface flags by default.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMockOnlyInterfaceFlagsByDefault(): void
     {
@@ -70,7 +70,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
      * Verify configured interface exemption cases are not flagged.
      *
      * @param string $symbol Interface symbol expected to be absent from findings.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('configuredInterfaceExemptionProvider')]
     public function testConfiguredInterfaceExemptionsAreNotFlagged(string $symbol): void
@@ -97,7 +97,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify interface hierarchy does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInterfaceHierarchyDoesNotFlag(): void
     {
@@ -130,7 +130,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify external type usage through returns, properties, instanceof, and composite types does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testExternalTypeHintUsageThroughReturnsPropertiesAndCompositeTypesDoesNotFlag(): void
     {
@@ -149,7 +149,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify framework attributes exempt interfaces when any configured prefix matches.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFrameworkAttributeExemptionsCheckAllAttributesAndContainsMatches(): void
     {
@@ -164,7 +164,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify flagged findings carry severity pillar and metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFlaggedFindingsCarrySeverityPillarAndMetadata(): void
     {
@@ -210,7 +210,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify only the expected two interfaces are flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOnlyTheExpectedTwoInterfacesAreFlagged(): void
     {
@@ -222,7 +222,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify additional excluded paths remove eligible units before analysis.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAdditionalExcludedPathsRemoveEligibleUnitsBeforeAnalysis(): void
     {
@@ -245,6 +245,8 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     }
 
     /**
+     * Analyse design-rule fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analyseFixtures(?AnalysisConfig $config = null): array
@@ -265,6 +267,8 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     }
 
     /**
+     * Parse design-rule fixtures into analysis units.
+     *
      * @return list<AnalysisUnit>
      */
     private function fixtureUnits(): array

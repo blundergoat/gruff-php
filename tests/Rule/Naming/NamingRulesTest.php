@@ -455,6 +455,8 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Run identifier-quality checks with custom rule options.
+     *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -476,6 +478,8 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Analyse naming fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyseFixture(string $fixture): array
@@ -514,6 +518,8 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Group naming findings by reported variable name.
+     *
      * @param list<\GruffPhp\Finding\Finding> $findings
      * @return array<string, list<string>>
      */

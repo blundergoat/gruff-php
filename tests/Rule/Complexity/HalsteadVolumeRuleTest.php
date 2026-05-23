@@ -29,7 +29,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,6 +38,8 @@ final class HalsteadVolumeRuleTest extends TestCase
     }
 
     /**
+     * Provide metrics cases for parameterized tests.
+     *
      * @return array<string, array{string, float, float, float, int, int}>
      */
     public static function metricsProvider(): array
@@ -69,7 +71,7 @@ final class HalsteadVolumeRuleTest extends TestCase
      * @param float  $expectedEffort     Expected Halstead effort.
      * @param int    $expectedVocabulary Expected vocabulary count.
      * @param int    $expectedLength     Expected token length.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('metricsProvider')]
     public function testHalsteadMetricsMatchExpected(
@@ -92,7 +94,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify default Halstead thresholds stay stable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -107,7 +109,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify findings include rounded metric metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFindingsIncludeRoundedMetricMetadata(): void
     {
@@ -132,7 +134,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify fractional threshold values are preserved in messages.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
@@ -186,7 +188,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(): \GruffPhp\Parser\AnalysisUnit
     {

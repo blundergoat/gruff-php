@@ -124,7 +124,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Analyse all project units for interfaces with exactly one concrete implementor.
      *
-     * @param list<AnalysisUnit> $units   Parsed project units to analyse together.
+     * @param list<AnalysisUnit> $units       Parsed project units to analyse together.
      * @param RuleContext        $ruleContext Rule context carrying config and settings.
      *
      * @return list<Finding> Findings for interfaces that lack substitutability value.
@@ -380,12 +380,14 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     }
 
     /**
+     * Build findings from the collected project-level rule facts.
+     *
      * @param array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}> $interfaces
      * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $implementations
      * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $typeReferences
-     * @param array<string, true>                                                                                               $extendedInterfaces
-     * @param list<string>                                                                                                      $externalPrefixes
-     * @param list<string>                                                                                                      $frameworkAttributePrefixes
+     * @param array<string, true>                                                                                                $extendedInterfaces
+     * @param list<string>                                                                                                       $externalPrefixes
+     * @param list<string>                                                                                                       $frameworkAttributePrefixes
      * @return list<Finding>
      */
     private function buildFindings(
@@ -479,6 +481,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     }
 
     /**
+     * Resolve name list for the design rule.
+     *
      * @param array<Name>|null $names
      * @return list<string>
      */
@@ -512,6 +516,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     }
 
     /**
+     * Resolve attributes for the design rule.
+     *
      * @param list<AttributeGroup> $attrGroups
      * @return list<string>
      */
@@ -559,6 +565,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     }
 
     /**
+     * Extract referenced names from a type declaration.
+     *
      * @return list<Name>
      */
     private function namesFromType(Identifier|Name|ComplexType|null $type): array

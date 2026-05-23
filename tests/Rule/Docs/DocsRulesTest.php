@@ -16,7 +16,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing public phpdoc detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingPublicPhpdocDetected(): void
     {
@@ -38,7 +38,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify documented method not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDocumentedMethodNotFlagged(): void
     {
@@ -51,7 +51,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify accessors require phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAccessorsRequirePhpdoc(): void
     {
@@ -66,7 +66,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify private and protected methods require phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPrivateAndProtectedMethodsRequirePhpdoc(): void
     {
@@ -80,7 +80,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify trivial typed public method requires phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTrivialTypedPublicMethodRequiresPhpdoc(): void
     {
@@ -93,7 +93,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify magic method requires phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMagicMethodRequiresPhpdoc(): void
     {
@@ -106,7 +106,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify rule interface contract methods require local phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRuleInterfaceContractMethodsRequireLocalPhpdoc(): void
     {
@@ -120,7 +120,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify internal helpers and conventional reporters require phpdoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInternalHelpersAndConventionalReportersRequirePhpdoc(): void
     {
@@ -134,7 +134,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing param tag detected for array parameters.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingParamTagDetectedForArrayParameters(): void
     {
@@ -153,7 +153,7 @@ final class DocsRulesTest extends DocsRuleTestCase
      * Verify missing param tag detected for documented methods even when signature type describes
      * parameter.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingParamTagDetectedForDocumentedMethodsEvenWhenSignatureTypeDescribesParameter(): void
     {
@@ -171,7 +171,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing param tag detected when throws doc omits scalar param.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingParamTagDetectedWhenThrowsDocOmitsScalarParam(): void
     {
@@ -189,7 +189,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing param tag detected for descriptive docblock.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingParamTagDetectedForDescriptiveDocblock(): void
     {
@@ -207,7 +207,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify complete param tag not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCompleteParamTagNotFlagged(): void
     {
@@ -220,7 +220,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify generic param tags with spaces are not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGenericParamTagsWithSpacesAreNotFlagged(): void
     {
@@ -233,7 +233,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing return tag detected for array return types.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingReturnTagDetectedForArrayReturnTypes(): void
     {
@@ -246,7 +246,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing return tag detected when signature fully describes return.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingReturnTagDetectedWhenSignatureFullyDescribesReturn(): void
     {
@@ -259,7 +259,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify missing return tag detected for descriptive docblock.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingReturnTagDetectedForDescriptiveDocblock(): void
     {
@@ -272,7 +272,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify any documented method requires return tag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAnyDocumentedMethodRequiresReturnTag(): void
     {
@@ -291,7 +291,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Verify void method with docblock triggers missing return tag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testVoidMethodWithDocblockTriggersMissingReturnTag(): void
     {

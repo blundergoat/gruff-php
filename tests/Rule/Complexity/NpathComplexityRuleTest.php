@@ -30,7 +30,7 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -39,6 +39,8 @@ final class NpathComplexityRuleTest extends TestCase
     }
 
     /**
+     * Provide npath cases for parameterized tests.
+     *
      * @return array<string, array{string, int}>
      */
     public static function npathProvider(): array
@@ -66,7 +68,7 @@ final class NpathComplexityRuleTest extends TestCase
      *
      * @param string $methodName    Fixture method name.
      * @param int    $expectedNpath Expected NPath complexity.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('npathProvider')]
     public function testNpathComplexityMatchesExpected(string $methodName, int $expectedNpath): void
@@ -77,7 +79,7 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Verify default NPath thresholds stay stable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -92,7 +94,7 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Verify findings include NPath metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFindingsIncludeNpathMetadata(): void
     {
@@ -115,7 +117,7 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Verify capped NPath findings use the cap label and metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCappedNpathFindingUsesCapLabel(): void
     {
@@ -132,7 +134,7 @@ final class NpathComplexityRuleTest extends TestCase
     /**
      * Verify fractional threshold values are preserved in messages.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
@@ -150,7 +152,7 @@ final class NpathComplexityRuleTest extends TestCase
      * Analyse a fixture with custom NPath thresholds.
      *
      * @param AnalysisUnit             $analysisUnit Parsed fixture.
-     * @param array<string, int|float> $thresholds Rule thresholds.
+     * @param array<string, int|float> $thresholds   Rule thresholds.
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyse(AnalysisUnit $analysisUnit, array $thresholds): array
@@ -188,7 +190,7 @@ final class NpathComplexityRuleTest extends TestCase
      * Parse a complexity fixture into an analysis unit.
      *
      * @param string $fixture Fixture filename.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseFixture(string $fixture): AnalysisUnit
     {

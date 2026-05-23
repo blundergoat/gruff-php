@@ -33,7 +33,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -43,7 +43,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify unreachable code after return.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnreachableCodeAfterReturn(): void
     {
@@ -51,7 +51,7 @@ final class WasteRulesTest extends TestCase
 
         self::assertCount(3, $findings);
 
-        $ruleIds = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $ruleIds        = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
         $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
 
         self::assertSame([UnreachableCodeRule::ID], $ruleIds);
@@ -61,7 +61,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify no unreachable code in clean file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoUnreachableCodeInCleanFile(): void
     {
@@ -73,7 +73,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify empty method detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEmptyMethodDetected(): void
     {
@@ -81,7 +81,7 @@ final class WasteRulesTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $ruleIds = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
+        $ruleIds        = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
         $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
 
         self::assertSame([EmptyMethodRule::ID], $ruleIds);
@@ -91,7 +91,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify abstract method not flagged as empty.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAbstractMethodNotFlaggedAsEmpty(): void
     {
@@ -104,7 +104,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify promoted constructor not flagged as empty.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedConstructorNotFlaggedAsEmpty(): void
     {
@@ -117,7 +117,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify empty class detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEmptyClassDetected(): void
     {
@@ -130,7 +130,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify empty exception marker not flagged as empty class.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testEmptyExceptionMarkerNotFlaggedAsEmptyClass(): void
     {
@@ -143,7 +143,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify unused imports detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedImportsDetected(): void
     {
@@ -159,7 +159,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify used import not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUsedImportNotFlagged(): void
     {
@@ -172,7 +172,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify unused parameter in private method.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedParameterInPrivateMethod(): void
     {
@@ -185,7 +185,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify used parameter not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUsedParameterNotFlagged(): void
     {
@@ -200,7 +200,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify unused parameter in public method without external contract.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedParameterInPublicMethodWithoutExternalContract(): void
     {
@@ -222,7 +222,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify public method parameters with external contracts are not checked.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPublicMethodParametersWithExternalContractsAreNotChecked(): void
     {
@@ -240,7 +240,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify promoted private constructor parameters are used as properties.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedPrivateConstructorParametersAreUsedAsProperties(): void
     {
@@ -253,7 +253,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify commented out code detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCommentedOutCodeDetected(): void
     {
@@ -266,7 +266,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify one line call wrapper methods are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOneLineCallWrapperMethodsAreDetected(): void
     {
@@ -282,7 +282,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify one line method rule skips pure expressions and no argument accessors.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
     {
@@ -297,7 +297,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify one-line method caller and named-factory exemptions are opt-in.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOneLineMethodRuleSupportsIntentBearingExemptions(): void
     {
@@ -327,7 +327,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify one-line method rule supports explicit symbol allowlists.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOneLineMethodRuleSupportsExplicitSymbolAllowlists(): void
     {
@@ -355,7 +355,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify redundant variable before return detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRedundantVariableBeforeReturnDetected(): void
     {
@@ -368,7 +368,7 @@ final class WasteRulesTest extends TestCase
     /**
      * Verify clean file has no waste findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanFileHasNoWasteFindings(): void
     {
@@ -382,6 +382,8 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
+     * Analyse waste-rule fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
@@ -397,7 +399,7 @@ final class WasteRulesTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

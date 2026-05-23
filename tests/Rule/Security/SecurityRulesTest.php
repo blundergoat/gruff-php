@@ -49,7 +49,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -59,7 +59,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify dangerous execution patterns detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDangerousExecutionPatternsDetected(): void
     {
@@ -79,7 +79,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify typed callable invocations are not dangerous dynamic calls.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
     {
@@ -93,7 +93,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify local closure invocations are not treated like arbitrary dynamic calls.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLocalClosureInvocationsAreNotDangerousDynamicCalls(): void
     {
@@ -106,7 +106,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify callable collections are not treated like arbitrary dynamic calls.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCallableCollectionInvocationsAreNotDangerousDynamicCalls(): void
     {
@@ -118,7 +118,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify static logger text that names sensitive concepts is not treated as leaked data.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testStaticSensitiveLoggerMessagesAreNotFlagged(): void
     {
@@ -130,7 +130,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify runtime sensitive log values still produce findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSensitiveLoggerRuntimeValuesStillFlagged(): void
     {
@@ -142,7 +142,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify request data security heuristics detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRequestDataSecurityHeuristicsDetected(): void
     {
@@ -160,7 +160,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify boundary security patterns detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBoundarySecurityPatternsDetected(): void
     {
@@ -174,7 +174,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify deterministic bootstrap include paths are not treated as variable includes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFixedBootstrapIncludePathsAreNotVariableIncludes(): void
     {
@@ -187,7 +187,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify expanded security sink patterns detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testExpandedSecuritySinkPatternsDetected(): void
     {
@@ -204,7 +204,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify risky GitHub Actions workflow patterns detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testGithubActionsWorkflowRisksDetected(): void
     {
@@ -216,7 +216,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify safe wrappers and literal patterns are not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSafeWrappersAndLiteralPatternsAreNotFlagged(): void
     {
@@ -236,7 +236,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify unserialize with object hydration disabled is not reported.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnserializeAllowedClassesFalseIsNotFlagged(): void
     {
@@ -248,7 +248,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify cumulative security fixture covers every security rule without duplicate findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
@@ -293,7 +293,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Verify security rules respect config disables.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSecurityRulesRespectConfigDisables(): void
     {
@@ -312,8 +312,10 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Assert the expected security finding count for a rule.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -325,6 +327,8 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Run one security rule against a fixture and return its findings.
+     *
      * @return list<Finding>
      */
     private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId): array
@@ -340,6 +344,8 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Analyse security fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analyse(string $fixture): array
@@ -357,7 +363,7 @@ final class SecurityRulesTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseFixture(string $filename): AnalysisUnit
     {
@@ -370,7 +376,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the dangerous-execution fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function dangerousExecutionUnit(): AnalysisUnit
     {
@@ -402,7 +408,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the typed-callable fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function typedCallableUnit(): AnalysisUnit
     {
@@ -443,7 +449,7 @@ PHP,
     /**
      * Parse the local-closure fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function localClosureUnit(): AnalysisUnit
     {
@@ -484,7 +490,7 @@ PHP,
     /**
      * Parse the callable-collection fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function callableCollectionUnit(): AnalysisUnit
     {
@@ -529,7 +535,7 @@ PHP,
     /**
      * Parse the static logger message fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function staticLoggerMessageUnit(): AnalysisUnit
     {
@@ -554,7 +560,7 @@ PHP,
     /**
      * Parse the runtime logger value fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function runtimeLoggerValueUnit(): AnalysisUnit
     {
@@ -578,7 +584,7 @@ PHP,
     /**
      * Parse the fixed-include fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function fixedIncludeUnit(): AnalysisUnit
     {
@@ -601,7 +607,7 @@ PHP,
     /**
      * Parse the safe-unserialize fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function safeUnserializeUnit(): AnalysisUnit
     {
@@ -623,7 +629,7 @@ PHP,
      *
      * @param string $source      Source directory.
      * @param string $displayPath Fixture display path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseSource(string $source, string $displayPath): AnalysisUnit
     {

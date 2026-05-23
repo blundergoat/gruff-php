@@ -195,12 +195,16 @@ final class AnalyseCommand extends Command
         );
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
-        $scoreStart  = hrtime(true);
-        $score       = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
-        $scoreNs     = hrtime(true) - $scoreStart;
+        $scoreStart     = hrtime(true);
+        $score          = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
+        $scoreNs        = hrtime(true) - $scoreStart;
+        $reviewFindings = $options->diffVs === null ? $findings : array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
+        ));
         $reviewScore = $options->diffVs === null
             ? $score->composite->score
-            : $this->branchReviewScore($findings, $options);
+            : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars())->composite->score;
         $review = $this->buildBranchReview(
             projectRoot:     $projectRoot,
             options:         $options,
@@ -344,6 +348,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Filter allowed secret previews for the current analysis scope.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */
@@ -389,9 +395,7 @@ final class AnalyseCommand extends Command
         }
     }
 
-    /**
-     * @return list<string>|null Null means the changed-only review diff is empty, so no current files should be scanned.
-     */
+    /** @return list<string>|null Null means an empty changed-only review diff has no files to scan. */
     private function currentAnalysisPaths(AnalyseCommandOptions $options, ?DiffResult $reviewDiff): ?array
     {
         if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
@@ -406,6 +410,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Filter source diagnostics for the current analysis scope.
+     *
      * @param list<RunDiagnostic> $diagnostics
      * @return list<RunDiagnostic>
      */
@@ -491,6 +497,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Filter findings to changed files for the current analysis scope.
+     *
      * @param list<Finding> $findings
      * @param list<string>  $changedFiles
      * @return list<Finding>
@@ -608,25 +616,7 @@ final class AnalyseCommand extends Command
         }
     }
 
-    /**
-     * Calculate the branch-review score from static-analysis findings only.
-     *
-     * @param list<Finding> $findings Current findings after diff and baseline filtering.
-     * @return float Composite score used for branch-review delta comparison.
-     */
-    private function branchReviewScore(array $findings, AnalyseCommandOptions $options): float
-    {
-        $reviewFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
-        ));
-
-        return (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars())->composite->score;
-    }
-
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> Paths that need to be copied from the base ref. */
     private function baseSnapshotPaths(
         string $projectRoot,
         AnalyseCommandOptions $options,
@@ -664,9 +654,7 @@ final class AnalyseCommand extends Command
         return $paths;
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> Paths that should be analysed from the base snapshot. */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
         if ($options->isChangedOnly && $options->paths === []) {
@@ -681,6 +669,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Keep requested paths that exist in the base snapshot.
+     *
      * @param list<string> $paths
      * @return list<string>
      */
@@ -699,9 +689,7 @@ final class AnalyseCommand extends Command
         return $existing === [] ? [] : $existing;
     }
 
-    /**
-     * @return list<\GruffPhp\Parser\AnalysisUnit>
-     */
+    /** @return list<\GruffPhp\Parser\AnalysisUnit> Project files needed by project-wide rules. */
     private function projectContextUnits(
         string $projectRoot,
         AnalyseCommandOptions $options,
@@ -722,9 +710,7 @@ final class AnalyseCommand extends Command
         )->analysisUnits;
     }
 
-    /**
-     * @return list<\GruffPhp\Parser\AnalysisUnit>
-     */
+    /** @return list<\GruffPhp\Parser\AnalysisUnit> Base-snapshot files needed for branch-review comparison. */
     private function baseProjectContextUnits(string $baseRoot, AnalyseCommandOptions $options, AnalysisConfig $config): array
     {
         return (new AnalysisSourceLoader())->load(
@@ -735,9 +721,7 @@ final class AnalyseCommand extends Command
         )->analysisUnits;
     }
 
-    /**
-     * @return bool True when changed-only mode still needs complete context for project-level rules.
-     */
+    /** @return bool True when changed-only mode still needs complete context for project-level rules. */
     private function shouldLoadChangedOnlyProjectContext(
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
@@ -751,8 +735,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * @param list<string> $paths
-     * @return list<string>
+     * @param list<string> $paths User-supplied path arguments.
+     * @return list<string> Project-relative paths sorted for stable matching.
      */
     private function normaliseRequestedPaths(string $projectRoot, array $paths): array
     {
@@ -813,6 +797,8 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Normalize finding paths for the CLI command.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */

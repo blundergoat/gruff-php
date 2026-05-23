@@ -27,7 +27,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify cumulative fixture triggers multiple rules.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCumulativeFixtureTriggersMultipleRules(): void
     {
@@ -70,7 +70,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify config override changes findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfigOverrideChangesFindings(): void
     {
@@ -101,7 +101,7 @@ final class SizeIntegrationTest extends TestCase
     /**
      * Verify clean fixture produces no size findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanFixtureProducesNoSizeFindings(): void
     {

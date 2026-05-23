@@ -81,6 +81,8 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
+     * Build xml method findings for the security rule.
+     *
      * @return list<Finding>
      */
     private function xmlMethodFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array

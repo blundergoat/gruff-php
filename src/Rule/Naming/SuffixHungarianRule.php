@@ -81,8 +81,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Find properties, parameters, and locals that encode type suffixes.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for configured suffixes.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for configured suffixes.
      * @return list<Finding> Findings for suffix-Hungarian identifiers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -95,13 +95,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
             foreach ($property->props as $prop) {
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $prop,
-                    identifier: ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
-                    suffixes:   $suffixes,
-                    tokenizer:  $identifierTokenizer,
-                    type:       $property->type,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $prop,
+                    identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                    suffixes:     $suffixes,
+                    tokenizer:    $identifierTokenizer,
+                    type:         $property->type,
                 );
 
                 if ($finding instanceof Finding) {
@@ -119,13 +119,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $param,
-                    identifier: ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
-                    suffixes:   $suffixes,
-                    tokenizer:  $identifierTokenizer,
-                    type:       $param->type,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $param,
+                    identifier:   ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
+                    suffixes:     $suffixes,
+                    tokenizer:    $identifierTokenizer,
+                    type:         $param->type,
                 );
 
                 if ($finding instanceof Finding) {
@@ -140,13 +140,13 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 }
 
                 $finding = $this->finding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $variable,
-                    identifier: ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    suffixes:   $suffixes,
-                    tokenizer:  $identifierTokenizer,
-                    type:       null,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $variable,
+                    identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                    suffixes:     $suffixes,
+                    tokenizer:    $identifierTokenizer,
+                    type:         null,
                 );
 
                 if ($finding instanceof Finding) {
@@ -339,6 +339,8 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
+     * Normalize configured suffixes to case-insensitive lookup keys.
+     *
      * @param list<string> $suffixes
      * @return array<string, string>
      */

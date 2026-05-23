@@ -48,8 +48,8 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Find mock variables that are assigned but never read.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused mock assignments.
      */
@@ -75,6 +75,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
+     * Collect mock variables created in the test scope.
+     *
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, array{line: int, name: string}>
      */
@@ -107,6 +109,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
+     * Collect reads of variables created as mocks.
+     *
      * @param array<int, true> $assignedVarObjectIds
      * @return array<string, true>
      */
@@ -130,6 +134,8 @@ final readonly class UnusedMockRule implements RuleInterface
     }
 
     /**
+     * Build findings for unread mocks in the test-quality rule.
+     *
      * @param array<string, array{line: int, name: string}> $mockAssignments
      * @param array<string, true>                           $reads
      * @return list<Finding>

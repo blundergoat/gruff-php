@@ -56,7 +56,7 @@ final readonly class GitDiffProvider
      * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
      * @throws DiffException When Git cannot list untracked files.
-     * @return void No return value.
+     * @return void
      */
     private function appendUntrackedFiles(string $projectRoot, array &$changedFiles, array &$changedLines): void
     {
@@ -84,7 +84,7 @@ final readonly class GitDiffProvider
     /**
      * Ensure diff mode only runs inside a git working tree.
      *
-     * @return void No return value.
+     * @return void
      */
     private function ensureGitWorkTree(string $projectRoot): void
     {
@@ -97,6 +97,8 @@ final readonly class GitDiffProvider
     }
 
     /**
+     * Build the git diff command used to calculate changed lines.
+     *
      * @return list<string>
      */
     private function diffCommand(string $mode): array
@@ -125,6 +127,8 @@ final readonly class GitDiffProvider
     }
 
     /**
+     * Parse unified diff for the diff parser.
+     *
      * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>}
      */
     private function parseUnifiedDiff(string $diff): array
@@ -192,7 +196,7 @@ final readonly class GitDiffProvider
      * @param string|null                           $filePath     Project-relative changed path.
      * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
-     * @return void No return value.
+     * @return void
      */
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
     {

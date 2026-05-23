@@ -48,8 +48,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Find files that lack a file-level docblock or a documented sole class-like declaration.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for missing file-level documentation.
      */
@@ -77,6 +77,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
+     * List top-level statements that count toward file documentation.
+     *
      * @return list<Node\Stmt>
      */
     private function topLevelStatements(AnalysisUnit $analysisUnit): array
@@ -133,6 +135,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
+     * Build finding for the documentation rule.
+     *
      * @return list<Finding>
      */
     private function buildFinding(AnalysisUnit $analysisUnit, Node\Stmt $first): array

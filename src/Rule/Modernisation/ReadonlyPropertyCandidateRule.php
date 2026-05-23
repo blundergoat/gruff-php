@@ -48,8 +48,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     /**
      * Find constructor-assigned properties that could be readonly.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for readonly property candidates.
      */
@@ -108,6 +108,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     }
 
     /**
+     * Collect constructor assignments that affect the modernisation rule.
+     *
      * @return array<string, true>
      */
     private function constructorAssignments(Stmt\Class_ $class): array
@@ -137,6 +139,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     }
 
     /**
+     * Collect late assignments that affect the modernisation rule.
+     *
      * @return array<string, true>
      */
     private function lateAssignments(Stmt\Class_ $class): array

@@ -24,7 +24,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -34,7 +34,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify unused private methods detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedPrivateMethodsDetected(): void
     {
@@ -50,7 +50,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify used private method not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUsedPrivateMethodNotFlagged(): void
     {
@@ -63,7 +63,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify magic methods excluded.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMagicMethodsExcluded(): void
     {
@@ -76,7 +76,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify protected method not checked.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testProtectedMethodNotChecked(): void
     {
@@ -89,7 +89,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify unused private property detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUnusedPrivatePropertyDetected(): void
     {
@@ -105,7 +105,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify used property not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUsedPropertyNotFlagged(): void
     {
@@ -118,7 +118,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify public property not checked.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPublicPropertyNotChecked(): void
     {
@@ -131,7 +131,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify never read property distinguished.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNeverReadPropertyDistinguished(): void
     {
@@ -149,7 +149,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify promoted private property detected when never read.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPromotedPrivatePropertyDetectedWhenNeverRead(): void
     {
@@ -167,7 +167,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify used promoted private property not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testUsedPromotedPrivatePropertyNotFlagged(): void
     {
@@ -181,7 +181,7 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Verify clean file has no dead code findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanFileHasNoDeadCodeFindings(): void
     {
@@ -194,6 +194,8 @@ final class DeadCodeRulesTest extends TestCase
     }
 
     /**
+     * Analyse dead-code fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyseRule(string $fixture, string $ruleId): array
@@ -210,7 +212,7 @@ final class DeadCodeRulesTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

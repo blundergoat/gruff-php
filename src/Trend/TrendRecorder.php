@@ -64,6 +64,8 @@ final readonly class TrendRecorder
     }
 
     /**
+     * Read entries for the component.
+     *
      * @return list<TrendEntry>
      */
     private function readEntries(string $path): array

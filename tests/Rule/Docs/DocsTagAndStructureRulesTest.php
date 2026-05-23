@@ -24,7 +24,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify stale param tag detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testStaleParamTagDetected(): void
     {
@@ -37,7 +37,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing throws tag detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingThrowsTagDetected(): void
     {
@@ -50,7 +50,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify override aware throws rule uses inherited contracts but local phpdoc is required.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testOverrideAwareThrowsRuleUsesInheritedContractsButLocalPhpdocIsRequired(): void
     {
@@ -68,7 +68,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify bare PHPDoc tags are detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testBarePhpdocTagsDetected(): void
     {
@@ -85,7 +85,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify descriptive PHPDoc tags are not bare PHPDoc.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDescriptivePhpdocTagsAreNotBarePhpdoc(): void
     {
@@ -100,7 +100,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify todo density detected.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTodoDensityDetected(): void
     {
@@ -113,7 +113,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotations require description.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testVarAnnotationsRequireDescription(): void
     {
@@ -127,7 +127,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated property does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testVarAnnotationOnAttributeDecoratedPropertyDoesNotFlag(): void
     {
@@ -142,7 +142,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify var annotation on attribute decorated method does not flag.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testVarAnnotationOnAttributeDecoratedMethodDoesNotFlag(): void
     {
@@ -184,7 +184,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify clean fixture has no doc findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanFixtureHasNoDocFindings(): void
     {
@@ -199,7 +199,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing class phpdoc flags class interface trait enum.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingClassPhpdocFlagsClassInterfaceTraitEnum(): void
     {
@@ -226,7 +226,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing class phpdoc skips anonymous and documented classes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingClassPhpdocSkipsAnonymousAndDocumentedClasses(): void
     {
@@ -240,7 +240,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc flags files without any docblock.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingFilePhpdocFlagsFilesWithoutAnyDocblock(): void
     {
@@ -257,7 +257,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips file with explicit file docblock.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingFilePhpdocSkipsFileWithExplicitFileDocblock(): void
     {
@@ -272,7 +272,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing file phpdoc skips single documented class file.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingFilePhpdocSkipsSingleDocumentedClassFile(): void
     {
@@ -287,7 +287,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing property phpdoc flags declared and promoted properties.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingPropertyPhpdocFlagsDeclaredAndPromotedProperties(): void
     {
@@ -310,7 +310,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing property phpdoc records kind metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingPropertyPhpdocRecordsKindMetadata(): void
     {
@@ -332,7 +332,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing property phpdoc skips anonymous class property.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingPropertyPhpdocSkipsAnonymousClassProperty(): void
     {
@@ -351,7 +351,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing constant phpdoc flags class constants and enum cases.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingConstantPhpdocFlagsClassConstantsAndEnumCases(): void
     {
@@ -377,7 +377,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Verify missing constant phpdoc exempts enum cases when enum has docblock.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMissingConstantPhpdocExemptsEnumCasesWhenEnumHasDocblock(): void
     {

@@ -12,6 +12,8 @@ use GruffPhp\Rule\RuleDefinition;
 final readonly class RuleSelection
 {
     /**
+     * Store rule-selection include and exclude lists.
+     *
      * @param list<string> $tiers
      * @param list<string> $pillars
      * @param list<string> $rules
@@ -61,6 +63,8 @@ final readonly class RuleSelection
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array<string, list<string>>
      */
     public function toArray(): array

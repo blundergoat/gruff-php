@@ -29,7 +29,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,6 +38,8 @@ final class MaintainabilityIndexRuleTest extends TestCase
     }
 
     /**
+     * Provide index cases for parameterized tests.
+     *
      * @return array<string, array{string, float}>
      */
     public static function indexProvider(): array
@@ -65,7 +67,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
      *
      * @param string $methodName    Fixture method name.
      * @param float  $expectedIndex Expected maintainability index.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('indexProvider')]
     public function testMaintainabilityIndexMatchesExpected(string $methodName, float $expectedIndex): void
@@ -78,7 +80,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify default maintainability thresholds stay stable.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefinitionThresholdsAreStable(): void
     {
@@ -93,7 +95,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify low maintainability findings include rounded metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFindingsIncludeRoundedMetadata(): void
     {
@@ -118,7 +120,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify fractional threshold values are preserved in messages.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
@@ -140,8 +142,8 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Return a named method from the cognitive fixture.
      *
-     * @param AnalysisUnit $analysisUnit       Parsed fixture.
-     * @param string       $methodName Fixture method name.
+     * @param AnalysisUnit $analysisUnit Parsed fixture.
+     * @param string       $methodName   Fixture method name.
      * @return ClassMethod Fixture method node.
      */
     private function fixtureMethod(AnalysisUnit $analysisUnit, string $methodName): ClassMethod
@@ -160,7 +162,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseFixture(): AnalysisUnit
     {

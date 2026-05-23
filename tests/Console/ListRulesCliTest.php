@@ -15,7 +15,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify version command runs through binary.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testVersionCommandRunsThroughBinary(): void
     {
@@ -30,7 +30,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify list command runs through binary.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testListCommandRunsThroughBinary(): void
     {
@@ -46,7 +46,7 @@ final class ListRulesCliTest extends CliTestCase
     /**
      * Verify clean checkout install runs CLI help.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCleanCheckoutInstallRunsCliHelp(): void
     {

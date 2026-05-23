@@ -15,7 +15,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Verify analyse command uses Git-visible files for default discovery.
      *
-     * @return void No return value.
+     * @return void
      * @throws JsonException
      */
     public function testAnalyseCommandUsesGitVisibleFilesForDefaultDiscovery(): void
@@ -77,7 +77,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Require the git executable for Git-backed CLI tests.
      *
-     * @return void No return value.
+     * @return void
      */
     private function requireGit(): void
     {
@@ -94,7 +94,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
      *
      * @param string       $project Project root.
      * @param list<string> $args    Git arguments.
-     * @return void No return value.
+     * @return void
      */
     private function runGit(string $project, array $args): void
     {
@@ -110,7 +110,7 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
      * @param string $project  Project root.
      * @param string $path     Project-relative path.
      * @param string $contents File contents.
-     * @return void No return value.
+     * @return void
      */
     private function writeProjectFile(string $project, string $path, string $contents): void
     {

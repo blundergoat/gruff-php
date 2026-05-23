@@ -60,6 +60,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append review details to report output.
+     *
      * @param list<string> $lines
      * @return void
      */
@@ -101,6 +103,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append score details to report output.
+     *
      * @param list<string> $lines
      * @return void
      */
@@ -148,6 +152,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append baseline details to report output.
+     *
      * @param list<string> $lines
      * @return void
      */
@@ -188,6 +194,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append mutation details to report output.
+     *
      * @param list<string> $lines
      * @return void
      */
@@ -295,6 +303,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append path section details to report output.
+     *
      * @param list<string> $lines
      * @param list<string> $paths
      * @return void
@@ -314,6 +324,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append diagnostics details to report output.
+     *
      * @param list<string>        $lines
      * @param list<RunDiagnostic> $diagnostics
      * @return void
@@ -346,6 +358,8 @@ final readonly class TextReporter
     }
 
     /**
+     * Append findings details to report output.
+     *
      * @param list<string>  $lines
      * @param list<Finding> $findings
      * @return void

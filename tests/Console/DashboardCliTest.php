@@ -14,7 +14,7 @@ final class DashboardCliTest extends CliTestCase
     /**
      * Verify dashboard command serves refreshable HTML report.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDashboardCommandServesRefreshableHtmlReport(): void
     {
@@ -78,7 +78,7 @@ final class DashboardCliTest extends CliTestCase
     /**
      * Verify dashboard scan omits mutation UI.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDashboardScanOmitsMutationUi(): void
     {
@@ -115,7 +115,7 @@ final class DashboardCliTest extends CliTestCase
     /**
      * Verify dashboard command can scan another project from browser query.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDashboardCommandCanScanAnotherProjectFromBrowserQuery(): void
     {

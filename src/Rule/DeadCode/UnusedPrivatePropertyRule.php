@@ -53,8 +53,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Find private properties that are never read, never written, or unused entirely.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused private properties.
      */
@@ -78,7 +78,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $findings = array_merge(
                 $findings,
                 $this->findingsForProperties(
-                    analysisUnit:         $analysisUnit,
+                    analysisUnit: $analysisUnit,
                     definition:   $definition,
                     classLike:    $classLike,
                     privateProps: $privateProps,
@@ -91,6 +91,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
+     * Collect private properties declared on a class-like node.
+     *
      * @param Class_|Trait_|Enum_ $classLike
      * @return array<string, array{line: int, writtenByDeclaration: bool}>
      */
@@ -136,6 +138,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
+     * Track reads and writes for collected private properties.
+     *
      * @param Class_|Trait_|Enum_                                         $classLike
      * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
      * @return array{reads: array<string, true>, writes: array<string, true>}
@@ -189,6 +193,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     }
 
     /**
+     * Build findings for properties in the dead-code rule.
+     *
      * @param Class_|Trait_|Enum_                                            $classLike
      * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps
      * @param array{reads: array<string, true>, writes: array<string, true>} $usage

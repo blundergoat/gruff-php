@@ -156,6 +156,8 @@ final class ReportCommand extends Command
     }
 
     /**
+     * Build the analyse command argv used by report generation.
+     *
      * @return list<string>
      */
     private function analyseCommand(InputInterface $input): array
@@ -244,7 +246,7 @@ final class ReportCommand extends Command
     {
         if ($input->hasParameterOption('--baseline', true)) {
             $optionValue = $this->optionalStringOption($input, 'baseline');
-            $command[]  = '--baseline';
+            $command[]   = '--baseline';
 
             if ($optionValue !== null) {
                 $command[] = $optionValue;

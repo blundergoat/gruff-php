@@ -27,7 +27,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verify repeated structures are found after non-candidate methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRepeatedStructuresAreFoundAfterNonCandidates(): void
     {
@@ -57,7 +57,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Verify findings carry the grouped method metadata and message.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testFindingsCarryGroupedMethodMetadata(): void
     {
@@ -94,7 +94,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseFixture(string $filename): AnalysisUnit
     {

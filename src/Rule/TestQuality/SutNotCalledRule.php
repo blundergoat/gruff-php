@@ -137,8 +137,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Find tests whose name implies a SUT call that is absent from the body.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mismatched test names and calls.
      */
@@ -240,6 +240,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
+     * List variable names that likely represent the system under test.
+     *
      * @return list<string>
      */
     private function candidateSutNames(string $testName): array
@@ -279,6 +281,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
+     * Split an identifier into lowercase tokens for test-name heuristics.
+     *
      * @return list<string>
      */
     private function camelCaseTokens(string $identifierName): array
@@ -291,6 +295,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
+     * Find the first token that marks the expected outcome in a test name.
+     *
      * @param list<string> $tokens
      *
      * @return int|null
@@ -307,6 +313,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
+     * Extract the leading verb token from a test method name.
+     *
      * @return string|null
      */
     private function methodVerb(string $token): ?string

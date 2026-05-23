@@ -77,6 +77,8 @@ final readonly class AnalysisReport
     }
 
     /**
+     * Count findings by severity for report metadata.
+     *
      * @return array{advisory: int, warning: int, error: int, total: int}
      */
     public function findingCounts(): array
@@ -109,6 +111,8 @@ final readonly class AnalysisReport
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array<string, ReportValue>
      */
     public function toArray(): array

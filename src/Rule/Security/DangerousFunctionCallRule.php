@@ -67,8 +67,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find dynamic execution, eval, assert-string, and dangerous shell calls.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for dangerous execution patterns.
      */
@@ -110,6 +110,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
+     * Find local variables documented or assigned as callables.
+     *
      * @return array<string, true>
      */
     private function callableLocalVariableNames(AnalysisUnit $analysisUnit): array
@@ -132,12 +134,14 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
+     * Find foreach variables that receive callable values.
+     *
      * @return array<string, true>
      */
     private function callableForeachVariableNames(AnalysisUnit $analysisUnit): array
     {
-        $names                         = [];
-        $callableCollectionProperties  = $this->callableCollectionPropertyNames($analysisUnit);
+        $names                        = [];
+        $callableCollectionProperties = $this->callableCollectionPropertyNames($analysisUnit);
 
         foreach (NodeIndex::nodesOf($analysisUnit, Foreach_::class) as $foreach) {
             if (!$foreach->valueVar instanceof Expr\Variable || !is_string($foreach->valueVar->name)) {
@@ -155,6 +159,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
+     * Find properties that expose callable collections.
+     *
      * @return array<string, true>
      */
     private function callableCollectionPropertyNames(AnalysisUnit $analysisUnit): array
@@ -178,6 +184,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
+     * Find parameters documented as callables.
+     *
      * @return array<string, true>
      */
     private function callableParameterNames(AnalysisUnit $analysisUnit): array
@@ -202,6 +210,8 @@ final class DangerousFunctionCallRule implements RuleInterface
     }
 
     /**
+     * Find properties documented or typed as callables.
+     *
      * @return array<string, true>
      */
     private function callablePropertyNames(AnalysisUnit $analysisUnit): array
@@ -270,6 +280,7 @@ final class DangerousFunctionCallRule implements RuleInterface
             return false;
         }
 
+        // Match @var annotations whose declared type is callable-like.
         return preg_match('/@var\s+[^\n]*(?:callable|Closure)\b/i', $docComment->getText()) === 1;
     }
 

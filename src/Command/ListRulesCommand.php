@@ -88,6 +88,8 @@ final class ListRulesCommand extends Command
     }
 
     /**
+     * Build the machine-readable row emitted by list-rules.
+     *
      * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}
      */
     private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array

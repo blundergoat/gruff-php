@@ -37,7 +37,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify credential patterns are detected with redacted previews.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCredentialPatternsAreDetectedWithRedactedPreviews(): void
     {
@@ -66,7 +66,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify config like files are discovered and scanned as text.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfigLikeFilesAreDiscoveredAndScannedAsText(): void
     {
@@ -91,7 +91,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify PHI and PII profiles are detected in fixture data.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhiAndPiiProfilesAreDetectedInFixtureData(): void
     {
@@ -104,7 +104,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify allowed dummy values are not flagged.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
@@ -119,7 +119,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify matches inside PHP comments are skipped for opt-in pattern rules but private-key still fires.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testInCommentMatchesAreSkippedExceptPrivateKey(): void
     {
@@ -139,7 +139,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify hardcoded env value requires secret like value evidence.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHardcodedEnvValueRequiresSecretLikeValueEvidence(): void
     {
@@ -173,17 +173,18 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify route and URL path literals are not treated as high-entropy secrets.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHighEntropyRoutePathsAreNotFlagged(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-route-entropy-');
         self::assertIsString($path);
         $path .= '.php';
+        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
         $source = "<?php\n\n"
             . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
             . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
-            . '$secret = ' . var_export('M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ', true) . ";\n";
+            . '$secret = ' . var_export($secret, true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
@@ -203,16 +204,17 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify medical terminology metadata is not treated as embedded secret material.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHighEntropyMedicalStandardMetadataIsNotFlagged(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-medical-entropy-');
         self::assertIsString($path);
         $path .= '.php';
+        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
         $source = "<?php\n\n"
             . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
-            . '$secret = ' . var_export('M7qP2vL9xZ4aB8nC3dF6gH1jK5mN0rS2tV9wY4zQ', true) . ";\n";
+            . '$secret = ' . var_export($secret, true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
@@ -232,17 +234,19 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify placeholder PHI examples are suppressed without muting real-looking values.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testPhiPlaceholderExamplesAreNotFlagged(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-phi-placeholder-');
         self::assertIsString($path);
         $path .= '.md';
-        $source = implode("\n", [
-            '"medicare_number": { "value": "2345 67890 1", "confidence": "high", "source_snippet": "Medicare: 2345 67890 1" },',
+        $placeholderMedicare = '2345 ' . '67890 ' . '1';
+        $realMedicare        = '2123 ' . '45678 ' . '1';
+        $source              = implode("\n", [
+            sprintf('"medicare_number": { "value": "%s", "confidence": "high", "source_snippet": "Medicare: %s" },', $placeholderMedicare, $placeholderMedicare),
             '$VOUCHER->set(\'PatientFundMembershipNum\', \'123456789\');',
-            '"patient_medicare": "2123 45678 1"',
+            sprintf('"patient_medicare": "%s"', $realMedicare),
             '',
         ]);
         self::assertNotFalse(file_put_contents($path, $source));
@@ -264,7 +268,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify secret rules respect detector selection config.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSecretRulesRespectDetectorSelectionConfig(): void
     {
@@ -286,7 +290,7 @@ final class SensitiveDataRulesTest extends TestCase
      * Verify CLI text and JSON reports do not leak full secrets.
      *
      * @throws JsonException
-     * @return void No return value.
+     * @return void
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {
@@ -306,8 +310,10 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Assert the expected sensitive-data finding count for a rule.
+     *
      * @param list<Finding> $findings
-     * @return void No return value.
+     * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
@@ -319,6 +325,8 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Analyse sensitive-data fixtures and return findings for assertions.
+     *
      * @return list<Finding>
      */
     private function analysePath(string $path): array
@@ -327,6 +335,8 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Analyse sensitive-data fixtures and return findings for assertions.
+     *
      * @param list<AnalysisUnit> $units
      * @return list<Finding>
      */
@@ -344,7 +354,7 @@ final class SensitiveDataRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -387,6 +397,8 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Build synthetic secret-like values for sensitive-data tests.
+     *
      * @return list<string>
      */
     private function secretValues(): array

@@ -131,6 +131,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+     * Expose rule settings keyed by rule identifier.
+     *
      * @return array<string, RuleSettings>
      */
     public function rules(): array
@@ -167,6 +169,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+     * Expose configured path ignore patterns.
+     *
      * @return list<string>
      */
     public function ignoredPathPatterns(): array
@@ -192,6 +196,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+     * Expose identifier abbreviations allowed by naming rules.
+     *
      * @return list<string>
      */
     public function acceptedAbbreviations(): array
@@ -217,6 +223,8 @@ final readonly class AnalysisConfig
     }
 
     /**
+     * Expose redacted secret previews allowed by sensitive-data rules.
+     *
      * @return list<string>
      */
     public function allowedSecretPreviews(): array

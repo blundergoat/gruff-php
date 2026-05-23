@@ -309,6 +309,8 @@ final class RuleRegistry
     }
 
     /**
+     * List every registered rule in execution order.
+     *
      * @return list<RuleInterface|ProjectRuleInterface>
      */
     public function all(): array
@@ -578,10 +580,10 @@ final class RuleRegistry
     /**
      * Run all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit>      $units              Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits       Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook; default analyse runs leave this null.
+     * @param list<AnalysisUnit>      $units                           Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $ruleContext                     Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits                    Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver              Optional per-rule timing hook; default analyse runs leave this null.
      * @param bool                    $shouldReleaseUnitsAfterAnalysis Whether units can release AST contents after analysis.
      * @return list<Finding> Findings produced by enabled rules.
      */
@@ -645,6 +647,8 @@ final class RuleRegistry
     }
 
     /**
+     * Run project-level rules that need the full analysis context.
+     *
      * @param list<ProjectRuleInterface> $rules
      * @param list<AnalysisUnit>         $contextUnits
      * @return list<Finding>
@@ -682,6 +686,8 @@ final class RuleRegistry
     }
 
     /**
+     * Build deduplicate findings for the component.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */

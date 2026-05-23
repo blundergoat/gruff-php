@@ -203,6 +203,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Build abbreviation findings for the naming rule.
+     *
      * @param list<string> $acceptedAbbreviations
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -225,6 +227,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Build hungarian findings for the naming rule.
+     *
      * @param list<string> $typePrefixes
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -246,6 +250,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Build boolean prefix property findings for the naming rule.
+     *
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -267,6 +273,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Build negative boolean findings for the naming rule.
+     *
      * @param list<string> $cliMirrorAllowlist
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -294,6 +302,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Group naming findings by reported identifier name.
+     *
      * @param list<\GruffPhp\Finding\Finding> $findings
      * @return array<string, list<string>>
      */

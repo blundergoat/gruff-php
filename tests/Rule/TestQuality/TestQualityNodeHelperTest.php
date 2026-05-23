@@ -25,7 +25,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Prepare parser fixtures before each helper test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -35,7 +35,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify PHPUnit file detection handles paths and conventional suffixes.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testLooksLikePhpUnitTestFileRecognisesPathsAndSuffixes(): void
     {
@@ -49,7 +49,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify PHPUnit and Pest scopes are discovered in source order.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testScopesDiscoversPhpUnitAndPestTestsInSourceOrder(): void
     {
@@ -84,7 +84,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify test method classification requires an attribute, annotation, or TestCase parent.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMethodClassificationHandlesAttributesAnnotationsParentsAndDetachedNodes(): void
     {
@@ -109,7 +109,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify calls and assertion calls are classified with lower-case names.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testCallsAndAssertionCallsClassifyNames(): void
     {
@@ -131,7 +131,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify trivial assertion detection covers PHPUnit and Pest literal idioms.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testTrivialAssertionDetectionCoversPhpUnitAndPestLiterals(): void
     {
@@ -167,7 +167,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify the assertion detector recognises the expanded Pest expectation API.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testAssertionCallDetectionCoversExpandedPestExpectations(): void
     {
@@ -209,7 +209,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify argument, literal, Pest-chain, and magic-number helpers.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testArgumentLiteralPestAndMagicNumberHelpers(): void
     {
@@ -275,7 +275,7 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Verify mock creation and verification helper lists stay intentional.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testMockCreationAndVerificationHelpers(): void
     {

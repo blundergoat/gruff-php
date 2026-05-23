@@ -26,7 +26,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify complex fixture triggers multiple complexity rules.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testComplexFixtureTriggersMultipleComplexityRules(): void
     {
@@ -61,7 +61,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify simple fixture produces no complexity findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSimpleFixtureProducesNoComplexityFindings(): void
     {
@@ -82,7 +82,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify config override changes complexity findings.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testConfigOverrideChangesComplexityFindings(): void
     {
@@ -119,7 +119,7 @@ final class ComplexityIntegrationTest extends TestCase
     /**
      * Verify NPath cap is explicit in metadata and message.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNpathCapIsExplicitInMetadataAndMessage(): void
     {

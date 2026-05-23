@@ -63,8 +63,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Find short variable names outside accepted local conventions.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context carrying accepted abbreviations.
      * @return list<Finding> Findings for overly short variable names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -104,13 +104,13 @@ final readonly class ShortVariableRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                definition: $definition,
-                analysisUnit:       $analysisUnit,
-                ruleContext:    $ruleContext,
-                node:       $param,
-                kind:       $param->flags === 0 ? 'parameter' : 'property',
-                name:       $param->var->name,
-                symbol:     $symbol,
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                ruleContext:  $ruleContext,
+                node:         $param,
+                kind:         $param->flags === 0 ? 'parameter' : 'property',
+                name:         $param->var->name,
+                symbol:       $symbol,
             );
 
             if ($finding instanceof Finding) {
@@ -148,13 +148,13 @@ final readonly class ShortVariableRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                definition: $definition,
-                analysisUnit:       $analysisUnit,
-                ruleContext:    $ruleContext,
-                node:       $variable,
-                kind:       'variable',
-                name:       $name,
-                symbol:     $symbol,
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                ruleContext:  $ruleContext,
+                node:         $variable,
+                kind:         'variable',
+                name:         $name,
+                symbol:       $symbol,
             );
 
             if ($finding instanceof Finding) {
@@ -227,6 +227,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Collect variable names introduced by foreach loops.
+     *
      * @return array<string, true>
      */
     private function collectLoopVars(FunctionLikeScope $scope): array
@@ -245,6 +247,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Collect variable names introduced by catch clauses.
+     *
      * @return array<string, true>
      */
     private function collectCatchVars(FunctionLikeScope $scope): array
@@ -261,6 +265,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Collect variable references keyed by variable name.
+     *
      * @param array<Node>        $nodes
      * @param array<string,true> $variables
      * @return void
@@ -277,6 +283,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * List descendant nodes in the current function-like scope.
+     *
      * @param callable(Node): bool $predicate
      * @return list<Node>
      */
@@ -294,6 +302,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Filter descendant nodes with a predicate.
+     *
      * @param list<Node>           $nodes
      * @param callable(Node): bool $predicate
      * @return list<Node>
@@ -310,6 +320,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Append descendant nodes that satisfy a predicate.
+     *
      * @param callable(Node): bool $predicate
      * @param list<Node>           $matches
      * @return void
@@ -330,6 +342,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * List direct child nodes that can be recursively traversed.
+     *
      * @return list<Node>
      */
     private function childNodes(Node $node): array
@@ -344,6 +358,8 @@ final readonly class ShortVariableRule implements RuleInterface
     }
 
     /**
+     * Append traversable child nodes to the current collection.
+     *
      * @param list<Node> $children
      * @return void
      */

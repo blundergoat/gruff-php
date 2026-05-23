@@ -158,7 +158,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Build a renderer fixture.
      *
-     * @return DashboardPageRenderer Fixture value.
+     * @return DashboardPageRenderer
      */
     private function renderer(): DashboardPageRenderer
     {

@@ -62,8 +62,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Find private methods that are not referenced inside their class-like scope.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unused private methods.
      */
@@ -87,7 +87,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             $findings    = array_merge(
                 $findings,
                 $this->findingsForUnusedMethods(
-                    analysisUnit:           $analysisUnit,
+                    analysisUnit:   $analysisUnit,
                     definition:     $definition,
                     classLike:      $classLike,
                     privateMethods: $privateMethods,
@@ -100,6 +100,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
+     * Collect private methods declared on a class-like node.
+     *
      * @param Class_|Trait_|Enum_ $classLike
      * @return array<string, Stmt\ClassMethod>
      */
@@ -122,6 +124,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
+     * Collect private method calls made inside a class-like node.
+     *
      * @param Class_|Trait_|Enum_ $classLike
      * @return array<string, true>
      */
@@ -188,6 +192,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     }
 
     /**
+     * Build findings for unused methods in the dead-code rule.
+     *
      * @param Class_|Trait_|Enum_             $classLike
      * @param array<string, Stmt\ClassMethod> $privateMethods
      * @param array<string, true>             $calledNames

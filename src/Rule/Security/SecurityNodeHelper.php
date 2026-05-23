@@ -19,6 +19,8 @@ use PhpParser\NodeFinder;
 final class SecurityNodeHelper
 {
     /**
+     * List PHP superglobals treated as request-controlled input.
+     *
      * @return list<string>
      */
     public static function userInputSuperglobals(): array
@@ -276,7 +278,7 @@ final class SecurityNodeHelper
                 return $current;
             }
 
-            $parent = $current->getAttribute('parent');
+            $parent  = $current->getAttribute('parent');
             $current = $parent instanceof Node ? $parent : null;
         }
 

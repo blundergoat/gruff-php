@@ -34,6 +34,8 @@ final readonly class ChangedLineRange
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array{start: int, end: int}
      */
     public function toArray(): array

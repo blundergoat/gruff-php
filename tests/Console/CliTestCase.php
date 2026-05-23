@@ -20,7 +20,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Create an isolated project fixture for baseline CLI tests.
      *
-     * @return string Fixture value.
+     * @return string
      */
     protected function createBaselineProject(): string
     {
@@ -59,7 +59,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture value.
+     * @return string
      */
     protected function tempDir(): string
     {
@@ -74,7 +74,7 @@ abstract class CliTestCase extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
-     * @return void No return value.
+     * @return void
      */
     protected function removeDir(string $path): void
     {
@@ -107,7 +107,7 @@ abstract class CliTestCase extends TestCase
      *
      * @param string $source      Source directory.
      * @param string $destination Destination directory.
-     * @return void No return value.
+     * @return void
      */
     protected function copyPackageTree(string $source, string $destination): void
     {
@@ -159,7 +159,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Return an unused local TCP port for dashboard tests.
      *
-     * @return int Fixture value.
+     * @return int
      * @throws RuntimeException When the helper cannot complete the fixture operation.
      */
     protected function unusedPort(): int
@@ -201,7 +201,7 @@ abstract class CliTestCase extends TestCase
      *
      * @param int     $port    Local TCP port.
      * @param Process $process Dashboard server process.
-     * @return void No return value.
+     * @return void
      */
     protected function waitForHttpServer(int $port, Process $process): void
     {
@@ -231,7 +231,7 @@ abstract class CliTestCase extends TestCase
      *
      * @param int    $port Local TCP port.
      * @param string $path Filesystem path.
-     * @return string Fixture value.
+     * @return string
      * @throws RuntimeException When the helper cannot complete the fixture operation.
      */
     protected function fetchHttp(int $port, string $path): string

@@ -15,9 +15,9 @@ use PhpCsFixer\Tokenizer\Tokens;
 final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 {
     /**
-     * Return the custom fixer rule name.
+     * Identify the in-repo named-argument alignment fixer.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public function getName(): string
     {
@@ -25,9 +25,9 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     }
 
     /**
-     * Return the custom fixer definition.
+     * Describe the named-argument alignment fixer for PHP-CS-Fixer.
      *
-     * @return FixerDefinitionInterface Fixture value.
+     * @return FixerDefinitionInterface
      */
     public function getDefinition(): FixerDefinitionInterface
     {
@@ -42,9 +42,9 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     }
 
     /**
-     * Return the custom fixer priority.
+     * Run after built-in whitespace fixers so alignment sees final argument layout.
      *
-     * @return int Fixture value.
+     * @return int
      */
     public function getPriority(): int
     {
@@ -55,7 +55,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether the token stream may contain named arguments.
      *
      * @param Tokens $tokens Token stream to fix.
-     * @return bool True when the assertion condition is met.
+     * @return bool
      */
     public function isCandidate(Tokens $tokens): bool
     {
@@ -67,9 +67,9 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Apply named-argument alignment to a token stream.
      *
-     * @param SplFileInfo $file File being fixed.
-     * @param Tokens $tokens Token stream to fix.
-     * @return void No return value.
+     * @param SplFileInfo $file   File being fixed.
+     * @param Tokens      $tokens Token stream to fix.
+     * @return void
      */
     protected function applyFix(SplFileInfo $file, Tokens $tokens): void
     {
@@ -85,7 +85,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Align consecutive multiline named-argument groups in source code.
      *
      * @param string $code Source code to inspect.
-     * @return string Fixture value.
+     * @return string
      */
     private function alignNamedArgumentGroups(string $code): string
     {
@@ -127,7 +127,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether a source line contains a named argument.
      *
      * @param string $line Source line to inspect.
-     * @return bool True when the assertion condition is met.
+     * @return bool
      */
     private function isNamedArgumentLine(string $line): bool
     {
@@ -138,6 +138,8 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     }
 
     /**
+     * Align one consecutive block of multiline named arguments.
+     *
      * @param list<string> $lines
      * @param list<int>    $group
      * @return void

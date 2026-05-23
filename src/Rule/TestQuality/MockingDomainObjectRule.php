@@ -51,8 +51,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * Find mock creations for classes that match configured domain-object patterns.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for mocked domain objects.
      */
@@ -109,6 +109,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
+     * Map imported class aliases to fully qualified names.
+     *
      * @return array<string, string>
      */
     private function collectUseAliases(AnalysisUnit $analysisUnit): array

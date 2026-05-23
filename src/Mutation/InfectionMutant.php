@@ -30,6 +30,8 @@ final readonly class InfectionMutant
     }
 
     /**
+     * Serialize this value object into the array shape used by reports.
+     *
      * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null}
      */
     public function toArray(): array

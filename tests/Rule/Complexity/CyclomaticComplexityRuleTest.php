@@ -30,7 +30,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -39,6 +39,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
+     * Provide method ccn cases for parameterized tests.
+     *
      * @return array<string, array{string, int}>
      */
     public static function methodCcnProvider(): array
@@ -59,7 +61,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
      *
      * @param string $methodName  Fixture method name.
      * @param int    $expectedCcn Expected cyclomatic complexity.
-     * @return void No return value.
+     * @return void
      */
     #[DataProvider('methodCcnProvider')]
     public function testCyclomaticCountMatchesExpected(string $methodName, int $expectedCcn): void
@@ -85,7 +87,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify no findings for simple methods.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testNoFindingsForSimpleMethods(): void
     {
@@ -97,7 +99,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify warning for method above threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testWarningForMethodAboveThreshold(): void
     {
@@ -119,7 +121,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify error for method above error threshold.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testErrorForMethodAboveErrorThreshold(): void
     {
@@ -131,6 +133,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
+     * Analyse complexity fixtures and return findings for assertions.
+     *
      * @param array<string, int> $thresholds
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -150,7 +154,7 @@ final class CyclomaticComplexityRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

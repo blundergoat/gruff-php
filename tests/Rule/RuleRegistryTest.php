@@ -108,7 +108,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default registry contains stable rule ids.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultRegistryContainsStableRuleIds(): void
     {
@@ -165,7 +165,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify runs enabled rules over parsed files.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRunsEnabledRulesOverParsedFiles(): void
     {
@@ -192,7 +192,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify skips disabled rules.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testSkipsDisabledRules(): void
     {
@@ -214,7 +214,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify deduplicates project level findings across units.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDeduplicatesProjectLevelFindingsAcrossUnits(): void
     {
@@ -237,7 +237,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify rejects duplicate rule ids.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testRejectsDuplicateRuleIds(): void
     {
@@ -253,7 +253,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default rules have listable descriptions.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultRulesHaveListableDescriptions(): void
     {
@@ -271,7 +271,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Verify default rule definitions keep stable reporting and config metadata.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testDefaultRuleDefinitionsStayStable(): void
     {
@@ -312,7 +312,7 @@ final class RuleRegistryTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $displayPath Fixture display path.
-     * @return AnalysisUnit Fixture value.
+     * @return AnalysisUnit
      */
     private function parseFixture(string $displayPath): AnalysisUnit
     {
@@ -325,7 +325,7 @@ final class RuleRegistryTest extends TestCase
      * Build a fixture rule with the requested identifier.
      *
      * @param string $id Rule identifier.
-     * @return RuleInterface Fixture value.
+     * @return RuleInterface
      */
     private function fakeRule(string $id): RuleInterface
     {
@@ -342,7 +342,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return metadata for the fixture rule.
              *
-             * @return RuleDefinition Fixture value.
+             * @return RuleDefinition
              */
             public function definition(): RuleDefinition
             {
@@ -359,8 +359,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit    Analysis unit.
-             * @param RuleContext  $ruleContext Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit Analysis unit.
+             * @param RuleContext  $ruleContext  Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -384,7 +384,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Build a project-level fixture rule with duplicate identity.
      *
-     * @return RuleInterface Fixture value.
+     * @return RuleInterface
      */
     private function duplicateProjectRule(): RuleInterface
     {
@@ -392,7 +392,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return metadata for the fixture rule.
              *
-             * @return RuleDefinition Fixture value.
+             * @return RuleDefinition
              */
             public function definition(): RuleDefinition
             {
@@ -409,8 +409,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit    Analysis unit.
-             * @param RuleContext  $ruleContext Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit Analysis unit.
+             * @param RuleContext  $ruleContext  Rule context for the fixture.
              * @return list<\GruffPhp\Finding\Finding> Fixture findings.
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array

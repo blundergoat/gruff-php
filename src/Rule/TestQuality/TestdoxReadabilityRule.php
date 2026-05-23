@@ -33,13 +33,13 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                self::ID,
-            name:              'Testdox readability',
-            pillar:            Pillar::TestQuality,
-            tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Advisory,
-            confidence:        Confidence::Low,
-            defaultThresholds: ['minWords' => 3],
+            id:                 self::ID,
+            name:               'Testdox readability',
+            pillar:             Pillar::TestQuality,
+            tier:               RuleTier::V01,
+            defaultSeverity:    Severity::Advisory,
+            confidence:         Confidence::Low,
+            defaultThresholds:  ['minWords' => 3],
             isEnabledByDefault: false,
         );
     }
@@ -47,8 +47,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Find test names that produce hard-to-read TestDox output.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unreadable TestDox names.
      */
@@ -94,6 +94,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
+     * Split testdox text into words for readability checks.
+     *
      * @return list<string>
      */
     private function splitWords(string $methodName): array

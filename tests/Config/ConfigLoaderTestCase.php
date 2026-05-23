@@ -16,7 +16,7 @@ abstract class ConfigLoaderTestCase extends TestCase
      *
      * @param string $contents Config file contents.
      * @param string $suffix   File suffix.
-     * @return string Fixture value.
+     * @return string
      */
     protected function writeTempConfig(string $contents, string $suffix = '.yaml'): string
     {

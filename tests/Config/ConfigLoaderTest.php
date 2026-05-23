@@ -304,6 +304,8 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Provide invalid inline config cases for parameterized tests.
+     *
      * @return array<string, array{string, string}>
      */
     public static function invalidInlineConfigProvider(): array

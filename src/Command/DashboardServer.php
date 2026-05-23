@@ -27,9 +27,9 @@ final readonly class DashboardServer
     /**
      * Bind the dashboard socket and process HTTP clients until the socket closes.
      *
-     * @param OutputInterface         $output  Console output for the dashboard URL and errors.
-     * @param string                  $host    Hostname or address to bind.
-     * @param int                     $port    Port to bind.
+     * @param OutputInterface         $output                  Console output for the dashboard URL and errors.
+     * @param string                  $host                    Hostname or address to bind.
+     * @param int                     $port                    Port to bind.
      * @param DashboardRequestContext $dashboardRequestContext Request context shared with handlers.
      * @return int Symfony command exit code.
      */
@@ -128,6 +128,8 @@ final readonly class DashboardServer
     }
 
     /**
+     * Accept one dashboard HTTP client connection.
+     *
      * @param resource $server
      * @return resource|false
      */

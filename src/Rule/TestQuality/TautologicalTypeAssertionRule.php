@@ -48,8 +48,8 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Find `assertInstanceOf` calls where the value type is already proven locally.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for redundant type assertions.
      */
@@ -102,6 +102,8 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
+     * Map local variables to the class names assigned to them.
+     *
      * @return array<string, string>
      */
     private function collectLocalAssignmentTypes(TestQualityScope $scope): array

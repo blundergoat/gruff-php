@@ -58,8 +58,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Find tests that mutate global state without detected cleanup hooks.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for unscoped global state mutation.
      */
@@ -110,6 +110,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Build superglobal findings for the test-quality rule.
+     *
      * @return list<Finding>
      */
     private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
@@ -123,11 +125,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                analysisUnit:     $analysisUnit,
-                scope:    $scope,
-                line:     $assign->getStartLine(),
-                message:  sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
-                metadata: ['variant' => 'superglobal', 'name' => $superglobal],
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                line:         $assign->getStartLine(),
+                message:      sprintf('%s writes to $%s without a tearDown / #[After] cleanup.', $scope->symbol, $superglobal),
+                metadata:     ['variant' => 'superglobal', 'name' => $superglobal],
             );
         }
 
@@ -135,6 +137,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Build state function findings for the test-quality rule.
+     *
      * @return list<Finding>
      */
     private function stateFunctionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
@@ -152,11 +156,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
 
             $findings[] = $this->finding(
-                analysisUnit:     $analysisUnit,
-                scope:    $scope,
-                line:     $call->getStartLine(),
-                message:  sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
-                metadata: ['variant' => 'function', 'name' => $name],
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                line:         $call->getStartLine(),
+                message:      sprintf('%s calls %s() without a tearDown / #[After] cleanup.', $scope->symbol, $name),
+                metadata:     ['variant' => 'function', 'name' => $name],
             );
         }
 
@@ -235,6 +239,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
+     * Index declared classes by fully qualified and short names.
+     *
      * @return array<string, Stmt\Class_>
      */
     private function classesByName(AnalysisUnit $analysisUnit): array

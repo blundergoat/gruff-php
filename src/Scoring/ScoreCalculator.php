@@ -90,7 +90,9 @@ final readonly class ScoreCalculator
     }
 
     /**
-     * @param list<Finding> $findings
+     * Calculate per-pillar scores from the active finding set.
+     *
+     * @param list<Finding>     $findings
      * @param list<Pillar>|null $scorePillars
      * @return list<PillarScore>
      */
@@ -166,6 +168,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+     * Calculate per-file scores from the active finding set.
+     *
      * @param list<Finding> $findings
      * @return list<FileScore>
      */
@@ -219,6 +223,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+     * Bucket complexity findings by rule identifier.
+     *
      * @param list<Finding> $findings
      * @return array<string, int>
      */
@@ -281,6 +287,8 @@ final readonly class ScoreCalculator
     }
 
     /**
+     * Count findings by severity for scoring and summaries.
+     *
      * @param list<Finding> $findings
      * @return array{advisory: int, warning: int, error: int}
      */

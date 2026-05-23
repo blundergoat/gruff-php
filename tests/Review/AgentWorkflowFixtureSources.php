@@ -12,7 +12,7 @@ final class AgentWorkflowFixtureSources
     /**
      * Return source code for the base review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function baseExampleSource(): string
     {
@@ -35,7 +35,7 @@ PHP;
     /**
      * Return source code for the changed review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function changedExampleSource(): string
     {
@@ -65,7 +65,7 @@ PHP;
     /**
      * Return source code for the removed-base review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function removedBaseExampleSource(): string
     {
@@ -93,7 +93,7 @@ PHP;
     /**
      * Return source code for an added risky review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function addedRiskSource(): string
     {
@@ -116,7 +116,7 @@ PHP;
     /**
      * Return source code for a project-rule interface review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function bookingGatewayInterfaceSource(): string
     {
@@ -135,7 +135,7 @@ PHP;
     /**
      * Return changed source code for a project-rule interface review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function changedBookingGatewayInterfaceSource(): string
     {
@@ -155,7 +155,7 @@ PHP;
     /**
      * Return source code for the unchanged implementor side of a project-rule review fixture.
      *
-     * @return string Fixture value.
+     * @return string
      */
     public static function bookingOtpGatewaySource(): string
     {

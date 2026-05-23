@@ -59,6 +59,8 @@ final readonly class BranchReviewComparator
     }
 
     /**
+     * Index findings by branch-review identity.
+     *
      * @param list<Finding> $findings
      * @return array<string, list<Finding>>
      */

@@ -22,7 +22,7 @@ abstract class DocsRuleTestCase extends TestCase
     /**
      * Prepare parser fixtures before each rule test.
      *
-     * @return void No return value.
+     * @return void
      */
     protected function setUp(): void
     {
@@ -30,6 +30,8 @@ abstract class DocsRuleTestCase extends TestCase
     }
 
     /**
+     * Analyse documentation fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseFixture(string $fixture): array
@@ -42,6 +44,8 @@ abstract class DocsRuleTestCase extends TestCase
     }
 
     /**
+     * Analyse documentation fixtures and return findings for assertions.
+     *
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseRule(string $fixture, string $ruleId): array
@@ -56,7 +60,7 @@ abstract class DocsRuleTestCase extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit Fixture value.
+     * @return \GruffPhp\Parser\AnalysisUnit
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

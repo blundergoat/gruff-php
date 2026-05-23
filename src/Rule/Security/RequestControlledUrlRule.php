@@ -77,6 +77,8 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
+     * Build http client findings for the security rule.
+     *
      * @return list<Finding>
      */
     private function httpClientFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
@@ -97,6 +99,8 @@ final class RequestControlledUrlRule implements RuleInterface
     }
 
     /**
+     * Build function findings for the security rule.
+     *
      * @return list<Finding>
      */
     private function functionFindings(AnalysisUnit $analysisUnit, Expr\FuncCall $call): array

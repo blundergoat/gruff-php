@@ -28,7 +28,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter escapes run data and renders report sections.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterEscapesRunDataAndRendersReportSections(): void
     {
@@ -80,7 +80,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter omits mutation visualization.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterOmitsMutationVisualization(): void
     {
@@ -112,7 +112,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter uses canonical severity vocabulary and accessible markup.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterUsesCanonicalSeverityVocabularyAndAccessibleMarkup(): void
     {
@@ -143,7 +143,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders diagnostics when present.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersDiagnosticsWhenPresent(): void
     {
@@ -165,7 +165,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter uses celebration subtitle when no warning or error findings exist.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterUsesCelebrationSubtitleWhenNoWarningOrErrorFindingsExist(): void
     {
@@ -188,7 +188,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders opt in editor links.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersOptInEditorLinks(): void
     {
@@ -208,7 +208,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify VS Code editor links support Windows absolute paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersWindowsVscodeEditorLinks(): void
     {
@@ -234,7 +234,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders PHP storm editor links.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersPhpStormEditorLinks(): void
     {
@@ -249,7 +249,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter renders interactive findings only when enabled.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersInteractiveFindingsOnlyWhenEnabled(): void
     {
@@ -272,7 +272,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter static snapshot matches fixture.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterStaticSnapshotMatchesFixture(): void
     {
@@ -284,7 +284,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify HTML reporter interactive snapshot matches fixture.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterInteractiveSnapshotMatchesFixture(): void
     {
@@ -296,7 +296,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify missing score default path and active diff labels render safely.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterHandlesMissingScoreDefaultPathAndActiveDiffScope(): void
     {
@@ -328,7 +328,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify major sections keep their document order around diagnostics.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterKeepsMastheadDiagnosticsAndVerdictInOrder(): void
     {
@@ -351,7 +351,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify diagnostic locations prefer parsed file paths with lines over input paths.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterDiagnosticLocationsPreferFilePathLineThenPath(): void
     {
@@ -368,7 +368,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify custom score reports render empty and distribution edge cases.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
@@ -399,7 +399,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify custom score reports render offender metrics in fixed column order.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
@@ -428,7 +428,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Verify interactive pillar select size is bounded.
      *
-     * @return void No return value.
+     * @return void
      */
     public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
     {
@@ -462,7 +462,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Build a sample analysis report for renderer assertions.
      *
-     * @return AnalysisReport Fixture value.
+     * @return AnalysisReport
      */
     private function sampleReport(): AnalysisReport
     {
@@ -532,7 +532,7 @@ final class HtmlReporterTest extends TestCase
      * Load an expected fixture snapshot.
      *
      * @param string $name Fixture name.
-     * @return string Fixture value.
+     * @return string
      */
     private function fixture(string $name): string
     {
