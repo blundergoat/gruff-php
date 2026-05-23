@@ -18,7 +18,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PhpDocMixedOveruseRuleTest behavior.
+ * Covers detection of overused PHPDoc mixed types with exemptions for unstructured array bags, generic templates, throws-only blocks, and untyped-signature mixed docs; checks advisory severity and modernisation pillar.
  */
 final class PhpDocMixedOveruseRuleTest extends TestCase
 {

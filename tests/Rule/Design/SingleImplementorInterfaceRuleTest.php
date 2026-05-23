@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers SingleImplementorInterfaceRuleTest behavior.
+ * Covers single-implementor interface detection: internal one-impl flagging, mock-only flagging, configured exemptions, hierarchy and external-usage exemption, framework-attribute exemptions, and finding metadata.
  */
 final class SingleImplementorInterfaceRuleTest extends TestCase
 {

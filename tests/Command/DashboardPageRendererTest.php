@@ -8,7 +8,7 @@ use GruffPhp\Command\DashboardPageRenderer;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers DashboardPageRenderer behavior.
+ * Covers dashboard HTML rendering: escaping, checkbox state markers, metadata payload injection around the body tag, JSON-encoding fallback, and error-page formatting.
  */
 final class DashboardPageRendererTest extends TestCase
 {

@@ -7,7 +7,7 @@ namespace GruffPhp\Tests\Console;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers DashboardCliTest behavior.
+ * Covers the dashboard CLI command: refreshable HTML server, mutation UI suppression when configured, and ad-hoc scans of other projects via browser query.
  */
 final class DashboardCliTest extends CliTestCase
 {

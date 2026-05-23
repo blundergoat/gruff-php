@@ -20,7 +20,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers SizeIntegrationTest behavior.
+ * Covers co-firing of size rules on cumulative fixtures, config-override response, and silence on clean inputs.
  */
 final class SizeIntegrationTest extends TestCase
 {

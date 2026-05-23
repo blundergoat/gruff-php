@@ -19,7 +19,7 @@ use GruffPhp\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers ScoreCalculatorTest behavior.
+ * Covers score calculation: simple A-F grade boundaries, mutation-pillar omission when Infection data is absent, composite god-method detection, file-metric inclusion, and pillar-scoped composites.
  */
 final class ScoreCalculatorTest extends TestCase
 {

@@ -24,7 +24,7 @@ use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 
 /**
- * Covers NamingRulesTest behavior.
+ * Covers the naming rule pack: generic method names, single-char and Hungarian variables with sensible exemptions, boolean prefixes, class-file mismatch, identifier tokenisation, and identifier quality across closures and arrow scopes.
  */
 final class NamingRulesTest extends NamingRuleTestCase
 {

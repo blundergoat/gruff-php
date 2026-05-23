@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers CyclomaticComplexityRuleTest behavior.
+ * Covers cyclomatic complexity counting on fixtures plus warning and error threshold transitions for individual methods.
  */
 final class CyclomaticComplexityRuleTest extends TestCase
 {

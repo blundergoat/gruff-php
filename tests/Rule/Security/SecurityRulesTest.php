@@ -39,7 +39,7 @@ use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers SecurityRulesTest behavior.
+ * Covers the security rule pack: dangerous execution and deserialisation, dynamic-call discrimination, sensitive-logger handling, request-data heuristics, workflow risks, and config-driven disables.
  */
 final class SecurityRulesTest extends TestCase
 {

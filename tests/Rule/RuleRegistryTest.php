@@ -101,7 +101,7 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers RuleRegistryTest behavior.
+ * Covers the default rule registry: stable rule IDs and definitions, enabled-rule execution, disabled-rule skipping, project-level finding deduplication, duplicate-ID rejection, and listable descriptions.
  */
 final class RuleRegistryTest extends TestCase
 {

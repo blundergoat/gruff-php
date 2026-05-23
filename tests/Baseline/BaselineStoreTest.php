@@ -13,7 +13,7 @@ use GruffPhp\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers BaselineStoreTest behavior.
+ * Covers atomic baseline file replacement without leaving temp-file residue on disk.
  */
 final class BaselineStoreTest extends TestCase
 {

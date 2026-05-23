@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers AgentWorkflowCliTest behavior.
+ * Covers agent workflow CLI flows: list-rules metadata, display filters, SARIF output, branch-review introduced/removed/line-shifted findings, changed-only scoping, and review-mode option validation.
  */
 final class AgentWorkflowCliTest extends TestCase
 {

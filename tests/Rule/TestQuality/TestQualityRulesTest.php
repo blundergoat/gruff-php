@@ -46,7 +46,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers TestQualityRulesTest behavior.
+ * Covers the test-quality rule pack across PHPUnit and Pest: assertion smells, eager tests, SUT-not-called, oversized methods, unused mocks, global-state leaks, repeated structures, and per-rule severity options.
  */
 final class TestQualityRulesTest extends TestCase
 {

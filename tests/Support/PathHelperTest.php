@@ -8,7 +8,7 @@ use GruffPhp\Support\PathHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PathHelper behavior.
+ * Covers absolute-path detection, dot-segment canonicalisation, and relative-path normalisation across Unix, UNC, and drive-letter inputs.
  */
 final class PathHelperTest extends TestCase
 {

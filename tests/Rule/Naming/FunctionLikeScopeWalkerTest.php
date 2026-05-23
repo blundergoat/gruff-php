@@ -12,7 +12,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers FunctionLikeScopeWalker behavior.
+ * Covers function-like scope walking: isolation of nested closures, shadowed parameters, separate scopes for arrow functions inside foreach, and method-before-body-closure yield order.
  */
 final class FunctionLikeScopeWalkerTest extends TestCase
 {

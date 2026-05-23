@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers NestingDepthRuleTest behavior.
+ * Covers nesting depth measurement on fixtures plus warning and error transitions for shallow, deep, and very deeply nested methods.
  */
 final class NestingDepthRuleTest extends TestCase
 {

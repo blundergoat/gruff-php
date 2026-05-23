@@ -27,7 +27,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers SensitiveDataRulesTest behavior.
+ * Covers sensitive-data detection: credentials with redacted previews, PHI/PII profiles, config-file scanning, dummy/placeholder allowlisting, comment-context skipping, high-entropy false-positive avoidance, and CLI report redaction.
  */
 final class SensitiveDataRulesTest extends TestCase
 {

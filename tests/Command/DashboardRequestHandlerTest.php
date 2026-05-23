@@ -18,7 +18,7 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers DashboardRequestHandlerTest behavior.
+ * Covers dashboard HTTP request validation: host header allowlist, oversized request lines and header blocks, and per-route method restrictions.
  */
 final class DashboardRequestHandlerTest extends TestCase
 {

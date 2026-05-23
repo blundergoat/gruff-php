@@ -8,7 +8,7 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers AnalyseCliTest behavior.
+ * Covers the analyse CLI end-to-end: single-file mode, syntax-error handling, threshold-driven exits, JSON/HTML/SARIF/GitHub outputs, profile and selection config, scoring, and editor-link options.
  */
 final class AnalyseCliTest extends CliTestCase
 {

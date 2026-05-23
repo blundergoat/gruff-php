@@ -12,7 +12,7 @@ use GruffPhp\Finding\Severity;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers FindingTest behavior.
+ * Covers serialisation of Finding into the documented stable shape.
  */
 final class FindingTest extends TestCase
 {

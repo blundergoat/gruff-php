@@ -15,7 +15,7 @@ use PhpParser\Node\Stmt;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers TestQualityNodeHelper behavior.
+ * Covers test-file detection, PHPUnit/Pest scope discovery, method classification (attributes/annotations/parents/detached), assertion-call recognition, argument-literal helpers, and mock creation/verification detection.
  */
 final class TestQualityNodeHelperTest extends TestCase
 {

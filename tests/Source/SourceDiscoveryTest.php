@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers SourceDiscoveryTest behavior.
+ * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile exclusion, glob patterns, missing-path reporting, and canonical deduplication.
  */
 final class SourceDiscoveryTest extends TestCase
 {

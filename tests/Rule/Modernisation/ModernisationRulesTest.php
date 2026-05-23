@@ -26,7 +26,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers ModernisationRulesTest behavior.
+ * Covers modernisation rule detection: PHP version gating, PHP 8.x candidates, exemption of legitimate mutable cases, and error-suppression flagged as security-with-modernisation pillar.
  */
 final class ModernisationRulesTest extends TestCase
 {

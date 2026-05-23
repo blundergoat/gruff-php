@@ -9,7 +9,7 @@ use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
 
 /**
- * Covers DocsRulesTest behavior.
+ * Covers documentation rule enforcement: missing PHPDoc on public/accessor/private/magic/interface-contract methods, and missing param and return tags across array, descriptive, void, and scalar-throws cases.
  */
 final class DocsRulesTest extends DocsRuleTestCase
 {

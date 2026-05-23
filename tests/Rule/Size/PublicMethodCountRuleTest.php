@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PublicMethodCountRuleTest behavior.
+ * Covers public-method-count thresholds: allowed shapes pass and excessive counts emit a warning.
  */
 final class PublicMethodCountRuleTest extends TestCase
 {

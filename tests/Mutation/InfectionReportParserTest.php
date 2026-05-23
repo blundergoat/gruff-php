@@ -14,7 +14,7 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * Covers InfectionReportParserTest behavior.
+ * Covers Infection JSON report parsing: full reports, optional status fields, malformed/missing/invalid input rejection, and runner integration with project vendor binaries and config.
  *
  * @phpstan-type InvalidReportScalar bool|float|int|object|string|null
  * @phpstan-type InvalidReportLevel10 array<array-key, InvalidReportScalar>

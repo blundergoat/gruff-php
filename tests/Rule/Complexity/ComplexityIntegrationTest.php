@@ -19,7 +19,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers ComplexityIntegrationTest behavior.
+ * Covers co-firing of complexity rules on cumulative fixtures, silence on simple inputs, response to config overrides, and N-path cap surfacing in metadata and messages.
  */
 final class ComplexityIntegrationTest extends TestCase
 {

@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers GitArchiveSnapshotTest behavior.
+ * Covers git archive snapshotting: requested-path scoping, absolute-path canonicalisation, empty snapshots, cleanup on failure, and rejection of unsafe refs.
  */
 final class GitArchiveSnapshotTest extends TestCase
 {

@@ -23,7 +23,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers WasteRulesTest behavior.
+ * Covers waste detection: unreachable code, empty methods and classes, unused imports and parameters, commented-out code, one-line wrapper methods (with intent and allowlist exemptions), and redundant variable-before-return.
  */
 final class WasteRulesTest extends TestCase
 {

@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers CognitiveComplexityRuleTest behavior.
+ * Covers cognitive complexity counting on fixtures, threshold stability, no-finding cases, warning emission, and same-operator boolean chain collapsing.
  */
 final class CognitiveComplexityRuleTest extends TestCase
 {

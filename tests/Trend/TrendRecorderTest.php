@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * Covers TrendRecorderTest behavior.
+ * Covers trend history recording: previous-score delta computation, nested history bounding, missing-history handling, and rejection of invalid payloads.
  *
  * @phpstan-type InvalidHistoryScalar bool|float|int|string
  * @phpstan-type InvalidHistoryNested array<array-key, InvalidHistoryScalar>

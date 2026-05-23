@@ -10,7 +10,7 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers CliTestCase behavior.
+ * Base class for CLI integration tests; provides baseline project scaffolding, temp directories, package-tree copying, port allocation, and HTTP server helpers.
  */
 abstract class CliTestCase extends TestCase
 {

@@ -21,7 +21,7 @@ use GruffPhp\Scoring\ScoreReport;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers HtmlReporterTest behavior.
+ * Covers HTML report rendering: escaping, severity vocabulary, editor links (VS Code, PhpStorm, Windows), diagnostics ordering, snapshot stability, and interactive controls.
  */
 final class HtmlReporterTest extends TestCase
 {

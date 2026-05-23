@@ -8,7 +8,7 @@ use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers ListRulesCliTest behavior.
+ * Covers the version, list, and help CLI commands running end-to-end through the built binary on a clean checkout.
  */
 final class ListRulesCliTest extends CliTestCase
 {

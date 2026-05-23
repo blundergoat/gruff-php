@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers GitDiffProviderTest behavior.
+ * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter scope, and rejection of unsafe base refs.
  */
 final class GitDiffProviderTest extends TestCase
 {

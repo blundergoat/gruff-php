@@ -9,7 +9,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PhpFileParserTest behavior.
+ * Covers PHP file parsing into analysis units and reporting of syntax errors as parse diagnostics.
  */
 final class PhpFileParserTest extends TestCase
 {

@@ -15,7 +15,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers ClassLengthRuleTest behavior.
+ * Covers class-length thresholds (warning/error), interface exemption, and trait inclusion.
  */
 final class ClassLengthRuleTest extends TestCase
 {

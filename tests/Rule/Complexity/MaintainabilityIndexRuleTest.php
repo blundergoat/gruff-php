@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers MaintainabilityIndexRule behavior.
+ * Covers maintainability index computation, threshold stability, rounded metadata, and fractional-threshold preservation in finding messages.
  */
 final class MaintainabilityIndexRuleTest extends TestCase
 {

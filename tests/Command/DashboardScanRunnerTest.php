@@ -15,7 +15,7 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers DashboardScanRunner behavior.
+ * Covers dashboard scan caching: source-fingerprint and content-hash invalidation, diff and include-ignored bypass, config/baseline change invalidation, and error rendering for empty or timed-out scans.
  */
 final class DashboardScanRunnerTest extends TestCase
 {

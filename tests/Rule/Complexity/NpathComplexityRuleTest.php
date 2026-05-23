@@ -18,7 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers NpathComplexityRule behavior.
+ * Covers N-path complexity computation, threshold stability, finding metadata, cap labelling for very large N-paths, and fractional-threshold preservation in messages.
  */
 final class NpathComplexityRuleTest extends TestCase
 {

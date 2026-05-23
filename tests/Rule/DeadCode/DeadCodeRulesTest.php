@@ -14,7 +14,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers DeadCodeRulesTest behavior.
+ * Covers dead-code detection: unused/used private methods (with magic and protected exclusions) and unused/used/never-read private properties (including promoted constructor properties).
  */
 final class DeadCodeRulesTest extends TestCase
 {

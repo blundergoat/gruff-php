@@ -16,7 +16,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers ParameterCountRuleTest behavior.
+ * Covers parameter-count thresholds for methods, constructor variants (promoted, value-object exemption, configured ceiling), exempt callables, and interfaces.
  */
 final class ParameterCountRuleTest extends TestCase
 {

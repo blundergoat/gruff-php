@@ -179,7 +179,7 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
 }
 
 /**
- * Covers FixtureDefaultDisabledRule behavior.
+ * Fixture rule used by the loader's enabled-state tests; default-disabled with no analysis output.
  */
 final readonly class FixtureDefaultDisabledRule implements RuleInterface
 {
@@ -218,7 +218,7 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
 }
 
 /**
- * Covers FixtureOptionsRule behavior.
+ * Fixture rule used by the loader's option-validation tests; exposes typed options for the test config payloads.
  */
 final readonly class FixtureOptionsRule implements RuleInterface
 {

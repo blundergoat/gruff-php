@@ -17,7 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers HalsteadVolumeRule behavior.
+ * Covers Halstead volume metrics, threshold stability, rounded finding metadata, and fractional-threshold preservation in messages.
  */
 final class HalsteadVolumeRuleTest extends TestCase
 {

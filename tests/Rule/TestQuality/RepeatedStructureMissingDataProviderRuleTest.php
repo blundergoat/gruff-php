@@ -15,7 +15,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers RepeatedStructureMissingDataProviderRule behavior.
+ * Covers detection of repeated test structures after non-candidates and the grouped method metadata carried on findings.
  */
 final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
 {

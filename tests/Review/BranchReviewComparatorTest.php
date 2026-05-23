@@ -13,7 +13,7 @@ use GruffPhp\Review\BranchReviewComparator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers BranchReviewComparator behavior.
+ * Covers counting of duplicate review finding identities rather than collapsing them.
  */
 final class BranchReviewComparatorTest extends TestCase
 {

@@ -12,7 +12,7 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers DashboardStateFactory behavior.
+ * Covers dashboard state construction: console input merging, fallback conventions, bare-flag preservation, checkbox unchecking, project-root resolution, and string-option validation.
  */
 final class DashboardStateFactoryTest extends TestCase
 {

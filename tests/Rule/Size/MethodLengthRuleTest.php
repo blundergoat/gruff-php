@@ -15,7 +15,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers MethodLengthRuleTest behavior.
+ * Covers method-length thresholds (warning/error), multiline-call collapsing, closure-as-method counting, and disabled-rule suppression.
  */
 final class MethodLengthRuleTest extends TestCase
 {

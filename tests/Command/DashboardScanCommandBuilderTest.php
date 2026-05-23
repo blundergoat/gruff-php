@@ -8,7 +8,7 @@ use GruffPhp\Command\DashboardScanCommandBuilder;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers DashboardScanCommandBuilderTest behavior.
+ * Covers dashboard scan command building: dash-prefixed and quoted path token preservation, owned-option separation, and prevention of option-like paths reaching the argument vector.
  */
 final class DashboardScanCommandBuilderTest extends TestCase
 {

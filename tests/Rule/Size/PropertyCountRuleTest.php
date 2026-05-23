@@ -15,7 +15,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers PropertyCountRuleTest behavior.
+ * Covers property-count thresholds for declared, promoted constructor, and trait properties.
  */
 final class PropertyCountRuleTest extends TestCase
 {

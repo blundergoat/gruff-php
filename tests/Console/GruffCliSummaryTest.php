@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers GruffCliSummaryTest behavior.
+ * Covers the summary CLI command: digest section output, suppression of per-finding lines, JSON-schema-conformant output, invalid-option rejection, and registration in the command list.
  */
 final class GruffCliSummaryTest extends TestCase
 {

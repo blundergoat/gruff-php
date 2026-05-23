@@ -15,7 +15,7 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers AverageMethodLengthRuleTest behavior.
+ * Covers average-method-length thresholds, warning/error transitions, and skipping of classes with no methods.
  */
 final class AverageMethodLengthRuleTest extends TestCase
 {

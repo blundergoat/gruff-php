@@ -18,7 +18,7 @@ use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * Covers ConfigLoaderTest behavior.
+ * Covers YAML config discovery, threshold and severity overrides, default-rule loading, rule disabling, PHP version pinning, and rejection of invalid input.
  */
 final class ConfigLoaderTest extends ConfigLoaderTestCase
 {

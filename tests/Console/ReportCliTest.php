@@ -8,7 +8,7 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers ReportCliTest behavior.
+ * Covers the report CLI command: static and JSON output, HTML report flag forwarding, repeated rule filter forwarding, dash-prefixed path preservation, baseline flag, and no-write-on-invalid-analyse behaviour.
  */
 final class ReportCliTest extends CliTestCase
 {
