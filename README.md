@@ -11,17 +11,18 @@ for type checking or tests.
 ## Release Status
 
 This repository is prepared for the public `0.1.0` tag. Development checkouts
-may report `0.1.0-dev`; the release script updates the binary version to
-`0.1.0` before tagging.
+currently report `0.1.0-dev`; `scripts/bump-version.sh 0.1.0` updates the CLI
+version and stamps the changelog before tagging.
 
 Current package facts:
 
 - Package name: `devgoat/gruff-php`
+- Repository: `https://github.com/blundergoat/gruff-php`
 - Binary: `bin/gruff-php`
 - PHP requirement: `^8.3`
 - Runtime dependencies: `nikic/php-parser`, Symfony Console/Finder/Process/Yaml
-- Rule catalogue: 114 registry rules across 11 pillars
-- Config format: YAML only (`.yaml`)
+- Rule catalogue: 120 registry rules across 11 pillars
+- Config format: YAML only (`.yaml` / `.yml`)
 - License: MIT (see [`LICENSE`](LICENSE))
 
 ## Installation
@@ -29,7 +30,7 @@ Current package facts:
 From a checkout:
 
 ```bash
-git clone <repo-url> gruff-php
+git clone https://github.com/blundergoat/gruff-php.git
 cd gruff-php
 composer install
 php bin/gruff-php --help
@@ -123,19 +124,21 @@ php bin/gruff-php list-rules --format json
 ## Rule Pillars
 
 `list-rules --format json` is the source of truth for rule metadata. The v0.1
-catalogue includes these pillars:
+catalogue currently contains 120 registry rules:
 
-- `size`
-- `complexity`
-- `maintainability`
-- `dead-code`
-- `naming`
-- `documentation`
-- `modernisation`
-- `security`
-- `sensitive-data`
-- `test-quality`
-- `design`
+| Pillar | Rules |
+| --- | ---: |
+| `size` | 7 |
+| `complexity` | 5 |
+| `maintainability` | 2 |
+| `dead-code` | 9 |
+| `naming` | 12 |
+| `documentation` | 14 |
+| `modernisation` | 10 |
+| `security` | 18 |
+| `sensitive-data` | 9 |
+| `test-quality` | 33 |
+| `design` | 1 |
 
 Representative rule IDs:
 
@@ -147,6 +150,7 @@ naming.identifier-quality
 docs.missing-param-tag
 modernisation.readonly-property-candidate
 security.unsafe-unserialize
+security.path-traversal-file-access
 sensitive-data.high-entropy-string
 test-quality.no-assertions
 design.single-implementor-interface
@@ -358,14 +362,18 @@ Before tagging `0.1.0`:
   stamp the date.
 - Run `scripts/bump-version.sh 0.1.0` to update `src/Console/Application.php`
   and stamp the `CHANGELOG.md` entry.
-- Confirm Packagist metadata and repository URL.
+- Confirm Packagist metadata, repository URL, issue tracker, and GitHub private
+  vulnerability reporting for `https://github.com/blundergoat/gruff-php`.
 - Run `composer validate --strict`, `composer check`, `composer test`, and
   `composer format:check`.
+- Run `php bin/gruff-php list-rules --format json` and confirm the rule count
+  and public IDs match this README and `CHANGELOG.md`.
 - Run `php bin/gruff-php analyse` and confirm the default self-scan exits 0.
 - Review [`CHANGELOG.md`](CHANGELOG.md).
 - Review [`SECURITY.md`](SECURITY.md) and confirm the private reporting path is
   enabled for the public repository.
-- Confirm generated artifacts such as `history.json`, `infection-report.json`, and local caches are not part of the release archive.
+- Confirm generated artifacts such as `history.json`, `infection-report.json`,
+  and local caches are not part of the release archive.
 
 ## More Documentation
 

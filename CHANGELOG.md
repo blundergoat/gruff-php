@@ -139,7 +139,7 @@ First public release of `gruff-php`.
 
 ### Rule Catalogue
 
-The v0.1 catalogue includes **114** registry rules across 11 pillars:
+The v0.1 catalogue includes **120** registry rules across 11 pillars:
 
 | Pillar | Rules |
 | --- | ---: |
@@ -150,9 +150,9 @@ The v0.1 catalogue includes **114** registry rules across 11 pillars:
 | `naming` | 12 |
 | `documentation` | 14 |
 | `modernisation` | 10 |
-| `security` | 11 |
+| `security` | 18 |
 | `sensitive-data` | 9 |
-| `test-quality` | 34 |
+| `test-quality` | 33 |
 | `design` | 1 |
 
 Representative rule families:
@@ -178,8 +178,10 @@ Representative rule families:
   direct global access.
 - **Security** — dangerous calls, unsafe `unserialize`, weak crypto, variable
   includes, SQL concatenation, header injection, error suppression, silent
-  catches, request-data `extract`/`compact`, insecure randomness, and disabled
-  SSL verification.
+  catches, request-data `extract`/`compact`, insecure randomness, disabled SSL
+  verification, path traversal, process-command construction, request-controlled
+  URLs, sensitive-data logging, unsafe archive extraction, unsafe XML loading,
+  and risky GitHub Actions workflow patterns.
 - **Sensitive data** — AWS access keys, private-key headers, API-key patterns,
   JWTs, database URLs with passwords, hardcoded env-style secrets,
   high-entropy strings, PHI patterns, and realistic PII in test fixtures.

@@ -311,4 +311,6 @@ For CI gating, choose the policy explicitly:
 ## Current Gaps to Avoid Assuming
 
 - `--diff=<base>` is a changed-line/file filter, not a full base/current subtraction engine.
-- Packaging work beyond Composer/local checkout usage is not implemented here.
+- Packagist publication is release-process work outside this CLI. The package
+  itself exposes Composer/local checkout usage through `bin/gruff-php` and
+  `vendor/bin/gruff-php`.

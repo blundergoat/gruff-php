@@ -29,38 +29,40 @@ php bin/gruff-php summary [paths...] [options]
 
 ## Example — text format
 
+The example output below was captured from a development checkout. A tagged
+release prints `0.1.0` instead of `0.1.0-dev`.
+
 ```bash
 php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.1.0 — summary
+gruff-php 0.1.0-dev — summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
-Files     6 discovered, 6 parsed, 2 ignored, 0 missing, 0 parse errors
+Files     2 discovered, 2 parsed, 6 ignored, 0 missing, 0 parse errors
 
-Composite B (85.40 / 100)
+Composite A (95.50 / 100)
 Scope     full-project
+Score note Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
 
 Pillars
-  documentation   D  62.00 findings=11    advisory=11    warning=0     error=0
-  naming          F   4.00 findings=6     advisory=0     warning=6     error=0
-  dead-code       B  88.00 findings=4     advisory=4     warning=0     error=0
+  naming          D  65.00 findings=3     advisory=1     warning=2     error=0
+  documentation   A  90.00 findings=3     advisory=3     warning=0     error=0
   size            A 100.00 findings=0     advisory=0     warning=0     error=0
   ...
 
 Top 3 rules by finding count
-      6  naming.class-file-mismatch      naming         a=0 w=6 e=0
-      5  docs.missing-class-phpdoc       documentation  a=5 w=0 e=0
-      5  docs.missing-file-phpdoc        documentation  a=5 w=0 e=0
+      2  naming.class-file-mismatch      naming  a=0 w=2 e=0
+      1  docs.missing-class-phpdoc       documentation  a=1 w=0 e=0
+      1  docs.missing-constant-phpdoc    documentation  a=1 w=0 e=0
 
-Top 3 file offenders
-  D   67.50  tests/Fixtures/Source/mixed/build/ignored.php      findings=4  a=3 w=1 e=0
-  D   67.50  tests/Fixtures/Source/mixed/cache/ignored.php      findings=4  a=3 w=1 e=0
-  D   67.50  tests/Fixtures/Source/mixed/generated/ignored.php  findings=4  a=3 w=1 e=0
+Top 2 file offenders
+  D   67.50  tests/Fixtures/Source/mixed/nested/beta.php  findings=4    a=3 w=1 e=0
+  C   76.25  tests/Fixtures/Source/mixed/alpha.php        findings=2    a=1 w=1 e=0
 
-Totals    21 findings (advisory=15, warning=6, error=0)
+Totals    6 findings (advisory=4, warning=2, error=0)
 ```
 
 Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.
@@ -74,35 +76,37 @@ php bin/gruff-php summary src --format=json --top=5
 ```json
 {
   "schemaVersion": "gruff.summary.v1",
-  "tool": { "name": "gruff-php", "version": "0.1.0" },
+  "tool": { "name": "gruff-php", "version": "0.1.0-dev" },
   "scope": {
     "paths": ["src"],
-    "configPath": ".gruff-php.yaml",
-    "filesDiscovered": 234,
-    "filesParsed": 234,
+    "configPath": "/home/devgoat/projects/gruff-workspace/gruff-php/.gruff-php.yaml",
+    "filesDiscovered": 237,
+    "filesParsed": 237,
     "ignoredPaths": 0,
     "missingPaths": 0,
     "parseErrors": 0,
     "scope": "full-project"
   },
-  "composite": { "score": 45.2, "grade": "F" },
-  "findings": { "advisory": 1825, "warning": 1815, "error": 664, "total": 4304 },
+  "composite": { "score": 89.7, "grade": "B" },
+  "findings": { "advisory": 217, "warning": 0, "error": 0, "total": 217 },
   "pillars": [
-    { "pillar": "documentation", "grade": "F", "score": 0, "findings": 3584, "advisories": 1118, "warnings": 1814, "errors": 652, "penalty": 100, "applicable": true },
+    { "pillar": "documentation", "grade": "B", "score": 78.55, "findings": 216, "advisories": 216, "warnings": 0, "errors": 0, "penalty": 21.45, "applicable": true },
     ...
   ],
   "topRules": [
-    { "ruleId": "docs.return-comment", "count": 1426, "advisory": 0, "warning": 1426, "error": 0, "pillar": "documentation" },
+    { "ruleId": "docs.bare-phpdoc-tags", "count": 203, "advisory": 203, "warning": 0, "error": 0, "pillar": "documentation" },
     ...
   ],
   "topOffenders": [
-    { "file": "src/Reporting/HtmlReporter.php", "score": 0, "grade": "F", "findings": 90, "advisories": 56, "warnings": 28, "errors": 6, "penalty": 100, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
+    { "file": "src/Rule/Naming/IdentifierQualityRule.php", "score": 55, "grade": "F", "findings": 12, "advisories": 12, "warnings": 0, "errors": 0, "penalty": 45, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
     ...
   ]
 }
 ```
 
-The schema is versioned for this pre-release package. New top-level keys may be added; once the package is released, existing keys should not be renamed or change shape without bumping the schema version.
+The schema is versioned for the public package. New top-level keys may be
+added in compatible releases; existing keys should not be renamed or change
+shape without bumping the schema version.
 
 ## What this is *not*
 

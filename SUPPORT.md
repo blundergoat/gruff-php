@@ -5,7 +5,8 @@ CI, reporting, and rule-calibration workflows.
 
 ## Getting Help
 
-Use the repository's public issue tracker for:
+Use the public issue tracker at
+`https://github.com/blundergoat/gruff-php/issues` for:
 
 - Bug reports.
 - Reproducible false positives.
@@ -21,7 +22,8 @@ Do not use public issues for vulnerability reports or real secrets. See
 Please include:
 
 - PHP version: `php -v`
-- gruff-php version: `php bin/gruff-php --version` or installed package version
+- gruff-php version: `php bin/gruff-php --version` from a checkout or
+  `vendor/bin/gruff-php --version` from an installed package
 - Install method: source checkout or Composer package
 - Command run
 - Whether `.gruff-php.yaml` (or legacy `.gruff.yaml`) or a baseline was loaded
