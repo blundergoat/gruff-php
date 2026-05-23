@@ -50,8 +50,8 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Find assertions inside loops that lack a context-bearing message.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for loop assertions without messages.
      */

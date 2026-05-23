@@ -37,9 +37,9 @@ final class AnalysisPipeline
     private readonly Closure $projectContextUnitsResolver;
 
     /**
-     * @param RuleRegistry $registry Rule registry used to execute enabled rules.
+     * @param RuleRegistry                                                                                                             $registry Rule registry used to execute enabled rules.
      * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
-     *     Resolves full project context units for legacy review analysis.
+     *                                                                                                                                           Resolves full project context units for legacy review analysis.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
@@ -79,34 +79,34 @@ final class AnalysisPipeline
     ): array {
         if ($analysisPaths === null) {
             return [
-                'sources'             => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
-                'findings'            => [],
-                'discoverParseNs'     => hrtime(true) - $discoverStart,
-                'analyseNs'           => 0,
+                'sources' => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
+                'findings' => [],
+                'discoverParseNs' => hrtime(true) - $discoverStart,
+                'analyseNs' => 0,
                 'projectContextUnits' => [],
             ];
         }
 
         if ($this->canStream($options, $reviewDiff, $ruleContext)) {
             return $this->runStreaming(
-                projectRoot:     $projectRoot,
-                options:         $options,
-                config:          $config,
-                ruleContext:     $ruleContext,
-                analysisPaths:   $analysisPaths,
-                discoverStart:   $discoverStart,
+                projectRoot:        $projectRoot,
+                options:            $options,
+                config:             $config,
+                ruleContext:        $ruleContext,
+                analysisPaths:      $analysisPaths,
+                discoverStart:      $discoverStart,
                 ruleRunnerObserver: $ruleRunnerObserver,
             );
         }
 
         return $this->runLegacy(
-            projectRoot:     $projectRoot,
-            options:         $options,
-            config:          $config,
-            ruleContext:     $ruleContext,
-            reviewDiff:      $reviewDiff,
-            analysisPaths:   $analysisPaths,
-            discoverStart:   $discoverStart,
+            projectRoot:        $projectRoot,
+            options:            $options,
+            config:             $config,
+            ruleContext:        $ruleContext,
+            reviewDiff:         $reviewDiff,
+            analysisPaths:      $analysisPaths,
+            discoverStart:      $discoverStart,
             ruleRunnerObserver: $ruleRunnerObserver,
         );
     }
@@ -148,7 +148,7 @@ final class AnalysisPipeline
         int $discoverStart,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
-        $discovery       = (new AnalysisSourceLoader())->discover(
+        $discovery = (new AnalysisSourceLoader())->discover(
             $projectRoot,
             $analysisPaths,
             $options->shouldIncludeIgnored,
@@ -160,8 +160,8 @@ final class AnalysisPipeline
         $phpFileParser     = new PhpFileParser();
 
         $this->registry->beginStreaming($ruleContext);
-        $findings    = [];
-        $parsedCount = 0;
+        $findings     = [];
+        $parsedCount  = 0;
         $analyseStart = hrtime(true);
 
         foreach ($discoveryResult->files as $file) {
@@ -189,10 +189,10 @@ final class AnalysisPipeline
         $analyseNs = hrtime(true) - $analyseStart;
 
         return [
-            'sources'             => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount),
-            'findings'            => $findings,
-            'discoverParseNs'     => $discoverParseNs,
-            'analyseNs'           => $analyseNs,
+            'sources' => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount),
+            'findings' => $findings,
+            'discoverParseNs' => $discoverParseNs,
+            'analyseNs' => $analyseNs,
             'projectContextUnits' => [],
         ];
     }
@@ -247,10 +247,10 @@ final class AnalysisPipeline
         $analyseNs = hrtime(true) - $analyseStart;
 
         return [
-            'sources'             => $sources,
-            'findings'            => $findings,
-            'discoverParseNs'     => $discoverParseNs,
-            'analyseNs'           => $analyseNs,
+            'sources' => $sources,
+            'findings' => $findings,
+            'discoverParseNs' => $discoverParseNs,
+            'analyseNs' => $analyseNs,
             'projectContextUnits' => $projectContextUnits,
         ];
     }

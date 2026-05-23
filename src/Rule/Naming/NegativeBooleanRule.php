@@ -67,8 +67,8 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Find bool properties and parameters that use negative flag names.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for CLI mirror allowlist.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for CLI mirror allowlist.
      * @return list<Finding> Findings for negative boolean flags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -85,7 +85,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
             foreach ($property->props as $prop) {
                 $finding = $this->propertyFinding(
                     definition:       $definition,
-                    analysisUnit:             $analysisUnit,
+                    analysisUnit:     $analysisUnit,
                     propertyProperty: $prop,
                     allowlist:        $allowlist,
                 );
@@ -98,11 +98,11 @@ final readonly class NegativeBooleanRule implements RuleInterface
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
             foreach ($scope->node->params as $param) {
                 $finding = $this->parameterFinding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    scope:      $scope,
-                    param:      $param,
-                    allowlist:  $allowlist,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    scope:        $scope,
+                    param:        $param,
+                    allowlist:    $allowlist,
                 );
                 if ($finding instanceof Finding) {
                     $findings[] = $finding;
@@ -133,7 +133,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
         return $this->finding(
             definition:   $definition,
-            analysisUnit:         $analysisUnit,
+            analysisUnit: $analysisUnit,
             node:         $propertyProperty,
             kind:         'property',
             name:         $name,
@@ -168,7 +168,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
 
         return $this->finding(
             definition:   $definition,
-            analysisUnit:         $analysisUnit,
+            analysisUnit: $analysisUnit,
             node:         $param,
             kind:         $param->flags === 0 ? 'parameter' : 'property',
             name:         $name,

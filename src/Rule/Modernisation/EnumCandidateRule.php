@@ -47,8 +47,8 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Find string or integer constant groups that could become enums.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for enum candidate classes.
      */
@@ -58,7 +58,7 @@ final readonly class EnumCandidateRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $constants = $class->getConstants();

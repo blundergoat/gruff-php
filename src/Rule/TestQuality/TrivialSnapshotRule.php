@@ -45,8 +45,8 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Find snapshot assertions that lack supporting behavioral assertions.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for trivial snapshot tests.
      */

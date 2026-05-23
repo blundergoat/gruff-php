@@ -43,8 +43,8 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Find database connection URLs that embed passwords.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for credential-bearing database URLs.
      */
@@ -71,7 +71,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
                 continue;
             }
 
-            $password              = $matches['password'][$index][0];
+            $password = $matches['password'][$index][0];
             if (SecretScannerHelper::isLikelyDummyValue($password)) {
                 continue;
             }
@@ -82,14 +82,14 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             }
 
             $findings[] = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     sprintf('Database connection string contains an inline password: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::High,
-                detector:    'database-url-password',
-                preview:     $preview,
-                remediation: 'Move database passwords into a secret store or runtime environment variable.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      sprintf('Database connection string contains an inline password: %s.', $preview),
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::High,
+                detector:     'database-url-password',
+                preview:      $preview,
+                remediation:  'Move database passwords into a secret store or runtime environment variable.',
             );
         }
 

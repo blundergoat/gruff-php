@@ -46,16 +46,16 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Find test methods whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized test methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition  = $this->definition();
-        $settings    = $ruleContext->settingsFor($definition);
-        $threshold   = $this->thresholdForPath(
+        $definition = $this->definition();
+        $settings   = $ruleContext->settingsFor($definition);
+        $threshold  = $this->thresholdForPath(
             $analysisUnit->file->displayPath,
             (int) $settings->numericThreshold('maxMeaningfulLines'),
             $settings->option('pathOverrides'),

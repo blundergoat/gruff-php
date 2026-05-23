@@ -46,14 +46,14 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
     /**
      * Find test classes that inherit directly from production classes.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for tests extending production types.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $className = $class->name?->toString();

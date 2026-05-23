@@ -46,8 +46,8 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Find concrete classes that declare no members and are not exception markers.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for empty classes.
      */

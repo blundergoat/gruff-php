@@ -50,8 +50,8 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Find classes and enums with too many public methods.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized public APIs.
      */

@@ -55,8 +55,8 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose physical line length exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized classes, traits, or enums.
      */
@@ -65,7 +65,7 @@ final readonly class ClassLengthRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]);
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]);
 
         $findings = [];
 

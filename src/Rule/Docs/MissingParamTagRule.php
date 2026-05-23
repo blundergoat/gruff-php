@@ -49,8 +49,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Find documented public function-like declarations with undocumented parameters.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      * @return list<Finding> Findings for missing parameter tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array

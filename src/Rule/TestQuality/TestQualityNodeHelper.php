@@ -56,7 +56,7 @@ final class TestQualityNodeHelper
             return $cache->offsetGet($analysisUnit);
         }
 
-        $scopes     = [];
+        $scopes = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\ClassMethod::class) as $classMethod) {
             if (!self::isTestMethod($classMethod)) {

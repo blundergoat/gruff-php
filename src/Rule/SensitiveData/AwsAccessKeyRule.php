@@ -43,8 +43,8 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble AWS access key IDs.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for AWS key-like literals.
      */
@@ -69,14 +69,14 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             }
 
             $findings[] = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::High,
-                detector:    'aws-access-key',
-                preview:     SecretScannerHelper::redactedPreview($candidateSecret),
-                remediation: 'Remove the key from source and rotate it if it was real.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      sprintf('Potential AWS access key detected: %s.', SecretScannerHelper::redactedPreview($candidateSecret)),
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::High,
+                detector:     'aws-access-key',
+                preview:      SecretScannerHelper::redactedPreview($candidateSecret),
+                remediation:  'Remove the key from source and rotate it if it was real.',
             );
         }
 

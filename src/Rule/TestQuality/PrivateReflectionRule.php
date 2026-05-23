@@ -53,8 +53,8 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Find tests that use reflection or binding to reach private implementation details.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for private-reflection test access.
      */

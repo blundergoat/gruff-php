@@ -55,15 +55,15 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find mixed test naming styles and weakly descriptive test names.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for inconsistent or poor test names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
-        $patterns   = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
+        $findings = [];
+        $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('poorNamePatterns');
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             $camelCount = 0;

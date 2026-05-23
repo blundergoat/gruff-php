@@ -49,8 +49,8 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Find files whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for oversized files.
      */

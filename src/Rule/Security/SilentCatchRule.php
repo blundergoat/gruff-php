@@ -46,14 +46,14 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Find catch blocks that only contain no-op statements.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for swallowed exceptions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Catch_::class) as $catch) {
             if (!$this->isSilent($catch)) {

@@ -46,14 +46,14 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Find mutable public properties that expose object state directly.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for public property declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
             if (ModernisationNodeHelper::isDtoClass($class)) {

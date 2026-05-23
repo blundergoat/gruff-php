@@ -83,8 +83,8 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context carrying thresholds.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
      * @return list<Finding> Findings for complex function-like declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array

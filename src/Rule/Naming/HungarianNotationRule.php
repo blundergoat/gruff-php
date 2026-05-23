@@ -56,8 +56,8 @@ final readonly class HungarianNotationRule implements RuleInterface
     /**
      * Find local variables that use type-prefix naming.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      * @return list<Finding> Findings for Hungarian notation variables.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -99,13 +99,13 @@ final readonly class HungarianNotationRule implements RuleInterface
             }
 
             $finding = $this->finding(
-                definition: $definition,
-                analysisUnit:       $analysisUnit,
-                node:       $param,
-                kind:       'parameter',
-                name:       $param->var->name,
-                symbol:     $symbol,
-                prefixes:   $prefixes,
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $param,
+                kind:         'parameter',
+                name:         $param->var->name,
+                symbol:       $symbol,
+                prefixes:     $prefixes,
             );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;
@@ -133,13 +133,13 @@ final readonly class HungarianNotationRule implements RuleInterface
 
         foreach ($scope->localVariables as $name => $variable) {
             $finding = $this->finding(
-                definition: $definition,
-                analysisUnit:       $analysisUnit,
-                node:       $variable,
-                kind:       'variable',
-                name:       $name,
-                symbol:     $symbol,
-                prefixes:   $prefixes,
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $variable,
+                kind:         'variable',
+                name:         $name,
+                symbol:       $symbol,
+                prefixes:     $prefixes,
             );
             if ($finding instanceof Finding) {
                 $findings[] = $finding;

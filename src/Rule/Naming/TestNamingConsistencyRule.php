@@ -47,8 +47,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find test method names that do not follow the configured convention.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for inconsistent test names.
      */

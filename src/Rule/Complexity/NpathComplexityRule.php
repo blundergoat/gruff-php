@@ -60,8 +60,8 @@ final readonly class NpathComplexityRule implements RuleInterface
     /**
      * Flag methods whose NPath complexity (independent execution paths) exceeds the configured threshold.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding>
      */
@@ -70,7 +70,7 @@ final readonly class NpathComplexityRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 

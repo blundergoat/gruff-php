@@ -59,8 +59,8 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Find functions and methods whose names are too generic to communicate intent.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for generic callable names.
      */

@@ -27,8 +27,8 @@ final readonly class RuleDefinition
      * @param Confidence                                                                   $confidence         Default confidence assigned to rule
      *                                                                                                         findings.
      * @param array<string, int|float>                                                     $defaultThresholds  Named numeric thresholds for rule
-     *                                                                                     settings (legacy tiered shape; mutually exclusive with
-     *                                                                                     $severityThreshold per ADR-008).
+     *                                                                                                         settings (legacy tiered shape; mutually exclusive with
+     *                                                                                                         $severityThreshold per ADR-008).
      * @param list<Pillar>                                                                 $secondaryPillars   Additional pillars affected by the
      *                                                                                                         rule.
      * @param bool                                                                         $isEnabledByDefault Whether the rule runs unless disabled

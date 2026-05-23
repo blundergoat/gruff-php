@@ -34,12 +34,12 @@ final readonly class TodoDensityRule implements RuleInterface
     public function definition(): RuleDefinition
     {
         return new RuleDefinition(
-            id:                       self::ID,
-            name:                     'TODO/FIXME density',
-            pillar:                   Pillar::Documentation,
-            tier:                     RuleTier::V01,
-            defaultSeverity:          Severity::Error,
-            confidence:               Confidence::High,
+            id:                self::ID,
+            name:              'TODO/FIXME density',
+            pillar:            Pillar::Documentation,
+            tier:              RuleTier::V01,
+            defaultSeverity:   Severity::Error,
+            confidence:        Confidence::High,
             severityThreshold: new SeverityThreshold(10, Severity::Error),
         );
     }
@@ -47,8 +47,8 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Count TODO-style markers in comments and report files above threshold.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for excessive TODO density.
      */

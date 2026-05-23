@@ -51,8 +51,8 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Find direct superglobal access outside controller boundaries.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for forbidden global reads.
      */
@@ -62,8 +62,8 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
-        $seen       = [];
+        $findings = [];
+        $seen     = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Variable::class) as $variable) {
             if (!is_string($variable->name) || !in_array($variable->name, self::FORBIDDEN_GLOBALS, true)) {

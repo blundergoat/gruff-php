@@ -80,8 +80,8 @@ final class DashboardStateFactory
      */
     public function state(InputInterface $input, string $projectRoot, array $query): array
     {
-        $defaults       = $this->defaultQuery($input, $projectRoot);
-        $scanScope      = $query['scanScope'] ?? $defaults['scanScope'];
+        $defaults        = $this->defaultQuery($input, $projectRoot);
+        $scanScope       = $query['scanScope'] ?? $defaults['scanScope'];
         $isSubmittedForm = $query !== [];
 
         return [

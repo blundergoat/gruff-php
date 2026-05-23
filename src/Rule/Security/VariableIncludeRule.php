@@ -54,7 +54,7 @@ final class VariableIncludeRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Include_::class) as $include) {
             if ($this->isFixedIncludeExpression($include->expr)) {

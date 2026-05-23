@@ -47,8 +47,8 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Find test cases that hide behavior behind conditionals.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for conditional logic inside tests.
      */
@@ -61,7 +61,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
+        $findings = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             foreach (NodeIndex::descendantsOfAny($scope->node, [Stmt\If_::class]) as $conditional) {

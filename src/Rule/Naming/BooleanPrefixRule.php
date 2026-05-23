@@ -81,8 +81,8 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Find bool-returning functions and methods without a boolean-style prefix.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for poorly named boolean callables.
      */
@@ -100,11 +100,11 @@ final readonly class BooleanPrefixRule implements RuleInterface
             $symbol               = $this->symbol($scope);
             $functionLikeFindings = $node instanceof ClassMethod || $node instanceof Function_
                 ? $this->functionLikeFindings(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $node,
-                    symbol:     $symbol,
-                    prefixes:   $prefixes,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $node,
+                    symbol:       $symbol,
+                    prefixes:     $prefixes,
                 )
                 : [];
 
@@ -113,7 +113,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 ...$functionLikeFindings,
                 ...$this->parameterFindings(
                     definition:      $definition,
-                    analysisUnit:            $analysisUnit,
+                    analysisUnit:    $analysisUnit,
                     scope:           $scope,
                     symbol:          $symbol,
                     prefixes:        $prefixes,
@@ -134,12 +134,12 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 }
 
                 $findings[] = $this->identifierFinding(
-                    definition: $definition,
-                    analysisUnit:       $analysisUnit,
-                    node:       $prop,
-                    kind:       'property',
-                    name:       $name,
-                    symbol:     '$' . $name,
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $prop,
+                    kind:         'property',
+                    name:         $name,
+                    symbol:       '$' . $name,
                 );
             }
         }
@@ -214,12 +214,12 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
 
             $findings[] = $this->identifierFinding(
-                definition: $definition,
-                analysisUnit:       $analysisUnit,
-                node:       $param,
-                kind:       $param->flags === 0 ? 'parameter' : 'property',
-                name:       $name,
-                symbol:     $symbol,
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $param,
+                kind:         $param->flags === 0 ? 'parameter' : 'property',
+                name:         $name,
+                symbol:       $symbol,
             );
         }
 

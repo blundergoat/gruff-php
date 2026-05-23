@@ -20,7 +20,7 @@ interface ProjectRuleInterface
     public function definition(): RuleDefinition;
 
     /**
-     * @param list<AnalysisUnit> $units   Parsed units available to the project-level rule.
+     * @param list<AnalysisUnit> $units       Parsed units available to the project-level rule.
      * @param RuleContext        $ruleContext Project-level rule context for this analysis pass.
      * @return list<Finding>
      */

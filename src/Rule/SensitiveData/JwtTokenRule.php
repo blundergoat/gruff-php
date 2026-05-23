@@ -43,8 +43,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble embedded JWT tokens.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for JWT-like literals.
      */
@@ -70,14 +70,14 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
 
             $preview    = SecretScannerHelper::redactedPreview($candidateSecret);
             $findings[] = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     sprintf('JWT-like token literal detected: %s.', $preview),
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::Medium,
-                detector:    'jwt-token',
-                preview:     $preview,
-                remediation: 'Move tokens out of source fixtures/config and generate them at runtime.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      sprintf('JWT-like token literal detected: %s.', $preview),
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::Medium,
+                detector:     'jwt-token',
+                preview:      $preview,
+                remediation:  'Move tokens out of source fixtures/config and generate them at runtime.',
             );
         }
 

@@ -46,8 +46,8 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Find switch statements whose direct-return branches may become match expressions.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8 match-expression candidates.
      */
@@ -57,7 +57,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Switch_::class) as $switch) {
             if (count($switch->cases) < 3 || !$this->allCasesReturnDirectly($switch)) {

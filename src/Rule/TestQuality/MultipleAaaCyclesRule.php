@@ -49,8 +49,8 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Find tests that appear to repeat act/assert cycles in one method.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for repeated AAA cycles.
      */

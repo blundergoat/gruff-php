@@ -51,8 +51,8 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Find class-like declarations that do not have a PHPDoc block.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for undocumented class-like declarations.
      */

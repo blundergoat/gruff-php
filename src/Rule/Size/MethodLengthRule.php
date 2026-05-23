@@ -55,8 +55,8 @@ final readonly class MethodLengthRule implements RuleInterface
     /**
      * Find callables whose logical statement line count exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for long callables.
      */

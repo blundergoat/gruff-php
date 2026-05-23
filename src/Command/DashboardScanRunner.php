@@ -79,7 +79,7 @@ final class DashboardScanRunner
      * Run a dashboard scan request and return HTML for the iframe.
      *
      * @param DashboardRequestContext $dashboardRequestContext Dashboard request context.
-     * @param array<string, string>   $query   Request query values from the dashboard form.
+     * @param array<string, string>   $query                   Request query values from the dashboard form.
      * @return string Dashboard HTML for either scan results or an error panel.
      */
     public function scanHtml(DashboardRequestContext $dashboardRequestContext, array $query): string

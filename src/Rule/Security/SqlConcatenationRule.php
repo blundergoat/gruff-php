@@ -53,8 +53,8 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Find query method calls whose first argument uses concatenation or interpolation.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for heuristic SQL concatenation.
      */

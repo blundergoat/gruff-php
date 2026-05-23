@@ -18,7 +18,7 @@ final readonly class BaselineApplication
      *
      * @param string        $projectRoot  Project root used to resolve the baseline path.
      * @param string        $baselinePath Baseline path to read.
-     * @param list<Finding> $findings Findings to filter.
+     * @param list<Finding> $findings     Findings to filter.
      * @throws BaselineException When the baseline cannot be read or validated.
      * @return list<Finding> Filtered findings.
      */

@@ -61,8 +61,8 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Find functions, methods, and closures with too many parameters.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for callables above configured thresholds.
      */
@@ -73,7 +73,7 @@ final readonly class ParameterCountRule implements RuleInterface
         $promotedCeiling = $this->integerOption($settings->options, 'promotedConstructorMaxParameters', 25);
         $constructorMax  = $this->integerOption($settings->options, 'constructorMaxParameters', 0);
 
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class, Closure::class, ArrowFunction::class]);
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class, Closure::class, ArrowFunction::class]);
 
         $findings = [];
 

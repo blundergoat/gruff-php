@@ -55,8 +55,8 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Detect functions and methods whose control flow nests too deeply.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Nesting-depth findings for the analysed unit.
      */
@@ -65,7 +65,7 @@ final readonly class NestingDepthRule implements RuleInterface
         $definition = $this->definition();
         $settings   = $ruleContext->settingsFor($definition);
 
-        $nodes      = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
+        $nodes = NodeIndex::nodesOfAny($analysisUnit, [ClassMethod::class, Function_::class]);
 
         $findings = [];
 

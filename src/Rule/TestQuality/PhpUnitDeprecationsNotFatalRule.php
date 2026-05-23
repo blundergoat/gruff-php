@@ -63,8 +63,8 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Report a project once when PHPUnit deprecations do not fail the run.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext Rule context carrying project root.
+     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext  Rule context carrying project root.
      * @return list<Finding> Findings for non-fatal PHPUnit deprecations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -85,7 +85,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
 
         $this->emittedRoots[$root] = true;
 
-        $attributes = $config->root->attributes();
+        $attributes     = $config->root->attributes();
         $attributeValue = $attributes !== null ? $attributes->failOnDeprecation : null;
 
         if ($attributeValue !== null && strtolower($attributeValue->__toString()) !== 'false' && $attributeValue->__toString() !== '') {

@@ -45,8 +45,8 @@ final readonly class ExcessiveMockingRule implements RuleInterface
     /**
      * Find tests that create more mocks than the configured threshold.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for heavily mocked tests.
      */

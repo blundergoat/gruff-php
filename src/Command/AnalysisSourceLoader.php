@@ -69,7 +69,7 @@ final readonly class AnalysisSourceLoader
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
 
         return [
-            'discovery'   => $discoveryResult,
+            'discovery' => $discoveryResult,
             'diagnostics' => $this->missingPathDiagnostics($discoveryResult),
         ];
     }

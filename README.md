@@ -1,5 +1,11 @@
 # gruff-php
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/devgoat/gruff-php.svg?style=flat-square)](https://packagist.org/packages/devgoat/gruff-php)
+[![Total Downloads](https://img.shields.io/packagist/dt/devgoat/gruff-php.svg?style=flat-square)](https://packagist.org/packages/devgoat/gruff-php)
+[![PHP Version Require](https://img.shields.io/packagist/dependency-v/devgoat/gruff-php/php?style=flat-square)](https://packagist.org/packages/devgoat/gruff-php)
+[![CI](https://img.shields.io/github/actions/workflow/status/blundergoat/gruff-php/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/blundergoat/gruff-php/actions/workflows/ci.yml)
+[![License](https://img.shields.io/packagist/l/devgoat/gruff-php.svg?style=flat-square)](LICENSE)
+
 `gruff-php` is an opinionated PHP code-quality analyzer. It scans PHP projects,
 scores findings across rule pillars, and emits reports for terminals, CI,
 GitHub annotations, SARIF consumers, static HTML, and a local dashboard.

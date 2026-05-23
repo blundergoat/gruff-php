@@ -15,7 +15,7 @@ use GruffPhp\Support\PathHelper;
 final readonly class StringListConfigParser
 {
     /**
-     * @param ConfigValue $configValue      Raw config value to normalize.
+     * @param ConfigValue $configValue     Raw config value to normalize.
      * @param string      $path            Config path used in validation messages.
      * @param bool        $hasPathPatterns Whether values are interpreted as path patterns.
      * @param bool        $allowsGlobs     Whether glob-like wildcard patterns are accepted.

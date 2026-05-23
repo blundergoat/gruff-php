@@ -49,8 +49,8 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Find array-callable expressions that may use first-class callable syntax.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for PHP 8.1 callable syntax candidates.
      */
@@ -60,7 +60,7 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return [];
         }
 
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Expr\Array_::class) as $array) {
             if (!$this->isCallableArray($array) || !$this->isCallableContext($array)) {

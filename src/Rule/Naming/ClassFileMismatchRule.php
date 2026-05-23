@@ -50,8 +50,8 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Find primary class names that do not match their file names.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for class and file name mismatches.
      */

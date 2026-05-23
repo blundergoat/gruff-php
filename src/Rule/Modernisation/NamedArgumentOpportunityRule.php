@@ -49,8 +49,8 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find calls with many positional arguments that would read better named.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for named argument opportunities.
      */

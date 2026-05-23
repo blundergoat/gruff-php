@@ -50,8 +50,8 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Find documented public functions that throw without an @throws tag.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<Finding> Findings for missing @throws documentation.
      */

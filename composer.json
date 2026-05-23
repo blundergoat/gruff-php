@@ -1,8 +1,36 @@
 {
     "name": "devgoat/gruff-php",
-    "description": "Opinionated PHP code quality analyzer.",
+    "description": "Opinionated PHP code-quality analyzer with 120 rules, SARIF output, baselines, and a local dashboard.",
     "type": "library",
+    "keywords": [
+        "php",
+        "static-analysis",
+        "code-quality",
+        "code-analysis",
+        "code-review",
+        "linter",
+        "quality-gate",
+        "sarif",
+        "cli",
+        "baselines",
+        "dogfood",
+        "phpstan-alternative"
+    ],
+    "homepage": "https://github.com/blundergoat/gruff-php",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Matthew Hansen",
+            "homepage": "https://www.blundergoat.com/about",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/blundergoat/gruff-php/issues",
+        "source": "https://github.com/blundergoat/gruff-php",
+        "docs": "https://github.com/blundergoat/gruff-php/blob/main/README.md",
+        "security": "https://github.com/blundergoat/gruff-php/security/policy"
+    },
     "require": {
         "php": "^8.3",
         "nikic/php-parser": "^5.6",

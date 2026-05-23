@@ -43,8 +43,8 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that appear to contain private key material.
      *
-     * @param AnalysisUnit $analysisUnit    Parsed unit to inspect.
-     * @param RuleContext  $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
      */
@@ -60,14 +60,14 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
         foreach ($matches[0] as $match) {
             [$header, $offset] = $match;
             $findings[]        = SecretScannerHelper::finding(
-                analysisUnit:        $analysisUnit,
-                ruleId:      self::ID,
-                message:     'Private key block header detected; key body is redacted.',
-                line:        SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
-                confidence:  Confidence::High,
-                detector:    'private-key-header',
-                preview:     $header,
-                remediation: 'Remove private keys from source and rotate the key if it was real.',
+                analysisUnit: $analysisUnit,
+                ruleId:       self::ID,
+                message:      'Private key block header detected; key body is redacted.',
+                line:         SecretScannerHelper::lineNumberForOffset($analysisUnit->source, $offset),
+                confidence:   Confidence::High,
+                detector:     'private-key-header',
+                preview:      $header,
+                remediation:  'Remove private keys from source and rotate the key if it was real.',
             );
         }
 
