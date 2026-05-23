@@ -27,6 +27,20 @@ final class DashboardScanCommandBuilderTest extends TestCase
     }
 
     /**
+     * Verify quoted Windows paths keep literal backslashes.
+     *
+     * @return void
+     */
+    public function testDashboardPathTokensPreserveQuotedBackslashes(): void
+    {
+        $dashboardScanCommandBuilder = new DashboardScanCommandBuilder('/tmp/gruff');
+
+        self::assertSame(['C:\\temp files\\src'], $dashboardScanCommandBuilder->parsePaths('"C:\temp files\src"'));
+        self::assertSame(['C:\\temp files\\src'], $dashboardScanCommandBuilder->parsePaths('"C:\\\\temp files\\\\src"'));
+        self::assertSame(['fixtures/A "quoted" Case'], $dashboardScanCommandBuilder->parsePaths('"fixtures/A \\"quoted\\" Case"'));
+    }
+
+    /**
      * Verify analyse command separates owned options from user paths.
      *
      * @return void

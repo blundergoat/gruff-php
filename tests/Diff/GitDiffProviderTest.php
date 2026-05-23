@@ -124,6 +124,32 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
+     * Verify working tree mode includes untracked, unignored files.
+     *
+     * @return void No return value.
+     */
+    public function testGitDiffProviderWorkingTreeIncludesUntrackedFiles(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->initialiseRepository($tempDir);
+            file_put_contents($tempDir . '/NewFile.php', "<?php\nfinal class NewFile {}\n");
+            file_put_contents($tempDir . '/ignored.php', "<?php\nfinal class Ignored {}\n");
+            file_put_contents($tempDir . '/.gitignore', "ignored.php\n");
+
+            $diff = (new GitDiffProvider())->changedLines($tempDir, 'working-tree');
+
+            self::assertContains('NewFile.php', $diff->changedFiles);
+            self::assertNotContains('ignored.php', $diff->changedFiles);
+            self::assertSame([], $diff->rangesFor('NewFile.php'));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * Verify Git diff provider parses paths with spaces.
      *
      * @return void No return value.

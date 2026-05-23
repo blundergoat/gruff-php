@@ -35,6 +35,10 @@ final readonly class GitDiffProvider
         $parsed      = $this->parseUnifiedDiff($process->getOutput());
         $isLocalMode = in_array($mode, ['staged', 'unstaged', 'working-tree'], true);
 
+        if ($mode === 'working-tree') {
+            $this->appendUntrackedFiles($projectRoot, $parsed['files'], $parsed['lines']);
+        }
+
         return new DiffResult(
             active:       true,
             mode:         $isLocalMode ? $mode : 'base-ref',
@@ -43,6 +47,38 @@ final readonly class GitDiffProvider
             changedFiles: $parsed['files'],
             message:      'Diff mode filters findings to changed lines when line ranges are available, otherwise to changed files.',
         );
+    }
+
+    /**
+     * Include untracked, unignored files in the working-tree diff scope.
+     *
+     * @param string                                $projectRoot  Git working tree root.
+     * @param list<string>                          $changedFiles Changed files collected so far.
+     * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     * @throws DiffException When Git cannot list untracked files.
+     * @return void No return value.
+     */
+    private function appendUntrackedFiles(string $projectRoot, array &$changedFiles, array &$changedLines): void
+    {
+        $process = new Process(['git', 'ls-files', '--others', '--exclude-standard', '-z'], $projectRoot);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new DiffException(trim($process->getErrorOutput()) !== ''
+                ? trim($process->getErrorOutput())
+                : 'Unable to list untracked files for working-tree diff mode.');
+        }
+
+        foreach (explode("\0", $process->getOutput()) as $filePath) {
+            if ($filePath === '') {
+                continue;
+            }
+
+            $this->appendChangedFile($filePath, $changedFiles, $changedLines);
+        }
+
+        sort($changedFiles, SORT_STRING);
+        ksort($changedLines, SORT_STRING);
     }
 
     /**
@@ -136,7 +172,7 @@ final readonly class GitDiffProvider
                 continue;
             }
 
-            $endLine   = $startLine + $length - 1;
+            $endLine = $startLine + $length - 1;
 
             $changedLines[$currentFile][] = new ChangedLineRange($startLine, $endLine);
         }
@@ -153,8 +189,8 @@ final readonly class GitDiffProvider
     /**
      * Add a changed file once and prepare its range bucket.
      *
-     * @param string|null                              $filePath     Project-relative changed path.
-     * @param list<string>                             $changedFiles Changed files collected so far.
+     * @param string|null                           $filePath     Project-relative changed path.
+     * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
      * @return void No return value.
      */
@@ -164,7 +200,7 @@ final readonly class GitDiffProvider
             return;
         }
 
-        $changedFiles[]             = $filePath;
+        $changedFiles[]          = $filePath;
         $changedLines[$filePath] = [];
     }
 

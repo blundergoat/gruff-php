@@ -39,6 +39,18 @@ final class PathHelperTest extends TestCase
     }
 
     /**
+     * Verify canonical fallback collapses dot segments in paths that do not exist.
+     *
+     * @return void
+     */
+    public function testCanonicalCollapsesDotSegmentsWhenPathDoesNotExist(): void
+    {
+        self::assertSame('/repo/src', PathHelper::canonical('/repo/../repo/src'));
+        self::assertSame('C:/repo/src', PathHelper::canonical('C:\\repo\\..\\repo\\src'));
+        self::assertSame('src/File.php', PathHelper::canonical('./src/../src/File.php'));
+    }
+
+    /**
      * Verify display path normalization keeps absolute paths absolute.
      *
      * @return void

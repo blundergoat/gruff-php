@@ -37,13 +37,25 @@ final readonly class DashboardScanCommandBuilder
 
         foreach ($matches as $match) {
             $quotedPath = $match[1] ?? '';
-            $path       = $quotedPath !== '' ? stripcslashes($quotedPath) : ($match[2] ?? '');
+            $path       = $quotedPath !== '' ? $this->unescapeQuotedPath($quotedPath) : ($match[2] ?? '');
             if ($path !== '') {
                 $parsedPaths[] = $path;
             }
         }
 
         return $parsedPaths === [] ? ['.'] : $parsedPaths;
+    }
+
+    /**
+     * Decode only the quote and backslash escapes emitted by the dashboard path tokenizer.
+     *
+     * @return string Path with wrapper-level escapes removed.
+     */
+    private function unescapeQuotedPath(string $quotedPath): string
+    {
+        $unescapedPath = preg_replace('/\\\\(["\\\\])/', '$1', $quotedPath);
+
+        return is_string($unescapedPath) ? $unescapedPath : $quotedPath;
     }
 
     /**

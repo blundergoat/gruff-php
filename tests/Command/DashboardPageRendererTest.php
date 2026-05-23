@@ -42,7 +42,7 @@ final class DashboardPageRendererTest extends TestCase
         self::assertStringContainsString('<div class="field-grid"><label>Config path<input name="config" value=".gruff &quot;quoted&quot;.yaml" placeholder=".gruff-php.yaml"></label><label>Baseline<input name="baseline" value="base&amp;line.json" placeholder="gruff-baseline.json"></label></div>', $html);
         self::assertStringContainsString('<div class="field-grid"><label>Scan scope<select name="scanScope"><option value="full">whole branch</option><option value="diff" selected>diff only</option></select></label>', $html);
         self::assertStringContainsString('<label>Fail on<select name="failOn"><option value="none">none</option><option value="advisory">advisory</option><option value="warning" selected>warning</option><option value="error">error</option></select></label></div><div class="option-grid">', $html);
-        self::assertStringContainsString('<div class="option-grid"><label class="check"><input type="checkbox" name="noBaseline" value="1" checked><span>skip baseline</span></label><label class="check"><input type="checkbox" name="includeIgnored" value="1"><span>include ignored</span></label><label class="check"><input type="checkbox" name="reportInteractive" value="1" checked><span>interactive findings</span></label></div>', $html);
+        self::assertStringContainsString('<div class="option-grid"><label class="check"><input type="checkbox" name="noConfig" value="1"><span>skip config</span></label><label class="check"><input type="checkbox" name="noBaseline" value="1" checked><span>skip baseline</span></label><label class="check"><input type="checkbox" name="includeIgnored" value="1"><span>include ignored</span></label><label class="check"><input type="checkbox" name="reportInteractive" value="1" checked><span>interactive findings</span></label></div>', $html);
         self::assertStringContainsString('</label></div><div class="panel-actions"><button type="button" id="refresh">Refresh</button><button type="submit" id="run-scan">Run scan</button></div></form></section><iframe id="report-frame"', $html);
         self::assertStringContainsString('data-initial-src="/scan?project=%2Ftmp%2Fgruff%20%3Croot%3E&amp;paths=src%20tests&amp;scanScope=diff&amp;failOn=warning&amp;config=.gruff%20%22quoted%22.yaml&amp;baseline=base%26line.json&amp;noBaseline=1&amp;noConfig=&amp;includeIgnored=&amp;reportInteractive=1"', $html);
         self::assertStringContainsString('srcdoc="&lt;!DOCTYPE html&gt;&lt;html lang=&quot;en-NZ&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;UTF-8&quot;&gt;&lt;style&gt;body{margin:0;background:#0d0c0a;color:#f3e9d2;', $html);
@@ -59,6 +59,18 @@ final class DashboardPageRendererTest extends TestCase
         $html = $this->renderer()->dashboardHtml($this->state(['includeIgnored' => '1']));
 
         self::assertStringContainsString('<label class="check"><input type="checkbox" name="includeIgnored" value="1" checked><span>include ignored</span></label>', $html);
+    }
+
+    /**
+     * Verify no-config checkbox state is rendered when selected.
+     *
+     * @return void
+     */
+    public function testDashboardHtmlMarksNoConfigWhenSelected(): void
+    {
+        $html = $this->renderer()->dashboardHtml($this->state(['noConfig' => '1']));
+
+        self::assertStringContainsString('<label class="check"><input type="checkbox" name="noConfig" value="1" checked><span>skip config</span></label>', $html);
     }
 
     /**

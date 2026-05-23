@@ -164,6 +164,7 @@ final readonly class GitArchiveSnapshot
             }
 
             if (PathHelper::isAbsolute($candidate)) {
+                $candidate = rtrim(PathHelper::canonical($candidate), '/');
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {

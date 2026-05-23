@@ -146,14 +146,14 @@ final class AnalyseCommand extends Command
 
         $ruleContext      = new RuleContext($projectRoot, $config);
         $analysisPipeline = new AnalysisPipeline($registry, $this->projectContextUnits(...));
-        $analysisRun = $analysisPipeline->runAnalysis(
-            projectRoot:     $projectRoot,
-            options:         $options,
-            config:          $config,
-            ruleContext:     $ruleContext,
-            reviewDiff:      $reviewDiff,
-            analysisPaths:   $analysisPaths,
-            discoverStart:   $discoverStart,
+        $analysisRun      = $analysisPipeline->runAnalysis(
+            projectRoot:        $projectRoot,
+            options:            $options,
+            config:             $config,
+            ruleContext:        $ruleContext,
+            reviewDiff:         $reviewDiff,
+            analysisPaths:      $analysisPaths,
+            discoverStart:      $discoverStart,
             ruleRunnerObserver: $runtimeTimingObserver,
         );
         $sources             = $analysisRun['sources'];
@@ -195,16 +195,19 @@ final class AnalyseCommand extends Command
         );
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
-        $scoreStart = hrtime(true);
-        $score      = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
-        $scoreNs    = hrtime(true) - $scoreStart;
-        $review     = $this->buildBranchReview(
+        $scoreStart  = hrtime(true);
+        $score       = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
+        $scoreNs     = hrtime(true) - $scoreStart;
+        $reviewScore = $options->diffVs === null
+            ? $score->composite->score
+            : $this->branchReviewScore($findings, $options);
+        $review = $this->buildBranchReview(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
             registry:        $registry,
             currentFindings: $findings,
-            currentScore:    $score->composite->score,
+            currentScore:    $reviewScore,
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,
         );
@@ -606,6 +609,22 @@ final class AnalyseCommand extends Command
     }
 
     /**
+     * Calculate the branch-review score from static-analysis findings only.
+     *
+     * @param list<Finding> $findings Current findings after diff and baseline filtering.
+     * @return float Composite score used for branch-review delta comparison.
+     */
+    private function branchReviewScore(array $findings, AnalyseCommandOptions $options): float
+    {
+        $reviewFindings = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => $finding->pillar !== Pillar::Mutation,
+        ));
+
+        return (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars())->composite->score;
+    }
+
+    /**
      * @return list<string>
      */
     private function baseSnapshotPaths(
@@ -747,6 +766,7 @@ final class AnalyseCommand extends Command
             }
 
             if (PathHelper::isAbsolute($candidate)) {
+                $candidate = rtrim(PathHelper::canonical($candidate), '/');
                 if ($candidate === $root) {
                     $candidate = '.';
                 } elseif (str_starts_with($candidate, $root . '/')) {

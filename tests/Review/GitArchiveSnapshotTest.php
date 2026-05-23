@@ -42,6 +42,33 @@ final class GitArchiveSnapshotTest extends TestCase
     }
 
     /**
+     * Verify absolute snapshot paths are canonicalized before root trimming.
+     *
+     * @return void No return value.
+     */
+    public function testCreateCanonicalizesAbsoluteRequestedPaths(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repo               = $this->repoWithBaseFiles();
+        $gitArchiveSnapshot = new GitArchiveSnapshot();
+        $snapshotRoot       = null;
+
+        try {
+            $dottedPath   = dirname($repo) . '/' . basename($repo) . '/../' . basename($repo) . '/src/Target.php';
+            $snapshotRoot = $gitArchiveSnapshot->create($repo, 'HEAD', [$dottedPath]);
+
+            self::assertFileExists($snapshotRoot . '/src/Target.php');
+            self::assertFileDoesNotExist($snapshotRoot . '/src/Unrelated.php');
+        } finally {
+            if ($snapshotRoot !== null) {
+                $gitArchiveSnapshot->remove($snapshotRoot);
+            }
+
+            $this->removeDir($repo);
+        }
+    }
+
+    /**
      * Verify create returns empty snapshot when requested paths do not exist in base.
      *
      * @return void No return value.

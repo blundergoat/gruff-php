@@ -490,10 +490,36 @@ final readonly class HtmlReporter
         $absolutePath = $this->absolutePath($filePath);
 
         return match ($this->editorLink) {
-            'vscode' => 'vscode://file' . implode('/', array_map(rawurlencode(...), explode('/', $absolutePath))) . ($line === null ? '' : ':' . $line),
+            'vscode' => $this->vscodeHref($absolutePath, $line),
             'phpstorm' => 'phpstorm://open?file=' . rawurlencode($absolutePath) . ($line === null ? '' : '&line=' . $line),
             default => null,
         };
+    }
+
+    /**
+     * Build a VS Code file protocol URL for Unix, Windows drive, and UNC paths.
+     *
+     * @return string VS Code file URL.
+     */
+    private function vscodeHref(string $absolutePath, ?int $line): string
+    {
+        $path            = PathHelper::normalizeSeparators($absolutePath);
+        $segments        = explode('/', $path);
+        $encodedSegments = [];
+
+        foreach ($segments as $index => $segment) {
+            // Match a Windows drive segment so the drive colon remains usable by VS Code.
+            $encodedSegments[] = $index === 0 && preg_match('/^[A-Za-z]:$/', $segment) === 1
+                ? $segment
+                : rawurlencode($segment);
+        }
+
+        $encodedPath = implode('/', $encodedSegments);
+        if (!str_starts_with($encodedPath, '/')) {
+            $encodedPath = '/' . $encodedPath;
+        }
+
+        return 'vscode://file' . $encodedPath . ($line === null ? '' : ':' . $line);
     }
 
     /**

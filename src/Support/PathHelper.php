@@ -78,7 +78,11 @@ final class PathHelper
     {
         $realPath = realpath($path);
 
-        return self::normalizeSeparators(is_string($realPath) ? $realPath : $path);
+        if (is_string($realPath)) {
+            return self::normalizeSeparators($realPath);
+        }
+
+        return self::collapseDotSegments(self::normalizeSeparators($path));
     }
 
     /**
@@ -119,5 +123,88 @@ final class PathHelper
         }
 
         return rtrim($path, '/');
+    }
+
+    /**
+     * Collapse "." and ".." path segments without requiring the path to exist.
+     *
+     * @param string $path Normalized path using forward slash separators.
+     * @return string Path with dot segments removed.
+     */
+    private static function collapseDotSegments(string $path): string
+    {
+        if ($path === '') {
+            return '';
+        }
+
+        [$prefix, $remaining] = self::splitRoot($path);
+        $collapsed            = implode('/', self::collapsedSegments($remaining, $prefix !== ''));
+
+        if ($prefix === '') {
+            return $collapsed;
+        }
+
+        return $prefix . $collapsed;
+    }
+
+    /**
+     * Split an absolute root prefix from the rest of a normalized path.
+     *
+     * @return array{0: string, 1: string} Root prefix and remaining path.
+     */
+    private static function splitRoot(string $path): array
+    {
+        // Match a Windows drive-letter root such as C:/ before segment processing.
+        if (preg_match('/^[A-Za-z]:\//', $path) === 1) {
+            return [substr($path, 0, 3), substr($path, 3)];
+        }
+
+        // Match a bare Windows drive root such as C:.
+        if (preg_match('/^[A-Za-z]:$/', $path) === 1) {
+            return [$path, ''];
+        }
+
+        if (str_starts_with($path, '//')) {
+            return ['//', substr($path, 2)];
+        }
+
+        if (str_starts_with($path, '/')) {
+            return ['/', substr($path, 1)];
+        }
+
+        return ['', $path];
+    }
+
+    /**
+     * Collapse relative path segments after the root has been separated.
+     *
+     * @return list<string> Normalized path segments.
+     */
+    private static function collapsedSegments(string $path, bool $absolute): array
+    {
+        $segments = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                if ($segments !== [] && end($segments) !== '..') {
+                    array_pop($segments);
+                    continue;
+                }
+
+                if (!$absolute) {
+                    $segments[] = $segment;
+                }
+
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return $segments;
     }
 }

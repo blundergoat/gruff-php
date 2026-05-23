@@ -206,6 +206,32 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
+     * Verify VS Code editor links support Windows absolute paths.
+     *
+     * @return void No return value.
+     */
+    public function testHtmlReporterRendersWindowsVscodeEditorLinks(): void
+    {
+        $finding = new Finding(
+            ruleId:     'docs.missing-public-phpdoc',
+            message:    'Public method has no PHPDoc.',
+            filePath:   'C:/repo/Foo Bar.php',
+            line:       12,
+            severity:   Severity::Warning,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+        );
+
+        $html = (new HtmlReporter('/workspace/project', 'vscode'))->render($this->report([$finding]));
+
+        self::assertStringContainsString(
+            'href="vscode://file/C:/repo/Foo%20Bar.php:12"',
+            $html,
+        );
+    }
+
+    /**
      * Verify HTML reporter renders PHP storm editor links.
      *
      * @return void No return value.
