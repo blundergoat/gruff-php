@@ -6,7 +6,7 @@ Last reviewed 2026-05-14. Terms are grouped by domain. Each entry points at the 
 
 ### gruff-php
 
-The repository name and Composer package (`devgoat/gruff-php`, `composer.json`). It ships a single PHP CLI binary (`bin/gruff`) and the `GruffPhp\` PSR-4 library under `src/`. v0.1 is unreleased; the README and `CHANGELOG.md` describe its current scope.
+The repository name and Composer package (`blundergoat/gruff-php`, `composer.json`). It ships a single PHP CLI binary (`bin/gruff`) and the `GruffPhp\` PSR-4 library under `src/`. v0.1 is unreleased; the README and `CHANGELOG.md` describe its current scope.
 
 ### Project-owned app surface
 

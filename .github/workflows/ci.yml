@@ -70,6 +70,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
 
     steps:
       - name: Check out repository

@@ -72,7 +72,7 @@ quality concern.
 A useful bug report includes:
 
 - `php -v`
-- `composer show devgoat/gruff-php` or the commit hash
+- `composer show blundergoat/gruff-php` or the commit hash
 - The command you ran
 - Expected behavior
 - Actual output, preferably with `--format json --fail-on none`
