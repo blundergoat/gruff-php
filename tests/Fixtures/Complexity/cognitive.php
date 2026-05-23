@@ -36,7 +36,7 @@ class CognitiveFixture
         return 0;
     }
 
-    // CC = 3 (if +1, && +1, || +1 — operator switch)
+    // CC = 3 (if +1, && +1, || +1 - operator switch)
     public function booleanChain(int $x, int $y): bool
     {
         if ($x > 0 && $y > 0 || $x < -10) {
@@ -46,7 +46,7 @@ class CognitiveFixture
         return false;
     }
 
-    // CC = 2 (if +1, && +1 — same-operator chain = 1)
+    // CC = 2 (if +1, && +1 - same-operator chain = 1)
     public function sameOperatorChain(int $x, int $y, int $z): bool
     {
         if ($x > 0 && $y > 0 && $z > 0) {

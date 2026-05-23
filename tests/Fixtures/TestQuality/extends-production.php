@@ -36,7 +36,7 @@ final class OrderServiceProperTest extends TestCase
     }
 }
 
-// Edge: test class extends a project-specific *TestCase descendant — still a test base, no finding.
+// Edge: test class extends a project-specific *TestCase descendant - still a test base, no finding.
 final class OrderServiceCustomBaseTest extends CustomTestCase
 {
     public function testCustomBase(): void

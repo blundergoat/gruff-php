@@ -79,7 +79,7 @@ final class TestQualityRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-core-smells.php');
 
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $findings);
-        // sleep + time + microtime + new DateTime('now') + new DateTimeImmutable() — frozen DateTime is not flagged
+        // sleep + time + microtime + new DateTime('now') + new DateTimeImmutable() - frozen DateTime is not flagged
         self::assertRuleCount(SleepInTestRule::ID, 5, $findings);
     }
 
@@ -96,7 +96,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockOnlyTestRule::ID, 1, $findings);
         self::assertRuleCount(MysteryGuestRule::ID, 1, $findings);
         self::assertRuleCount(MagicNumberAssertionRule::ID, 1, $findings);
-        // ReflectionMethod + ReflectionClass + Closure::bind — one finding per test scope
+        // ReflectionMethod + ReflectionClass + Closure::bind - one finding per test scope
         self::assertRuleCount(PrivateReflectionRule::ID, 3, $findings);
         self::assertRuleCount(DataProviderAnnotationRule::ID, 1, $findings);
         self::assertRuleCount(TrivialSnapshotRule::ID, 1, $findings);

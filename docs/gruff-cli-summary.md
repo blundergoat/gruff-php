@@ -1,6 +1,6 @@
 # `gruff-php summary`
 
-A compact digest of a scan. Runs the analyser once, aggregates by pillar and rule, and prints a single readable block — **no per-finding spam**.
+A compact digest of a scan. Runs the analyser once, aggregates by pillar and rule, and prints a single readable block - **no per-finding spam**.
 
 Use it when:
 
@@ -27,7 +27,7 @@ php bin/gruff-php summary [paths...] [options]
 | `--top=N` | `10` | Cap the "Top N rules" and "Top N file offenders" sections. |
 | `--include-ignored` | off | Scan ignored files by using filesystem traversal instead of Git/default ignores. |
 
-## Example — text format
+## Example - text format
 
 The example output below was captured from a development checkout. A tagged
 release prints `0.1.0` instead of `0.1.0-dev`.
@@ -37,7 +37,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.1.0-dev — summary
+gruff-php 0.1.0-dev - summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
@@ -67,7 +67,7 @@ Totals    6 findings (advisory=4, warning=2, error=0)
 
 Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.
 
-## Example — JSON format
+## Example - JSON format
 
 ```bash
 php bin/gruff-php summary src --format=json --top=5
@@ -110,9 +110,9 @@ shape without bumping the schema version.
 
 ## What this is *not*
 
-- Not a `analyse` replacement — there's no per-finding list, no remediation hints, no diff/baseline interaction, no mutation analysis, no HTML rendering. Use `analyse` (with `--min-severity`, `--include-rule`, etc.) when you need full findings.
-- Not faster scanning — it runs the full rule registry. The "speed" is in reading the output, not the scan.
-- Not dashboard-server cached — every invocation rescans. Pipe it into a script if you want repeated lookups.
+- Not a `analyse` replacement - there's no per-finding list, no remediation hints, no diff/baseline interaction, no mutation analysis, no HTML rendering. Use `analyse` (with `--min-severity`, `--include-rule`, etc.) when you need full findings.
+- Not faster scanning - it runs the full rule registry. The "speed" is in reading the output, not the scan.
+- Not dashboard-server cached - every invocation rescans. Pipe it into a script if you want repeated lookups.
 
 ## Exit codes
 
@@ -126,7 +126,7 @@ shape without bumping the schema version.
 
 ## See also
 
-- [`gruff-cli-agent-instructions.md`](gruff-cli-agent-instructions.md) — for agents wrapping the CLI.
-- [`gruff-cli-branch-review.md`](gruff-cli-branch-review.md) — diff-aware review workflow.
-- [`README.md`](../README.md) — main project overview.
-- [`src/Command/SummaryCommand.php`](../src/Command/SummaryCommand.php) — source of truth.
+- [`gruff-cli-agent-instructions.md`](gruff-cli-agent-instructions.md) - for agents wrapping the CLI.
+- [`gruff-cli-branch-review.md`](gruff-cli-branch-review.md) - diff-aware review workflow.
+- [`README.md`](../README.md) - main project overview.
+- [`src/Command/SummaryCommand.php`](../src/Command/SummaryCommand.php) - source of truth.

@@ -37,7 +37,7 @@ final readonly class StmtChildBlock
     /**
      * @param string       $kind       One of the `KIND_*` constants identifying the block role.
      * @param array<Stmt>  $statements Statements inside the block, as PhpParser yields them.
-     * @param Node         $owner      Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) — gives rules access to extras.
+     * @param Node         $owner      Owning node (Stmt, Else_, ElseIf_, Case_, Catch_, or Finally_) - gives rules access to extras.
      */
     public function __construct(
         public string $kind,

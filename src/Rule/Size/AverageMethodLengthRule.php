@@ -24,7 +24,7 @@ use PhpParser\Node\Stmt\Trait_;
 /**
  * Detects types whose methods are long on average, even if no single method dominates.
  *
- * Measures logical lines — distinct start lines of non-`Nop` statements — averaged
+ * Measures logical lines - distinct start lines of non-`Nop` statements - averaged
  * across all methods in the class. See ADR-012 for the container/content metric split.
  */
 final readonly class AverageMethodLengthRule implements RuleInterface

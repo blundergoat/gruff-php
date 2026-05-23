@@ -51,7 +51,7 @@ final class TestMethodLengthTest extends TestCase
         self::assertSame(3, $value);
     }
 
-    // Edge: long visual span but mostly blanks/braces/comments — meaningful lines are well under threshold.
+    // Edge: long visual span but mostly blanks/braces/comments - meaningful lines are well under threshold.
     public function testHasLotsOfWhitespaceAndComments(): void
     {
         // arrange

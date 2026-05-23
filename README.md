@@ -347,7 +347,7 @@ Useful scripts:
 `src/`, full self-scan), captures wall time and peak memory, and compares each
 result to `.goat-flow/logs/perf/m50-baseline/baseline.json`. Use
 `composer perf -- --baseline --yes` to overwrite the baseline after intentional
-rule or threshold changes. Baselines are machine- and PHP-version-specific —
+rule or threshold changes. Baselines are machine- and PHP-version-specific -
 regenerate locally rather than committing a CI-host baseline. Tolerances default
 to wall +20%, peak +25%; override with `GRUFF_PERF_WALL_TOLERANCE` /
 `GRUFF_PERF_MEM_TOLERANCE`. Use `--quick` for a single-corpus, no-warmup run.

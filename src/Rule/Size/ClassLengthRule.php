@@ -24,7 +24,7 @@ use PhpParser\Node\Stmt\Trait_;
  * Detects class-like declarations that exceed the configured line threshold.
  *
  * Measures raw lines between the class declaration and its closing brace,
- * inclusive — whitespace and comments count. Class-length is a container
+ * inclusive - whitespace and comments count. Class-length is a container
  * measure, not a density measure. See ADR-012.
  */
 final readonly class ClassLengthRule implements RuleInterface

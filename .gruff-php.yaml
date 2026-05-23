@@ -471,7 +471,7 @@ rules:
         severity: error
     # Too many parameters make calls error-prone.
     # Final readonly promoted-DTO constructors are exempt from the base threshold
-    # until they exceed `promotedConstructorMaxParameters` — keeps legitimate
+    # until they exceed `promotedConstructorMaxParameters` - keeps legitimate
     # value-object aggregations clean while bounding the exemption.
     size.parameter-count:
         enabled: true

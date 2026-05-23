@@ -12,7 +12,7 @@ use PhpParser\Node\Stmt;
  *
  * Replaces the duplicated `instanceof Stmt\If_/For_/Foreach_/While_/Do_/Switch_/TryCatch`
  * chains that previously appeared across complexity and waste rules. When PHP
- * adds a new statement type, only this file changes — the consuming rules
+ * adds a new statement type, only this file changes - the consuming rules
  * inherit the new coverage automatically.
  *
  * Rules contribute per-block payload by switching on `StmtChildBlock::$kind`

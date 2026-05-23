@@ -23,7 +23,7 @@ use PhpParser\Node\Stmt\Function_;
 /**
  * Detects method and function bodies that exceed the configured line threshold.
  *
- * Measures logical lines — distinct start lines of non-`Nop` statements inside
+ * Measures logical lines - distinct start lines of non-`Nop` statements inside
  * the callable body. Multi-line constructor calls, fluent builders, and array
  * literals count as one logical line per statement boundary. See ADR-012.
  */
