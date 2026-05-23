@@ -1,0 +1,41 @@
+gruff-php 0.1.0-dev
+Format: text
+Fail threshold: error
+
+Files
+  Discovered: 1
+  Parsed: 1
+  Ignored: 0
+  Missing: 0
+  Parse errors: 0
+
+Score
+  Composite: A (96.50/100)
+  Scope: full-project
+  Score drivers: Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
+  Pillars:
+    size: B (84.00) findings=1
+    complexity: A (100.00) findings=0
+    maintainability: A (100.00) findings=0
+    dead-code: A (100.00) findings=0
+    naming: B (81.00) findings=2
+    documentation: A (100.00) findings=0
+    modernisation: A (100.00) findings=0
+    security: A (100.00) findings=0
+    sensitive-data: A (100.00) findings=0
+    test-quality: A (100.00) findings=0
+
+Findings
+  [warning] size.file-length
+    tests/Fixtures/Source/mixed/alpha.php:1
+    File has 27 lines, above the warning threshold of 3.
+  [warning] naming.class-file-mismatch
+    tests/Fixtures/Source/mixed/alpha.php:12
+    Class Alpha does not match file name alpha.php.
+  [advisory] naming.identifier-quality
+    tests/Fixtures/Source/mixed/alpha.php:19
+    Method name "value" is generic and does not communicate clear intent.
+
+Summary
+  Findings: 3 (advisory: 1, warning: 2, error: 0)
+  Exit code: 0

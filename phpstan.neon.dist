@@ -1,0 +1,18 @@
+parameters:
+    level: 10
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - tests/Fixtures/Source/syntax-error
+        - tests/Fixtures/Source/Code
+        - tests/Fixtures/Size
+        - tests/Fixtures/Complexity
+        - tests/Fixtures/DeadCode
+        - tests/Fixtures/Naming
+        - tests/Fixtures/Docs
+        - tests/Fixtures/Security
+        - tests/Fixtures/SensitiveData
+        - tests/Fixtures/Modernisation
+        - tests/Fixtures/TestQuality
+        - tests/Fixtures/Mutation/Infection

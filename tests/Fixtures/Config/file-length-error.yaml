@@ -1,0 +1,4 @@
+rules:
+    size.file-length:
+        threshold: 3
+        severity: error

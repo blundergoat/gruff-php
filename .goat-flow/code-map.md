@@ -1,36 +1,419 @@
 # Code Map - gruff-php
 
+Last reviewed 2026-05-23. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+
+## Top-level layout
+
 ```text
 .
-|-- README.md = only project-owned app/documentation file currently present
-|-- AGENTS.md = Codex root instruction file
-|-- CLAUDE.md = Claude Code root instruction file
-|-- .gitignore = local agent settings ignore rules
-|-- .github/ = GitHub-facing repository guidance
-|   `-- git-commit-instructions.md = commit message and commit safety rules
-|-- .goat-flow/ = goat-flow harness, project memory, and reference docs
-|   |-- config.yaml = goat-flow version and configured agents
-|   |-- architecture.md = current system architecture notes
-|   |-- code-map.md = this repository map
-|   |-- glossary.md = project and harness terms
-|   |-- footguns/ = durable architectural traps when real evidence exists
-|   |-- lessons/ = durable behavioral lessons from real incidents
-|   |-- patterns/ = reusable successful approaches
-|   |-- decisions/ = ADRs when durable decisions exist
-|   |-- skill-reference/ = shared goat-flow skill/tool playbooks
-|   |-- tasks/ = local milestone/task workspace
-|   |-- scratchpad/ = local temporary notes
-|   `-- logs/ = local setup, quality, critique, and security logs
-|-- .claude/ = Claude Code goat-flow setup
-|   |-- settings.json = Claude hook/permission config
-|   |-- hooks/deny-dangerous.sh = shell safety hook
-|   `-- skills/ = seven installed goat-flow skills
-|-- .codex/ = Codex goat-flow setup
-|   |-- config.toml = Codex hooks feature config
-|   |-- hooks.json = Codex PreToolUse hook registration
-|   `-- hooks/deny-dangerous.sh = shell safety hook
-`-- .agents/ = shared Codex/Gemini skill root
-    `-- skills/ = seven installed goat-flow skills for Codex
+|-- README.md                 = project entry doc; also probed by docs.missing-readme rule
+|-- CHANGELOG.md              = unreleased notes for the v0.1 surface
+|-- CLAUDE.md                 = Claude Code root instruction file
+|-- AGENTS.md                 = Codex peer instruction file
+|-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
+|-- composer.lock             = resolved Composer dependency versions
+|-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
+|-- phpunit.xml.dist          = PHPUnit 11 test suite config
+|-- package.json              = harness-only Node manifest (no app code consumes it)
+|-- pnpm-lock.yaml            = pnpm lockfile for harness Node tooling
+|-- node_modules/             = harness Node tooling install (gitignored)
+|-- vendor/                   = Composer install (gitignored)
+|-- bin/                      = PHP CLI entrypoint
+|-- scripts/                  = local maintenance scripts
+|-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)
+|-- tests/                    = PHPUnit suite + fixtures (PSR-4 root `GruffPhp\Tests\`)
+|-- .editorconfig             = editor settings
+|-- .gitattributes            = git export/diff rules
+|-- .gitignore                = root ignore rules
+|-- .github/                  = repository-facing guidance and CI workflow, including the gruff security-profile SARIF upload job
+|-- .idea/                    = JetBrains IDE settings (developer-local)
+|-- .goat-flow/               = goat-flow project memory and reference docs
+|-- .claude/                  = Claude Code config, hooks, and installed skills
+|-- .codex/                   = Codex hooks/config surface
+`-- .agents/                  = shared peer-agent skill root (Codex/Gemini)
 ```
 
-No `src/`, `tests/`, `composer.json`, `vendor/`, or CI directory exists yet.
+## Application surface
+
+```text
+bin/
+`-- gruff-php                                 = `#!/usr/bin/env php` shim that loads autoload and runs Console\Application
+
+scripts/
+|-- preflight-checks.sh                       = local PHPStan + PHPUnit + full-project gruff analysis runner with coloured pass/fail summary
+|-- start-dev.sh                              = starts `bin/gruff-php dashboard` with environment-overridable host/port/project/scan timeout
+`-- maintenance/                              = ad-hoc maintenance scripts (developer-local)
+
+src/
+|-- Analysis/
+|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/review/trend/baseline/filter metadata
+|   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/baseline/history errors)
+|-- Baseline/
+|   |-- BaselineData.php                      = loaded/generated baseline entries indexed by fingerprint
+|   |-- BaselineEntry.php                     = fingerprint/rule/file/line/symbol/message row
+|   |-- BaselineException.php                 = baseline read/write/validation failure exception
+|   |-- BaselineFilter.php                    = suppresses findings matching baseline fingerprint + rule + file
+|   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
+|   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
+|-- Command/
+|   |-- AnalyseCommand.php                    = `analyse` command; loads config, applies optional execution profiles (`--profile=security` selects security + sensitive-data rules), derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
+|   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
+|   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
+|   |-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
+|   |-- SummaryCommand.php                    = `summary` command; runs the analyser once and renders compact text/JSON aggregate output
+|   `-- SummaryReportData.php                 = aggregate payload for summary command rendering
+|-- Config/
+|   |-- AnalysisConfig.php                    = resolved per-rule settings, selection, configured path ignores, and allowlists
+|   |-- ConfigException.php                   = invalid-config exception type (RuntimeException subclass)
+|   |-- ConfigLoader.php                      = `.gruff-php.yaml` / legacy `.gruff.yaml` / `--config` YAML loader (`.yaml`/`.yml` only); strict unknown-key, path, allowlist, selection, type, and threshold validation
+|   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
+|   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
+|-- Console/
+|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.0-dev` until `scripts/bump-version.sh` stamps a release; registers `analyse`, `summary`, `dashboard`, `list-rules`, and `report`
+|-- Diff/
+|   |-- ChangedLineRange.php                  = inclusive changed-line range value object
+|   |-- DiffException.php                     = diff-mode failure exception
+|   |-- DiffFindingFilter.php                 = keeps findings touching changed ranges or changed files
+|   |-- DiffResult.php                        = diff-mode metadata exposed in reports
+|   `-- GitDiffProvider.php                   = zero-context `git diff` parser for working-tree, staged, unstaged, or base-ref modes; includes deleted-file paths for branch-review removed findings
+|-- Finding/
+|   |-- Confidence.php                        = `low` / `medium` / `high` enum
+|   |-- Finding.php                           = readonly finding value with stable `fingerprint()` (sha256 of identity fields, truncated)
+|   |-- Pillar.php                            = quality pillar enum (size, complexity, coupling, dead-code, naming, documentation, security, sensitive-data, design, modernisation, test-quality, architecture, maintainability, mutation)
+|   |-- RuleTier.php                          = release-tier enum (currently only `v0.1`)
+|   `-- Severity.php                          = `advisory` / `warning` / `error` enum
+|-- Review/
+|   |-- BranchReviewComparator.php            = stable-identity introduced/removed/unchanged finding comparison
+|   |-- BranchReviewResult.php                = branch-review metadata exposed in reports
+|   |-- FindingReviewIdentity.php             = review identity key: file + rule + symbol/message
+|   `-- GitArchiveSnapshot.php                = temporary path-limited `git archive` extraction for base-ref analysis without worktree mutation or buffered tar handoff
+|-- Mutation/
+|   |-- InfectionMutant.php                   = parsed Infection mutant row with status, file, line, mutator, diff, and process output
+|   |-- InfectionReport.php                   = parsed Infection report plus MSI, covered MSI, survived-mutant, and per-file summary helpers
+|   |-- InfectionReportParser.php             = full Infection JSON parser; validates stats/sections and normalises paths
+|   |-- InfectionRunResult.php                = result value for optional Infection process execution
+|   |-- InfectionRunner.php                   = explicit opt-in Infection `run` wrapper using Symfony Process and executable lookup
+|   |-- MutationAnalysisResult.php            = report + optional baseline/budget aggregate exposed as optional JSON `mutation`
+|   |-- MutationFileSummary.php               = per-file mutation totals and MSI values
+|   |-- MutationFindingFactory.php             = emits `mutation.survived-mutant`, `mutation.budget-exceeded`, `mutation.msi-regression`
+|   `-- MutationReportException.php           = invalid/malformed Infection report exception type
+|-- Parser/
+|   |-- AnalysisUnit.php                      = parsed unit: SourceFile, source text, AST statements, token list, diagnostics; `lineCount()` helper
+|   |-- ParseDiagnostic.php                   = per-file parse error message + 1-based line
+|   `-- PhpFileParser.php                     = nikic/php-parser wrapper; attaches `ParentConnectingVisitor`; non-PHP files return empty AST/tokens
+|-- Project/
+|   |-- PhpUnitConfig.php                     = parsed PHPUnit XML config value object (absolute + display path + `SimpleXMLElement` root)
+|   `-- PhpUnitConfigDiscovery.php            = walks `phpunit.xml`/`phpunit.xml.dist`/`phpunit.dist.xml` from a project root once per analyser run; cached per root
+|-- Reporting/
+|   |-- FailThreshold.php                     = `none` / `advisory` / `warning` / `error` enum + `isTriggeredBy(Severity)` predicate
+|   |-- FindingDisplayFilter.php              = post-analysis display filter for severity, pillar, and rule include/exclude flags
+|   |-- GithubAnnotationsReporter.php         = GitHub Actions annotation renderer with escaped annotation properties
+|   |-- HotspotReporter.php                   = hotspot-map JSON renderer based on file scores
+|   |-- HtmlReporter.php                      = self-contained escaped HTML report renderer
+|   |-- JsonReporter.php                      = pretty-printed JSON renderer of `AnalysisReport::toArray()`
+|   |-- MarkdownReporter.php                  = PR-comment style Markdown renderer with branch-review and grouped findings
+|   |-- OutputFormat.php                      = `text` / `json` / `html` / `markdown` / `github` / `hotspot` / `sarif` enum
+|   |-- SarifReporter.php                     = SARIF 2.1.0 renderer for code-scanning ingestion
+|   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, baseline, findings, summary)
+|-- Rule/
+|   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
+|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
+|   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
+|   |-- ProjectRuleInterface.php              = `definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>` contract; project-wide rules run once after the per-unit loop (see ADR-003)
+|   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs per-unit `RuleInterface` rules first, then project-wide `ProjectRuleInterface` rules over the full unit list, deduplicates overlapping naming findings by documented rule priority, then sorts findings by file/line/ruleId/message
+|   |-- SourceTextRuleInterface.php           = marker subinterface; rules implementing it also receive non-PHP text/config files
+|   |-- Complexity/
+|   |   |-- CognitiveComplexityRule.php       = `complexity.cognitive`
+|   |   |-- CyclomaticComplexityRule.php      = `complexity.cyclomatic`
+|   |   |-- HalsteadVolumeRule.php            = `complexity.halstead-volume`
+|   |   |-- MaintainabilityIndexRule.php      = `complexity.maintainability-index` (Maintainability pillar)
+|   |   |-- NestingDepthRule.php              = `complexity.nesting-depth`
+|   |   `-- NpathComplexityRule.php           = `complexity.npath`
+|   |-- DeadCode/
+|   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
+|   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
+|   |-- Design/
+|   |   `-- SingleImplementorInterfaceRule.php = `design.single-implementor-interface` (ProjectRuleInterface; flags internal interfaces with exactly one implementor and no external type-hint usage; configurable external prefixes, framework attributes, mock-as-implementor toggle, and additional excluded paths)
+|   |-- Docs/
+|   |   |-- MissingClassPhpdocRule.php        = `docs.missing-class-phpdoc` (flags class/interface/trait/enum declarations without a docblock; skips anonymous classes)
+|   |   |-- MissingConstantPhpdocRule.php     = `docs.missing-constant-phpdoc` (flags class constants without a docblock; enum cases exempt when the enclosing enum is documented)
+|   |   |-- MissingFilePhpdocRule.php         = `docs.missing-file-phpdoc` (flags files without a file-level docblock; single-class-per-file with class docblock acts as exemption)
+|   |   |-- MissingParamTagRule.php           = `docs.missing-param-tag`
+|   |   |-- MissingPropertyPhpdocRule.php     = `docs.missing-property-phpdoc` (flags declared properties without docblock; constructor-promoted properties satisfied by constructor `@param`)
+|   |   |-- MissingPublicPhpdocRule.php       = `docs.missing-public-phpdoc` (error for any method declaration without local PHPDoc)
+|   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
+|   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag` (flags any documented method/function without `@return`, excluding constructors/destructors)
+|   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
+|   |   |-- RegexCommentRule.php              = `docs.regex-comment` (requires an immediate one-line comment explaining configured regex matcher calls, defaulting to `preg_match`)
+|   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
+|   |   |-- TodoDensityRule.php               = `docs.todo-density`
+|   |   |-- BarePhpdocTagsRule.php            = `docs.bare-phpdoc-tags`
+|   |   `-- VarAnnotationDescriptionRule.php  = `docs.var-annotation-description` (flags local `@var` assertions that only restate type/variable without a reason)
+|   |-- Naming/
+|   |   |-- AbbreviationAllowlistRule.php      = `naming.abbreviation-allowlist` (requires 2-3 char lowercase project abbreviations to be declared in `allowlists.acceptedAbbreviations`)
+|   |   |-- BooleanPrefixRule.php             = `naming.boolean-prefix`
+|   |   |-- ClassFileMismatchRule.php         = `naming.class-file-mismatch`
+|   |   |-- ConfusingNameRule.php             = `naming.confusing-name`
+|   |   |-- FunctionLikeScope.php             = scope value for closure-aware naming walks
+|   |   |-- FunctionLikeScopeWalker.php       = shared isolated function/method/closure/arrow scope walker for naming rules
+|   |   |-- GenericMethodNameRule.php         = `naming.generic-method`
+|   |   |-- HungarianNotationRule.php         = `naming.hungarian-notation`
+|   |   |-- IdentifierQualityRule.php         = `naming.identifier-quality`
+|   |   |-- IdentifierTokenizer.php           = shared camel/snake/acronym tokenizer for identifier-quality
+|   |   |-- NegativeBooleanRule.php           = `naming.negative-boolean` (bool properties/params with negative prefixes; configurable `cliMirrorAllowlist`)
+|   |   |-- ParameterTypeNameRule.php         = `naming.parameter-type-name` (expects class-typed parameters and direct `new Type()` locals to use lower-camel short type names; trims configurable suffixes such as Interface)
+|   |   |-- ShortVariableRule.php             = `naming.short-variable`
+|   |   |-- SuffixHungarianRule.php           = `naming.suffix-hungarian` (type suffixes such as String/Map/Set; configurable `typeSuffixes`)
+|   |   `-- TestNamingConsistencyRule.php     = `naming.test-naming-consistency`
+|   |-- Modernisation/                        = AST-driven PHP-modernisation opportunity rules; PHP syntax suggestions respect `minimumPhpVersion`
+|   |   |-- ConstructorPromotionCandidateRule.php = `modernisation.constructor-promotion-candidate`
+|   |   |-- EnumCandidateRule.php              = `modernisation.enum-candidate`
+|   |   |-- FirstClassCallableCandidateRule.php = `modernisation.first-class-callable-candidate`
+|   |   |-- ForbiddenGlobalAccessRule.php      = `modernisation.forbidden-global-access`
+|   |   |-- MatchExpressionCandidateRule.php   = `modernisation.match-expression-candidate`
+|   |   |-- MixedTypeOveruseRule.php           = `modernisation.mixed-type-overuse` (signature surface only)
+|   |   |-- ModernisationNodeHelper.php        = shared PHP-version/type/parent-node helpers
+|   |   |-- NamedArgumentOpportunityRule.php   = `modernisation.named-argument-opportunity`
+|   |   |-- PhpDocMixedOveruseRule.php         = `modernisation.phpdoc-mixed-overuse` (PHPDoc surface: array shapes / unions / nested generics containing mixed across `@param`, `@return`, `@var`, `@property`, `@phpstan-*`, `@psalm-*`; suppresses standalone PHPDoc-only mixed already reported by the signature rule)
+|   |   |-- PublicPropertyRule.php             = `modernisation.public-property`
+|   |   `-- ReadonlyPropertyCandidateRule.php = `modernisation.readonly-property-candidate`
+|   |-- SensitiveData/                        = SensitiveData-pillar SourceTextRuleInterface rules; scan PHP plus config/text/env files
+|   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern` (common provider token patterns)
+|   |   |-- AwsAccessKeyRule.php              = `sensitive-data.aws-access-key`
+|   |   |-- DatabaseUrlPasswordRule.php       = `sensitive-data.database-url-password`
+|   |   |-- HardcodedEnvValueRule.php         = `sensitive-data.hardcoded-env-value`
+|   |   |-- HighEntropyStringRule.php         = `sensitive-data.high-entropy-string`
+|   |   |-- JwtTokenRule.php                  = `sensitive-data.jwt-token`
+|   |   |-- PhiPatternRule.php                = `sensitive-data.phi-pattern`
+|   |   |-- PiiTestFixtureRule.php            = `sensitive-data.pii-test-fixture`
+|   |   |-- PrivateKeyRule.php                = `sensitive-data.private-key`
+|   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the sensitive-data pack
+|   |-- Security/                             = AST-driven heuristic rules plus scoped source-text workflow checks
+|   |   |-- DangerousFunctionCallRule.php     = `security.dangerous-function-call`
+|   |   |-- DisabledSslVerificationRule.php   = `security.disabled-ssl-verification`
+|   |   |-- ErrorSuppressionRule.php          = `security.error-suppression`
+|   |   |-- ExtractCompactUserInputRule.php   = `security.extract-compact-user-input`
+|   |   |-- GithubActionsRiskyWorkflowRule.php = `security.github-actions-risky-workflow`
+|   |   |-- HeaderInjectionRule.php           = `security.header-injection`
+|   |   |-- InsecureRandomRule.php            = `security.insecure-random`
+|   |   |-- PathTraversalFileAccessRule.php   = `security.path-traversal-file-access`
+|   |   |-- ProcessCommandConstructionRule.php = `security.process-command-construction`
+|   |   |-- RequestControlledUrlRule.php      = `security.request-controlled-url`
+|   |   |-- SecurityNodeHelper.php            = shared AST traversal helpers for the security pack
+|   |   |-- SensitiveDataLoggingRule.php      = `security.sensitive-data-logging`
+|   |   |-- SilentCatchRule.php               = `security.silent-catch`
+|   |   |-- SqlConcatenationRule.php          = `security.sql-concatenation`
+|   |   |-- UnsafeArchiveExtractionRule.php   = `security.unsafe-archive-extraction`
+|   |   |-- UnsafeXmlLoadingRule.php          = `security.unsafe-xml-loading`
+|   |   |-- UnsafeUnserializeRule.php         = `security.unsafe-unserialize`
+|   |   |-- VariableIncludeRule.php           = `security.variable-include`
+|   |   `-- WeakCryptoRule.php                = `security.weak-crypto`
+|   |-- TestQuality/                          = PHPUnit/Pest AST rules scoped by `TestQualityNodeHelper`
+|   |   |-- ConditionalTestLogicRule.php      = `test-quality.conditional-logic`
+|   |   |-- DataProviderAnnotationRule.php    = `test-quality.data-provider-annotation`
+|   |   |-- EagerTestRule.php                 = `test-quality.eager-test` (filters method calls on result variables so getters on a returned value don't count as fresh SUT calls)
+|   |   |-- EmptyDataProviderRule.php         = `test-quality.empty-data-provider` (provably empty `#[DataProvider]`/`@dataProvider` targets)
+|   |   |-- ExceptionTypeOnlyRule.php         = `test-quality.exception-type-only` (`expectException()` without `expectExceptionMessage`/`Code`/`Object`)
+|   |   |-- ExcessiveMockingRule.php          = `test-quality.excessive-mocking`
+|   |   |-- ExtendsProductionClassRule.php    = `test-quality.extends-production-class` (`class FooTest extends Foo` not via `*TestCase`)
+|   |   |-- GlobalStateMutationRule.php       = `test-quality.global-state-mutation` (superglobal/`putenv`/`ini_set`/`error_reporting` writes without tearDown / `#[After]` cleanup)
+|   |   |-- LoopAssertionWithoutMessageRule.php = `test-quality.loop-assertion-without-message`
+|   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion` (default-allowlists HTTP status codes; configurable `allowedLiterals`)
+|   |   |-- MockingDomainObjectRule.php       = `test-quality.mocking-domain-object` (default-disabled; requires `domainNamespaces` glob list)
+|   |   |-- MockOnlyTestRule.php              = `test-quality.mock-only-test`
+|   |   |-- MockWithoutExpectationRule.php    = `test-quality.mock-without-expectation` (per-finding severity: `dead-mock`/warning vs `stub-only`/advisory)
+|   |   |-- MultipleAaaCyclesRule.php         = `test-quality.multiple-aaa-cycles` (default-disabled)
+|   |   |-- MysteryGuestRule.php              = `test-quality.mystery-guest`
+|   |   |-- NoAssertionsRule.php              = `test-quality.no-assertions` (recognises wide PHPUnit `expect*` family + Pest `expect()`)
+|   |   |-- PhpUnitCoverageSourceMissingRule.php = `test-quality.phpunit-coverage-source-missing` (project-config rule)
+|   |   |-- PhpUnitDeprecationsNotFatalRule.php = `test-quality.phpunit-deprecations-not-fatal`
+|   |   |-- PhpUnitStrictFlagsMissingRule.php = `test-quality.phpunit-strict-flags-missing`
+|   |   |-- PrivateReflectionRule.php         = `test-quality.private-reflection` (covers `ReflectionMethod`/`Class`/`Property`, `Closure::bind`, `bindTo`)
+|   |   |-- RepeatedStructureMissingDataProviderRule.php = `test-quality.repeated-structure-missing-data-provider` (3+ structurally identical methods)
+|   |   |-- SetupBloatRule.php                = `test-quality.setup-bloat`
+|   |   |-- SkippedWithoutReasonRule.php      = `test-quality.skipped-without-reason`
+|   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test` (covers `sleep`/`usleep` family + `time`/`microtime` + `new DateTime('now')`/`DateTimeImmutable()`)
+|   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called` (skips subprocess-execution tests; matches verb-without-trailing-`s` candidates so `testLoadsX` matches `load()`)
+|   |   |-- TautologicalTypeAssertionRule.php = `test-quality.tautological-type-assertion` (only when local static evidence proves the asserted type)
+|   |   |-- TestdoxReadabilityRule.php        = `test-quality.testdox-readability` (default-disabled; `minWords` threshold)
+|   |   |-- TestLongerThanSutRule.php         = `test-quality.test-longer-than-sut`
+|   |   |-- TestMethodTooLongRule.php         = `test-quality.test-method-too-long` (default 25 meaningful lines; configurable)
+|   |   |-- TestNamingConsistencyRule.php     = `test-quality.naming-consistency` (configurable `poorNamePatterns` regex list)
+|   |   |-- TestQualityNodeHelper.php         = shared test-scope/assertion/mock/SUT-call helpers
+|   |   |-- TestQualityScope.php              = detected PHPUnit/Pest scope value
+|   |   |-- TrivialAssertionRule.php          = `test-quality.trivial-assertion`
+|   |   |-- TrivialSnapshotRule.php           = `test-quality.trivial-snapshot`
+|   |   `-- UnusedMockRule.php                = `test-quality.unused-mock` (mock variable never read in scope)
+|   |-- Size/
+|   |   |-- AverageMethodLengthRule.php       = `size.average-method-length`
+|   |   |-- ClassLengthRule.php               = `size.class-length`
+|   |   |-- FileLengthRule.php                = `size.file-length` (warn 400 / error 800 default thresholds)
+|   |   |-- MethodLengthRule.php              = `size.method-length`
+|   |   |-- ParameterCountRule.php            = `size.parameter-count`
+|   |   |-- PropertyCountRule.php             = `size.property-count`
+|   |   `-- PublicMethodCountRule.php         = `size.public-method-count`
+|   `-- Waste/
+|       |-- CommentedOutCodeRule.php          = `waste.commented-out-code`
+|       |-- EmptyClassRule.php                = `waste.empty-class`
+|       |-- EmptyMethodRule.php               = `waste.empty-method`
+|       |-- OneLineMethodRule.php             = `waste.one-line-method` (Maintainability pillar)
+|       |-- RedundantVariableRule.php         = `waste.redundant-variable`
+|       |-- UnreachableCodeRule.php           = `waste.unreachable-code`
+|       |-- UnusedImportRule.php              = `waste.unused-import`
+|       `-- UnusedParameterRule.php           = `waste.unused-parameter`
+|-- Scoring/
+|   |-- CompositeFindingFactory.php           = emits `design.god-method` from overlapping size + complexity findings
+|   |-- FileScore.php                         = per-file top-offender score value
+|   |-- Grade.php                             = A-F grade helper around 0-100 scores
+|   |-- PillarScore.php                       = per-pillar score/count/penalty value
+|   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, mutation scoring, and profile-scoped composite scoring for `--profile=security`
+|   `-- ScoreReport.php                       = serialisable score payload for reports
+|-- Source/
+|   |-- SourceDiscovery.php                   = Git-visible or fallback recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/md/neon/sh/toml/xml/yaml/yml + `.env*`, `.editorconfig`, `.gitattributes`, `.gitignore`); deterministic ksort + path canonicalisation; configured ignores and generated lockfile skips
+|   |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
+|   `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
+`-- Trend/
+    |-- TrendRecorder.php                     = optional bounded JSON score-history writer for `--history-file`
+    `-- TrendReport.php                       = current-vs-previous score delta payload
+```
+
+Git worktree discovery uses `git ls-files --cached --others --exclude-standard` by default so tracked files and unignored untracked files define the broad scan boundary. Configured `paths.ignore` still applies after Git enumeration, and generated lockfile names (`package-lock.json`, `composer.lock`, `pnpm-lock.yaml`, `yarn.lock`, `npm-shrinkwrap.json`, `bun.lockb`) stay skipped to avoid known generated-artifact noise. `--include-ignored` opts into filesystem traversal for deliberate ignored-file scans. Non-Git fallback traversal uses `SourceDiscovery::IGNORED_DIRECTORIES`: `.fleet`, `.git`, `.goat-flow/logs`, `.goat-flow/scratchpad`, `.goat-flow/tasks`, `.hg`, `.idea`, `.phpunit.cache`, `.svn`, `.vscode`, `build`, `cache`, `coverage`, `dist`, `generated`, `node_modules`, `tmp`, `var/cache`, `vendor`.
+
+## Test surface
+
+```text
+tests/
+|-- Config/
+|   `-- ConfigLoaderTest.php                  = default config, YAML overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
+|-- Console/
+|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff-php`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
+|-- Diff/
+|   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
+|-- Finding/
+|   `-- FindingTest.php                       = `Finding::toArray()` shape and `fingerprint()` stability
+|-- Mutation/
+|   `-- InfectionReportParserTest.php         = full Infection JSON parser, path normalisation, MSI/per-file summaries, malformed report handling
+|-- Parser/
+|   `-- PhpFileParserTest.php                 = valid parse, syntax-error diagnostics, parent-connecting visitor
+|-- Reporting/
+|   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
+|-- Review/
+|   `-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
+|-- Source/
+|   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
+|-- Rule/
+|   |-- RuleRegistryTest.php                  = registry sorting, enable/disable, duplicate-id rejection, parse-error skipping
+|   |-- Complexity/
+|   |   |-- CognitiveComplexityRuleTest.php
+|   |   |-- ComplexityIntegrationTest.php
+|   |   |-- CyclomaticComplexityRuleTest.php
+|   |   `-- NestingDepthRuleTest.php
+|   |-- DeadCode/
+|   |   `-- DeadCodeRulesTest.php
+|   |-- Docs/
+|   |   `-- DocsRulesTest.php
+|   |-- Naming/
+|   |   `-- NamingRulesTest.php
+|   |-- SensitiveData/
+|   |   `-- SensitiveDataRulesTest.php
+|   |-- Security/
+|   |   `-- SecurityRulesTest.php
+|   |-- Size/
+|   |   |-- AverageMethodLengthRuleTest.php
+|   |   |-- ClassLengthRuleTest.php
+|   |   |-- MethodLengthRuleTest.php
+|   |   |-- ParameterCountRuleTest.php
+|   |   |-- PropertyCountRuleTest.php
+|   |   |-- PublicMethodCountRuleTest.php
+|   |   `-- SizeIntegrationTest.php
+|   `-- Waste/
+|       `-- WasteRulesTest.php
+|-- Scoring/
+|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring, design composite findings
+`-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
+    |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
+    |-- Complexity/                           = complexity-rule source fixtures
+    |-- Config/                               = flat tree of explicit config fixtures (rule disable, threshold override, selection, allowlists, opt-in heuristic enables, etc.)
+    |-- DeadCode/                             = dead-code + waste rule source fixtures
+    |-- Docs/                                 = documentation-rule source fixtures
+    |-- Modernisation/                        = modernisation-rule source fixtures (incl. nested Controller/ for routing-style cases)
+    |-- Mutation/Infection/                   = Infection JSON reports: valid, clean, baseline, malformed
+    |-- Naming/                               = naming-rule source fixtures
+    |-- PhpUnitConfig/                        = PHPUnit XML configs for the project-config rules: strict/, lax/, legacy-whitelist/, no-config/
+    |-- Security/                             = security-rule source fixtures
+    |-- SensitiveData/                        = sensitive-data rule fixtures (php, json, env-style)
+    |-- Size/                                 = size-rule source fixtures
+    |-- Source/                               = parser/discovery: empty/, mixed/, syntax-error/, plus Code/ holding the mutation-target SUT
+    `-- TestQuality/                          = static test-quality rule fixtures: per-rule positive/negative/edge files plus the cumulative-test-quality file that exercises every rule once
+```
+
+## goat-flow harness
+
+```text
+.goat-flow/
+|-- architecture.md                           = system architecture notes (this file's sibling)
+|-- code-map.md                               = this repository map
+|-- glossary.md                               = project and harness terms
+|-- config.yaml                               = goat-flow version + configured agents
+|-- security-policy.md                        = baseline security expectations
+|-- decisions/
+|   |-- ADR-001-package-baseline-and-integrations.md
+|   `-- README.md
+|-- footguns/
+|   |-- setup.md
+|   `-- README.md
+|-- lessons/
+|   |-- setup.md
+|   `-- README.md
+|-- patterns/
+|   `-- README.md
+|-- skill-reference/
+|   |-- README.md
+|   |-- skill-conventions.md
+|   |-- skill-preamble.md
+|   |-- browser-use.md                        = browser-use CLI availability + usage playbook
+|   |-- page-capture.md                       = page-capture CLI playbook
+|   |-- skill-quality-testing.md              = quality-testing skill index
+|   `-- skill-quality-testing/                = supporting docs for skill-quality-testing
+|-- tasks/                                    = local milestone/task workspace (gitignored content under it)
+|-- scratchpad/                               = local temporary notes (gitignored content under it)
+`-- logs/                                     = local setup, quality, critique, and security logs (gitignored content under it)
+
+.claude/
+|-- settings.json                             = committed Claude Code settings
+|-- settings.local.json                       = developer-local Claude Code settings (gitignored)
+|-- hooks/
+|   `-- deny-dangerous.sh                     = PreToolUse shell-safety hook
+`-- skills/
+    |-- goat/
+    |-- goat-critique/
+    |-- goat-debug/
+    |-- goat-plan/
+    |-- goat-qa/
+    |-- goat-review/
+    `-- goat-security/
+
+.codex/
+|-- config.toml                               = Codex hooks feature config
+|-- hooks.json                                = Codex PreToolUse hook registration
+`-- hooks/
+    `-- deny-dangerous.sh                     = shell-safety hook (mirrors Claude's)
+
+.agents/
+`-- skills/                                   = peer-agent skills mirroring `.claude/skills/`
+    |-- goat/
+    |-- goat-critique/
+    |-- goat-debug/
+    |-- goat-plan/
+    |-- goat-qa/
+    |-- goat-review/
+    `-- goat-security/
+```
+
+## Notes
+
+- `vendor/` and `node_modules/` are generated and gitignored.
+- CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
+- `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

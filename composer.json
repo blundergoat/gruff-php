@@ -1,0 +1,93 @@
+{
+    "name": "devgoat/gruff-php",
+    "description": "Opinionated PHP code-quality analyzer with 120 rules, SARIF output, baselines, and a local dashboard.",
+    "type": "library",
+    "keywords": [
+        "php",
+        "static-analysis",
+        "code-quality",
+        "code-analysis",
+        "code-review",
+        "linter",
+        "quality-gate",
+        "sarif",
+        "cli",
+        "baselines",
+        "dogfood",
+        "phpstan-alternative"
+    ],
+    "homepage": "https://github.com/blundergoat/gruff-php",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Matthew Hansen",
+            "homepage": "https://www.blundergoat.com/about",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/blundergoat/gruff-php/issues",
+        "source": "https://github.com/blundergoat/gruff-php",
+        "docs": "https://github.com/blundergoat/gruff-php/blob/main/README.md",
+        "security": "https://github.com/blundergoat/gruff-php/security/policy"
+    },
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5.6",
+        "symfony/console": "^6.4 || ^7.0 || ^8.0",
+        "symfony/finder": "^6.4 || ^7.0 || ^8.0",
+        "symfony/process": "^6.4 || ^7.0 || ^8.0",
+        "symfony/yaml": "^6.4"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "infection/infection": "^0.32",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "GruffPhp\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "GruffPhp\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/gruff-php"
+    ],
+    "scripts": {
+        "check": [
+            "composer validate --strict",
+            "composer audit --locked",
+            "@security:scan",
+            "bash -n scripts/preflight-checks.sh",
+            "bash -n scripts/mutation-test-diff.sh",
+            "bash -n scripts/mutation-test-full.sh",
+            "bash -n scripts/format-php-code.sh",
+            "bash -n scripts/bump-version.sh",
+            "find src tests -name '*.php' -not -path 'tests/Fixtures/Source/syntax-error/*' -print0 | xargs -0 -n1 -P 4 php -l > /dev/null",
+            "bash -n scripts/start-dev.sh",
+            "bash -n scripts/test-performance.sh",
+            "@phpstan"
+        ],
+        "format": "scripts/format-php-code.sh",
+        "format:check": "php-cs-fixer check --config=.php-cs-fixer.dist.php --diff",
+        "perf": "scripts/test-performance.sh",
+        "phpstan": "phpstan analyse --configuration=phpstan.neon.dist",
+        "security:scan": "php bin/gruff-php analyse src scripts .github composer.json package.json .gitattributes .gitignore .gruff-php.yaml phpunit.xml.dist phpstan.neon.dist infection.json5 --no-config --profile=security --format=text --fail-on=warning --no-baseline",
+        "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {
+            "infection/extension-installer": true
+        },
+        "classmap-authoritative": true,
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

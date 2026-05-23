@@ -1,0 +1,10 @@
+{
+  "patient_nhi": "ABC1234",
+  "patient_ssn": "123-45-6789",
+  "patient_mrn": "MRN-A1B2C3D4",
+  "patient_medicare": "2123 45678 1",
+  "tax_file_number": "123 456 782",
+  "customer_email": "avery.realperson@private-mail.net",
+  "customer_phone": "212-867-5309",
+  "customer_address": "742 Evergreen Terrace"
+}

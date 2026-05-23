@@ -1,5 +1,5 @@
 # CLAUDE.md - v1.5.1 (2026-05-09)
-gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app structure or commands until real source/config files exist.
+gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
 
@@ -7,7 +7,7 @@ gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app 
 2. This instruction file
 3. `.goat-flow/architecture.md`
 4. `.goat-flow/code-map.md`
-5. Skills and `.goat-flow/skill-reference/` on demand
+5. Skills and `.goat-flow/skill-playbooks/` on demand
 
 ## Autonomy Tiers
 
@@ -20,7 +20,7 @@ gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app 
 ## Hard Rules
 
 - If a file exists, modify it in place; do not create backup or `_new` variants.
-- Keep app claims grounded in existing files. Today there is no `composer.json`, `src/`, `tests/`, or PHP runtime config.
+- Keep app claims grounded in existing files. Current app surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, and `phpunit.xml.dist`.
 - Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
 - Preserve cross-agent consistency between `CLAUDE.md` and `AGENTS.md` for shared goat-flow rules.
 - Keep the controlling goat-flow workspace distinct from this selected target project when tools or prompts originate outside this checkout.
@@ -28,15 +28,20 @@ gruff-php is a new PHP workspace scaffold. Current invariant: do not invent app 
 ## Key Resources
 
 - Learning loop: `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/`
-- Tool playbooks: `.goat-flow/skill-reference/browser-use.md`, `.goat-flow/skill-reference/page-capture.md`
+- Tool playbooks: `.goat-flow/skill-playbooks/browser-use.md`, `.goat-flow/skill-playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
 
 ## Essential Commands
 
-No application lint, typecheck, build, or test command is configured yet.
+Application commands configured by `composer.json`:
 
 ```bash
 git status --short --untracked-files=all
+composer check
+composer test
+composer perf
+php bin/gruff-php --help
+php bin/gruff-php analyse
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude
 node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent claude --harness
 ```
@@ -46,7 +51,7 @@ node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agen
 When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
 
 ### READ
-Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-reference/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
 
 ### SCOPE
 Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
@@ -56,6 +61,15 @@ State: `[MODE]` | Goal: `[one line]` | Exit: `[condition]`. Implement narrowly a
 
 ### VERIFY
 Run relevant checks before claiming success. If no app commands exist, say that explicitly. For shell changes run `bash -n` or `shellcheck` when available. Do not claim checks passed without literal pass/fail output from this session.
+
+**Hallucination red-flags:**
+1. **Checks passed.** Do not claim tests pass or any check passed (composer check, shellcheck, audit) without showing the literal pass/fail line copied verbatim from this session's run. Paraphrase, cached output, or prior-session results do not count.
+2. **Completion.** Do not claim completion without listing the specific files changed in this turn. If no files were changed, say so explicitly.
+3. **Fix verification.** Do not claim a fix works without running the reproduction steps that originally demonstrated the bug. "Looks correct" is not verification.
+4. **Hedged claims.** Do not use "should work", "probably fine", "looks good" as verification. These are guesses, not evidence.
+5. **Rule paraphrase.** Do not weaken a rule by restating it with different words. Spirit over letter — paraphrases count as the same constraint.
+
+Rationalisations to reject: see the Excuse / Reality table in `.goat-flow/skill-reference/skill-preamble.md`. If you catch yourself thinking the Excuse, run the proof or mark the claim **UNVERIFIED**.
 
 ## Definition of Done
 
@@ -76,7 +90,7 @@ Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lesso
 | Claude instruction file | `CLAUDE.md` |
 | Codex peer instruction file | `AGENTS.md` |
 | Learning loop | `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/` |
-| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-* references) | `.goat-flow/skill-reference/` - read BEFORE declaring a tool unavailable |
+| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |

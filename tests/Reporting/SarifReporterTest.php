@@ -1,0 +1,441 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Tests\Reporting;
+
+use GruffPhp\Analysis\AnalysisReport;
+use GruffPhp\Diff\DiffResult;
+use GruffPhp\Finding\Confidence;
+use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Pillar;
+use GruffPhp\Finding\RuleTier;
+use GruffPhp\Finding\Severity;
+use GruffPhp\Mutation\InfectionMutant;
+use GruffPhp\Mutation\InfectionReport;
+use GruffPhp\Mutation\MutationAnalysisResult;
+use GruffPhp\Mutation\MutationFindingFactory;
+use GruffPhp\Reporting\JsonReporter;
+use GruffPhp\Reporting\SarifReporter;
+use GruffPhp\Scoring\ScoreCalculator;
+use GruffPhp\Scoring\ScoreReport;
+use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Covers SARIF report rendering contracts.
+ *
+ * @phpstan-type JsonScalar bool|float|int|object|string|null
+ * @phpstan-type JsonLevel8 array<array-key, JsonScalar>
+ * @phpstan-type JsonLevel7 array<array-key, JsonScalar|JsonLevel8>
+ * @phpstan-type JsonLevel6 array<array-key, JsonScalar|JsonLevel7>
+ * @phpstan-type JsonLevel5 array<array-key, JsonScalar|JsonLevel6>
+ * @phpstan-type JsonLevel4 array<array-key, JsonScalar|JsonLevel5>
+ * @phpstan-type JsonLevel3 array<array-key, JsonScalar|JsonLevel4>
+ * @phpstan-type JsonLevel2 array<array-key, JsonScalar|JsonLevel3>
+ * @phpstan-type JsonLevel1 array<array-key, JsonScalar|JsonLevel2>
+ * @phpstan-type JsonArray array<array-key, JsonScalar|JsonLevel1>
+ * @phpstan-type JsonValue JsonScalar|JsonLevel1|JsonLevel2|JsonLevel3|JsonLevel4|JsonLevel5|JsonLevel6|JsonLevel7|JsonLevel8|JsonArray
+ */
+final class SarifReporterTest extends TestCase
+{
+    /**
+     * Verify SARIF output preserves native report identity while exposing code-scanning metadata.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testSarifReporterEmitsRegistryRulesResultIdentityAndRunProperties(): void
+    {
+        $finding = new Finding(
+            ruleId:           'security.dangerous-function-call',
+            message:          'Dangerous call to eval().',
+            filePath:         './src\\app.php',
+            line:             12,
+            severity:         Severity::Error,
+            pillar:           Pillar::Security,
+            tier:             RuleTier::V01,
+            confidence:       Confidence::High,
+            endLine:          13,
+            column:           5,
+            symbol:           'run',
+            remediation:      'Avoid eval.',
+            secondaryPillars: [Pillar::Maintainability],
+            metadata:         ['target' => 'eval'],
+        );
+        $findings = [$finding];
+        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $report   = $this->report($findings, $score);
+
+        $payload  = $this->decode((new SarifReporter())->render($report));
+        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules    = $this->listValue($driver, 'rules');
+        $ruleIds  = array_map(
+            fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
+            $rules,
+        );
+        $sortedRuleIds = $ruleIds;
+        sort($sortedRuleIds, SORT_STRING);
+        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
+        $ruleIndex = $result['ruleIndex'] ?? null;
+        self::assertIsInt($ruleIndex);
+        $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
+
+        self::assertSame('2.1.0', $this->stringValue($payload, 'version'));
+        self::assertSame('gruff-php', $this->stringValue($driver, 'name'));
+        self::assertSame('0.1.0-test', $this->stringValue($driver, 'semanticVersion'));
+        self::assertArrayNotHasKey('informationUri', $driver);
+        self::assertSame($sortedRuleIds, $ruleIds);
+        self::assertContains('size.file-length', $ruleIds);
+        self::assertSame('security.dangerous-function-call', $this->stringValue($result, 'ruleId'));
+        self::assertSame('security.dangerous-function-call', $this->stringValue($matchingRule, 'id'));
+        self::assertSame('Dangerous function calls', $this->stringValue($matchingRule, 'name'));
+        self::assertSame('warning', $this->stringValue($this->stringKeyedArray($matchingRule, 'properties'), 'defaultSeverity'));
+        self::assertSame('error', $this->stringValue($result, 'level'));
+        self::assertSame('Dangerous call to eval().', $this->stringValue($this->stringKeyedArray($result, 'message'), 'text'));
+        self::assertSame('src/app.php', $this->stringValue(
+            $this->stringKeyedArray(
+                $this->stringKeyedArray(
+                    $this->stringKeyedArray($this->listValue($result, 'locations')[0] ?? null),
+                    'physicalLocation',
+                ),
+                'artifactLocation',
+            ),
+            'uri',
+        ));
+        $region = $this->stringKeyedArray(
+            $this->stringKeyedArray($this->listValue($result, 'locations')[0] ?? null),
+            'physicalLocation',
+        )['region'];
+        self::assertIsArray($region);
+        $expectedStartLine   = $finding->line;
+        $expectedStartColumn = $finding->column;
+        $expectedEndLine     = $finding->endLine;
+        self::assertSame($expectedStartLine, $region['startLine'] ?? null);
+        self::assertSame($expectedStartColumn, $region['startColumn'] ?? null);
+        self::assertSame($expectedEndLine, $region['endLine'] ?? null);
+        $partialFingerprints = $this->stringKeyedArray($result, 'partialFingerprints');
+        self::assertSame($finding->fingerprint(), $this->stringValue($partialFingerprints, 'gruffFingerprint'));
+        self::assertArrayNotHasKey('primary', $partialFingerprints);
+        $resultProperties = $this->stringKeyedArray($result, 'properties');
+        self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
+        self::assertSame('eval', $this->stringKeyedArray($resultProperties, 'metadata')['target'] ?? null);
+        $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
+        self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertSame($score->composite->score, $runProperties['score'] ?? null);
+        self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
+        self::assertSame('gruff.analysis.v1', $this->stringValue($this->decode((new JsonReporter())->render($report)), 'schemaVersion'));
+        self::assertArrayNotHasKey('codeFlows', $result);
+        self::assertArrayNotHasKey('threadFlows', $result);
+        self::assertArrayNotHasKey('fixes', $result);
+    }
+
+    /**
+     * Verify empty reports stay valid SARIF while omitting absent score data.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
+    {
+        $payload  = $this->decode((new SarifReporter())->render($this->report([])));
+        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+
+        self::assertSame([], $this->listValue($sarifRun, 'results'));
+        self::assertContains('size.file-length', array_map(
+            fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
+            $this->listValue($driver, 'rules'),
+        ));
+        $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
+        self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertArrayNotHasKey('score', $runProperties);
+        self::assertArrayNotHasKey('grade', $runProperties);
+    }
+
+    /**
+     * Verify severity values map to SARIF result levels.
+     *
+     * @param Severity $severity Finding severity to render.
+     * @param string   $level    Expected SARIF level.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    #[DataProvider('severityLevels')]
+    public function testSarifReporterMapsSeverityLevels(Severity $severity, string $level): void
+    {
+        $payload = $this->decode((new SarifReporter())->render($this->report([
+            $this->finding(severity: $severity),
+        ])));
+        $result = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
+
+        self::assertSame($level, $this->stringValue($result, 'level'));
+    }
+
+    /**
+     * Provide SARIF severity examples for reporter tests.
+     *
+     * @return iterable<string, array{0: Severity, 1: string}>
+     */
+    public static function severityLevels(): iterable
+    {
+        yield 'error' => [Severity::Error, 'error'];
+        yield 'warning' => [Severity::Warning, 'warning'];
+        yield 'advisory' => [Severity::Advisory, 'note'];
+    }
+
+    /**
+     * Verify non-registry mutation findings receive deterministic fallback driver rules.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testSarifReporterEmitsFallbackRuleForMutationFinding(): void
+    {
+        $mutationAnalysisResult = new MutationAnalysisResult(new InfectionReport(
+            reportPath: 'infection.json',
+            stats:      [
+                'totalMutantsCount' => 1,
+                'msi' => 0.0,
+                'coveredCodeMsi' => 0.0,
+                'mutationCodeCoverage' => 100.0,
+            ],
+            mutants:    [
+                new InfectionMutant(
+                    status:        'escaped',
+                    filePath:      './tests\\ExampleTest.php',
+                    line:          22,
+                    mutator:       'PublicVisibility',
+                    diff:          'diff',
+                    processOutput: 'output',
+                ),
+            ],
+        ));
+        $finding   = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
+        $payload   = $this->decode((new SarifReporter())->render($this->report([$finding])));
+        $sarifRun  = $this->sarifRun($payload);
+        $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules     = $this->listValue($driver, 'rules');
+        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
+        $ruleIndex = $result['ruleIndex'] ?? null;
+        self::assertIsInt($ruleIndex);
+        $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
+
+        self::assertSame('mutation.survived-mutant', $this->stringValue($result, 'ruleId'));
+        self::assertSame('mutation.survived-mutant', $this->stringValue($matchingRule, 'id'));
+        self::assertSame('mutation.survived-mutant', $this->stringValue($matchingRule, 'name'));
+        self::assertSame('mutation.survived-mutant', $this->stringValue($this->stringKeyedArray($matchingRule, 'shortDescription'), 'text'));
+        $ruleProperties = $this->stringKeyedArray($matchingRule, 'properties');
+        self::assertSame('mutation', $this->stringValue($ruleProperties, 'pillar'));
+        self::assertSame('warning', $this->stringValue($ruleProperties, 'severity'));
+        $resultProperties = $this->stringKeyedArray($result, 'properties');
+        self::assertSame('PublicVisibility', $this->stringValue($resultProperties, 'symbol'));
+        self::assertSame('escaped', $this->stringKeyedArray($resultProperties, 'metadata')['status'] ?? null);
+    }
+
+    /**
+     * Verify optional regions and additional path shapes render without fabricated data.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testSarifReporterHandlesOptionalRegionsAndAdditionalPathShapes(): void
+    {
+        $payload = $this->decode((new SarifReporter())->render($this->report([
+            $this->finding(ruleId: 'fixture.no-line', filePath: 'src\\NoLine.php', line: null),
+            $this->finding(ruleId: 'fixture.nested-dot', filePath: '././src/NestedDot.php', line: 4),
+            $this->finding(ruleId: 'fixture.windows-mixed', filePath: 'C:\\repo/src\\Mixed.php', line: 8),
+        ])));
+        $results = $this->listValue($this->sarifRun($payload), 'results');
+
+        $firstLocation = $this->physicalLocation($results[0] ?? null);
+        self::assertSame('src/NoLine.php', $this->stringValue($this->stringKeyedArray($firstLocation, 'artifactLocation'), 'uri'));
+        self::assertArrayNotHasKey('region', $firstLocation);
+
+        $secondLocation = $this->physicalLocation($results[1] ?? null);
+        $nestedDotLine  = 4;
+        self::assertSame('src/NestedDot.php', $this->stringValue($this->stringKeyedArray($secondLocation, 'artifactLocation'), 'uri'));
+        self::assertSame($nestedDotLine, $this->stringKeyedArray($secondLocation, 'region')['startLine'] ?? null);
+
+        $thirdLocation = $this->physicalLocation($results[2] ?? null);
+        self::assertSame('C:/repo/src/Mixed.php', $this->stringValue($this->stringKeyedArray($thirdLocation, 'artifactLocation'), 'uri'));
+    }
+
+    /**
+     * Verify SARIF and native JSON preserve the same report identity over one report instance.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testSarifReporterPreservesNativeJsonSchemaAndFindingCount(): void
+    {
+        $report = $this->report([
+            $this->finding(ruleId: 'fixture.warning', severity: Severity::Warning),
+            $this->finding(ruleId: 'fixture.advisory', severity: Severity::Advisory),
+        ]);
+        $json     = $this->decode((new JsonReporter())->render($report));
+        $sarif    = $this->decode((new SarifReporter())->render($report));
+        $sarifRun = $this->sarifRun($sarif);
+
+        self::assertSame('gruff.analysis.v1', $this->stringValue($json, 'schemaVersion'));
+        self::assertSame($this->stringValue($json, 'schemaVersion'), $this->stringValue($this->stringKeyedArray($sarifRun, 'properties'), 'gruffSchemaVersion'));
+        self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($sarifRun, 'results'));
+        self::assertSame(
+            array_map(
+                fn (mixed $finding): string => $this->stringValue($this->stringKeyedArray($finding), 'ruleId'),
+                $this->listValue($json, 'findings'),
+            ),
+            array_map(
+                fn (mixed $result): string => $this->stringValue($this->stringKeyedArray($result), 'ruleId'),
+                $this->listValue($sarifRun, 'results'),
+            ),
+        );
+    }
+
+    /**
+     * @param list<Finding> $findings Findings to attach to the report.
+     * @return AnalysisReport Focused report fixture.
+     */
+    private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
+    {
+        return new AnalysisReport(
+            toolVersion:     '0.1.0-test',
+            requestedPaths:  ['src'],
+            format:          'sarif',
+            failOn:          'none',
+            filesDiscovered: count($findings),
+            filesParsed:     count($findings),
+            ignoredPaths:    [],
+            missingPaths:    [],
+            diagnostics:     [],
+            findings:        $findings,
+            exitCode:        0,
+            score:           $score,
+            diff:            DiffResult::inactive(),
+        );
+    }
+
+    /**
+     * Build a focused finding for SARIF renderer tests.
+     *
+     * @return Finding Focused finding fixture.
+     */
+    private function finding(
+        string $ruleId = 'security.dangerous-function-call',
+        string $filePath = 'src/app.php',
+        ?int $line = 1,
+        Severity $severity = Severity::Warning,
+    ): Finding {
+        return new Finding(
+            ruleId:     $ruleId,
+            message:    'Finding message.',
+            filePath:   $filePath,
+            line:       $line,
+            severity:   $severity,
+            pillar:     Pillar::Security,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+        );
+    }
+
+    /**
+     * @param JsonArray $payload SARIF payload.
+     * @return JsonArray
+     */
+    private function sarifRun(array $payload): array
+    {
+        return $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+    }
+
+    /**
+     * Extract the physical location object from a SARIF result fixture.
+     *
+     * @return JsonArray Location payload.
+     */
+    private function physicalLocation(mixed $result): array
+    {
+        return $this->stringKeyedArray(
+            $this->stringKeyedArray($this->listValue($this->stringKeyedArray($result), 'locations')[0] ?? null),
+            'physicalLocation',
+        );
+    }
+
+    /**
+     * @throws JsonException
+     * @return JsonArray
+     */
+    private function decode(string $json): array
+    {
+        $decodedJson = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+        return $this->stringKeyedArray($decodedJson);
+    }
+
+    /**
+     * @param JsonArray $payload Source array.
+     * @return list<JsonValue>
+     */
+    private function listValue(array $payload, string $key): array
+    {
+        $payloadValue = $payload[$key] ?? null;
+        self::assertIsArray($payloadValue);
+
+        return array_values($payloadValue);
+    }
+
+    /**
+     * Normalize a decoded JSON value or keyed child to an array payload.
+     *
+     * @return JsonArray String-keyed payload.
+     */
+    private function stringKeyedArray(mixed $payload, ?string $key = null): array
+    {
+        $payloadValue = $key === null && is_array($payload) ? $payload : (is_array($payload) ? ($payload[$key] ?? null) : null);
+        $this->assertJsonArray($payloadValue);
+
+        return $payloadValue;
+    }
+
+    /**
+     * Assert that decoded SARIF contains an object at the requested key.
+     *
+     * @phpstan-assert JsonArray $payload
+     * @return void
+     */
+    private function assertJsonArray(mixed $payload): void
+    {
+        self::assertIsArray($payload);
+
+        foreach ($payload as $payloadValue) {
+            if (is_array($payloadValue)) {
+                $this->assertJsonArray($payloadValue);
+
+                continue;
+            }
+
+            self::assertTrue(
+                $payloadValue === null
+                || is_bool($payloadValue)
+                || is_float($payloadValue)
+                || is_int($payloadValue)
+                || is_object($payloadValue)
+                || is_string($payloadValue),
+            );
+        }
+    }
+
+    /**
+     * @param JsonArray $payload Source array.
+     * @return string String value.
+     */
+    private function stringValue(array $payload, string $key): string
+    {
+        $payloadValue = $payload[$key] ?? null;
+        self::assertIsString($payloadValue);
+
+        return $payloadValue;
+    }
+}

@@ -1,0 +1,58 @@
+{
+  "stats": {
+    "totalMutantsCount": 4,
+    "killedCount": 2,
+    "escapedCount": 1,
+    "timedOutCount": 1,
+    "msi": 50.0,
+    "coveredCodeMsi": 50.0,
+    "mutationCodeCoverage": 100.0
+  },
+  "escaped": [
+    {
+      "mutator": {
+        "mutatorName": "Plus",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 11
+      },
+      "diff": "-        return $subtotal + $tax;\n+        return $subtotal - $tax;",
+      "processOutput": "Failed asserting that 8 is identical to 12."
+    }
+  ],
+  "timeouted": [
+    {
+      "mutator": {
+        "mutatorName": "IntegerPlus",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 11
+      },
+      "diff": "-        return $subtotal + $tax;\n+        return $subtotal + $tax + 1;",
+      "processOutput": "Mutation timed out."
+    }
+  ],
+  "killed": [
+    {
+      "mutator": {
+        "mutatorName": "PublicVisibility",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 9
+      },
+      "diff": "-    public function calculateTotal\n+    protected function calculateTotal",
+      "processOutput": ""
+    },
+    {
+      "mutator": {
+        "mutatorName": "ReturnRemoval",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 11
+      },
+      "diff": "-        return $subtotal + $tax;\n+        return null;",
+      "processOutput": ""
+    }
+  ],
+  "killedByStaticAnalysis": [],
+  "errored": [],
+  "syntaxErrors": [],
+  "uncovered": [],
+  "ignored": []
+}

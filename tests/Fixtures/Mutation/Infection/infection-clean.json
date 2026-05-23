@@ -1,0 +1,38 @@
+{
+  "stats": {
+    "totalMutantsCount": 2,
+    "killedCount": 2,
+    "escapedCount": 0,
+    "timedOutCount": 0,
+    "msi": 100.0,
+    "coveredCodeMsi": 100.0,
+    "mutationCodeCoverage": 100.0
+  },
+  "escaped": [],
+  "timeouted": [],
+  "killed": [
+    {
+      "mutator": {
+        "mutatorName": "Plus",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 11
+      },
+      "diff": "",
+      "processOutput": ""
+    },
+    {
+      "mutator": {
+        "mutatorName": "ReturnRemoval",
+        "originalFilePath": "tests/Fixtures/Source/Code/OrderCalculator.php",
+        "originalStartLine": 11
+      },
+      "diff": "",
+      "processOutput": ""
+    }
+  ],
+  "killedByStaticAnalysis": [],
+  "errored": [],
+  "syntaxErrors": [],
+  "uncovered": [],
+  "ignored": []
+}

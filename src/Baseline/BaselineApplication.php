@@ -1,0 +1,139 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GruffPhp\Baseline;
+
+use GruffPhp\Analysis\RunDiagnostic;
+use GruffPhp\Diff\DiffResult;
+use GruffPhp\Finding\Finding;
+
+/**
+ * Applies baseline suppression to findings and returns the filtered report data.
+ */
+final readonly class BaselineApplication
+{
+    /**
+     * Apply an existing baseline file without building report metadata.
+     *
+     * @param string        $projectRoot  Project root used to resolve the baseline path.
+     * @param string        $baselinePath Baseline path to read.
+     * @param list<Finding> $findings     Findings to filter.
+     * @throws BaselineException When the baseline cannot be read or validated.
+     * @return list<Finding> Filtered findings.
+     */
+    public function filterExisting(string $projectRoot, string $baselinePath, array $findings): array
+    {
+        $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
+
+        return (new BaselineFilter())->apply($baseline, $findings, false)['findings'];
+    }
+
+    /**
+     * @param string                     $projectRoot Project root used to resolve baseline paths.
+     * @param BaselineApplicationOptions $options     Baseline application options selected for this run.
+     * @param list<Finding>              $findings    Findings to generate from or filter in place.
+     * @param DiffResult|null            $diff        Diff scope used to preserve changed-line findings when present.
+     * @param list<RunDiagnostic>        $diagnostics Diagnostics collected during baseline handling.
+     * @return BaselineReport|null Baseline report when a baseline was generated or applied.
+     */
+    public function apply(
+        string $projectRoot,
+        BaselineApplicationOptions $options,
+        array &$findings,
+        ?DiffResult $diff,
+        array &$diagnostics,
+    ): ?BaselineReport {
+        $baselineStore = new BaselineStore($projectRoot);
+
+        if ($options->generateBaselinePath !== null) {
+            return $this->generate($baselineStore, $options->generateBaselinePath, $findings, $diagnostics);
+        }
+
+        if ($options->baselinePath === null) {
+            return null;
+        }
+
+        return $this->applyExistingBaseline(
+            store:       $baselineStore,
+            options:     $options,
+            findings:    $findings,
+            diff:        $diff,
+            diagnostics: $diagnostics,
+        );
+    }
+
+    /**
+     * @param list<Finding>       $findings
+     * @param list<RunDiagnostic> $diagnostics
+     * @return BaselineReport|null Generated baseline report, or null when writing fails.
+     */
+    private function generate(
+        BaselineStore $store,
+        string $generateBaselinePath,
+        array $findings,
+        array &$diagnostics,
+    ): ?BaselineReport {
+        try {
+            $baseline = $store->write($generateBaselinePath, $findings);
+        } catch (BaselineException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type:    'baseline-error',
+                message: $exception->getMessage(),
+                path:    $generateBaselinePath,
+            );
+
+            return null;
+        }
+
+        return new BaselineReport(
+            path:               $baseline->path,
+            generated:          true,
+            totalEntries:       count($baseline->entries),
+            suppressedFindings: 0,
+            staleEvaluation:    'generated',
+            source:             $generateBaselinePath === BaselineStore::DEFAULT_FILENAME
+                ? BaselineReport::SOURCE_DEFAULT
+                : BaselineReport::SOURCE_EXPLICIT,
+        );
+    }
+
+    /**
+     * @param list<Finding>       $findings
+     * @param list<RunDiagnostic> $diagnostics
+     * @return BaselineReport|null Applied baseline report, or null when reading fails.
+     */
+    private function applyExistingBaseline(
+        BaselineStore $store,
+        BaselineApplicationOptions $options,
+        array &$findings,
+        ?DiffResult $diff,
+        array &$diagnostics,
+    ): ?BaselineReport {
+        try {
+            $baseline    = $store->read($options->baselinePath ?? '');
+            $application = (new BaselineFilter())->apply($baseline, $findings, $diff instanceof DiffResult && $diff->active);
+        } catch (BaselineException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type:    'baseline-error',
+                message: $exception->getMessage(),
+                path:    $options->baselinePath,
+            );
+
+            return null;
+        }
+
+        $findings = $application['findings'];
+        $report   = $application['report'];
+
+        return new BaselineReport(
+            path:               $report->path,
+            generated:          $report->generated,
+            totalEntries:       $report->totalEntries,
+            suppressedFindings: $report->suppressedFindings,
+            staleEvaluation:    $report->staleEvaluation,
+            staleEntries:       $report->staleEntries,
+            source:             $options->isBaselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
+        );
+    }
+}

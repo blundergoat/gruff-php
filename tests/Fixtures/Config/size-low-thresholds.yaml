@@ -1,0 +1,22 @@
+rules:
+    size.file-length:
+        threshold: 5
+        severity: warning
+    size.method-length:
+        threshold: 3
+        severity: warning
+    size.class-length:
+        threshold: 5
+        severity: warning
+    size.parameter-count:
+        threshold: 2
+        severity: warning
+    size.public-method-count:
+        threshold: 3
+        severity: warning
+    size.property-count:
+        threshold: 3
+        severity: warning
+    size.average-method-length:
+        threshold: 2
+        severity: warning

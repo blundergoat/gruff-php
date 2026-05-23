@@ -1,0 +1,3 @@
+rules:
+    test-quality.testdox-readability:
+        enabled: true

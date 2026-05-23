@@ -35,6 +35,22 @@ Allowed non-ADR file: `README.md`.
 
 Everything else in this directory is a stats failure. If a note cannot earn an ADR filename, route it using the table above.
 
+## Current ADRs
+
+- `ADR-001-package-baseline-and-integrations.md`
+- `ADR-002-commit-gruff-baseline-json.md`
+- `ADR-003-project-rule-seam.md`
+- `ADR-004-public-phpdoc-template.md`
+- `ADR-005-intent-bearing-one-line-methods.md`
+- `ADR-006-control-flow-comment-policy.md`
+- `ADR-007-gitignore-aware-discovery.md`
+- `ADR-008-single-threshold-rubric-severity.md`
+- `ADR-009-size-rubric-default-recalibration.md`
+- `ADR-010-complexity-and-docs-rubric-default-recalibration.md`
+- `ADR-011-single-file-scan-option.md`
+- `ADR-012-size-rule-line-counting-metric.md`
+- `ADR-013-dogfood-scans-use-project-config.md`
+
 ## Required Structure
 
 Every ADR must include:

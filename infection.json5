@@ -1,0 +1,17 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "testFrameworkOptions": "--testsuite=unit",
+    "minMsi": 80,
+    "minCoveredMsi": 80,
+    "mutators": {
+        "@default": true
+    },
+    "logs": {
+        "json": "infection-report.json"
+    }
+}

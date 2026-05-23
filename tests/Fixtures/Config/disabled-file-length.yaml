@@ -1,0 +1,3 @@
+rules:
+    size.file-length:
+        enabled: false

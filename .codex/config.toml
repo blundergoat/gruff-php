@@ -1,11 +1,23 @@
 # Codex CLI config template - copy to .codex/config.toml
 #
 # Key differences from Claude Code:
-# - No PreToolUse equivalent for non-shell tools (file writes can't be pre-blocked)
-# - This file only enables the hooks engine
-# - Hook registrations live in .codex/hooks.json
+# - This file enables the hooks engine with the current Codex feature flag
+# - Filesystem allow/deny policy uses Codex permission profiles, not Claude's
+#   settings.json permissions.allow/permissions.deny syntax
+# - Hook registrations live in .codex/hooks.json for goat-flow installs
 # - The shipped codex-hooks.json template registers the PreToolUse deny hook
-# - goat-flow does not model a Codex post-turn hook event
+# - Command deny policy still lives in the Bash-matched PreToolUse hook because
+#   Codex permission profiles describe filesystem/network access, not shell
+#   command pattern denies like git push or sudo
+default_permissions = "goat-flow"
 
 [features]
-codex_hooks = true
+hooks = true
+
+[permissions.goat-flow.filesystem]
+glob_scan_max_depth = 3
+# Codex 0.131 accepts exact paths and trailing "/**" subtrees here.
+# Exact entries must point at files that exist in the target checkout; absent
+# exact paths can make Codex fail before shell startup. Filename globs such as
+# "*.key" are covered by .codex/hooks/deny-dangerous.sh.
+":workspace_roots" = { "." = "write", "secrets/**" = "none", ".ssh/**" = "none", ".aws/**" = "none", ".docker/**" = "none", ".gnupg/**" = "none", ".kube/**" = "none" }
