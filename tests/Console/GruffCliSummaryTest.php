@@ -43,6 +43,8 @@ final class GruffCliSummaryTest extends TestCase
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
         self::assertStringContainsString('Totals', $output);
+        self::assertStringContainsString('gruff-php analyse --generate-baseline', $output);
+        self::assertStringContainsString('known debt', $output);
     }
 
     /**

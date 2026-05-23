@@ -78,6 +78,18 @@ final class DashboardCommand extends Command
             return Command::INVALID;
         }
 
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            $input,
+            $output,
+            $this->getApplication(),
+            $projectRoot,
+            $dashboardStateFactory->optionalStringOption($input, 'config'),
+            (bool) $input->getOption('no-config'),
+        );
+        if ($promptExitCode !== null) {
+            return $promptExitCode;
+        }
+
         $port = $this->port($input, $output);
 
         if ($port === false) {

@@ -114,6 +114,18 @@ final class ReportCommand extends Command
             return Command::FAILURE;
         }
 
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            $input,
+            $output,
+            $this->getApplication(),
+            $projectRoot,
+            $this->optionalStringOption($input, 'config'),
+            (bool) $input->getOption('no-config'),
+        );
+        if ($promptExitCode !== null) {
+            return $promptExitCode;
+        }
+
         $process = new Process($this->analyseCommand($input), $projectRoot);
         $process->setTimeout(null);
         $process->run();
