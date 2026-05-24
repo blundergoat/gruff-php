@@ -482,6 +482,29 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
+     * Verify multiple AAA cycles can exempt accepted broad contract-test files.
+     *
+     * @return void
+     */
+    public function testMultipleAaaCyclesHonoursIgnoredPathPatterns(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(MultipleAaaCyclesRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            MultipleAaaCyclesRule::ID,
+            new RuleSettings(
+                true,
+                $settings->thresholds,
+                array_merge($settings->options, ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/*']]),
+            ),
+        );
+
+        $findings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config);
+
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $findings);
+    }
+
+    /**
      * Verify testdox readability fires by default and with explicit config.
      *
      * @return void

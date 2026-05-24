@@ -130,21 +130,21 @@ final class InitCommand extends Command
     /**
      * Build the YAML document mirroring registry defaults.
      *
-     * @param RuleRegistry   $registry     Rule registry supplying definitions.
-     * @param AnalysisConfig $config       Config seeded from the registry defaults.
+     * @param RuleRegistry   $ruleRegistry  Rule registry supplying definitions.
+     * @param AnalysisConfig $analysisConfig Config seeded from the registry defaults.
      * @param list<string>   $ignoredPaths Paths to omit from generated project scans.
      * @return array<string, mixed>
      */
-    private static function buildConfigDocument(RuleRegistry $registry, AnalysisConfig $config, array $ignoredPaths): array
+    private static function buildConfigDocument(RuleRegistry $ruleRegistry, AnalysisConfig $analysisConfig, array $ignoredPaths): array
     {
         $rules = [];
-        foreach ($registry->all() as $rule) {
-            $definition             = $rule->definition();
-            $rules[$definition->id] = self::buildRuleEntry($definition);
+        foreach ($ruleRegistry->all() as $rule) {
+            $ruleDefinition             = $rule->definition();
+            $rules[$ruleDefinition->id] = self::buildRuleEntry($ruleDefinition);
         }
 
         return [
-            'minimumPhpVersion' => $config->minimumPhpVersion(),
+            'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
             'paths' => [
                 'ignore' => $ignoredPaths,
             ],
@@ -209,24 +209,24 @@ final class InitCommand extends Command
     /**
      * Serialise one rule's registry defaults into the config shape.
      *
-     * @param RuleDefinition $definition Rule definition to serialise.
+     * @param RuleDefinition $ruleDefinition Rule definition to serialise.
      * @return array<string, mixed>
      */
-    private static function buildRuleEntry(RuleDefinition $definition): array
+    private static function buildRuleEntry(RuleDefinition $ruleDefinition): array
     {
-        $ruleEntry = ['enabled' => $definition->isEnabledByDefault];
+        $ruleEntry = ['enabled' => $ruleDefinition->isEnabledByDefault];
 
-        if ($definition->severityThreshold instanceof SeverityThreshold) {
-            $ruleEntry['threshold'] = $definition->severityThreshold->threshold;
-            $ruleEntry['severity']  = $definition->severityThreshold->severity->value;
+        if ($ruleDefinition->severityThreshold instanceof SeverityThreshold) {
+            $ruleEntry['threshold'] = $ruleDefinition->severityThreshold->threshold;
+            $ruleEntry['severity']  = $ruleDefinition->severityThreshold->severity->value;
         }
 
-        if ($definition->defaultThresholds !== []) {
-            $ruleEntry['thresholds'] = $definition->defaultThresholds;
+        if ($ruleDefinition->defaultThresholds !== []) {
+            $ruleEntry['thresholds'] = $ruleDefinition->defaultThresholds;
         }
 
-        if ($definition->defaultOptions !== []) {
-            $ruleEntry['options'] = $definition->defaultOptions;
+        if ($ruleDefinition->defaultOptions !== []) {
+            $ruleEntry['options'] = $ruleDefinition->defaultOptions;
         }
 
         return $ruleEntry;
