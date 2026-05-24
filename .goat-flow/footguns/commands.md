@@ -43,7 +43,7 @@ last_reviewed: 2026-05-24
 
 **Evidence:** PR #3 review (Codex P1). Compare `MissingConfigPrompt::hasProjectConfig()` against `InitCommand::execute` — they both answer "is there already a config?" but use different file sets. `ConfigLoader::DEFAULT_CONFIG_FILE` and `ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE` already centralise the file names; the predicate that uses them does not.
 
-**Prevention:** Centralise the "discoverable project config" check in one helper — for example a static method on `ConfigLoader`, `ConfigLoader::projectHasConfig(string $projectRoot): bool` — and call it from every caller: the prompt's skip-gate, the init overwrite guard, dashboard state setup, and any future command that asks the same question. Whenever two methods encode the same predicate over the same constants, treat that as a drift waiting to happen and consolidate before the next entry point is added.
+**Prevention:** Centralise the "discoverable project config" check in one helper — for example a static method on `ConfigLoader`, `ConfigLoader::hasProjectConfig(string $projectRoot): bool` — and call it from every caller: the prompt's skip-gate, the init overwrite guard, dashboard state setup, and any future command that asks the same question. Whenever two methods encode the same predicate over the same constants, treat that as a drift waiting to happen and consolidate before the next entry point is added.
 
 ## Footgun: Empty option strings need explicit normalization to null
 

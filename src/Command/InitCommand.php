@@ -89,10 +89,10 @@ final class InitCommand extends Command
             return Command::FAILURE;
         }
 
-        $targetPath = $projectRoot . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
-        $force      = (bool) $input->getOption('force');
+        $targetPath  = $projectRoot . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+        $shouldForce = (bool) $input->getOption('force');
 
-        $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $force, $output);
+        $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $shouldForce, $output);
         if ($guardExitCode !== null) {
             return $guardExitCode;
         }
@@ -155,9 +155,9 @@ final class InitCommand extends Command
      *
      * @return int|null Exit code when init must refuse, or null when writing may proceed.
      */
-    private function guardExistingConfig(string $projectRoot, string $targetPath, bool $force, OutputInterface $output): ?int
+    private function guardExistingConfig(string $projectRoot, string $targetPath, bool $shouldForce, OutputInterface $output): ?int
     {
-        if ($force) {
+        if ($shouldForce) {
             return null;
         }
 

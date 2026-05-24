@@ -60,7 +60,7 @@ final readonly class ConfigLoader
      * @param string $projectRoot Project root used for config discovery.
      * @return bool True when a preferred or legacy config file exists at the root.
      */
-    public static function projectHasConfig(string $projectRoot): bool
+    public static function hasProjectConfig(string $projectRoot): bool
     {
         $root = rtrim($projectRoot, '/');
 

@@ -263,9 +263,8 @@ final class MissingConfigPromptTest extends TestCase
     {
         $this->withTemporaryProject(function (string $project): void {
             $stringInput    = $this->interactiveInput("y\n");
-            $stdoutBuffer   = new BufferedOutput();
-            $stderrBuffer   = new BufferedOutput();
-            $consoleOutput  = $this->fakeConsoleOutput($stdoutBuffer, $stderrBuffer);
+            $bufferedOutput = new BufferedOutput();
+            $consoleOutput  = $this->fakeConsoleOutput($bufferedOutput);
 
             $result = MissingConfigPrompt::maybeOffer(
                 input:              $stringInput,
@@ -277,46 +276,68 @@ final class MissingConfigPromptTest extends TestCase
             );
 
             self::assertNull($result);
-            self::assertSame('', $stdoutBuffer->fetch());
-            $errorOutput = $stderrBuffer->fetch();
+            self::assertSame('', $consoleOutput->fetch());
+            $errorOutput = $bufferedOutput->fetch();
             self::assertStringContainsString(MissingConfigPrompt::PROMPT_TEXT, $errorOutput);
             self::assertStringContainsString('Wrote ' . $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE, $errorOutput);
         });
     }
 
     /**
-     * Build a minimal ConsoleOutputInterface backed by two BufferedOutput streams.
+     * Build a minimal ConsoleOutputInterface that captures error chatter into the given buffer.
      *
-     * @return ConsoleOutputInterface Test double with separate stdout and stderr capture.
+     * The fake's own BufferedOutput parent captures any main-stream writes so the
+     * caller can assert that the routing under test never leaks payloads onto stdout.
+     *
+     * @param BufferedOutput $bufferedOutput Buffer that should receive the error-stream chatter.
+     * @return BufferedOutput&ConsoleOutputInterface Test double exposing the supplied buffer as the error stream.
      */
-    private function fakeConsoleOutput(BufferedOutput $stdout, BufferedOutput $stderr): ConsoleOutputInterface
+    private function fakeConsoleOutput(BufferedOutput $bufferedOutput): BufferedOutput&ConsoleOutputInterface
     {
-        return new class ($stdout, $stderr) extends BufferedOutput implements ConsoleOutputInterface
+        return new class ($bufferedOutput) extends BufferedOutput implements ConsoleOutputInterface
         {
-            public function __construct(
-                private readonly BufferedOutput $stdout,
-                private readonly BufferedOutput $stderr,
-            ) {
+            /**
+             * Capture the buffer returned to callers asking for the error stream.
+             *
+             * @param BufferedOutput $bufferedOutput Buffer exposed as the error stream.
+             */
+            public function __construct(private readonly BufferedOutput $bufferedOutput)
+            {
                 parent::__construct();
             }
 
+            /**
+             * Return the BufferedOutput used by tests to capture STDERR-bound chatter.
+             *
+             * @return OutputInterface Error stream backed by the captured buffer.
+             */
             public function getErrorOutput(): OutputInterface
             {
-                return $this->stderr;
+                return $this->bufferedOutput;
             }
 
-            public function setErrorOutput(OutputInterface $error): void
+            /**
+             * Ignore attempts to swap the error stream; the fake exposes a single fixed buffer.
+             *
+             * @param OutputInterface $output Replacement stream the fake silently discards.
+             * @return void
+             */
+            public function setErrorOutput(OutputInterface $output): void
             {
+                unset($output);
             }
 
+            /**
+             * Reject section creation; the fake never participates in sectioned rendering.
+             *
+             * @throws LogicException Always; the test scenario never exercises sectioned output.
+             * @return ConsoleSectionOutput Never returns — the call always throws.
+             */
             public function section(): ConsoleSectionOutput
             {
-                throw new LogicException('section() not supported by test fake.');
-            }
+                $reason = 'section() not supported by test fake.';
 
-            protected function doWrite(string $message, bool $newline): void
-            {
-                $this->stdout->write($message, $newline);
+                throw new LogicException($reason);
             }
         };
     }

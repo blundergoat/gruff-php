@@ -57,7 +57,7 @@ final readonly class MissingConfigPrompt
         if (!$input->isInteractive()) {
             return null;
         }
-        if (ConfigLoader::projectHasConfig($projectRoot)) {
+        if (ConfigLoader::hasProjectConfig($projectRoot)) {
             return null;
         }
         if (!$symfonyApplication instanceof SymfonyApplication) {
