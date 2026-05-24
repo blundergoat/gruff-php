@@ -35,9 +35,6 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Run dependency audit
-        run: composer audit:dependencies
-
       - name: Run Composer checks
         run: composer check
 

@@ -114,6 +114,17 @@ final class ReportCommand extends Command
             return Command::FAILURE;
         }
 
+        $outputPath     = $this->optionalStringOption($input, 'output');
+        $resolvedOutput = null;
+        if ($outputPath !== null) {
+            $resolvedOutput = PathHelper::resolveAgainst($projectRoot, $outputPath);
+            if (!is_dir(dirname($resolvedOutput))) {
+                $output->writeln(sprintf('<error>Report output directory does not exist: %s</error>', dirname($resolvedOutput)));
+
+                return Command::INVALID;
+            }
+        }
+
         $promptExitCode = MissingConfigPrompt::maybeOffer(
             input:              $input,
             output:             $output,
@@ -130,10 +141,9 @@ final class ReportCommand extends Command
         $process->setTimeout(null);
         $process->run();
         $this->writeStderr($output, $process->getErrorOutput());
-        $report     = $process->getOutput();
-        $outputPath = $this->optionalStringOption($input, 'output');
+        $report = $process->getOutput();
 
-        if ($outputPath === null) {
+        if ($resolvedOutput === null) {
             $output->write($report, false, OutputInterface::OUTPUT_RAW);
 
             return $process->getExitCode() ?? Command::FAILURE;
@@ -147,22 +157,13 @@ final class ReportCommand extends Command
             return $exitCode;
         }
 
-        $path      = PathHelper::resolveAgainst($projectRoot, $outputPath);
-        $directory = dirname($path);
-
-        if (!is_dir($directory)) {
-            $output->writeln(sprintf('<error>Report output directory does not exist: %s</error>', $directory));
-
-            return Command::INVALID;
-        }
-
-        if (file_put_contents($path, $report) === false) {
-            $output->writeln(sprintf('<error>Unable to write report: %s</error>', $path));
+        if (file_put_contents($resolvedOutput, $report) === false) {
+            $output->writeln(sprintf('<error>Unable to write report: %s</error>', $resolvedOutput));
 
             return Command::FAILURE;
         }
 
-        $output->writeln(sprintf('<info>Report written to %s</info>', $path));
+        $output->writeln(sprintf('<info>Report written to %s</info>', $resolvedOutput));
 
         return $exitCode;
     }

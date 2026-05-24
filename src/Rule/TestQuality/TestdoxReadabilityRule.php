@@ -85,7 +85,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
-                remediation: 'Rename the test so it describes the scenario and expected behaviour (e.g. testProcess -> testProcessOrder).',
+                remediation: 'Rename the test so it describes the scenario and expected behaviour (e.g. testProcess -> testProcessRejectsCancelledOrders).',
                 metadata:    ['words' => count($words), 'threshold' => $threshold],
             );
         }

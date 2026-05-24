@@ -7,10 +7,14 @@ namespace GruffPhp\Tests\Command;
 use GruffPhp\Command\MissingConfigPrompt;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Console\Application;
+use LogicException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\ConsoleSectionOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Covers MissingConfigPrompt: triggers init on accept, skips on decline, --no-config, --config, and non-interactive runs.
@@ -177,6 +181,144 @@ final class MissingConfigPromptTest extends TestCase
             self::assertSame('', $bufferedOutput->fetch());
             self::assertSame("# existing\n", file_get_contents($existingConfigPath));
         });
+    }
+
+    /**
+     * Verify a legacy `.gruff.yaml` is treated as existing project config.
+     *
+     * @return void
+     */
+    public function testExistingLegacyConfigSkipsPromptSilently(): void
+    {
+        $this->withTemporaryProject(function (string $project): void {
+            $legacyConfigPath = $project . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+            file_put_contents($legacyConfigPath, "# legacy\n");
+
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
+            );
+
+            self::assertNull($result);
+            self::assertSame('', $bufferedOutput->fetch());
+            self::assertSame("# legacy\n", file_get_contents($legacyConfigPath));
+            self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        });
+    }
+
+    /**
+     * Verify init writes to the supplied project root, not the process CWD.
+     *
+     * Locks the dashboard regression where `--project /other/repo` would
+     * dispatch init against CWD and create config in the wrong directory.
+     *
+     * @return void
+     */
+    public function testPromptDispatchesInitInGivenProjectRoot(): void
+    {
+        $cwd     = $this->createTempDirectory();
+        $project = $this->createTempDirectory();
+        $origCwd = getcwd();
+        self::assertIsString($origCwd);
+        self::assertTrue(chdir($cwd));
+
+        try {
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
+            );
+
+            self::assertNull($result);
+            self::assertFileExists($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+            self::assertFileDoesNotExist($cwd . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        } finally {
+            chdir($origCwd);
+            $this->removeTempDirectory($cwd);
+            $this->removeTempDirectory($project);
+        }
+    }
+
+    /**
+     * Verify ConsoleOutputInterface callers route prompt chatter to STDERR.
+     *
+     * Stops the prompt from corrupting machine-readable payloads written to STDOUT.
+     *
+     * @return void
+     */
+    public function testConsoleOutputInterfaceRoutesPromptToErrorStream(): void
+    {
+        $this->withTemporaryProject(function (string $project): void {
+            $stringInput    = $this->interactiveInput("y\n");
+            $stdoutBuffer   = new BufferedOutput();
+            $stderrBuffer   = new BufferedOutput();
+            $consoleOutput  = $this->fakeConsoleOutput($stdoutBuffer, $stderrBuffer);
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:              $stringInput,
+                output:             $consoleOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
+            );
+
+            self::assertNull($result);
+            self::assertSame('', $stdoutBuffer->fetch());
+            $errorOutput = $stderrBuffer->fetch();
+            self::assertStringContainsString(MissingConfigPrompt::PROMPT_TEXT, $errorOutput);
+            self::assertStringContainsString('Wrote ' . $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE, $errorOutput);
+        });
+    }
+
+    /**
+     * Build a minimal ConsoleOutputInterface backed by two BufferedOutput streams.
+     *
+     * @return ConsoleOutputInterface Test double with separate stdout and stderr capture.
+     */
+    private function fakeConsoleOutput(BufferedOutput $stdout, BufferedOutput $stderr): ConsoleOutputInterface
+    {
+        return new class ($stdout, $stderr) extends BufferedOutput implements ConsoleOutputInterface
+        {
+            public function __construct(
+                private readonly BufferedOutput $stdout,
+                private readonly BufferedOutput $stderr,
+            ) {
+                parent::__construct();
+            }
+
+            public function getErrorOutput(): OutputInterface
+            {
+                return $this->stderr;
+            }
+
+            public function setErrorOutput(OutputInterface $error): void
+            {
+            }
+
+            public function section(): ConsoleSectionOutput
+            {
+                throw new LogicException('section() not supported by test fake.');
+            }
+
+            protected function doWrite(string $message, bool $newline): void
+            {
+                $this->stdout->write($message, $newline);
+            }
+        };
     }
 
     /**

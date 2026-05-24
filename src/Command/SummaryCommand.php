@@ -186,7 +186,7 @@ final class SummaryCommand extends Command
     {
         $configPath = $input->getOption('config');
 
-        return is_string($configPath) ? $configPath : null;
+        return is_string($configPath) && $configPath !== '' ? $configPath : null;
     }
 
     /**

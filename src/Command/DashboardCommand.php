@@ -79,18 +79,6 @@ final class DashboardCommand extends Command
             return Command::INVALID;
         }
 
-        $promptExitCode = MissingConfigPrompt::maybeOffer(
-            input:              $input,
-            output:             $output,
-            symfonyApplication: $this->getApplication(),
-            projectRoot:        $projectRoot,
-            explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
-            shouldSkipConfig:   (bool) $input->getOption('no-config'),
-        );
-        if ($promptExitCode !== null) {
-            return $promptExitCode;
-        }
-
         $port = $this->port($input, $output);
 
         if ($port === false) {
@@ -101,6 +89,18 @@ final class DashboardCommand extends Command
 
         if ($scanTimeout === false) {
             return Command::INVALID;
+        }
+
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $this->getApplication(),
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
+            shouldSkipConfig:   (bool) $input->getOption('no-config'),
+        );
+        if ($promptExitCode !== null) {
+            return $promptExitCode;
         }
 
         $host                    = $dashboardStateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;

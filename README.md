@@ -12,7 +12,7 @@
 
 | Field | Value |
 | --- | --- |
-| Release line | Published `0.1.0` package line |
+| Release line | Published `0.1.1` package line |
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |

@@ -73,7 +73,8 @@ final class InitCommand extends Command
         $this
             ->setName('init')
             ->setDescription('Write a default .gruff-php.yaml config file populated with registry defaults.')
-            ->addOption('force', null, InputOption::VALUE_NONE, 'Overwrite an existing .gruff-php.yaml file.');
+            ->addOption('project-root', null, InputOption::VALUE_REQUIRED, 'Directory to write the config file in. Defaults to the current working directory.')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Overwrite an existing .gruff-php.yaml file or write alongside a legacy .gruff.yaml.');
     }
 
     /**
@@ -83,23 +84,17 @@ final class InitCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $projectRoot = getcwd();
-        if ($projectRoot === false) {
-            $output->writeln('<error>Unable to determine current working directory.</error>');
-
+        $projectRoot = $this->projectRoot($input, $output);
+        if ($projectRoot === null) {
             return Command::FAILURE;
         }
 
         $targetPath = $projectRoot . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
         $force      = (bool) $input->getOption('force');
 
-        if (is_file($targetPath) && !$force) {
-            $output->writeln(sprintf(
-                '<error>%s already exists. Pass --force to overwrite.</error>',
-                ConfigLoader::DEFAULT_CONFIG_FILE,
-            ));
-
-            return Command::FAILURE;
+        $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $force, $output);
+        if ($guardExitCode !== null) {
+            return $guardExitCode;
         }
 
         $registry = RuleRegistry::defaults();
@@ -125,6 +120,68 @@ final class InitCommand extends Command
         $output->writeln('     Use `gruff-php analyse --no-baseline` to audit without that baseline.');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Resolve the directory the new config file will be written to.
+     *
+     * @return string|null Directory to use, or null after emitting an error.
+     */
+    private function projectRoot(InputInterface $input, OutputInterface $output): ?string
+    {
+        $explicit = $input->getOption('project-root');
+        if (is_string($explicit) && $explicit !== '') {
+            if (!is_dir($explicit)) {
+                $output->writeln(sprintf('<error>--project-root must be an existing directory: %s</error>', $explicit));
+
+                return null;
+            }
+
+            return rtrim($explicit, '/');
+        }
+
+        $cwd = getcwd();
+        if ($cwd === false) {
+            $output->writeln('<error>Unable to determine current working directory.</error>');
+
+            return null;
+        }
+
+        return $cwd;
+    }
+
+    /**
+     * Refuse to overwrite a preferred or legacy config file without --force.
+     *
+     * @return int|null Exit code when init must refuse, or null when writing may proceed.
+     */
+    private function guardExistingConfig(string $projectRoot, string $targetPath, bool $force, OutputInterface $output): ?int
+    {
+        if ($force) {
+            return null;
+        }
+
+        if (is_file($targetPath)) {
+            $output->writeln(sprintf(
+                '<error>%s already exists. Pass --force to overwrite.</error>',
+                ConfigLoader::DEFAULT_CONFIG_FILE,
+            ));
+
+            return Command::FAILURE;
+        }
+
+        $legacyPath = $projectRoot . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+        if (is_file($legacyPath)) {
+            $output->writeln(sprintf(
+                '<error>%s already exists; writing %s would silently switch analyse over to generated defaults. Remove or rename the legacy file, or pass --force to write the preferred config alongside it.</error>',
+                ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE,
+                ConfigLoader::DEFAULT_CONFIG_FILE,
+            ));
+
+            return Command::FAILURE;
+        }
+
+        return null;
     }
 
     /**

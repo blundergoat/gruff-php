@@ -102,7 +102,7 @@ Default scans are local source inspections. `gruff-php` parses files and may cal
 
 ### Symfony Console Application
 
-`src/Console/Application.php` registers the CLI commands: `analyse`, `summary`, `report`, `dashboard`, and `list-rules`, plus Symfony-provided help/list/completion behavior.
+`src/Console/Application.php` registers the CLI commands: `analyse`, `summary`, `report`, `dashboard`, `init`, and `list-rules`, plus Symfony-provided help/list/completion behavior.
 
 ### PHP Parser
 

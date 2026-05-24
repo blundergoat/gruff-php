@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 
@@ -27,7 +28,12 @@ final readonly class MissingConfigPrompt
      * Decide whether to offer the init prompt and run it when accepted.
      *
      * Skips silently when stdin is non-interactive, when the caller passed
-     * --no-config or --config, or when a project config already exists.
+     * --no-config or --config, or when a project config already exists. The
+     * prompt and any dispatched init output are routed to the error stream so
+     * machine-readable stdout payloads (JSON, SARIF, HTML) stay parseable. The
+     * dispatched init command is scoped to {@see $projectRoot} so callers that
+     * address a non-CWD root (notably `dashboard --project ...`) write the new
+     * config in the right directory.
      *
      * @param InputInterface          $input              Console input for the calling command.
      * @param OutputInterface         $output             Console output for the calling command.
@@ -51,7 +57,7 @@ final readonly class MissingConfigPrompt
         if (!$input->isInteractive()) {
             return null;
         }
-        if (self::hasProjectConfig($projectRoot)) {
+        if (ConfigLoader::projectHasConfig($projectRoot)) {
             return null;
         }
         if (!$symfonyApplication instanceof SymfonyApplication) {
@@ -63,9 +69,11 @@ final readonly class MissingConfigPrompt
             return null;
         }
 
+        $promptOutput = self::promptOutput($output);
+
         $accepted = (bool) $questionHelper->ask(
             $input,
-            $output,
+            $promptOutput,
             new ConfirmationQuestion(self::PROMPT_TEXT, false),
         );
         if (!$accepted) {
@@ -73,27 +81,33 @@ final readonly class MissingConfigPrompt
         }
 
         $initCommand = $symfonyApplication->find('init');
-        $exitCode    = $initCommand->run(new ArrayInput(['command' => 'init']), $output);
+        $exitCode    = $initCommand->run(
+            new ArrayInput([
+                'command'        => 'init',
+                '--project-root' => $projectRoot,
+            ]),
+            $promptOutput,
+        );
 
         return $exitCode === Command::SUCCESS ? null : $exitCode;
     }
 
     /**
-     * Check whether the project root already holds a discoverable config file.
+     * Pick the stream that should carry the prompt and dispatched init output.
      *
-     * @param string $projectRoot Project root used for config discovery.
-     * @return bool True when a project config file already exists.
+     * Routes interactive chatter to STDERR when the caller exposes a separate
+     * error stream so JSON, SARIF, and HTML payloads written to STDOUT stay
+     * uncorrupted.
+     *
+     * @param OutputInterface $output Console output supplied by the caller.
+     * @return OutputInterface Error stream when available; otherwise the supplied output.
      */
-    private static function hasProjectConfig(string $projectRoot): bool
+    private static function promptOutput(OutputInterface $output): OutputInterface
     {
-        $root = rtrim($projectRoot, '/');
-
-        foreach ([ConfigLoader::DEFAULT_CONFIG_FILE, ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE] as $candidate) {
-            if (is_file($root . '/' . $candidate)) {
-                return true;
-            }
+        if ($output instanceof ConsoleOutputInterface) {
+            return $output->getErrorOutput();
         }
 
-        return false;
+        return $output;
     }
 }

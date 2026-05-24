@@ -128,6 +128,96 @@ final class InitCliTest extends CliTestCase
     }
 
     /**
+     * Verify init refuses when a legacy .gruff.yaml exists without --force.
+     *
+     * @return void
+     */
+    public function testInitRefusesWhenLegacyConfigPresent(): void
+    {
+        $project    = $this->tempDir();
+        $legacyPath = $project . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+
+        try {
+            file_put_contents($legacyPath, "# legacy\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+            ], $project);
+            $process->run();
+
+            self::assertNotSame(0, $process->getExitCode());
+            self::assertStringContainsString(
+                ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE,
+                $process->getErrorOutput() . $process->getOutput(),
+            );
+            self::assertSame("# legacy\n", file_get_contents($legacyPath));
+            self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --force writes the preferred config alongside an existing legacy file.
+     *
+     * @return void
+     */
+    public function testInitForceWritesAlongsideLegacyConfig(): void
+    {
+        $project    = $this->tempDir();
+        $legacyPath = $project . '/' . ConfigLoader::LEGACY_DEFAULT_CONFIG_FILE;
+
+        try {
+            file_put_contents($legacyPath, "# legacy\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--force',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertSame("# legacy\n", file_get_contents($legacyPath));
+            self::assertFileExists($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --project-root writes the config into the supplied directory, not CWD.
+     *
+     * @return void
+     */
+    public function testInitWritesToProjectRootOption(): void
+    {
+        $cwd     = $this->tempDir();
+        $project = $this->tempDir();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--project-root',
+                $project,
+            ], $cwd);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            self::assertFileExists($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+            self::assertFileDoesNotExist($cwd . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        } finally {
+            $this->removeDir($cwd);
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Verify --force preserves an existing path ignore list.
      *
      * @return void

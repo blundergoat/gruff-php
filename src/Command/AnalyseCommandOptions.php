@@ -117,7 +117,7 @@ final readonly class AnalyseCommandOptions
         return new self(
             paths:                         $paths,
             shouldIncludeIgnored:          (bool) $input->getOption('include-ignored'),
-            configPath:                    is_string($configPath) ? $configPath : null,
+            configPath:                    is_string($configPath) && $configPath !== '' ? $configPath : null,
             noConfig:                      (bool) $input->getOption('no-config'),
             profile:                       self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
             mutation:                      new MutationAnalysisOptions(
