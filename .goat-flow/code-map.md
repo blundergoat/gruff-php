@@ -70,7 +70,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.1`; registers `analyse`, `summary`, `dashboard`, `init`, `list-rules`, and `report`
+|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.2`; registers `analyse`, `summary`, `dashboard`, `init`, `list-rules`, and `report`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception
