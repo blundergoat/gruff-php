@@ -51,6 +51,29 @@ final readonly class ConfigLoader
     }
 
     /**
+     * Report whether the project root already holds a discoverable config file.
+     *
+     * Used by callers that need a fast "is there any project config?" check
+     * without loading the file. Covers both the preferred and legacy filenames
+     * so callers do not drift from {@see resolveConfigPath()}.
+     *
+     * @param string $projectRoot Project root used for config discovery.
+     * @return bool True when a preferred or legacy config file exists at the root.
+     */
+    public static function hasProjectConfig(string $projectRoot): bool
+    {
+        $root = rtrim($projectRoot, '/');
+
+        foreach ([self::DEFAULT_CONFIG_FILE, self::LEGACY_DEFAULT_CONFIG_FILE] as $candidate) {
+            if (is_file($root . '/' . $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Load analysis config from an explicit, project, or fallback YAML file.
      *
      * @param string|null  $configPath Explicit config path supplied by the CLI.

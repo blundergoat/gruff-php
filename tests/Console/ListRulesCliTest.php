@@ -24,7 +24,7 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php', $process->getOutput());
-        self::assertStringContainsString('0.1.0-dev', $process->getOutput());
+        self::assertStringContainsString('0.1.1', $process->getOutput());
     }
 
     /**
@@ -41,6 +41,20 @@ final class ListRulesCliTest extends CliTestCase
         self::assertStringContainsString('analyse', $process->getOutput());
         self::assertStringContainsString('dashboard', $process->getOutput());
         self::assertStringContainsString('report', $process->getOutput());
+    }
+
+    /**
+     * Verify list-rules accepts the shared text format alias.
+     *
+     * @return void
+     */
+    public function testListRulesAcceptsTextFormatAlias(): void
+    {
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'text']);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Rule ID | Pillar | Tier | Severity | Confidence | Enabled | Description', $process->getOutput());
     }
 
     /**

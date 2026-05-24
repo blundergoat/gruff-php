@@ -41,8 +41,9 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
-            defaultThresholds:  ['minCycles' => 2],
-            isEnabledByDefault: false,
+            defaultThresholds:  ['minCycles' => 3],
+            defaultOptions:     ['ignoredPathPatterns' => []],
+            isEnabledByDefault: true,
         );
     }
 
@@ -56,7 +57,13 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $threshold = (int) $ruleContext->settingsFor($this->definition())->numericThreshold('minCycles');
+        $settings = $ruleContext->settingsFor($this->definition());
+
+        if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+            return [];
+        }
+
+        $threshold = (int) $settings->numericThreshold('minCycles');
         $findings  = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
@@ -103,14 +110,24 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             $hasAssertion        = false;
             $hasNonAssertionCall = false;
 
-            foreach ($nodeFinder->find([$stmt], static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+            $calls = $nodeFinder->find(
+                [$stmt],
+                static fn (Node $node): bool => $node instanceof Expr\FuncCall
+                    || $node instanceof Expr\MethodCall
+                    || $node instanceof Expr\StaticCall,
+            );
+
+            foreach ($calls as $call) {
                 if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }
 
                 if (TestQualityNodeHelper::isAssertionCall($call)) {
                     $hasAssertion = true;
-                } elseif (!TestQualityNodeHelper::isMockCreationCall($call) && !TestQualityNodeHelper::isMockVerificationCall($call)) {
+                } elseif (!$this->isNestedInAssertionCall($call)
+                    && !TestQualityNodeHelper::isMockCreationCall($call)
+                    && !TestQualityNodeHelper::isMockVerificationCall($call)
+                ) {
                     $hasNonAssertionCall = true;
                 }
             }
@@ -128,5 +145,46 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         }
 
         return $cycles;
+    }
+
+    /**
+     * Check whether a project-configured path exemption applies.
+     *
+     * @param list<string> $patterns Glob patterns for accepted broad test shapes.
+     * @return bool True when the display path matches an ignored pattern.
+     */
+    private function isPathIgnored(string $displayPath, array $patterns): bool
+    {
+        $normalizedPath = str_replace('\\', '/', $displayPath);
+
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Detect whether a call is used only to compute an assertion argument.
+     *
+     * @return bool True when the call is nested inside an assertion call.
+     */
+    private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $parent = $call->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
+                && TestQualityNodeHelper::isAssertionCall($parent)
+            ) {
+                return true;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
     }
 }

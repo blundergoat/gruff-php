@@ -34,6 +34,7 @@ FAILED=0
 FAILURES=()
 START_TIME=$(date +%s%N)
 MUTATION_MODE=off
+RELEASE_VERSION=""
 
 rule() {
     printf '  %s\n' "${DIM}────────────────────────────────────────────${RESET}"
@@ -178,7 +179,7 @@ dependency_audit_check() {
     local output
     local status
 
-    output=$(composer audit --locked 2>&1)
+    output=$(composer audit:dependencies 2>&1)
     status=$?
 
     if ((status == 0)); then
@@ -188,6 +189,111 @@ dependency_audit_check() {
     fi
 
     return "$status"
+}
+
+version_consistency_check() {
+    local release_version=${1:-}
+
+    # shellcheck disable=SC2016
+    php -r '
+$releaseVersion = $argv[1] ?? "";
+$applicationPath = "src/Console/Application.php";
+$changelogPath = "CHANGELOG.md";
+$binaryPath = "bin/gruff-php";
+$errors = [];
+
+$fail = static function (string $message) use (&$errors): void {
+    $errors[] = $message;
+};
+
+if ($releaseVersion !== "" && !preg_match("/^[0-9]+\.[0-9]+\.[0-9]+$/", $releaseVersion)) {
+    $fail("release version must look like X.Y.Z, got: " . $releaseVersion);
+}
+
+$applicationBody = file_get_contents($applicationPath);
+if ($applicationBody === false) {
+    $fail("could not read " . $applicationPath);
+    $applicationVersion = "";
+} elseif (!preg_match("/public const VERSION = \x27([^\x27]+)\x27;/", $applicationBody, $match)) {
+    $fail("could not read Application::VERSION from " . $applicationPath);
+    $applicationVersion = "";
+} else {
+    $applicationVersion = $match[1];
+}
+
+$cliOutput = [];
+$cliStatus = 0;
+exec(PHP_BINARY . " " . escapeshellarg($binaryPath) . " --version 2>&1", $cliOutput, $cliStatus);
+$cliText = trim(implode("\n", $cliOutput));
+if ($cliStatus !== 0) {
+    $fail("php " . $binaryPath . " --version failed: " . $cliText);
+    $cliVersion = "";
+} elseif (!preg_match("/^gruff-php\s+(\S+)$/", $cliText, $match)) {
+    $fail("unexpected CLI version output: " . $cliText);
+    $cliVersion = "";
+} else {
+    $cliVersion = $match[1];
+}
+
+if ($applicationVersion !== "" && $cliVersion !== "" && $applicationVersion !== $cliVersion) {
+    $fail("Application::VERSION " . $applicationVersion . " does not match CLI version " . $cliVersion);
+}
+
+$changelogBody = file_get_contents($changelogPath);
+if ($changelogBody === false) {
+    $fail("could not read " . $changelogPath);
+    $changelogVersion = "";
+    $changelogState = "";
+} elseif (!preg_match("/^## ([0-9]+\.[0-9]+\.[0-9]+) - (Unreleased|[0-9]{4}-[0-9]{2}-[0-9]{2})[ \t]*$/m", $changelogBody, $match)) {
+    $fail("could not find top release heading in " . $changelogPath);
+    $changelogVersion = "";
+    $changelogState = "";
+} else {
+    $changelogVersion = $match[1];
+    $changelogState = $match[2];
+}
+
+if ($applicationVersion !== "" && $changelogVersion !== "") {
+    $baseVersion = preg_replace("/-.*/", "", $applicationVersion);
+    if ($baseVersion !== $changelogVersion) {
+        $fail("Application::VERSION base " . $baseVersion . " does not match CHANGELOG top version " . $changelogVersion);
+    }
+
+    if (str_contains($applicationVersion, "-")) {
+        if ($changelogState !== "Unreleased") {
+            $fail("prerelease/dev version " . $applicationVersion . " requires an Unreleased CHANGELOG heading for " . $baseVersion);
+        }
+    } elseif ($changelogState === "Unreleased") {
+        $fail("release version " . $applicationVersion . " requires a dated CHANGELOG heading; run scripts/bump-version.sh " . $applicationVersion);
+    }
+}
+
+if ($releaseVersion !== "") {
+    if ($applicationVersion !== "" && $applicationVersion !== $releaseVersion) {
+        $fail("Application::VERSION is " . $applicationVersion . ", expected release " . $releaseVersion . "; run scripts/bump-version.sh " . $releaseVersion);
+    }
+    if ($changelogVersion !== "" && $changelogVersion !== $releaseVersion) {
+        $fail("CHANGELOG top version is " . $changelogVersion . ", expected release " . $releaseVersion);
+    }
+    if ($changelogState !== "" && $changelogState === "Unreleased") {
+        $fail("CHANGELOG entry for " . $releaseVersion . " is still Unreleased; run scripts/bump-version.sh " . $releaseVersion);
+    }
+}
+
+if ($errors !== []) {
+    fwrite(STDOUT, implode("\n", $errors));
+    exit(1);
+}
+
+$detail = $applicationVersion . " matches CLI";
+if ($changelogVersion !== "" && $changelogState !== "") {
+    $detail .= " and CHANGELOG " . $changelogVersion . " - " . $changelogState;
+}
+if ($releaseVersion !== "") {
+    $detail .= " for release " . $releaseVersion;
+}
+echo $detail;
+' "$release_version"
 }
 
 gruff_report_summary() {
@@ -287,15 +393,19 @@ summary() {
 
 usage() {
     cat <<'USAGE'
-Usage: scripts/preflight-checks.sh [--mutate-diff|--mutate-full]
+Usage: scripts/preflight-checks.sh [--release-version X.Y.Z] [--mutate-diff|--mutate-full]
 
 Runs the standard preflight gate:
+  - Version consistency
   - PHPStan
   - PHPUnit
   - Composer dependency audit
   - Gruff full-project scan
 
 Options:
+  --release-version X.Y.Z
+                   Require the CLI, Application::VERSION, and CHANGELOG.md to
+                   match a dated release version.
   --mutate-diff    Run Infection using edited PHPUnit unit test files only.
   --mutate-full    Run the full Infection mutation suite against unit tests.
   -h, --help       Show this help.
@@ -308,9 +418,19 @@ main() {
     local audit_status=0
     local gruff_status=0
     local mutation_status=0
+    local version_status=0
 
     while (($# > 0)); do
         case "$1" in
+            --release-version)
+                if [[ $# -lt 2 ]]; then
+                    printf '%sMissing value for --release-version.%s\n' "$RED" "$RESET" >&2
+                    usage >&2
+                    return 64
+                fi
+                RELEASE_VERSION="$2"
+                shift
+                ;;
             --mutate-diff)
                 MUTATION_MODE="diff"
                 ;;
@@ -343,6 +463,9 @@ main() {
         return 127
     fi
 
+    run_step "Version consistency" version_consistency_check "$RELEASE_VERSION"
+    version_status=$?
+
     run_step "Static analysis (PHPStan L10)" static_analysis_check
     phpstan_status=$?
 
@@ -369,7 +492,7 @@ main() {
     summary
     local summary_status=$?
 
-    if ((phpstan_status != 0 || test_status != 0 || audit_status != 0 || gruff_status != 0 || mutation_status != 0)); then
+    if ((version_status != 0 || phpstan_status != 0 || test_status != 0 || audit_status != 0 || gruff_status != 0 || mutation_status != 0)); then
         return 1
     fi
 

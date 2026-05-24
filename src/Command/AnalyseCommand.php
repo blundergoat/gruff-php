@@ -126,7 +126,7 @@ final class AnalyseCommand extends Command
         $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
         $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
 
-        $setupResult = (new AnalyseCommandSetupBuilder())->build($input);
+        $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
         if (!$setupResult->setup instanceof AnalyseCommandSetup) {
             return $this->renderSetupFailure($setupResult, $output);

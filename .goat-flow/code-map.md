@@ -117,7 +117,7 @@ src/
 |   `-- TextReporter.php                      = grouped terminal renderer (header, files, paths, diagnostics, score, baseline, findings, summary)
 |-- Rule/
 |   |-- RuleContext.php                       = project root + AnalysisConfig; `settingsFor(RuleDefinition)` accessor
-|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (default-disabled heuristics opt in), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
+|   |-- RuleDefinition.php                    = stable rule metadata: id (slug-validated), name, pillar, tier, default severity, confidence, default thresholds, secondary pillars, `defaultEnabled` (runs unless config disables it), `defaultOptions` (non-numeric configuration like namespace globs / poor-name patterns / allowed literals), and listable description
 |   |-- RuleInterface.php                     = `definition()` + `analyse(AnalysisUnit, RuleContext): list<Finding>` contract
 |   |-- ProjectRuleInterface.php              = `definition()` + `analyseProject(list<AnalysisUnit>, RuleContext): list<Finding>` contract; project-wide rules run once after the per-unit loop (see ADR-003)
 |   |-- RuleRegistry.php                      = ksort-sorted registry; `defaults()` wires all v0.1 rules; `analyse()` applies rule selection/enabled settings, skips parse-errored units, runs per-unit `RuleInterface` rules first, then project-wide `ProjectRuleInterface` rules over the full unit list, deduplicates overlapping naming findings by documented rule priority, then sorts findings by file/line/ruleId/message
@@ -219,10 +219,10 @@ src/
 |   |   |-- GlobalStateMutationRule.php       = `test-quality.global-state-mutation` (superglobal/`putenv`/`ini_set`/`error_reporting` writes without tearDown / `#[After]` cleanup)
 |   |   |-- LoopAssertionWithoutMessageRule.php = `test-quality.loop-assertion-without-message`
 |   |   |-- MagicNumberAssertionRule.php      = `test-quality.magic-number-assertion` (default-allowlists HTTP status codes; configurable `allowedLiterals`)
-|   |   |-- MockingDomainObjectRule.php       = `test-quality.mocking-domain-object` (default-disabled; requires `domainNamespaces` glob list)
+|   |   |-- MockingDomainObjectRule.php       = `test-quality.mocking-domain-object` (enabled; emits only when `domainNamespaces` glob list is configured)
 |   |   |-- MockOnlyTestRule.php              = `test-quality.mock-only-test`
 |   |   |-- MockWithoutExpectationRule.php    = `test-quality.mock-without-expectation` (per-finding severity: `dead-mock`/warning vs `stub-only`/advisory)
-|   |   |-- MultipleAaaCyclesRule.php         = `test-quality.multiple-aaa-cycles` (default-disabled)
+|   |   |-- MultipleAaaCyclesRule.php         = `test-quality.multiple-aaa-cycles` (ignores helper calls nested inside assertion arguments)
 |   |   |-- MysteryGuestRule.php              = `test-quality.mystery-guest`
 |   |   |-- NoAssertionsRule.php              = `test-quality.no-assertions` (recognises wide PHPUnit `expect*` family + Pest `expect()`)
 |   |   |-- PhpUnitCoverageSourceMissingRule.php = `test-quality.phpunit-coverage-source-missing` (project-config rule)
@@ -235,7 +235,7 @@ src/
 |   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test` (covers `sleep`/`usleep` family + `time`/`microtime` + `new DateTime('now')`/`DateTimeImmutable()`)
 |   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called` (skips subprocess-execution tests; matches verb-without-trailing-`s` candidates so `testLoadsX` matches `load()`)
 |   |   |-- TautologicalTypeAssertionRule.php = `test-quality.tautological-type-assertion` (only when local static evidence proves the asserted type)
-|   |   |-- TestdoxReadabilityRule.php        = `test-quality.testdox-readability` (default-disabled; `minWords` threshold)
+|   |   |-- TestdoxReadabilityRule.php        = `test-quality.testdox-readability` (`minWords` threshold)
 |   |   |-- TestLongerThanSutRule.php         = `test-quality.test-longer-than-sut`
 |   |   |-- TestMethodTooLongRule.php         = `test-quality.test-method-too-long` (default 25 meaningful lines; configurable)
 |   |   |-- TestNamingConsistencyRule.php     = `test-quality.naming-consistency` (configurable `poorNamePatterns` regex list)

@@ -36,13 +36,15 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $output = $process->getOutput();
 
-        self::assertStringContainsString('gruff-php 0.1.0-dev - summary', $output);
+        self::assertStringContainsString('gruff-php 0.1.1 - summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
         self::assertStringContainsString('Composite', $output);
         self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
         self::assertStringContainsString('Totals', $output);
+        self::assertStringContainsString('gruff-php analyse --generate-baseline', $output);
+        self::assertStringContainsString('known debt', $output);
     }
 
     /**
@@ -100,7 +102,7 @@ final class GruffCliSummaryTest extends TestCase
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);
-        self::assertSame('0.1.0-dev', $tool['version'] ?? null);
+        self::assertSame('0.1.1', $tool['version'] ?? null);
 
         $scope = $decoded['scope'] ?? null;
         self::assertIsArray($scope);

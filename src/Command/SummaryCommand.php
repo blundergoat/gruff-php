@@ -82,6 +82,18 @@ final class SummaryCommand extends Command
             return Command::INVALID;
         }
 
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $this->getApplication(),
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $configPath,
+            shouldSkipConfig:   $noConfig,
+        );
+        if ($promptExitCode !== null) {
+            return $promptExitCode;
+        }
+
         $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
         $config       = $this->analysisConfig(
@@ -174,7 +186,7 @@ final class SummaryCommand extends Command
     {
         $configPath = $input->getOption('config');
 
-        return is_string($configPath) ? $configPath : null;
+        return is_string($configPath) && $configPath !== '' ? $configPath : null;
     }
 
     /**
@@ -478,6 +490,12 @@ final class SummaryCommand extends Command
             $summaryReportData->totals['warning'],
             $summaryReportData->totals['error'],
         );
+
+        if ($summaryReportData->totals['total'] > 0) {
+            $lines[] = '';
+            $lines[] = 'Baseline  After review, `gruff-php analyse --generate-baseline` records current findings as known debt.';
+            $lines[] = '          Use `gruff-php analyse --no-baseline` to audit without a baseline.';
+        }
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }

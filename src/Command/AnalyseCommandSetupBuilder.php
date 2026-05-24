@@ -13,8 +13,10 @@ use GruffPhp\Console\Application;
 use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Rule\RuleRegistry;
+use Symfony\Component\Console\Application as SymfonyApplication;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Builds validated analyse command setup from console input.
@@ -24,11 +26,16 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build the validated analysis setup from console input.
      *
-     * @param InputInterface $input Symfony console input for the analyse command.
+     * @param InputInterface           $input              Symfony console input for the analyse command.
+     * @param OutputInterface          $output             Symfony console output for optional init prompting.
+     * @param SymfonyApplication|null  $symfonyApplication Console application used to dispatch the init command.
      * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
      */
-    public function build(InputInterface $input): AnalyseCommandSetupResult
-    {
+    public function build(
+        InputInterface $input,
+        OutputInterface $output,
+        ?SymfonyApplication $symfonyApplication,
+    ): AnalyseCommandSetupResult {
         $projectRoot = getcwd();
 
         if ($projectRoot === false) {
@@ -38,6 +45,24 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
+    }
+
+    /**
+     * Build setup, prompting for an init config only after option validation passes.
+     *
+     * @param InputInterface          $input              Symfony console input for the analyse command.
+     * @param OutputInterface         $output             Console output used for the optional init prompt.
+     * @param SymfonyApplication|null $symfonyApplication Console application used to dispatch the init command.
+     * @param string                  $projectRoot        Current project root.
+     * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
+     */
+    private function buildSetup(
+        InputInterface $input,
+        OutputInterface $output,
+        ?SymfonyApplication $symfonyApplication,
+        string $projectRoot,
+    ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
             return AnalyseCommandSetupResult::plainError(
@@ -84,6 +109,18 @@ final readonly class AnalyseCommandSetupBuilder
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
                 $formatResult,
             );
+        }
+
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $symfonyApplication,
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $options->configPath,
+            shouldSkipConfig:   $options->noConfig,
+        );
+        if ($promptExitCode !== null) {
+            return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
 
         $options      = $options->withDefaultBaseline($projectRoot);

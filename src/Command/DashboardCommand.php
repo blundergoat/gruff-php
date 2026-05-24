@@ -37,6 +37,7 @@ final class DashboardCommand extends Command
             ->setDescription('Serve the local gruff-php dashboard.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Initial files or directories to analyse.')
             ->addOption('project', null, InputOption::VALUE_REQUIRED, 'Initial project root for scans.')
+            ->addOption('project-root', null, InputOption::VALUE_REQUIRED, 'Alias for --project.')
             ->addOption('host', null, InputOption::VALUE_REQUIRED, 'Host for the dashboard server.', default: self::DEFAULT_HOST)
             ->addOption('port', null, InputOption::VALUE_REQUIRED, 'Port for the dashboard server.', default: (string) self::DEFAULT_PORT)
             ->addOption('scan-timeout', null, InputOption::VALUE_REQUIRED, 'Seconds to allow each refresh scan. Use 0 to disable.', default: '120')
@@ -73,7 +74,7 @@ final class DashboardCommand extends Command
         $projectRoot           = $dashboardStateFactory->initialProjectRoot($input, $cwd);
 
         if ($projectRoot === null) {
-            $output->writeln('<error>Initial --project must resolve to an existing directory.</error>');
+            $output->writeln('<error>Initial --project/--project-root must resolve to an existing directory.</error>');
 
             return Command::INVALID;
         }
@@ -88,6 +89,18 @@ final class DashboardCommand extends Command
 
         if ($scanTimeout === false) {
             return Command::INVALID;
+        }
+
+        $promptExitCode = MissingConfigPrompt::maybeOffer(
+            input:              $input,
+            output:             $output,
+            symfonyApplication: $this->getApplication(),
+            projectRoot:        $projectRoot,
+            explicitConfigPath: $dashboardStateFactory->optionalStringOption($input, 'config'),
+            shouldSkipConfig:   (bool) $input->getOption('no-config'),
+        );
+        if ($promptExitCode !== null) {
+            return $promptExitCode;
         }
 
         $host                    = $dashboardStateFactory->optionalStringOption($input, 'host') ?? self::DEFAULT_HOST;

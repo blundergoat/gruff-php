@@ -26,11 +26,18 @@ Rule IDs use the shape `<namespace>.<rule-slug>`.
 
 ## Config Files
 
-The shared project config filename is `.gruff.yaml`. Implementations may also
-support a tool-prefixed variant (for example `gruff-php` prefers
-`.gruff-php.yaml` and falls back to `.gruff.yaml`), `.gruff.yml`, or
-language-native config for compatibility. Checked-in dogfood config should
-prefer the implementation's primary YAML filename.
+Each implementation should prefer its tool-prefixed config filename. Legacy
+fallbacks are compatibility features, not the primary convention.
+
+| Project | Primary config | Default fallbacks |
+| --- | --- | --- |
+| `gruff-go` | `.gruff-go.yaml` | none |
+| `gruff-php` | `.gruff-php.yaml` | `.gruff.yaml` |
+| `gruff-py` | `.gruff-py.yaml` | `.gruff.yaml`, then `pyproject.toml` |
+| `gruff-rs` | `.gruff-rs.yaml` | none |
+| `gruff-ts` | `.gruff-ts.yaml` | `.gruff.json`, `.gruff.yaml`, `.gruff.yml` |
+
+Checked-in dogfood config should prefer the implementation's primary filename.
 
 Use these root keys when the implementation supports them:
 
@@ -55,8 +62,8 @@ rules:
 ```
 
 Do not add unsupported root keys just to make files visually identical. For
-example, `gruff-rs` and `gruff-ts` currently do not implement `selection`, so
-their `.gruff.yaml` files should omit it.
+example, `gruff-rs` uses `rules.select` / `rules.ignore` instead of the PHP/Python
+`selection` section, and `gruff-ts` does not implement `selection`.
 
 ## Rule Config Keys
 
@@ -79,9 +86,9 @@ the source of truth.
 | --- | --- |
 | `gruff-go` | Emits dotted rule IDs and accepts legacy hyphen-only plus `documentation.*` config aliases. Its `acceptedAbbreviations` loader currently requires uppercase initialisms. |
 | `gruff-php` | Uses dotted rule IDs, `docs.*`, YAML-only config (`.gruff-php.yaml` preferred, legacy `.gruff.yaml` accepted), `selection`, and a single `threshold` + `severity` shorthand for rubric rules. |
-| `gruff-py` | Uses dotted rule IDs, `docs.*`, `.gruff.yaml` before `pyproject.toml`, and `warning` / `error` threshold names. |
-| `gruff-rs` | Uses dotted rule IDs and `.gruff.yaml`; `metrics.*` and `architecture.*` are documented Rust-specific namespaces, and several threshold names use `warn`. |
-| `gruff-ts` | Uses dotted rule IDs, `docs.*`, and several threshold names that use `warn`; its default discovery still checks `.gruff.json` before `.gruff.yaml`. |
+| `gruff-py` | Uses dotted rule IDs, `docs.*`, `.gruff-py.yaml` before legacy `.gruff.yaml`, then `pyproject.toml`, and `warning` / `error` threshold names. |
+| `gruff-rs` | Uses dotted rule IDs and `.gruff-rs.yaml`; `metrics.*` and `architecture.*` are documented Rust-specific namespaces, and several threshold names use `warn`. |
+| `gruff-ts` | Uses dotted rule IDs, `docs.*`, `.gruff-ts.yaml` first, then `.gruff.json`, `.gruff.yaml`, and `.gruff.yml`; several threshold names use `warn`. |
 
 ## Remaining Consistency Candidates
 
@@ -92,6 +99,12 @@ the source of truth.
   `metrics.maintainability-pressure`, while PHP and Python use the
   `complexity.*` namespace for related metrics. Keep this documented until a
   compatibility migration is chosen.
-- Config discovery order differs: `gruff-ts` checks `.gruff.json` before
-  `.gruff.yaml`, while the other implementations prefer `.gruff.yaml` where
-  they support default discovery.
+- Config discovery order differs by language and should stay documented rather
+  than forced into exact parity without a user-facing reason.
+
+## Shared Contract
+
+The workspace-level contract that governs naming for rule IDs and config keys
+lives in `CONTRACT.md` at the gruff workspace monorepo root, alongside the
+sibling gruff-* package checkouts. It is the source of truth for CLI and docs
+consistency decisions across packages; this repository does not vendor a copy.

@@ -1,4 +1,4 @@
-gruff-php 0.1.0-dev
+gruff-php 0.1.1
 Format: text
 Fail threshold: error
 

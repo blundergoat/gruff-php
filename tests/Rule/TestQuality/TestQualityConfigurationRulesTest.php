@@ -54,11 +54,11 @@ final class TestQualityConfigurationRulesTest extends TestCase
     private const PROJECT_ROOT = __DIR__ . '/../../..';
 
     /**
-     * Verify mocking domain object is disabled by default and requires patterns to fire.
+     * Verify mocking domain object is enabled by default but requires patterns to fire.
      *
      * @return void
      */
-    public function testMockingDomainObjectIsDisabledByDefaultAndRequiresPatternsToFire(): void
+    public function testMockingDomainObjectIsEnabledByDefaultAndRequiresPatternsToFire(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);

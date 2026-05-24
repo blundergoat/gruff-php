@@ -6,34 +6,43 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/blundergoat/gruff-php/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/blundergoat/gruff-php/actions/workflows/ci.yml)
 [![License](https://img.shields.io/packagist/l/blundergoat/gruff-php.svg?style=flat-square)](LICENSE)
 
-`gruff-php` is an opinionated PHP code-quality analyzer. It scans PHP projects,
-scores findings across rule pillars, and emits reports for terminals, CI,
-GitHub annotations, SARIF consumers, static HTML, and a local dashboard.
+`gruff-php` is an opinionated PHP code-quality analyzer. It scans PHP projects, scores findings across quality pillars, and emits reports for terminals, CI annotations, SARIF consumers, static HTML, and a local dashboard. It is heuristic static analysis; run it beside PHPStan, Psalm, PHPUnit, PHP-CS-Fixer, PHPCS, security scanners, and code review, not instead of them.
 
-It is heuristic tooling. Use it alongside PHPStan, PHPUnit, PHP-CS-Fixer,
-Psalm, PHPCS, or other project-specific gates; do not treat it as a replacement
-for type checking or tests.
+## Status At A Glance
 
-## Release Status
+| Field | Value |
+| --- | --- |
+| Release line | Published `0.1.1` package line |
+| Runtime | PHP `^8.3` |
+| Package | `blundergoat/gruff-php` |
+| Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
+| Rule catalogue | 120 rules across 11 pillars |
+| Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
+| Analysis schema | `gruff.analysis.v1` |
+| Baseline schema | `gruff.baseline.v1` |
+| Severity gate | `--fail-on` with `none`, `advisory`, `warning`, `error` |
+| Dashboard | `127.0.0.1:8765` by default |
 
-This repository is prepared for the public `0.1.0` tag. Development checkouts
-currently report `0.1.0-dev`; `scripts/bump-version.sh 0.1.0` updates the CLI
-version and stamps the changelog before tagging.
+## Requirements
 
-Current package facts:
+- PHP `8.3+`.
+- Composer for dependency installation.
+- Git only for diff and branch-review modes.
+- Infection only when mutation-analysis flags are used.
 
-- Package name: `blundergoat/gruff-php`
-- Repository: `https://github.com/blundergoat/gruff-php`
-- Binary: `bin/gruff-php`
-- PHP requirement: `^8.3`
-- Runtime dependencies: `nikic/php-parser`, Symfony Console/Finder/Process/Yaml
-- Rule catalogue: 120 registry rules across 11 pillars
-- Config format: YAML only (`.yaml` / `.yml`)
-- License: MIT (see [`LICENSE`](LICENSE))
+Runtime dependencies are `nikic/php-parser` plus Symfony Console, Finder, Process, and Yaml.
 
-## Installation
+## Install
 
-From a checkout:
+Install as a project dev dependency:
+
+```bash
+composer require --dev blundergoat/gruff-php
+vendor/bin/gruff-php init
+vendor/bin/gruff-php summary
+```
+
+From a source checkout:
 
 ```bash
 git clone https://github.com/blundergoat/gruff-php.git
@@ -42,95 +51,131 @@ composer install
 php bin/gruff-php --help
 ```
 
-After Packagist publication:
-
-```bash
-composer require --dev blundergoat/gruff-php
-vendor/bin/gruff-php --help
-```
-
 ## Quick Start
 
 ```bash
-# Analyze the current project
-php bin/gruff-php analyse
+# Create the project config.
+vendor/bin/gruff-php init
 
-# Analyze selected paths
-php bin/gruff-php analyse src tests
+# Review the current finding mix.
+vendor/bin/gruff-php summary
 
-# Keep the process green while inspecting findings
-php bin/gruff-php analyse --fail-on none
+# Explore without failing because of findings.
+vendor/bin/gruff-php analyse --fail-on none
 
-# JSON for automation
-php bin/gruff-php analyse --format json --fail-on none > gruff-report.json
+# Gate on warning and error findings.
+vendor/bin/gruff-php analyse --fail-on warning
 
-# Markdown for PR comments
-php bin/gruff-php analyse --format markdown --fail-on none > gruff-report.md
+# Emit SARIF for code scanning.
+vendor/bin/gruff-php analyse --format sarif --fail-on none > gruff.sarif
 
-# SARIF for code-scanning ingestion
-php bin/gruff-php analyse --format sarif --fail-on none > gruff.sarif
+# Generate a fresh-start baseline.
+vendor/bin/gruff-php analyse --generate-baseline --fail-on none
 
-# Static HTML report
-php bin/gruff-php report --format html --output gruff-report.html
-
-# Local dashboard
-php bin/gruff-php dashboard
-```
-
-The default fail threshold is `error`, so warning and advisory findings do not
-fail the command unless you opt in:
-
-```bash
-php bin/gruff-php analyse --fail-on warning
-php bin/gruff-php analyse --fail-on advisory
+# Start the local dashboard.
+vendor/bin/gruff-php dashboard
 ```
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `analyse` | Run the analyzer and print findings in `text`, `json`, `html`, `markdown`, `github`, `hotspot`, or `sarif` format. |
-| `summary` | Print a compact score and top-offender digest without the full finding list. |
-| `report` | Render an HTML or JSON report to stdout or `--output`. |
-| `dashboard` | Serve a local dashboard on `127.0.0.1:8765` by default. |
+| `analyse [paths...]` | Run the analyzer and print findings. |
+| `summary [paths...]` | Print compact score, pillar, rule, and file summaries. |
+| `report [paths...]` | Render an HTML or JSON report to stdout or `--output`. |
+| `dashboard` | Serve the local browser dashboard. |
 | `list-rules` | Print rule metadata as a table or JSON. |
-
-Symfony Console also provides `list`, `help`, and shell completion support:
-
-```bash
-php bin/gruff-php list
-php bin/gruff-php analyse --help
-php bin/gruff-php list-rules --format json
-```
+| `list`, `help`, `completion` | Symfony Console command catalogue, help, and shell completion support. |
 
 ## Output Formats
 
-`analyse --format` accepts:
+`analyse --format <fmt>` accepts:
 
-| Format | Intended use |
+| Format | Use it for |
 | --- | --- |
-| `text` | Human CLI output. |
-| `json` | Machine-readable `gruff.analysis.v1` reports. |
-| `html` | Self-contained report output. |
-| `markdown` | PR comment or issue summary text. |
+| `text` | Human terminal output. |
+| `json` | Full `gruff.analysis.v1` report. |
+| `html` | Self-contained inspection report. |
+| `markdown` | Pull-request or issue comment summary. |
 | `github` | GitHub Actions workflow annotations. |
-| `hotspot` | JSON hotspot map keyed around file scores. |
-| `sarif` | SARIF 2.1.0 for code-scanning ingestion. |
+| `hotspot` | File-level hotspot JSON. |
+| `sarif` | SARIF 2.1.0 for code scanning. |
 
-`report --format` currently accepts `html` and `json`.
+`report --format <fmt>` accepts `html` and `json`.
 
 ## Exit Codes
 
 | Code | Meaning |
 | --- | --- |
-| `0` | The run completed and no finding met the `--fail-on` threshold. |
-| `1` | At least one finding met the `--fail-on` threshold. |
-| `2` | A run diagnostic occurred, such as config failure, missing path, parse error, baseline error, history-file error, diff failure, or mutation-tool failure. |
+| `0` | Run completed and no finding met `--fail-on`. |
+| `1` | At least one finding met `--fail-on`. |
+| `2` | Fatal diagnostic such as config failure, missing path, parse error, baseline error, history-file error, diff failure, mutation-tool failure, or invalid input. |
 
-## Rule Pillars
+`analyse` defaults to `--fail-on error`.
 
-`list-rules --format json` is the source of truth for rule metadata. The v0.1
-catalogue currently contains 120 registry rules:
+## CI Usage
+
+Generic CI command:
+
+```bash
+vendor/bin/gruff-php analyse --format github --fail-on warning
+```
+
+GitHub Actions SARIF jobs can install dependencies, run the analyzer, then upload `gruff-php.sarif`:
+
+```yaml
+jobs:
+  gruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+      - run: composer install --no-interaction --prefer-dist
+      - run: vendor/bin/gruff-php analyse --format sarif --fail-on none > gruff-php.sarif
+```
+
+Security-focused gates can bypass adoption baselines:
+
+```bash
+vendor/bin/gruff-php analyse --profile security --no-baseline --fail-on warning
+```
+
+## Configuration
+
+Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard` auto-load it unless `--config <path>` or `--no-config` is supplied. Legacy `.gruff.yaml` files are still auto-loaded when `.gruff-php.yaml` is absent. Unknown keys and unsupported rule options fail closed.
+
+```yaml
+minimumPhpVersion: 8.3
+
+paths:
+  ignore:
+    - tests/Fixtures/**
+    - generated
+
+selection:
+  tiers: [v0.1]
+  pillars: [security, sensitive-data]
+  excludeRules: []
+
+allowlists:
+  acceptedAbbreviations: [id, db]
+  secretPreviews: []
+
+rules:
+  size.method-length:
+    threshold: 80
+    severity: error
+  complexity.cyclomatic:
+    enabled: false
+```
+
+Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresholds and options.
+
+## Rules And Pillars
+
+The v0.1 catalogue contains 120 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
@@ -146,167 +191,34 @@ catalogue currently contains 120 registry rules:
 | `test-quality` | 33 |
 | `design` | 1 |
 
-Representative rule IDs:
+Some dead-code pillar rules keep a `waste.*` rule-id prefix for historical continuity. Filter by the `pillar` field from `list-rules --format json` when the pillar matters more than the rule-id prefix.
 
-```text
-size.method-length
-complexity.cyclomatic
-waste.unused-import
-naming.identifier-quality
-docs.missing-param-tag
-modernisation.readonly-property-candidate
-security.unsafe-unserialize
-security.path-traversal-file-access
-sensitive-data.high-entropy-string
-test-quality.no-assertions
-design.single-implementor-interface
-```
+## Baselines And Changed-Code Scans
 
-Some dead-code pillar rules keep the `waste.*` rule-id prefix for historical
-continuity. Use the `pillar` field from `list-rules --format json` when
-filtering by pillar.
-
-Use this command to inspect the full catalogue:
+Baselines suppress reviewed findings by fingerprint:
 
 ```bash
-php bin/gruff-php list-rules
-php bin/gruff-php list-rules --format json
+vendor/bin/gruff-php analyse --generate-baseline --fail-on none
+vendor/bin/gruff-php analyse --baseline=gruff-baseline.json --fail-on warning
+vendor/bin/gruff-php analyse --no-baseline --fail-on none
 ```
 
-## Configuration
-
-Place `.gruff-php.yaml` in the project root. `analyse`, `report`, and `dashboard`
-auto-load it unless `--no-config` is supplied. Legacy `.gruff.yaml` files are
-still auto-loaded when `.gruff-php.yaml` is absent. You can also pass
-`--config=path/to/file.yaml`.
-
-```yaml
-minimumPhpVersion: 8.3
-
-paths:
-  ignore:
-    - tests/Fixtures/**
-    - generated
-
-selection:
-  tiers: [v0.1]
-  pillars: [security, sensitive-data]
-  rules: []
-  excludePillars: []
-  excludeRules: []
-
-allowlists:
-  acceptedAbbreviations: [id, db]
-  secretPreviews: []
-
-rules:
-  size.method-length:
-    threshold: 80
-    severity: error
-  complexity.cyclomatic:
-    enabled: false
-  size.parameter-count:
-    threshold: 10
-    severity: error
-    options:
-      constructorMaxParameters: 0
-      promotedConstructorMaxParameters: 25
-  test-quality.magic-number-assertion:
-    options:
-      allowedLiterals: [200, 201, 404, 500]
-```
-
-Supported top-level keys:
-
-| Key | Purpose |
-| --- | --- |
-| `minimumPhpVersion` | Minimum PHP version used by version-gated modernisation rules. |
-| `paths.ignore` | Project-relative paths or glob patterns to skip. |
-| `selection` | Include or exclude rules by tier, pillar, or rule id. |
-| `allowlists.acceptedAbbreviations` | Naming tokens accepted by naming rules. |
-| `allowlists.secretPreviews` | Redacted sensitive-data previews to suppress after review. |
-| `rules.<id>` | Per-rule `enabled`, `threshold`, `severity`, `thresholds`, or `options`. |
-
-Unknown keys are rejected. Threshold and option names must match the rule's
-definition. Use `php bin/gruff-php list-rules --format json` to inspect the
-available defaults and option names. For `size.parameter-count`,
-`constructorMaxParameters: 0` means constructors inherit the main threshold;
-set it above zero only when non-exempt constructors should use a separate cap.
-Promoted final readonly value-object constructors are bounded separately by
-`promotedConstructorMaxParameters`.
-
-## Baselines
-
-Baselines suppress known findings by fingerprint without disabling rules.
+Changed-code scans can filter to changed lines or compare against a base ref:
 
 ```bash
-# Write gruff-baseline.json in the project root
-php bin/gruff-php analyse --generate-baseline
-
-# Auto-apply gruff-baseline.json when it exists
-php bin/gruff-php analyse
-
-# Use an explicit baseline file
-php bin/gruff-php analyse --baseline=baselines/release.json
-
-# Skip auto-baseline for one run
-php bin/gruff-php analyse --no-baseline
+vendor/bin/gruff-php analyse --diff=staged --format github --fail-on warning
+vendor/bin/gruff-php analyse --diff-vs=origin/main --changed-only --fail-on none
 ```
 
-Baseline files use schema `gruff.baseline.v1`. Full-project scans report stale
-baseline entries when a stored finding no longer exists.
-
-## Diff And Branch Review
-
-Filter findings to changed files or changed lines:
-
-```bash
-php bin/gruff-php analyse --diff
-php bin/gruff-php analyse --diff=staged
-php bin/gruff-php analyse --diff=unstaged
-php bin/gruff-php analyse --diff=origin/main
-```
-
-Compare current findings against a base ref:
-
-```bash
-php bin/gruff-php analyse --diff-vs=origin/main
-php bin/gruff-php analyse --diff-vs=origin/main --changed-only
-```
-
-See [`docs/gruff-cli-branch-review.md`](docs/gruff-cli-branch-review.md) for
-agent-oriented branch review usage.
-
-## Display Filters
-
-Display filters reduce report noise without changing what rules run or what
-fails the command:
-
-```bash
-php bin/gruff-php analyse --min-severity warning
-php bin/gruff-php analyse --include-pillar security --include-pillar sensitive-data
-php bin/gruff-php analyse --exclude-rule test-quality.mystery-guest
-php bin/gruff-php analyse --paths-relative-to "$PWD"
-```
+Display filters such as `--min-severity`, `--include-pillar`, and `--exclude-rule` reduce rendered output without changing which rules execute.
 
 ## Mutation Analysis
 
-Mutation analysis is optional. `gruff-php` can ingest an Infection JSON report
-or run Infection before ingesting the report path you provide.
+Mutation analysis is optional. `gruff-php` can ingest an Infection JSON report or run Infection before ingesting the report path you provide:
 
 ```bash
-php bin/gruff-php analyse --infection-report=infection-report.json
-
-php bin/gruff-php analyse \
-  --infection-run \
-  --infection-report=infection-report.json \
-  --infection-bin=infection \
-  --infection-config=infection.json5
-
-php bin/gruff-php analyse \
-  --infection-report=infection-report.json \
-  --mutation-baseline=baseline-infection.json \
-  --mutation-budget=3
+vendor/bin/gruff-php analyse --infection-report=infection-report.json
+vendor/bin/gruff-php analyse --infection-run --infection-report=infection-report.json
 ```
 
 The dashboard does not run mutation analysis.
@@ -314,15 +226,31 @@ The dashboard does not run mutation analysis.
 ## Dashboard
 
 ```bash
-php bin/gruff-php dashboard
-php bin/gruff-php dashboard --host=0.0.0.0 --port=9000
-php bin/gruff-php dashboard --project=/path/to/project
-php bin/gruff-php dashboard --diff
-php bin/gruff-php dashboard --scan-timeout=300
+vendor/bin/gruff-php dashboard
+vendor/bin/gruff-php dashboard --host=127.0.0.1 --port=8765 --project=/path/to/project
 ```
 
-The dashboard serves a local control page and refresh endpoint. It is intended
-for local development, not as a public network service.
+The dashboard serves a local control page and refresh endpoint. It has no authentication and is intended for local development; keep it on loopback unless the network is trusted.
+
+In polyglot repositories, remember that `gruff-go`, `gruff-php`, and `gruff-py` all default to port `8765`; use `--port` when running multiple dashboards at the same time.
+
+## Trust Boundary
+
+Default scans are local source inspections. `gruff-php` parses PHP files and selected project metadata; it does not execute target application code, run tests, query vulnerability feeds, or contact package registries. Git is used only for explicit diff modes. External processes are used for explicitly requested features such as Infection runs. Sensitive-data previews are redacted before they reach terminal, JSON, SARIF, GitHub, Markdown, or HTML output.
+
+## Stability Contract
+
+The `0.1.x` line treats rule IDs, finding fingerprints, baseline identity, `gruff.analysis.v1`, `gruff.baseline.v1`, SARIF rendering, and CLI exit semantics as compatibility-sensitive. Breaking changes should be tagged as a future minor release and recorded in [`CHANGELOG.md`](CHANGELOG.md).
+
+## How It Compares
+
+| Tool | Relationship |
+| --- | --- |
+| PHPStan / Psalm | Type-aware static analysis. `gruff-php` adds scoring, baselines, reports, dashboard, and heuristic project-quality rules. |
+| PHPUnit | Runtime tests. `gruff-php` can flag test-quality smells but does not prove behavior. |
+| PHP-CS-Fixer / PHPCS | Formatting and style policy. `gruff-php` does not format code. |
+| Infection | Mutation testing. `gruff-php` can ingest or run Infection, but mutation analysis remains optional. |
+| Composer audit | Advisory-backed dependency checks. `gruff-php` reports local static signals and does not replace advisory feeds. |
 
 ## Development
 
@@ -330,67 +258,22 @@ for local development, not as a public network service.
 composer install
 composer check
 composer test
+composer format:check
 bash scripts/preflight-checks.sh
 ```
 
-Useful scripts:
+Performance checks are available with `composer perf`; mutation workflows live in `scripts/mutation-test-diff.sh` and `scripts/mutation-test-full.sh`. Release steps belong in the release checklist and `scripts/bump-version.sh`.
 
-| Command | Purpose |
-| --- | --- |
-| `composer check` | Composer validation, shell syntax checks, PHP syntax checks, PHPStan. |
-| `composer test` | PHPUnit test suite. |
-| `composer perf` | Wall, peak-memory, per-rule timing vs. a local baseline. See below. |
-| `composer format` | Apply PHP-CS-Fixer formatting. |
-| `composer format:check` | Check PHP-CS-Fixer formatting. |
-| `scripts/mutation-test-diff.sh` | Diff-scoped Infection workflow. |
-| `scripts/mutation-test-full.sh` | Full Infection workflow. |
-| `scripts/start-dev.sh` | Start the local dashboard. |
-| `scripts/bump-version.sh` | Bump `Application::VERSION` and stamp the matching `CHANGELOG.md` entry. |
+## Documentation
 
-### Performance harness
-
-`composer perf` runs `php bin/gruff-php analyse` against three corpora (`src/Diff`,
-`src/`, full self-scan), captures wall time and peak memory, and compares each
-result to `.goat-flow/logs/perf/m50-baseline/baseline.json`. Use
-`composer perf -- --baseline --yes` to overwrite the baseline after intentional
-rule or threshold changes. Baselines are machine- and PHP-version-specific -
-regenerate locally rather than committing a CI-host baseline. Tolerances default
-to wall +20%, peak +25%; override with `GRUFF_PERF_WALL_TOLERANCE` /
-`GRUFF_PERF_MEM_TOLERANCE`. Use `--quick` for a single-corpus, no-warmup run.
-
-CI runs on PHP 8.3 and 8.4 via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
-## Public Release Checklist
-
-Before tagging `0.1.0`:
-
-- Confirm `CHANGELOG.md` has `## 0.1.0 - Unreleased`; the release script will
-  stamp the date.
-- Run `scripts/bump-version.sh 0.1.0` to update `src/Console/Application.php`
-  and stamp the `CHANGELOG.md` entry.
-- Confirm Packagist metadata, repository URL, issue tracker, and GitHub private
-  vulnerability reporting for `https://github.com/blundergoat/gruff-php`.
-- Run `composer validate --strict`, `composer check`, `composer test`, and
-  `composer format:check`.
-- Run `php bin/gruff-php list-rules --format json` and confirm the rule count
-  and public IDs match this README and `CHANGELOG.md`.
-- Run `php bin/gruff-php analyse` and confirm the default self-scan exits 0.
-- Review [`CHANGELOG.md`](CHANGELOG.md).
-- Review [`SECURITY.md`](SECURITY.md) and confirm the private reporting path is
-  enabled for the public repository.
-- Confirm generated artifacts such as `history.json`, `infection-report.json`,
-  and local caches are not part of the release archive.
-
-## More Documentation
-
-- [`CHANGELOG.md`](CHANGELOG.md)
-- [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- [`SECURITY.md`](SECURITY.md)
-- [`SUPPORT.md`](SUPPORT.md)
-- [`docs/gruff-cli-summary.md`](docs/gruff-cli-summary.md)
-- [`docs/gruff-cli-agent-instructions.md`](docs/gruff-cli-agent-instructions.md)
-- [`docs/gruff-cli-branch-review.md`](docs/gruff-cli-branch-review.md)
-- [`docs/naming-conventions.md`](docs/naming-conventions.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Summary command](docs/gruff-cli-summary.md)
+- [Agent instructions](docs/gruff-cli-agent-instructions.md)
+- [Branch review](docs/gruff-cli-branch-review.md)
+- [Naming conventions](docs/naming-conventions.md)
 
 ## Author
 

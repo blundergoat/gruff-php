@@ -22,11 +22,9 @@ use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Rule\Size\MethodLengthRule;
 use GruffPhp\Rule\TestQuality\MockingDomainObjectRule;
-use GruffPhp\Rule\TestQuality\MultipleAaaCyclesRule;
 use GruffPhp\Rule\TestQuality\PhpUnitCoverageSourceMissingRule;
 use GruffPhp\Rule\TestQuality\PhpUnitDeprecationsNotFatalRule;
 use GruffPhp\Rule\TestQuality\PhpUnitStrictFlagsMissingRule;
-use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
 use GruffPhp\Source\SourceDiscovery;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
@@ -52,9 +50,9 @@ final class RuleRegressionSnapshotTest extends TestCase
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
         self::assertCount(143, $units);
-        self::assertCount(2343, $findings);
+        self::assertCount(2354, $findings);
         self::assertSame(
-            'e65eabad38a65cbc' . '8d6bc3e605238d67f58536b8cbd4e5a75acfc029a6a8e88e',
+            'b57fb5fb973ea90d' . '1969cdffa32466b65acadc67439182451d68a8714dfe9255',
             hash('sha256', $json),
         );
     }
@@ -84,11 +82,9 @@ final class RuleRegressionSnapshotTest extends TestCase
             FileLengthRule::ID,
             MethodLengthRule::ID,
             MockingDomainObjectRule::ID,
-            MultipleAaaCyclesRule::ID,
             PhpUnitCoverageSourceMissingRule::ID,
             PhpUnitDeprecationsNotFatalRule::ID,
             PhpUnitStrictFlagsMissingRule::ID,
-            TestdoxReadabilityRule::ID,
         ], $defaultMissing);
 
         $supplementalRuleIds = $this->uniqueRuleIds($this->supplementalCalibrationFindings());
