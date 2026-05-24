@@ -28,7 +28,7 @@ final class ListRulesCommand extends Command
         $this
             ->setName('list-rules')
             ->setDescription('List gruff-php rule metadata.')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: table or json.', default: 'table');
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, table, or json.', default: 'table');
     }
 
     /**
@@ -39,8 +39,8 @@ final class ListRulesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $format = $input->getOption('format');
-        if (!is_string($format) || !in_array($format, ['table', 'json'], true)) {
-            $output->writeln('<error>USAGE-ERROR Unsupported rule-list format. Use table or json.</error>');
+        if (!is_string($format) || !in_array($format, ['text', 'table', 'json'], true)) {
+            $output->writeln('<error>USAGE-ERROR Unsupported rule-list format. Use text, table, or json.</error>');
 
             return Command::INVALID;
         }

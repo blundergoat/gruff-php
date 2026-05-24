@@ -67,7 +67,11 @@ final class DashboardStateFactory
      */
     public function initialProjectRoot(InputInterface $input, string $launchRoot): ?string
     {
-        return $this->resolveProjectRoot($this->optionalStringOption($input, 'project') ?? $launchRoot, $launchRoot);
+        $project = $this->optionalStringOption($input, 'project-root')
+            ?? $this->optionalStringOption($input, 'project')
+            ?? $launchRoot;
+
+        return $this->resolveProjectRoot($project, $launchRoot);
     }
 
     /**

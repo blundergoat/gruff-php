@@ -28,6 +28,8 @@ final class DashboardCliTest extends CliTestCase
             '127.0.0.1',
             '--port',
             (string) $port,
+            '--project-root',
+            self::PROJECT_ROOT,
             '--scan-timeout',
             '30',
         ], self::PROJECT_ROOT);

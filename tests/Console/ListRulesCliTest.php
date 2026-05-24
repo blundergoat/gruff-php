@@ -44,6 +44,20 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
+     * Verify list-rules accepts the shared text format alias.
+     *
+     * @return void
+     */
+    public function testListRulesAcceptsTextFormatAlias(): void
+    {
+        $process = new Process([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'list-rules', '--format', 'text']);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('Rule ID | Pillar | Tier | Severity | Confidence | Enabled | Description', $process->getOutput());
+    }
+
+    /**
      * Verify clean checkout install runs CLI help.
      *
      * @return void

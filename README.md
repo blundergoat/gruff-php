@@ -38,7 +38,8 @@ Install as a project dev dependency:
 
 ```bash
 composer require --dev blundergoat/gruff-php
-vendor/bin/gruff-php --help
+vendor/bin/gruff-php init
+vendor/bin/gruff-php summary
 ```
 
 From a source checkout:
@@ -53,6 +54,12 @@ php bin/gruff-php --help
 ## Quick Start
 
 ```bash
+# Create the project config.
+vendor/bin/gruff-php init
+
+# Review the current finding mix.
+vendor/bin/gruff-php summary
+
 # Explore without failing because of findings.
 vendor/bin/gruff-php analyse --fail-on none
 
@@ -224,6 +231,8 @@ vendor/bin/gruff-php dashboard --host=127.0.0.1 --port=8765 --project=/path/to/p
 ```
 
 The dashboard serves a local control page and refresh endpoint. It has no authentication and is intended for local development; keep it on loopback unless the network is trusted.
+
+In polyglot repositories, remember that `gruff-go`, `gruff-php`, and `gruff-py` all default to port `8765`; use `--port` when running multiple dashboards at the same time.
 
 ## Trust Boundary
 
