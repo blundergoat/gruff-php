@@ -25,7 +25,7 @@ final class Application extends SymfonyApplication
     /**
      * Version displayed by the CLI.
      */
-    public const VERSION = '0.1.1';
+    public const VERSION = '0.1.2';
 
     /**
      * Register the gruff-php CLI command surface with Symfony Console.

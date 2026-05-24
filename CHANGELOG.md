@@ -5,6 +5,27 @@ All notable changes to `gruff-php` are documented here. Follows
 Development builds report a `-dev` suffix until `scripts/bump-version.sh`
 stamps the tag.
 
+## 0.1.2 - 2026-05-24
+
+Harness and documentation maintenance for goat-flow 1.7.0.
+
+- Updated Codex and Claude instruction files to use the packaged
+  `@blundergoat/goat-flow` audit CLI and to list the real app/quality
+  surface, including `.gruff-php.yaml`, `phpstan.neon.dist`, scripts,
+  `package-lock.json`, and GitHub workflows.
+- Converted legacy Claude `goat-security` reference files into v1.7.0
+  redirect stubs pointing at the consolidated `identity-and-data.md` and
+  `supply-chain-and-cicd.md` references, preventing stale guidance from
+  being loaded accidentally.
+- Refreshed goat-flow architecture and code-map docs for the current CLI
+  surface: the `init` command, dedicated Console test files, `skill-playbooks`
+  routing, and resolved CLI footguns around config creation.
+- Updated dangerous-command hook self-tests to use the real
+  `healthkit/healthkit` repository identifier instead of placeholder
+  `example-org/example-repo` values.
+- Broadened the `symfony/yaml` runtime constraint to match the other Symfony
+  components: `^6.4 || ^7.0 || ^8.0`.
+
 ## 0.1.1 - 2026-05-24
 
 Onboarding-focused follow-up to 0.1.0.
