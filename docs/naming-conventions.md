@@ -104,7 +104,7 @@ the source of truth.
 
 ## Shared Contract
 
-The workspace-level contract lives at
-[`../../CONTRACT.md`](../../CONTRACT.md). This file provides naming guidance for
-rule IDs and config keys; the contract is the source of truth for CLI and docs
-consistency decisions.
+The workspace-level contract that governs naming for rule IDs and config keys
+lives in `CONTRACT.md` at the gruff workspace monorepo root, alongside the
+sibling gruff-* package checkouts. It is the source of truth for CLI and docs
+consistency decisions across packages; this repository does not vendor a copy.
