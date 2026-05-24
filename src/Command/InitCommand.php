@@ -13,6 +13,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -40,6 +41,27 @@ final class InitCommand extends Command
      * Indent width matching the existing project config files.
      */
     private const YAML_INDENT = 4;
+
+    /**
+     * Default paths omitted from generated project scans.
+     *
+     * Keeps agent harness files, generated reports, copied vendor code, and
+     * analyzer fixtures out of normal user-facing reports.
+     *
+     * @var list<string>
+     */
+    private const DEFAULT_IGNORED_PATHS = [
+        '.agents/**',
+        '.antigravitycli/**',
+        '.claude/**',
+        '.codex/**',
+        '.github/**',
+        '.goat-flow/**',
+        'history.json',
+        'infection-report.json',
+        'src/Vendor/**',
+        'tests/Fixtures/**',
+    ];
 
     /**
      * Register init CLI options and metadata.
@@ -83,9 +105,10 @@ final class InitCommand extends Command
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
-        $document = self::buildConfigDocument($registry, $config);
-        $yaml     = Yaml::dump($document, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-        $contents = self::FILE_HEADER . $yaml;
+        $ignoredPaths = self::existingIgnoredPaths($targetPath) ?? self::DEFAULT_IGNORED_PATHS;
+        $document     = self::buildConfigDocument($registry, $config, $ignoredPaths);
+        $yaml         = Yaml::dump($document, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+        $contents     = self::FILE_HEADER . $yaml;
 
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
@@ -107,11 +130,12 @@ final class InitCommand extends Command
     /**
      * Build the YAML document mirroring registry defaults.
      *
-     * @param RuleRegistry   $registry Rule registry supplying definitions.
-     * @param AnalysisConfig $config   Config seeded from the registry defaults.
+     * @param RuleRegistry   $registry     Rule registry supplying definitions.
+     * @param AnalysisConfig $config       Config seeded from the registry defaults.
+     * @param list<string>   $ignoredPaths Paths to omit from generated project scans.
      * @return array<string, mixed>
      */
-    private static function buildConfigDocument(RuleRegistry $registry, AnalysisConfig $config): array
+    private static function buildConfigDocument(RuleRegistry $registry, AnalysisConfig $config, array $ignoredPaths): array
     {
         $rules = [];
         foreach ($registry->all() as $rule) {
@@ -122,7 +146,7 @@ final class InitCommand extends Command
         return [
             'minimumPhpVersion' => $config->minimumPhpVersion(),
             'paths' => [
-                'ignore' => [],
+                'ignore' => $ignoredPaths,
             ],
             'allowlists' => [
                 'acceptedAbbreviations' => [],
@@ -137,6 +161,49 @@ final class InitCommand extends Command
             ],
             'rules' => $rules,
         ];
+    }
+
+    /**
+     * Read an existing config's path ignores so --force does not wipe local policy.
+     *
+     * @return list<string>|null Existing ignore paths, or null when none can be preserved.
+     */
+    private static function existingIgnoredPaths(string $targetPath): ?array
+    {
+        if (!is_file($targetPath)) {
+            return null;
+        }
+
+        try {
+            $decoded = Yaml::parseFile($targetPath);
+        } catch (ParseException) {
+            return null;
+        }
+
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $paths = $decoded['paths'] ?? null;
+        if (!is_array($paths)) {
+            return null;
+        }
+
+        $ignore = $paths['ignore'] ?? null;
+        if (!is_array($ignore) || !array_is_list($ignore)) {
+            return null;
+        }
+
+        $ignoredPaths = [];
+        foreach ($ignore as $path) {
+            if (!is_string($path) || trim($path) === '') {
+                return null;
+            }
+
+            $ignoredPaths[] = trim($path);
+        }
+
+        return $ignoredPaths;
     }
 
     /**

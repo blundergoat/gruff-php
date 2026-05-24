@@ -5,7 +5,17 @@
 # Future analyse/report runs auto-apply gruff-baseline.json; use `gruff-php analyse --no-baseline` to audit without it.
 minimumPhpVersion: 8.3
 paths:
-    ignore: []
+    ignore:
+        - '.agents/**'
+        - '.antigravitycli/**'
+        - '.claude/**'
+        - '.codex/**'
+        - '.github/**'
+        - '.goat-flow/**'
+        - 'history.json'
+        - 'infection-report.json'
+        - 'src/Vendor/**'
+        - 'tests/Fixtures/**'
 allowlists:
     acceptedAbbreviations: []
     secretPreviews: []

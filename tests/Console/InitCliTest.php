@@ -53,6 +53,23 @@ final class InitCliTest extends CliTestCase
             self::assertArrayHasKey('selection', $decoded);
             self::assertArrayHasKey('rules', $decoded);
 
+            $paths = $decoded['paths'];
+            self::assertIsArray($paths);
+            self::assertSame(
+                [
+                    '.agents/**',
+                    '.antigravitycli/**',
+                    '.claude/**',
+                    '.codex/**',
+                    '.github/**',
+                    '.goat-flow/**',
+                    'history.json',
+                    'infection-report.json',
+                    'src/Vendor/**',
+                    'tests/Fixtures/**',
+                ],
+                $paths['ignore'] ?? null,
+            );
             self::assertIsArray($decoded['rules']);
             self::assertArrayHasKey('complexity.cognitive', $decoded['rules']);
             self::assertSame(
@@ -119,6 +136,52 @@ final class InitCliTest extends CliTestCase
             self::assertStringStartsWith('# .gruff-php.yaml', $contents);
             self::assertStringNotContainsString('# existing', $contents);
             self::assertStringContainsString('known debt', $process->getOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --force preserves an existing path ignore list.
+     *
+     * @return void
+     */
+    public function testInitForcePreservesExistingPathIgnores(): void
+    {
+        $project    = $this->tempDir();
+        $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+
+        try {
+            file_put_contents($configPath, implode("\n", [
+                'paths:',
+                '    ignore:',
+                "        - 'custom/cache/**'",
+                "        - '.local-agent/**'",
+                'rules:',
+                '    size.file-length:',
+                '        enabled: false',
+                '',
+            ]));
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--force',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+            $decoded = Yaml::parse($this->configContents($configPath));
+            self::assertIsArray($decoded);
+            $paths = $decoded['paths'] ?? null;
+            self::assertIsArray($paths);
+            self::assertSame(['custom/cache/**', '.local-agent/**'], $paths['ignore'] ?? null);
+
+            $rules = $decoded['rules'] ?? null;
+            self::assertIsArray($rules);
+            self::assertArrayHasKey('complexity.cognitive', $rules);
         } finally {
             $this->removeDir($project);
         }
