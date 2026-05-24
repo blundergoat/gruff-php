@@ -64,9 +64,11 @@
     "scripts": {
         "check": [
             "composer validate --strict",
-            "composer audit --locked",
+            "@audit:dependencies",
             "@security:scan",
             "bash -n scripts/preflight-checks.sh",
+            "bash -n scripts/dependency-install.sh",
+            "bash -n scripts/dependency-update.sh",
             "bash -n scripts/mutation-test-diff.sh",
             "bash -n scripts/mutation-test-full.sh",
             "bash -n scripts/format-php-code.sh",
@@ -76,6 +78,7 @@
             "bash -n scripts/test-performance.sh",
             "@phpstan"
         ],
+        "audit:dependencies": "composer --no-interaction audit --locked",
         "format": "scripts/format-php-code.sh",
         "format:check": "php-cs-fixer check --config=.php-cs-fixer.dist.php --diff",
         "perf": "scripts/test-performance.sh",
