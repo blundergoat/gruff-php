@@ -25,7 +25,7 @@ final class Application extends SymfonyApplication
     /**
      * Version displayed by the CLI.
      */
-    public const VERSION = '0.1.2';
+    public const VERSION = '0.1.3';
 
     /**
      * Register the gruff-php CLI command surface with Symfony Console.
@@ -34,11 +34,13 @@ final class Application extends SymfonyApplication
     {
         parent::__construct(self::NAME, self::VERSION);
 
-        $this->add(new AnalyseCommand());
-        $this->add(new DashboardCommand());
-        $this->add(new InitCommand());
-        $this->add(new ListRulesCommand());
-        $this->add(new ReportCommand());
-        $this->add(new SummaryCommand());
+        $this->addCommands([
+            new AnalyseCommand(),
+            new DashboardCommand(),
+            new InitCommand(),
+            new ListRulesCommand(),
+            new ReportCommand(),
+            new SummaryCommand(),
+        ]);
     }
 }

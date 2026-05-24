@@ -24,7 +24,7 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php', $process->getOutput());
-        self::assertStringContainsString('0.1.2', $process->getOutput());
+        self::assertStringContainsString('0.1.3', $process->getOutput());
     }
 
     /**
@@ -92,6 +92,74 @@ final class ListRulesCliTest extends CliTestCase
 
             self::assertSame(0, $helpProcess->getExitCode(), $helpProcess->getErrorOutput());
             self::assertStringContainsString('Description:', $helpProcess->getOutput());
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify Composer's vendor/bin proxy boots the package through the consumer project's autoloader.
+     *
+     * @return void
+     * @throws \JsonException
+     */
+    public function testInstalledVendorBinProxyUsesConsumerAutoloader(): void
+    {
+        $composerPath = (new ExecutableFinder())->find('composer');
+
+        self::assertIsString($composerPath);
+
+        $tempDir  = $this->tempDir();
+        $package  = $tempDir . '/package/gruff-php';
+        $consumer = $tempDir . '/consumer';
+
+        try {
+            $this->copyPackageTree(self::PROJECT_ROOT, $package);
+            self::assertTrue(mkdir($consumer));
+
+            $composerJson = json_encode([
+                'repositories' => [[
+                    'type' => 'path',
+                    'url' => $package,
+                    'options' => [
+                        'symlink' => false,
+                        'versions' => [
+                            'blundergoat/gruff-php' => '0.1.x-dev',
+                        ],
+                    ],
+                ]],
+                'require-dev' => [
+                    'blundergoat/gruff-php' => '0.1.x-dev',
+                ],
+                'minimum-stability' => 'dev',
+                'prefer-stable' => true,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            file_put_contents($consumer . '/composer.json', $composerJson . "\n");
+
+            $installProcess = new Process([
+                $composerPath,
+                'update',
+                '--no-audit',
+                '--no-interaction',
+                '--prefer-dist',
+                '--no-progress',
+            ], $consumer);
+            $installProcess->setTimeout(120);
+            $installProcess->run();
+
+            self::assertSame(0, $installProcess->getExitCode(), $installProcess->getErrorOutput() . $installProcess->getOutput());
+            self::assertFileDoesNotExist($consumer . '/vendor/blundergoat/gruff-php/vendor/autoload.php');
+
+            $initProcess = new Process([
+                PHP_BINARY,
+                $consumer . '/vendor/bin/gruff-php',
+                'init',
+            ], $consumer);
+            $initProcess->run();
+
+            self::assertSame(0, $initProcess->getExitCode(), $initProcess->getErrorOutput() . $initProcess->getOutput());
+            self::assertFileExists($consumer . '/.gruff-php.yaml');
+            self::assertStringContainsString('Wrote ' . $consumer . '/.gruff-php.yaml', $initProcess->getOutput());
         } finally {
             $this->removeDir($tempDir);
         }
