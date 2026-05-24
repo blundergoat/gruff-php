@@ -24,7 +24,7 @@ final class ListRulesCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('gruff-php', $process->getOutput());
-        self::assertStringContainsString('0.1.0-dev', $process->getOutput());
+        self::assertStringContainsString('0.1.1', $process->getOutput());
     }
 
     /**

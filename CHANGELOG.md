@@ -2,10 +2,10 @@
 
 All notable changes to `gruff-php` are documented here. Follows
 [Keep a Changelog](https://keepachangelog.com/) and semantic versioning.
-Development builds report `0.1.0-dev` until `scripts/bump-version.sh` stamps
-the tag.
+Development builds report a `-dev` suffix until `scripts/bump-version.sh`
+stamps the tag.
 
-## 0.1.0 - Unreleased
+## 0.1.1 - 2026-05-24
 
 First public release.
 

@@ -30,14 +30,14 @@ php bin/gruff-php summary [paths...] [options]
 ## Example - text format
 
 The example output below was captured from a development checkout. A tagged
-release prints `0.1.0` instead of `0.1.0-dev`.
+release prints `0.1.1` instead of a `-dev` suffix.
 
 ```bash
 php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.1.0-dev - summary
+gruff-php 0.1.1 - summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
@@ -76,7 +76,7 @@ php bin/gruff-php summary src --format=json --top=5
 ```json
 {
   "schemaVersion": "gruff.summary.v1",
-  "tool": { "name": "gruff-php", "version": "0.1.0-dev" },
+  "tool": { "name": "gruff-php", "version": "0.1.1" },
   "scope": {
     "paths": ["src"],
     "configPath": "/home/devgoat/projects/gruff-workspace/gruff-php/.gruff-php.yaml",
