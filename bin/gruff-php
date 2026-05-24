@@ -5,6 +5,21 @@ declare(strict_types=1);
 
 use GruffPhp\Console\Application;
 
-require __DIR__ . '/../vendor/autoload.php';
+$composerAutoloadPath = $GLOBALS['_composer_autoload_path'] ?? null;
+$autoloadCandidates   = [
+    is_string($composerAutoloadPath) ? $composerAutoloadPath : null,
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
 
-exit((new Application())->run());
+foreach ($autoloadCandidates as $autoloadPath) {
+    if (is_string($autoloadPath) && is_file($autoloadPath)) {
+        require $autoloadPath;
+
+        exit((new Application())->run());
+    }
+}
+
+fwrite(STDERR, "Unable to locate Composer autoload.php. Run `composer install` before using gruff-php.\n");
+
+exit(1);
