@@ -43,6 +43,16 @@ final class MultipleAaaCyclesTest extends TestCase
         self::assertNotNull($result);
     }
 
+    // Edge: assertion helper calls after one act do not create extra act/assert cycles.
+    public function testAssertionHelpersAfterSingleActDoNotBecomeCycles(): void
+    {
+        $service = new OrderService();
+        $result = $service->run('one');
+
+        self::assertSame(1, $this->normalise($result));
+        self::assertTrue($this->isValid($result));
+    }
+
     // Edge: an act statement followed by an inline act-and-assert statement is one cycle, not two.
     public function testActThenInlineActAssertCountsAsOneCycle(): void
     {

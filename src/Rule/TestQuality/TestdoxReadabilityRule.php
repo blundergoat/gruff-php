@@ -39,7 +39,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
-            defaultThresholds:  ['minWords' => 3],
+            defaultThresholds:  ['minWords' => 2],
             isEnabledByDefault: true,
         );
     }
@@ -85,7 +85,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
-                remediation: 'Rename the test so it reads as a sentence describing the scenario and expected behaviour (e.g. testProcessOrder -> testProcessOrderMarksItAsPaid).',
+                remediation: 'Rename the test so it describes the scenario and expected behaviour (e.g. testProcess -> testProcessOrder).',
                 metadata:    ['words' => count($words), 'threshold' => $threshold],
             );
         }

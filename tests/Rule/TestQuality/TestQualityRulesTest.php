@@ -489,7 +489,7 @@ final class TestQualityRulesTest extends TestCase
     public function testTestdoxReadabilityFiresByDefaultAndWithExplicitConfig(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
-        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $defaultFindings);
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 1, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
         $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
@@ -501,7 +501,7 @@ final class TestQualityRulesTest extends TestCase
             $config,
         );
 
-        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $configuredFindings);
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 1, $configuredFindings);
     }
 
     /**

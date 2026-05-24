@@ -41,7 +41,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             tier:               RuleTier::V01,
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
-            defaultThresholds:  ['minCycles' => 2],
+            defaultThresholds:  ['minCycles' => 3],
             isEnabledByDefault: true,
         );
     }
@@ -103,14 +103,24 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             $hasAssertion        = false;
             $hasNonAssertionCall = false;
 
-            foreach ($nodeFinder->find([$stmt], static fn (Node $node): bool => $node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall) as $call) {
+            $calls = $nodeFinder->find(
+                [$stmt],
+                static fn (Node $node): bool => $node instanceof Expr\FuncCall
+                    || $node instanceof Expr\MethodCall
+                    || $node instanceof Expr\StaticCall,
+            );
+
+            foreach ($calls as $call) {
                 if (!$call instanceof Expr\FuncCall && !$call instanceof Expr\MethodCall && !$call instanceof Expr\StaticCall) {
                     continue;
                 }
 
                 if (TestQualityNodeHelper::isAssertionCall($call)) {
                     $hasAssertion = true;
-                } elseif (!TestQualityNodeHelper::isMockCreationCall($call) && !TestQualityNodeHelper::isMockVerificationCall($call)) {
+                } elseif (!$this->isNestedInAssertionCall($call)
+                    && !TestQualityNodeHelper::isMockCreationCall($call)
+                    && !TestQualityNodeHelper::isMockVerificationCall($call)
+                ) {
                     $hasNonAssertionCall = true;
                 }
             }
@@ -128,5 +138,27 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         }
 
         return $cycles;
+    }
+
+    /**
+     * Detect whether a call is used only to compute an assertion argument.
+     *
+     * @return bool True when the call is nested inside an assertion call.
+     */
+    private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        $parent = $call->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
+                && TestQualityNodeHelper::isAssertionCall($parent)
+            ) {
+                return true;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
     }
 }

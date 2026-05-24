@@ -8,13 +8,13 @@ use PHPUnit\Framework\TestCase;
 
 final class TestdoxReadabilityTest extends TestCase
 {
-    // Positive: 2 words after the test prefix (under default threshold of 3).
+    // Negative: 2 words after the test prefix meets the default threshold.
     public function testProcessOrder(): void
     {
         self::assertSame(1, 1);
     }
 
-    // Positive: 1 word.
+    // Positive: 1 word is too terse to render as useful TestDox.
     public function testProcess(): void
     {
         self::assertSame(1, 1);

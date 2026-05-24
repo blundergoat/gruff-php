@@ -403,7 +403,7 @@ rules:
     test-quality.multiple-aaa-cycles:
         enabled: true
         thresholds:
-            minCycles: 2
+            minCycles: 3
     test-quality.mystery-guest:
         enabled: true
     test-quality.naming-consistency:
@@ -451,7 +451,7 @@ rules:
     test-quality.testdox-readability:
         enabled: true
         thresholds:
-            minWords: 3
+            minWords: 2
     test-quality.trivial-assertion:
         enabled: true
     test-quality.trivial-snapshot:
