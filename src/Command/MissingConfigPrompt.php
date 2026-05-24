@@ -22,7 +22,7 @@ final readonly class MissingConfigPrompt
     /**
      * Prompt text shown to interactive users when no config is discovered.
      */
-    public const PROMPT_TEXT = 'No .gruff-php.yaml found in this directory. Run `gruff-php init` for config and baseline guidance? [y/N] ';
+    public const PROMPT_TEXT = 'No .gruff-php.yaml or .gruff.yaml found in your project root. Run `gruff-php init` for config and baseline guidance? [y/N] ';
 
     /**
      * Decide whether to offer the init prompt and run it when accepted.
