@@ -1,4 +1,4 @@
-# AGENTS.md - v1.5.1 (2026-05-09)
+# AGENTS.md - project v1.5.1 / goat-flow 1.7.0 (2026-05-24)
 gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -20,7 +20,7 @@ gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and 
 ## Hard Rules
 
 - If a file exists, modify it in place; do not create backup or `_new` variants.
-- Keep app claims grounded in existing files. Current app surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, and `phpunit.xml.dist`.
+- Keep app claims grounded in existing files. Current app/quality surface: `composer.json`, `composer.lock`, `bin/gruff-php`, `src/`, `tests/`, `phpunit.xml.dist`, `phpstan.neon.dist`, `.gruff-php.yaml`, `scripts/`, `package.json`, `package-lock.json`, and `.github/workflows/`.
 - Route durable project knowledge to `.goat-flow/`; keep this hot-path file behavioral and concise.
 - Use `apply_patch` for manual edits when available.
 - Preserve cross-agent consistency between `AGENTS.md` and `CLAUDE.md` for shared goat-flow rules.
@@ -43,8 +43,8 @@ composer test
 composer perf
 php bin/gruff-php --help
 php bin/gruff-php analyse
-node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent codex
-node --import tsx /home/devgoat/projects/goat-flow/src/cli/cli.ts audit . --agent codex --harness
+node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent codex
+node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent codex --harness
 ```
 
 ## Execution Loop: READ -> SCOPE -> ACT -> VERIFY

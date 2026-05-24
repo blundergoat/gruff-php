@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-23. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-24. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -58,6 +58,7 @@ src/
 |-- Command/
 |   |-- AnalyseCommand.php                    = `analyse` command; loads config, applies optional execution profiles (`--profile=security` selects security + sensitive-data rules), derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
 |   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
+|   |-- InitCommand.php                       = `init` command; writes `.gruff-php.yaml` from registry defaults and preserves existing `paths.ignore` values on forced regeneration
 |   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
 |   |-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
 |   |-- SummaryCommand.php                    = `summary` command; runs the analyser once and renders compact text/JSON aggregate output
@@ -69,7 +70,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.0-dev` until `scripts/bump-version.sh` stamps a release; registers `analyse`, `summary`, `dashboard`, `list-rules`, and `report`
+|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.1`; registers `analyse`, `summary`, `dashboard`, `init`, `list-rules`, and `report`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception
@@ -286,7 +287,15 @@ tests/
 |-- Config/
 |   `-- ConfigLoaderTest.php                  = default config, YAML overrides, disable, path ignore, allowlist, selection, unknown-key/threshold validation
 |-- Console/
-|   `-- GruffCliTest.php                      = end-to-end CLI smoke tests via `bin/gruff-php`: version/list/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, Infection ingestion, baselines, static/served HTML reports, Markdown/GitHub/hotspot/history/diff paths
+|   |-- AnalyseCliTest.php                    = end-to-end `analyse` coverage: version/help, parser output, config/selection/allowlists, fail-on, JSON/schema score data, static HTML, SARIF, GitHub annotations, profiles, and filters
+|   |-- AnalyseCliBaselineTest.php            = baseline generation, suppression, stale-entry reporting, and invalid baseline flag combinations
+|   |-- AnalyseCliGitDiscoveryTest.php        = Git-aware default discovery and ignored-file handling
+|   |-- AnalyseCliMutationTest.php            = Infection JSON ingestion, mutation summary rendering, mutation budget, and MSI regression findings
+|   |-- AnalyseCliRuntimeTest.php             = `--print-runtime` summary/detail stderr JSON and default-output invariance
+|   |-- DashboardCliTest.php                  = local dashboard server, scan endpoint, interactive controls, mutation UI suppression, and alternate project roots
+|   |-- InitCliTest.php                       = default config creation, refusal to overwrite without force, forced regeneration, and path-ignore preservation
+|   |-- ListRulesCliTest.php                  = version/list/help smoke tests and rule metadata output
+|   `-- ReportCliTest.php                     = static/JSON report delegation, output writing, forwarded analysis flags, dash-prefixed paths, and no-write-on-invalid-analyse behaviour
 |-- Diff/
 |   `-- GitDiffProviderTest.php               = changed-line filtering, unstaged git diff parsing, non-git diff errors
 |-- Finding/
@@ -370,7 +379,9 @@ tests/
 |-- skill-reference/
 |   |-- README.md
 |   |-- skill-conventions.md
-|   |-- skill-preamble.md
+|   `-- skill-preamble.md
+|-- skill-playbooks/
+|   |-- README.md
 |   |-- browser-use.md                        = browser-use CLI availability + usage playbook
 |   |-- page-capture.md                       = page-capture CLI playbook
 |   |-- skill-quality-testing.md              = quality-testing skill index
