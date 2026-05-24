@@ -15,6 +15,16 @@ last_reviewed: 2026-05-24
 
 **Prevention:** CLI package bins need a regression test that installs the package into a consumer project and executes `vendor/bin/<tool>`, not only `php bin/<tool>` inside the source checkout. Keep the source-checkout fallback for direct development, but make the Composer proxy autoload path the first candidate.
 
+## Footgun: Consumer install tests can resolve newer dependency majors than the source checkout
+
+**Status:** active | **Created:** 2026-05-24 | **Evidence:** OBSERVED
+
+`composer.json` (search: `"symfony/console": "^6.4 || ^7.0 || ^8.0"`) allows Symfony Console 8 on PHP 8.4, while the source checkout lockfile on PHP 8.3 currently installs Symfony Console 7. `src/Console/Application.php` previously called the 7.4-deprecated `$this->add(...)` API, which passed all local source-checkout tests but failed in PR #5's PHP 8.4 consumer-install regression after Composer resolved `symfony/console v8.0.11`: `GruffPhp\Console\Application::add()` was undefined during `vendor/bin/gruff-php init`.
+
+**Evidence:** `src/Console/Application.php` (search: `addCommands`) now uses the cross-version registration API; `tests/Console/ListRulesCliTest.php` (search: `testInstalledVendorBinProxyUsesConsumerAutoloader`) exercises a consumer install path, but local PHP 8.3 resolution alone does not prove the Symfony 8 path. GitHub Actions run `26359298476` on PR #5 showed the PHP 8.4 failure while PHP 8.3 passed the same PHPUnit test.
+
+**Prevention:** When a package constraint includes a newer framework major than the local lockfile currently installs, verify the public CLI against that major before release. For Symfony Console support, prefer APIs present across every advertised major (`addCommands` across 6.4/7.x/8.x here) and avoid deprecated 7.x APIs when `^8.0` is allowed. A consumer-install test should either run in the CI PHP version that can resolve the newest major or include an explicit platform/dependency smoke so the highest supported major is actually exercised.
+
 ## Resolved Entries
 
 ## Footgun: PHP-named scaffold has no PHP app surface yet

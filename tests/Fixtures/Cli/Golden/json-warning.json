@@ -2,7 +2,7 @@
     "schemaVersion": "gruff.analysis.v1",
     "tool": {
         "name": "gruff-php",
-        "version": "0.1.2"
+        "version": "0.1.3"
     },
     "run": {
         "format": "json",
