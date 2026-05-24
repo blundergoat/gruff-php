@@ -47,6 +47,14 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Prevention:** Any rule that scans properties must include promoted constructor parameters in fixtures and treat private promoted params as property declarations with an initial write. Also include a used promoted private property and a public promoted property fixture so the rule proves both detection and visibility boundaries.
 
+## Footgun: naming.boolean-prefix requires the prefix at the start of the identifier
+
+**Status:** active | **Created:** 2026-05-24 | **Evidence:** OBSERVED
+
+`src/Rule/Naming/BooleanPrefixRule.php` (search: `allowedPrefixes`) checks that bool-returning methods, bool parameters, and bool properties *begin* with one of the configured prefixes (default `is`, `has`, `can`, `should`, `will`). Names that merely contain a prefix later in the identifier still fail. `ConfigLoader::projectHasConfig()` was flagged on its first cut because `has` appeared in the middle of the name; renaming to `hasProjectConfig()` cleared the rule. The same trap fires for parameters: `$shouldForce` passes, `$force` and `$forceShould` both fail.
+
+**Prevention:** When adding any bool-returning method, bool parameter, or bool property, put the prefix first. For names that read naturally with the subject before the verb (`projectHasConfig`, `userIsActive`), rephrase as prefix-first (`hasProjectConfig`, `isActiveUser`) or rename the subject out (`hasConfig` on a class already scoped to a project). The rule does not parse English — "name contains a prefix" is not enough; the leading token must be a configured prefix.
+
 ## Footgun: Vendored code under `src/Vendor/` evades the vendor filter
 
 **Status:** active | **Created:** 2026-05-11 | **Evidence:** OBSERVED
