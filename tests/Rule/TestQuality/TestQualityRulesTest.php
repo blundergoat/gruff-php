@@ -436,26 +436,26 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify multiple AAA cycles is disabled by default but fires when opted in.
+     * Verify multiple AAA cycles fires by default and with explicit config.
      *
      * @return void
      */
-    public function testMultipleAaaCyclesIsDisabledByDefaultButFiresWhenOptedIn(): void
+    public function testMultipleAaaCyclesFiresByDefaultAndWithExplicitConfig(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 0, $defaultFindings);
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
         $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
             $registry,
         );
-        $optedInFindings = $this->analysePaths(
+        $configuredFindings = $this->analysePaths(
             ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
             $config,
         );
 
-        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $optedInFindings);
+        self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $configuredFindings);
     }
 
     /**
@@ -482,26 +482,26 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify testdox readability is disabled by default but fires when opted in.
+     * Verify testdox readability fires by default and with explicit config.
      *
      * @return void
      */
-    public function testTestdoxReadabilityIsDisabledByDefaultButFiresWhenOptedIn(): void
+    public function testTestdoxReadabilityFiresByDefaultAndWithExplicitConfig(): void
     {
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
-        self::assertRuleCount(TestdoxReadabilityRule::ID, 0, $defaultFindings);
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $defaultFindings);
 
         $registry = RuleRegistry::defaults();
         $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
-        $optedInFindings = $this->analysePaths(
+        $configuredFindings = $this->analysePaths(
             ['tests/Fixtures/TestQuality/testdox-readability.php'],
             $config,
         );
 
-        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $optedInFindings);
+        self::assertRuleCount(TestdoxReadabilityRule::ID, 2, $configuredFindings);
     }
 
     /**

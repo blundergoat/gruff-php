@@ -40,7 +40,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
             defaultThresholds:  ['minWords' => 3],
-            isEnabledByDefault: false,
+            isEnabledByDefault: true,
         );
     }
 

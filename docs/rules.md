@@ -176,8 +176,8 @@ Total rules: 120
 | `test-quality.magic-number-assertion` | Magic number assertion | `advisory` | `low` | yes |
 | `test-quality.mock-only-test` | Mock-only test | `warning` | `medium` | yes |
 | `test-quality.mock-without-expectation` | Mock without expectation | `warning` | `medium` | yes |
-| `test-quality.mocking-domain-object` | Mocking a domain object | `advisory` | `low` | no |
-| `test-quality.multiple-aaa-cycles` | Multiple arrange-act-assert cycles | `advisory` | `low` | no |
+| `test-quality.mocking-domain-object` | Mocking a domain object | `advisory` | `low` | yes |
+| `test-quality.multiple-aaa-cycles` | Multiple arrange-act-assert cycles | `advisory` | `low` | yes |
 | `test-quality.mystery-guest` | Mystery guest | `advisory` | `medium` | yes |
 | `test-quality.naming-consistency` | Test naming consistency | `advisory` | `high` | yes |
 | `test-quality.no-assertions` | Test without assertions | `warning` | `medium` | yes |
@@ -193,8 +193,7 @@ Total rules: 120
 | `test-quality.tautological-type-assertion` | Tautological type assertion | `warning` | `high` | yes |
 | `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | yes |
 | `test-quality.test-method-too-long` | Test method too long | `advisory` | `high` | yes |
-| `test-quality.testdox-readability` | Testdox readability | `advisory` | `low` | no |
+| `test-quality.testdox-readability` | Testdox readability | `advisory` | `low` | yes |
 | `test-quality.trivial-assertion` | Trivial assertion | `warning` | `high` | yes |
 | `test-quality.trivial-snapshot` | Trivial snapshot | `advisory` | `medium` | yes |
 | `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | yes |
-

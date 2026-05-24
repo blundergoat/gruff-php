@@ -42,7 +42,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             defaultSeverity:    Severity::Advisory,
             confidence:         Confidence::Low,
             defaultThresholds:  ['minCycles' => 2],
-            isEnabledByDefault: false,
+            isEnabledByDefault: true,
         );
     }
 
