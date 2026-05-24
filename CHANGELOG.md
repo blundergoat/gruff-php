@@ -5,6 +5,18 @@ All notable changes to `gruff-php` are documented here. Follows
 Development builds report a `-dev` suffix until `scripts/bump-version.sh`
 stamps the tag.
 
+## 0.1.3 - 2026-05-24
+
+Patch release for the installed Composer binary bootstrap.
+
+- Fixed `vendor/bin/gruff-php` in consuming projects by preferring Composer's
+  generated `_composer_autoload_path` before source-checkout fallbacks. This
+  unblocks `composer require --dev blundergoat/gruff-php` followed by
+  `vendor/bin/gruff-php init`.
+- Added a regression test that installs `gruff-php` into a throwaway consumer
+  project and runs `vendor/bin/gruff-php init`, so the packaged dependency
+  layout is covered separately from `php bin/gruff-php` source-checkout runs.
+
 ## 0.1.2 - 2026-05-24
 
 Harness and documentation maintenance for goat-flow 1.7.0.
