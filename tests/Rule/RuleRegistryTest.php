@@ -301,9 +301,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(120, $definitions);
+        self::assertCount(119, $definitions);
         self::assertSame(
-            '34ef4333ae8a2695462' . 'f68cae258207bfc9d227456dbd575dfd54b280e21fdbf',
+            'a573ddaa4106bb4540cb' . '652b1004dae1b8c6a275b9f627933c5410f8c7f6d24f',
             hash('sha256', $json),
         );
     }

@@ -61,7 +61,7 @@ final class ScoreCalculatorTest extends TestCase
         $security = array_values(array_filter($score->pillars, static fn ($pillar): bool => $pillar->pillar === 'security'))[0] ?? null;
 
         self::assertNotNull($security);
-        self::assertSame(1, $security->errors);
+        self::assertSame(1, $security->error);
         self::assertSame('F', $security->grade?->letter);
     }
 
@@ -151,9 +151,9 @@ final class ScoreCalculatorTest extends TestCase
             'score' => 66.67,
             'grade' => 'D',
             'findings' => 1,
-            'advisories' => 0,
-            'warnings' => 1,
-            'errors' => 0,
+            'advisory' => 0,
+            'warning' => 1,
+            'error' => 0,
             'penalty' => 33.33,
         ], $pillars['mutation'] ?? null);
 

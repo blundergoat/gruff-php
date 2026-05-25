@@ -98,7 +98,7 @@ final class GruffCliSummaryTest extends TestCase
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
 
-        self::assertSame('gruff.summary.v1', $decoded['schemaVersion'] ?? null);
+        self::assertSame('gruff.summary.v2', $decoded['schemaVersion'] ?? null);
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);

@@ -162,7 +162,6 @@ src/
 |   |   |-- IdentifierQualityRule.php         = `naming.identifier-quality`
 |   |   |-- IdentifierTokenizer.php           = shared camel/snake/acronym tokenizer for identifier-quality
 |   |   |-- NegativeBooleanRule.php           = `naming.negative-boolean` (bool properties/params with negative prefixes; configurable `cliMirrorAllowlist`)
-|   |   |-- ParameterTypeNameRule.php         = `naming.parameter-type-name` (expects class-typed parameters and direct `new Type()` locals to use lower-camel short type names; trims configurable suffixes such as Interface)
 |   |   |-- ShortVariableRule.php             = `naming.short-variable`
 |   |   |-- SuffixHungarianRule.php           = `naming.suffix-hungarian` (type suffixes such as String/Map/Set; configurable `typeSuffixes`)
 |   |   `-- TestNamingConsistencyRule.php     = `naming.test-naming-consistency`

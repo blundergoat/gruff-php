@@ -64,6 +64,19 @@ final class InitCommand extends Command
     ];
 
     /**
+     * Universal-programming abbreviations seeded into fresh configs so the
+     * first scan does not flood naming.abbreviation-allowlist with terms a
+     * maintainer would never bother to allowlist by hand. Project-specific
+     * vocabulary (domain acronyms) should be appended to this list in the
+     * user's config rather than added here.
+     *
+     * @var list<string>
+     */
+    private const DEFAULT_ACCEPTED_ABBREVIATIONS = [
+        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
+    ];
+
+    /**
      * Register init CLI options and metadata.
      *
      * @return void
@@ -101,9 +114,10 @@ final class InitCommand extends Command
         $config   = AnalysisConfig::fromRegistry($registry);
 
         $ignoredPaths = self::existingIgnoredPaths($targetPath) ?? self::DEFAULT_IGNORED_PATHS;
-        $document     = self::buildConfigDocument($registry, $config, $ignoredPaths);
-        $yaml         = Yaml::dump($document, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-        $contents     = self::FILE_HEADER . $yaml;
+        $scaffold     = self::buildScaffoldDocument($config, $ignoredPaths);
+        $scaffoldYaml = Yaml::dump($scaffold, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+        $rulesYaml    = self::renderRulesSection($registry);
+        $contents     = self::FILE_HEADER . $scaffoldYaml . $rulesYaml;
 
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
@@ -185,28 +199,24 @@ final class InitCommand extends Command
     }
 
     /**
-     * Build the YAML document mirroring registry defaults.
+     * Build the scaffold sections of the generated config (everything above
+     * `rules:`). The `rules:` block is rendered separately by
+     * renderRulesSection so each rule can carry a leading description comment
+     * that Yaml::dump can't emit.
      *
-     * @param RuleRegistry   $ruleRegistry  Rule registry supplying definitions.
      * @param AnalysisConfig $analysisConfig Config seeded from the registry defaults.
      * @param list<string>   $ignoredPaths Paths to omit from generated project scans.
      * @return array<string, mixed>
      */
-    private static function buildConfigDocument(RuleRegistry $ruleRegistry, AnalysisConfig $analysisConfig, array $ignoredPaths): array
+    private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths): array
     {
-        $rules = [];
-        foreach ($ruleRegistry->all() as $rule) {
-            $ruleDefinition             = $rule->definition();
-            $rules[$ruleDefinition->id] = self::buildRuleEntry($ruleDefinition);
-        }
-
         return [
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
             'paths' => [
                 'ignore' => $ignoredPaths,
             ],
             'allowlists' => [
-                'acceptedAbbreviations' => [],
+                'acceptedAbbreviations' => self::DEFAULT_ACCEPTED_ABBREVIATIONS,
                 'secretPreviews' => [],
             ],
             'selection' => [
@@ -216,8 +226,32 @@ final class InitCommand extends Command
                 'excludePillars' => [],
                 'excludeRules' => [],
             ],
-            'rules' => $rules,
         ];
+    }
+
+    /**
+     * Render the `rules:` section of the generated config, with each rule
+     * preceded by a comment carrying the registry description (or the rule's
+     * display name when no description is set). Output is appended to the
+     * scaffold YAML; the existing 4-space indent contract is preserved.
+     *
+     * @return string Rendered `rules:` block including trailing newline.
+     */
+    private static function renderRulesSection(RuleRegistry $ruleRegistry): string
+    {
+        $output = "rules:\n";
+        foreach ($ruleRegistry->all() as $rule) {
+            $ruleDefinition = $rule->definition();
+            $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
+            $output        .= '    # ' . $description . "\n";
+            $entry          = self::buildRuleEntry($ruleDefinition);
+            $entryYaml      = Yaml::dump([$ruleDefinition->id => $entry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            foreach (explode("\n", rtrim($entryYaml, "\n")) as $line) {
+                $output .= '    ' . $line . "\n";
+            }
+        }
+
+        return $output;
     }
 
     /**

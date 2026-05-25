@@ -137,9 +137,9 @@ final readonly class ScoreCalculator
                     applicable: true,
                     grade:      Grade::fromScore($mutationAnalysisResult->report->msi()),
                     findings:   count($mutationFindings),
-                    advisories: $counts['advisory'],
-                    warnings:   $counts['warning'],
-                    errors:     $counts['error'],
+                    advisory:   $counts['advisory'],
+                    warning:    $counts['warning'],
+                    error:      $counts['error'],
                     penalty:    max(0.0, 100.0 - $mutationAnalysisResult->report->msi()),
                 );
                 continue;
@@ -157,9 +157,9 @@ final readonly class ScoreCalculator
                 applicable: true,
                 grade:      Grade::fromScore(100.0 - $penalty),
                 findings:   count($pillarFindings),
-                advisories: $counts['advisory'],
-                warnings:   $counts['warning'],
-                errors:     $counts['error'],
+                advisory:   $counts['advisory'],
+                warning:    $counts['warning'],
+                error:      $counts['error'],
                 penalty:    $penalty,
             );
         }
@@ -202,9 +202,9 @@ final readonly class ScoreCalculator
                 filePath:      $filePath,
                 grade:         Grade::fromScore(100.0 - $penalty),
                 findings:      count($fileFindings),
-                advisories:    $counts['advisory'],
-                warnings:      $counts['warning'],
-                errors:        $counts['error'],
+                advisory:      $counts['advisory'],
+                warning:       $counts['warning'],
+                error:         $counts['error'],
                 penalty:       $penalty,
                 maxCyclomatic: $this->maxMetadataInt($fileFindings, 'complexity.cyclomatic', 'complexity'),
                 maxCognitive:  $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),

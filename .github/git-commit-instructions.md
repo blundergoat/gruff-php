@@ -25,7 +25,7 @@ required.
 
 - ≤ 70 characters, imperative mood, no trailing period.
 - Pattern: `<Area> - <Action>` or `<Action> in <Area>`. Area is usually a
-  rule name, command, or subsystem (`ParameterTypeNameRule`, `analyse CLI`,
+  rule name, command, or subsystem (`AbbreviationAllowlistRule`, `analyse CLI`,
   `dashboard scan`).
 - **One observable change per subject.** If the subject contains "and",
   names two axes, or starts to read like a release-note paragraph - either
@@ -67,8 +67,8 @@ GOOD: Switch VarAnnotationDescriptionRule from token walker to AST
 ```
 
 ```
-BAD:  Improve parameter-type-name rule and tweak fixture
-GOOD: Add ignoredParameterNames option to naming.parameter-type-name
+BAD:  Improve abbreviation-allowlist rule and tweak fixture
+GOOD: Add ignoredNames option to naming.abbreviation-allowlist
 ```
 
 ```
@@ -103,11 +103,12 @@ intentional negatives and removes the dogfood false positives.
 ```
 
 ```
-Add ignoredParameterNames option to naming.parameter-type-name
+Add ignoredNames option to naming.abbreviation-allowlist
 
-AST-walker parameters like $node, $context, $stmt trip the rule
-even when the type makes the convention obvious. Default empty
-list; gruff opts in to its own AST vocabulary in .gruff-php.yaml.
+Project glossary entries like $cb, $fn, $ref are valid in
+gruff-php's PHP-Parser AST surface even though they are 2-3
+char lowercase. Default `['this']`; projects opt in their own
+allowlist via .gruff-php.yaml.
 ```
 
 ```
@@ -133,7 +134,7 @@ fix bug
 Multi-axis "and" subject - either split or move the second axis to a body
 bullet:
 ```
-Update VarAnnotationDescriptionRule and rename ParameterTypeNameRule fixture
+Update VarAnnotationDescriptionRule and rename ShortVariableRule fixture
 ```
 
 Run-on with implementation detail no reader needs:

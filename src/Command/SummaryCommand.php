@@ -29,7 +29,7 @@ final class SummaryCommand extends Command
     /**
      * Schema identifier for machine-readable summary output.
      */
-    public const SCHEMA_VERSION = 'gruff.summary.v1';
+    public const SCHEMA_VERSION = 'gruff.summary.v2';
 
     /**
      * Default number of top rules and offenders shown in summaries.
@@ -441,9 +441,9 @@ final class SummaryCommand extends Command
                 $grade,
                 $scoreText,
                 $pillar->findings,
-                $pillar->advisories,
-                $pillar->warnings,
-                $pillar->errors,
+                $pillar->advisory,
+                $pillar->warning,
+                $pillar->error,
             );
         }
 
@@ -475,9 +475,9 @@ final class SummaryCommand extends Command
                     $file->grade->score,
                     $file->filePath,
                     $file->findings,
-                    $file->advisories,
-                    $file->warnings,
-                    $file->errors,
+                    $file->advisory,
+                    $file->warning,
+                    $file->error,
                 );
             }
         }

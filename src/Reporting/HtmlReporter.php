@@ -140,24 +140,37 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Render the pillar-grade grid (one card per non-mutation pillar).
+     * Render the canonical Pillars table. Rows mirror the text/JSON summary
+     * shape produced by {@see pillarSummaryRows()}: every applicable pillar
+     * (excluding mutation, which the HTML keeps in findings) is shown with
+     * grade, score (2dp), findings, and per-severity counts, sorted by
+     * findings DESC then pillar ASC.
      *
      * @return string HTML for the pillars section.
      */
     private function pillars(AnalysisReport $report): string
     {
-        $items = $report->score === null ? [] : $report->score->pillars;
-        $html  = '<section class="pillars"><h2 class="section-head">pillar grades <span class="aside">weighted composite</span></h2><div class="pillar-grid">';
+        $rows = $this->pillarSummaryRows($report);
+        $html = '<section class="pillars"><h2 class="section-head">pillars <span class="aside">weighted composite</span></h2>'
+            . '<table class="pillar-list"><thead><tr>'
+            . '<th scope="col">pillar</th>'
+            . '<th scope="col" class="num">grade</th>'
+            . '<th scope="col" class="num">score</th>'
+            . '<th scope="col" class="num">findings</th>'
+            . '<th scope="col" class="num">advisory</th>'
+            . '<th scope="col" class="num">warning</th>'
+            . '<th scope="col" class="num">error</th>'
+            . '</tr></thead><tbody>';
 
-        foreach ($items as $pillar) {
-            if (strtolower($pillar->pillar) === 'mutation') {
-                continue;
-            }
-
-            $html .= $this->pillarCard($pillar);
+        if ($rows === []) {
+            $html .= '<tr><td colspan="7">No pillars.</td></tr>';
         }
 
-        return $html . '</div></section>';
+        foreach ($rows as $pillar) {
+            $html .= $this->pillarRow($pillar);
+        }
+
+        return $html . '</tbody></table></section>';
     }
 
     /**
@@ -248,26 +261,70 @@ final readonly class HtmlReporter
     }
 
     /**
-     * Render a single pillar card with grade and finding breakdown.
+     * Render a single row of the canonical pillars table.
      *
-     * @return string HTML for one pillar card.
+     * @return string HTML for one pillar row.
      */
-    private function pillarCard(PillarScore $pillar): string
+    private function pillarRow(PillarScore $pillar): string
     {
         $grade      = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
-        $gradeClass = strtolower($grade[0] ?? 'n');
-        $score      = $pillar->grade === null ? 'not applicable' : sprintf('%.2f', $pillar->grade->score);
+        $gradeClass = $pillar->grade === null ? 'n' : strtolower($grade[0] ?? 'n');
+        $score      = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
 
-        return '<div class="pillar">'
-            . sprintf('<div class="name">%s</div>', $this->escape($pillar->pillar))
-            . sprintf('<div class="grade %s">%s</div>', $this->escape($gradeClass), $this->escape($grade))
-            . '<div class="breakdown">'
-            . sprintf('<div class="row"><span class="key">score</span><span class="val">%s</span></div>', $this->escape($score))
-            . sprintf('<div class="row"><span class="key">findings</span><span class="val">%d</span></div>', $pillar->findings)
-            . sprintf('<div class="row"><span class="key">advisories</span><span class="val">%d</span></div>', $pillar->advisories)
-            . sprintf('<div class="row"><span class="key">warnings</span><span class="val">%d</span></div>', $pillar->warnings)
-            . sprintf('<div class="row"><span class="key">errors</span><span class="val">%d</span></div>', $pillar->errors)
-            . '</div></div>';
+        return '<tr>'
+            . sprintf('<td class="pillar-name">%s</td>', $this->escape($pillar->pillar))
+            . sprintf('<td class="num"><span class="grade-pill %s">%s</span></td>', $this->escape($gradeClass), $this->escape($grade))
+            . sprintf('<td class="num">%s</td>', $this->escape($score))
+            . sprintf('<td class="num">%d</td>', $pillar->findings)
+            . sprintf('<td class="num %s">%d</td>', $this->severityCellClass($pillar->advisory, 'note'), $pillar->advisory)
+            . sprintf('<td class="num %s">%d</td>', $this->severityCellClass($pillar->warning, 'warn'), $pillar->warning)
+            . sprintf('<td class="num %s">%d</td>', $this->severityCellClass($pillar->error, 'fail'), $pillar->error)
+            . '</tr>';
+    }
+
+    /**
+     * Return the applicable pillar scores for the canonical table, sorted by
+     * findings DESC then pillar ASC. Sourced from the existing PillarScore
+     * data without recomputing severity counts or scores. The mutation pillar
+     * is excluded so the HTML keeps mutation details in findings.
+     *
+     * @return list<PillarScore>
+     */
+    private function pillarSummaryRows(AnalysisReport $report): array
+    {
+        if ($report->score === null) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($report->score->pillars as $pillar) {
+            if (!$pillar->applicable) {
+                continue;
+            }
+
+            if (strtolower($pillar->pillar) === 'mutation') {
+                continue;
+            }
+
+            $rows[] = $pillar;
+        }
+
+        usort($rows, static function (PillarScore $left, PillarScore $right): int {
+            return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * Return the CSS tier class for a per-severity count cell. Zero-valued
+     * cells stay neutral so a clean pillar reads as visually quiet.
+     *
+     * @return string The CSS tier class, or empty when the count is zero.
+     */
+    private function severityCellClass(int $count, string $tier): string
+    {
+        return $count > 0 ? $tier : '';
     }
 
     /**

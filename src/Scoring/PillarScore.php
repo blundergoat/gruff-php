@@ -16,9 +16,9 @@ final readonly class PillarScore
      * @param bool       $applicable Whether the pillar had any applicable inputs.
      * @param Grade|null $grade      Letter grade and numeric score, when applicable.
      * @param int        $findings   Total findings counted for the pillar.
-     * @param int        $advisories Advisory findings counted for the pillar.
-     * @param int        $warnings   Warning findings counted for the pillar.
-     * @param int        $errors     Error findings counted for the pillar.
+     * @param int        $advisory   Advisory findings counted for the pillar.
+     * @param int        $warning    Warning findings counted for the pillar.
+     * @param int        $error      Error findings counted for the pillar.
      * @param float      $penalty    Score penalty applied to the pillar.
      */
     public function __construct(
@@ -26,9 +26,9 @@ final readonly class PillarScore
         public bool $applicable,
         public ?Grade $grade,
         public int $findings,
-        public int $advisories,
-        public int $warnings,
-        public int $errors,
+        public int $advisory,
+        public int $warning,
+        public int $error,
         public float $penalty,
     ) {
     }
@@ -40,9 +40,9 @@ final readonly class PillarScore
      *     score: float|null,
      *     grade: string|null,
      *     findings: int,
-     *     advisories: int,
-     *     warnings: int,
-     *     errors: int,
+     *     advisory: int,
+     *     warning: int,
+     *     error: int,
      *     penalty: float
      * }
      */
@@ -54,9 +54,9 @@ final readonly class PillarScore
             'score' => $this->grade?->score,
             'grade' => $this->grade?->letter,
             'findings' => $this->findings,
-            'advisories' => $this->advisories,
-            'warnings' => $this->warnings,
-            'errors' => $this->errors,
+            'advisory' => $this->advisory,
+            'warning' => $this->warning,
+            'error' => $this->error,
             'penalty' => round($this->penalty, 2),
         ];
     }

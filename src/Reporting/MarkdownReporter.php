@@ -6,6 +6,7 @@ namespace GruffPhp\Reporting;
 
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Finding\Finding;
+use GruffPhp\Scoring\PillarScore;
 
 /**
  * Renders analysis reports as Markdown.
@@ -146,7 +147,12 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * Append the score pillar table.
+     * Append the canonical 7-column Pillars table shared across the cross-port
+     * summary harmonisation. Rows are sourced from {@see pillarSummaryRows()}:
+     * every applicable pillar is shown with grade, score (2dp), findings, and
+     * per-severity counts, sorted by findings DESC then pillar ASC. Pillar
+     * data is sourced from the existing {@see PillarScore} entries without
+     * recomputing severity counts or scores.
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
@@ -154,26 +160,65 @@ final readonly class MarkdownReporter
      */
     private function appendPillarSection(array &$lines, AnalysisReport $report): void
     {
-        $pillars = $report->score === null ? [] : $report->score->pillars;
+        $rows = $this->pillarSummaryRows($report);
 
         array_push(
             $lines,
             '',
             '## Pillars',
             '',
-            '| Pillar | Grade | Score | Findings |',
-            '| --- | --- | ---: | ---: |',
+            '| Pillar | Grade | Score | Findings | Advisory | Warning | Error |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: |',
         );
 
-        foreach ($pillars as $pillar) {
+        if ($rows === []) {
+            $lines[] = '| _(none)_ |  |  |  |  |  |  |';
+            return;
+        }
+
+        foreach ($rows as $pillar) {
             $lines[] = sprintf(
-                '| %s | %s | %s | %d |',
+                '| %s | %s | %s | %d | %d | %d | %d |',
                 str_replace('|', '\\|', $pillar->pillar),
                 str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : $pillar->grade->letter),
                 str_replace('|', '\\|', $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score)),
                 $pillar->findings,
+                $pillar->advisory,
+                $pillar->warning,
+                $pillar->error,
             );
         }
+    }
+
+    /**
+     * Return the applicable pillar scores for the canonical Pillars table,
+     * sorted by findings DESC then pillar ASC. Sourced from the existing
+     * {@see PillarScore} data so per-severity counts and scores are never
+     * recomputed by the markdown reporter.
+     *
+     * @param AnalysisReport $report Analysis report providing the optional score.
+     * @return list<PillarScore>
+     */
+    private function pillarSummaryRows(AnalysisReport $report): array
+    {
+        if ($report->score === null) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($report->score->pillars as $pillar) {
+            if (!$pillar->applicable) {
+                continue;
+            }
+
+            $rows[] = $pillar;
+        }
+
+        usort($rows, static function (PillarScore $left, PillarScore $right): int {
+            return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
+        });
+
+        return $rows;
     }
 
     /**

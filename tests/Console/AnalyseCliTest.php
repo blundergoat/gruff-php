@@ -568,10 +568,11 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('<section class="verdict">', $process->getOutput());
-        self::assertStringContainsString('pillar grades', $process->getOutput());
+        self::assertStringContainsString('<section class="pillars">', $process->getOutput());
+        self::assertStringContainsString('<table class="pillar-list">', $process->getOutput());
         self::assertStringContainsString('score drivers', $process->getOutput());
         self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $process->getOutput());
-        self::assertStringNotContainsString('<div class="name">mutation</div>', $process->getOutput());
+        self::assertStringNotContainsString('<td class="pillar-name">mutation</td>', $process->getOutput());
         self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
     }
 

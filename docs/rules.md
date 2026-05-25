@@ -3,7 +3,7 @@
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 120
+Total rules: 119
 
 ## Summary By Pillar
 
@@ -15,7 +15,7 @@ Total rules: 120
 | `documentation` | 14 |
 | `maintainability` | 2 |
 | `modernisation` | 10 |
-| `naming` | 12 |
+| `naming` | 11 |
 | `security` | 18 |
 | `sensitive-data` | 9 |
 | `size` | 7 |
@@ -106,7 +106,6 @@ Total rules: 120
 | `naming.hungarian-notation` | Hungarian notation | `advisory` | `medium` | yes |
 | `naming.identifier-quality` | Identifier quality | `advisory` | `medium` | yes |
 | `naming.negative-boolean` | Negative boolean flag | `advisory` | `medium` | yes |
-| `naming.parameter-type-name` | Parameter and variable type name | `advisory` | `medium` | yes |
 | `naming.short-variable` | Short variable name | `advisory` | `high` | yes |
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |

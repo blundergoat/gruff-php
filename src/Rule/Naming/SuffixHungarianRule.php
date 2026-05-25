@@ -37,8 +37,8 @@ use PhpParser\Node\UnionType;
  *
  * Overlap deferral order is centralised in RuleRegistry:
  * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
- * parameter-type-name > identifier-quality > hungarian-notation >
- * suffix-hungarian > short-variable > abbreviation-allowlist.
+ * identifier-quality > hungarian-notation > suffix-hungarian > short-variable >
+ * abbreviation-allowlist.
  */
 final readonly class SuffixHungarianRule implements RuleInterface
 {
