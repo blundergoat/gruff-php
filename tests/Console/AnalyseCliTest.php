@@ -193,7 +193,7 @@ final class AnalyseCliTest extends CliTestCase
         $summary  = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
 
-        self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
         self::assertIsArray($summary);
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);

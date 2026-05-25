@@ -30,7 +30,7 @@ final readonly class AnalysisReport
     /**
      * Stable schema identifier emitted in machine-readable reports.
      */
-    public const SCHEMA_VERSION = 'gruff.analysis.v1';
+    public const SCHEMA_VERSION = 'gruff.analysis.v2';
 
     /**
      * @param string                      $toolVersion     Gruff version used to produce the report.

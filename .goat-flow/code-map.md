@@ -46,7 +46,7 @@ scripts/
 
 src/
 |-- Analysis/
-|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v1`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/review/trend/baseline/filter metadata
+|   |-- AnalysisReport.php                    = schema-versioned (`gruff.analysis.v2`) payload: tool, run, summary, paths, diagnostics, findings, optional mutation/score/diff/review/trend/baseline/filter metadata
 |   `-- RunDiagnostic.php                     = run-level diagnostic value object (config-error, missing-path, parse-error, usage-error, mutation/diff/baseline/history errors)
 |-- Baseline/
 |   |-- BaselineData.php                      = loaded/generated baseline entries indexed by fingerprint

@@ -20,8 +20,9 @@ summaries, and bump the `summary` command schema to v2.
   in `.goat-flow/decisions/ADR-014-retire-naming-parameter-type-name.md`;
   the cross-port sibling in `gruff-py` is being retired in lockstep
   (ADR-018 there). PHP naming-rule count drops from 12 to 11.
-- **Breaking:** `summary` output schema bumped to `gruff.summary.v2`.
-  Per-severity pillar and file counts now use singular property names
+- **Breaking:** `summary` and `analyse` JSON output schemas bumped to
+  `gruff.summary.v2` and `gruff.analysis.v2` respectively. Per-severity
+  pillar and file counts now use singular property names
   (`advisory` / `warning` / `error`) instead of plural
   (`advisories` / `warnings` / `errors`). Consumers of v1 JSON output
   need to update their parsers.

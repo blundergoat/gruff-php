@@ -94,7 +94,7 @@ Total rules: 119
 | `modernisation.public-property` | Public mutable property | `warning` | `high` | yes |
 | `modernisation.readonly-property-candidate` | Readonly property candidate | `advisory` | `medium` | yes |
 
-### `naming` (12)
+### `naming` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |

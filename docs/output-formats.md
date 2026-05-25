@@ -13,7 +13,7 @@ vendor/bin/gruff-php analyse src --format text --fail-on warning
 
 ## JSON
 
-Use `json` for automation. JSON reports use `gruff.analysis.v1`.
+Use `json` for automation. JSON reports use `gruff.analysis.v2`.
 
 ```sh
 vendor/bin/gruff-php analyse src --format json --fail-on none > gruff-php.json

@@ -1,5 +1,5 @@
 {
-    "schemaVersion": "gruff.analysis.v1",
+    "schemaVersion": "gruff.analysis.v2",
     "tool": {
         "name": "gruff-php",
         "version": "0.1.4"
