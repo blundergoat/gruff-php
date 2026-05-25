@@ -244,9 +244,9 @@ final class InitCommand extends Command
             $ruleDefinition = $rule->definition();
             $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
             $output        .= '    # ' . $description . "\n";
-            $entry          = self::buildRuleEntry($ruleDefinition);
-            $entryYaml      = Yaml::dump([$ruleDefinition->id => $entry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-            foreach (explode("\n", rtrim($entryYaml, "\n")) as $line) {
+            $ruleEntry      = self::buildRuleEntry($ruleDefinition);
+            $ruleEntryYaml  = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            foreach (explode("\n", rtrim($ruleEntryYaml, "\n")) as $line) {
                 $output .= '    ' . $line . "\n";
             }
         }
