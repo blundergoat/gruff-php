@@ -1,6 +1,6 @@
 ---
 category: workflow
-last_reviewed: 2026-05-24
+last_reviewed: 2026-05-25
 ---
 
 # Workflow Lessons
@@ -87,3 +87,16 @@ For the dogfood snapshots also expect new findings on the gruff source tree itse
 **Root cause:** The agent applied a general PHPDoc minimalism preference instead of treating the user's explicit rule standard as the source of truth for this analyser. gruff is an opinionated scanner; some rules intentionally require documentation that another project might consider redundant.
 
 **Prevention:** When the user specifies a rule standard, implement and verify that standard directly. Do not soften it based on generic style guidance unless the user asks for trade-offs. For PHPDoc rules in this repo, preserve the rule contract in tests using examples from both public methods and private helpers so future agents cannot narrow behavior back to "public contract only" or "only when the native signature is insufficient."
+
+## Lesson: Reviewer "outside diff" coverage is not exhaustive — sweep the whole repo before reporting scope
+
+**Created:** 2026-05-25
+
+**What happened:** Reviewing PR #6 (the `naming.parameter-type-name` retirement), CodeRabbit's "outside diff range" comments flagged two stale rule-count references: `docs/rules.md` section heading (search: `### \`naming\` (12)`) and `.goat-flow/architecture.md` prose (search: `exposes 120 rule ids`). The agent's initial evaluation took those two as the complete drift set and quoted scope on that basis. A real double-check pass found three additional parallel stamps no reviewer had flagged — `README.md` (search: `\| \`naming\` \| 12 \|`) and `README.md` (search: `120 rules across 11 pillars`), plus an entirely separate drift pattern that no reviewer surfaced at all: the user's earlier `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` had left `docs/gruff-cli-summary.md` (search: `gruff.summary.v1`, three lines including a literal JSON example) and `.goat-flow/architecture.md` (search: `gruff.summary.v1 digest`) advertising the pre-bump constant.
+
+**Root cause:** Treating an AI reviewer's flagged-file list as the canonical drift surface. Reviewers like CodeRabbit and Codex scan the PR diff plus a few "outside diff" candidates; files unrelated to the PR's touched paths are invisible to them. A drift pattern that exists in the PR almost always exists in untouched files too, because the underlying trap is structural ("the same fact is stamped in N places"), not localised.
+
+**Prevention:** When a reviewer flags a stale count, schema-version reference, or rule mention at one location, do not just fix that location. Grep the whole repo for the same pattern and report the full hit list before agreeing on scope. The canonical stamp maps live in the footguns:
+- For rule-count drift, see `.goat-flow/footguns/rules.md` (search: `Retiring a rule leaves stale count references`).
+- For schema-version drift, see `.goat-flow/footguns/schemas.md` (search: `Schema-version strings are stamped`).
+Quoting honest scope sets the user's expectation correctly; understating it forces a second turn of "you missed X, Y, Z" and erodes trust in the agent's audit.

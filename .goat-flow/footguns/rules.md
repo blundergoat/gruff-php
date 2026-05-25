@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-24
+last_reviewed: 2026-05-25
 ---
 
 # Rule Footguns
@@ -62,6 +62,14 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 `design.single-implementor-interface` (and any future project rule) excludes files whose displayPath starts with `vendor/` by default, matching the Composer convention. Some projects vendor third-party libraries by copying them into `src/Vendor/...` instead of relying on Composer (observed in external dogfood: `src/Vendor/LayerShifter/...`, `src/Vendor/phpdocx/...`). Those copies live under `src/` and the rule treats them as project code, flagging genuinely external interfaces as if they were internal. Three of seven full-project findings in that target were these vendored copies (43% false-positive rate before configuration).
 
 **Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff-php.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. `src/Rule/Design/SingleImplementorInterfaceRule.php` (search: `additionalExcludedPaths when the interface comes from copied vendor/framework code`) now includes the option in remediation text so users see the intended mitigation at the finding site.
+
+## Footgun: Retiring a rule leaves stale count references in five doc artefacts
+
+**Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
+
+The rule registry's true count lives only in `src/Rule/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`, plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update: a quality-table line in `README.md` (search: `Rule catalogue`), a per-pillar tally in `README.md` (search: `\| \`naming\` \|`), the same pillar tally in `docs/rules.md` (search: `\| \`naming\` \|`), a per-pillar section heading in `docs/rules.md` (search: `### \`naming\` (`), and a prose count in `.goat-flow/architecture.md` (search: `exposes [0-9]+ rule ids`). PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+
+**Prevention:** When retiring or adding a rule, after editing `src/Rule/RuleRegistry.php` run a sweep over the five stamp locations above. The short greppable form: `grep -rn "exposes [0-9]* rule\|Rule catalogue\|\\| \`naming\` \\|\|### \`naming\` (" README.md docs/rules.md .goat-flow/architecture.md`. Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
 
 ## Resolved Entries
 
