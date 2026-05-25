@@ -5,6 +5,40 @@ All notable changes to `gruff-php` are documented here. Follows
 Development builds report a `-dev` suffix until `scripts/bump-version.sh`
 stamps the tag.
 
+## 0.1.4 - 2026-05-25
+
+Retire the `naming.parameter-type-name` rule, refresh reporter pillar
+summaries, and bump the `summary` command schema to v2.
+
+- **Breaking:** retired `naming.parameter-type-name`. The rule class,
+  fixture, registry slot, priority-chain position in
+  `RuleRegistry::NAMING_RULE_PRIORITY`, and `docs/rules.md` entry are
+  deleted, and the project's own `.gruff-php.yaml` no longer ships a
+  per-rule tuning block for it. Adopters relying on the rule for
+  domain-DTO naming discipline will see those findings disappear after
+  the next `composer update`. Rationale and reversibility plan recorded
+  in `.goat-flow/decisions/ADR-014-retire-naming-parameter-type-name.md`;
+  the cross-port sibling in `gruff-py` is being retired in lockstep
+  (ADR-018 there). PHP naming-rule count drops from 12 to 11.
+- **Breaking:** `summary` output schema bumped to `gruff.summary.v2`.
+  Per-severity pillar and file counts now use singular property names
+  (`advisory` / `warning` / `error`) instead of plural
+  (`advisories` / `warnings` / `errors`). Consumers of v1 JSON output
+  need to update their parsers.
+- HTML and Markdown reporters render pillar summaries as a table with
+  per-severity finding counts; `MarkdownReporterTest` covers the new
+  output.
+- `init` now scaffolds default accepted abbreviations for the
+  `naming.abbreviation-allowlist` rule so new projects start with the
+  registry-curated allowlist rather than an empty one.
+- Documented the scaffold-then-manual-rules YAML emission pattern used
+  by `init` in `.goat-flow/patterns/commands.md`, generalised so every
+  rule's emitted block carries its registry description as a leading
+  comment.
+- Updated `.github/git-commit-instructions.md` example commit messages
+  to reference `AbbreviationAllowlistRule` and `ShortVariableRule`
+  instead of the retired rule.
+
 ## 0.1.3 - 2026-05-24
 
 Patch release for the installed Composer binary bootstrap.
