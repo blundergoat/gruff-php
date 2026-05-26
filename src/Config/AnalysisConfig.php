@@ -19,6 +19,18 @@ final readonly class AnalysisConfig
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
     /**
+     * Universal-programming abbreviations seeded into every config so naming.abbreviation-allowlist
+     * does not flood with terms a maintainer would never bother to allowlist by hand. Project-specific
+     * vocabulary (domain acronyms) belongs in the user's `allowlists.acceptedAbbreviations` instead.
+     * `InitCommand::DEFAULT_ACCEPTED_ABBREVIATIONS` references this constant so the two cannot drift.
+     *
+     * @var list<string>
+     */
+    public const DEFAULT_ACCEPTED_ABBREVIATIONS = [
+        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
+    ];
+
+    /**
      * @param array<string, RuleSettings>      $rules                 Effective settings keyed by rule id.
      * @param float                            $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
      * @param RuleSelection                    $ruleSelection         Include/exclude rule selection for the run.
@@ -62,7 +74,7 @@ final readonly class AnalysisConfig
             );
         }
 
-        return new self($rules);
+        return new self($rules, acceptedAbbreviations: self::DEFAULT_ACCEPTED_ABBREVIATIONS);
     }
 
     /**

@@ -94,7 +94,7 @@ final readonly class MissingParamTagRule implements RuleInterface
 
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
-                    message:     sprintf('Parameter $%s in %s has no @param tag.', $paramName, $symbol),
+                    message:     sprintf('Parameter $%s in %s needs an @param tag with a brief description (one plain-English clause; not a restatement of the type signature).', $paramName, $symbol),
                     filePath:    $analysisUnit->file->displayPath,
                     line:        $param->getStartLine(),
                     severity:    $definition->defaultSeverity,
@@ -102,7 +102,7 @@ final readonly class MissingParamTagRule implements RuleInterface
                     tier:        $definition->tier,
                     confidence:  $definition->confidence,
                     symbol:      $symbol,
-                    remediation: sprintf('Add @param tag for $%s.', $paramName),
+                    remediation: sprintf('Add an `@param SomeType $%s Description.` tag. This rule wants content, not boilerplate - the description should answer "what does the caller need to satisfy for this parameter."', $paramName),
                     metadata:    ['parameter' => $paramName],
                 );
             }
@@ -112,24 +112,95 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Extract parameter names documented by @param tags.
+     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes
+     * (`@param array{key:string,...} $payload` spanning N physical lines) match the closing
+     * `$payload` even though it sits on a different line from the `@param` token.
      *
      * @param string $docText Raw docblock text.
      * @return list<string> Parameter names found in the docblock.
      */
     public static function extractParamNames(string $docText): array
     {
+        $stripped   = self::stripDocFraming($docText);
         $paramNames = [];
-        foreach (preg_split('/\R/', $docText) ?: [] as $line) {
-            // Extract the documented variable name from each @param tag line.
-            if (preg_match('/@param\s+.+?\s+\$(\w+)\b/', $line, $matches) !== 1) {
-                continue;
+        $length     = strlen($stripped);
+        $position   = 0;
+
+        while ($position < $length) {
+            $tagPosition = strpos($stripped, '@param', $position);
+            if ($tagPosition === false) {
+                break;
             }
 
-            $paramNames[] = $matches[1];
+            $position = $tagPosition + strlen('@param');
+            $varName  = self::scanForParamVariable($stripped, $length, $position);
+            if ($varName !== null) {
+                $paramNames[] = $varName;
+            }
         }
 
         return $paramNames;
+    }
+
+    /**
+     * Walk forward from a `@param` token through balanced `{} <> [] ()` brackets and return the
+     * first `$varname` reached at depth zero. Stops at the next `@tag` (next docblock entry) or
+     * end of input.
+     *
+     * @param string $stripped Docblock text with `/**`, ` * `, and `*\/` framing removed.
+     * @param int    $length   Pre-computed `strlen($stripped)` to avoid recomputation per call.
+     * @param int    $position Cursor position (mutated to point past the matched variable).
+     * @return string|null Variable name when found, null when the `@param` tag has no closing `$varname`.
+     */
+    private static function scanForParamVariable(string $stripped, int $length, int &$position): ?string
+    {
+        $depth = 0;
+        while ($position < $length) {
+            $character = $stripped[$position];
+
+            if ($character === '{' || $character === '<' || $character === '[' || $character === '(') {
+                $depth++;
+                $position++;
+                continue;
+            }
+
+            if ($character === '}' || $character === '>' || $character === ']' || $character === ')') {
+                if ($depth > 0) {
+                    $depth--;
+                }
+                $position++;
+                continue;
+            }
+
+            if ($depth === 0 && $character === '@') {
+                return null;
+            }
+
+            if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $stripped, $matches, 0, $position) === 1) {
+                $position += strlen($matches[0]);
+
+                return $matches[1];
+            }
+
+            $position++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Remove docblock framing (`/**`, ` * `, `*\/`) so the result reads as flat prose for the
+     * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
+     * for caller inspection; only the per-line `*` decoration is stripped.
+     *
+     * @return string Docblock text without framing characters.
+     */
+    private static function stripDocFraming(string $docText): string
+    {
+        $stripped = preg_replace('/^\s*\/\*\*+/', '', $docText) ?? '';
+        $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
+
+        return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
     }
 
     /**

@@ -83,7 +83,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s has a docblock but no @return tag.', $symbol),
+                message:     sprintf('%s has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature).', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
@@ -91,7 +91,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Add @return tag documenting the return value.',
+                remediation: 'Add an `@return SomeType Description.` tag. This rule wants content, not boilerplate - the description should answer "what does the returned value represent at the edge cases."',
             );
         }
 

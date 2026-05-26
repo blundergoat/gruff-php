@@ -93,7 +93,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s throws but has no @throws tag.', $symbol),
+                message:     sprintf('%s throws but needs a @throws tag naming the exception type and the condition that triggers it (one plain-English clause; not a restatement of the exception class name).', $symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
@@ -101,7 +101,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Add @throws tag documenting the exception type.',
+                remediation: 'Add an `@throws SomeException Why this is raised.` tag to the docblock. This rule wants content, not boilerplate - the description should answer "what condition triggers this throw and how should the caller prepare."',
             );
         }
 

@@ -79,7 +79,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
 
             $findings[] = new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('%s %s has no PHPDoc.', ucfirst($kind), $name),
+                message:     sprintf('%s %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the class name).', ucfirst($kind), $name),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $node->getStartLine(),
                 severity:    $definition->defaultSeverity,
@@ -87,7 +87,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $name,
-                remediation: 'Add a docblock describing the type\'s purpose.',
+                remediation: 'Add a one-line `/** Description. */` block above the type. This rule wants content, not boilerplate - if your project policy is "no comments", that policy is about avoiding comments that restate code, not about removing documentation. The description should answer "what is this for, what does it own, what must callers satisfy."',
                 metadata:    [
                     'classKind' => $kind,
                     'name' => $name,

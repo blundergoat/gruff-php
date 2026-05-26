@@ -11,6 +11,7 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\Modernisation\ModernisationNodeHelper;
 use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -295,8 +296,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function parameterFindings(IdentifierFindingContext $findingContext, FunctionLikeScope $scope): array
     {
-        $findings = [];
-        $symbol   = $this->symbol($scope);
+        $findings              = [];
+        $symbol                = $this->symbol($scope);
+        $skipGenericComplaints = $this->isGenericByPurposeHelper($scope);
 
         foreach ($scope->node->params as $param) {
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -311,12 +313,50 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 symbol:                   $symbol,
             );
 
-            if ($finding instanceof Finding) {
-                $findings[] = $finding;
+            if (!$finding instanceof Finding) {
+                continue;
             }
+
+            if ($skipGenericComplaints && ($finding->metadata['variant'] ?? null) === 'generic') {
+                continue;
+            }
+
+            $findings[] = $finding;
         }
 
         return $findings;
+    }
+
+    /**
+     * Detect a single-parameter, wide-typed, non-`void`-returning helper whose sole parameter
+     * legitimately needs a generic name. The shape covers helpers like
+     * `private static function stringValue(mixed $value): string` whose intent is "coerce anything
+     * into the documented return type"; a generic parameter name (`$value`) is the right name there.
+     */
+    private function isGenericByPurposeHelper(FunctionLikeScope $scope): bool
+    {
+        $node = $scope->node;
+        if (!$node instanceof ClassMethod && !$node instanceof Function_) {
+            return false;
+        }
+
+        if (count($node->params) !== 1) {
+            return false;
+        }
+
+        if (ModernisationNodeHelper::typeName($node->returnType) === 'void') {
+            return false;
+        }
+
+        $type = $node->params[0]->type;
+
+        if ($type instanceof Node\UnionType && count($type->types) >= 3) {
+            return true;
+        }
+
+        $typeName = ModernisationNodeHelper::typeName($type);
+
+        return $typeName === 'mixed' || $typeName === 'scalar';
     }
 
     /**

@@ -56,6 +56,31 @@ final class ExternalAssignmentFixture
     }
 }
 
+final class MessageInboxFixture
+{
+    private array $messages;
+
+    public function __construct(array $initial)
+    {
+        $this->messages = $initial;
+    }
+
+    public function append(string $message): void
+    {
+        $this->messages[] = $message;
+    }
+
+    public function set(string $key, string $message): void
+    {
+        $this->messages[$key] = $message;
+    }
+
+    public function drop(string $key): void
+    {
+        unset($this->messages[$key]);
+    }
+}
+
 function shortCall(): void
 {
     configureSafeService('host', 'user', 'database');

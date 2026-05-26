@@ -366,6 +366,18 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
+     * Verify redundant variable rule respects PHPStan narrowing comments.
+     *
+     * @return void
+     */
+    public function testRedundantVariableRuleIgnoresPhpStanNarrowingComments(): void
+    {
+        $findings = $this->analyseRule('redundant-variable-phpstan-narrowing.php', RedundantVariableRule::ID);
+
+        self::assertSame([], $findings);
+    }
+
+    /**
      * Verify clean file has no waste findings.
      *
      * @return void

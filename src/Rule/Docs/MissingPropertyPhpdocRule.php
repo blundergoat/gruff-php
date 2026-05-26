@@ -140,7 +140,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
 
         return new Finding(
             ruleId:      $definition->id,
-            message:     sprintf('Property %s has no PHPDoc.', $symbol),
+            message:     sprintf('Property %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the type).', $symbol),
             filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
@@ -148,7 +148,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Add a docblock describing the property\'s purpose or shape.',
+            remediation: 'Add a one-line `/** Description. */` block above the property. This rule wants content, not boilerplate - the description should answer "what does this property hold, what invariant does it maintain."',
             metadata:    [
                 'propertyName' => $propertyName,
                 'kind' => 'declared',
@@ -224,7 +224,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
 
         return new Finding(
             ruleId:      $definition->id,
-            message:     sprintf('Promoted property %s has no @param tag on the constructor.', $symbol),
+            message:     sprintf('Promoted property %s needs an @param tag on the constructor with a brief description (one plain-English clause; not a restatement of the type).', $symbol),
             filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
@@ -232,7 +232,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: sprintf('Add an @param tag for $%s to the constructor\'s docblock.', $propertyName),
+            remediation: sprintf('Add an `@param SomeType $%s Description.` tag to the constructor\'s docblock. This rule wants content, not boilerplate - the description should answer "what does the caller need to satisfy for this promoted property."', $propertyName),
             metadata:    [
                 'propertyName' => $propertyName,
                 'kind' => 'promoted',

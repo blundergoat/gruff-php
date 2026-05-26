@@ -356,6 +356,30 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify identifier quality skips the lone parameter of single-arg wide-typed non-void helpers.
+     *
+     * @return void
+     */
+    public function testIdentifierQualitySkipsGenericByPurposeHelpers(): void
+    {
+        $findings = $this->analyseRule('identifier-quality-generic-helpers.php', IdentifierQualityRule::ID);
+        $symbols  = [];
+        foreach ($findings as $finding) {
+            $name           = $finding->metadata['identifierName'] ?? null;
+            $symbol         = $finding->symbol ?? '';
+            if (is_string($name)) {
+                $symbols[] = sprintf('%s|%s', $symbol, $name);
+            }
+        }
+
+        self::assertNotContains('GenericByPurposeHelperFixture::stringValue()|value', $symbols);
+        self::assertNotContains('GenericByPurposeHelperFixture::fingerprint()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::tag()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::transform()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::describe()|value', $symbols);
+    }
+
+    /**
      * Verify identifier quality metadata is specific.
      *
      * @return void

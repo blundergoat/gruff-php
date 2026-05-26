@@ -64,17 +64,14 @@ final class InitCommand extends Command
     ];
 
     /**
-     * Universal-programming abbreviations seeded into fresh configs so the
-     * first scan does not flood naming.abbreviation-allowlist with terms a
-     * maintainer would never bother to allowlist by hand. Project-specific
-     * vocabulary (domain acronyms) should be appended to this list in the
-     * user's config rather than added here.
+     * Universal-programming abbreviations seeded into fresh configs. Sourced from
+     * `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS` so the runtime default and the
+     * scaffolded init file stay in lockstep; the constant lives on `AnalysisConfig` because
+     * the runtime default is the source of truth and init is just a reflection of it.
      *
      * @var list<string>
      */
-    private const DEFAULT_ACCEPTED_ABBREVIATIONS = [
-        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
-    ];
+    private const DEFAULT_ACCEPTED_ABBREVIATIONS = AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS;
 
     /**
      * Register init CLI options and metadata.

@@ -66,7 +66,7 @@ final readonly class EnumCandidateRule implements RuleInterface
                 continue;
             }
 
-            if (!$this->allScalarConstants($constants)) {
+            if (!$this->allConstantsShareOneBackedEnumType($constants)) {
                 continue;
             }
 
@@ -93,18 +93,24 @@ final readonly class EnumCandidateRule implements RuleInterface
 
     /**
      * @param list<Stmt\ClassConst> $constants
-     * @return bool True when every constant value is a string or integer scalar.
+     * @return bool True when every constant value is a string-or-integer scalar AND every constant in the group is of the same backed-enum scalar type.
      */
-    private function allScalarConstants(array $constants): bool
+    private function allConstantsShareOneBackedEnumType(array $constants): bool
     {
+        $observedScalarTypes = [];
+
         foreach ($constants as $constantGroup) {
             foreach ($constantGroup->consts as $constant) {
-                if (!$constant->value instanceof Scalar\String_ && !$constant->value instanceof Scalar\Int_) {
+                if ($constant->value instanceof Scalar\String_) {
+                    $observedScalarTypes['string'] = true;
+                } elseif ($constant->value instanceof Scalar\Int_) {
+                    $observedScalarTypes['int'] = true;
+                } else {
                     return false;
                 }
             }
         }
 
-        return true;
+        return count($observedScalarTypes) === 1;
     }
 }

@@ -101,7 +101,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             foreach ($this->bareVarAnnotations($docText) as $variable) {
                 $findings[] = new Finding(
                     ruleId:      $definition->id,
-                    message:     sprintf('@var assertion for $%s must explain why the asserted type is needed.', $variable),
+                    message:     sprintf('@var assertion for $%s needs a brief reason after the variable name (one plain-English clause; not a restatement of the asserted type).', $variable),
                     filePath:    $analysisUnit->file->displayPath,
                     line:        $doc->getStartLine(),
                     severity:    $definition->defaultSeverity,
@@ -109,7 +109,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
                     tier:        $definition->tier,
                     confidence:  $definition->confidence,
                     symbol:      '$' . $variable,
-                    remediation: sprintf('Add a short reason after $%s in the @var annotation.', $variable),
+                    remediation: sprintf('Add a short reason after $%s in the @var annotation (e.g. `@var SomeType $%s Why this narrow type holds here.`). This rule wants content, not boilerplate - the reason should answer "why is this assertion safe here, what invariant guarantees the type."', $variable, $variable),
                     metadata:    ['variable' => $variable],
                 );
             }

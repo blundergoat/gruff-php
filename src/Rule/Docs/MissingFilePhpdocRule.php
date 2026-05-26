@@ -146,7 +146,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         return [
             new Finding(
                 ruleId:      $definition->id,
-                message:     sprintf('File %s has no file-level docblock.', $analysisUnit->file->displayPath),
+                message:     sprintf('File %s needs a brief intent description at the top (one plain-English line; not a restatement of the filename or namespace).', $analysisUnit->file->displayPath),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        1,
                 severity:    $definition->defaultSeverity,
@@ -154,7 +154,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $analysisUnit->file->displayPath,
-                remediation: 'Add a file-level docblock describing the file\'s purpose, or document the file\'s single declared type with a class-level docblock.',
+                remediation: 'Add a one-line `/** Description. */` block at the top of the file or on the single declared type. This rule wants content, not boilerplate - if your project policy is "no comments", that policy is about avoiding comments that restate code, not about removing documentation.',
                 metadata:    [
                     'firstStatementKind' => $this->statementKind($first),
                 ],

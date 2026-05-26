@@ -117,6 +117,10 @@ final readonly class RedundantVariableRule implements RuleInterface
             return;
         }
 
+        if ($this->hasPhpStanNarrowingTag($assignment, $returnStatement, $assignedVariable->name)) {
+            return;
+        }
+
         $findings[] = new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
@@ -142,5 +146,19 @@ final readonly class RedundantVariableRule implements RuleInterface
         foreach (StmtChildVisitor::childBlocks($statement) as $block) {
             $this->checkBlock($block->statements, $analysisUnit, $definition, $findings);
         }
+    }
+
+    private function hasPhpStanNarrowingTag(Stmt $assignment, Stmt $returnStatement, string $variableName): bool
+    {
+        $pattern = '/@(?:var|phpstan-var|psalm-var)\s+\S+\s+\$' . preg_quote($variableName, '/') . '\b/';
+
+        foreach ([$returnStatement, $assignment] as $statement) {
+            $docComment = $statement->getDocComment();
+            if ($docComment !== null && preg_match($pattern, $docComment->getText()) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
