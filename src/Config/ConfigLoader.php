@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -27,6 +28,22 @@ final readonly class ConfigLoader
      * Legacy default config file name accepted during the config rename.
      */
     public const LEGACY_DEFAULT_CONFIG_FILE = '.gruff.yaml';
+
+    /**
+     * Canonical schema version accepted as the top-level `schemaVersion:` value.
+     */
+    public const SCHEMA_VERSION = 'gruff-php.config.v0.1';
+
+    /**
+     * Gating commands accepted as `minimumSeverity:` keys. Commands not in this
+     * list (summary, init, list-rules) do not gate exit code; rejecting them at
+     * load time prevents the silent-no-op footgun where a user sets
+     * `minimumSeverity.summary: error` expecting CI to fail but never sees a
+     * non-zero exit. See ADR-015.
+     *
+     * @var list<string>
+     */
+    public const GATING_COMMANDS = ['analyse', 'report', 'dashboard'];
 
     /**
      * Create a loader for a project root with an optional package config fallback.
@@ -155,8 +172,10 @@ final readonly class ConfigLoader
     {
         $rootConfig = $this->readRootConfig($path);
         $this->assertKnownRootKeys($rootConfig);
+        $this->assertSchemaVersion($rootConfig);
 
         $config = $this->applyMinimumPhpVersion($config, $rootConfig);
+        $config = $this->applyMinimumSeverityConfig($config, $rootConfig);
         $config = $this->applyPathConfig($config, $rootConfig);
         $config = $this->applyAllowlistConfig($config, $rootConfig);
         $config = $this->applySelectionConfig($config, $registry, $rootConfig);
@@ -192,10 +211,103 @@ final readonly class ConfigLoader
     private function assertKnownRootKeys(array $rootConfig): void
     {
         foreach (array_keys($rootConfig) as $rootKey) {
-            if (!in_array($rootKey, ['rules', 'minimumPhpVersion', 'paths', 'allowlists', 'selection'], true)) {
+            if (!in_array($rootKey, ['schemaVersion', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'paths', 'allowlists', 'selection'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }
+    }
+
+    /**
+     * Hard-error when the top-level `schemaVersion:` field is missing, the
+     * wrong type, or names an unexpected version. ADR-015 introduces this
+     * field in 0.1.4 as a required key with a single accepted value; the
+     * hard-error path is the intentional UX per the pre-public-adoption
+     * schema window.
+     *
+     * @param ConfigObject $rootConfig
+     *
+     * @return void
+     */
+    private function assertSchemaVersion(array $rootConfig): void
+    {
+        if (!array_key_exists('schemaVersion', $rootConfig)) {
+            throw new ConfigException(sprintf(
+                'Config key "schemaVersion" is required. Add \'schemaVersion: %s\' to the top of .gruff-php.yaml, or regenerate with \'gruff-php init --force\'.',
+                self::SCHEMA_VERSION,
+            ));
+        }
+
+        $rawVersion = $rootConfig['schemaVersion'];
+        if (!is_string($rawVersion)) {
+            throw new ConfigException('Config key "schemaVersion" must be a string.');
+        }
+
+        if ($rawVersion !== self::SCHEMA_VERSION) {
+            throw new ConfigException(sprintf(
+                'Config key "schemaVersion" must be "%s". Got "%s". Update .gruff-php.yaml or regenerate with \'gruff-php init --force\'.',
+                self::SCHEMA_VERSION,
+                $rawVersion,
+            ));
+        }
+    }
+
+    /**
+     * Validate and apply the optional `minimumSeverity:` block. Rejects every
+     * non-gating command key (including summary, init, list-rules) and every
+     * non-canonical threshold value with a clear error. See ADR-015 for the
+     * rejection rationale.
+     *
+     * @param ConfigObject $rootConfig
+     *
+     * @return AnalysisConfig Config with the per-command minimumSeverity map applied.
+     */
+    private function applyMinimumSeverityConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('minimumSeverity', $rootConfig)) {
+            return $config;
+        }
+
+        $entries = $rootConfig['minimumSeverity'];
+        if (!is_array($entries) || ($entries !== [] && array_is_list($entries))) {
+            throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
+        }
+
+        $resolved = [];
+        foreach ($entries as $command => $rawValue) {
+            if (!is_string($command)) {
+                throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
+            }
+
+            if (!in_array($command, self::GATING_COMMANDS, true)) {
+                throw new ConfigException(sprintf(
+                    'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
+                    $command,
+                    implode(', ', self::GATING_COMMANDS),
+                ));
+            }
+
+            if (!is_string($rawValue)) {
+                throw new ConfigException(sprintf(
+                    'Config key "minimumSeverity.%s" must be a string. Got %s.',
+                    $command,
+                    get_debug_type($rawValue),
+                ));
+            }
+
+            $threshold = FailThreshold::fromInput($rawValue);
+            if ($threshold === null) {
+                throw new ConfigException(sprintf(
+                    'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
+                    $command,
+                    $rawValue,
+                    implode(', ', array_map(static fn (FailThreshold $case): string => $case->value, FailThreshold::cases())),
+                ));
+            }
+
+            $resolved[$command] = $threshold;
+        }
+
+        return $config->withMinimumSeverity($resolved);
     }
 
     /**

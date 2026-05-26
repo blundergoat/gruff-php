@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Input\InputInterface;
 
@@ -33,7 +35,7 @@ final class DashboardStateFactory
             'project' => $projectRoot,
             'paths' => $pathState,
             'scanScope' => $input->hasParameterOption('--diff', true) ? 'diff' : 'full',
-            'failOn' => $this->optionalStringOption($input, 'fail-on') ?? 'none',
+            'failOn' => $this->resolveDashboardFailOn($input),
             'config' => $this->optionalStringOption($input, 'config') ?? ConfigLoader::DEFAULT_CONFIG_FILE,
             'baseline' => $baseline,
             'noBaseline' => (bool) $input->getOption('no-baseline') ? '1' : '0',
@@ -135,6 +137,56 @@ final class DashboardStateFactory
         $realPath = realpath($path);
 
         return is_string($realPath) && is_dir($realPath) ? $realPath : null;
+    }
+
+    /**
+     * Apply ADR-015 precedence to the dashboard's initial-state --fail-on value.
+     *
+     * Explicit CLI flag > config.minimumSeverity.dashboard > binary default `none`.
+     * M12 will extend this through the form rendering and round-trip; M11 only
+     * fixes the initial-state default-source chain.
+     *
+     * @param InputInterface $input Console input for the dashboard command.
+     * @return string Resolved threshold suitable for the form's initial value.
+     */
+    private function resolveDashboardFailOn(InputInterface $input): string
+    {
+        if ($input->hasParameterOption('--fail-on', true)) {
+            return $this->optionalStringOption($input, 'fail-on') ?? 'none';
+        }
+
+        return $this->loadConfigFailThreshold($input) ?? 'none';
+    }
+
+    /**
+     * Load the project config (best-effort) and read `minimumSeverity.dashboard`.
+     *
+     * Config errors are swallowed because the dashboard server re-loads the
+     * same config for every request; this lookup just seeds the initial form
+     * value. Returning null lets the caller fall back to the binary default.
+     *
+     * @param InputInterface $input Console input for the dashboard command.
+     * @return string|null Resolved threshold string, or null when unavailable.
+     */
+    private function loadConfigFailThreshold(InputInterface $input): ?string
+    {
+        if ((bool) $input->getOption('no-config')) {
+            return null;
+        }
+
+        $projectRoot = getcwd();
+        if ($projectRoot === false) {
+            return null;
+        }
+
+        try {
+            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
+                ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
+        } catch (ConfigException) {
+            return null;
+        }
+
+        return $config->failThresholdFor('dashboard')?->value;
     }
 
     /**

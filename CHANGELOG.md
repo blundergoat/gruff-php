@@ -5,6 +5,17 @@ All notable changes to `gruff-php` are documented here. Follows
 Development builds report a `-dev` suffix until `scripts/bump-version.sh`
 stamps the tag.
 
+## [Unreleased]
+
+Introduce the per-command `minimumSeverity:` config dimension cross-port-aligned with gruff-go 0.1.2 (ADR-010), formalise the `schemaVersion:` field that pre-M11 configs lacked, and lower the `analyse` binary `--fail-on` default to match the cross-port philosophy. See [ADR-015](.goat-flow/decisions/ADR-015-per-command-minimum-severity.md).
+
+- **Breaking:** `.gruff-php.yaml` now requires a top-level `schemaVersion: gruff-php.config.v0.1` field. Configs missing the key fail to load with a migration hint pointing at `gruff-php init --force`. Pre-public-adoption schema window per ADR-015; the hard-error path is the intentional UX.
+- **Breaking:** the `analyse` command's binary `--fail-on` default lowered from `error` to `advisory`, matching the cross-port "show everything, fail on anything for gating commands" philosophy. Projects relying on the prior default see exit code 1 from warning- and advisory-tier findings that previously exited 0. Pass `--fail-on error` to restore the old behaviour, or set `minimumSeverity.analyse: error` in `.gruff-php.yaml`.
+- **Added:** `minimumSeverity:` per-command exit-code threshold block in `.gruff-php.yaml`. Keys: `analyse | report | dashboard`. Values: `advisory | warning | error | none`. The validator rejects every non-gating command key (including `summary`, `init`, `list-rules`) with a useful error naming the valid keys, and rejects every non-canonical value (including the gruff-go alias `never`) with the four accepted values listed. Precedence: explicit CLI `--fail-on` flag > `minimumSeverity.<cmd>` YAML > binary default. Aligned with gruff-go 0.1.2's `minimumSeverity` shape; both ports converged on `none` as the off-switch value. Intentional cross-port divergence: gruff-php validates 3 gating commands; gruff-go validates 4 (PHP's `summary` does not gate exit code).
+- **Added:** `AnalysisConfig::failThresholdFor(string $command): ?FailThreshold` exposes the per-command override to CLI consumers, returning null when the command has no entry. `AnalyseCommandSetupBuilder`, `ReportCommand`, and `DashboardStateFactory` consult this accessor before falling back to their respective binary defaults (`advisory`, `none`, `none`).
+- **Added:** `ConfigLoader::SCHEMA_VERSION` and `ConfigLoader::GATING_COMMANDS` constants single-source the canonical schema-version literal and the valid `minimumSeverity:` keys for the validator, init scaffold, and docs.
+- **Tests:** `tests/Reporting/FailThresholdTest.php` locks the `FailThreshold::fromInput` parser contract (acceptance of the four canonical values, rejection of every banned alias) plus the full `isTriggeredBy` matrix. `tests/Console/AnalyseMinimumSeverityPrecedenceTest.php` covers the precedence chain end-to-end (config-supplied error threshold suppresses warning-tier exit; CLI `--fail-on warning` overrides; binary default fails on advisory findings).
+
 ## 0.1.4 - 2026-05-25
 
 Retire the `naming.parameter-type-name` rule, refresh reporter pillar

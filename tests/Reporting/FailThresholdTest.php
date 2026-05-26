@@ -17,37 +17,45 @@ final class FailThresholdTest extends TestCase
     /**
      * Each canonical CLI value parses into the matching enum case.
      *
+     * @param string        $rawInput Raw CLI value supplied to FailThreshold::fromInput.
+     * @param FailThreshold $expected Enum case the parser must return for the canonical value.
      * @return void
      */
     #[DataProvider('canonicalValuesProvider')]
-    public function testFromInputAcceptsCanonicalValue(string $value, FailThreshold $expected): void
+    public function testFromInputAcceptsCanonicalValue(string $rawInput, FailThreshold $expected): void
     {
-        self::assertSame($expected, FailThreshold::fromInput($value));
+        self::assertSame($expected, FailThreshold::fromInput($rawInput));
     }
 
     /**
      * Banned aliases, case variants, and the empty string return null.
      *
+     * @param string $rawInput Raw CLI value the parser must reject as unsupported.
      * @return void
      */
     #[DataProvider('rejectedValuesProvider')]
-    public function testFromInputRejectsBannedValue(string $value): void
+    public function testFromInputRejectsBannedValue(string $rawInput): void
     {
-        self::assertNull(FailThreshold::fromInput($value));
+        self::assertNull(FailThreshold::fromInput($rawInput));
     }
 
     /**
      * isTriggeredBy returns the documented value for every threshold/severity pair.
      *
+     * @param FailThreshold $threshold     Threshold under test.
+     * @param Severity      $severity      Finding severity compared against the threshold.
+     * @param bool          $shouldTrigger Expected isTriggeredBy result for this pair.
      * @return void
      */
     #[DataProvider('triggerMatrixProvider')]
-    public function testIsTriggeredBy(FailThreshold $threshold, Severity $severity, bool $expected): void
+    public function testIsTriggeredBy(FailThreshold $threshold, Severity $severity, bool $shouldTrigger): void
     {
-        self::assertSame($expected, $threshold->isTriggeredBy($severity));
+        self::assertSame($shouldTrigger, $threshold->isTriggeredBy($severity));
     }
 
     /**
+     * Canonical CLI fail-on values paired with the enum case the parser must return.
+     *
      * @return iterable<string, array{string, FailThreshold}>
      */
     public static function canonicalValuesProvider(): iterable
@@ -59,6 +67,8 @@ final class FailThresholdTest extends TestCase
     }
 
     /**
+     * Inputs the parser must reject as unsupported (banned aliases, case variants, empty string).
+     *
      * @return iterable<string, array{string}>
      */
     public static function rejectedValuesProvider(): iterable
@@ -79,6 +89,8 @@ final class FailThresholdTest extends TestCase
     }
 
     /**
+     * Every (threshold, severity) pair paired with the documented isTriggeredBy result.
+     *
      * @return iterable<string, array{FailThreshold, Severity, bool}>
      */
     public static function triggerMatrixProvider(): iterable

@@ -1,4 +1,6 @@
 schemaVersion: gruff-php.config.v0.1
+minimumSeverity:
+    analyse: error
 rules:
     size.file-length:
         threshold: 3

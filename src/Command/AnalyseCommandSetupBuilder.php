@@ -136,6 +136,7 @@ final readonly class AnalyseCommandSetupBuilder
         if ($configResult instanceof AnalysisReport) {
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
+        $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $profileRuleSelection = $options->profileRuleSelection();
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
@@ -169,13 +170,33 @@ final readonly class AnalyseCommandSetupBuilder
     }
 
     /**
+     * Apply ADR-015 precedence to the parsed --fail-on value.
+     *
+     * @param InputInterface $input             Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config            Loaded analysis config supplying per-command overrides.
+     * @param FailThreshold  $explicitOrDefault Already-parsed CLI value; binary default when --fail-on omitted.
+     * @return FailThreshold Resolved threshold honouring CLI > config > binary precedence.
+     */
+    private function resolveFailThresholdWithConfig(
+        InputInterface $input,
+        AnalysisConfig $config,
+        FailThreshold $explicitOrDefault,
+    ): FailThreshold {
+        if ($input->hasParameterOption('--fail-on', true)) {
+            return $explicitOrDefault;
+        }
+
+        return $config->failThresholdFor('analyse') ?? $explicitOrDefault;
+    }
+
+    /**
      * Parse the requested failure threshold.
      *
      * @return FailThreshold|string Parsed threshold, or the unsupported raw value.
      */
     private function failThreshold(mixed $optionValue): FailThreshold|string
     {
-        $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Error->value;
+        $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }

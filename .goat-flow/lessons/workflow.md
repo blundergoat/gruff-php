@@ -1,9 +1,30 @@
 ---
 category: workflow
-last_reviewed: 2026-05-25
+last_reviewed: 2026-05-26
 ---
 
 # Workflow Lessons
+
+## Lesson: When introducing a required config field, auto-inject in the test helper rather than patching every fixture
+
+**Created:** 2026-05-26
+
+**Incident:** M11 introduced `schemaVersion: gruff-php.config.v0.1` as a required top-level field in `.gruff-php.yaml`, with `ConfigLoader::assertSchemaVersion` hard-erroring on missing/wrong values. The change was small (~10 lines of validator logic) but the blast radius surprised: 19 fixture configs in `tests/Fixtures/Config/`, the project's own `.gruff-php.yaml`, three inline `file_put_contents($path, "rules: {}\n")` calls in dashboard scan tests, four direct `file_put_contents` calls in `ConfigLoaderTest`, and every entry in `ConfigLoaderTest::invalidInlineConfigProvider` all loaded configs that now lacked `schemaVersion`. First test run after the validator landed: 24 errors + 51 failures, with most error messages identical (the migration hint) — a clear signal the schemaVersion guard was firing before any test could reach its actual assertion.
+
+The instinct was to patch each fixture and each inline write individually. Quick math: 19 + 1 + 3 + 4 = 27 file-level changes plus 11 data-provider entry rewrites = ~38 separate edits. Many would be near-duplicates, and the inline JSON in `invalidInlineConfigProvider` would either need every test case to grow a `"schemaVersion":"gruff-php.config.v0.1"` prefix or get bypassed via a parallel data path.
+
+Better approach taken: extend `ConfigLoaderTestCase::writeTempConfig` with an auto-inject helper that prepends `schemaVersion` whenever the contents don't already contain the string. `bash`/`sed` bulk-prepended the 19 fixture files in one loop; three `file_put_contents` callsites got two `Edit` calls (one used `replace_all` because two writes were identical); four direct-write tests in `ConfigLoaderTest` got four `Edit` calls. The data provider needed zero changes — auto-inject handled every case. Total: roughly 8 file-level changes instead of 38.
+
+The auto-inject also kept the migration reversible: tests that intentionally test the missing-schemaVersion error path pass `shouldInjectSchemaVersion: false` to bypass the helper, so the same `writeTempConfig` powers both the "schemaVersion is auto-included for legacy tests" path and the "schemaVersion is deliberately absent so we can test the error" path.
+
+**Do differently:** When a required schema field lands behind a hard-error validator and dozens of test fixtures need to acquire it:
+
+- Identify the single test helper that constructs config files (in gruff-php this is `ConfigLoaderTestCase::writeTempConfig`; gruff-go's equivalent is the per-test inline `file_put_contents` pattern, which would benefit from a similar helper).
+- Add an opt-out parameter (e.g. `bool $shouldInjectSchemaVersion = true`) so the auto-inject is the default but tests that exercise the missing-field error path can disable it.
+- Bulk-prepend the field to long-tail YAML fixtures via `sed -i '1i ...'`. Verify with `head -2` on a sample file before declaring the migration complete.
+- For inline JSON in data providers, the auto-inject helper detects the leading `{`, `json_decode`s, prepends the field, and `json_encode`s the result. No data-provider entry changes needed.
+
+The fixture-per-field migration cost is roughly linear in the number of fixtures, but the helper-level auto-inject is roughly constant. The opt-out parameter is the seam that makes both paths testable.
 
 ## Lesson: Never replace hand-maintained project config with generated defaults
 

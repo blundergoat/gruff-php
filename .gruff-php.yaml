@@ -1,3 +1,4 @@
+schemaVersion: gruff-php.config.v0.1
 # .gruff-php.yaml
 # Project self-scan policy. Seeded from `gruff-php init`, then tuned for this repository.
 # Preserve paths.ignore, allowlists, thresholds, and path-specific test-quality exceptions when regenerating.

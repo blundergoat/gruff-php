@@ -25,6 +25,8 @@ final class AnalyseCliTest extends CliTestCase
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--no-config',
+            '--fail-on',
+            'error',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -108,6 +110,8 @@ final class AnalyseCliTest extends CliTestCase
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
             'tests/Fixtures/Config/file-length-warning.yaml',
+            '--fail-on',
+            'error',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -180,6 +184,8 @@ final class AnalyseCliTest extends CliTestCase
             'tests/Fixtures/Config/file-length-warning.yaml',
             '--format',
             'json',
+            '--fail-on',
+            'error',
         ], __DIR__ . '/../..');
         $process->run();
 

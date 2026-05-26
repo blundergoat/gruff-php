@@ -49,7 +49,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(142, $units);
+        self::assertCount(143, $units);
         self::assertCount(2225, $findings);
         self::assertSame(
             'a6227f563bfa1cadd87d' . '5b9fa1f0039b92ce9c78e1b877e1105497633f199404',
