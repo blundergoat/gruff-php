@@ -64,9 +64,10 @@ final class HtmlReporterTest extends TestCase
         $html = (new HtmlReporter())->render($analysisReport);
 
         self::assertStringContainsString('<section class="verdict">', $html);
-        self::assertStringContainsString('pillar grades', $html);
+        self::assertStringContainsString('<section class="pillars">', $html);
         self::assertStringContainsString('top offenders', $html);
-        self::assertStringContainsString('<h2 class="section-head">pillar grades', $html);
+        self::assertStringContainsString('<h2 class="section-head">pillars <span class="aside">weighted composite</span></h2>', $html);
+        self::assertStringContainsString('<table class="pillar-list">', $html);
         self::assertStringContainsString('<h3 class="rule">docs.missing-public-phpdoc</h3>', $html);
         self::assertStringContainsString('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;', $html);
         self::assertStringContainsString('src/&lt;bad&gt;.php', $html);
@@ -74,7 +75,7 @@ final class HtmlReporterTest extends TestCase
         self::assertStringNotContainsString('fonts.googleapis.com', $html);
         self::assertStringContainsString('score drivers', $html);
         self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $html);
-        self::assertStringNotContainsString('<div class="name">mutation</div>', $html);
+        self::assertStringNotContainsString('<td class="pillar-name">mutation</td>', $html);
     }
 
     /**
@@ -105,7 +106,7 @@ final class HtmlReporterTest extends TestCase
 
         self::assertStringContainsString('cyclomatic complexity · flagged methods', $html);
         self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $html);
-        self::assertStringNotContainsString('<div class="name">mutation</div>', $html);
+        self::assertStringNotContainsString('<td class="pillar-name">mutation</td>', $html);
         self::assertStringNotContainsString('MSI', $html);
     }
 
@@ -121,9 +122,9 @@ final class HtmlReporterTest extends TestCase
         self::assertStringContainsString('<div class="lbl">errors</div>', $html);
         self::assertStringContainsString('<div class="lbl">warnings</div>', $html);
         self::assertStringContainsString('<div class="lbl">advisories</div>', $html);
-        self::assertStringContainsString('<span class="key">advisories</span>', $html);
-        self::assertStringContainsString('<span class="key">warnings</span>', $html);
-        self::assertStringContainsString('<span class="key">errors</span>', $html);
+        self::assertStringContainsString('<th scope="col" class="num">advisory</th>', $html);
+        self::assertStringContainsString('<th scope="col" class="num">warning</th>', $html);
+        self::assertStringContainsString('<th scope="col" class="num">error</th>', $html);
         self::assertStringNotContainsString('blocked', $html);
         self::assertStringNotContainsString('warned', $html);
         self::assertStringNotContainsString('noted', $html);
@@ -388,9 +389,9 @@ final class HtmlReporterTest extends TestCase
         $html = (new HtmlReporter())->render($report);
 
         self::assertStringContainsString('No offenders found.', $html);
-        self::assertStringNotContainsString('<div class="name">Mutation</div>', $html);
+        self::assertStringNotContainsString('<td class="pillar-name">Mutation</td>', $html);
         self::assertStringContainsString('<li>custom score</li>', $html);
-        self::assertStringContainsString('<div class="grade n">n/a</div>', $html);
+        self::assertStringContainsString('<td class="pillar-name">documentation</td><td class="num"><span class="grade-pill n">n/a</span></td><td class="num">n/a</td>', $html);
         self::assertStringContainsString('2 methods exceed CC 10 (2 in 11-15, 0 in 16-20, 0 at 21+).', $html);
         self::assertStringContainsString('style="height:50%;"', $html);
         self::assertStringContainsString('style="height:100%;"', $html);

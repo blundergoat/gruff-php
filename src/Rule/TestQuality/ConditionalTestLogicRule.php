@@ -75,7 +75,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
                     tier:        RuleTier::V01,
                     confidence:  Confidence::High,
                     symbol:      $scope->symbol,
-                    remediation: 'Split branches into separate test cases with explicit setup and expectations.',
+                    remediation: 'Split branches into separate test cases with explicit setup and expectations. If a path exercises framework-driven matrix tests where conditional branching is unavoidable, add it to `rules.test-quality.conditional-logic.options.ignoredPathPatterns` in `.gruff-php.yaml`.',
                 );
             }
         }

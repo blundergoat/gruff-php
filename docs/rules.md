@@ -1,9 +1,18 @@
 # Gruff PHP Rules
 
+Run `vendor/bin/gruff-php list-rules <rule-id>` to see a per-rule detail view
+including the description, default options with one-line explanations,
+escape-hatch config paths (`rules.<id>.options.*`, `enabled`, `excludeFromScore`,
+etc.), and any catalogued false-positive shapes with mitigations. Pass
+`--format=json` for the same payload in structured form. A typo prints up
+to three near-match suggestions and exits with code 2.
+
+
+
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 120
+Total rules: 119
 
 ## Summary By Pillar
 
@@ -15,7 +24,7 @@ Total rules: 120
 | `documentation` | 14 |
 | `maintainability` | 2 |
 | `modernisation` | 10 |
-| `naming` | 12 |
+| `naming` | 11 |
 | `security` | 18 |
 | `sensitive-data` | 9 |
 | `size` | 7 |
@@ -79,6 +88,29 @@ Total rules: 120
 | `complexity.maintainability-index` | Maintainability index | `error` | `medium` | yes |
 | `waste.one-line-method` | One-line method | `advisory` | `medium` | yes |
 
+`waste.one-line-method` ships with `minInFileCallers: 2` and
+`namedAlternativeFactoryExempt: true`. The first skips wrappers that are
+called from two or more sites in the same file (centralising shared
+logic is the wrapper's job). The second skips public static factory
+pairs like `Money::fromCents()` / `Money::fromDollars()` that exist for
+naming clarity. These defaults match gruff-php's own self-tuning, where
+the empirical noise floor for the rule sits. Override via the per-rule
+`options` block; the `allowedSymbols` list is the per-project escape
+hatch for named helpers that intentionally stay thin.
+
+`modernisation.phpdoc-mixed-overuse` exempts two type shapes that
+legitimately carry a `mixed` leaf. First, unstructured array/list bag
+generics — `array<string, mixed>`, `list<mixed>`, `array<int,
+array<string, mixed>>` — where the rule's signal would be replacing
+"mixed" with "unknown payload" prose. Second, PHPStan/Psalm `array{...}`
+envelope shapes that name at least one sibling field with a non-mixed
+type — e.g. `array{entries: list<array<string, mixed>>, total: int|null,
+complete: bool}`. The exempted nested `mixed` describes a heterogeneous
+leaf inside a typed envelope; the surrounding shape carries the meaning
+the rule would otherwise demand. Loose shapes still fire: `array{value:
+mixed}` (single-mixed field), `array<string|int, mixed>` (mixed-keyed
+bag), `Collection<mixed>` (single-leaf generic).
+
 ### `modernisation` (10)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -94,7 +126,7 @@ Total rules: 120
 | `modernisation.public-property` | Public mutable property | `warning` | `high` | yes |
 | `modernisation.readonly-property-candidate` | Readonly property candidate | `advisory` | `medium` | yes |
 
-### `naming` (12)
+### `naming` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -106,7 +138,6 @@ Total rules: 120
 | `naming.hungarian-notation` | Hungarian notation | `advisory` | `medium` | yes |
 | `naming.identifier-quality` | Identifier quality | `advisory` | `medium` | yes |
 | `naming.negative-boolean` | Negative boolean flag | `advisory` | `medium` | yes |
-| `naming.parameter-type-name` | Parameter and variable type name | `advisory` | `medium` | yes |
 | `naming.short-variable` | Short variable name | `advisory` | `high` | yes |
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |

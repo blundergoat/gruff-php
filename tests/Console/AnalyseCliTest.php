@@ -25,11 +25,13 @@ final class AnalyseCliTest extends CliTestCase
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--no-config',
+            '--fail-on',
+            'error',
         ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff-php 0.1.3', $process->getOutput());
+        self::assertStringContainsString('gruff-php 0.2.0', $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 6', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
@@ -108,6 +110,9 @@ final class AnalyseCliTest extends CliTestCase
             'tests/Fixtures/Source/mixed/alpha.php',
             '--config',
             'tests/Fixtures/Config/file-length-warning.yaml',
+            '--fail-on',
+            'error',
+            '--no-baseline',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -180,6 +185,9 @@ final class AnalyseCliTest extends CliTestCase
             'tests/Fixtures/Config/file-length-warning.yaml',
             '--format',
             'json',
+            '--fail-on',
+            'error',
+            '--no-baseline',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -193,7 +201,7 @@ final class AnalyseCliTest extends CliTestCase
         $summary  = $report['summary'] ?? null;
         $findings = $report['findings'] ?? null;
 
-        self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
         self::assertIsArray($summary);
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
@@ -568,10 +576,11 @@ final class AnalyseCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('<section class="verdict">', $process->getOutput());
-        self::assertStringContainsString('pillar grades', $process->getOutput());
+        self::assertStringContainsString('<section class="pillars">', $process->getOutput());
+        self::assertStringContainsString('<table class="pillar-list">', $process->getOutput());
         self::assertStringContainsString('score drivers', $process->getOutput());
         self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $process->getOutput());
-        self::assertStringNotContainsString('<div class="name">mutation</div>', $process->getOutput());
+        self::assertStringNotContainsString('<td class="pillar-name">mutation</td>', $process->getOutput());
         self::assertStringNotContainsString('fonts.googleapis.com', $process->getOutput());
     }
 

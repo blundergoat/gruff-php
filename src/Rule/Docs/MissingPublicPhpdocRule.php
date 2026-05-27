@@ -80,7 +80,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
 
         return new Finding(
             ruleId:      $definition->id,
-            message:     sprintf('Method %s has no PHPDoc.', $symbol),
+            message:     sprintf('Method %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).', $symbol),
             filePath:    $analysisUnit->file->displayPath,
             line:        $classMethod->getStartLine(),
             severity:    $definition->defaultSeverity,
@@ -88,7 +88,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Add a docblock describing the method\'s purpose.',
+            remediation: 'Add a one-line `/** Description. */` block above the method. This rule wants content, not boilerplate - if your project policy is "no comments", that policy is about avoiding comments that restate code, not about removing documentation. The description should answer "what is this for, what does it return at the edge value, what must the caller satisfy."',
         );
     }
 }

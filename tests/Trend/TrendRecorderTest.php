@@ -32,7 +32,7 @@ final class TrendRecorderTest extends TestCase
         try {
             file_put_contents($root . '/history.json', json_encode([
                 [
-                    'schemaVersion' => 'gruff.analysis.v1',
+                    'schemaVersion' => 'gruff.analysis.v2',
                     'timestamp' => '2026-05-12T00:00:00+00:00',
                     'score' => 80.0,
                     'grade' => 'B',
@@ -66,7 +66,7 @@ final class TrendRecorderTest extends TestCase
             $history = [];
             for ($index = 1; $index <= 55; $index++) {
                 $history[] = [
-                    'schemaVersion' => 'gruff.analysis.v1',
+                    'schemaVersion' => 'gruff.analysis.v2',
                     'timestamp' => sprintf('2026-05-12T00:%02d:00+00:00', $index % 60),
                     'score' => (float) $index,
                     'grade' => 'D',
@@ -89,7 +89,7 @@ final class TrendRecorderTest extends TestCase
             $firstPersisted = $persisted[0] ?? null;
             self::assertIsArray($firstPersisted);
             self::assertCount(1, $persisted);
-            self::assertSame('gruff.analysis.v1', $firstPersisted['schemaVersion'] ?? null);
+            self::assertSame('gruff.analysis.v2', $firstPersisted['schemaVersion'] ?? null);
             self::assertSame(91, $firstPersisted['score'] ?? null);
             self::assertSame('A', $firstPersisted['grade'] ?? null);
             self::assertSame('full-project', $firstPersisted['scope'] ?? null);

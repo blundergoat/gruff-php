@@ -25,6 +25,8 @@ final class AnalyseCliRuntimeTest extends CliTestCase
             'tests/Fixtures/Source/mixed',
             '--no-config',
             '--print-runtime',
+            '--fail-on',
+            'error',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -66,6 +68,8 @@ final class AnalyseCliRuntimeTest extends CliTestCase
             '--no-config',
             '--print-runtime',
             '--runtime-mode=detailed',
+            '--fail-on',
+            'error',
         ], self::PROJECT_ROOT);
         $process->run();
 
@@ -108,6 +112,8 @@ final class AnalyseCliRuntimeTest extends CliTestCase
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--no-config',
+            '--fail-on',
+            'error',
         ], self::PROJECT_ROOT);
         $process->run();
 

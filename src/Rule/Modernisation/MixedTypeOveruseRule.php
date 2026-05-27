@@ -84,7 +84,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Medium,
                 symbol:      $functionLike->name->toString() . '()',
-                remediation: 'Prefer narrower value objects, unions, or documented generics when the accepted shape is known; gruff-php reports only.',
+                remediation: 'Replace `mixed` with the actual input shape. For JSON-boundary helpers (parameters consuming `json_decode` output), use `array|bool|float|int|string|null` - the supertype of any top-level decoded value. When only one input shape is meaningful, narrow further to that concrete type (`?string`, `int|float|null`, a named class).',
                 metadata:    [
                     'requiresPhp' => 8.0,
                     'locations' => $locations,

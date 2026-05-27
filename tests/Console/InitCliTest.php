@@ -249,6 +249,138 @@ final class InitCliTest extends CliTestCase
     }
 
     /**
+     * Verify the scaffold emits the canonical schemaVersion + binary-default minimumSeverity block.
+     *
+     * @return void
+     */
+    public function testInitEmitsSchemaVersionAndMinimumSeverityBlock(): void
+    {
+        $project = $this->tempDir();
+
+        try {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+            $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+            $decoded    = $this->decodedConfig($configPath);
+
+            self::assertSame('gruff-php.config.v0.1', $decoded['schemaVersion'] ?? null);
+            self::assertSame(
+                ['analyse' => 'advisory', 'report' => 'none', 'dashboard' => 'none'],
+                $decoded['minimumSeverity'] ?? null,
+            );
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --force preserves a hand-edited minimumSeverity block byte-equivalent.
+     *
+     * @return void
+     */
+    public function testInitForcePreservesExistingMinimumSeverityBlock(): void
+    {
+        $project    = $this->tempDir();
+        $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+
+        try {
+            file_put_contents($configPath, implode("\n", [
+                'schemaVersion: gruff-php.config.v0.1',
+                'minimumSeverity:',
+                '    analyse: error',
+                '    report: warning',
+                '    dashboard: warning',
+                '',
+            ]));
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--force',
+            ], $project);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+            $decoded = $this->decodedConfig($configPath);
+            self::assertSame(
+                ['analyse' => 'error', 'report' => 'warning', 'dashboard' => 'warning'],
+                $decoded['minimumSeverity'] ?? null,
+            );
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --force refuses to regenerate when the existing schemaVersion is a deliberate downgrade.
+     *
+     * @return void
+     */
+    public function testInitForceRejectsExistingDowngradedSchemaVersion(): void
+    {
+        $project    = $this->tempDir();
+        $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+
+        try {
+            file_put_contents($configPath, "schemaVersion: gruff-php.config.v0.0\n");
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--force',
+            ], $project);
+            $process->run();
+
+            self::assertNotSame(0, $process->getExitCode());
+            self::assertStringContainsString('schemaVersion', $process->getOutput() . $process->getErrorOutput());
+            self::assertStringContainsString('gruff-php.config.v0.0', $process->getOutput() . $process->getErrorOutput());
+            self::assertSame("schemaVersion: gruff-php.config.v0.0\n", file_get_contents($configPath));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify --force rejects a hand-edited block that names a non-gating command.
+     *
+     * @return void
+     */
+    public function testInitForceRejectsExistingMinimumSeverityWithNonGatingCommand(): void
+    {
+        $project    = $this->tempDir();
+        $configPath = $project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE;
+        $original   = "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    summary: error\n";
+
+        try {
+            file_put_contents($configPath, $original);
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'init',
+                '--force',
+            ], $project);
+            $process->run();
+
+            self::assertNotSame(0, $process->getExitCode());
+            self::assertStringContainsString('minimumSeverity.summary', $process->getOutput() . $process->getErrorOutput());
+            self::assertSame($original, file_get_contents($configPath));
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Write an existing config with local path-ignore policy.
      *
      * @return void
@@ -292,7 +424,9 @@ final class InitCliTest extends CliTestCase
      */
     private function assertGeneratedConfigShape(array $decoded): void
     {
+        self::assertArrayHasKey('schemaVersion', $decoded);
         self::assertArrayHasKey('minimumPhpVersion', $decoded);
+        self::assertArrayHasKey('minimumSeverity', $decoded);
         self::assertArrayHasKey('paths', $decoded);
         self::assertArrayHasKey('allowlists', $decoded);
         self::assertArrayHasKey('selection', $decoded);

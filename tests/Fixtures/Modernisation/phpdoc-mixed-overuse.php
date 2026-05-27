@@ -322,6 +322,69 @@ final class PhpDocMixedOveruseFixture
     {
         return true;
     }
+
+    /**
+     * Precise envelope: `array{...}` shape with mixed-positive sibling fields.
+     * The nested mixed describes a heterogeneous leaf inside a typed envelope.
+     *
+     * @return array{entries: list<array<string, mixed>>, total: int|null, complete: bool}
+     */
+    public function preciseArrayShapeWithMixedLeaf(): array
+    {
+        return ['entries' => [], 'total' => 0, 'complete' => true];
+    }
+
+    /**
+     * Precise envelope: optional-key shape with concrete sibling.
+     *
+     * @return array{value?: mixed, kind: string}
+     */
+    public function preciseArrayShapeOptionalMixed(): array
+    {
+        return ['kind' => 'unset'];
+    }
+
+    /**
+     * Not precise: shape with only a single mixed field still fires.
+     *
+     * @return array{onlyValue: mixed}
+     */
+    public function arrayShapeWithOnlyMixedFieldStillFires(): array
+    {
+        return ['onlyValue' => null];
+    }
+
+    /**
+     * Not precise: empty shape still fires when somehow paired with a mixed token.
+     * The lookup is on the body string, so a stray `mixed` after the shape
+     * counts as a candidate type the rule should flag.
+     *
+     * @return array{}|mixed
+     */
+    public function emptyShapeUnionMixedStillFires(): array
+    {
+        return [];
+    }
+
+    /**
+     * Not precise: `array<string|int, mixed>` is a bag, not an envelope.
+     *
+     * @return array<string|int, mixed>
+     */
+    public function mixedKeyedBagStillFires(): array
+    {
+        return [];
+    }
+
+    /**
+     * Not precise: `Collection<mixed>` is a single-leaf generic, not a shape.
+     *
+     * @return Collection<mixed>
+     */
+    public function collectionMixedStillFires(): Collection
+    {
+        return new Collection();
+    }
 }
 
 /**

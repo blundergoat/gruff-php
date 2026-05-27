@@ -154,13 +154,34 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             }
 
             foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Expr\Assign::class) as $assign) {
-                $name = ModernisationNodeHelper::propertyFetchName($assign->var);
-                if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($assign->var)) {
-                    $assignments[$name] = true;
+                $this->recordPropertyMutation($assign->var, $assignments);
+            }
+
+            foreach ($nodeFinder->findInstanceOf($method->stmts ?? [], Stmt\Unset_::class) as $unset) {
+                foreach ($unset->vars as $unsetTarget) {
+                    $this->recordPropertyMutation($unsetTarget, $assignments);
                 }
             }
         }
 
         return $assignments;
+    }
+
+    /**
+     * Walk through any chain of array-index fetches and record the underlying `$this` property mutation.
+     *
+     * @param array<string, true> &$assignments
+     */
+    private function recordPropertyMutation(Expr $expr, array &$assignments): void
+    {
+        $target = $expr;
+        while ($target instanceof Expr\ArrayDimFetch) {
+            $target = $target->var;
+        }
+
+        $name = ModernisationNodeHelper::propertyFetchName($target);
+        if ($name !== null && ModernisationNodeHelper::isThisPropertyFetch($target)) {
+            $assignments[$name] = true;
+        }
     }
 }

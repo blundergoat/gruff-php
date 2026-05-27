@@ -11,13 +11,12 @@ use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
+use GruffPhp\Rule\Modernisation\ModernisationNodeHelper;
 use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
-use PhpParser\Node\Expr\ArrowFunction;
-use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Class_;
@@ -126,6 +125,23 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 'loopBodyThreshold' => 4,
             ],
             description: 'Catches placeholder, generic, and numbered identifiers that obscure intent.',
+            optionDescriptions: [
+                'placeholderNames' => 'Names treated as obviously placeholder (foo, bar, baz, tmp, temp).',
+                'genericTokens' => 'Tokens treated as generic when used as the whole identifier (data, entry, info, item).',
+                'ignoredNames' => 'Names exempt from all checks (loop counters, exception variables, $_).',
+                'minScopeReferences' => 'Minimum local-variable references before reporting generic names.',
+                'loopBodyThreshold' => 'Foreach body statement count above which generic loop names report.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'Short loop bodies that use a conventional generic name ($entry, $item, $row) when iterating a payload.',
+                    'mitigation' => 'Keep the loop body at or below loopBodyThreshold (default 4) statements, or add the name to options.ignoredNames.',
+                ],
+                [
+                    'shape' => 'Single-parameter helpers whose role is intentionally generic (mixed → string converters, JSON-boundary helpers).',
+                    'mitigation' => 'Single-parameter mixed-type helpers are skipped; rename multi-parameter helpers to describe their domain role.',
+                ],
+            ],
         );
     }
 
@@ -295,8 +311,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function parameterFindings(IdentifierFindingContext $findingContext, FunctionLikeScope $scope): array
     {
-        $findings = [];
-        $symbol   = $this->symbol($scope);
+        $findings              = [];
+        $symbol                = $this->symbol($scope);
+        $skipGenericComplaints = $this->isGenericByPurposeHelper($scope);
 
         foreach ($scope->node->params as $param) {
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -311,12 +328,50 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 symbol:                   $symbol,
             );
 
-            if ($finding instanceof Finding) {
-                $findings[] = $finding;
+            if (!$finding instanceof Finding) {
+                continue;
             }
+
+            if ($skipGenericComplaints && ($finding->metadata['variant'] ?? null) === 'generic') {
+                continue;
+            }
+
+            $findings[] = $finding;
         }
 
         return $findings;
+    }
+
+    /**
+     * Detect a single-parameter, wide-typed, non-`void`-returning helper whose sole parameter
+     * legitimately needs a generic name. The shape covers helpers like
+     * `private static function stringValue(mixed $value): string` whose intent is "coerce anything
+     * into the documented return type"; a generic parameter name (`$value`) is the right name there.
+     */
+    private function isGenericByPurposeHelper(FunctionLikeScope $scope): bool
+    {
+        $node = $scope->node;
+        if (!$node instanceof ClassMethod && !$node instanceof Function_) {
+            return false;
+        }
+
+        if (count($node->params) !== 1) {
+            return false;
+        }
+
+        if (ModernisationNodeHelper::typeName($node->returnType) === 'void') {
+            return false;
+        }
+
+        $type = $node->params[0]->type;
+
+        if ($type instanceof Node\UnionType && count($type->types) >= 3) {
+            return true;
+        }
+
+        $typeName = ModernisationNodeHelper::typeName($type);
+
+        return $typeName === 'mixed' || $typeName === 'scalar';
     }
 
     /**
@@ -454,7 +509,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             tier:        $identifierFindingContext->definition->tier,
             confidence:  $identifierFindingContext->definition->confidence,
             symbol:      $symbol,
-            remediation: 'Rename the identifier to describe its domain role or action.',
+            remediation: 'Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.',
             metadata:    [
                 'identifierKind' => $kind,
                 'identifierName' => $name,
@@ -680,8 +735,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
     {
+        $walker = new IdentifierAstWalker();
         foreach ($nodes as $node) {
-            foreach ($this->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
+            foreach ($walker->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
                 if ($variable instanceof Variable && is_string($variable->name)) {
                     $variables[$variable->name] = true;
                 }
@@ -704,80 +760,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         return $matches;
-    }
-
-    /**
-     * @param list<Node>           $nodes     Roots to traverse.
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @return list<Node> Descendant nodes that match the predicate.
-     */
-    private function nodesMatching(array $nodes, callable $predicate): array
-    {
-        $matches = [];
-
-        foreach ($nodes as $node) {
-            $this->collectMatchingNodes($node, $predicate, $matches);
-        }
-
-        return $matches;
-    }
-
-    /**
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @param list<Node>           $matches   Output list of matching descendant nodes.
-     * @return void
-     */
-    private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
-    {
-        if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
-            return;
-        }
-
-        if ($predicate($node)) {
-            $matches[] = $node;
-        }
-
-        foreach ($this->childNodes($node) as $child) {
-            $this->collectMatchingNodes($child, $predicate, $matches);
-        }
-    }
-
-    /**
-     * List direct child nodes that can be recursively traversed.
-     *
-     * @return list<Node>
-     */
-    private function childNodes(Node $node): array
-    {
-        $children = [];
-
-        foreach ($node->getSubNodeNames() as $name) {
-            $this->collectChildNodes($node->{$name}, $children);
-        }
-
-        return $children;
-    }
-
-    /**
-     * Append traversable child nodes to the current collection.
-     *
-     * @param list<Node> $children
-     * @return void
-     */
-    private function collectChildNodes(mixed $subNode, array &$children): void
-    {
-        if ($subNode instanceof Node) {
-            $children[] = $subNode;
-            return;
-        }
-
-        if (!is_array($subNode)) {
-            return;
-        }
-
-        foreach ($subNode as $childSubNode) {
-            $this->collectChildNodes($childSubNode, $children);
-        }
     }
 
     /**

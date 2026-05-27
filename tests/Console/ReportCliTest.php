@@ -95,7 +95,7 @@ final class ReportCliTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         $report = $this->decodeJsonOutput($process);
-        self::assertSame('gruff.analysis.v1', $report['schemaVersion'] ?? null);
+        self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
     }
 
     /**

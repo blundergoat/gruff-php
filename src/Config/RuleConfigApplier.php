@@ -83,6 +83,7 @@ final readonly class RuleConfigApplier
                 : $this->thresholds($ruleId, $ruleConfig, $registry, $settings->thresholds),
             options:           $this->options($ruleId, $ruleConfig, $registry, $settings->options),
             severityThreshold: $severityThreshold,
+            excludeFromScore:  $this->excludeFromScore($ruleId, $ruleConfig, $settings->excludeFromScore),
         ));
     }
 
@@ -95,10 +96,27 @@ final readonly class RuleConfigApplier
     private function assertKnownRuleKeys(string $ruleId, array $ruleConfig): void
     {
         foreach (array_keys($ruleConfig) as $key) {
-            if (!in_array($key, ['enabled', 'threshold', 'severity', 'thresholds', 'options'], true)) {
+            if (!in_array($key, ['enabled', 'threshold', 'severity', 'thresholds', 'options', 'excludeFromScore'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "rules.%s.%s".', $ruleId, $key));
             }
         }
+    }
+
+    /**
+     * @param ConfigObject $ruleConfig
+     * @return bool Effective excludeFromScore flag for the rule.
+     */
+    private function excludeFromScore(string $ruleId, array $ruleConfig, bool $isExcludedByDefault): bool
+    {
+        if (!array_key_exists('excludeFromScore', $ruleConfig)) {
+            return $isExcludedByDefault;
+        }
+
+        if (!is_bool($ruleConfig['excludeFromScore'])) {
+            throw new ConfigException(sprintf('Config key "rules.%s.excludeFromScore" must be boolean.', $ruleId));
+        }
+
+        return $ruleConfig['excludeFromScore'];
     }
 
     /**

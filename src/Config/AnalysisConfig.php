@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Rule\RuleRegistry;
 use InvalidArgumentException;
 
@@ -18,12 +19,25 @@ final readonly class AnalysisConfig
     public const DEFAULT_MINIMUM_PHP_VERSION = 8.3;
 
     /**
-     * @param array<string, RuleSettings> $rules                 Effective settings keyed by rule id.
-     * @param float                       $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection               $ruleSelection         Include/exclude rule selection for the run.
-     * @param list<string>                $ignoredPathPatterns   Path patterns skipped during discovery.
-     * @param list<string>                $acceptedAbbreviations Abbreviations accepted by naming rules.
-     * @param list<string>                $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * Universal-programming abbreviations seeded into every config so naming.abbreviation-allowlist
+     * does not flood with terms a maintainer would never bother to allowlist by hand. Project-specific
+     * vocabulary (domain acronyms) belongs in the user's `allowlists.acceptedAbbreviations` instead.
+     * `InitCommand::DEFAULT_ACCEPTED_ABBREVIATIONS` references this constant so the two cannot drift.
+     *
+     * @var list<string>
+     */
+    public const DEFAULT_ACCEPTED_ABBREVIATIONS = [
+        'age', 'app', 'db', 'fs', 'id', 'io', 'key', 'log', 'max', 'min', 'now', 'raw', 'rx', 'tx', 'ui', 'url',
+    ];
+
+    /**
+     * @param array<string, RuleSettings>      $rules                 Effective settings keyed by rule id.
+     * @param float                            $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection                    $ruleSelection         Include/exclude rule selection for the run.
+     * @param list<string>                     $ignoredPathPatterns   Path patterns skipped during discovery.
+     * @param list<string>                     $acceptedAbbreviations Abbreviations accepted by naming rules.
+     * @param list<string>                     $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * @param array<string, FailThreshold>     $minimumSeverity       Per-command exit-code thresholds, keyed by command name.
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
     public function __construct(
@@ -33,6 +47,7 @@ final readonly class AnalysisConfig
         private array $ignoredPathPatterns = [],
         private array $acceptedAbbreviations = [],
         private array $allowedSecretPreviews = [],
+        private array $minimumSeverity = [],
     ) {
         if ($this->minimumPhpVersion < 7.4) {
             throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
@@ -59,7 +74,7 @@ final readonly class AnalysisConfig
             );
         }
 
-        return new self($rules);
+        return new self($rules, acceptedAbbreviations: self::DEFAULT_ACCEPTED_ABBREVIATIONS);
     }
 
     /**
@@ -99,6 +114,7 @@ final readonly class AnalysisConfig
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
+            $this->minimumSeverity,
         );
     }
 
@@ -127,6 +143,7 @@ final readonly class AnalysisConfig
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
+            $this->minimumSeverity,
         );
     }
 
@@ -165,6 +182,7 @@ final readonly class AnalysisConfig
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
+            $this->minimumSeverity,
         );
     }
 
@@ -192,6 +210,7 @@ final readonly class AnalysisConfig
             $ignoredPathPatterns,
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
+            $this->minimumSeverity,
         );
     }
 
@@ -219,6 +238,7 @@ final readonly class AnalysisConfig
             $this->ignoredPathPatterns,
             $acceptedAbbreviations,
             $this->allowedSecretPreviews,
+            $this->minimumSeverity,
         );
     }
 
@@ -246,6 +266,36 @@ final readonly class AnalysisConfig
             $this->ignoredPathPatterns,
             $this->acceptedAbbreviations,
             $allowedSecretPreviews,
+            $this->minimumSeverity,
+        );
+    }
+
+    /**
+     * Return the per-command exit-code threshold for the named gating command.
+     *
+     * @param string $command Gating command name (analyse, report, dashboard).
+     * @return FailThreshold|null Configured threshold for the command, or null when unset.
+     */
+    public function failThresholdFor(string $command): ?FailThreshold
+    {
+        return $this->minimumSeverity[$command] ?? null;
+    }
+
+    /**
+     * @param array<string, FailThreshold> $minimumSeverity Per-command exit-code thresholds keyed by command name.
+     *
+     * @return self Config carrying the updated minimumSeverity map.
+     */
+    public function withMinimumSeverity(array $minimumSeverity): self
+    {
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->allowedSecretPreviews,
+            $minimumSeverity,
         );
     }
 }

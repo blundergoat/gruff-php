@@ -123,10 +123,10 @@ final class SarifReporterTest extends TestCase
         self::assertSame(['maintainability'], $this->listValue($resultProperties, 'secondaryPillars'));
         self::assertSame('eval', $this->stringKeyedArray($resultProperties, 'metadata')['target'] ?? null);
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
-        self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertSame('gruff.analysis.v2', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertSame($score->composite->score, $runProperties['score'] ?? null);
         self::assertSame($score->composite->letter, $runProperties['grade'] ?? null);
-        self::assertSame('gruff.analysis.v1', $this->stringValue($this->decode((new JsonReporter())->render($report)), 'schemaVersion'));
+        self::assertSame('gruff.analysis.v2', $this->stringValue($this->decode((new JsonReporter())->render($report)), 'schemaVersion'));
         self::assertArrayNotHasKey('codeFlows', $result);
         self::assertArrayNotHasKey('threadFlows', $result);
         self::assertArrayNotHasKey('fixes', $result);
@@ -150,7 +150,7 @@ final class SarifReporterTest extends TestCase
             $this->listValue($driver, 'rules'),
         ));
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
-        self::assertSame('gruff.analysis.v1', $this->stringValue($runProperties, 'gruffSchemaVersion'));
+        self::assertSame('gruff.analysis.v2', $this->stringValue($runProperties, 'gruffSchemaVersion'));
         self::assertArrayNotHasKey('score', $runProperties);
         self::assertArrayNotHasKey('grade', $runProperties);
     }
@@ -280,7 +280,7 @@ final class SarifReporterTest extends TestCase
         $sarif    = $this->decode((new SarifReporter())->render($report));
         $sarifRun = $this->sarifRun($sarif);
 
-        self::assertSame('gruff.analysis.v1', $this->stringValue($json, 'schemaVersion'));
+        self::assertSame('gruff.analysis.v2', $this->stringValue($json, 'schemaVersion'));
         self::assertSame($this->stringValue($json, 'schemaVersion'), $this->stringValue($this->stringKeyedArray($sarifRun, 'properties'), 'gruffSchemaVersion'));
         self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($sarifRun, 'results'));
         self::assertSame(

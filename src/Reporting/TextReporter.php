@@ -15,6 +15,14 @@ use GruffPhp\Mutation\MutationAnalysisResult;
 final readonly class TextReporter
 {
     /**
+     * Total-finding floor above which the flat per-finding list is no longer
+     * browsable and the footer hint suggests `summary` instead. Chosen at the
+     * empirical break-point where consumers report needing to write a Python
+     * summariser to triage; revisit if telemetry signals a different number.
+     */
+    private const OUTPUT_VOLUME_HINT_THRESHOLD = 50;
+
+    /**
      * Render an analysis report as the default human-readable text output.
      *
      * @param AnalysisReport $report Analysis report to render.
@@ -39,6 +47,7 @@ final readonly class TextReporter
         $this->appendPathSection($lines, 'Ignored paths', $report->ignoredPaths);
         $this->appendPathSection($lines, 'Missing paths', $report->missingPaths);
         $this->appendDiagnostics($lines, $report->diagnostics);
+        $this->appendRuleDeltas($lines, $report);
         $this->appendScore($lines, $report);
         $this->appendBaseline($lines, $report);
         $this->appendMutation($lines, $report->mutation);
@@ -56,7 +65,89 @@ final readonly class TextReporter
         );
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
+        $this->appendOutputVolumeHint($lines, $counts['total']);
+
         return implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    /**
+     * Suggest `summary` when the flat text report crosses the volume floor.
+     * The flat per-finding list stops being browsable past ~50 findings; the
+     * hint short-circuits the "open a Python summariser to triage" workaround
+     * that consumers were writing externally. See M08.
+     *
+     * @param list<string> $lines
+     * @return void
+     */
+    private function appendOutputVolumeHint(array &$lines, int $findingCount): void
+    {
+        if ($findingCount < self::OUTPUT_VOLUME_HINT_THRESHOLD) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = sprintf(
+            'Hint: %d findings is a lot to read flat. For a rule-grouped overview, try:',
+            $findingCount,
+        );
+        $lines[] = '  php bin/gruff-php summary <paths>';
+    }
+
+    /**
+     * Render the top-5 most-improved and most-regressed rules from a branch-review comparison.
+     * Composite scores are one number that can mask churn; the per-rule deltas direct
+     * attention to which rules actually shifted since the base. Block is silent when no
+     * branch-review is in scope. See M06 / ADR-016.
+     *
+     * @param list<string> $lines
+     * @return void
+     */
+    private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->review === null) {
+            return;
+        }
+
+        $rows = $report->review->perRuleDelta();
+        if ($rows === []) {
+            return;
+        }
+
+        $improved  = array_slice(array_filter($rows, static fn (array $row): bool => $row['net'] < 0), 0, 5);
+        $regressed = array_slice(
+            array_reverse(array_filter($rows, static fn (array $row): bool => $row['net'] > 0)),
+            0,
+            5,
+        );
+
+        if ($improved === [] && $regressed === []) {
+            return;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Rule deltas';
+
+        if ($improved !== []) {
+            $lines[] = sprintf(
+                '  Top %d improved: %s',
+                count($improved),
+                implode(', ', array_map(
+                    static fn (array $row): string => sprintf('%d %s', $row['net'], $row['ruleId']),
+                    $improved,
+                )),
+            );
+        }
+
+        if ($regressed !== []) {
+            $lines[] = sprintf(
+                '  Top %d regressed: %s',
+                count($regressed),
+                implode(', ', array_map(
+                    static fn (array $row): string => sprintf('+%d %s', $row['net'], $row['ruleId']),
+                    $regressed,
+                )),
+            );
+        }
     }
 
     /**

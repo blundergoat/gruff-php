@@ -1,3 +1,4 @@
+schemaVersion: gruff-php.config.v0.1
 allowlists:
     secretPreviews:
         - 'AKIA...T3R2 (redacted, 20 chars)'

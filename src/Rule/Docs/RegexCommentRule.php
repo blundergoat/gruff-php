@@ -17,9 +17,12 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\MatchArm;
 use PhpParser\Node\Name;
+use PhpParser\Node\Scalar;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
+use PhpParser\NodeFinder;
 
 /**
  * Requires a one-line explanatory comment before regex matcher calls.
@@ -30,9 +33,32 @@ final readonly class RegexCommentRule implements RuleInterface
     public const ID = 'docs.regex-comment';
 
     /**
-     * Regex function names that require a preceding explanation.
+     * Regex function names that require a preceding explanation. Defaults cover the five common
+     * PCRE functions; projects can override via `defaultOptions.functionNames` to extend or narrow.
      */
-    private const REGEX_FUNCTIONS = ['preg_match'];
+    private const REGEX_FUNCTIONS = [
+        'preg_match',
+        'preg_match_all',
+        'preg_replace',
+        'preg_replace_callback',
+        'preg_split',
+    ];
+
+    /**
+     * Function-head docblock substrings that satisfy the comment requirement for any contained
+     * regex call. The intent is to skip the per-call comment requirement when the enclosing
+     * function-like's docblock already describes the regex behaviour.
+     */
+    /**
+     * Substrings in a docblock that signal it already explains the regex behaviour.
+     * `match` was previously included but matches docblocks like "Match the route."
+     * far too broadly; dropped so the enclosing function-doc exemption only fires
+     * when the docblock actually mentions regex/pattern/preg_, or the specific
+     * function name (e.g. `preg_match_all`) which is added at lookup time.
+     *
+     * @var list<string>
+     */
+    private const FUNCTION_DOC_KEYWORDS = ['regex', 'pattern', 'preg_'];
 
     /**
      * Describe the regex-comment rule.
@@ -49,7 +75,7 @@ final readonly class RegexCommentRule implements RuleInterface
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
             defaultOptions:  ['functionNames' => self::REGEX_FUNCTIONS],
-            description:     'Requires a one-line explanatory comment immediately above configured regex matcher calls such as preg_match().',
+            description:     'Requires a one-line explanatory comment immediately above configured PCRE calls (preg_match, preg_match_all, preg_replace, preg_replace_callback, preg_split by default). Exempt when the call is inside a `match (true) { ... => "label" }` arm with a string-literal label, or when the enclosing function-like docblock references the regex behaviour.',
         );
     }
 
@@ -78,6 +104,14 @@ final readonly class RegexCommentRule implements RuleInterface
                 continue;
             }
 
+            if ($this->isInsideStringLabelledMatchArm($regexCallNode)) {
+                continue;
+            }
+
+            if ($this->hasEnclosingFunctionDocReferencingRegex($regexCallNode, $functionName)) {
+                continue;
+            }
+
             $findings[] = new Finding(
                 ruleId:      $definition->id,
                 message:     sprintf('%s() should have a one-line comment above it explaining what the regex checks.', $functionName),
@@ -88,7 +122,7 @@ final readonly class RegexCommentRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $this->symbol($regexCallNode),
-                remediation: sprintf('Add a one-line comment immediately above the %s() call explaining the regex intent.', $functionName),
+                remediation: sprintf('Add a one-line comment immediately above the %s() call explaining the regex intent. If this function is not a regex matcher in your codebase, remove it from `rules.docs.regex-comment.options.functionNames` in `.gruff-php.yaml`.', $functionName),
                 metadata:    ['function' => $functionName],
             );
         }
@@ -142,6 +176,87 @@ final readonly class RegexCommentRule implements RuleInterface
         }
 
         return null;
+    }
+
+    /**
+     * Check whether the regex call lives inside a `match (true)` arm whose key is a string literal
+     * label. The string literal already acts as the human-readable explanation, so per-call comments
+     * would duplicate it. Requires at least one literal-string arm condition reachable from the call.
+     *
+     * @return bool True when the call sits inside a string-labelled match arm.
+     */
+    private function isInsideStringLabelledMatchArm(FuncCall $regexCallNode): bool
+    {
+        $parent = $regexCallNode->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if ($parent instanceof MatchArm) {
+                foreach ($parent->conds ?? [] as $condition) {
+                    if ($this->containsRegexCall($condition, $regexCallNode) && $parent->body instanceof Scalar\String_) {
+                        return true;
+                    }
+                }
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine whether a node subtree contains the target regex call. Used to confirm the
+     * surrounding match-arm condition actually owns the call we're about to emit a finding for.
+     *
+     * @return bool True when the condition subtree reaches the target call.
+     */
+    private function containsRegexCall(Node $condition, FuncCall $regexCallNode): bool
+    {
+        if ($condition === $regexCallNode) {
+            return true;
+        }
+
+        return (new NodeFinder())->findFirst(
+            $condition,
+            static fn (Node $node): bool => $node === $regexCallNode,
+        ) instanceof Node;
+    }
+
+    /**
+     * Check whether the enclosing function-like carries a docblock that already explains the regex
+     * behaviour. Substring check against `regex`, `pattern`, `preg_`, or the specific function name
+     * (e.g. `preg_match_all`) is enough; the rule's job is to nudge documentation, not police its
+     * wording. `match` was previously included but proved too broad — see the FUNCTION_DOC_KEYWORDS
+     * docblock for the rationale.
+     *
+     * @return bool True when the enclosing docblock already references the regex behaviour.
+     */
+    private function hasEnclosingFunctionDocReferencingRegex(FuncCall $regexCallNode, string $functionName): bool
+    {
+        $parent = $regexCallNode->getAttribute('parent');
+
+        while ($parent instanceof Node) {
+            if ($parent instanceof ClassMethod || $parent instanceof Function_) {
+                $docComment = $parent->getDocComment();
+                if ($docComment === null) {
+                    return false;
+                }
+
+                $docText  = strtolower($docComment->getText());
+                $keywords = array_merge(self::FUNCTION_DOC_KEYWORDS, [$functionName]);
+                foreach ($keywords as $keyword) {
+                    if (str_contains($docText, $keyword)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            $parent = $parent->getAttribute('parent');
+        }
+
+        return false;
     }
 
     /**

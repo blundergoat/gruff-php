@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-24
+last_reviewed: 2026-05-27
 ---
 
 # Rule Footguns
@@ -63,6 +63,31 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Prevention:** Document the rule's `additionalExcludedPaths` option (defined in `SingleImplementorInterfaceRule::definition()`'s `defaultOptions`). When dogfooding the rule in a project with vendored copies under `src/`, set `additionalExcludedPaths: ['src/Vendor/']` (or the project-specific convention) in `.gruff-php.yaml`. Do not extend the rule's hard-coded vendor list with project-specific paths; configuration is the right escape hatch. `src/Rule/Design/SingleImplementorInterfaceRule.php` (search: `additionalExcludedPaths when the interface comes from copied vendor/framework code`) now includes the option in remediation text so users see the intended mitigation at the finding site.
 
+## Footgun: Retiring a rule leaves stale count references in five doc artefacts
+
+**Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
+
+The rule registry's true count lives only in `src/Rule/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
+
+```text
+README.md                       — quality-table line ("Rule catalogue")
+README.md                       — per-pillar tally row    | `naming` | N |
+docs/rules.md                   — same pillar tally       | `naming` | N |
+docs/rules.md                   — per-pillar section heading  ### `naming` (N)
+.goat-flow/architecture.md      — prose count ("exposes N rule ids")
+```
+
+PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+
+**Prevention:** When retiring or adding a rule, after editing `src/Rule/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
+
+```bash
+grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
+    README.md docs/rules.md .goat-flow/architecture.md
+```
+
+Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
+
 ## Resolved Entries
 
 ## Footgun: Project rules need full project context, not `--changed-only`
@@ -90,3 +115,25 @@ Rules that inspect project-level config files (`test-quality.phpunit-deprecation
 Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with `.json` or `.yaml` extensions (`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`) were classified as text units and scanned by every rule implementing `SourceTextRuleInterface`. On an external healthcare target branch diff this produced 1441 `sensitive-data.high-entropy-string` findings on npm integrity hashes (`sha512-aBc...` base64 SHA-512 digests), with literally zero true positives. The rule had no way to distinguish machine-generated lockfile metadata from a real secret in a JSON config.
 
 **Prevention:** Lockfile filenames are now hard-coded in `SourceDiscovery::IGNORED_FILENAMES` and treated like the `vendor/` directory: skipped during traversal, skipped when passed as an explicit path, and overridable only with `--include-ignored`. When adding a new `SourceTextRuleInterface` rule in the future, audit which file types it will match against the project state of a realistic open-source PHP project (Symfony, Laravel) and confirm that lockfiles, `.po`/`.mo` translation files, dist bundles, and similar machine-generated text artefacts either fall outside the rule's regex or are already filtered by source discovery. If a new false-positive class surfaces on a class of file, prefer extending `IGNORED_FILENAMES` over carving file-type exceptions into individual rules.
+
+## Footgun: Readonly-property walker missed array-write mutation on `$this->prop[…]`
+
+**Status:** resolved | **Created:** 2026-05-27 | **Resolved:** 2026-05-27 | **Evidence:** OBSERVED
+
+`src/Rule/Modernisation/ReadonlyPropertyCandidateRule.php` (search: `lateAssignments`) called `ModernisationNodeHelper::propertyFetchName($assign->var)` directly. For `$this->messages[] = $x`, `$this->messages['k'] = $x`, and `unset($this->messages['k'])`, the AST shape is `Expr\ArrayDimFetch` wrapping the `$this` `PropertyFetch` (or `Stmt\Unset_` entirely outside the `Expr\Assign::class` set), so the helper returned null and the rule treated the property as never mutated late — emitting a readonly candidacy finding even though applying the suggested `readonly` modifier would crash at runtime on the very next array-write. Reviewer cited a real-world hit on a Symfony 6.4 `ChatAssistantSession::appendUserMessage()`-style class.
+
+**Evidence:** Healthkit reviewer report at `.goat-flow/scratchpad/gruff-php-improvement-feedback.md` section 2. Reproduction: a final class with `private array $messages;`, constructor `$this->messages = []`, and `$this->messages[] = $x` in a later method produced a readonly candidate finding pre-fix and produces zero findings post-fix.
+
+**Resolution:** `lateAssignments` now walks `Expr\ArrayDimFetch` chains down to the underlying expression via `recordPropertyMutation()` before consulting the helper, AND iterates `Stmt\Unset_` nodes separately so `unset($this->prop['k'])` is treated as the same kind of post-constructor mutation. The shared helper (`ModernisationNodeHelper::propertyFetchName`/`isThisPropertyFetch`) stays untouched because only one rule needs the walk today; expanding the helper to do it would change the behaviour of every consumer for no current benefit.
+
+**Prevention:** When a modernisation rule reasons about "this property mutates after the constructor", it must check every AST shape that PHP allows to mutate the container without textually mentioning the property: plain `Expr\Assign` whose LHS is a `PropertyFetch`, `Expr\Assign` whose LHS is one-or-more `ArrayDimFetch` wrapping a `PropertyFetch`, and `Stmt\Unset_` whose arg list contains the same shape. `Expr\AssignOp::*` (compound assigns like `$this->count += 1`) is `Expr\AssignOp::class`, not `Expr\Assign::class`, and the same nodeFinder query would miss it — when a future rule needs compound-assign awareness, extend `recordPropertyMutation()` to be called from the `AssignOp` walker as well. The fixture lives at `tests/Fixtures/Modernisation/non-candidates.php` `MessageInboxFixture` covering all three sub-cases. Pass-by-reference detection (`func(&$this->prop)`) is deliberately deferred; see `.goat-flow/tasks/0.1.4/M01-modernisation-waste-false-positive-fixes.md` "## Deferred".
+
+## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
+
+**Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
+
+`src/Rule/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
+
+**Evidence:** Healthkit reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
+
+**Prevention:** When extending a type-shape exemption beyond a single canonical form, write the counter-fixture first. Every "loose" shape (mixed-keyed bag, single-mixed-field shape, mixed-only generic) gets a `*StillFires` fixture method that asserts the exemption did NOT swallow it. Only after the counter-fixtures are in place add the positive `*IsAllowed` cases. The shape-detector must use a depth-aware splitter (commas inside `<>{}()[]` belong to the inner shape, not the outer one); a naive `explode(',', ...)` would split `array{entries: list<array<string, mixed>>, total: int}` mid-list and corrupt the parse.

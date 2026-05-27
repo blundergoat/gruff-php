@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Command;
 
 use GruffPhp\Config\AnalysisConfig;
+use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Config\SeverityThreshold;
+use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleRegistry;
 use Symfony\Component\Console\Command\Command;
@@ -43,6 +45,20 @@ final class InitCommand extends Command
     private const YAML_INDENT = 4;
 
     /**
+     * Binary defaults emitted into the scaffolded `minimumSeverity:` block.
+     * Mirrors ADR-015: gating commands default to "show everything, fail on
+     * anything" for `analyse` and to off for the viewing commands. Project
+     * overrides on `--force` are preserved by `existingMinimumSeverity`.
+     *
+     * @var array<string, string>
+     */
+    private const DEFAULT_MINIMUM_SEVERITY = [
+        'analyse' => 'advisory',
+        'report' => 'none',
+        'dashboard' => 'none',
+    ];
+
+    /**
      * Default paths omitted from generated project scans.
      *
      * Keeps agent harness files, generated reports, copied vendor code, and
@@ -62,6 +78,16 @@ final class InitCommand extends Command
         'src/Vendor/**',
         'tests/Fixtures/**',
     ];
+
+    /**
+     * Universal-programming abbreviations seeded into fresh configs. Sourced from
+     * `AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS` so the runtime default and the
+     * scaffolded init file stay in lockstep; the constant lives on `AnalysisConfig` because
+     * the runtime default is the source of truth and init is just a reflection of it.
+     *
+     * @var list<string>
+     */
+    private const DEFAULT_ACCEPTED_ABBREVIATIONS = AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS;
 
     /**
      * Register init CLI options and metadata.
@@ -101,9 +127,20 @@ final class InitCommand extends Command
         $config   = AnalysisConfig::fromRegistry($registry);
 
         $ignoredPaths = self::existingIgnoredPaths($targetPath) ?? self::DEFAULT_IGNORED_PATHS;
-        $document     = self::buildConfigDocument($registry, $config, $ignoredPaths);
-        $yaml         = Yaml::dump($document, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
-        $contents     = self::FILE_HEADER . $yaml;
+
+        try {
+            $minimumSeverity = self::existingMinimumSeverity($targetPath) ?? self::DEFAULT_MINIMUM_SEVERITY;
+            self::existingSchemaVersion($targetPath);
+        } catch (ConfigException $exception) {
+            $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
+
+            return Command::FAILURE;
+        }
+
+        $scaffold     = self::buildScaffoldDocument($config, $ignoredPaths, $minimumSeverity);
+        $scaffoldYaml = Yaml::dump($scaffold, self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+        $rulesYaml    = self::renderRulesSection($registry);
+        $contents     = self::FILE_HEADER . $scaffoldYaml . $rulesYaml;
 
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
@@ -185,28 +222,27 @@ final class InitCommand extends Command
     }
 
     /**
-     * Build the YAML document mirroring registry defaults.
+     * Build the scaffold sections of the generated config (everything above
+     * `rules:`). The `rules:` block is rendered separately by
+     * renderRulesSection so each rule can carry a leading description comment
+     * that Yaml::dump can't emit.
      *
-     * @param RuleRegistry   $ruleRegistry  Rule registry supplying definitions.
-     * @param AnalysisConfig $analysisConfig Config seeded from the registry defaults.
-     * @param list<string>   $ignoredPaths Paths to omit from generated project scans.
+     * @param AnalysisConfig        $analysisConfig  Config seeded from the registry defaults.
+     * @param list<string>          $ignoredPaths    Paths to omit from generated project scans.
+     * @param array<string, string> $minimumSeverity Per-command exit-code thresholds emitted under `minimumSeverity:`.
      * @return array<string, mixed>
      */
-    private static function buildConfigDocument(RuleRegistry $ruleRegistry, AnalysisConfig $analysisConfig, array $ignoredPaths): array
+    private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $minimumSeverity): array
     {
-        $rules = [];
-        foreach ($ruleRegistry->all() as $rule) {
-            $ruleDefinition             = $rule->definition();
-            $rules[$ruleDefinition->id] = self::buildRuleEntry($ruleDefinition);
-        }
-
         return [
+            'schemaVersion' => ConfigLoader::SCHEMA_VERSION,
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
+            'minimumSeverity' => $minimumSeverity,
             'paths' => [
                 'ignore' => $ignoredPaths,
             ],
             'allowlists' => [
-                'acceptedAbbreviations' => [],
+                'acceptedAbbreviations' => self::DEFAULT_ACCEPTED_ABBREVIATIONS,
                 'secretPreviews' => [],
             ],
             'selection' => [
@@ -216,8 +252,182 @@ final class InitCommand extends Command
                 'excludePillars' => [],
                 'excludeRules' => [],
             ],
-            'rules' => $rules,
         ];
+    }
+
+    /**
+     * Render the `rules:` section of the generated config, with each rule
+     * preceded by a comment carrying the registry description (or the rule's
+     * display name when no description is set). Output is appended to the
+     * scaffold YAML; the existing 4-space indent contract is preserved.
+     *
+     * @return string Rendered `rules:` block including trailing newline.
+     */
+    private static function renderRulesSection(RuleRegistry $ruleRegistry): string
+    {
+        $output = "rules:\n";
+        foreach ($ruleRegistry->all() as $rule) {
+            $ruleDefinition = $rule->definition();
+            $description    = $ruleDefinition->description !== '' ? $ruleDefinition->description : $ruleDefinition->name;
+            $output        .= '    # ' . $description . "\n";
+            $ruleEntry      = self::buildRuleEntry($ruleDefinition);
+            $ruleEntryYaml  = Yaml::dump([$ruleDefinition->id => $ruleEntry], self::YAML_INLINE_DEPTH, self::YAML_INDENT, Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE);
+            foreach (explode("\n", rtrim($ruleEntryYaml, "\n")) as $line) {
+                $output .= '    ' . $line . "\n";
+            }
+        }
+
+        return $output;
+    }
+
+    /**
+     * Read an existing config's `minimumSeverity:` block so --force does not wipe
+     * a hand-edited gating threshold. Validates each entry against the same
+     * gating-command + threshold-value contract the loader applies so an invalid
+     * block surfaces a useful error before init blindly preserves it.
+     *
+     * @throws ConfigException When a preserved entry is not a valid gating command or threshold value.
+     * @return array<string, string>|null Existing block (command => threshold), or null when none can be preserved.
+     */
+    private static function existingMinimumSeverity(string $targetPath): ?array
+    {
+        if (!self::hasMinimumSeverityBlock($targetPath)) {
+            return null;
+        }
+
+        $existing  = self::readMinimumSeverityBlock($targetPath);
+        $preserved = [];
+        foreach ($existing as $command => $threshold) {
+            $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string) $command, $threshold);
+        }
+
+        return $preserved;
+    }
+
+    /**
+     * Return whether the existing config file has a `minimumSeverity:` block
+     * worth preserving. The caller pairs this with {@see readMinimumSeverityBlock}
+     * so the two-stage call avoids returning a nullable mixed-array shape from
+     * a single helper (which trips `modernisation.phpdoc-mixed-overuse`).
+     *
+     * @return bool True when the YAML loads and contains a top-level `minimumSeverity:` key.
+     */
+    private static function hasMinimumSeverityBlock(string $targetPath): bool
+    {
+        if (!is_file($targetPath)) {
+            return false;
+        }
+
+        try {
+            $decoded = Yaml::parseFile($targetPath);
+        } catch (ParseException) {
+            return false;
+        }
+
+        return is_array($decoded) && array_key_exists('minimumSeverity', $decoded);
+    }
+
+    /**
+     * Read and shape-validate the `minimumSeverity:` block from the existing config.
+     *
+     * @throws ConfigException When the key is not a map shape.
+     * @return array<array-key, mixed> Decoded YAML map; per-entry validation happens in the caller.
+     */
+    private static function readMinimumSeverityBlock(string $targetPath): array
+    {
+        $decoded = Yaml::parseFile($targetPath);
+        if (!is_array($decoded) || !array_key_exists('minimumSeverity', $decoded)) {
+            return [];
+        }
+
+        $existing = $decoded['minimumSeverity'];
+        if (!is_array($existing) || ($existing !== [] && array_is_list($existing))) {
+            throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
+        }
+
+        return $existing;
+    }
+
+    /**
+     * Confirm the user-supplied key names a real gating command.
+     *
+     * @throws ConfigException When the key is not a string or names a non-gating command.
+     * @return string Validated gating-command name.
+     */
+    private static function validateGatingCommand(mixed $command): string
+    {
+        if (!is_string($command)) {
+            throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
+        }
+
+        if (!in_array($command, ConfigLoader::GATING_COMMANDS, true)) {
+            throw new ConfigException(sprintf(
+                'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
+                $command,
+                implode(', ', ConfigLoader::GATING_COMMANDS),
+            ));
+        }
+
+        return $command;
+    }
+
+    /**
+     * Confirm the user-supplied threshold names a canonical `FailThreshold` value.
+     *
+     * @throws ConfigException When the value is not a string or not in the canonical four.
+     * @return string Validated threshold string (one of advisory|warning|error|none).
+     */
+    private static function validateGatingThreshold(string $command, mixed $threshold): string
+    {
+        if (!is_string($threshold) || FailThreshold::fromInput($threshold) === null) {
+            throw new ConfigException(sprintf(
+                'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
+                $command,
+                is_string($threshold) ? $threshold : get_debug_type($threshold),
+                implode(', ', array_map(static fn (FailThreshold $case): string => $case->value, FailThreshold::cases())),
+            ));
+        }
+
+        return $threshold;
+    }
+
+    /**
+     * Surface a clear error when an existing config carries a non-canonical
+     * `schemaVersion:` literal. Regenerating with `--force` must not silently
+     * overwrite a deliberate downgrade; the scaffold always writes the canonical
+     * value, so a mismatch is treated as a user intent worth confirming.
+     *
+     * @throws ConfigException When the existing schemaVersion is set but does not match the canonical value.
+     * @return void
+     */
+    private static function existingSchemaVersion(string $targetPath): void
+    {
+        if (!is_file($targetPath)) {
+            return;
+        }
+
+        try {
+            $decoded = Yaml::parseFile($targetPath);
+        } catch (ParseException) {
+            return;
+        }
+
+        if (!is_array($decoded) || !array_key_exists('schemaVersion', $decoded)) {
+            return;
+        }
+
+        $existing = $decoded['schemaVersion'];
+        if (!is_string($existing) || $existing === '') {
+            return;
+        }
+
+        if ($existing !== ConfigLoader::SCHEMA_VERSION) {
+            throw new ConfigException(sprintf(
+                'Config key "schemaVersion" must be "%s". Got "%s". Remove the deliberate override before regenerating with --force.',
+                ConfigLoader::SCHEMA_VERSION,
+                $existing,
+            ));
+        }
     }
 
     /**

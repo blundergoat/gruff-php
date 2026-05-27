@@ -30,7 +30,7 @@ final readonly class AnalysisReport
     /**
      * Stable schema identifier emitted in machine-readable reports.
      */
-    public const SCHEMA_VERSION = 'gruff.analysis.v1';
+    public const SCHEMA_VERSION = 'gruff.analysis.v2';
 
     /**
      * @param string                      $toolVersion     Gruff version used to produce the report.
@@ -95,6 +95,44 @@ final readonly class AnalysisReport
         }
 
         return $counts;
+    }
+
+    /**
+     * Count findings by rule id with per-severity breakdown for triage views.
+     * Sorted by `total DESC, ruleId ASC` so the noisiest rules surface first
+     * and ordering stays deterministic across runs. See M08.
+     *
+     * @return list<array{ruleId: string, total: int, advisory: int, warning: int, error: int}>
+     */
+    public function findingCountsByRule(): array
+    {
+        $byRule = [];
+
+        foreach ($this->findings as $finding) {
+            $byRule[$finding->ruleId] ??= ['total' => 0, 'advisory' => 0, 'warning' => 0, 'error' => 0];
+            $byRule[$finding->ruleId]['total']++;
+            $byRule[$finding->ruleId][$finding->severity->value]++;
+        }
+
+        $rows = [];
+
+        foreach ($byRule as $ruleId => $counts) {
+            $rows[] = [
+                'ruleId' => $ruleId,
+                'total' => $counts['total'],
+                'advisory' => $counts['advisory'],
+                'warning' => $counts['warning'],
+                'error' => $counts['error'],
+            ];
+        }
+
+        usort(
+            $rows,
+            static fn (array $left, array $right): int => $right['total'] <=> $left['total']
+                ?: strcmp($left['ruleId'], $right['ruleId']),
+        );
+
+        return $rows;
     }
 
     /**

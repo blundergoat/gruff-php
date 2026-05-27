@@ -14,8 +14,6 @@ use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\IdentifierTokenizer;
-use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
@@ -289,20 +287,6 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * Verify identifier tokenizer splits common identifier shapes.
-     *
-     * @return void
-     */
-    public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
-    {
-        $identifierTokenizer = new IdentifierTokenizer();
-
-        self::assertSame(['http', 'response', 'code'], $identifierTokenizer->tokenize('HTTPResponseCode'));
-        self::assertSame(['order', 'item', '2'], $identifierTokenizer->tokenize('order_item2'));
-        self::assertSame(['temp'], $identifierTokenizer->tokenize('_temp'));
-    }
-
-    /**
      * Verify identifier quality finds placeholder generic and numbered names.
      *
      * @return void
@@ -354,6 +338,30 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('e', $names);
         self::assertNotContains('calculateInvoiceTotal', $names);
         self::assertNotContains('invoiceTotal', $names);
+    }
+
+    /**
+     * Verify identifier quality skips the lone parameter of single-arg wide-typed non-void helpers.
+     *
+     * @return void
+     */
+    public function testIdentifierQualitySkipsGenericByPurposeHelpers(): void
+    {
+        $findings = $this->analyseRule('identifier-quality-generic-helpers.php', IdentifierQualityRule::ID);
+        $symbols  = [];
+        foreach ($findings as $finding) {
+            $name           = $finding->metadata['identifierName'] ?? null;
+            $symbol         = $finding->symbol ?? '';
+            if (is_string($name)) {
+                $symbols[] = sprintf('%s|%s', $symbol, $name);
+            }
+        }
+
+        self::assertNotContains('GenericByPurposeHelperFixture::stringValue()|value', $symbols);
+        self::assertNotContains('GenericByPurposeHelperFixture::fingerprint()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::tag()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::transform()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::describe()|value', $symbols);
     }
 
     /**
@@ -413,7 +421,6 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'tmp', symbolPrefix: 'closure@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: HungarianNotationRule::ID, metadataKey: 'variable', metadataValue: 'strName', symbolPrefix: 'closure@'));
         self::assertTrue($this->hasFinding(findings: $findings, ruleId: BooleanPrefixRule::ID, metadataKey: 'identifierName', metadataValue: 'changedOnly', symbolPrefix: 'closure@'));
-        self::assertTrue($this->hasFinding(findings: $findings, ruleId: ParameterTypeNameRule::ID, metadataKey: 'parameter', metadataValue: 'session', symbolPrefix: 'closure@'));
 
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: IdentifierQualityRule::ID, metadataKey: 'identifierName', metadataValue: 'foo', symbolPrefix: 'ClosureCoverageFixture::run()'));
         self::assertFalse($this->hasFinding(findings: $findings, ruleId: ShortVariableRule::ID, metadataKey: 'variable', metadataValue: 'x', symbolPrefix: 'ClosureCoverageFixture::run()'));

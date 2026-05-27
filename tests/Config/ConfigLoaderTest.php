@@ -12,6 +12,7 @@ use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
@@ -71,7 +72,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
             $configPath,
-            "rules:\n    complexity.cyclomatic:\n        threshold: 70\n        severity: error\n",
+            "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 70\n        severity: error\n",
         ));
 
         try {
@@ -98,7 +99,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($directory));
         self::assertNotFalse(file_put_contents(
             $configPath,
-            "rules:\n    complexity.cyclomatic:\n        threshold: 130\n        severity: error\n",
+            "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 130\n        severity: error\n",
         ));
 
         try {
@@ -127,7 +128,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
             $fallbackPath,
-            "rules:\n    complexity.cyclomatic:\n        threshold: 110\n        severity: error\n",
+            "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 110\n        severity: error\n",
         ));
 
         try {
@@ -157,7 +158,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         self::assertTrue(mkdir($fallbackDirectory));
         self::assertNotFalse(file_put_contents(
             $fallbackPath,
-            "rules:\n    complexity.cyclomatic:\n        threshold: 170\n        severity: error\n",
+            "schemaVersion: gruff-php.config.v0.1\nrules:\n    complexity.cyclomatic:\n        threshold: 170\n        severity: error\n",
         ));
 
         try {
@@ -355,7 +356,120 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
                 '{"allowlists":{"acceptedAbbreviations":["not-valid!"]}}',
                 'Config value "allowlists.acceptedAbbreviations" contains invalid identifier "not-valid!".',
             ],
+            'minimumSeverity rejects non-map' => [
+                '{"minimumSeverity":"advisory"}',
+                'Config key "minimumSeverity" must be a map of command name to threshold.',
+            ],
+            'minimumSeverity rejects summary command' => [
+                '{"minimumSeverity":{"summary":"advisory"}}',
+                'Config key "minimumSeverity.summary" is not a valid gating command. Valid keys are: analyse, report, dashboard.',
+            ],
+            'minimumSeverity rejects init command' => [
+                '{"minimumSeverity":{"init":"advisory"}}',
+                'Config key "minimumSeverity.init" is not a valid gating command. Valid keys are: analyse, report, dashboard.',
+            ],
+            'minimumSeverity rejects list-rules command' => [
+                '{"minimumSeverity":{"list-rules":"advisory"}}',
+                'Config key "minimumSeverity.list-rules" is not a valid gating command. Valid keys are: analyse, report, dashboard.',
+            ],
+            'minimumSeverity rejects unknown command' => [
+                '{"minimumSeverity":{"foobar":"advisory"}}',
+                'Config key "minimumSeverity.foobar" is not a valid gating command. Valid keys are: analyse, report, dashboard.',
+            ],
+            'minimumSeverity rejects legacy severity value' => [
+                '{"minimumSeverity":{"analyse":"medium"}}',
+                'Config key "minimumSeverity.analyse" value "medium" is not a valid threshold. Accepted: none, advisory, warning, error.',
+            ],
+            'minimumSeverity rejects never value (gruff-go alias)' => [
+                '{"minimumSeverity":{"analyse":"never"}}',
+                'Config key "minimumSeverity.analyse" value "never" is not a valid threshold. Accepted: none, advisory, warning, error.',
+            ],
+            'minimumSeverity rejects non-string threshold value' => [
+                '{"minimumSeverity":{"analyse":7}}',
+                'Config key "minimumSeverity.analyse" must be a string. Got int.',
+            ],
+            'excludeFromScore rejects non-boolean value' => [
+                '{"rules":{"size.file-length":{"excludeFromScore":"yes"}}}',
+                'Config key "rules.size.file-length.excludeFromScore" must be boolean.',
+            ],
         ];
+    }
+
+    /**
+     * Verify excludeFromScore defaults to false and accepts true/false overrides.
+     *
+     * @return void
+     */
+    public function testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides(): void
+    {
+        $registry      = RuleRegistry::defaults();
+        $defaultConfig = (new ConfigLoader(__DIR__ . '/../..'))->load(null, $registry);
+        self::assertFalse($defaultConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+
+        $optInPath = $this->writeTempConfig(
+            '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":true}}}',
+        );
+        $optInConfig = (new ConfigLoader(dirname($optInPath)))->load(basename($optInPath), $registry);
+        self::assertTrue($optInConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+
+        $optOutPath = $this->writeTempConfig(
+            '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":false}}}',
+        );
+        $optOutConfig = (new ConfigLoader(dirname($optOutPath)))->load(basename($optOutPath), $registry);
+        self::assertFalse($optOutConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+    }
+
+    /**
+     * Verify a config that omits `schemaVersion` fails the load with the migration hint.
+     *
+     * @return void
+     */
+    public function testRejectsMissingSchemaVersion(): void
+    {
+        $path = $this->writeTempConfig('{"rules":{}}', shouldInjectSchemaVersion: false);
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(
+            'Config key "schemaVersion" is required. Add \'schemaVersion: gruff-php.config.v0.1\' to the top of .gruff-php.yaml, or regenerate with \'gruff-php init --force\'.',
+        );
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    /**
+     * Verify a config with a non-canonical `schemaVersion` value fails the load.
+     *
+     * @return void
+     */
+    public function testRejectsWrongSchemaVersion(): void
+    {
+        $path = $this->writeTempConfig('{"schemaVersion":"gruff-php.config.v9.9","rules":{}}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(
+            'Config key "schemaVersion" must be "gruff-php.config.v0.1". Got "gruff-php.config.v9.9". Update .gruff-php.yaml or regenerate with \'gruff-php init --force\'.',
+        );
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+    }
+
+    /**
+     * Verify a config with a full `minimumSeverity:` block round-trips through `load()`.
+     *
+     * @return void
+     */
+    public function testAcceptsMinimumSeverityBlockRoundTrips(): void
+    {
+        $path = $this->writeTempConfig(
+            '{"minimumSeverity":{"analyse":"error","report":"warning","dashboard":"none"}}',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+
+        self::assertSame(FailThreshold::Error, $config->failThresholdFor('analyse'));
+        self::assertSame(FailThreshold::Warning, $config->failThresholdFor('report'));
+        self::assertSame(FailThreshold::None, $config->failThresholdFor('dashboard'));
+        self::assertNull($config->failThresholdFor('summary'));
     }
 
     /**

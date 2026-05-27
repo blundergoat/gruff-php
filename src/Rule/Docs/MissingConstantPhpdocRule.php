@@ -14,6 +14,9 @@ use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
+use PhpParser\Comment;
+use PhpParser\Comment\Doc;
+use PhpParser\Node;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassConst;
 use PhpParser\Node\Stmt\ClassLike;
@@ -108,13 +111,16 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
                 continue;
             }
 
+            $hasLineComment = $this->hasLeadingLineComment($statement);
+
             foreach ($statement->consts as $const) {
                 $findings[] = $this->classConstantFinding(
-                    constantName: $const->name->toString(),
-                    className:    $className,
-                    line:         $statement->getStartLine(),
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
+                    constantName:   $const->name->toString(),
+                    className:      $className,
+                    line:           $statement->getStartLine(),
+                    definition:     $definition,
+                    analysisUnit:   $analysisUnit,
+                    hasLineComment: $hasLineComment,
                 );
             }
         }
@@ -133,12 +139,31 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         int $line,
         RuleDefinition $definition,
         AnalysisUnit $analysisUnit,
+        bool $hasLineComment,
     ): Finding {
         $symbol = sprintf('%s::%s', $className, $constantName);
 
+        $message = $hasLineComment
+            ? sprintf('Constant %s has a leading `//` line comment but no PHPDoc - convert to `/** ... */` for tooling consumers.', $symbol)
+            : sprintf('Constant %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the value).', $symbol);
+
+        $remediation = $hasLineComment
+            ? sprintf('Promote the existing `//` comment above %s into a `/** ... */` block so docblock-aware tooling can read it.', $symbol)
+            : 'Add a one-line `/** Description. */` block. This rule wants content, not boilerplate - if your project policy is "no comments", that policy is about avoiding comments that restate code, not about removing documentation. The description should answer "what is this for, what does it represent at the edge value, what must the caller satisfy."';
+
+        $metadata = [
+            'constantName' => $constantName,
+            'kind' => 'class-constant',
+            'className' => $className,
+        ];
+
+        if ($hasLineComment) {
+            $metadata['commentKind'] = 'line';
+        }
+
         return new Finding(
             ruleId:      $definition->id,
-            message:     sprintf('Constant %s has no PHPDoc.', $symbol),
+            message:     $message,
             filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
@@ -146,12 +171,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Add a one-line docblock above the constant.',
-            metadata:    [
-                'constantName' => $constantName,
-                'kind' => 'class-constant',
-                'className' => $className,
-            ],
+            remediation: $remediation,
+            metadata:    $metadata,
         );
     }
 
@@ -177,11 +198,12 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             }
 
             $findings[] = $this->enumCaseFinding(
-                caseName:     $statement->name->toString(),
-                className:    $className,
-                line:         $statement->getStartLine(),
-                definition:   $definition,
-                analysisUnit: $analysisUnit,
+                caseName:       $statement->name->toString(),
+                className:      $className,
+                line:           $statement->getStartLine(),
+                definition:     $definition,
+                analysisUnit:   $analysisUnit,
+                hasLineComment: $this->hasLeadingLineComment($statement),
             );
         }
 
@@ -199,12 +221,31 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         int $line,
         RuleDefinition $definition,
         AnalysisUnit $analysisUnit,
+        bool $hasLineComment,
     ): Finding {
         $symbol = sprintf('%s::%s', $className, $caseName);
 
+        $message = $hasLineComment
+            ? sprintf('Enum case %s has a leading `//` line comment but no PHPDoc - convert to `/** ... */` for tooling consumers.', $symbol)
+            : sprintf('Enum case %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the case name) and the enum itself is undocumented.', $symbol);
+
+        $remediation = $hasLineComment
+            ? sprintf('Promote the existing `//` comment above %s into a `/** ... */` block, or document the enum at the class level.', $symbol)
+            : 'Document either each case with a one-line `/** Description. */` block or add a class-level docblock to the enum. The description should answer "what does this case represent and when is it used".';
+
+        $metadata = [
+            'constantName' => $caseName,
+            'kind' => 'enum-case',
+            'className' => $className,
+        ];
+
+        if ($hasLineComment) {
+            $metadata['commentKind'] = 'line';
+        }
+
         return new Finding(
             ruleId:      $definition->id,
-            message:     sprintf('Enum case %s has no PHPDoc and the enum itself is undocumented.', $symbol),
+            message:     $message,
             filePath:    $analysisUnit->file->displayPath,
             line:        $line,
             severity:    $definition->defaultSeverity,
@@ -212,12 +253,32 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: 'Document either each case or add a class-level docblock to the enum.',
-            metadata:    [
-                'constantName' => $caseName,
-                'kind' => 'enum-case',
-                'className' => $className,
-            ],
+            remediation: $remediation,
+            metadata:    $metadata,
         );
+    }
+
+    /**
+     * Detect a leading non-doc `//` or `#` line comment attached to the statement.
+     */
+    private function hasLeadingLineComment(Node\Stmt $statement): bool
+    {
+        foreach ($statement->getComments() as $comment) {
+            if (!$comment instanceof Doc && $this->isLineComment($comment)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Distinguish `//` and `#` single-line comment shapes from block comments.
+     */
+    private function isLineComment(Comment $comment): bool
+    {
+        $text = ltrim($comment->getText());
+
+        return str_starts_with($text, '//') || str_starts_with($text, '#');
     }
 }

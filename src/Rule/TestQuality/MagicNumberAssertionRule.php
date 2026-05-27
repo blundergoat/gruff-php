@@ -147,7 +147,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
                     tier:        RuleTier::V01,
                     confidence:  Confidence::Low,
                     symbol:      $scope->symbol,
-                    remediation: 'Name important constants or derive expected values from arranged data when that improves readability.',
+                    remediation: 'Name important constants or derive expected values from arranged data when that improves readability. If the literal is a stable domain code (HTTP status, well-known port, protocol constant), add it to `rules.test-quality.magic-number-assertion.options.allowedLiterals` in `.gruff-php.yaml`.',
                     metadata:    ['number' => $number],
                 );
             }

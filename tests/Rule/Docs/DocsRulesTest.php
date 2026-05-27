@@ -132,6 +132,30 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
+     * Verify missing param tag recognises multi-line `@param array{...} $payload` shapes whose
+     * closing `$varname` sits on a different physical line than the `@param` token.
+     *
+     * @return void
+     */
+    public function testMissingParamTagRecognisesMultiLineArrayShape(): void
+    {
+        $findings = $this->analyseRule('missing-param-tag-multi-line-array-shape.php', MissingParamTagRule::ID);
+
+        $reported = [];
+        foreach ($findings as $finding) {
+            $symbol    = $finding->symbol ?? '';
+            $parameter = $finding->metadata['parameter'] ?? null;
+            if (is_string($parameter)) {
+                $reported[] = sprintf('%s|%s', $symbol, $parameter);
+            }
+        }
+
+        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|topic', $reported);
+        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|payload', $reported);
+        self::assertContains('MultiLineArrayShapeFixture::publishTurnWithMalformedDoc()|payload', $reported);
+    }
+
+    /**
      * Verify missing param tag detected for array parameters.
      *
      * @return void

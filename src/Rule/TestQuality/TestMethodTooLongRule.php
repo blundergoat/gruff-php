@@ -90,7 +90,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
                 confidence:  Confidence::High,
                 endLine:     $scope->endLine,
                 symbol:      $scope->symbol,
-                remediation: 'Split the scenario into focused tests, extract setup helpers, or move shared arrangement into setUp().',
+                remediation: 'Split the scenario into focused tests, extract setup helpers, or move shared arrangement into setUp(). If a path consistently needs a higher threshold (e.g. integration suites), add an entry to `rules.test-quality.test-method-too-long.options.pathOverrides` in `.gruff-php.yaml`.',
                 metadata:    ['meaningfulLines' => $count, 'threshold' => $threshold],
             );
         }

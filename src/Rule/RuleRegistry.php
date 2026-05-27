@@ -48,7 +48,6 @@ use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Naming\NegativeBooleanRule;
-use GruffPhp\Rule\Naming\ParameterTypeNameRule;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
@@ -144,12 +143,11 @@ final class RuleRegistry
         'naming.confusing-name' => 1,
         'naming.negative-boolean' => 2,
         'naming.boolean-prefix' => 3,
-        'naming.parameter-type-name' => 4,
-        'naming.identifier-quality' => 5,
-        'naming.hungarian-notation' => 6,
-        'naming.suffix-hungarian' => 7,
-        'naming.short-variable' => 8,
-        'naming.abbreviation-allowlist' => 9,
+        'naming.identifier-quality' => 4,
+        'naming.hungarian-notation' => 5,
+        'naming.suffix-hungarian' => 6,
+        'naming.short-variable' => 7,
+        'naming.abbreviation-allowlist' => 8,
     ];
 
     /** @var array<string, RuleInterface|ProjectRuleInterface> */
@@ -209,7 +207,6 @@ final class RuleRegistry
             new HungarianNotationRule(),
             new IdentifierQualityRule(),
             new NegativeBooleanRule(),
-            new ParameterTypeNameRule(),
             new ShortVariableRule(),
             new SuffixHungarianRule(),
             new TestNamingConsistencyRule(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -39,6 +40,7 @@ final readonly class ScoreCalculator
      * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
      * @param int                         $fileScoreLimit         Maximum file offender rows to retain.
      * @param list<Pillar>|null           $scorePillars           Optional pillar set included in composite scoring.
+     * @param AnalysisConfig|null         $analysisConfig         Optional config used to filter findings from rules marked `excludeFromScore` (ADR-016).
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
     public function calculate(
@@ -47,7 +49,9 @@ final readonly class ScoreCalculator
         ?DiffResult $diffResult,
         int $fileScoreLimit = 10,
         ?array $scorePillars = null,
+        ?AnalysisConfig $analysisConfig = null,
     ): ScoreReport {
+        $findings   = $this->scoredFindings($findings, $analysisConfig);
         $pillars    = $this->pillarScores($findings, $mutationAnalysisResult, $scorePillars);
         $scoreTotal = 0.0;
         $scoreCount = 0;
@@ -73,6 +77,58 @@ final readonly class ScoreCalculator
             scope:                  $scope,
             explanation:            $this->scoreExplanation($mutationAnalysisResult),
         );
+    }
+
+    /**
+     * Filter the input findings to only those that contribute to scoring penalties.
+     * A rule marked `excludeFromScore: true` is informational: its findings still
+     * flow through reports (the scorer never sees them after this filter), but
+     * they do not affect the composite or pillar penalty buckets. See ADR-016.
+     *
+     * Synthetic composite findings (e.g. `design.god-method` from
+     * {@see CompositeFindingFactory}) are not in the registry; they carry their
+     * component rule IDs in `metadata.componentRules`. A composite is excluded
+     * iff EVERY component rule is excluded — otherwise a single non-excluded
+     * component should still let the composite penalty land.
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
+    {
+        if (!$analysisConfig instanceof AnalysisConfig) {
+            return $findings;
+        }
+
+        $rules = $analysisConfig->rules();
+
+        return array_values(array_filter(
+            $findings,
+            static function (Finding $finding) use ($rules): bool {
+                $settings = $rules[$finding->ruleId] ?? null;
+                if ($settings !== null) {
+                    return !$settings->isExcludedFromScore();
+                }
+
+                // Synthetic finding: walk componentRules metadata when present.
+                $componentRules = $finding->metadata['componentRules'] ?? null;
+                if (!is_array($componentRules) || $componentRules === []) {
+                    return true;
+                }
+
+                foreach ($componentRules as $componentRuleId) {
+                    if (!is_string($componentRuleId)) {
+                        continue;
+                    }
+                    $componentSettings = $rules[$componentRuleId] ?? null;
+                    if ($componentSettings === null || !$componentSettings->isExcludedFromScore()) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+        ));
     }
 
     /**
@@ -137,9 +193,9 @@ final readonly class ScoreCalculator
                     applicable: true,
                     grade:      Grade::fromScore($mutationAnalysisResult->report->msi()),
                     findings:   count($mutationFindings),
-                    advisories: $counts['advisory'],
-                    warnings:   $counts['warning'],
-                    errors:     $counts['error'],
+                    advisory:   $counts['advisory'],
+                    warning:    $counts['warning'],
+                    error:      $counts['error'],
                     penalty:    max(0.0, 100.0 - $mutationAnalysisResult->report->msi()),
                 );
                 continue;
@@ -157,9 +213,9 @@ final readonly class ScoreCalculator
                 applicable: true,
                 grade:      Grade::fromScore(100.0 - $penalty),
                 findings:   count($pillarFindings),
-                advisories: $counts['advisory'],
-                warnings:   $counts['warning'],
-                errors:     $counts['error'],
+                advisory:   $counts['advisory'],
+                warning:    $counts['warning'],
+                error:      $counts['error'],
                 penalty:    $penalty,
             );
         }
@@ -202,9 +258,9 @@ final readonly class ScoreCalculator
                 filePath:      $filePath,
                 grade:         Grade::fromScore(100.0 - $penalty),
                 findings:      count($fileFindings),
-                advisories:    $counts['advisory'],
-                warnings:      $counts['warning'],
-                errors:        $counts['error'],
+                advisory:      $counts['advisory'],
+                warning:       $counts['warning'],
+                error:         $counts['error'],
                 penalty:       $penalty,
                 maxCyclomatic: $this->maxMetadataInt($fileFindings, 'complexity.cyclomatic', 'complexity'),
                 maxCognitive:  $this->maxMetadataInt($fileFindings, 'complexity.cognitive', 'complexity'),

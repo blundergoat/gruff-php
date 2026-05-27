@@ -15,9 +15,9 @@ final readonly class FileScore
      * @param string     $filePath      Display path for the scored file.
      * @param Grade      $grade         Letter grade and numeric score for the file.
      * @param int        $findings      Total findings counted for the file.
-     * @param int        $advisories    Advisory findings counted for the file.
-     * @param int        $warnings      Warning findings counted for the file.
-     * @param int        $errors        Error findings counted for the file.
+     * @param int        $advisory      Advisory findings counted for the file.
+     * @param int        $warning       Warning findings counted for the file.
+     * @param int        $error         Error findings counted for the file.
      * @param float      $penalty       Score penalty applied to the file.
      * @param int|null   $maxCyclomatic Highest cyclomatic complexity found in the file.
      * @param int|null   $maxCognitive  Highest cognitive complexity found in the file.
@@ -28,9 +28,9 @@ final readonly class FileScore
         public string $filePath,
         public Grade $grade,
         public int $findings,
-        public int $advisories,
-        public int $warnings,
-        public int $errors,
+        public int $advisory,
+        public int $warning,
+        public int $error,
         public float $penalty,
         public ?int $maxCyclomatic,
         public ?int $maxCognitive,
@@ -45,9 +45,9 @@ final readonly class FileScore
      *     score: float,
      *     grade: string,
      *     findings: int,
-     *     advisories: int,
-     *     warnings: int,
-     *     errors: int,
+     *     advisory: int,
+     *     warning: int,
+     *     error: int,
      *     penalty: float,
      *     maxCyclomatic: int|null,
      *     maxCognitive: int|null,
@@ -62,9 +62,9 @@ final readonly class FileScore
             'score' => $this->grade->score,
             'grade' => $this->grade->letter,
             'findings' => $this->findings,
-            'advisories' => $this->advisories,
-            'warnings' => $this->warnings,
-            'errors' => $this->errors,
+            'advisory' => $this->advisory,
+            'warning' => $this->warning,
+            'error' => $this->error,
             'penalty' => round($this->penalty, 2),
             'maxCyclomatic' => $this->maxCyclomatic,
             'maxCognitive' => $this->maxCognitive,

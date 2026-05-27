@@ -117,6 +117,10 @@ final readonly class RedundantVariableRule implements RuleInterface
             return;
         }
 
+        if ($this->hasPhpStanNarrowingTag($assignment, $returnStatement, $assignedVariable->name)) {
+            return;
+        }
+
         $findings[] = new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Variable $%s is redundant because it is immediately returned.', $assignedVariable->name),
@@ -142,5 +146,30 @@ final readonly class RedundantVariableRule implements RuleInterface
         foreach (StmtChildVisitor::childBlocks($statement) as $block) {
             $this->checkBlock($block->statements, $analysisUnit, $definition, $findings);
         }
+    }
+
+    /**
+     * Detect when a `@var`/`@phpstan-var`/`@psalm-var` docblock on the assignment or
+     * return statement narrows the variable's type. The intermediate variable then
+     * carries a type-system contract that bare return-of-expression would lose, so
+     * the redundant-variable finding must be suppressed for that assign.
+     *
+     * @param Stmt   $assignment      Statement holding the assignment expression.
+     * @param Stmt   $returnStatement Following return statement.
+     * @param string $variableName    Bare variable name being assigned and returned.
+     * @return bool True when the docblock pins a type for the variable.
+     */
+    private function hasPhpStanNarrowingTag(Stmt $assignment, Stmt $returnStatement, string $variableName): bool
+    {
+        $pattern = '/@(?:var|phpstan-var|psalm-var)\s+\S+\s+\$' . preg_quote($variableName, '/') . '\b/';
+
+        foreach ([$returnStatement, $assignment] as $statement) {
+            $docComment = $statement->getDocComment();
+            if ($docComment !== null && preg_match($pattern, $docComment->getText()) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

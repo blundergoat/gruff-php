@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Scoring;
 
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -13,6 +14,8 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\InfectionMutant;
 use GruffPhp\Mutation\InfectionReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
+use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreCalculator;
@@ -61,7 +64,7 @@ final class ScoreCalculatorTest extends TestCase
         $security = array_values(array_filter($score->pillars, static fn ($pillar): bool => $pillar->pillar === 'security'))[0] ?? null;
 
         self::assertNotNull($security);
-        self::assertSame(1, $security->errors);
+        self::assertSame(1, $security->error);
         self::assertSame('F', $security->grade?->letter);
     }
 
@@ -151,9 +154,9 @@ final class ScoreCalculatorTest extends TestCase
             'score' => 66.67,
             'grade' => 'D',
             'findings' => 1,
-            'advisories' => 0,
-            'warnings' => 1,
-            'errors' => 0,
+            'advisory' => 0,
+            'warning' => 1,
+            'error' => 0,
             'penalty' => 33.33,
         ], $pillars['mutation'] ?? null);
 
@@ -193,6 +196,101 @@ final class ScoreCalculatorTest extends TestCase
 
         self::assertSame(['security', 'sensitive-data'], $pillars);
         self::assertSame('F', $score->composite->letter);
+    }
+
+    /**
+     * Verify findings from `excludeFromScore: true` rules are filtered before the penalty bucket.
+     *
+     * @return void
+     */
+    public function testExcludeFromScoreRuleFindingsDoNotPenaliseTheComposite(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $findings = [
+            $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
+        ];
+
+        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
+
+        self::assertLessThan(100.0, $scoredWithRule->composite->score);
+        self::assertSame(100.0, $scoredWithoutRule->composite->score);
+    }
+
+    /**
+     * Verify default behaviour (no config supplied) is unchanged.
+     *
+     * @return void
+     */
+    public function testNullAnalysisConfigKeepsAllFindingsInScore(): void
+    {
+        $findings = [
+            $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
+        ];
+
+        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: null);
+
+        self::assertLessThan(100.0, $score->composite->score);
+    }
+
+    /**
+     * Verify synthetic composite findings honour `excludeFromScore` on their component rules.
+     *
+     * A composite finding ({@see \GruffPhp\Scoring\CompositeFindingFactory}) is dropped
+     * from scoring only when EVERY component rule listed in its metadata is excluded.
+     * A single non-excluded component keeps the composite penalty in play.
+     *
+     * @return void
+     */
+    public function testCompositeFindingHonoursExcludeFromScoreOnComponentRules(): void
+    {
+        $registry  = RuleRegistry::defaults();
+        $composite = $this->finding(
+            'design.god-method',
+            Pillar::Design,
+            Severity::Warning,
+            metadata: ['componentRules' => ['complexity.cognitive', 'size.method-length']],
+        );
+
+        $bothExcluded = AnalysisConfig::fromRegistry($registry);
+        foreach (['complexity.cognitive', 'size.method-length'] as $ruleId) {
+            $settings     = $bothExcluded->ruleSettings($ruleId);
+            $bothExcluded = $bothExcluded->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
+                enabled:           $settings->enabled,
+                thresholds:        $settings->thresholds,
+                options:           $settings->options,
+                severityThreshold: $settings->severityThreshold,
+                excludeFromScore:  true,
+            ));
+        }
+
+        $oneExcluded = $this->configWithExcludedRule($registry, 'complexity.cognitive');
+
+        $scoredBothExcluded = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $bothExcluded);
+        $scoredOneExcluded  = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $oneExcluded);
+
+        self::assertSame(100.0, $scoredBothExcluded->composite->score);
+        self::assertLessThan(100.0, $scoredOneExcluded->composite->score);
+    }
+
+    /**
+     * Build an AnalysisConfig with one rule marked excludeFromScore.
+     *
+     * @param string $ruleId Rule identifier to mark excluded.
+     * @return AnalysisConfig
+     */
+    private function configWithExcludedRule(RuleRegistry $registry, string $ruleId): AnalysisConfig
+    {
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings($ruleId);
+
+        return $config->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
+            enabled:           $settings->enabled,
+            thresholds:        $settings->thresholds,
+            options:           $settings->options,
+            severityThreshold: $settings->severityThreshold,
+            excludeFromScore:  true,
+        ));
     }
 
     /**

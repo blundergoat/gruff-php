@@ -97,6 +97,10 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return false;
         }
 
+        if ($array->items[0]->key !== null || $array->items[1]->key !== null) {
+            return false;
+        }
+
         $target = $array->items[0]->value;
         $method = $array->items[1]->value;
 
@@ -104,9 +108,13 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             return false;
         }
 
+        if ($target instanceof Expr\ClassConstFetch) {
+            return $target->name instanceof Node\Identifier
+                && strtolower($target->name->toString()) === 'class';
+        }
+
         return $target instanceof Expr\Variable
-            || $target instanceof Expr\PropertyFetch
-            || $target instanceof Expr\ClassConstFetch;
+            || $target instanceof Expr\PropertyFetch;
     }
 
     /**

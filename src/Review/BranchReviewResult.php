@@ -49,6 +49,51 @@ final readonly class BranchReviewResult
     }
 
     /**
+     * Bucket introduced and removed findings by rule id and return per-rule deltas
+     * sorted by net change. Net = introduced - removed. Zero-net rules are
+     * omitted. Ties are broken by rule id ascending so output is deterministic.
+     *
+     * @return list<array{ruleId: string, introduced: int, removed: int, net: int}>
+     */
+    public function perRuleDelta(): array
+    {
+        $buckets = [];
+
+        foreach ($this->introduced as $finding) {
+            $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
+            $buckets[$finding->ruleId]['introduced']++;
+        }
+
+        foreach ($this->removed as $finding) {
+            $buckets[$finding->ruleId] ??= ['introduced' => 0, 'removed' => 0];
+            $buckets[$finding->ruleId]['removed']++;
+        }
+
+        $rows = [];
+
+        foreach ($buckets as $ruleId => $counts) {
+            $net = $counts['introduced'] - $counts['removed'];
+            if ($net === 0) {
+                continue;
+            }
+            $rows[] = [
+                'ruleId' => $ruleId,
+                'introduced' => $counts['introduced'],
+                'removed' => $counts['removed'],
+                'net' => $net,
+            ];
+        }
+
+        usort(
+            $rows,
+            static fn (array $left, array $right): int => $left['net'] <=> $right['net']
+                ?: strcmp($left['ruleId'], $right['ruleId']),
+        );
+
+        return $rows;
+    }
+
+    /**
      * Serialize this value object into the array shape used by reports.
      *
      * @return array<string, ReviewValue>
@@ -65,6 +110,7 @@ final readonly class BranchReviewResult
                 'unchanged' => count($this->unchanged),
             ],
             'deltaScore' => $this->deltaScore,
+            'perRuleDelta' => $this->perRuleDelta(),
             'introduced' => array_map(static fn (Finding $finding): array => $finding->toArray(), $this->introduced),
             'removed' => array_map(static fn (Finding $finding): array => $finding->toArray(), $this->removed),
             'unchanged' => array_map(static fn (Finding $finding): array => $finding->toArray(), $this->unchanged),

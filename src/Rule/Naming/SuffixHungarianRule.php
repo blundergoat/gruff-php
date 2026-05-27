@@ -37,8 +37,8 @@ use PhpParser\Node\UnionType;
  *
  * Overlap deferral order is centralised in RuleRegistry:
  * class-file-mismatch > confusing-name > negative-boolean > boolean-prefix >
- * parameter-type-name > identifier-quality > hungarian-notation >
- * suffix-hungarian > short-variable > abbreviation-allowlist.
+ * identifier-quality > hungarian-notation > suffix-hungarian > short-variable >
+ * abbreviation-allowlist.
  */
 final readonly class SuffixHungarianRule implements RuleInterface
 {
@@ -195,7 +195,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: sprintf('Rename $%s to describe its role without repeating the type.', $name),
+            remediation: sprintf('Rename $%s to describe its role without repeating the type. If the suffix is a domain convention rather than type-restating, remove it from `rules.naming.suffix-hungarian.options.typeSuffixes` in `.gruff-php.yaml`.', $name),
             metadata:    ['identifierKind' => $kind, 'identifierName' => $name, 'suffix' => $suffix],
         );
     }

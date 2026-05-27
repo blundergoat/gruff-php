@@ -1,3 +1,4 @@
+schemaVersion: gruff-php.config.v0.1
 paths:
     ignore:
         - 'tests/Fixtures/Source/mixed/alpha.php'

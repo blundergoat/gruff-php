@@ -1,3 +1,4 @@
+schemaVersion: gruff-php.config.v0.1
 # .gruff-php.yaml
 # Project self-scan policy. Seeded from `gruff-php init`, then tuned for this repository.
 # Preserve paths.ignore, allowlists, thresholds, and path-specific test-quality exceptions when regenerating.
@@ -274,74 +275,6 @@ rules:
                 - 'GruffPhp\Command\AnalyseCommandOptions::noBaseline'
                 - 'GruffPhp\Command\SummaryCommand::hasConfigConflict::noConfig'
                 - 'GruffPhp\Command\SummaryCommand::analysisConfig::noConfig'
-    naming.parameter-type-name:
-        enabled: true
-        options:
-            typeSuffixesToTrim:
-                - Interface
-            ignoredParameterNames:
-                - node
-                - stmt
-                - expr
-                - call
-                - registry
-                - config
-                - definition
-                - scope
-                - report
-                - options
-                - baseline
-                - baselineReport
-                - composite
-                - defaultSeverity
-                - diagnostic
-                - diff
-                - file
-                - filters
-                - format
-                - identity
-                - minSeverity
-                - mutation
-                - pillar
-                - result
-                - review
-                - reviewDiff
-                - score
-                - settings
-                - setup
-                - store
-                - tier
-                - trend
-                - ancestorMethod
-                - assignment
-                - candidate
-                - child
-                - class
-                - classLike
-                - condition
-                - constructor
-                - expression
-                - first
-                - name
-                - newExpression
-                - parameter
-                - receiver
-                - returnStatement
-                - statement
-                - target
-                - type
-                - value
-                - discovery
-                - findingContext
-                - renderer
-                - responder
-                - response
-                - root
-                - scanRunner
-                - stateFactory
-                - tokenizer
-                - owner
-                - block
     naming.short-variable:
         enabled: true
     naming.suffix-hungarian:

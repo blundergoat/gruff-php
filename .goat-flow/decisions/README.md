@@ -50,6 +50,7 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-011-single-file-scan-option.md`
 - `ADR-012-size-rule-line-counting-metric.md`
 - `ADR-013-dogfood-scans-use-project-config.md`
+- `ADR-014-retire-naming-parameter-type-name.md`
 
 ## Required Structure
 

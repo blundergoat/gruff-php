@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Command;
 
+use GruffPhp\Config\ConfigException;
+use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -178,7 +181,7 @@ final class ReportCommand extends Command
         $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', '--format'];
         $command[] = $this->optionalStringOption($input, 'format') ?? 'html';
         $command[] = '--fail-on';
-        $command[] = $this->optionalStringOption($input, 'fail-on') ?? 'none';
+        $command[] = $this->resolveFailOn($input);
 
         $this->appendStringOptions($command, $input);
         $this->appendReportEditorLinkOption($command, $input);
@@ -345,6 +348,66 @@ final class ReportCommand extends Command
                 $command[] = $diff;
             }
         }
+    }
+
+    /**
+     * Apply ADR-015 precedence for the report command's --fail-on value.
+     *
+     * Explicit CLI flag > config.minimumSeverity.report > binary default `none`.
+     * The resolved value is forwarded to the analyse subprocess as an explicit
+     * --fail-on, so the subprocess uses it directly rather than re-applying
+     * analyse's own precedence chain (which has a different binary default).
+     *
+     * @param InputInterface $input Console input for the report command.
+     * @return string Resolved threshold suitable for `--fail-on`.
+     */
+    private function resolveFailOn(InputInterface $input): string
+    {
+        // Symfony's $input->getOption('fail-on') returns the option's default value
+        // ('none') even when the user did not pass --fail-on at all, so we have to
+        // detect "explicit" via the raw parameter list. Otherwise the config-supplied
+        // minimumSeverity.report value can never win, defeating the M11 wiring.
+        if ($input->hasParameterOption('--fail-on', true)) {
+            return $this->optionalStringOption($input, 'fail-on') ?? 'none';
+        }
+
+        $configThreshold = $this->loadConfigFailThreshold($input);
+        if ($configThreshold !== null) {
+            return $configThreshold;
+        }
+
+        return 'none';
+    }
+
+    /**
+     * Load the project config (best-effort) and read `minimumSeverity.report`.
+     *
+     * Config errors are swallowed because the analyse subprocess re-loads the
+     * same config and will surface any failures through its usual diagnostic
+     * path. Returning null lets the caller fall back to the binary default.
+     *
+     * @param InputInterface $input Console input for the report command.
+     * @return string|null Resolved threshold string, or null when unavailable.
+     */
+    private function loadConfigFailThreshold(InputInterface $input): ?string
+    {
+        if ((bool) $input->getOption('no-config')) {
+            return null;
+        }
+
+        $projectRoot = getcwd();
+        if ($projectRoot === false) {
+            return null;
+        }
+
+        try {
+            $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
+                ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
+        } catch (ConfigException) {
+            return null;
+        }
+
+        return $config->failThresholdFor('report')?->value;
     }
 
     /**

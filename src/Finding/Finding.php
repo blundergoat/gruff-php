@@ -24,6 +24,7 @@ namespace GruffPhp\Finding;
  *     confidence: string,
  *     remediation: string|null,
  *     fingerprint: string,
+ *     stableIdentity: string,
  *     metadata: FindingMetadata|object
  * }
  */
@@ -88,6 +89,7 @@ final readonly class Finding
             'confidence' => $this->confidence->value,
             'remediation' => $this->remediation,
             'fingerprint' => $this->fingerprint(),
+            'stableIdentity' => $this->stableIdentity(),
             'metadata' => $this->metadata === [] ? (object) [] : $this->metadata,
         ];
     }
@@ -110,5 +112,30 @@ final readonly class Finding
         ], JSON_THROW_ON_ERROR);
 
         return substr(hash('sha256', $encoded), 0, 16);
+    }
+
+    /**
+     * Build a line-insensitive identity for line-shift-resilient diffs.
+     *
+     * Keyed by `[ruleId, file, symbol, message]` when the finding carries a
+     * symbol, or `[ruleId, file, message]` when symbol is null. Line / endLine
+     * / column are intentionally excluded so two findings of the same rule on
+     * the same symbol that shifted lines via unrelated edits resolve to the
+     * same identity. `message` is included even when symbol is set so multiple
+     * findings sharing one symbol (e.g. `docs.missing-param-tag` emitting one
+     * finding per missing parameter, all under the same method name) stay
+     * distinct in external diff tooling. For baseline matching, callers should
+     * still use {@see fingerprint()}; this field is informational for external
+     * diff tooling.
+     *
+     * @return string Sixteen-character SHA-256 prefix for the line-insensitive identity.
+     */
+    public function stableIdentity(): string
+    {
+        $payload = $this->symbol !== null
+            ? ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'symbol' => $this->symbol, 'message' => $this->message]
+            : ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'message' => $this->message];
+
+        return substr(hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)), 0, 16);
     }
 }

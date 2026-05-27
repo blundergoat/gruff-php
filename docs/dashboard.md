@@ -27,6 +27,28 @@ vendor/bin/gruff-php dashboard --host=127.0.0.1 --port=8765 --project=.
 | `--diff` | false | Start in diff-only mode. |
 | `--include-ignored` | false | Include ignored files. |
 
+## Initial Fail Threshold
+
+The `Fail on` `<select>` defaults to `none` unless the project config carries
+`minimumSeverity.dashboard:`. Resolution order:
+
+1. CLI `--fail-on` flag at `dashboard` launch time (when set explicitly)
+2. `minimumSeverity.dashboard` in `.gruff-php.yaml`
+3. Binary default `none`
+
+Submitting the form posts the selected value as `failOn`, which is forwarded
+to the analyse subprocess as `--fail-on`. The option list itself
+(`none | advisory | warning | error`) is fixed.
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+minimumSeverity:
+  dashboard: warning
+```
+
+See [`docs/configuration.md`](configuration.md#minimum-severity) for the
+rejection contract and the precedence rule.
+
 ## Safety
 
 The dashboard has no authentication and should stay bound to loopback unless the

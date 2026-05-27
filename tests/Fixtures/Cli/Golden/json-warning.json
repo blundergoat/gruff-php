@@ -1,8 +1,8 @@
 {
-    "schemaVersion": "gruff.analysis.v1",
+    "schemaVersion": "gruff.analysis.v2",
     "tool": {
         "name": "gruff-php",
-        "version": "0.1.3"
+        "version": "0.2.0"
     },
     "run": {
         "format": "json",
@@ -53,6 +53,7 @@
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
             "fingerprint": "f034a267b2fdcbc9",
+            "stableIdentity": "b7289768254b1d9c",
             "metadata": {
                 "lines": 27,
                 "threshold": 3,
@@ -74,6 +75,7 @@
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
             "fingerprint": "3b9c556468b6bc15",
+            "stableIdentity": "106e7b2df944f9fd",
             "metadata": {}
         },
         {
@@ -89,8 +91,9 @@
             "secondaryPillars": [],
             "tier": "v0.1",
             "confidence": "medium",
-            "remediation": "Rename the identifier to describe its domain role or action.",
+            "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
             "fingerprint": "25633f1c266ca38f",
+            "stableIdentity": "f726935116318593",
             "metadata": {
                 "identifierKind": "method",
                 "identifierName": "value",
@@ -114,9 +117,9 @@
                 "score": 84,
                 "grade": "B",
                 "findings": 1,
-                "advisories": 0,
-                "warnings": 1,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 1,
+                "error": 0,
                 "penalty": 16
             },
             {
@@ -125,9 +128,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -136,9 +139,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -147,9 +150,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -158,9 +161,9 @@
                 "score": 81,
                 "grade": "B",
                 "findings": 2,
-                "advisories": 1,
-                "warnings": 1,
-                "errors": 0,
+                "advisory": 1,
+                "warning": 1,
+                "error": 0,
                 "penalty": 19
             },
             {
@@ -169,9 +172,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -180,9 +183,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -191,9 +194,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -202,9 +205,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             },
             {
@@ -213,9 +216,9 @@
                 "score": 100,
                 "grade": "A",
                 "findings": 0,
-                "advisories": 0,
-                "warnings": 0,
-                "errors": 0,
+                "advisory": 0,
+                "warning": 0,
+                "error": 0,
                 "penalty": 0
             }
         ],
@@ -225,9 +228,9 @@
                 "score": 56.25,
                 "grade": "F",
                 "findings": 3,
-                "advisories": 1,
-                "warnings": 2,
-                "errors": 0,
+                "advisory": 1,
+                "warning": 2,
+                "error": 0,
                 "penalty": 43.75,
                 "maxCyclomatic": null,
                 "maxCognitive": null,

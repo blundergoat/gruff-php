@@ -168,11 +168,12 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
             [
                 'RegexCommentFixture::isSeparatedRegexMatch()',
                 'RegexCommentFixture::isUndocumentedRegexMatch()',
+                'RegexCommentFixture::matchTheRouteUncommentedRegex()',
             ],
             $symbols,
         );
         self::assertSame(
-            ['preg_match', 'preg_match'],
+            ['preg_match', 'preg_match', 'preg_match'],
             array_map(static function ($finding): ?string {
                 $functionName = $finding->metadata['function'] ?? null;
 
@@ -386,5 +387,35 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
         self::assertNotContains('DocumentedEnum::FIRST', $symbols);
         self::assertNotContains('DocumentedEnum::SECOND', $symbols);
+    }
+
+    /**
+     * Verify constants with a leading `//` line comment get the line-comment-specific message and metadata.
+     *
+     * @return void
+     */
+    public function testMissingConstantPhpdocSurfacesLineCommentVariant(): void
+    {
+        $findings = $this->analyseRule('missing-constant-phpdoc-line-comment.php', MissingConstantPhpdocRule::ID);
+
+        $byConstant = [];
+        foreach ($findings as $finding) {
+            $constantName = $finding->metadata['constantName'] ?? null;
+            if (is_string($constantName)) {
+                $byConstant[$constantName] = $finding;
+            }
+        }
+
+        self::assertArrayHasKey('CSV_BYTE_CAP', $byConstant);
+        self::assertArrayHasKey('PLAIN_NO_COMMENT', $byConstant);
+
+        $lineCommented = $byConstant['CSV_BYTE_CAP'];
+        self::assertSame('line', $lineCommented->metadata['commentKind'] ?? null);
+        self::assertStringContainsString('leading `//` line comment', $lineCommented->message);
+        self::assertStringContainsString('convert to `/** ... */`', $lineCommented->message);
+
+        $plain = $byConstant['PLAIN_NO_COMMENT'];
+        self::assertArrayNotHasKey('commentKind', $plain->metadata);
+        self::assertStringContainsString('needs a brief intent description', $plain->message);
     }
 }

@@ -130,6 +130,42 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Verify enum candidate rule ignores classes that mix scalar constant types.
+     *
+     * @return void
+     */
+    public function testEnumCandidateRuleIgnoresMixedScalarConstants(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/enum-candidate-mixed-scalar.php');
+
+        self::assertRuleCount(EnumCandidateRule::ID, 0, $findings);
+    }
+
+    /**
+     * Verify first-class callable rule ignores non-`::class` ConstFetch targets.
+     *
+     * @return void
+     */
+    public function testFirstClassCallableRuleIgnoresNonClassClassConst(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/first-class-callable-non-class-const.php');
+
+        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
+    }
+
+    /**
+     * Verify first-class callable rule ignores associative two-key array literals.
+     *
+     * @return void
+     */
+    public function testFirstClassCallableRuleIgnoresAssociativeArrayLiterals(): void
+    {
+        $findings = $this->analysePath('tests/Fixtures/Modernisation/first-class-callable-associative-array.php');
+
+        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
+    }
+
+    /**
      * Verify error suppression uses security finding with modernisation secondary pillar.
      *
      * @return void

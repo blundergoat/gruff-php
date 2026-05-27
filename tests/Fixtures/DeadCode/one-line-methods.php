@@ -92,3 +92,34 @@ final class SingleFactoryFixture
         return new self($status);
     }
 }
+
+final class CrossClassCallerOwnerA
+{
+    public function persist(BookingSession $session): void
+    {
+        $this->save($session);
+    }
+
+    public function alsoPersist(BookingSession $session): void
+    {
+        $this->save($session);
+    }
+
+    private function save(BookingSession $session): void
+    {
+        unset($session);
+    }
+}
+
+final class CrossClassCallerOwnerB
+{
+    public function save(BookingSession $session): BookingSession
+    {
+        return $this->normalise($session);
+    }
+
+    private function normalise(BookingSession $session): BookingSession
+    {
+        return $session;
+    }
+}
