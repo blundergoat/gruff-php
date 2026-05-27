@@ -55,8 +55,76 @@ final class FindingTest extends TestCase
             'confidence' => 'high',
             'remediation' => 'Split the file.',
             'fingerprint' => $finding->fingerprint(),
+            'stableIdentity' => $finding->stableIdentity(),
             'metadata' => ['lines' => 401, 'threshold' => 400],
         ], $finding->toArray());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->fingerprint());
+        self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->stableIdentity());
+    }
+
+    /**
+     * Verify stableIdentity ignores line shifts when symbol is set.
+     *
+     * @return void
+     */
+    public function testStableIdentitySurvivesLineShiftsWhenSymbolIsSet(): void
+    {
+        $atLine10 = $this->finding(line: 10, symbol: 'Example::doWork()');
+        $atLine42 = $this->finding(line: 42, symbol: 'Example::doWork()');
+
+        self::assertSame($atLine10->stableIdentity(), $atLine42->stableIdentity());
+        self::assertNotSame($atLine10->fingerprint(), $atLine42->fingerprint());
+    }
+
+    /**
+     * Verify stableIdentity falls back to message text when symbol is null.
+     *
+     * @return void
+     */
+    public function testStableIdentityFallsBackToMessageWhenSymbolIsNull(): void
+    {
+        $atLine10 = $this->finding(line: 10, symbol: null);
+        $atLine99 = $this->finding(line: 99, symbol: null);
+
+        self::assertSame($atLine10->stableIdentity(), $atLine99->stableIdentity());
+        self::assertNotSame($atLine10->fingerprint(), $atLine99->fingerprint());
+    }
+
+    /**
+     * Verify stableIdentity diverges across different rule IDs even at the same symbol.
+     *
+     * @return void
+     */
+    public function testStableIdentityDifferentRuleIdsProduceDifferentValues(): void
+    {
+        $sizeRule       = $this->finding(line: 10, ruleId: 'size.file-length', symbol: 'Example::doWork()');
+        $complexityRule = $this->finding(line: 10, ruleId: 'complexity.cognitive', symbol: 'Example::doWork()');
+
+        self::assertNotSame($sizeRule->stableIdentity(), $complexityRule->stableIdentity());
+    }
+
+    /**
+     * Build a Finding fixture for stable-identity tests.
+     *
+     * @return Finding
+     */
+    private function finding(
+        int $line,
+        ?string $symbol,
+        string $ruleId = 'size.file-length',
+    ): Finding {
+        return new Finding(
+            ruleId:           $ruleId,
+            message:          'File is too long.',
+            filePath:         'src/Example.php',
+            line:             $line,
+            severity:         Severity::Warning,
+            pillar:           Pillar::Size,
+            tier:             RuleTier::V01,
+            confidence:       Confidence::High,
+            endLine:          $line + 10,
+            column:           4,
+            symbol:           $symbol,
+        );
     }
 }

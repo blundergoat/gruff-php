@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Scoring;
 
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -39,6 +40,7 @@ final readonly class ScoreCalculator
      * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
      * @param int                         $fileScoreLimit         Maximum file offender rows to retain.
      * @param list<Pillar>|null           $scorePillars           Optional pillar set included in composite scoring.
+     * @param AnalysisConfig|null         $analysisConfig         Optional config used to filter findings from rules marked `excludeFromScore` (ADR-016).
      * @return ScoreReport Calculated composite, pillar, and file-level scores.
      */
     public function calculate(
@@ -47,7 +49,9 @@ final readonly class ScoreCalculator
         ?DiffResult $diffResult,
         int $fileScoreLimit = 10,
         ?array $scorePillars = null,
+        ?AnalysisConfig $analysisConfig = null,
     ): ScoreReport {
+        $findings   = $this->scoredFindings($findings, $analysisConfig);
         $pillars    = $this->pillarScores($findings, $mutationAnalysisResult, $scorePillars);
         $scoreTotal = 0.0;
         $scoreCount = 0;
@@ -73,6 +77,33 @@ final readonly class ScoreCalculator
             scope:                  $scope,
             explanation:            $this->scoreExplanation($mutationAnalysisResult),
         );
+    }
+
+    /**
+     * Filter the input findings to only those that contribute to scoring penalties.
+     * A rule marked `excludeFromScore: true` is informational: its findings still
+     * flow through reports (the scorer never sees them after this filter), but
+     * they do not affect the composite or pillar penalty buckets. See ADR-016.
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
+    {
+        if (!$analysisConfig instanceof AnalysisConfig) {
+            return $findings;
+        }
+
+        $rules = $analysisConfig->rules();
+
+        return array_values(array_filter(
+            $findings,
+            static function (Finding $finding) use ($rules): bool {
+                $settings = $rules[$finding->ruleId] ?? null;
+
+                return $settings === null || !$settings->isExcludedFromScore();
+            },
+        ));
     }
 
     /**

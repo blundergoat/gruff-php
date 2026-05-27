@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Scoring;
 
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -13,6 +14,8 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\InfectionMutant;
 use GruffPhp\Mutation\InfectionReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
+use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreCalculator;
@@ -193,6 +196,61 @@ final class ScoreCalculatorTest extends TestCase
 
         self::assertSame(['security', 'sensitive-data'], $pillars);
         self::assertSame('F', $score->composite->letter);
+    }
+
+    /**
+     * Verify findings from `excludeFromScore: true` rules are filtered before the penalty bucket.
+     *
+     * @return void
+     */
+    public function testExcludeFromScoreRuleFindingsDoNotPenaliseTheComposite(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $findings = [
+            $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
+        ];
+
+        $scoredWithRule    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
+        $scoredWithoutRule = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: $this->configWithExcludedRule($registry, FileLengthRule::ID));
+
+        self::assertLessThan(100.0, $scoredWithRule->composite->score);
+        self::assertSame(100.0, $scoredWithoutRule->composite->score);
+    }
+
+    /**
+     * Verify default behaviour (no config supplied) is unchanged.
+     *
+     * @return void
+     */
+    public function testNullAnalysisConfigKeepsAllFindingsInScore(): void
+    {
+        $findings = [
+            $this->finding(FileLengthRule::ID, Pillar::Size, Severity::Error),
+        ];
+
+        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), analysisConfig: null);
+
+        self::assertLessThan(100.0, $score->composite->score);
+    }
+
+    /**
+     * Build an AnalysisConfig with one rule marked excludeFromScore.
+     *
+     * @param string $ruleId Rule identifier to mark excluded.
+     * @return AnalysisConfig
+     */
+    private function configWithExcludedRule(RuleRegistry $registry, string $ruleId): AnalysisConfig
+    {
+        $config   = AnalysisConfig::fromRegistry($registry);
+        $settings = $config->ruleSettings($ruleId);
+
+        return $config->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
+            enabled:           $settings->enabled,
+            thresholds:        $settings->thresholds,
+            options:           $settings->options,
+            severityThreshold: $settings->severityThreshold,
+            excludeFromScore:  true,
+        ));
     }
 
     /**

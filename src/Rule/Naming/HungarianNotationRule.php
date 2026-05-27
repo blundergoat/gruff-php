@@ -180,7 +180,7 @@ final readonly class HungarianNotationRule implements RuleInterface
             tier:        $definition->tier,
             confidence:  $definition->confidence,
             symbol:      $symbol,
-            remediation: sprintf('Remove the type prefix. Use $%s instead.', lcfirst(substr($name, strlen($prefix)))),
+            remediation: sprintf('Remove the type prefix. Use $%s instead. If the prefix is a domain convention rather than Hungarian notation, remove it from `rules.naming.hungarian-notation.options.typePrefixes` in `.gruff-php.yaml`.', lcfirst(substr($name, strlen($prefix)))),
             metadata:    ['variable' => $name, 'prefix' => $prefix, 'identifierKind' => $kind],
         );
     }

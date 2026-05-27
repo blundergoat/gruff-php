@@ -53,6 +53,7 @@
             "confidence": "high",
             "remediation": "Split oversized files or move responsibilities into smaller units.",
             "fingerprint": "f034a267b2fdcbc9",
+            "stableIdentity": "b7289768254b1d9c",
             "metadata": {
                 "lines": 27,
                 "threshold": 3,
@@ -74,6 +75,7 @@
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
             "fingerprint": "3b9c556468b6bc15",
+            "stableIdentity": "debdb313996b39d5",
             "metadata": {}
         },
         {
@@ -89,8 +91,9 @@
             "secondaryPillars": [],
             "tier": "v0.1",
             "confidence": "medium",
-            "remediation": "Rename the identifier to describe its domain role or action.",
+            "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
             "fingerprint": "25633f1c266ca38f",
+            "stableIdentity": "aae737666c1e8143",
             "metadata": {
                 "identifierKind": "method",
                 "identifierName": "value",

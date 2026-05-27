@@ -15,6 +15,16 @@ last_reviewed: 2026-05-27
 
 **Prevention:** When adding a new universal default that ships via `gruff-php init`, the value must live on `AnalysisConfig` as a `public const` (or a value object equivalent) and `AnalysisConfig::fromRegistry()` must populate the corresponding accessor. `InitCommand`'s scaffold constant should reference the `AnalysisConfig` constant directly (`AnalysisConfig::DEFAULT_ACCEPTED_ABBREVIATIONS`) so the two values cannot drift. Same shape for any future allowlist, ignore-path default, or threshold floor: scaffold + runtime must share one declaration. The Hard Rules section of `CLAUDE.md` already says "If a file exists, modify it in place; do not create backup or `_new` variants" — the same single-source-of-truth principle applies to defaults: never declare the same default in two places.
 
+## Lesson: When the dogfood config has tuned a rule, those tunings are the real defaults
+
+**Created:** 2026-05-27
+
+**What happened:** `waste.one-line-method` shipped with `minInFileCallers: 0` and `namedAlternativeFactoryExempt: false` as `defaultOptions`. The project's own `.gruff-php.yaml` overrode both to `minInFileCallers: 2` and `namedAlternativeFactoryExempt: true` because the unmodified defaults produced too much noise on this codebase. External adopters scanning their own code hit the same noise without the benefit of the self-tuned overrides — the "default" was effectively unusable. Lifting the dogfood values into the rule's `defaultOptions` removed three findings from the regression snapshot fixture (`AlternativeFactoryFixture::ready`, `AlternativeFactoryFixture::failed`, `OneLineMethodFixture::sharedHelper`) without disabling any real signal.
+
+**Root cause:** Treating ship defaults and dogfood tuning as separate dimensions. The reasoning was: "ship the rule on the strict side, let projects opt into the lenient knobs." In practice, the only project that calibrated the rule chose strict because the lenient ship default was noisy on real code. The signal is: when the dogfood project has accumulated overrides for a rule, those overrides ARE the calibrated defaults; the ship defaults are an uncalibrated prior nobody has validated.
+
+**Prevention:** Before shipping a rule's defaults, check whether the dogfood `.gruff-php.yaml` already tunes them. If so, the tuned values are the candidate ship defaults; the rationale to ship something different needs concrete evidence (a different project that benefits from the looser values). The project config can stay redundant (explicit pin) or be removed (relies on defaults); pick the redundant-pin shape until the new defaults have ridden at least one release without complaint, then revisit. Applies to any rule with knobs: thresholds, minimum-counts, exemption flags. Same lockstep applies as for "scaffolded init values must flow through `AnalysisConfig`" — one canonical declaration, multiple consumers, never two source-of-truth copies.
+
 ## Lesson: Keyword-based exemptions need fixture audits because existing positive-case fixtures often use the trigger words
 
 **Created:** 2026-05-27

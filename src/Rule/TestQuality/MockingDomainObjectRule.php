@@ -99,7 +99,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
                     tier:        RuleTier::V01,
                     confidence:  Confidence::Low,
                     symbol:      $scope->symbol,
-                    remediation: 'Domain objects usually carry behaviour worth exercising directly. Construct the real instance, or move the boundary so this collaborator becomes a service interface that is safe to mock.',
+                    remediation: 'Domain objects usually carry behaviour worth exercising directly. Construct the real instance, or move the boundary so this collaborator becomes a service interface that is safe to mock. If a namespace genuinely holds boundary collaborators rather than domain objects, remove it from `rules.test-quality.mocking-domain-object.options.domainNamespaces` in `.gruff-php.yaml`.',
                     metadata:    ['class' => $resolved, 'pattern' => $matched],
                 );
             }

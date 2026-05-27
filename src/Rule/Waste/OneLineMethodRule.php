@@ -77,11 +77,27 @@ final readonly class OneLineMethodRule implements RuleInterface
             confidence:      Confidence::Medium,
             defaultOptions:  [
                 'minParameters' => 1,
-                'minInFileCallers' => 0,
-                'namedAlternativeFactoryExempt' => false,
+                'minInFileCallers' => 2,
+                'namedAlternativeFactoryExempt' => true,
                 'allowedSymbols' => [],
             ],
             description: 'Flags trivial methods that only wrap a one-line call expression.',
+            optionDescriptions: [
+                'minParameters' => 'Minimum parameter count before flagging (skips zero-arg accessors).',
+                'minInFileCallers' => 'Skip when the wrapper is called from this many sites in the same file (default 2).',
+                'namedAlternativeFactoryExempt' => 'Skip public static factory pairs like Money::fromCents()/fromDollars() that exist for naming clarity.',
+                'allowedSymbols' => 'Qualified symbols that intentionally stay thin (API contracts, security helpers); see remediation.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'Public API contract methods whose body legitimately delegates to one internal call (e.g. DashboardStateFactory::initialProjectRoot()).',
+                    'mitigation' => 'Add the qualified symbol to options.allowedSymbols.',
+                ],
+                [
+                    'shape' => 'Named-alternative factory pairs (Money::fromCents(), Money::fromDollars()) where each factory wraps `new self(...)`.',
+                    'mitigation' => 'namedAlternativeFactoryExempt defaults to true; verify both factories return new instances of the same class.',
+                ],
+            ],
         );
     }
 
@@ -149,7 +165,7 @@ final readonly class OneLineMethodRule implements RuleInterface
                 confidence:  $definition->confidence,
                 endLine:     $classMethod->getEndLine() > 0 ? $classMethod->getEndLine() : null,
                 symbol:      $symbol,
-                remediation: 'Inline the expression at the call site or expand the method so it owns a meaningful contract.',
+                remediation: 'Inline the expression at the call site or expand the method so it owns a meaningful contract. If this method is an intentional API contract, add its qualified symbol to `rules.waste.one-line-method.options.allowedSymbols` in `.gruff-php.yaml`.',
                 metadata:    [
                     'method' => $classMethod->name->toString(),
                     'parameterCount' => count($classMethod->params),

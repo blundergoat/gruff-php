@@ -123,7 +123,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
                     tier:        RuleTier::V01,
                     confidence:  Confidence::Low,
                     symbol:      sprintf('%s::%s()', $className, $first->name->toString()),
-                    remediation: 'Collapse the repeated tests into one method driven by #[DataProvider] or @dataProvider with the differing values as data rows.',
+                    remediation: 'Collapse the repeated tests into one method driven by #[DataProvider] or @dataProvider with the differing values as data rows. If a path consistently produces structurally similar tests by design, add it to `rules.test-quality.repeated-structure-missing-data-provider.options.ignoredPathPatterns` in `.gruff-php.yaml`.',
                     metadata:    ['count' => count($methods), 'methods' => $names],
                 );
             }

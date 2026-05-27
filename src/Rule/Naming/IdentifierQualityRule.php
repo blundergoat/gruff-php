@@ -127,6 +127,23 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 'loopBodyThreshold' => 4,
             ],
             description: 'Catches placeholder, generic, and numbered identifiers that obscure intent.',
+            optionDescriptions: [
+                'placeholderNames' => 'Names treated as obviously placeholder (foo, bar, baz, tmp, temp).',
+                'genericTokens' => 'Tokens treated as generic when used as the whole identifier (data, entry, info, item).',
+                'ignoredNames' => 'Names exempt from all checks (loop counters, exception variables, $_).',
+                'minScopeReferences' => 'Minimum local-variable references before reporting generic names.',
+                'loopBodyThreshold' => 'Foreach body statement count above which generic loop names report.',
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape' => 'Short loop bodies that use a conventional generic name ($entry, $item, $row) when iterating a payload.',
+                    'mitigation' => 'Keep the loop body at or below loopBodyThreshold (default 4) statements, or add the name to options.ignoredNames.',
+                ],
+                [
+                    'shape' => 'Single-parameter helpers whose role is intentionally generic (mixed → string converters, JSON-boundary helpers).',
+                    'mitigation' => 'Single-parameter mixed-type helpers are skipped; rename multi-parameter helpers to describe their domain role.',
+                ],
+            ],
         );
     }
 
@@ -494,7 +511,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             tier:        $identifierFindingContext->definition->tier,
             confidence:  $identifierFindingContext->definition->confidence,
             symbol:      $symbol,
-            remediation: 'Rename the identifier to describe its domain role or action.',
+            remediation: 'Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.',
             metadata:    [
                 'identifierKind' => $kind,
                 'identifierName' => $name,

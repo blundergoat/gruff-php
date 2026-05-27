@@ -19,6 +19,22 @@ Use `json` for automation. JSON reports use `gruff.analysis.v2`.
 vendor/bin/gruff-php analyse src --format json --fail-on none > gruff-php.json
 ```
 
+Each finding carries two identifier fields:
+
+- `fingerprint` — 16-character SHA-256 prefix over `ruleId + file + line +
+  endLine + column + symbol + message`. The line-sensitive identity used
+  by baseline matching (so a moved violation can be re-baselined
+  deliberately) and by SARIF emission.
+- `stableIdentity` — 16-character SHA-256 prefix over `ruleId + file +
+  symbol` (or `ruleId + file + message` when symbol is null). The
+  line-insensitive identity intended for custom diff tooling that needs
+  to track "the same finding" across unrelated edits that shift line
+  numbers. Two findings of the same rule on the same symbol share a
+  `stableIdentity` but have different `fingerprint` values.
+
+For baseline matching, use `fingerprint`. For line-shift-resilient diff
+tooling, use `stableIdentity`.
+
 ## HTML
 
 Use `html` for archived human review or dashboard scan output:

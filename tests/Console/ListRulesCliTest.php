@@ -58,6 +58,81 @@ final class ListRulesCliTest extends CliTestCase
     }
 
     /**
+     * Verify list-rules with a rule id argument renders the per-rule detail view.
+     *
+     * @return void
+     */
+    public function testListRulesRendersPerRuleDetailViewForKnownId(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'naming.identifier-quality',
+        ]);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $output = $process->getOutput();
+        self::assertStringContainsString('Rule: naming.identifier-quality', $output);
+        self::assertStringContainsString('Default options:', $output);
+        self::assertStringContainsString('placeholderNames', $output);
+        self::assertStringContainsString('Escape hatches:', $output);
+        self::assertStringContainsString('rules.naming.identifier-quality.excludeFromScore', $output);
+        self::assertStringContainsString('Common false-positive shapes:', $output);
+    }
+
+    /**
+     * Verify list-rules detail view JSON includes the structured payload.
+     *
+     * @return void
+     */
+    public function testListRulesDetailJsonIncludesStructuredFields(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'waste.one-line-method',
+            '--format',
+            'json',
+        ]);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $payload = json_decode($process->getOutput(), associative: true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($payload);
+        self::assertSame('waste.one-line-method', $payload['id'] ?? null);
+        self::assertArrayHasKey('escapeHatches', $payload);
+        self::assertArrayHasKey('falsePositiveShapes', $payload);
+        self::assertIsArray($payload['escapeHatches']);
+        self::assertNotEmpty($payload['escapeHatches']);
+    }
+
+    /**
+     * Verify list-rules with an unknown rule id suggests near matches and exits INVALID.
+     *
+     * @return void
+     */
+    public function testListRulesUnknownRuleSuggestsNearMatches(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'list-rules',
+            'naming.identifier-qualty',
+        ]);
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode());
+        $combined = $process->getOutput() . $process->getErrorOutput();
+        self::assertStringContainsString('Unknown rule', $combined);
+        self::assertStringContainsString('Did you mean', $combined);
+        self::assertStringContainsString('naming.identifier-quality', $combined);
+    }
+
+    /**
      * Verify clean checkout install runs CLI help.
      *
      * @return void

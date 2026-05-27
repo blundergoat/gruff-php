@@ -388,7 +388,35 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
                 '{"minimumSeverity":{"analyse":7}}',
                 'Config key "minimumSeverity.analyse" must be a string. Got int.',
             ],
+            'excludeFromScore rejects non-boolean value' => [
+                '{"rules":{"size.file-length":{"excludeFromScore":"yes"}}}',
+                'Config key "rules.size.file-length.excludeFromScore" must be boolean.',
+            ],
         ];
+    }
+
+    /**
+     * Verify excludeFromScore defaults to false and accepts true/false overrides.
+     *
+     * @return void
+     */
+    public function testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides(): void
+    {
+        $registry      = RuleRegistry::defaults();
+        $defaultConfig = (new ConfigLoader(__DIR__ . '/../..'))->load(null, $registry);
+        self::assertFalse($defaultConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+
+        $optInPath = $this->writeTempConfig(
+            '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":true}}}',
+        );
+        $optInConfig = (new ConfigLoader(dirname($optInPath)))->load(basename($optInPath), $registry);
+        self::assertTrue($optInConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+
+        $optOutPath = $this->writeTempConfig(
+            '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":false}}}',
+        );
+        $optOutConfig = (new ConfigLoader(dirname($optOutPath)))->load(basename($optOutPath), $registry);
+        self::assertFalse($optOutConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
     }
 
     /**

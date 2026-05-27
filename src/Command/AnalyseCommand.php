@@ -196,7 +196,7 @@ final class AnalyseCommand extends Command
         $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
         $scoreStart     = hrtime(true);
-        $score          = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars());
+        $score          = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
         $scoreNs        = hrtime(true) - $scoreStart;
         $reviewFindings = $options->diffVs === null ? $findings : array_values(array_filter(
             $findings,
@@ -204,7 +204,7 @@ final class AnalyseCommand extends Command
         ));
         $reviewScore = $options->diffVs === null
             ? $score->composite->score
-            : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars())->composite->score;
+            : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite->score;
         $review = $this->buildBranchReview(
             projectRoot:     $projectRoot,
             options:         $options,
@@ -544,7 +544,7 @@ final class AnalyseCommand extends Command
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
         if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
-            $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars());
+            $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,
@@ -593,7 +593,7 @@ final class AnalyseCommand extends Command
             }
 
             $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null, scorePillars: $options->profileScorePillars());
+            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
 
             return (new BranchReviewComparator())->compare(
                 current:       $currentFindings,

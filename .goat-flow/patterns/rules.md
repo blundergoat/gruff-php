@@ -1,9 +1,33 @@
 ---
 category: rules
-last_reviewed: 2026-05-11
+last_reviewed: 2026-05-27
 ---
 
 # Rule Engine Patterns
+
+## Pattern: Remediation text shape — fix sentence plus config-hatch sentence
+
+**Created:** 2026-05-27 (M07)
+
+**Context:** Every rule has an escape hatch in `defaultOptions` for the cases where the rule's heuristic over-fires on intentional code. The default options live in the rule's `definition()` and the YAML config under `rules.<rule-id>.options.*` or, for cross-rule allowlists, `allowlists.*`. Users hitting a finding need both the in-source fix and the config-level override; without the config hint they often disable the rule entirely or accumulate baselines instead of telling gruff "this case is intentional".
+
+**Approach:** When a rule has a discoverable escape-hatch knob, structure its `remediation` field as two sentences:
+
+1. **Fix sentence.** What to do in the code (rename, inline, narrow the type, replace the magic literal, etc.). The text should make sense without the second sentence so users who don't want to touch config can act on it alone.
+2. **Config-hatch sentence.** "If this `<name|identifier|pattern|literal>` is intentional, add it to ``rules.<id>.options.<key>`` in `.gruff-php.yaml`." Use backticks around the literal YAML path. For global allowlists (`naming.abbreviation-allowlist` → `allowlists.acceptedAbbreviations`) use the full global path instead of the per-rule path.
+
+**Examples** (`src/Rule/Waste/OneLineMethodRule.php`):
+- "Inline the expression at the call site or expand the method so it owns a meaningful contract. If this method is an intentional API contract, add its qualified symbol to `rules.waste.one-line-method.options.allowedSymbols` in `.gruff-php.yaml`."
+
+**Constraints:**
+- Two sentences maximum. The field is for human-readable guidance, not embedded fix commands.
+- The named config key must already exist in the rule's `defaultOptions` (or be a global `allowlists.*` path). Don't surface a non-existent knob.
+- Don't enumerate what to add (specific values are project-specific). Just name the path.
+- If the rule has NO escape-hatch knob, skip the second sentence — better to be honest than to invent a config key.
+
+**Why two sentences:** structured remediation metadata on `Finding` (`fixKind`, `fixCommand`, machine-readable suggestions) was considered and deferred — the text-only enrichment lands the value without changing the JSON schema. If codemod tooling needs structured data later, the second sentence becomes the seed for a `configKey` metadata field; until then it sits in the human-readable string and is consumed by every reporter unchanged.
+
+**Verification:** `php bin/gruff-php analyse src --no-config --format=json --fail-on=none | jq '.findings[] | select(.remediation | contains("`.gruff-php.yaml`")) | .ruleId' | sort | uniq -c` should list every rule that has an escape hatch with at least one finding. Rules without knobs (size/complexity rules, security rules with no opt-out path) will not appear and that is correct.
 
 ## Pattern: Project-level rule seam
 

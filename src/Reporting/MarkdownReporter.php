@@ -88,6 +88,57 @@ final readonly class MarkdownReporter
                 count($report->review->removed),
                 count($report->review->unchanged),
             );
+            $this->appendRuleDeltas($lines, $report);
+        }
+    }
+
+    /**
+     * Render the top-5 most-improved and most-regressed rules from a branch-review comparison.
+     * Surfaced before the per-pillar score so the rule-level shift is visible alongside
+     * the composite (which can mask churn). See M06 / ADR-016.
+     *
+     * @param list<string>   $lines  Markdown lines being built.
+     * @param AnalysisReport $report Analysis report to render.
+     * @return void
+     */
+    private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
+    {
+        if ($report->review === null) {
+            return;
+        }
+
+        $rows = $report->review->perRuleDelta();
+        if ($rows === []) {
+            return;
+        }
+
+        $improved  = array_slice(array_filter($rows, static fn (array $row): bool => $row['net'] < 0), 0, 5);
+        $regressed = array_slice(
+            array_reverse(array_filter($rows, static fn (array $row): bool => $row['net'] > 0)),
+            0,
+            5,
+        );
+
+        if ($improved !== []) {
+            $lines[] = sprintf(
+                '**Top %d improved:** %s',
+                count($improved),
+                implode(', ', array_map(
+                    static fn (array $row): string => sprintf('`%d %s`', $row['net'], $row['ruleId']),
+                    $improved,
+                )),
+            );
+        }
+
+        if ($regressed !== []) {
+            $lines[] = sprintf(
+                '**Top %d regressed:** %s',
+                count($regressed),
+                implode(', ', array_map(
+                    static fn (array $row): string => sprintf('`+%d %s`', $row['net'], $row['ruleId']),
+                    $regressed,
+                )),
+            );
         }
     }
 

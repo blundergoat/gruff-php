@@ -36,7 +36,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
-        self::assertCount(22, $findings, 'Expected 22 phpdoc-mixed findings on the fixture.');
+        self::assertCount(26, $findings, 'Expected 26 phpdoc-mixed findings on the fixture.');
 
         $methodsFlagged = array_values(array_unique(array_map(
             static fn (Finding $finding): string => $finding->symbol ?? '',
@@ -50,6 +50,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
                 '$uppercasePsalmVar',
                 'PhpDocMixedOveruseFixture::arrayBagSuffixIsNotAllowed()',
                 'PhpDocMixedOveruseFixture::arrayShapeMixedReturn()',
+                'PhpDocMixedOveruseFixture::arrayShapeWithOnlyMixedFieldStillFires()',
+                'PhpDocMixedOveruseFixture::collectionMixedStillFires()',
+                'PhpDocMixedOveruseFixture::emptyShapeUnionMixedStillFires()',
                 'PhpDocMixedOveruseFixture::listSuffixIsNotAllowed()',
                 'PhpDocMixedOveruseFixture::methodPropertyTag()',
                 'PhpDocMixedOveruseFixture::methodTypeAliasTag()',
@@ -60,6 +63,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
                 'PhpDocMixedOveruseFixture::mixedAfterUnscannedTag()',
                 'PhpDocMixedOveruseFixture::mixedInCollection()',
                 'PhpDocMixedOveruseFixture::mixedInIterable()',
+                'PhpDocMixedOveruseFixture::mixedKeyedBagStillFires()',
                 'PhpDocMixedOveruseFixture::prefixedListIsNotAllowed()',
                 'PhpDocMixedOveruseFixture::unionWithMixed()',
                 'PhpDocMixedOveruseFixture::untypedSignatureMixedDoc()',
@@ -96,6 +100,26 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         ));
 
         self::assertSame([], $unexpectedFindings);
+    }
+
+    /**
+     * Verify precise `array{...}` envelopes with at least one concrete sibling field
+     * are exempted while loose shapes (only-mixed fields, mixed-keyed bags,
+     * single-leaf generics) keep firing.
+     *
+     * @return void
+     */
+    public function testPreciseArrayShapeEnvelopesAreAllowedWhileLooseShapesStillFire(): void
+    {
+        $findings = $this->phpdocMixedFindings($this->analyseFixture());
+        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+
+        self::assertNotContains('PhpDocMixedOveruseFixture::preciseArrayShapeWithMixedLeaf()', $symbols);
+        self::assertNotContains('PhpDocMixedOveruseFixture::preciseArrayShapeOptionalMixed()', $symbols);
+
+        self::assertContains('PhpDocMixedOveruseFixture::arrayShapeWithOnlyMixedFieldStillFires()', $symbols);
+        self::assertContains('PhpDocMixedOveruseFixture::mixedKeyedBagStillFires()', $symbols);
+        self::assertContains('PhpDocMixedOveruseFixture::collectionMixedStillFires()', $symbols);
     }
 
     /**

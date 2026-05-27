@@ -270,7 +270,7 @@ final class SummaryCommand extends Command
             shouldReleaseUnitsAfterAnalysis: true,
         );
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit);
+        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
 
         return new SummaryReportData(
             paths:             $paths,

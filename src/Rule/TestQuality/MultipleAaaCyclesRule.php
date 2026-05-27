@@ -87,7 +87,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,
                 symbol:      $scope->symbol,
-                remediation: 'Each test should arrange once, act once, and assert once. Split this method into separate tests for each scenario.',
+                remediation: 'Each test should arrange once, act once, and assert once. Split this method into separate tests for each scenario. If a path legitimately uses sequential scenarios (e.g. end-to-end suites), add it to `rules.test-quality.multiple-aaa-cycles.options.ignoredPathPatterns` in `.gruff-php.yaml`.',
                 metadata:    ['cycles' => $cycles, 'threshold' => $threshold],
             );
         }

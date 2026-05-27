@@ -118,6 +118,24 @@ rules:
 Run `vendor/bin/gruff-php list-rules --format json` to inspect rule IDs and
 available defaults.
 
+### Visibility without scoring
+
+`excludeFromScore: true` keeps a rule running and surfaces its findings in
+every report, but the findings no longer contribute to the composite or
+pillar penalty bucket. Use it when a rule is informational for the team
+but you do not want its volume to dominate the grade. `enabled: false`
+remains the way to silence a rule entirely.
+
+```yaml
+rules:
+  docs.missing-public-phpdoc:
+    enabled: true
+    excludeFromScore: true
+```
+
+See [`ADR-016`](../.goat-flow/decisions/ADR-016-visibility-only-rule-scoring-tier.md)
+for the rationale and the failure-mode comparison.
+
 ## Compatibility
 
 The shared cross-language config expectations are documented in

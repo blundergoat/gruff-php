@@ -181,7 +181,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $symbol,
-                remediation: 'Rename to use a boolean prefix, e.g. isActive(), hasPermission().',
+                remediation: 'Rename to use a boolean prefix, e.g. isActive(), hasPermission(). If a project-specific prefix is intentional, add it to `rules.naming.boolean-prefix.options.allowedPrefixes` in `.gruff-php.yaml`.',
             ),
         ];
     }

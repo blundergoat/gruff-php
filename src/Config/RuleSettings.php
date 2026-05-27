@@ -17,13 +17,23 @@ final readonly class RuleSettings
      * @param array<string, int|float>                                                     $thresholds        Named numeric thresholds available to the rule.
      * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options           Rule-specific option values from config.
      * @param SeverityThreshold|null                                                       $severityThreshold Optional single threshold/severity override.
+     * @param bool                                                                         $excludeFromScore  When true, the rule still runs and surfaces findings in reports but its findings do not penalise the composite score. See ADR-016.
      */
     public function __construct(
         public bool $enabled,
         public array $thresholds,
         public array $options = [],
         public ?SeverityThreshold $severityThreshold = null,
+        public bool $excludeFromScore = false,
     ) {
+    }
+
+    /**
+     * @return bool True when this rule's findings should be reported but not scored.
+     */
+    public function isExcludedFromScore(): bool
+    {
+        return $this->excludeFromScore;
     }
 
     /**

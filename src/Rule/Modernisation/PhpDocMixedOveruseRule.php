@@ -77,6 +77,17 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             tier:            RuleTier::V01,
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Medium,
+            description: 'Flags PHPDoc @param/@return/@var/@property tags using mixed where a narrower type would carry more meaning. Unstructured array bags and precise array{...} envelope shapes are exempt.',
+            falsePositiveShapes: [
+                [
+                    'shape' => 'JSON-boundary helpers consuming json_decode output where every top-level shape is possible.',
+                    'mitigation' => 'Narrow @param/@return to `array|bool|float|int|string|null` - the supertype of any top-level decoded value.',
+                ],
+                [
+                    'shape' => 'Envelope shapes with mixed leaves (FHIR resources, LLM tool-call args).',
+                    'mitigation' => 'Use `array{key: type, ...}` syntax with at least one concrete sibling field; precise envelopes are exempted.',
+                ],
+            ],
         );
     }
 
@@ -127,6 +138,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     continue;
                 }
 
+                if ($this->isPreciseArrayShape($block['body'])) {
+                    continue;
+                }
+
                 $paramName = in_array($tagKind, self::PARAM_TAGS, true)
                     ? $this->extractParamName($block['body'])
                     : null;
@@ -149,7 +164,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                     tier:        $definition->tier,
                     confidence:  $definition->confidence,
                     symbol:      $symbol,
-                    remediation: 'Prefer a narrower PHPDoc type than mixed (named class, value object, union, or bounded generic). gruff-php reports only.',
+                    remediation: 'Narrow the PHPDoc type to match what the function actually accepts. For JSON-boundary helpers use `array|bool|float|int|string|null`. For envelope shapes where the leaf is genuinely heterogeneous (e.g. FHIR resources, LLM tool-call args), name the envelope precisely with `array{...}` syntax — precise shapes are exempted by the rule. When only one input shape is meaningful, narrow to that concrete type (`?string`, `int|float|null`, a named class).',
                     metadata:    [
                         'tagKind' => $tagKind,
                         'paramName' => $paramName,
@@ -299,6 +314,107 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         }
 
         return $this->isArrayBagType($type);
+    }
+
+    /**
+     * Detect PHPStan/Psalm `array{...}` shapes that carry at least one field whose
+     * type is not `mixed`. The nested mixed in that case describes a genuinely
+     * heterogeneous leaf (e.g. JSON envelope payload) rather than type sloppiness.
+     * An `array{value: mixed}` shape with no concrete sibling field is NOT
+     * precise and still fires.
+     *
+     * @return bool True when the type is a precise envelope shape.
+     */
+    private function isPreciseArrayShape(string $body): bool
+    {
+        $type = $this->extractTypeExpression($body);
+        if ($type === null) {
+            return false;
+        }
+
+        $type = preg_replace('/\s+/', '', $type) ?? $type;
+        if (!preg_match('/^array\{(.*)\}$/i', $type, $matches)) {
+            return false;
+        }
+
+        $inner = $matches[1];
+        if ($inner === '') {
+            return false;
+        }
+
+        foreach ($this->splitTopLevelComma($inner) as $pair) {
+            $colonIndex = $this->topLevelColonIndex($pair);
+            if ($colonIndex === null) {
+                continue;
+            }
+
+            $fieldType = trim(substr($pair, $colonIndex + 1));
+            if ($fieldType !== '' && strcasecmp($fieldType, 'mixed') !== 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Split a string on top-level commas, ignoring commas nested inside `<>{}()[]`.
+     *
+     * @return list<string>
+     */
+    private function splitTopLevelComma(string $body): array
+    {
+        $segments = [];
+        $segment  = '';
+        $depth    = 0;
+        $length   = strlen($body);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $body[$i];
+
+            if ($char === '<' || $char === '{' || $char === '(' || $char === '[') {
+                $depth++;
+            } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
+                $depth = max(0, $depth - 1);
+            }
+
+            if ($depth === 0 && $char === ',') {
+                $segments[] = $segment;
+                $segment    = '';
+                continue;
+            }
+
+            $segment .= $char;
+        }
+
+        if ($segment !== '') {
+            $segments[] = $segment;
+        }
+
+        return $segments;
+    }
+
+    /**
+     * Return the index of the first top-level colon in a shape pair, or null when none exists.
+     */
+    private function topLevelColonIndex(string $pair): ?int
+    {
+        $depth  = 0;
+        $length = strlen($pair);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $pair[$i];
+
+            if ($char === '<' || $char === '{' || $char === '(' || $char === '[') {
+                $depth++;
+            } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
+                $depth = max(0, $depth - 1);
+            } elseif ($char === ':' && $depth === 0) {
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**

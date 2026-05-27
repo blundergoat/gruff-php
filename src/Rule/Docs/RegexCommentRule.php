@@ -113,7 +113,7 @@ final readonly class RegexCommentRule implements RuleInterface
                 tier:        $definition->tier,
                 confidence:  $definition->confidence,
                 symbol:      $this->symbol($regexCallNode),
-                remediation: sprintf('Add a one-line comment immediately above the %s() call explaining the regex intent.', $functionName),
+                remediation: sprintf('Add a one-line comment immediately above the %s() call explaining the regex intent. If this function is not a regex matcher in your codebase, remove it from `rules.docs.regex-comment.options.functionNames` in `.gruff-php.yaml`.', $functionName),
                 metadata:    ['function' => $functionName],
             );
         }
