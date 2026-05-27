@@ -168,11 +168,12 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
             [
                 'RegexCommentFixture::isSeparatedRegexMatch()',
                 'RegexCommentFixture::isUndocumentedRegexMatch()',
+                'RegexCommentFixture::matchTheRouteUncommentedRegex()',
             ],
             $symbols,
         );
         self::assertSame(
-            ['preg_match', 'preg_match'],
+            ['preg_match', 'preg_match', 'preg_match'],
             array_map(static function ($finding): ?string {
                 $functionName = $finding->metadata['function'] ?? null;
 

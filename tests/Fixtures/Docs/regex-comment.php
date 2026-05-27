@@ -88,4 +88,20 @@ final class RegexCommentFixture
             default => null,
         };
     }
+
+    /**
+     * Match the candidate name to a fixture key in ordinary English usage.
+     * The word "match" here is incidental prose and must not exempt the call below.
+     *
+     * @param string $candidateName Name being checked.
+     * @return bool True when the candidate uses the fixture format.
+     */
+    public function matchTheRouteUncommentedRegex(string $candidateName): bool
+    {
+        if ($candidateName === '') {
+            return false;
+        }
+
+        return preg_match('/^[A-Z][A-Z0-9_]+$/', $candidateName) === 1;
+    }
 }

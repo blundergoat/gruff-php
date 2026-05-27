@@ -188,6 +188,7 @@ final readonly class MissingParamTagRule implements RuleInterface
                 return null;
             }
 
+            // Anchored regex pulls the `$name` token at the current cursor position; the `/A` anchor enforces start-at-offset.
             if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $stripped, $matches, 0, $position) === 1) {
                 $position += strlen($matches[0]);
 

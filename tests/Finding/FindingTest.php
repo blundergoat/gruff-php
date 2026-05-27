@@ -104,6 +104,42 @@ final class FindingTest extends TestCase
     }
 
     /**
+     * Verify two findings of the same rule on the same symbol but with different
+     * messages stay distinct. `docs.missing-param-tag` emits one finding per
+     * missing parameter under the same method symbol — those must not collapse
+     * to one identity in external diff tooling.
+     *
+     * @return void
+     */
+    public function testStableIdentitySeparatesSameSymbolFindingsByMessage(): void
+    {
+        $missingFoo = new Finding(
+            ruleId:     'docs.missing-param-tag',
+            message:    '@param $foo missing for Example::doWork().',
+            filePath:   'src/Example.php',
+            line:       10,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+            symbol:     'Example::doWork()',
+        );
+        $missingBar = new Finding(
+            ruleId:     'docs.missing-param-tag',
+            message:    '@param $bar missing for Example::doWork().',
+            filePath:   'src/Example.php',
+            line:       10,
+            severity:   Severity::Advisory,
+            pillar:     Pillar::Documentation,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+            symbol:     'Example::doWork()',
+        );
+
+        self::assertNotSame($missingFoo->stableIdentity(), $missingBar->stableIdentity());
+    }
+
+    /**
      * Build a Finding fixture for stable-identity tests.
      *
      * @return Finding

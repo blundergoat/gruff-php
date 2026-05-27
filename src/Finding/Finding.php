@@ -117,20 +117,23 @@ final readonly class Finding
     /**
      * Build a line-insensitive identity for line-shift-resilient diffs.
      *
-     * Keyed by `[ruleId, file, symbol]` when the finding carries a symbol, or
-     * `[ruleId, file, message]` when symbol is null. Line / endLine / column
-     * are intentionally excluded so two findings of the same rule on the same
-     * symbol that shifted lines via unrelated edits resolve to the same
-     * identity. For baseline matching, callers should still use
-     * {@see fingerprint()}; this field is informational for external diff
-     * tooling.
+     * Keyed by `[ruleId, file, symbol, message]` when the finding carries a
+     * symbol, or `[ruleId, file, message]` when symbol is null. Line / endLine
+     * / column are intentionally excluded so two findings of the same rule on
+     * the same symbol that shifted lines via unrelated edits resolve to the
+     * same identity. `message` is included even when symbol is set so multiple
+     * findings sharing one symbol (e.g. `docs.missing-param-tag` emitting one
+     * finding per missing parameter, all under the same method name) stay
+     * distinct in external diff tooling. For baseline matching, callers should
+     * still use {@see fingerprint()}; this field is informational for external
+     * diff tooling.
      *
      * @return string Sixteen-character SHA-256 prefix for the line-insensitive identity.
      */
     public function stableIdentity(): string
     {
         $payload = $this->symbol !== null
-            ? ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'symbol' => $this->symbol]
+            ? ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'symbol' => $this->symbol, 'message' => $this->message]
             : ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'message' => $this->message];
 
         return substr(hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)), 0, 16);

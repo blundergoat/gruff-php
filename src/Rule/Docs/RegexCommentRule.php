@@ -49,7 +49,16 @@ final readonly class RegexCommentRule implements RuleInterface
      * regex call. The intent is to skip the per-call comment requirement when the enclosing
      * function-like's docblock already describes the regex behaviour.
      */
-    private const FUNCTION_DOC_KEYWORDS = ['regex', 'pattern', 'preg_', 'match'];
+    /**
+     * Substrings in a docblock that signal it already explains the regex behaviour.
+     * `match` was previously included but matches docblocks like "Match the route."
+     * far too broadly; dropped so the enclosing function-doc exemption only fires
+     * when the docblock actually mentions regex/pattern/preg_, or the specific
+     * function name (e.g. `preg_match_all`) which is added at lookup time.
+     *
+     * @var list<string>
+     */
+    private const FUNCTION_DOC_KEYWORDS = ['regex', 'pattern', 'preg_'];
 
     /**
      * Describe the regex-comment rule.
@@ -173,6 +182,8 @@ final readonly class RegexCommentRule implements RuleInterface
      * Check whether the regex call lives inside a `match (true)` arm whose key is a string literal
      * label. The string literal already acts as the human-readable explanation, so per-call comments
      * would duplicate it. Requires at least one literal-string arm condition reachable from the call.
+     *
+     * @return bool True when the call sits inside a string-labelled match arm.
      */
     private function isInsideStringLabelledMatchArm(FuncCall $regexCallNode): bool
     {
@@ -196,6 +207,8 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Determine whether a node subtree contains the target regex call. Used to confirm the
      * surrounding match-arm condition actually owns the call we're about to emit a finding for.
+     *
+     * @return bool True when the condition subtree reaches the target call.
      */
     private function containsRegexCall(Node $condition, FuncCall $regexCallNode): bool
     {
@@ -211,9 +224,12 @@ final readonly class RegexCommentRule implements RuleInterface
 
     /**
      * Check whether the enclosing function-like carries a docblock that already explains the regex
-     * behaviour. Substring match on `regex`, `pattern`, `preg_`, `match`, or the specific function
-     * name (e.g. `preg_match_all`) is enough; the rule's job is to nudge documentation, not police
-     * its wording.
+     * behaviour. Substring check against `regex`, `pattern`, `preg_`, or the specific function name
+     * (e.g. `preg_match_all`) is enough; the rule's job is to nudge documentation, not police its
+     * wording. `match` was previously included but proved too broad — see the FUNCTION_DOC_KEYWORDS
+     * docblock for the rationale.
+     *
+     * @return bool True when the enclosing docblock already references the regex behaviour.
      */
     private function hasEnclosingFunctionDocReferencingRegex(FuncCall $regexCallNode, string $functionName): bool
     {

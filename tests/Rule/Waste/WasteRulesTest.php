@@ -325,6 +325,28 @@ final class WasteRulesTest extends TestCase
     }
 
     /**
+     * Verify caller-count exemption is scoped to the owning class. A second class in
+     * the same file that defines a same-named method (e.g. `save()`) but only has one
+     * self-caller must still fire even when another class's `save()` has two callers.
+     *
+     * @return void
+     */
+    public function testOneLineMethodRuleScopesCallerCountToOwningClass(): void
+    {
+        $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        // CrossClassCallerOwnerB::save() has only one in-class caller and must still fire,
+        // even though CrossClassCallerOwnerA::save() (different class, same method name)
+        // has two callers in the same file.
+        self::assertContains('CrossClassCallerOwnerB::save()', $symbols);
+
+        // CrossClassCallerOwnerA::save() has two self-callers; default minInFileCallers: 2
+        // means it does not fire.
+        self::assertNotContains('CrossClassCallerOwnerA::save()', $symbols);
+    }
+
+    /**
      * Verify one-line method rule supports explicit symbol allowlists.
      *
      * @return void

@@ -735,8 +735,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     private function collectVariablesByName(array $nodes, array &$variables): void
     {
+        $walker = new IdentifierAstWalker();
         foreach ($nodes as $node) {
-            foreach ($this->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
+            foreach ($walker->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
                 if ($variable instanceof Variable && is_string($variable->name)) {
                     $variables[$variable->name] = true;
                 }
@@ -759,16 +760,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         return $matches;
-    }
-
-    /**
-     * @param list<Node>           $nodes     Roots to traverse.
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @return list<Node> Descendant nodes that match the predicate.
-     */
-    private function nodesMatching(array $nodes, callable $predicate): array
-    {
-        return (new IdentifierAstWalker())->nodesMatching($nodes, $predicate);
     }
 
     /**

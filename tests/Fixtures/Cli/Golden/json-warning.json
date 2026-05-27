@@ -75,7 +75,7 @@
             "confidence": "high",
             "remediation": "Rename the file to Alpha.php or the class to alpha.",
             "fingerprint": "3b9c556468b6bc15",
-            "stableIdentity": "debdb313996b39d5",
+            "stableIdentity": "106e7b2df944f9fd",
             "metadata": {}
         },
         {
@@ -93,7 +93,7 @@
             "confidence": "medium",
             "remediation": "Rename the identifier to describe its domain role or action. If the placeholder or generic token is intentional, add it to `rules.naming.identifier-quality.options.placeholderNames`, `genericTokens`, or `ignoredNames` in `.gruff-php.yaml`.",
             "fingerprint": "25633f1c266ca38f",
-            "stableIdentity": "aae737666c1e8143",
+            "stableIdentity": "f726935116318593",
             "metadata": {
                 "identifierKind": "method",
                 "identifierName": "value",

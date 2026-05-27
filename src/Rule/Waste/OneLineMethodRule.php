@@ -20,8 +20,10 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
+use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
+use PhpParser\Node\Stmt\Trait_;
 use PhpParser\NodeFinder;
 
 /**
@@ -120,16 +122,21 @@ final readonly class OneLineMethodRule implements RuleInterface
         $factoryExempt      = $settings->option('namedAlternativeFactoryExempt') === true;
         $allowedSymbols     = array_fill_keys($settings->stringListOption('allowedSymbols'), true);
         $nodeFinder         = new NodeFinder();
-        $methodCallCounts   = $this->methodCallCounts($analysisUnit);
+        $selfCallCounts     = $this->selfCallCountsByClass($analysisUnit, $nodeFinder);
         $factoryMethodIds   = $factoryExempt ? $this->namedAlternativeFactoryMethodIds($analysisUnit) : [];
         $findings           = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, ClassMethod::class) as $classMethod) {
+            $enclosingClassId = $this->enclosingClassId($classMethod);
+            $selfCallerCount  = $enclosingClassId !== null
+                ? ($selfCallCounts[$enclosingClassId][strtolower($classMethod->name->toString())] ?? 0)
+                : 0;
+
             if ($this->shouldSkip(
                 classMethod:      $classMethod,
                 minParameters:    $minParameters,
                 minInFileCallers: $minInFileCallers,
-                methodCallCounts: $methodCallCounts,
+                selfCallerCount:  $selfCallerCount,
                 factoryMethodIds: $factoryMethodIds,
             )) {
                 continue;
@@ -180,7 +187,7 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Decide whether a method shape is exempt from one-line wrapper checks.
      *
-     * @param array<string, int> $methodCallCounts Method-call counts keyed by lowercase method name.
+     * @param int                $selfCallerCount  Count of in-class `$this->name()` / `self::name()` / `static::name()` / `parent::name()` calls.
      * @param array<int, true>   $factoryMethodIds Alternative named-factory method object ids.
      *
      * @return bool True when the method should not be reported.
@@ -189,7 +196,7 @@ final readonly class OneLineMethodRule implements RuleInterface
         ClassMethod $classMethod,
         int $minParameters,
         int $minInFileCallers,
-        array $methodCallCounts,
+        int $selfCallerCount,
         array $factoryMethodIds,
     ): bool
     {
@@ -211,7 +218,28 @@ final readonly class OneLineMethodRule implements RuleInterface
             return true;
         }
 
-        return $minInFileCallers > 0 && ($methodCallCounts[strtolower($name)] ?? 0) >= $minInFileCallers;
+        return $minInFileCallers > 0 && $selfCallerCount >= $minInFileCallers;
+    }
+
+    /**
+     * Walk up from a ClassMethod to its enclosing class-like declaration so caller
+     * counts can be scoped by owning class. Returns null when the method is not
+     * enclosed by a class/trait/enum (e.g. interface methods, which the rule
+     * already skips via `isAbstract()`).
+     *
+     * @return int|null Object id of the enclosing class-like, or null when unresolved.
+     */
+    private function enclosingClassId(ClassMethod $classMethod): ?int
+    {
+        $node = $classMethod->getAttribute('parent');
+        while ($node instanceof Node) {
+            if ($node instanceof Class_ || $node instanceof Trait_ || $node instanceof Enum_) {
+                return spl_object_id($node);
+            }
+            $node = $node->getAttribute('parent');
+        }
+
+        return null;
     }
 
     /**
@@ -230,22 +258,51 @@ final readonly class OneLineMethodRule implements RuleInterface
     }
 
     /**
-     * Count method and static-call names inside the current file.
+     * Count in-class self-targeted method calls (`$this->name()`, `self::name()`,
+     * `static::name()`, `parent::name()`) keyed by enclosing class object id and
+     * lowercase method name. Scoping by class prevents two unrelated classes in
+     * the same file from cross-contaminating each other's caller counts — a
+     * file with `A::save()` called twice and a separate `B::save()` wrapper
+     * with no callers would otherwise see `B::save()` silently exempted under
+     * the `minInFileCallers: 2` default.
      *
-     * @return array<string, int> Counts keyed by lowercase method name.
+     * @return array<int, array<string, int>> Counts keyed by class object id, then lowercase method name.
      */
-    private function methodCallCounts(AnalysisUnit $analysisUnit): array
+    private function selfCallCountsByClass(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
+        /** @var array<int, array<string, int>> $counts Accumulator shape is built incrementally per class. */
         $counts = [];
 
-        foreach (NodeIndex::nodesOfAny($analysisUnit, [Expr\MethodCall::class, Expr\StaticCall::class]) as $call) {
-            /** @var Expr\MethodCall|Expr\StaticCall $call NodeIndex query is constrained to call classes. */
-            if (!$call->name instanceof Node\Identifier) {
-                continue;
-            }
+        foreach (NodeIndex::nodesOfAny($analysisUnit, [Class_::class, Trait_::class, Enum_::class]) as $class) {
+            /** @var Class_|Trait_|Enum_ $class NodeIndex query is constrained to these class-like kinds. */
+            $classId          = spl_object_id($class);
+            $counts[$classId] = [];
 
-            $name          = strtolower($call->name->toString());
-            $counts[$name] = ($counts[$name] ?? 0) + 1;
+            foreach ($class->getMethods() as $method) {
+                if ($method->stmts === null) {
+                    continue;
+                }
+
+                $calls = $nodeFinder->find($method->stmts, static function (Node $node): bool {
+                    if ($node instanceof Expr\MethodCall && $node->var instanceof Expr\Variable && $node->var->name === 'this') {
+                        return $node->name instanceof Node\Identifier;
+                    }
+                    if ($node instanceof Expr\StaticCall && $node->class instanceof Name && $node->name instanceof Node\Identifier) {
+                        return in_array(strtolower($node->class->toString()), ['self', 'static', 'parent'], true);
+                    }
+
+                    return false;
+                });
+
+                foreach ($calls as $call) {
+                    /** @var Expr\MethodCall|Expr\StaticCall $call NodeFinder predicate guarantees the union. */
+                    if (!$call->name instanceof Node\Identifier) {
+                        continue;
+                    }
+                    $name                      = strtolower($call->name->toString());
+                    $counts[$classId][$name]   = ($counts[$classId][$name] ?? 0) + 1;
+                }
+            }
         }
 
         return $counts;

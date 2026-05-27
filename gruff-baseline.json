@@ -1,6 +1,6 @@
 {
     "schemaVersion": "gruff.baseline.v1",
-    "generatedAt": "2026-05-27T11:19:23+00:00",
+    "generatedAt": "2026-05-27T18:41:37+00:00",
     "findings": [
         {
             "fingerprint": "857aaeaf33b58b64",
@@ -147,30 +147,6 @@
             "message": "@param $varname in MissingParamTagRule::scanForParamVariable() does not match any parameter."
         },
         {
-            "fingerprint": "e7b1d851cc66c4b3",
-            "ruleId": "docs.missing-return-tag",
-            "file": "src/Rule/Docs/RegexCommentRule.php",
-            "line": 177,
-            "symbol": "RegexCommentRule::isInsideStringLabelledMatchArm()",
-            "message": "RegexCommentRule::isInsideStringLabelledMatchArm() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
-        },
-        {
-            "fingerprint": "987dbb5e10336cd8",
-            "ruleId": "docs.missing-return-tag",
-            "file": "src/Rule/Docs/RegexCommentRule.php",
-            "line": 200,
-            "symbol": "RegexCommentRule::containsRegexCall()",
-            "message": "RegexCommentRule::containsRegexCall() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
-        },
-        {
-            "fingerprint": "dbf4b894279f2b6d",
-            "ruleId": "docs.missing-return-tag",
-            "file": "src/Rule/Docs/RegexCommentRule.php",
-            "line": 218,
-            "symbol": "RegexCommentRule::hasEnclosingFunctionDocReferencingRegex()",
-            "message": "RegexCommentRule::hasEnclosingFunctionDocReferencingRegex() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
-        },
-        {
             "fingerprint": "55808d7ca38d5666",
             "ruleId": "docs.regex-comment",
             "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
@@ -259,10 +235,10 @@
             "message": "DocsRulesTest::testMissingParamTagRecognisesMultiLineArrayShape() contains conditional logic; tests should usually be linear."
         },
         {
-            "fingerprint": "8c4b23738f8cb4b4",
+            "fingerprint": "5770d6a5857f374c",
             "ruleId": "test-quality.conditional-logic",
             "file": "tests/Rule/Docs/DocsTagAndStructureRulesTest.php",
-            "line": 403,
+            "line": 404,
             "symbol": "DocsTagAndStructureRulesTest::testMissingConstantPhpdocSurfacesLineCommentVariant()",
             "message": "DocsTagAndStructureRulesTest::testMissingConstantPhpdocSurfacesLineCommentVariant() contains conditional logic; tests should usually be linear."
         },
