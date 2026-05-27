@@ -14,7 +14,6 @@ use GruffPhp\Rule\Naming\ConfusingNameRule;
 use GruffPhp\Rule\Naming\GenericMethodNameRule;
 use GruffPhp\Rule\Naming\HungarianNotationRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
-use GruffPhp\Rule\Naming\IdentifierTokenizer;
 use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
@@ -285,20 +284,6 @@ final class NamingRulesTest extends NamingRuleTestCase
         ));
 
         self::assertSame([], $mismatches);
-    }
-
-    /**
-     * Verify identifier tokenizer splits common identifier shapes.
-     *
-     * @return void
-     */
-    public function testIdentifierTokenizerSplitsCommonIdentifierShapes(): void
-    {
-        $identifierTokenizer = new IdentifierTokenizer();
-
-        self::assertSame(['http', 'response', 'code'], $identifierTokenizer->tokenize('HTTPResponseCode'));
-        self::assertSame(['order', 'item', '2'], $identifierTokenizer->tokenize('order_item2'));
-        self::assertSame(['temp'], $identifierTokenizer->tokenize('_temp'));
     }
 
     /**

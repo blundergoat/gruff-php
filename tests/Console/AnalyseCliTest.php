@@ -112,6 +112,7 @@ final class AnalyseCliTest extends CliTestCase
             'tests/Fixtures/Config/file-length-warning.yaml',
             '--fail-on',
             'error',
+            '--no-baseline',
         ], __DIR__ . '/../..');
         $process->run();
 
@@ -186,6 +187,7 @@ final class AnalyseCliTest extends CliTestCase
             'json',
             '--fail-on',
             'error',
+            '--no-baseline',
         ], __DIR__ . '/../..');
         $process->run();
 

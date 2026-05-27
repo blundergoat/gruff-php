@@ -1,0 +1,286 @@
+{
+    "schemaVersion": "gruff.baseline.v1",
+    "generatedAt": "2026-05-27T11:19:23+00:00",
+    "findings": [
+        {
+            "fingerprint": "857aaeaf33b58b64",
+            "ruleId": "modernisation.named-argument-opportunity",
+            "file": "src/Command/ListRulesCommand.php",
+            "line": 62,
+            "symbol": null,
+            "message": "Call with 5 positional arguments may be clearer with PHP 8 named arguments."
+        },
+        {
+            "fingerprint": "93fabc7b2ca43716",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Command/ListRulesCommand.php",
+            "line": 247,
+            "symbol": "arrow@247",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "cc71b01a4e216336",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Command/ListRulesCommand.php",
+            "line": 319,
+            "symbol": "arrow@319",
+            "message": "Parameter name \"item\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "7923f553b546f973",
+            "ruleId": "naming.boolean-prefix",
+            "file": "src/Config/RuleConfigApplier.php",
+            "line": 109,
+            "symbol": "RuleConfigApplier::excludeFromScore()",
+            "message": "RuleConfigApplier::excludeFromScore() returns bool but does not use a boolean prefix (is, has, can, should, will)."
+        },
+        {
+            "fingerprint": "9c3a0ea931ede4d9",
+            "ruleId": "naming.boolean-prefix",
+            "file": "src/Config/RuleSettings.php",
+            "line": 27,
+            "symbol": "RuleSettings::__construct()",
+            "message": "Property \"$excludeFromScore\" is typed bool but does not use a boolean prefix or approved state adjective."
+        },
+        {
+            "fingerprint": "a624c315e86fc0e1",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/MarkdownReporter.php",
+            "line": 115,
+            "symbol": "arrow@115",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "d3527b119806974b",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/MarkdownReporter.php",
+            "line": 117,
+            "symbol": "arrow@117",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "4495a9b829a28d78",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/MarkdownReporter.php",
+            "line": 127,
+            "symbol": "arrow@127",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "3adbc3417b69b277",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/MarkdownReporter.php",
+            "line": 138,
+            "symbol": "arrow@138",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "ecff067da2798627",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/TextReporter.php",
+            "line": 116,
+            "symbol": "arrow@116",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "2f6cbb9f2035bf93",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/TextReporter.php",
+            "line": 118,
+            "symbol": "arrow@118",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "d1d0db1a40b81c52",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/TextReporter.php",
+            "line": 135,
+            "symbol": "arrow@135",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "32cd1c3cad167c19",
+            "ruleId": "naming.identifier-quality",
+            "file": "src/Reporting/TextReporter.php",
+            "line": 146,
+            "symbol": "arrow@146",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "1a3277e559f10974",
+            "ruleId": "naming.abbreviation-allowlist",
+            "file": "src/Review/BranchReviewResult.php",
+            "line": 75,
+            "symbol": "BranchReviewResult::perRuleDelta()",
+            "message": "Variable \"$net\" is a short lowercase name not declared in acceptedAbbreviations."
+        },
+        {
+            "fingerprint": "9460ad5a7ec635d2",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Docs/MissingConstantPhpdocRule.php",
+            "line": 264,
+            "symbol": "MissingConstantPhpdocRule::hasLeadingLineComment()",
+            "message": "MissingConstantPhpdocRule::hasLeadingLineComment() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "1167a1a53aa57604",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Docs/MissingConstantPhpdocRule.php",
+            "line": 278,
+            "symbol": "MissingConstantPhpdocRule::isLineComment()",
+            "message": "MissingConstantPhpdocRule::isLineComment() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "79118f5f19b8a130",
+            "ruleId": "docs.stale-param-tag",
+            "file": "src/Rule/Docs/MissingParamTagRule.php",
+            "line": 122,
+            "symbol": "MissingParamTagRule::extractParamNames()",
+            "message": "@param $payload in MissingParamTagRule::extractParamNames() does not match any parameter."
+        },
+        {
+            "fingerprint": "099d15d88c19fdf3",
+            "ruleId": "docs.stale-param-tag",
+            "file": "src/Rule/Docs/MissingParamTagRule.php",
+            "line": 167,
+            "symbol": "MissingParamTagRule::scanForParamVariable()",
+            "message": "@param $varname in MissingParamTagRule::scanForParamVariable() does not match any parameter."
+        },
+        {
+            "fingerprint": "e7b1d851cc66c4b3",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Docs/RegexCommentRule.php",
+            "line": 177,
+            "symbol": "RegexCommentRule::isInsideStringLabelledMatchArm()",
+            "message": "RegexCommentRule::isInsideStringLabelledMatchArm() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "987dbb5e10336cd8",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Docs/RegexCommentRule.php",
+            "line": 200,
+            "symbol": "RegexCommentRule::containsRegexCall()",
+            "message": "RegexCommentRule::containsRegexCall() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "dbf4b894279f2b6d",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Docs/RegexCommentRule.php",
+            "line": 218,
+            "symbol": "RegexCommentRule::hasEnclosingFunctionDocReferencingRegex()",
+            "message": "RegexCommentRule::hasEnclosingFunctionDocReferencingRegex() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "55808d7ca38d5666",
+            "ruleId": "docs.regex-comment",
+            "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
+            "line": 336,
+            "symbol": "PhpDocMixedOveruseRule::isPreciseArrayShape()",
+            "message": "preg_match() should have a one-line comment above it explaining what the regex checks."
+        },
+        {
+            "fingerprint": "0651315b77a369c3",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
+            "line": 400,
+            "symbol": "PhpDocMixedOveruseRule::topLevelColonIndex()",
+            "message": "PhpDocMixedOveruseRule::topLevelColonIndex() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "76364d63e0a78fdf",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Modernisation/ReadonlyPropertyCandidateRule.php",
+            "line": 175,
+            "symbol": "ReadonlyPropertyCandidateRule::recordPropertyMutation()",
+            "message": "ReadonlyPropertyCandidateRule::recordPropertyMutation() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "96ecada15c5ee0ed",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Rule/Naming/IdentifierQualityRule.php",
+            "line": 351,
+            "symbol": "IdentifierQualityRule::isGenericByPurposeHelper()",
+            "message": "IdentifierQualityRule::isGenericByPurposeHelper() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "06fe8b6c30946e46",
+            "ruleId": "docs.regex-comment",
+            "file": "src/Rule/Waste/RedundantVariableRule.php",
+            "line": 168,
+            "symbol": "RedundantVariableRule::hasPhpStanNarrowingTag()",
+            "message": "preg_match() should have a one-line comment above it explaining what the regex checks."
+        },
+        {
+            "fingerprint": "80f46c0fe0bf44b6",
+            "ruleId": "naming.identifier-quality",
+            "file": "tests/Analysis/AnalysisReportTest.php",
+            "line": 61,
+            "symbol": "arrow@61",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "3a02b16d9c90cfd9",
+            "ruleId": "test-quality.multiple-aaa-cycles",
+            "file": "tests/Config/ConfigLoaderTest.php",
+            "line": 403,
+            "symbol": "ConfigLoaderTest::testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides()",
+            "message": "ConfigLoaderTest::testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides() contains 3 act-then-assert cycles; consider splitting into focused tests."
+        },
+        {
+            "fingerprint": "8b02bd804cf15a36",
+            "ruleId": "sensitive-data.high-entropy-string",
+            "file": "tests/Console/ListRulesCliTest.php",
+            "line": 81,
+            "symbol": null,
+            "message": "High-entropy string literal detected: rule...core (redacted, 48 chars)."
+        },
+        {
+            "fingerprint": "34ceb37acc6e2b1a",
+            "ruleId": "naming.identifier-quality",
+            "file": "tests/Review/BranchReviewResultTest.php",
+            "line": 97,
+            "symbol": "arrow@97",
+            "message": "Parameter name \"row\" is generic and does not communicate clear intent."
+        },
+        {
+            "fingerprint": "c0f439dcfac4859a",
+            "ruleId": "docs.stale-param-tag",
+            "file": "tests/Rule/Docs/DocsRulesTest.php",
+            "line": 140,
+            "symbol": "DocsRulesTest::testMissingParamTagRecognisesMultiLineArrayShape()",
+            "message": "@param $payload in DocsRulesTest::testMissingParamTagRecognisesMultiLineArrayShape() does not match any parameter."
+        },
+        {
+            "fingerprint": "0f2372ede2179621",
+            "ruleId": "test-quality.conditional-logic",
+            "file": "tests/Rule/Docs/DocsRulesTest.php",
+            "line": 148,
+            "symbol": "DocsRulesTest::testMissingParamTagRecognisesMultiLineArrayShape()",
+            "message": "DocsRulesTest::testMissingParamTagRecognisesMultiLineArrayShape() contains conditional logic; tests should usually be linear."
+        },
+        {
+            "fingerprint": "8c4b23738f8cb4b4",
+            "ruleId": "test-quality.conditional-logic",
+            "file": "tests/Rule/Docs/DocsTagAndStructureRulesTest.php",
+            "line": 403,
+            "symbol": "DocsTagAndStructureRulesTest::testMissingConstantPhpdocSurfacesLineCommentVariant()",
+            "message": "DocsTagAndStructureRulesTest::testMissingConstantPhpdocSurfacesLineCommentVariant() contains conditional logic; tests should usually be linear."
+        },
+        {
+            "fingerprint": "7ca7695be05c62cc",
+            "ruleId": "test-quality.repeated-structure-missing-data-provider",
+            "file": "tests/Rule/Modernisation/ModernisationRulesTest.php",
+            "line": 137,
+            "symbol": "ModernisationRulesTest::testEnumCandidateRuleIgnoresMixedScalarConstants()",
+            "message": "ModernisationRulesTest has 3 structurally identical test methods (testEnumCandidateRuleIgnoresMixedScalarConstants, testFirstClassCallableRuleIgnoresNonClassClassConst, testFirstClassCallableRuleIgnoresAssociativeArrayLiterals) that look like a data provider would replace."
+        },
+        {
+            "fingerprint": "d4536ad4405afc50",
+            "ruleId": "test-quality.conditional-logic",
+            "file": "tests/Rule/Naming/NamingRulesTest.php",
+            "line": 355,
+            "symbol": "NamingRulesTest::testIdentifierQualitySkipsGenericByPurposeHelpers()",
+            "message": "NamingRulesTest::testIdentifierQualitySkipsGenericByPurposeHelpers() contains conditional logic; tests should usually be linear."
+        }
+    ]
+}
