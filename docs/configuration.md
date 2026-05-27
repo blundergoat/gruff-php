@@ -16,13 +16,60 @@ with built-in defaults.
 
 Supported top-level sections are:
 
+- `schemaVersion`
+- `minimumPhpVersion`
+- `minimumSeverity`
 - `paths`
 - `allowlists`
 - `selection`
 - `rules`
-- `minimumPhpVersion`
 
 Unknown top-level keys are rejected so config mistakes fail early.
+
+## Schema Version
+
+`schemaVersion` is required at the top of every `.gruff-php.yaml`. The only
+value accepted today is `gruff-php.config.v0.1`:
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+```
+
+Configs missing this key fail to load with a hint pointing at
+`gruff-php init --force`. See
+[`ADR-015`](../.goat-flow/decisions/ADR-015-per-command-minimum-severity.md)
+for the rationale.
+
+## Minimum Severity
+
+`minimumSeverity` sets the exit-code threshold per gating command. Keys are
+`analyse`, `report`, and `dashboard`; values are `advisory`, `warning`,
+`error`, or `none`:
+
+```yaml
+minimumSeverity:
+  analyse: advisory
+  report: none
+  dashboard: none
+```
+
+The validator rejects every other key, including `summary`, `init`, and
+`list-rules`, because those commands do not gate exit code; silent
+acceptance would hide a CI misconfiguration. It also rejects every other
+value (including the gruff-go alias `never`) with an error naming the four
+accepted values.
+
+Precedence when resolving the effective threshold:
+
+1. CLI `--fail-on` flag (when set explicitly)
+2. `minimumSeverity.<command>` from `.gruff-php.yaml`
+3. Binary default — `advisory` for `analyse`, `none` for `report` and
+   `dashboard`
+
+`analyse`'s binary default lowered from `error` to `advisory` in 0.1.5 so
+that every finding visible in the report can fail CI by default. Pass
+`--fail-on error` or set `minimumSeverity.analyse: error` to restore the
+older behaviour.
 
 ## Paths
 

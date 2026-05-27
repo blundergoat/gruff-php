@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Command;
 
+use GruffPhp\Command\DashboardScanCommandBuilder;
 use GruffPhp\Command\DashboardStateFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputArgument;
@@ -12,10 +14,26 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers dashboard state construction: console input merging, fallback conventions, bare-flag preservation, checkbox unchecking, project-root resolution, and string-option validation.
+ * Covers dashboard state construction: console input merging, fallback conventions, bare-flag preservation, checkbox unchecking, project-root resolution, string-option validation, and the ADR-015 precedence chain (CLI > config.minimumSeverity.dashboard > binary default) through to the scan command builder.
  */
 final class DashboardStateFactoryTest extends TestCase
 {
+    /** @var list<string> */
+    private array $tempDirs = [];
+
+    /**
+     * Remove temporary project directories created by tests.
+     *
+     * @return void
+     */
+    protected function tearDown(): void
+    {
+        foreach ($this->tempDirs as $tempDir) {
+            $this->removeTempDirectory($tempDir);
+        }
+        $this->tempDirs = [];
+    }
+
     /**
      * Verify console input is converted into complete dashboard defaults.
      *
@@ -171,6 +189,106 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
+     * Verify the ADR-015 precedence chain resolves the dashboard initial-state threshold correctly.
+     *
+     * Each row writes a `.gruff-php.yaml` carrying `minimumSeverity.dashboard:
+     * error`, then invokes `defaultQuery` with the parameters under test. The
+     * expected value reflects which level of the chain wins: CLI flag (when
+     * set explicitly), config (when no flag), or binary default (when
+     * `--no-config` suppresses the config lookup).
+     *
+     * @param array<string, mixed> $parameters     Input parameters passed to ArrayInput.
+     * @param string               $expectedFailOn Resolved threshold the state should carry.
+     * @return void
+     */
+    #[DataProvider('provideDashboardPrecedenceCases')]
+    public function testDefaultQueryAppliesDashboardThresholdPrecedence(array $parameters, string $expectedFailOn): void
+    {
+        $project = $this->createProjectWithConfigDashboardThreshold('error');
+
+        $this->withCwd($project, function () use ($project, $parameters, $expectedFailOn): void {
+            $state = (new DashboardStateFactory())->defaultQuery($this->input($parameters), $project);
+
+            self::assertSame($expectedFailOn, $state['failOn']);
+        });
+    }
+
+    /**
+     * Provide ADR-015 precedence cases for `defaultQuery` resolution.
+     *
+     * @return array<string, array{0: array<string, bool|string>, 1: string}>
+     */
+    public static function provideDashboardPrecedenceCases(): array
+    {
+        return [
+            'config wins over binary default when no CLI flag' => [[], 'error'],
+            'CLI flag overrides config' => [['--fail-on' => 'warning'], 'warning'],
+            'no-config falls through to binary default' => [['--no-config' => true], 'none'],
+        ];
+    }
+
+    /**
+     * Verify the state -> scan command builder round-trip preserves the resolved fail-on value.
+     *
+     * The request payload's `failOn` flows through `DashboardStateFactory::state` into
+     * `DashboardScanCommandBuilder::analyseCommand` as the `--fail-on` argument.
+     * Manual-only testing would miss a regression where the value is dropped or
+     * rewritten between the form and the scan command.
+     *
+     * @return void
+     */
+    public function testRoundTripRequestFailOnReachesScanCommand(): void
+    {
+        $factory  = new DashboardStateFactory();
+        $state    = $factory->state($this->input(), '/repo', ['failOn' => 'warning']);
+        $command  = (new DashboardScanCommandBuilder('/tmp/gruff'))->analyseCommand(['src'], $state);
+        $position = (int) array_search('--fail-on', $command, true);
+
+        self::assertGreaterThan(0, $position);
+        self::assertSame('warning', $command[$position + 1]);
+    }
+
+    /**
+     * Verify the config-fallback resolved threshold reaches the scan command on the no-request path.
+     *
+     * @return void
+     */
+    public function testRoundTripConfigFallbackReachesScanCommand(): void
+    {
+        $project = $this->createProjectWithConfigDashboardThreshold('error');
+
+        $this->withCwd($project, function () use ($project): void {
+            $factory  = new DashboardStateFactory();
+            $state    = $factory->state($this->input(), $project, []);
+            $command  = (new DashboardScanCommandBuilder('/tmp/gruff'))->analyseCommand(['src'], $state);
+            $position = (int) array_search('--fail-on', $command, true);
+
+            self::assertGreaterThan(0, $position);
+            self::assertSame('error', $command[$position + 1]);
+        });
+    }
+
+    /**
+     * Verify the binary default resolved threshold reaches the scan command when neither flag nor config carries one.
+     *
+     * @return void
+     */
+    public function testRoundTripBinaryDefaultReachesScanCommand(): void
+    {
+        $project = $this->createProjectDir();
+
+        $this->withCwd($project, function () use ($project): void {
+            $factory  = new DashboardStateFactory();
+            $state    = $factory->state($this->input(['--no-config' => true]), $project, []);
+            $command  = (new DashboardScanCommandBuilder('/tmp/gruff'))->analyseCommand(['src'], $state);
+            $position = (int) array_search('--fail-on', $command, true);
+
+            self::assertGreaterThan(0, $position);
+            self::assertSame('none', $command[$position + 1]);
+        });
+    }
+
+    /**
      * @param array<string, mixed> $parameters
      * @return ArrayInput Input fixture value.
      */
@@ -187,5 +305,81 @@ final class DashboardStateFactoryTest extends TestCase
             new InputOption('diff', null, InputOption::VALUE_NONE),
             new InputOption('include-ignored', null, InputOption::VALUE_NONE),
         ]));
+    }
+
+    /**
+     * Build a temporary project containing a .gruff-php.yaml with a dashboard threshold.
+     *
+     * @param string $threshold Threshold value to set under `minimumSeverity.dashboard`.
+     * @return string Absolute project root path.
+     */
+    private function createProjectWithConfigDashboardThreshold(string $threshold): string
+    {
+        $project = $this->createProjectDir();
+        file_put_contents(
+            $project . '/.gruff-php.yaml',
+            "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    dashboard: " . $threshold . "\n",
+        );
+
+        return $project;
+    }
+
+    /**
+     * Create a unique temporary directory tracked for cleanup.
+     *
+     * @return string Absolute path to the new directory.
+     */
+    private function createProjectDir(): string
+    {
+        $project = sys_get_temp_dir() . '/gruff-dashboard-state-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($project));
+        $this->tempDirs[] = $project;
+
+        return $project;
+    }
+
+    /**
+     * Run the callable with the working directory pointed at the given project.
+     *
+     * @param string         $project  Working directory the closure should run in.
+     * @param callable():void $callable Closure invoked under the swapped CWD.
+     * @return void
+     */
+    private function withCwd(string $project, callable $callable): void
+    {
+        $origCwd = getcwd();
+        self::assertIsString($origCwd);
+        self::assertTrue(chdir($project));
+
+        try {
+            $callable();
+        } finally {
+            chdir($origCwd);
+        }
+    }
+
+    /**
+     * Remove a temporary directory tree.
+     *
+     * @param string $path Absolute path to remove.
+     * @return void
+     */
+    private function removeTempDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $items = scandir($path) ?: [];
+
+        foreach ($items as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $entryPath = $path . '/' . $entry;
+            is_dir($entryPath) ? $this->removeTempDirectory($entryPath) : unlink($entryPath);
+        }
+
+        rmdir($path);
     }
 }

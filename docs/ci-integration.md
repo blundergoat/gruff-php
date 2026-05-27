@@ -34,6 +34,28 @@ vendor/bin/gruff-php analyse src tests --fail-on warning
 
 Use `--fail-on none` when the job should only publish reports.
 
+Project defaults can also live in `.gruff-php.yaml` under `minimumSeverity:`
+so CI invocations stay short and the threshold lives next to the rest of
+the analysis policy:
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+minimumSeverity:
+  analyse: advisory
+  report: none
+  dashboard: none
+```
+
+Precedence is `--fail-on` flag > YAML `minimumSeverity.<cmd>` > binary
+default. The CLI flag still wins when set, so per-job overrides remain
+unaffected. See
+[`docs/configuration.md`](configuration.md#minimum-severity) for the full
+rejection contract.
+
+The `analyse` binary default is `advisory` in 0.1.5+. CI jobs that relied
+on the previous `error` floor must either pass `--fail-on error` or set
+`minimumSeverity.analyse: error` in the project config.
+
 ## Baselines
 
 Generate an adoption baseline after reviewing current findings:
