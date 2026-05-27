@@ -15,7 +15,7 @@ stamps the tag.
 
 [semver]: https://semver.org/
 
-## 0.2.0 - 2026-05-27
+## 0.2.0 - 2026-05-28
 
 gruff-php 0.2.0 tightens the CI gating philosophy, requires explicit config-schema versioning, and adds a per-rule triage surface so large scans stop being overwhelming. Five breaking changes (`schemaVersion:` required, `analyse` default lowered, JSON schemas v2, one rule retired, `waste.one-line-method` defaults tightened) motivate the minor bump from 0.1.x; each ships with a migration path below.
 
