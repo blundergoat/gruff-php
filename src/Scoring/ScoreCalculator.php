@@ -85,6 +85,12 @@ final readonly class ScoreCalculator
      * flow through reports (the scorer never sees them after this filter), but
      * they do not affect the composite or pillar penalty buckets. See ADR-016.
      *
+     * Synthetic composite findings (e.g. `design.god-method` from
+     * {@see CompositeFindingFactory}) are not in the registry; they carry their
+     * component rule IDs in `metadata.componentRules`. A composite is excluded
+     * iff EVERY component rule is excluded — otherwise a single non-excluded
+     * component should still let the composite penalty land.
+     *
      * @param list<Finding> $findings
      * @return list<Finding>
      */
@@ -100,8 +106,27 @@ final readonly class ScoreCalculator
             $findings,
             static function (Finding $finding) use ($rules): bool {
                 $settings = $rules[$finding->ruleId] ?? null;
+                if ($settings !== null) {
+                    return !$settings->isExcludedFromScore();
+                }
 
-                return $settings === null || !$settings->isExcludedFromScore();
+                // Synthetic finding: walk componentRules metadata when present.
+                $componentRules = $finding->metadata['componentRules'] ?? null;
+                if (!is_array($componentRules) || $componentRules === []) {
+                    return true;
+                }
+
+                foreach ($componentRules as $componentRuleId) {
+                    if (!is_string($componentRuleId)) {
+                        continue;
+                    }
+                    $componentSettings = $rules[$componentRuleId] ?? null;
+                    if ($componentSettings === null || !$componentSettings->isExcludedFromScore()) {
+                        return true;
+                    }
+                }
+
+                return false;
             },
         ));
     }

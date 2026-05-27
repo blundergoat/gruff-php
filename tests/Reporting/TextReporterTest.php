@@ -72,7 +72,7 @@ final class TextReporterTest extends TestCase
         }
 
         return new AnalysisReport(
-            toolVersion:     '0.1.4',
+            toolVersion:     '0.2.0',
             requestedPaths:  ['src'],
             format:          'text',
             failOn:          'none',

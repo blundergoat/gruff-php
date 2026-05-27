@@ -60,4 +60,4 @@ The key lives under `rules.<rule-id>.excludeFromScore` alongside the existing `e
 
 - Reviewer report: `.goat-flow/scratchpad/gruff-php-improvement-feedback.md` section 13a.
 - Prior single-threshold severity decision (informs why the severity axis is not overloaded with scoring semantics): `.goat-flow/decisions/ADR-008-single-threshold-rubric-severity.md`.
-- Task package: `.goat-flow/tasks/0.1.4/M06-disabled-severity-visibility-tier.md`.
+- Task package: `.goat-flow/tasks/0.2.0/M06-disabled-severity-visibility-tier.md`.

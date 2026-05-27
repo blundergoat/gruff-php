@@ -220,7 +220,7 @@ final readonly class ConfigLoader
     /**
      * Hard-error when the top-level `schemaVersion:` field is missing, the
      * wrong type, or names an unexpected version. ADR-015 introduces this
-     * field in 0.1.4 as a required key with a single accepted value; the
+     * field in 0.2.0 as a required key with a single accepted value; the
      * hard-error path is the intentional UX per the pre-public-adoption
      * schema window.
      *
@@ -352,7 +352,10 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Apply configured allowlists when present.
+     * Apply configured allowlists when present. Sub-keys that the user omitted
+     * leave the registry-seeded defaults intact; a user who configures
+     * `allowlists.secretPreviews` only must NOT lose
+     * `DEFAULT_ACCEPTED_ABBREVIATIONS` (`id`, `url`, etc.) as a side effect.
      *
      * @param ConfigObject $rootConfig
      *
@@ -366,9 +369,15 @@ final readonly class ConfigLoader
 
         $allowlists = $this->parseAllowlistsConfig($rootConfig['allowlists']);
 
-        return $config
-            ->withAcceptedAbbreviations($allowlists['acceptedAbbreviations'])
-            ->withAllowedSecretPreviews($allowlists['secretPreviews']);
+        if ($allowlists['acceptedAbbreviations'] !== null) {
+            $config = $config->withAcceptedAbbreviations($allowlists['acceptedAbbreviations']);
+        }
+
+        if ($allowlists['secretPreviews'] !== null) {
+            $config = $config->withAllowedSecretPreviews($allowlists['secretPreviews']);
+        }
+
+        return $config;
     }
 
     /**
@@ -413,9 +422,12 @@ final readonly class ConfigLoader
     }
 
     /**
-     * Parse naming and secret-preview allowlists from configuration.
+     * Parse naming and secret-preview allowlists from configuration. Sub-keys
+     * that the user omitted return `null` so the caller can keep the
+     * registry-seeded defaults intact rather than overriding them with an
+     * empty list.
      *
-     * @return array{acceptedAbbreviations: list<string>, secretPreviews: list<string>}
+     * @return array{acceptedAbbreviations: list<string>|null, secretPreviews: list<string>|null}
      */
     private function parseAllowlistsConfig(mixed $decodedValue): array
     {
@@ -427,22 +439,23 @@ final readonly class ConfigLoader
             }
         }
 
-        $acceptedAbbreviations = array_key_exists('acceptedAbbreviations', $allowlists)
-            ? (new StringListConfigParser())->parse($this->configValue($allowlists['acceptedAbbreviations']), 'allowlists.acceptedAbbreviations', false, false)
-            : [];
-        foreach ($acceptedAbbreviations as $abbreviation) {
-            // Allow only PHP identifier-shaped abbreviations in the naming allowlist.
-            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $abbreviation)) {
-                throw new ConfigException(sprintf(
-                    'Config value "allowlists.acceptedAbbreviations" contains invalid identifier "%s".',
-                    $abbreviation,
-                ));
+        $acceptedAbbreviations = null;
+        if (array_key_exists('acceptedAbbreviations', $allowlists)) {
+            $acceptedAbbreviations = (new StringListConfigParser())->parse($this->configValue($allowlists['acceptedAbbreviations']), 'allowlists.acceptedAbbreviations', false, false);
+            foreach ($acceptedAbbreviations as $abbreviation) {
+                // Allow only PHP identifier-shaped abbreviations in the naming allowlist.
+                if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $abbreviation)) {
+                    throw new ConfigException(sprintf(
+                        'Config value "allowlists.acceptedAbbreviations" contains invalid identifier "%s".',
+                        $abbreviation,
+                    ));
+                }
             }
         }
 
         $secretPreviews = array_key_exists('secretPreviews', $allowlists)
             ? (new StringListConfigParser())->parse($this->configValue($allowlists['secretPreviews']), 'allowlists.secretPreviews', false, false)
-            : [];
+            : null;
 
         return [
             'acceptedAbbreviations' => $acceptedAbbreviations,

@@ -7,7 +7,7 @@ Use it when:
 - The `analyse` text output is too long to read at a glance.
 - You're dogfooding new rules and want to see "where is the noise concentrated?" without scrolling.
 - A CI step needs a one-glance score breakdown without rendering the full HTML or JSON report.
-- You want a small JSON shape to feed into another tool (schema: `gruff.summary.v1`).
+- You want a small JSON shape to feed into another tool (schema: `gruff.summary.v2`).
 
 ## Usage
 
@@ -23,7 +23,7 @@ php bin/gruff-php summary [paths...] [options]
 |---|---|---|
 | `--config=PATH` | auto-discover `.gruff-php.yaml` (legacy `.gruff.yaml`) | Use a specific config file. |
 | `--no-config` | off | Skip the auto-discovered config for this run; built-in defaults only. Cannot combine with `--config`. |
-| `--format=text\|json` | `text` | `text` is the human digest, `json` is `gruff.summary.v1` for tooling. |
+| `--format=text\|json` | `text` | `text` is the human digest, `json` is `gruff.summary.v2` for tooling. |
 | `--top=N` | `10` | Cap the "Top N rules" and "Top N file offenders" sections. |
 | `--include-ignored` | off | Scan ignored files by using filesystem traversal instead of Git/default ignores. |
 
@@ -75,7 +75,7 @@ php bin/gruff-php summary src --format=json --top=5
 
 ```json
 {
-  "schemaVersion": "gruff.summary.v1",
+  "schemaVersion": "gruff.summary.v2",
   "tool": { "name": "gruff-php", "version": "0.1.1" },
   "scope": {
     "paths": ["src"],
@@ -90,7 +90,7 @@ php bin/gruff-php summary src --format=json --top=5
   "composite": { "score": 89.7, "grade": "B" },
   "findings": { "advisory": 217, "warning": 0, "error": 0, "total": 217 },
   "pillars": [
-    { "pillar": "documentation", "grade": "B", "score": 78.55, "findings": 216, "advisories": 216, "warnings": 0, "errors": 0, "penalty": 21.45, "applicable": true },
+    { "pillar": "documentation", "grade": "B", "score": 78.55, "findings": 216, "advisory": 216, "warning": 0, "error": 0, "penalty": 21.45, "applicable": true },
     ...
   ],
   "topRules": [
@@ -98,7 +98,7 @@ php bin/gruff-php summary src --format=json --top=5
     ...
   ],
   "topOffenders": [
-    { "file": "src/Rule/Naming/IdentifierQualityRule.php", "score": 55, "grade": "F", "findings": 12, "advisories": 12, "warnings": 0, "errors": 0, "penalty": 45, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
+    { "file": "src/Rule/Naming/IdentifierQualityRule.php", "score": 55, "grade": "F", "findings": 12, "advisory": 12, "warning": 0, "error": 0, "penalty": 45, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
     ...
   ]
 }

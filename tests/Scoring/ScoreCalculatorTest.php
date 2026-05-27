@@ -234,6 +234,46 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
+     * Verify synthetic composite findings honour `excludeFromScore` on their component rules.
+     *
+     * A composite finding ({@see \GruffPhp\Scoring\CompositeFindingFactory}) is dropped
+     * from scoring only when EVERY component rule listed in its metadata is excluded.
+     * A single non-excluded component keeps the composite penalty in play.
+     *
+     * @return void
+     */
+    public function testCompositeFindingHonoursExcludeFromScoreOnComponentRules(): void
+    {
+        $registry  = RuleRegistry::defaults();
+        $composite = $this->finding(
+            'design.god-method',
+            Pillar::Design,
+            Severity::Warning,
+            metadata: ['componentRules' => ['complexity.cognitive', 'size.method-length']],
+        );
+
+        $bothExcluded = AnalysisConfig::fromRegistry($registry);
+        foreach (['complexity.cognitive', 'size.method-length'] as $ruleId) {
+            $settings     = $bothExcluded->ruleSettings($ruleId);
+            $bothExcluded = $bothExcluded->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
+                enabled:           $settings->enabled,
+                thresholds:        $settings->thresholds,
+                options:           $settings->options,
+                severityThreshold: $settings->severityThreshold,
+                excludeFromScore:  true,
+            ));
+        }
+
+        $oneExcluded = $this->configWithExcludedRule($registry, 'complexity.cognitive');
+
+        $scoredBothExcluded = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $bothExcluded);
+        $scoredOneExcluded  = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $oneExcluded);
+
+        self::assertSame(100.0, $scoredBothExcluded->composite->score);
+        self::assertLessThan(100.0, $scoredOneExcluded->composite->score);
+    }
+
+    /**
      * Build an AnalysisConfig with one rule marked excludeFromScore.
      *
      * @param string $ruleId Rule identifier to mark excluded.

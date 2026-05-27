@@ -363,9 +363,12 @@ final class ReportCommand extends Command
      */
     private function resolveFailOn(InputInterface $input): string
     {
-        $explicit = $this->optionalStringOption($input, 'fail-on');
-        if ($explicit !== null) {
-            return $explicit;
+        // Symfony's $input->getOption('fail-on') returns the option's default value
+        // ('none') even when the user did not pass --fail-on at all, so we have to
+        // detect "explicit" via the raw parameter list. Otherwise the config-supplied
+        // minimumSeverity.report value can never win, defeating the M11 wiring.
+        if ($input->hasParameterOption('--fail-on', true)) {
+            return $this->optionalStringOption($input, 'fail-on') ?? 'none';
         }
 
         $configThreshold = $this->loadConfigFailThreshold($input);

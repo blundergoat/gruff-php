@@ -5,51 +5,23 @@ All notable changes to `gruff-php` are documented here. Follows
 Development builds report a `-dev` suffix until `scripts/bump-version.sh`
 stamps the tag.
 
-## [Unreleased]
+## 0.2.0 - 2026-05-27
 
-Introduce the per-command `minimumSeverity:` config dimension cross-port-aligned with gruff-go 0.1.2 (ADR-010), formalise the `schemaVersion:` field that pre-M11 configs lacked, and lower the `analyse` binary `--fail-on` default to match the cross-port philosophy. See [ADR-015](.goat-flow/decisions/ADR-015-per-command-minimum-severity.md).
+Retire `naming.parameter-type-name`, introduce the per-command `minimumSeverity:` config dimension (ADR-015, cross-port-aligned with gruff-go 0.1.2 ADR-010), add the visibility-only `excludeFromScore` rule flag (ADR-016), and ship a per-rule triage surface across `list-rules`, branch-review reporting, and the `analyse` footer hint. Five breaking changes (schemaVersion required, analyse default lowered, JSON schema bumped, rule retired, waste defaults tightened) motivate the minor bump from 0.1.x.
 
-- **Breaking:** `.gruff-php.yaml` now requires a top-level `schemaVersion: gruff-php.config.v0.1` field. Configs missing the key fail to load with a migration hint pointing at `gruff-php init --force`. Pre-public-adoption schema window per ADR-015; the hard-error path is the intentional UX.
-- **Breaking:** the `analyse` command's binary `--fail-on` default lowered from `error` to `advisory`, matching the cross-port "show everything, fail on anything for gating commands" philosophy. Projects relying on the prior default see exit code 1 from warning- and advisory-tier findings that previously exited 0. Pass `--fail-on error` to restore the old behaviour, or set `minimumSeverity.analyse: error` in `.gruff-php.yaml`.
-- **Added:** `minimumSeverity:` per-command exit-code threshold block in `.gruff-php.yaml`. Keys: `analyse | report | dashboard`. Values: `advisory | warning | error | none`. The validator rejects every non-gating command key (including `summary`, `init`, `list-rules`) with a useful error naming the valid keys, and rejects every non-canonical value (including the gruff-go alias `never`) with the four accepted values listed. Precedence: explicit CLI `--fail-on` flag > `minimumSeverity.<cmd>` YAML > binary default. Aligned with gruff-go 0.1.2's `minimumSeverity` shape; both ports converged on `none` as the off-switch value. Intentional cross-port divergence: gruff-php validates 3 gating commands; gruff-go validates 4 (PHP's `summary` does not gate exit code).
-- **Added:** `AnalysisConfig::failThresholdFor(string $command): ?FailThreshold` exposes the per-command override to CLI consumers, returning null when the command has no entry. `AnalyseCommandSetupBuilder`, `ReportCommand`, and `DashboardStateFactory` consult this accessor before falling back to their respective binary defaults (`advisory`, `none`, `none`).
-- **Added:** `ConfigLoader::SCHEMA_VERSION` and `ConfigLoader::GATING_COMMANDS` constants single-source the canonical schema-version literal and the valid `minimumSeverity:` keys for the validator, init scaffold, and docs.
-- **Tests:** `tests/Reporting/FailThresholdTest.php` locks the `FailThreshold::fromInput` parser contract (acceptance of the four canonical values, rejection of every banned alias) plus the full `isTriggeredBy` matrix. `tests/Console/AnalyseMinimumSeverityPrecedenceTest.php` covers the precedence chain end-to-end (config-supplied error threshold suppresses warning-tier exit; CLI `--fail-on warning` overrides; binary default fails on advisory findings).
-
-## 0.1.4 - 2026-05-25
-
-Retire the `naming.parameter-type-name` rule, refresh reporter pillar
-summaries, and bump the `summary` command schema to v2.
-
-- **Breaking:** retired `naming.parameter-type-name`. The rule class,
-  fixture, registry slot, priority-chain position in
-  `RuleRegistry::NAMING_RULE_PRIORITY`, and `docs/rules.md` entry are
-  deleted, and the project's own `.gruff-php.yaml` no longer ships a
-  per-rule tuning block for it. Adopters relying on the rule for
-  domain-DTO naming discipline will see those findings disappear after
-  the next `composer update`. Rationale and reversibility plan recorded
-  in `.goat-flow/decisions/ADR-014-retire-naming-parameter-type-name.md`;
-  the cross-port sibling in `gruff-py` is being retired in lockstep
-  (ADR-018 there). PHP naming-rule count drops from 12 to 11.
-- **Breaking:** `summary` and `analyse` JSON output schemas bumped to
-  `gruff.summary.v2` and `gruff.analysis.v2` respectively. Per-severity
-  pillar and file counts now use singular property names
-  (`advisory` / `warning` / `error`) instead of plural
-  (`advisories` / `warnings` / `errors`). Consumers of v1 JSON output
-  need to update their parsers.
-- HTML and Markdown reporters render pillar summaries as a table with
-  per-severity finding counts; `MarkdownReporterTest` covers the new
-  output.
-- `init` now scaffolds default accepted abbreviations for the
-  `naming.abbreviation-allowlist` rule so new projects start with the
-  registry-curated allowlist rather than an empty one.
-- Documented the scaffold-then-manual-rules YAML emission pattern used
-  by `init` in `.goat-flow/patterns/commands.md`, generalised so every
-  rule's emitted block carries its registry description as a leading
-  comment.
-- Updated `.github/git-commit-instructions.md` example commit messages
-  to reference `AbbreviationAllowlistRule` and `ShortVariableRule`
-  instead of the retired rule.
+- **Breaking:** retired `naming.parameter-type-name` (rule class, fixture, `NAMING_RULE_PRIORITY` slot, docs row, dogfood tuning block). ADR-014 records rationale; gruff-py retires in lockstep (their ADR-018). PHP naming rules drop from 12 to 11.
+- **Breaking:** `summary` / `analyse` JSON schemas bumped to `gruff.summary.v2` / `gruff.analysis.v2`. Per-severity counts use singular keys (`advisory` / `warning` / `error`); v1 parsers must update.
+- **Breaking:** `.gruff-php.yaml` requires `schemaVersion: gruff-php.config.v0.1`. Configs missing the key hard-error with a migration hint pointing at `gruff-php init --force` (ADR-015).
+- **Breaking:** `analyse` `--fail-on` default lowered from `error` to `advisory` to match the cross-port "show everything, fail on anything for gating commands" philosophy. Restore via `--fail-on error` or `minimumSeverity.analyse: error`.
+- **Breaking:** `waste.one-line-method` defaults tightened to `minInFileCallers: 2`, `namedAlternativeFactoryExempt: true` (matches gruff-php's own self-tuning).
+- **Added:** `minimumSeverity:` per-command block (`analyse | report | dashboard`; values `advisory | warning | error | none`). Non-gating keys and non-canonical values (including gruff-go's `never`) rejected with explicit errors. Precedence: CLI `--fail-on` > YAML > binary default.
+- **Added:** `rules.<id>.excludeFromScore: true` keeps findings visible while excluding them from composite/pillar penalties; orthogonal to `enabled: false` (ADR-016).
+- **Added:** branch-review reporters (text + Markdown) render "Top 5 improved / Top 5 regressed" rules before the composite score; `BranchReviewResult::perRuleDelta()` is the JSON-exposed source.
+- **Added:** `Finding::stableIdentity` — line-insensitive sibling to `fingerprint` for diff tooling; baselines and SARIF stay keyed on `fingerprint`.
+- **Added:** `modernisation.phpdoc-mixed-overuse` exempts precise `array{...}` envelopes (with at least one non-mixed sibling field); loose shapes (`Collection<mixed>`, `array<string|int, mixed>`, `array{value: mixed}`) still fire.
+- **Added:** `list-rules <ruleId>` detail view (text + JSON) surfacing default options, escape-hatch config paths, false-positive shapes; typos suggest near matches and exit 2.
+- **Added:** `analyse --format=text` footer hint suggesting `summary` when findings >= 50; `AnalysisReport::findingCountsByRule()` accessor for triage views.
+- **Added:** `init` scaffolds default accepted abbreviations for `naming.abbreviation-allowlist`; `AnalysisConfig::failThresholdFor()`, `ConfigLoader::SCHEMA_VERSION` and `GATING_COMMANDS` constants; HTML/Markdown reporters render pillar tables; 11 rule remediations now name their escape-hatch config path.
 
 ## 0.1.3 - 2026-05-24
 

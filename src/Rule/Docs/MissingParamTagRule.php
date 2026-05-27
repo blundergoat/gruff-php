@@ -133,7 +133,19 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             $position = $tagPosition + strlen('@param');
-            $varName  = self::scanForParamVariable($stripped, $length, $position);
+
+            // Require a word boundary after `@param`. Otherwise `@param-out`,
+            // `@param-immutable`, etc. (which document output-only or constraint
+            // semantics, not an input parameter) would be treated as `@param`
+            // and falsely suppress the missing-input-tag finding.
+            if ($position < $length) {
+                $next = $stripped[$position];
+                if ($next === '-' || ctype_alnum($next) || $next === '_') {
+                    continue;
+                }
+            }
+
+            $varName = self::scanForParamVariable($stripped, $length, $position);
             if ($varName !== null) {
                 $paramNames[] = $varName;
             }

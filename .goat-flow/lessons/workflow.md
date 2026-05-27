@@ -168,7 +168,21 @@ For the dogfood snapshots also expect new findings on the gruff source tree itse
 
 **Created:** 2026-05-25
 
-**What happened:** Reviewing PR #6 (the `naming.parameter-type-name` retirement), CodeRabbit's "outside diff range" comments flagged two stale rule-count references: `docs/rules.md` section heading (search: `### \`naming\` (12)`) and `.goat-flow/architecture.md` prose (search: `exposes 120 rule ids`). The agent's initial evaluation took those two as the complete drift set and quoted scope on that basis. A real double-check pass found three additional parallel stamps no reviewer had flagged — `README.md` (search: `\| \`naming\` \| 12 \|`) and `README.md` (search: `120 rules across 11 pillars`), plus an entirely separate drift pattern that no reviewer surfaced at all: the user's earlier `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` had left `docs/gruff-cli-summary.md` (search: `gruff.summary.v1`, three lines including a literal JSON example) and `.goat-flow/architecture.md` (search: `gruff.summary.v1 digest`) advertising the pre-bump constant.
+**What happened:** Reviewing PR #6 (the `naming.parameter-type-name` retirement), CodeRabbit's "outside diff range" comments flagged two stale rule-count references:
+
+```text
+docs/rules.md               section heading  ### `naming` (12)
+.goat-flow/architecture.md  prose            "exposes 120 rule ids"
+```
+
+The agent's initial evaluation took those two as the complete drift set and quoted scope on that basis. A real double-check pass found three additional parallel stamps no reviewer had flagged:
+
+```text
+README.md   pillar tally row          | `naming` | 12 |
+README.md   prose                     "120 rules across 11 pillars"
+```
+
+Plus an entirely separate drift pattern that no reviewer surfaced at all: the user's earlier `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` had left `docs/gruff-cli-summary.md` (three lines including a literal JSON example) and `.goat-flow/architecture.md` ("gruff.summary.v1 digest") advertising the pre-bump constant.
 
 **Root cause:** Treating an AI reviewer's flagged-file list as the canonical drift surface. Reviewers like CodeRabbit and Codex scan the PR diff plus a few "outside diff" candidates; files unrelated to the PR's touched paths are invisible to them. A drift pattern that exists in the PR almost always exists in untouched files too, because the underlying trap is structural ("the same fact is stamped in N places"), not localised.
 

@@ -19,7 +19,22 @@ last_reviewed: 2026-05-27
 
 A `SCHEMA_VERSION` constant in PHP is just one of N stamps of the version string. The rest live in prose, compatibility tables, JSON examples in Markdown, and code-map descriptions — none of which the compiler can update when the constant moves. PR #6's `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` (search: `SCHEMA_VERSION = 'gruff.summary.v`) left four stale references behind: `docs/gruff-cli-summary.md` (search: `gruff.summary.v1`, three occurrences including a literal `schemaVersion` line in a JSON example) and `.goat-flow/architecture.md` (search: `gruff.summary.v1 digest`). No reviewer flagged this; it surfaced only on a manual sweep.
 
-**Prevention:** Whenever you bump a `SCHEMA_VERSION` constant, grep the repo for the OLD version literal before claiming the bump complete. Concrete current map of `gruff.analysis.v*` stamps that must move together: prose in `README.md` (search: `Analysis schema`, `Full \`gruff.analysis.v`, `compatibility-sensitive`), three occurrences in `.goat-flow/architecture.md` (search: `gruff.analysis.v`), `.goat-flow/glossary.md` (search: `Native JSON uses`), `.goat-flow/code-map.md` (search: `schema-versioned`), `docs/output-formats.md` (search: `JSON reports use`), the golden fixture `tests/Fixtures/Cli/Golden/json-warning.json` (search: `"schemaVersion"`), plus assertion sites in `tests/Reporting/SarifReporterTest.php` (4 hits), `tests/Console/AnalyseCliTest.php`, `tests/Console/ReportCliTest.php`, and `tests/Trend/TrendRecorderTest.php` (3 hits, two of which are intentional v1 fixture data for older-history coverage and may legitimately stay). Leave `CHANGELOG.md` historical entries and `history.json` alone — those are append-only record.
+**Prevention:** Whenever you bump a `SCHEMA_VERSION` constant, grep the repo for the OLD version literal before claiming the bump complete. Concrete current map of `gruff.analysis.v*` stamps that must move together:
+
+```text
+README.md                                       prose: "Analysis schema", "Full gruff.analysis.v...", "compatibility-sensitive"
+.goat-flow/architecture.md                      three occurrences of gruff.analysis.v
+.goat-flow/glossary.md                          "Native JSON uses..."
+.goat-flow/code-map.md                          "schema-versioned"
+docs/output-formats.md                          "JSON reports use..."
+tests/Fixtures/Cli/Golden/json-warning.json     "schemaVersion" literal
+tests/Reporting/SarifReporterTest.php           4 assertion hits
+tests/Console/AnalyseCliTest.php                assertion hits
+tests/Console/ReportCliTest.php                 assertion hits
+tests/Trend/TrendRecorderTest.php               3 hits (two are intentional v1 fixture data and may stay)
+```
+
+Leave `CHANGELOG.md` historical entries and `history.json` alone — those are append-only record.
 
 ## Footgun: The `gruff-php.config.v0.1` literal lives in two source-of-truth places plus user-facing surfaces
 

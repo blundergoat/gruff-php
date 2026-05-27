@@ -291,18 +291,53 @@ final class InitCommand extends Command
      */
     private static function existingMinimumSeverity(string $targetPath): ?array
     {
-        if (!is_file($targetPath)) {
+        if (!self::hasMinimumSeverityBlock($targetPath)) {
             return null;
+        }
+
+        $existing  = self::readMinimumSeverityBlock($targetPath);
+        $preserved = [];
+        foreach ($existing as $command => $threshold) {
+            $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string) $command, $threshold);
+        }
+
+        return $preserved;
+    }
+
+    /**
+     * Return whether the existing config file has a `minimumSeverity:` block
+     * worth preserving. The caller pairs this with {@see readMinimumSeverityBlock}
+     * so the two-stage call avoids returning a nullable mixed-array shape from
+     * a single helper (which trips `modernisation.phpdoc-mixed-overuse`).
+     *
+     * @return bool True when the YAML loads and contains a top-level `minimumSeverity:` key.
+     */
+    private static function hasMinimumSeverityBlock(string $targetPath): bool
+    {
+        if (!is_file($targetPath)) {
+            return false;
         }
 
         try {
             $decoded = Yaml::parseFile($targetPath);
         } catch (ParseException) {
-            return null;
+            return false;
         }
 
+        return is_array($decoded) && array_key_exists('minimumSeverity', $decoded);
+    }
+
+    /**
+     * Read and shape-validate the `minimumSeverity:` block from the existing config.
+     *
+     * @throws ConfigException When the key is not a map shape.
+     * @return array<array-key, mixed> Decoded YAML map; per-entry validation happens in the caller.
+     */
+    private static function readMinimumSeverityBlock(string $targetPath): array
+    {
+        $decoded = Yaml::parseFile($targetPath);
         if (!is_array($decoded) || !array_key_exists('minimumSeverity', $decoded)) {
-            return null;
+            return [];
         }
 
         $existing = $decoded['minimumSeverity'];
@@ -310,33 +345,50 @@ final class InitCommand extends Command
             throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
         }
 
-        $preserved = [];
-        foreach ($existing as $command => $threshold) {
-            if (!is_string($command)) {
-                throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
-            }
+        return $existing;
+    }
 
-            if (!in_array($command, ConfigLoader::GATING_COMMANDS, true)) {
-                throw new ConfigException(sprintf(
-                    'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
-                    $command,
-                    implode(', ', ConfigLoader::GATING_COMMANDS),
-                ));
-            }
-
-            if (!is_string($threshold) || FailThreshold::fromInput($threshold) === null) {
-                throw new ConfigException(sprintf(
-                    'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
-                    $command,
-                    is_string($threshold) ? $threshold : get_debug_type($threshold),
-                    implode(', ', array_map(static fn (FailThreshold $case): string => $case->value, FailThreshold::cases())),
-                ));
-            }
-
-            $preserved[$command] = $threshold;
+    /**
+     * Confirm the user-supplied key names a real gating command.
+     *
+     * @throws ConfigException When the key is not a string or names a non-gating command.
+     * @return string Validated gating-command name.
+     */
+    private static function validateGatingCommand(mixed $command): string
+    {
+        if (!is_string($command)) {
+            throw new ConfigException('Config key "minimumSeverity" keys must be strings.');
         }
 
-        return $preserved;
+        if (!in_array($command, ConfigLoader::GATING_COMMANDS, true)) {
+            throw new ConfigException(sprintf(
+                'Config key "minimumSeverity.%s" is not a valid gating command. Valid keys are: %s.',
+                $command,
+                implode(', ', ConfigLoader::GATING_COMMANDS),
+            ));
+        }
+
+        return $command;
+    }
+
+    /**
+     * Confirm the user-supplied threshold names a canonical `FailThreshold` value.
+     *
+     * @throws ConfigException When the value is not a string or not in the canonical four.
+     * @return string Validated threshold string (one of advisory|warning|error|none).
+     */
+    private static function validateGatingThreshold(string $command, mixed $threshold): string
+    {
+        if (!is_string($threshold) || FailThreshold::fromInput($threshold) === null) {
+            throw new ConfigException(sprintf(
+                'Config key "minimumSeverity.%s" value "%s" is not a valid threshold. Accepted: %s.',
+                $command,
+                is_string($threshold) ? $threshold : get_debug_type($threshold),
+                implode(', ', array_map(static fn (FailThreshold $case): string => $case->value, FailThreshold::cases())),
+            ));
+        }
+
+        return $threshold;
     }
 
     /**

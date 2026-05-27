@@ -71,7 +71,7 @@ final class AnalysisReportTest extends TestCase
     private function reportFor(array $findings): AnalysisReport
     {
         return new AnalysisReport(
-            toolVersion:     '0.1.4',
+            toolVersion:     '0.2.0',
             requestedPaths:  ['src'],
             format:          'text',
             failOn:          'none',

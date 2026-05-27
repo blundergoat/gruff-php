@@ -67,9 +67,26 @@ Constructor-promoted properties are represented as `Node\Param` entries with vis
 
 **Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
 
-The rule registry's true count lives only in `src/Rule/RuleRegistry.php` (search: `NAMING_RULE_PRIORITY`, plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update: a quality-table line in `README.md` (search: `Rule catalogue`), a per-pillar tally in `README.md` (search: `\| \`naming\` \|`), the same pillar tally in `docs/rules.md` (search: `\| \`naming\` \|`), a per-pillar section heading in `docs/rules.md` (search: `### \`naming\` (`), and a prose count in `.goat-flow/architecture.md` (search: `exposes [0-9]+ rule ids`). PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+The rule registry's true count lives only in `src/Rule/RuleRegistry.php` (the `NAMING_RULE_PRIORITY` constant plus the public registration block), but human-readable counts of the same facts are stamped in five other artefacts that don't auto-update. The five stamp locations are:
 
-**Prevention:** When retiring or adding a rule, after editing `src/Rule/RuleRegistry.php` run a sweep over the five stamp locations above. The short greppable form: `grep -rn "exposes [0-9]* rule\|Rule catalogue\|\\| \`naming\` \\|\|### \`naming\` (" README.md docs/rules.md .goat-flow/architecture.md`. Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
+```text
+README.md                       — quality-table line ("Rule catalogue")
+README.md                       — per-pillar tally row    | `naming` | N |
+docs/rules.md                   — same pillar tally       | `naming` | N |
+docs/rules.md                   — per-pillar section heading  ### `naming` (N)
+.goat-flow/architecture.md      — prose count ("exposes N rule ids")
+```
+
+PR #6 retired `naming.parameter-type-name`, dropping the registry count from 120 → 119 and the naming-pillar count from 12 → 11. The PR updated the `docs/rules.md` pillar tally but missed the other four stamps. CodeRabbit's outside-diff sweep caught two of the four (the `docs/rules.md` section heading and the `architecture.md` prose); the two README stamps weren't in the PR's touched-file set so neither AI reviewer surfaced them.
+
+**Prevention:** When retiring or adding a rule, after editing `src/Rule/RuleRegistry.php` run a sweep over the five stamp locations above. Greppable form:
+
+```bash
+grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
+    README.md docs/rules.md .goat-flow/architecture.md
+```
+
+Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
 
 ## Resolved Entries
 

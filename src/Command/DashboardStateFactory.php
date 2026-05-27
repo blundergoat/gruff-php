@@ -35,7 +35,7 @@ final class DashboardStateFactory
             'project' => $projectRoot,
             'paths' => $pathState,
             'scanScope' => $input->hasParameterOption('--diff', true) ? 'diff' : 'full',
-            'failOn' => $this->resolveDashboardFailOn($input),
+            'failOn' => $this->resolveDashboardFailOn($input, $projectRoot),
             'config' => $this->optionalStringOption($input, 'config') ?? ConfigLoader::DEFAULT_CONFIG_FILE,
             'baseline' => $baseline,
             'noBaseline' => (bool) $input->getOption('no-baseline') ? '1' : '0',
@@ -146,16 +146,17 @@ final class DashboardStateFactory
      * M12 will extend this through the form rendering and round-trip; M11 only
      * fixes the initial-state default-source chain.
      *
-     * @param InputInterface $input Console input for the dashboard command.
+     * @param InputInterface $input       Console input for the dashboard command.
+     * @param string         $projectRoot Active project root resolved from --project/--project-root.
      * @return string Resolved threshold suitable for the form's initial value.
      */
-    private function resolveDashboardFailOn(InputInterface $input): string
+    private function resolveDashboardFailOn(InputInterface $input, string $projectRoot): string
     {
         if ($input->hasParameterOption('--fail-on', true)) {
             return $this->optionalStringOption($input, 'fail-on') ?? 'none';
         }
 
-        return $this->loadConfigFailThreshold($input) ?? 'none';
+        return $this->loadConfigFailThreshold($input, $projectRoot) ?? 'none';
     }
 
     /**
@@ -165,17 +166,17 @@ final class DashboardStateFactory
      * same config for every request; this lookup just seeds the initial form
      * value. Returning null lets the caller fall back to the binary default.
      *
-     * @param InputInterface $input Console input for the dashboard command.
+     * The config is read from the resolved `--project/--project-root`, not the
+     * shell's `getcwd()`, so launching the dashboard from outside the target
+     * project still reads the right `.gruff-php.yaml`.
+     *
+     * @param InputInterface $input       Console input for the dashboard command.
+     * @param string         $projectRoot Resolved project root to load config from.
      * @return string|null Resolved threshold string, or null when unavailable.
      */
-    private function loadConfigFailThreshold(InputInterface $input): ?string
+    private function loadConfigFailThreshold(InputInterface $input, string $projectRoot): ?string
     {
         if ((bool) $input->getOption('no-config')) {
-            return null;
-        }
-
-        $projectRoot = getcwd();
-        if ($projectRoot === false) {
             return null;
         }
 

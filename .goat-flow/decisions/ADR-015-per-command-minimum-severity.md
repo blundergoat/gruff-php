@@ -83,5 +83,5 @@ The first cost is bounded; the second and third have not yet materialised becaus
 
 - Wording brainstorm: `/home/devgoat/projects/gruff-workspace/gruff-go/.goat-flow/logs/critiques/2026-05-26-config-wording-brainstorm-b5k2x.md`
 - Sibling ADR: `/home/devgoat/projects/gruff-workspace/gruff-go/.goat-flow/decisions/ADR-010-per-command-minimum-severity.md`
-- Task package: `.goat-flow/tasks/0.1.4/minimum-severity-overview.md`
+- Task package: `.goat-flow/tasks/0.2.0/minimum-severity-overview.md`
 - ADR-008 (single-threshold rubric severity): `.goat-flow/decisions/ADR-008-single-threshold-rubric-severity.md`
