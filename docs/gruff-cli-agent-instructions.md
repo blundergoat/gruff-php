@@ -376,6 +376,10 @@ failureConditions:
 
 "New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-vs`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `failureReason.scope: "new"` and a top-level `newFindingsCount`. Enabling the gate with no reference point (no baseline and no `--diff-vs`) errors at setup rather than treating every finding as new.
 
+## Result cache
+
+Cache-eligible runs (no project rules active — e.g. `--profile security`, or a config that excludes the design/dead-code rules) reuse unchanged files' findings across runs from a content-addressed, gitignored `.gruff-cache/`. The cache is automatic and correctness-safe: it keys on file bytes + the resolved rule settings + the gruff version, so any change is a fresh analysis, and a cold cache or `--no-cache` is byte-identical to a cached run. Runs that use project rules (the default rule set) bypass the cache. Pass `--no-cache` to force a fresh analysis of every file. Add `.gruff-cache/` to `.gitignore` (gruff already ignores it during discovery).
+
 ## Current Gaps to Avoid Assuming
 
 - `--diff=<base>` is a changed-line/file filter, not a full base/current subtraction engine.
