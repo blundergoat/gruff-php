@@ -24,6 +24,7 @@ use GruffPhp\Mutation\MutationAnalysisBuilder;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Mutation\MutationFindingFactory;
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Reporting\GithubAnnotationsReporter;
 use GruffPhp\Reporting\HotspotReporter;
 use GruffPhp\Reporting\HtmlReporter;
@@ -32,6 +33,7 @@ use GruffPhp\Reporting\MarkdownReporter;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Reporting\SarifReporter;
 use GruffPhp\Reporting\TextReporter;
+use GruffPhp\Reporting\ThresholdTrip;
 use GruffPhp\Review\BranchReviewComparator;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Review\GitArchiveSnapshot;
@@ -114,6 +116,7 @@ final class AnalyseCommand extends Command
                 ),
             )
             ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.')
+            ->addOption('baseline-include-absent', null, InputOption::VALUE_NONE, 'With a baseline applied, list resolved (absent) baseline entries in text, markdown, and HTML output.')
             ->addOption('print-runtime', null, InputOption::VALUE_NONE, 'Emit performance instrumentation (wall, peak memory, phase, optional per-rule) as JSON on stderr.')
             ->addOption('runtime-mode', null, InputOption::VALUE_REQUIRED, 'Runtime payload detail: summary (default) or detailed (adds per-rule totals).', default: 'summary');
     }
@@ -130,6 +133,7 @@ final class AnalyseCommand extends Command
         $runtimeModeOpt        = $input->getOption('runtime-mode');
         $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
         $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
+        $baselineIncludeAbsent = (bool) $input->getOption('baseline-include-absent');
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
@@ -237,7 +241,9 @@ final class AnalyseCommand extends Command
             }
         }
 
-        $exitCode        = $this->resolveExitCode($diagnostics, $findings, $failThreshold);
+        $gate            = $this->resolveExitCode($diagnostics, $findings, $setup->failThresholds);
+        $exitCode        = $gate['exitCode'];
+        $failureReason   = $gate['trip'];
         $displayFilter   = $options->displayFilter();
         $displayFindings = $displayFilter->apply($findings);
         $displayReview   = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
@@ -263,6 +269,8 @@ final class AnalyseCommand extends Command
             review:          $displayReview,
             filters:         $displayFilter,
             suppressedCount: $suppressedCount,
+            baselineIncludeAbsent: $baselineIncludeAbsent,
+            failureReason:   $failureReason,
         );
 
         $reportStart = hrtime(true);
@@ -623,21 +631,20 @@ final class AnalyseCommand extends Command
      * @param list<RunDiagnostic>             $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
      *
-     * @return int Symfony command exit code.
+     * @return array{exitCode: int, trip: ThresholdTrip|null} Exit code, with the breached gate threshold when one tripped.
      */
-    private function resolveExitCode(array $diagnostics, array $findings, FailThreshold $failThreshold): int
+    private function resolveExitCode(array $diagnostics, array $findings, FailThresholds $failThresholds): array
     {
         if ($diagnostics !== []) {
-            return Command::INVALID;
+            return ['exitCode' => Command::INVALID, 'trip' => null];
         }
 
-        foreach ($findings as $finding) {
-            if ($failThreshold->isTriggeredBy($finding->severity)) {
-                return Command::FAILURE;
-            }
-        }
+        $trip = $failThresholds->tripsOn($findings);
 
-        return Command::SUCCESS;
+        return [
+            'exitCode' => $trip instanceof ThresholdTrip ? Command::FAILURE : Command::SUCCESS,
+            'trip' => $trip,
+        ];
     }
 
     /**

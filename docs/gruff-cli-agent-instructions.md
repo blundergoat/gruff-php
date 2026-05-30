@@ -236,6 +236,18 @@ php bin/gruff-php analyse src --generate-baseline --format text --fail-on none
 
 Only update `gruff-baseline.json` when accepting known findings is intentional and reviewable.
 
+Read baseline movement to see how debt changed. Every applied-baseline run classifies findings into three buckets, exposed in JSON at `baseline.buckets` and summarised as a one-line "Movement" view in text, markdown, and HTML:
+
+- **new** — present this run, not in the baseline (the set a new-findings gate would block);
+- **unchanged** — matched a baseline entry (accepted debt, removed before scoring);
+- **resolved** — a baseline entry with no matching finding this run (a fixed item).
+
+```bash
+php bin/gruff-php analyse src --baseline --format json --fail-on none | jq '.baseline.buckets'
+```
+
+Pass `--baseline-include-absent` to list the resolved entries in text, markdown, and HTML output (off by default to keep PR comments short). In diff-scoped runs the resolved bucket is reported as zero, because baseline entries outside the diff are not evaluated.
+
 ## Output Formats for Agents
 
 Use JSON for post-processing:
@@ -325,6 +337,21 @@ For CI gating, choose the policy explicitly:
 --fail-on warning
 --fail-on error
 ```
+
+## Failure Conditions (count gate)
+
+`--fail-on <severity>` is a binary gate. For a count-based policy — "allow N findings at a severity, fail above" — set `failureConditions:` in `.gruff-php.yaml`:
+
+```yaml
+failureConditions:
+  total: 200
+  severityThresholds:
+    error: 0
+    warning: 5
+    advisory: 50
+```
+
+"allow N" means the run passes at count ≤ N and fails at count > N; `error: 0` is the legacy "fail on any error". Any threshold that trips — a severity cap or the `total` cap — fails the run. An explicit `--fail-on` flag overrides `failureConditions`; with neither set, the gate is unchanged from before. When the gate trips, the JSON report carries a top-level `failureReason` (`{thresholdKind, count, cap, message}`) and text/markdown print a one-line `Failed: …`, so CI logs explain *why* without a re-run. Baselined findings are excluded from the count (the gate sees the post-baseline set).
 
 ## Current Gaps to Avoid Assuming
 

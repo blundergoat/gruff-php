@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Config;
 
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Rule\RuleRegistry;
 use InvalidArgumentException;
 
@@ -38,6 +39,7 @@ final readonly class AnalysisConfig
      * @param list<string>                     $acceptedAbbreviations Abbreviations accepted by naming rules.
      * @param list<string>                     $allowedSecretPreviews Secret previews explicitly allowed by config.
      * @param array<string, FailThreshold>     $minimumSeverity       Per-command exit-code thresholds, keyed by command name.
+     * @param FailThresholds|null              $failureConditions     Severity-bucketed count gate from failureConditions config, when set.
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
     public function __construct(
@@ -48,6 +50,7 @@ final readonly class AnalysisConfig
         private array $acceptedAbbreviations = [],
         private array $allowedSecretPreviews = [],
         private array $minimumSeverity = [],
+        private ?FailThresholds $failureConditions = null,
     ) {
         if ($this->minimumPhpVersion < 7.4) {
             throw new InvalidArgumentException('Minimum PHP version must be at least 7.4.');
@@ -115,6 +118,7 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -144,6 +148,7 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -183,6 +188,7 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -211,6 +217,7 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -239,6 +246,7 @@ final readonly class AnalysisConfig
             $acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -267,6 +275,7 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $allowedSecretPreviews,
             $this->minimumSeverity,
+            $this->failureConditions,
         );
     }
 
@@ -296,6 +305,36 @@ final readonly class AnalysisConfig
             $this->acceptedAbbreviations,
             $this->allowedSecretPreviews,
             $minimumSeverity,
+            $this->failureConditions,
+        );
+    }
+
+    /**
+     * Return the severity-bucketed count gate from failureConditions config, when set.
+     *
+     * @return FailThresholds|null Configured failure-condition thresholds, or null when unset.
+     */
+    public function failureConditions(): ?FailThresholds
+    {
+        return $this->failureConditions;
+    }
+
+    /**
+     * @param FailThresholds|null $failureConditions Severity-bucketed count gate to apply, or null to clear it.
+     *
+     * @return self Config carrying the updated failure conditions.
+     */
+    public function withFailureConditions(?FailThresholds $failureConditions): self
+    {
+        return new self(
+            $this->rules,
+            $this->minimumPhpVersion,
+            $this->ruleSelection,
+            $this->ignoredPathPatterns,
+            $this->acceptedAbbreviations,
+            $this->allowedSecretPreviews,
+            $this->minimumSeverity,
+            $failureConditions,
         );
     }
 }

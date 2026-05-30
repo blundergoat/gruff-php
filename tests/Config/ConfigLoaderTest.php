@@ -13,6 +13,7 @@ use GruffPhp\Config\SeverityThreshold;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
 use GruffPhp\Rule\TestQuality\TestMethodTooLongRule;
@@ -287,6 +288,26 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify a failureConditions block is parsed into the config count gate.
+     *
+     * @return void
+     */
+    public function testLoadsFailureConditionsBlock(): void
+    {
+        $path = $this->writeTempConfig(
+            "failureConditions:\n    total: 200\n    severityThresholds:\n        error: 0\n        warning: 5\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $gate   = $config->failureConditions();
+
+        self::assertInstanceOf(FailThresholds::class, $gate);
+        self::assertSame(200, $gate->total);
+        self::assertSame(['error' => 0, 'warning' => 5], $gate->severityCounts);
+    }
+
+    /**
      * Verify inline invalid config shapes are rejected with explicit messages.
      *
      * @param string $configJson      Inline JSON config.
@@ -335,6 +356,22 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             'unknown root key' => [
                 '{"plugins": []}',
                 'Unknown config key "plugins".',
+            ],
+            'failureConditions rejects non-object' => [
+                '{"failureConditions":"strict"}',
+                'Config key "failureConditions" must be an object.',
+            ],
+            'failureConditions rejects unknown key' => [
+                '{"failureConditions":{"totals":1}}',
+                'Unknown config key "failureConditions.totals".',
+            ],
+            'failureConditions rejects unknown severity' => [
+                '{"failureConditions":{"severityThresholds":{"critical":1}}}',
+                'Unknown severity "critical" in failureConditions.severityThresholds. Use advisory, warning, or error.',
+            ],
+            'failureConditions rejects non-int total' => [
+                '{"failureConditions":{"total":"lots"}}',
+                'Config key "failureConditions.total" must be a non-negative integer.',
             ],
             'unknown threshold key' => [
                 '{"rules":{"complexity.cyclomatic":{"thresholds":{"critical":1}}}}',

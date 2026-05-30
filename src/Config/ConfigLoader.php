@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GruffPhp\Config;
 
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Support\PathHelper;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -176,6 +177,7 @@ final readonly class ConfigLoader
 
         $config = $this->applyMinimumPhpVersion($config, $rootConfig);
         $config = $this->applyMinimumSeverityConfig($config, $rootConfig);
+        $config = $this->applyFailureConditionsConfig($config, $rootConfig);
         $config = $this->applyPathConfig($config, $rootConfig);
         $config = $this->applyAllowlistConfig($config, $rootConfig);
         $config = $this->applySelectionConfig($config, $registry, $rootConfig);
@@ -211,7 +213,7 @@ final readonly class ConfigLoader
     private function assertKnownRootKeys(array $rootConfig): void
     {
         foreach (array_keys($rootConfig) as $rootKey) {
-            if (!in_array($rootKey, ['schemaVersion', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'paths', 'allowlists', 'selection'], true)) {
+            if (!in_array($rootKey, ['schemaVersion', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }
@@ -349,6 +351,27 @@ final readonly class ConfigLoader
         }
 
         return $config->withIgnoredPathPatterns($this->parsePathsConfig($rootConfig['paths']));
+    }
+
+    /**
+     * Apply the optional failureConditions count gate when present.
+     *
+     * @param ConfigObject $rootConfig
+     * @throws ConfigException When the failureConditions block is malformed.
+     * @return AnalysisConfig Config with the failure-condition thresholds applied.
+     */
+    private function applyFailureConditionsConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
+    {
+        if (!array_key_exists('failureConditions', $rootConfig)) {
+            return $config;
+        }
+
+        $failureConditions = $rootConfig['failureConditions'];
+        if (!is_array($failureConditions)) {
+            throw new ConfigException('Config key "failureConditions" must be an object.');
+        }
+
+        return $config->withFailureConditions(FailThresholds::fromConfig($failureConditions));
     }
 
     /**

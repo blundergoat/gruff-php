@@ -10,6 +10,7 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Reporting\FindingDisplayFilter;
+use GruffPhp\Reporting\ThresholdTrip;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Source\IgnoredPath;
@@ -55,6 +56,8 @@ final readonly class AnalysisReport
      * @param FindingDisplayFilter|null   $filters            Display filters applied to the report output.
      * @param int|null                    $suppressedCount    Findings excluded by changed-region filtering.
      * @param list<IgnoredPath>           $ignoredPathDetails Ignored paths enriched with source and matching pattern.
+     * @param bool                        $baselineIncludeAbsent Whether reporters should list resolved (absent) baseline entries.
+     * @param ThresholdTrip|null          $failureReason      Gate threshold that tripped, when the run failed a count threshold.
      */
     public function __construct(
         public string $toolVersion,
@@ -78,6 +81,8 @@ final readonly class AnalysisReport
         public ?FindingDisplayFilter $filters = null,
         public ?int $suppressedCount = null,
         public array $ignoredPathDetails = [],
+        public bool $baselineIncludeAbsent = false,
+        public ?ThresholdTrip $failureReason = null,
     ) {
     }
 
@@ -200,6 +205,10 @@ final readonly class AnalysisReport
 
         if ($this->suppressedCount !== null) {
             $report['suppressedCount'] = $this->suppressedCount;
+        }
+
+        if ($this->failureReason instanceof ThresholdTrip) {
+            $report['failureReason'] = $this->failureReason->toArray();
         }
 
         if ($this->mutation instanceof MutationAnalysisResult) {

@@ -424,9 +424,22 @@ final readonly class HtmlReporter
 
         if ($report->baseline !== null) {
             $items[] = sprintf(
-                'Baseline suppression removed %d finding(s) before scoring; suppressed findings are accepted debt.',
-                $report->baseline->suppressedFindings,
+                'Baseline movement: %d new, %d unchanged, %d resolved; unchanged findings are accepted debt removed before scoring.',
+                $report->baseline->newCount,
+                $report->baseline->unchangedCount,
+                $report->baseline->absentCount,
             );
+
+            if ($report->baselineIncludeAbsent) {
+                foreach ($report->baseline->staleEntries as $resolvedEntry) {
+                    $items[] = sprintf(
+                        'Resolved: %s %s%s',
+                        $resolvedEntry->ruleId,
+                        $resolvedEntry->filePath,
+                        $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                    );
+                }
+            }
         }
 
         if ($report->filters !== null && $report->filters->isActive()) {

@@ -65,6 +65,10 @@ final readonly class TextReporter
         );
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
+        if ($report->failureReason !== null) {
+            $lines[] = sprintf('  Failed: %s.', $report->failureReason->message());
+        }
+
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
@@ -261,6 +265,12 @@ final readonly class TextReporter
         $lines[] = sprintf('  Entries: %d', $report->baseline->totalEntries);
         $lines[] = sprintf('  Generated: %s', $report->baseline->generated ? 'yes' : 'no');
         $lines[] = sprintf('  Suppressed findings: %d', $report->baseline->suppressedFindings);
+        $lines[] = sprintf(
+            '  Movement: %d new, %d unchanged, %d resolved',
+            $report->baseline->newCount,
+            $report->baseline->unchangedCount,
+            $report->baseline->absentCount,
+        );
         $lines[] = sprintf('  Stale evaluation: %s', $report->baseline->staleEvaluation);
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
         $lines[] = '  Note: suppressed findings are accepted debt and are removed before scoring.';
@@ -281,6 +291,18 @@ final readonly class TextReporter
                 count($report->baseline->staleEntries),
                 $report->baseline->path,
             );
+        }
+
+        if ($report->baselineIncludeAbsent && $report->baseline->staleEntries !== []) {
+            $lines[] = '  Resolved entries:';
+            foreach ($report->baseline->staleEntries as $resolvedEntry) {
+                $lines[] = sprintf(
+                    '    %s %s%s',
+                    $resolvedEntry->ruleId,
+                    $resolvedEntry->filePath,
+                    $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                );
+            }
         }
     }
 

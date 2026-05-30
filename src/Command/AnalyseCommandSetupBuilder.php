@@ -11,6 +11,7 @@ use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Console\Application;
 use GruffPhp\Reporting\FailThreshold;
+use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Rule\RuleRegistry;
 use Symfony\Component\Console\Application as SymfonyApplication;
@@ -137,19 +138,21 @@ final readonly class AnalyseCommandSetupBuilder
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
+        $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
         $profileRuleSelection = $options->profileRuleSelection();
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
 
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
-            projectRoot:   $projectRoot,
-            options:       $options,
-            format:        $formatResult,
-            failThreshold: $failThreshold,
-            config:        $configResult,
-            configPath:    $this->effectiveConfigPath($options, $configLoader),
-            registry:      $registry,
+            projectRoot:    $projectRoot,
+            options:        $options,
+            format:         $formatResult,
+            failThreshold:  $failThreshold,
+            failThresholds: $failThresholds,
+            config:         $configResult,
+            configPath:     $this->effectiveConfigPath($options, $configLoader),
+            registry:       $registry,
         ));
     }
 
@@ -187,6 +190,36 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         return $config->failThresholdFor('analyse') ?? $explicitOrDefault;
+    }
+
+    /**
+     * Resolve the count-gate thresholds with explicit CLI > failureConditions > resolved-default precedence.
+     *
+     * An explicit `--fail-on` always wins (back-compat); otherwise an explicit
+     * `failureConditions:` block is used; otherwise the already-resolved singular
+     * threshold (config minimumSeverity or the binary default) is desugared so the
+     * gate stays byte-identical to today.
+     *
+     * @param InputInterface $input         Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config        Loaded config supplying the optional failureConditions block.
+     * @param FailThreshold  $failThreshold Already-resolved singular threshold for the run.
+     * @return FailThresholds Count-gate thresholds that decide the exit code.
+     */
+    private function resolveFailThresholds(
+        InputInterface $input,
+        AnalysisConfig $config,
+        FailThreshold $failThreshold,
+    ): FailThresholds {
+        if ($input->hasParameterOption('--fail-on', true)) {
+            return FailThresholds::fromFailOn($failThreshold);
+        }
+
+        $failureConditions = $config->failureConditions();
+        if ($failureConditions instanceof FailThresholds) {
+            return $failureConditions;
+        }
+
+        return FailThresholds::fromFailOn($failThreshold);
     }
 
     /**

@@ -52,6 +52,10 @@ final readonly class MarkdownReporter
             sprintf('**Findings:** %d total, %d error, %d warning, %d advisory', $counts['total'], $counts['error'], $counts['warning'], $counts['advisory']),
         );
 
+        if ($report->failureReason !== null) {
+            $lines[] = sprintf('**Failed:** %s.', $report->failureReason->message());
+        }
+
         if ($score !== null) {
             $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
         }
@@ -69,11 +73,28 @@ final readonly class MarkdownReporter
 
         if ($report->baseline !== null) {
             $lines[] = sprintf(
-                '**Baseline:** suppressed %d finding(s) from `%s`; stale entries %d. Suppressed findings are accepted debt and are removed before scoring.',
-                $report->baseline->suppressedFindings,
+                '**Baseline:** %d new, %d unchanged, %d resolved (`%s`). Unchanged findings are accepted debt and are removed before scoring.',
+                $report->baseline->newCount,
+                $report->baseline->unchangedCount,
+                $report->baseline->absentCount,
                 $report->baseline->path,
-                count($report->baseline->staleEntries),
             );
+
+            if ($report->baselineIncludeAbsent && $report->baseline->staleEntries !== []) {
+                $lines[] = '';
+                $lines[] = '<details><summary>Resolved baseline entries</summary>';
+                $lines[] = '';
+                foreach ($report->baseline->staleEntries as $resolvedEntry) {
+                    $lines[] = sprintf(
+                        '- `%s` %s%s',
+                        $resolvedEntry->ruleId,
+                        $resolvedEntry->filePath,
+                        $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                    );
+                }
+                $lines[] = '';
+                $lines[] = '</details>';
+            }
         }
 
         if ($report->mutation !== null) {

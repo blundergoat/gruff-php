@@ -443,4 +443,85 @@ final class AnalyseCliBaselineTest extends CliTestCase
             $this->removeDir($project);
         }
     }
+
+    /**
+     * Verify resolving a baselined finding reports it as a resolved bucket and lists it only with the flag.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testBaselineIncludeAbsentListsResolvedEntries(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+
+            // Fully document the public surface so the only baselined finding is resolved with no new findings.
+            file_put_contents(
+                $project . '/src/OrderCalculator.php',
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Calculates order totals for baseline movement tests.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     *\n     * @param int \$subtotal  Order subtotal in minor units.\n     * @param int \$taxAmount Tax to add in minor units.\n     * @return int Combined order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
+            );
+
+            $defaultRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none']);
+            self::assertStringContainsString('Movement: 0 new, 0 unchanged, 1 resolved', $defaultRun->getOutput());
+            self::assertStringNotContainsString('Resolved entries:', $defaultRun->getOutput());
+
+            $textRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none', '--baseline-include-absent']);
+            self::assertStringContainsString('Resolved entries:', $textRun->getOutput());
+            self::assertStringContainsString('docs.missing-public-phpdoc', $textRun->getOutput());
+
+            $markdownRun = $this->runInProject($project, ['analyse', 'src', '--format', 'markdown', '--fail-on', 'none', '--baseline-include-absent']);
+            self::assertStringContainsString('**Baseline:** 0 new, 0 unchanged, 1 resolved', $markdownRun->getOutput());
+            self::assertStringContainsString('<details><summary>Resolved baseline entries</summary>', $markdownRun->getOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify a new finding and a still-matching finding land in the new and unchanged buckets.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testBaselineMovementCountsNewAndUnchanged(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+
+            file_put_contents(
+                $project . '/src/Newcomer.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Newcomer fixture introduced after baseline generation.\n */\nfinal readonly class Newcomer\n{\n    public function arrive(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+
+            $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none']);
+            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            $buckets = $baseline['buckets'] ?? null;
+            self::assertIsArray($buckets);
+            self::assertSame(1, $buckets['unchanged'] ?? null);
+            self::assertSame(0, $buckets['absent'] ?? null);
+            self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Run the analyse CLI inside a project directory and return the finished process.
+     *
+     * @param list<string> $args CLI arguments passed after the binary.
+     * @return Process Completed analyse process.
+     */
+    private function runInProject(string $project, array $args): Process
+    {
+        $process = new Process(array_merge([PHP_BINARY, __DIR__ . '/../../bin/gruff-php'], $args), $project);
+        $process->run();
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        return $process;
+    }
 }
