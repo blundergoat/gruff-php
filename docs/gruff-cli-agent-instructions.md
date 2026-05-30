@@ -353,6 +353,29 @@ failureConditions:
 
 "allow N" means the run passes at count ≤ N and fails at count > N; `error: 0` is the legacy "fail on any error". Any threshold that trips — a severity cap or the `total` cap — fails the run. An explicit `--fail-on` flag overrides `failureConditions`; with neither set, the gate is unchanged from before. When the gate trips, the JSON report carries a top-level `failureReason` (`{thresholdKind, count, cap, message}`) and text/markdown print a one-line `Failed: …`, so CI logs explain *why* without a re-run. Baselined findings are excluded from the count (the gate sees the post-baseline set).
 
+## New-findings-only gate (`--fail-on-new`)
+
+The highest-value hook policy: fail only on the debt a change *introduces*, leaving pre-existing findings visible but non-blocking. Provide a reference point — a committed baseline or a `--diff-vs` ref — and enable the gate:
+
+```bash
+# Against a committed baseline (existing debt frozen in gruff-baseline.json):
+php bin/gruff-php analyse src --baseline --fail-on-new
+
+# Against a base ref, no baseline file (PR-check style):
+php bin/gruff-php analyse src --diff-vs origin/main --fail-on-new
+```
+
+`--fail-on-new` is shorthand for `failureConditions.newFindings.severityThresholds.error: 0`; the YAML form takes the same `severityThresholds`/`total` shape as the total gate:
+
+```yaml
+failureConditions:
+  severityThresholds: { error: 0 }     # total gate (all findings)
+  newFindings:
+    severityThresholds: { error: 0 }   # new-findings gate
+```
+
+"New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-vs`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `failureReason.scope: "new"` and a top-level `newFindingsCount`. Enabling the gate with no reference point (no baseline and no `--diff-vs`) errors at setup rather than treating every finding as new.
+
 ## Current Gaps to Avoid Assuming
 
 - `--diff=<base>` is a changed-line/file filter, not a full base/current subtraction engine.

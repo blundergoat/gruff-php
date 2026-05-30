@@ -308,6 +308,26 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify a failureConditions.newFindings block parses into a nested sub-gate.
+     *
+     * @return void
+     */
+    public function testLoadsNewFindingsSubGate(): void
+    {
+        $path = $this->writeTempConfig(
+            "failureConditions:\n    newFindings:\n        severityThresholds:\n            error: 0\n",
+            '.yaml',
+        );
+
+        $config = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $gate   = $config->failureConditions();
+
+        self::assertInstanceOf(FailThresholds::class, $gate);
+        self::assertInstanceOf(FailThresholds::class, $gate->newFindingsGate);
+        self::assertSame(['error' => 0], $gate->newFindingsGate->severityCounts);
+    }
+
+    /**
      * Verify inline invalid config shapes are rejected with explicit messages.
      *
      * @param string $configJson      Inline JSON config.
@@ -372,6 +392,14 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             'failureConditions rejects non-int total' => [
                 '{"failureConditions":{"total":"lots"}}',
                 'Config key "failureConditions.total" must be a non-negative integer.',
+            ],
+            'failureConditions.newFindings rejects unknown key' => [
+                '{"failureConditions":{"newFindings":{"totals":1}}}',
+                'Unknown config key "failureConditions.newFindings.totals".',
+            ],
+            'failureConditions.newFindings rejects nested newFindings' => [
+                '{"failureConditions":{"newFindings":{"newFindings":{"total":1}}}}',
+                'Unknown config key "failureConditions.newFindings.newFindings".',
             ],
             'unknown threshold key' => [
                 '{"rules":{"complexity.cyclomatic":{"thresholds":{"critical":1}}}}',

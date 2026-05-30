@@ -165,6 +165,86 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
+     * Verify tripsOnScope reports a new-findings breach with the "new" scope.
+     *
+     * @return void
+     */
+    public function testTripsOnScopeReportsNewScope(): void
+    {
+        $gate = (new FailThresholds(null, []))->withNewFindingsGate(new FailThresholds(null, ['error' => 0]));
+
+        $trip = $gate->tripsOnScope([], [$this->finding(Severity::Error)]);
+        self::assertInstanceOf(ThresholdTrip::class, $trip);
+        self::assertSame(ThresholdTrip::SCOPE_NEW, $trip->scope);
+        self::assertSame('error', $trip->thresholdKind);
+    }
+
+    /**
+     * Verify tripsOnScope falls through to the total gate with the "total" scope.
+     *
+     * @return void
+     */
+    public function testTripsOnScopeReportsTotalScopeWhenOnlyTotalTrips(): void
+    {
+        $gate = new FailThresholds(null, ['error' => 0]);
+
+        $trip = $gate->tripsOnScope([$this->finding(Severity::Error)], []);
+        self::assertInstanceOf(ThresholdTrip::class, $trip);
+        self::assertSame(ThresholdTrip::SCOPE_TOTAL, $trip->scope);
+    }
+
+    /**
+     * Verify the new-findings trip wins when both the new and total gates fire.
+     *
+     * @return void
+     */
+    public function testTripsOnScopeNewGateWinsWhenBothTrip(): void
+    {
+        $gate = (new FailThresholds(null, ['error' => 0]))->withNewFindingsGate(new FailThresholds(null, ['error' => 0]));
+
+        $trip = $gate->tripsOnScope([$this->finding(Severity::Error)], [$this->finding(Severity::Error)]);
+        self::assertInstanceOf(ThresholdTrip::class, $trip);
+        self::assertSame(ThresholdTrip::SCOPE_NEW, $trip->scope);
+    }
+
+    /**
+     * Verify tripsOnScope returns null when neither gate trips.
+     *
+     * @return void
+     */
+    public function testTripsOnScopeReturnsNullWhenNeitherTrips(): void
+    {
+        $gate = (new FailThresholds(null, ['error' => 5]))->withNewFindingsGate(new FailThresholds(null, ['error' => 5]));
+
+        self::assertNull($gate->tripsOnScope([$this->finding(Severity::Error)], [$this->finding(Severity::Error)]));
+    }
+
+    /**
+     * Verify fromConfig parses a newFindings sub-gate.
+     *
+     * @return void
+     */
+    public function testFromConfigParsesNewFindingsSubGate(): void
+    {
+        $gate = FailThresholds::fromConfig(['newFindings' => ['severityThresholds' => ['error' => 0]]]);
+
+        self::assertInstanceOf(FailThresholds::class, $gate->newFindingsGate);
+        self::assertSame(['error' => 0], $gate->newFindingsGate->severityCounts);
+    }
+
+    /**
+     * Verify a doubly-nested newFindings block is rejected.
+     *
+     * @return void
+     */
+    public function testFromConfigRejectsNestedNewFindings(): void
+    {
+        $this->expectException(ConfigException::class);
+
+        FailThresholds::fromConfig(['newFindings' => ['newFindings' => ['total' => 1]]]);
+    }
+
+    /**
      * Build a finding at the requested severity for gate evaluation.
      *
      * @param Severity $severity Severity to attach to the finding.
