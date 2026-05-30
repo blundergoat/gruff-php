@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace GruffPhp\Command;
 
 use GruffPhp\Analysis\RunDiagnostic;
+use GruffPhp\Cache\AnalysisFingerprint;
+use GruffPhp\Cache\ResultCache;
 use GruffPhp\Config\AnalysisConfig;
+use GruffPhp\Console\Application;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
@@ -76,6 +79,7 @@ final class AnalysisPipeline
         ?array $analysisPaths,
         int $discoverStart,
         ?RuleRunnerObserver $ruleRunnerObserver,
+        bool $noCache = false,
     ): array {
         if ($analysisPaths === null) {
             return [
@@ -96,6 +100,7 @@ final class AnalysisPipeline
                 analysisPaths:      $analysisPaths,
                 discoverStart:      $discoverStart,
                 ruleRunnerObserver: $ruleRunnerObserver,
+                noCache:            $noCache,
             );
         }
 
@@ -148,6 +153,7 @@ final class AnalysisPipeline
         array $analysisPaths,
         int $discoverStart,
         ?RuleRunnerObserver $ruleRunnerObserver,
+        bool $noCache,
     ): array {
         $discovery = (new AnalysisSourceLoader())->discover(
             $projectRoot,
@@ -160,12 +166,34 @@ final class AnalysisPipeline
         $discoveryResult   = $discovery['discovery'];
         $phpFileParser     = new PhpFileParser();
 
+        // The per-file result cache is only byte-identical-correct when no rule
+        // needs cross-file state: project rules (accumulators included) observe
+        // every unit during analysis, so reusing a cached file's findings without
+        // re-running them would corrupt the project-rule output.
+        $cacheable   = !$noCache && !$this->registry->hasEnabledProjectRules($config);
+        $cache       = $cacheable ? ResultCache::forProject($projectRoot) : null;
+        $fingerprint = $cacheable ? AnalysisFingerprint::forRun($this->registry, $config, Application::VERSION) : null;
+
         $this->registry->beginStreaming($ruleContext);
         $findings     = [];
         $parsedCount  = 0;
         $analyseStart = hrtime(true);
 
         foreach ($discoveryResult->files as $file) {
+            $cacheKey = null;
+            if ($cache instanceof ResultCache && $fingerprint instanceof AnalysisFingerprint && is_readable($file->absolutePath)) {
+                $contents = file_get_contents($file->absolutePath);
+                if (is_string($contents)) {
+                    $cacheKey       = $fingerprint->forFile($file->displayPath, $contents);
+                    $cachedFindings = $cache->get($cacheKey);
+                    if ($cachedFindings !== null) {
+                        array_push($findings, ...$cachedFindings);
+                        $parsedCount++;
+                        continue;
+                    }
+                }
+            }
+
             $unit = $phpFileParser->parse($file);
             if (!$unit->hasParseErrors()) {
                 $parsedCount++;
@@ -179,7 +207,11 @@ final class AnalysisPipeline
                 );
             }
 
-            array_push($findings, ...$this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver));
+            $unitFindings = $this->registry->analyseUnit($unit, $ruleContext, $ruleRunnerObserver);
+            array_push($findings, ...$unitFindings);
+            if ($cache instanceof ResultCache && $cacheKey !== null && !$unit->hasParseErrors()) {
+                $cache->put($cacheKey, $unitFindings);
+            }
             NodeIndex::evictUnit($unit);
             $unit->release();
             unset($unit);

@@ -95,6 +95,102 @@ final readonly class Finding
     }
 
     /**
+     * Reconstruct a finding from its serialized array form (the inverse of toArray()).
+     *
+     * The derived `fingerprint` / `stableIdentity` fields are recomputed from the
+     * restored inputs, never read from the payload, so a round-trip is lossless.
+     *
+     * @param array<string, mixed> $data Serialized finding produced by toArray().
+     * @return self Reconstructed finding.
+     */
+    public static function fromArray(array $data): self
+    {
+        $secondaryPillars = [];
+        $rawSecondary     = $data['secondaryPillars'] ?? [];
+        if (is_array($rawSecondary)) {
+            foreach ($rawSecondary as $pillarValue) {
+                $secondaryPillars[] = Pillar::from(self::stringField($pillarValue));
+            }
+        }
+
+        $rawMetadata = $data['metadata'] ?? [];
+        $metadata    = [];
+        if (is_array($rawMetadata)) {
+            foreach ($rawMetadata as $metadataKey => $metadataValue) {
+                $metadata[is_string($metadataKey) ? $metadataKey : (string) $metadataKey] = self::metadataValue($metadataValue);
+            }
+        }
+
+        return new self(
+            ruleId:           self::stringField($data['ruleId'] ?? null),
+            message:          self::stringField($data['message'] ?? null),
+            filePath:         self::stringField($data['file'] ?? null),
+            line:             self::nullableInt($data['line'] ?? null),
+            severity:         Severity::from(self::stringField($data['severity'] ?? null)),
+            pillar:           Pillar::from(self::stringField($data['pillar'] ?? null)),
+            tier:             RuleTier::from(self::stringField($data['tier'] ?? null)),
+            confidence:       Confidence::from(self::stringField($data['confidence'] ?? null)),
+            endLine:          self::nullableInt($data['endLine'] ?? null),
+            column:           self::nullableInt($data['column'] ?? null),
+            symbol:           self::nullableString($data['symbol'] ?? null),
+            remediation:      self::nullableString($data['remediation'] ?? null),
+            secondaryPillars: $secondaryPillars,
+            metadata:         $metadata,
+        );
+    }
+
+    /**
+     * @param mixed $value Raw value from a decoded payload.
+     * @return string String value, or an empty string when not a string.
+     */
+    private static function stringField(mixed $value): string
+    {
+        return is_string($value) ? $value : '';
+    }
+
+    /**
+     * Narrow a decoded metadata value to the supported scalar/list shape.
+     *
+     * @param mixed $value Raw decoded metadata value.
+     * @return bool|float|int|string|null|array<array-key, bool|float|int|string|null> Narrowed metadata value.
+     */
+    private static function metadataValue(mixed $value): bool|float|int|string|null|array
+    {
+        if (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null) {
+            return $value;
+        }
+
+        if (!is_array($value)) {
+            return null;
+        }
+
+        $list = [];
+        foreach ($value as $itemKey => $item) {
+            $list[$itemKey] = is_bool($item) || is_int($item) || is_float($item) || is_string($item) || $item === null ? $item : null;
+        }
+
+        return $list;
+    }
+
+    /**
+     * @param mixed $value Raw value from a decoded payload.
+     * @return int|null Integer value, or null when not an integer.
+     */
+    private static function nullableInt(mixed $value): ?int
+    {
+        return is_int($value) ? $value : null;
+    }
+
+    /**
+     * @param mixed $value Raw value from a decoded payload.
+     * @return string|null String value, or null when not a non-empty string.
+     */
+    private static function nullableString(mixed $value): ?string
+    {
+        return is_string($value) ? $value : null;
+    }
+
+    /**
      * Build the stable short hash used to identify equivalent findings.
      *
      * @return string Sixteen-character SHA-256 prefix for the finding identity.

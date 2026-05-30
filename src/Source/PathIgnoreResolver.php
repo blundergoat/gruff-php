@@ -41,6 +41,7 @@ final readonly class PathIgnoreResolver
         '.goat-flow/logs',
         '.goat-flow/scratchpad',
         '.goat-flow/tasks',
+        '.gruff-cache',
         '.hg',
         '.idea',
         '.phpunit.cache',

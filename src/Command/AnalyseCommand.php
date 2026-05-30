@@ -118,6 +118,7 @@ final class AnalyseCommand extends Command
                 ),
             )
             ->addOption('no-baseline', null, InputOption::VALUE_NONE, 'Skip auto-applying the default baseline file for this run.')
+            ->addOption('no-cache', null, InputOption::VALUE_NONE, 'Disable the on-disk result cache for this run (analyse every file fresh).')
             ->addOption('baseline-include-absent', null, InputOption::VALUE_NONE, 'With a baseline applied, list resolved (absent) baseline entries in text, markdown, and HTML output.')
             ->addOption('print-runtime', null, InputOption::VALUE_NONE, 'Emit performance instrumentation (wall, peak memory, phase, optional per-rule) as JSON on stderr.')
             ->addOption('runtime-mode', null, InputOption::VALUE_REQUIRED, 'Runtime payload detail: summary (default) or detailed (adds per-rule totals).', default: 'summary');
@@ -136,6 +137,7 @@ final class AnalyseCommand extends Command
         $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
         $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
         $baselineIncludeAbsent = (bool) $input->getOption('baseline-include-absent');
+        $noCache               = (bool) $input->getOption('no-cache');
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
@@ -167,6 +169,7 @@ final class AnalyseCommand extends Command
             analysisPaths:      $analysisPaths,
             discoverStart:      $discoverStart,
             ruleRunnerObserver: $runtimeTimingObserver,
+            noCache:            $noCache,
         );
         $sources             = $analysisRun['sources'];
         $findings            = $analysisRun['findings'];
