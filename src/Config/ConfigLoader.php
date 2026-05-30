@@ -47,6 +47,18 @@ final readonly class ConfigLoader
     public const GATING_COMMANDS = ['analyse', 'report', 'dashboard'];
 
     /**
+     * Bundled preset names available to the `extends:` key.
+     *
+     * @var list<string>
+     */
+    public const BUNDLED_PRESETS = ['gruff.starter', 'gruff.recommended', 'gruff.strict'];
+
+    /**
+     * Maximum depth of an `extends:` inheritance chain before failing.
+     */
+    private const MAX_EXTENDS_DEPTH = 5;
+
+    /**
      * Create a loader for a project root with an optional package config fallback.
      *
      * @param string      $projectRoot        Project root used for primary config discovery.
@@ -171,18 +183,95 @@ final readonly class ConfigLoader
      */
     private function applyConfigFile(AnalysisConfig $config, RuleRegistry $registry, string $path): AnalysisConfig
     {
+        foreach ($this->resolveExtendsChain($path, [], 1) as $rootConfig) {
+            $this->assertKnownRootKeys($rootConfig);
+            $this->assertSchemaVersion($rootConfig);
+
+            $config = $this->applyMinimumPhpVersion($config, $rootConfig);
+            $config = $this->applyMinimumSeverityConfig($config, $rootConfig);
+            $config = $this->applyFailureConditionsConfig($config, $rootConfig);
+            $config = $this->applyPathConfig($config, $rootConfig);
+            $config = $this->applyAllowlistConfig($config, $rootConfig);
+            $config = $this->applySelectionConfig($config, $registry, $rootConfig);
+            $config = (new RuleConfigApplier())->apply($config, $registry, $rootConfig);
+        }
+
+        return $config;
+    }
+
+    /**
+     * Resolve a config file's `extends:` chain into an ordered list of configs.
+     *
+     * The list is ancestor-first, current-file-last, so applying each in order
+     * layers child settings over inherited ones (a child block overrides the
+     * parent's for the same section — see ADR-021). A cycle or a chain deeper than
+     * the cap throws.
+     *
+     * @param string       $path     Config file to resolve.
+     * @param list<string> $ancestry Canonical paths already in the chain (cycle guard).
+     * @param int          $depth    Current resolution depth (1 at the root file).
+     * @throws ConfigException When the chain cycles, exceeds the depth cap, or a target is invalid.
+     * @return list<ConfigObject> Configs to apply in order, ancestor first.
+     */
+    private function resolveExtendsChain(string $path, array $ancestry, int $depth): array
+    {
+        $label = PathHelper::canonical($path);
+        if (in_array($label, $ancestry, true)) {
+            throw new ConfigException(sprintf('Config "extends" cycle detected: %s.', implode(' -> ', [...$ancestry, $label])));
+        }
+
+        if ($depth > self::MAX_EXTENDS_DEPTH) {
+            throw new ConfigException(sprintf('Config "extends" chain exceeds the maximum depth of %d: %s.', self::MAX_EXTENDS_DEPTH, implode(' -> ', [...$ancestry, $label])));
+        }
+
         $rootConfig = $this->readRootConfig($path);
-        $this->assertKnownRootKeys($rootConfig);
-        $this->assertSchemaVersion($rootConfig);
+        $extends    = $rootConfig['extends'] ?? null;
+        if ($extends === null) {
+            return [$rootConfig];
+        }
 
-        $config = $this->applyMinimumPhpVersion($config, $rootConfig);
-        $config = $this->applyMinimumSeverityConfig($config, $rootConfig);
-        $config = $this->applyFailureConditionsConfig($config, $rootConfig);
-        $config = $this->applyPathConfig($config, $rootConfig);
-        $config = $this->applyAllowlistConfig($config, $rootConfig);
-        $config = $this->applySelectionConfig($config, $registry, $rootConfig);
+        if (!is_string($extends) || $extends === '') {
+            throw new ConfigException('Config key "extends" must be a non-empty preset name or path.');
+        }
 
-        return (new RuleConfigApplier())->apply($config, $registry, $rootConfig);
+        $parentPath  = $this->resolveExtendsReference($extends, $path);
+        $parentChain = $this->resolveExtendsChain($parentPath, [...$ancestry, $label], $depth + 1);
+
+        return [...$parentChain, $rootConfig];
+    }
+
+    /**
+     * Resolve an `extends:` reference (bundled preset name or path) to a config file path.
+     *
+     * @param string $reference   Preset name (`gruff.*`) or a relative/absolute path.
+     * @param string $loadingFile Config file declaring the `extends:` (paths resolve from its directory).
+     * @throws ConfigException When the preset name is unknown or the path target is missing.
+     * @return string Absolute path to the referenced config file.
+     */
+    private function resolveExtendsReference(string $reference, string $loadingFile): string
+    {
+        if (str_starts_with($reference, 'gruff.')) {
+            $presetPath = self::packageRoot() . '/resources/profiles/' . $reference . '.yaml';
+            if (!is_file($presetPath)) {
+                throw new ConfigException(sprintf(
+                    "Unknown preset '%s'. Available presets: %s.",
+                    $reference,
+                    implode(', ', self::BUNDLED_PRESETS),
+                ));
+            }
+
+            return $presetPath;
+        }
+
+        $candidate = PathHelper::isAbsolute($reference)
+            ? $reference
+            : dirname($loadingFile) . '/' . $reference;
+
+        if (!is_file($candidate)) {
+            throw new ConfigException(sprintf('Config "extends" target not found: %s.', $reference));
+        }
+
+        return $candidate;
     }
 
     /**
@@ -213,7 +302,7 @@ final readonly class ConfigLoader
     private function assertKnownRootKeys(array $rootConfig): void
     {
         foreach (array_keys($rootConfig) as $rootKey) {
-            if (!in_array($rootKey, ['schemaVersion', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection'], true)) {
+            if (!in_array($rootKey, ['schemaVersion', 'extends', 'rules', 'minimumPhpVersion', 'minimumSeverity', 'failureConditions', 'paths', 'allowlists', 'selection'], true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s".', $rootKey));
             }
         }

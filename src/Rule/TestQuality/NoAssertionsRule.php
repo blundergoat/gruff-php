@@ -37,7 +37,7 @@ final readonly class NoAssertionsRule implements RuleInterface
             name:            'Test without assertions',
             pillar:          Pillar::TestQuality,
             tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
+            defaultSeverity: Severity::Error,
             confidence:      Confidence::Medium,
         );
     }
@@ -64,7 +64,7 @@ final readonly class NoAssertionsRule implements RuleInterface
                 message:     sprintf('%s has no detected PHPUnit or Pest assertions.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
-                severity:    Severity::Warning,
+                severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Medium,

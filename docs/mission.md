@@ -17,7 +17,7 @@ Every rule and default earns its place by serving one of three verifiability goa
 
 1. **Legible enough to verify.** Complexity and nesting are capped so a method fits in a reviewer's head, and every method — public or private — must carry an intent-bearing doc comment stating what it is for, what it returns at the edges, and what the caller must satisfy. The comment is a plain-English contract the reviewer checks the implementation against. A doc comment that contradicts the code is a signal the change needs a deeper look — not noise.
 2. **Secure where the eye fails.** The `security` and `sensitive-data` pillars catch the classes of mistake a human reviewer skims past: injection, unsafe deserialization, leaked secrets, weak crypto, and similar.
-3. **Tested for real, not padded.** The `test-quality` pillar rewards genuine assertions and flags low-signal ceremony, so a green suite means the behaviour is actually exercised rather than mocked into a tautology.
+3. **Tested for real, not padded.** The `test-quality` pillar rewards genuine assertions and flags low-signal ceremony. Its strongest signals gate hard — a test that asserts nothing, never calls its subject, or asserts a tautology fails `--fail-on error` — so a green suite means the behaviour is actually exercised rather than mocked into a tautology.
 
 ## The calibration principle
 

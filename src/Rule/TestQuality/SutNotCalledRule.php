@@ -129,7 +129,7 @@ final readonly class SutNotCalledRule implements RuleInterface
             name:            'Test name mentions SUT that is not called',
             pillar:          Pillar::TestQuality,
             tier:            RuleTier::V01,
-            defaultSeverity: Severity::Advisory,
+            defaultSeverity: Severity::Error,
             confidence:      Confidence::Low,
         );
     }
@@ -165,7 +165,7 @@ final readonly class SutNotCalledRule implements RuleInterface
                 message:     sprintf('%s name implies a SUT behavior, but no matching method call was detected.', $scope->symbol),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
-                severity:    Severity::Advisory,
+                severity:    Severity::Error,
                 pillar:      Pillar::TestQuality,
                 tier:        RuleTier::V01,
                 confidence:  Confidence::Low,

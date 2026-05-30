@@ -376,6 +376,24 @@ failureConditions:
 
 "New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-vs`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `failureReason.scope: "new"` and a top-level `newFindingsCount`. Enabling the gate with no reference point (no baseline and no `--diff-vs`) errors at setup rather than treating every finding as new.
 
+## Config presets (`extends:`)
+
+Instead of hand-maintaining a long `.gruff-php.yaml`, extend a bundled preset and add only your deltas:
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+extends: gruff.recommended   # or gruff.starter (lean) / gruff.strict (tighter)
+rules:
+  complexity.cognitive:
+    threshold: 25            # your override on top of the preset
+```
+
+- `gruff.recommended` — gruff's default rule set; `extends: gruff.recommended` with no overrides behaves exactly like no config at all.
+- `gruff.starter` — the highest-signal pillars only (security, sensitive-data, size, complexity) for first adoption; far fewer findings.
+- `gruff.strict` — recommended plus tighter complexity/size thresholds.
+
+`extends:` also accepts a relative or absolute path (`extends: ./shared.gruff-php.yaml`) so a team can share one base. Chains resolve ancestor-first (a child's section overrides the inherited one); cycles, chains deeper than five hops, and unknown preset names fail fast with a clear error. Use `--config <path>` to point at a specific config file.
+
 ## Result cache
 
 Cache-eligible runs (no project rules active — e.g. `--profile security`, or a config that excludes the design/dead-code rules) reuse unchanged files' findings across runs from a content-addressed, gitignored `.gruff-cache/`. The cache is automatic and correctness-safe: it keys on file bytes + the resolved rule settings + the gruff version, so any change is a fresh analysis, and a cold cache or `--no-cache` is byte-identical to a cached run. Runs that use project rules (the default rule set) bypass the cache. Pass `--no-cache` to force a fresh analysis of every file. Add `.gruff-cache/` to `.gitignore` (gruff already ignores it during discovery).

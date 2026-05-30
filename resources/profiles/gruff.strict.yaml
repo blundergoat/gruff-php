@@ -1,0 +1,26 @@
+# gruff.strict — the recommended set with tighter gates, for teams holding a high
+# bar on new code. It keeps every recommended rule and tightens the complexity and
+# size thresholds below their defaults, so code that is "merely large" or "merely
+# branchy" is flagged earlier.
+#
+# Tier criteria: a tightened threshold lives here only when the stricter value is
+# defensible as a team standard, not merely "smaller is better".
+schemaVersion: gruff-php.config.v0.1
+extends: gruff.recommended
+rules:
+  complexity.cognitive:
+    enabled: true
+    threshold: 15
+    severity: error
+  complexity.nesting-depth:
+    enabled: true
+    threshold: 3
+    severity: error
+  size.method-length:
+    enabled: true
+    threshold: 50
+    severity: error
+  size.parameter-count:
+    enabled: true
+    threshold: 5
+    severity: error

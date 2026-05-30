@@ -1,0 +1,17 @@
+# gruff.starter — the highest-signal subset, for a project adopting gruff for the
+# first time. It narrows the recommended set to the pillars where a finding almost
+# always means "fix this": security, sensitive-data, and the size/complexity guards
+# that track human comprehension. A typical mid-size codebase sees far fewer
+# findings than under gruff.recommended; widen to recommended once the backlog is
+# under control.
+#
+# Tier criteria: a pillar lives here only if its findings are high-precision and
+# almost always actionable on first adoption.
+schemaVersion: gruff-php.config.v0.1
+extends: gruff.recommended
+selection:
+  pillars:
+    - security
+    - sensitive-data
+    - size
+    - complexity

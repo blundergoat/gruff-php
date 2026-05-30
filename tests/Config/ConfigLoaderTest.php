@@ -308,6 +308,53 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify extends: gruff.strict applies the preset's tightened thresholds.
+     *
+     * @return void
+     */
+    public function testExtendsAppliesBundledPresetSettings(): void
+    {
+        $dir = sys_get_temp_dir() . '/gruff-extends-strict-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($dir));
+
+        try {
+            file_put_contents($dir . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: gruff.strict\n");
+            $config   = (new ConfigLoader($dir, ConfigLoader::packageRoot()))->load(null, RuleRegistry::defaults());
+            $settings = $config->ruleSettings('complexity.cognitive');
+
+            self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
+            self::assertSame(15, $settings->severityThreshold->threshold);
+        } finally {
+            unlink($dir . '/.gruff-php.yaml');
+            rmdir($dir);
+        }
+    }
+
+    /**
+     * Verify a cyclic extends chain throws with the chain in the message.
+     *
+     * @return void
+     */
+    public function testExtendsCycleThrows(): void
+    {
+        $dir = sys_get_temp_dir() . '/gruff-extends-cycle-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($dir));
+        file_put_contents($dir . '/a.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./b.yaml\n");
+        file_put_contents($dir . '/b.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./a.yaml\n");
+
+        try {
+            $this->expectException(ConfigException::class);
+            $this->expectExceptionMessageMatches('/extends.*cycle detected/');
+
+            (new ConfigLoader($dir, ConfigLoader::packageRoot()))->load('a.yaml', RuleRegistry::defaults());
+        } finally {
+            unlink($dir . '/a.yaml');
+            unlink($dir . '/b.yaml');
+            rmdir($dir);
+        }
+    }
+
+    /**
      * Verify a failureConditions.newFindings block parses into a nested sub-gate.
      *
      * @return void
@@ -376,6 +423,10 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
             'unknown root key' => [
                 '{"plugins": []}',
                 'Unknown config key "plugins".',
+            ],
+            'extends unknown preset' => [
+                '{"extends": "gruff.bogus"}',
+                "Unknown preset 'gruff.bogus'. Available presets: gruff.starter, gruff.recommended, gruff.strict.",
             ],
             'failureConditions rejects non-object' => [
                 '{"failureConditions":"strict"}',

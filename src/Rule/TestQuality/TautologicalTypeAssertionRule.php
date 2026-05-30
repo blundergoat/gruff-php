@@ -40,7 +40,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
             name:            'Tautological type assertion',
             pillar:          Pillar::TestQuality,
             tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
+            defaultSeverity: Severity::Error,
             confidence:      Confidence::High,
         );
     }
@@ -87,7 +87,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
                     ),
                     filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
-                    severity:    Severity::Warning,
+                    severity:    Severity::Error,
                     pillar:      Pillar::TestQuality,
                     tier:        RuleTier::V01,
                     confidence:  Confidence::High,

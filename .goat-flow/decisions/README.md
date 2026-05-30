@@ -55,6 +55,10 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-016-visibility-only-rule-scoring-tier.md`
 - `ADR-017-mission-govern-ai-generated-code.md`
 - `ADR-018-retire-npath-and-recalibrate-complexity.md`
+- `ADR-019-paths-ignore-authoritative-and-check-ignore.md`
+- `ADR-020-incremental-result-cache.md`
+- `ADR-021-config-presets-and-extends.md`
+- `ADR-022-test-quality-gate-parity.md`
 
 ## Required Structure
 
