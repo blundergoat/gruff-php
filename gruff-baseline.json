@@ -1,7 +1,63 @@
 {
     "schemaVersion": "gruff.baseline.v1",
-    "generatedAt": "2026-05-27T18:41:37+00:00",
+    "generatedAt": "2026-05-30T00:51:46+00:00",
     "findings": [
+        {
+            "fingerprint": "8712053e7010898b",
+            "ruleId": "size.file-length",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 1,
+            "symbol": null,
+            "message": "File has 1018 lines, above the error threshold of 1000."
+        },
+        {
+            "fingerprint": "69e1aa51c7458310",
+            "ruleId": "size.class-length",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 56,
+            "symbol": "AnalyseCommand",
+            "message": "AnalyseCommand is 962 lines, above the error threshold of 800."
+        },
+        {
+            "fingerprint": "7072e32451aec2a9",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 452,
+            "symbol": "AnalyseCommand::buildExplicitRangesDiffResult()",
+            "message": "AnalyseCommand::buildExplicitRangesDiffResult() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "b375f9f2eaffdda2",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 452,
+            "symbol": "AnalyseCommand::buildExplicitRangesDiffResult()",
+            "message": "AnalyseCommand::buildExplicitRangesDiffResult() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "a41edefc27c7a7dd",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 493,
+            "symbol": "AnalyseCommand::parseChangedRanges()",
+            "message": "AnalyseCommand::parseChangedRanges() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "a6e66cc3ff894438",
+            "ruleId": "docs.regex-comment",
+            "file": "src/Command/AnalyseCommand.php",
+            "line": 503,
+            "symbol": "AnalyseCommand::parseChangedRanges()",
+            "message": "preg_match() should have a one-line comment above it explaining what the regex checks."
+        },
+        {
+            "fingerprint": "2bbc1b5141768020",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Command/AnalyseCommandOptions.php",
+            "line": 462,
+            "symbol": "AnalyseCommandOptions::diffMode()",
+            "message": "AnalyseCommandOptions::diffMode() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
         {
             "fingerprint": "857aaeaf33b58b64",
             "ruleId": "modernisation.named-argument-opportunity",
@@ -41,6 +97,134 @@
             "line": 27,
             "symbol": "RuleSettings::__construct()",
             "message": "Property \"$excludeFromScore\" is typed bool but does not use a boolean prefix or approved state adjective."
+        },
+        {
+            "fingerprint": "97653f88c2944899",
+            "ruleId": "docs.missing-constant-phpdoc",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 18,
+            "symbol": "DiffFindingFilter::SCOPE_SYMBOL",
+            "message": "Constant DiffFindingFilter::SCOPE_SYMBOL needs a brief intent description above its declaration (one plain-English line; not a restatement of the value)."
+        },
+        {
+            "fingerprint": "b64970fcd63f0a92",
+            "ruleId": "docs.missing-constant-phpdoc",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 19,
+            "symbol": "DiffFindingFilter::SCOPE_HUNK",
+            "message": "Constant DiffFindingFilter::SCOPE_HUNK needs a brief intent description above its declaration (one plain-English line; not a restatement of the value)."
+        },
+        {
+            "fingerprint": "82dd81fe1733a60e",
+            "ruleId": "waste.one-line-method",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 26,
+            "symbol": "DiffFindingFilter::filter()",
+            "message": "DiffFindingFilter::filter() only wraps a one-line call expression."
+        },
+        {
+            "fingerprint": "276a2ac03306768e",
+            "ruleId": "docs.missing-param-tag",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 37,
+            "symbol": "DiffFindingFilter::apply()",
+            "message": "Parameter $scope in DiffFindingFilter::apply() needs an @param tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "e3f266dba2237926",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 64,
+            "symbol": "DiffFindingFilter::isFindingInScope()",
+            "message": "DiffFindingFilter::isFindingInScope() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "35d81562c13f6d21",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 64,
+            "symbol": "DiffFindingFilter::isFindingInScope()",
+            "message": "DiffFindingFilter::isFindingInScope() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "b4ec924182dbd24e",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 96,
+            "symbol": "DiffFindingFilter::rangesTouch()",
+            "message": "DiffFindingFilter::rangesTouch() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "9cb382ce4fa6d423",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 96,
+            "symbol": "DiffFindingFilter::rangesTouch()",
+            "message": "DiffFindingFilter::rangesTouch() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "ea2e9ae704e8c287",
+            "ruleId": "naming.boolean-prefix",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 96,
+            "symbol": "DiffFindingFilter::rangesTouch()",
+            "message": "DiffFindingFilter::rangesTouch() returns bool but does not use a boolean prefix (is, has, can, should, will)."
+        },
+        {
+            "fingerprint": "85939238de15c0fb",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 110,
+            "symbol": "DiffFindingFilter::enclosingRange()",
+            "message": "DiffFindingFilter::enclosingRange() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "ed1af08cb722cca0",
+            "ruleId": "docs.missing-return-tag",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 110,
+            "symbol": "DiffFindingFilter::enclosingRange()",
+            "message": "DiffFindingFilter::enclosingRange() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "2f55a0b947d22e06",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 134,
+            "symbol": "DiffFindingFilter::declarationRangesByFile()",
+            "message": "DiffFindingFilter::declarationRangesByFile() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "133a69b011eea856",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 169,
+            "symbol": "DiffFindingFilter::collectDeclarationRanges()",
+            "message": "DiffFindingFilter::collectDeclarationRanges() has PHPDoc tags but no descriptive summary or tag descriptions."
+        },
+        {
+            "fingerprint": "1cf9f4c1b7a36e42",
+            "ruleId": "docs.missing-public-phpdoc",
+            "file": "src/Diff/DiffFindingFilter.php",
+            "line": 199,
+            "symbol": "DiffFindingFilter::isScopeNode()",
+            "message": "Method DiffFindingFilter::isScopeNode() needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature)."
+        },
+        {
+            "fingerprint": "775881ad40beb5b2",
+            "ruleId": "docs.missing-param-tag",
+            "file": "src/Diff/UnifiedDiffParser.php",
+            "line": 17,
+            "symbol": "UnifiedDiffParser::parse()",
+            "message": "Parameter $diff in UnifiedDiffParser::parse() needs an @param tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "195d698cb2daca88",
+            "ruleId": "docs.regex-comment",
+            "file": "src/Diff/UnifiedDiffParser.php",
+            "line": 51,
+            "symbol": "UnifiedDiffParser::parse()",
+            "message": "preg_match() should have a one-line comment above it explaining what the regex checks."
         },
         {
             "fingerprint": "a624c315e86fc0e1",
@@ -147,6 +331,14 @@
             "message": "@param $varname in MissingParamTagRule::scanForParamVariable() does not match any parameter."
         },
         {
+            "fingerprint": "cb88dad8a60c09bc",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
+            "line": 102,
+            "symbol": "PhpDocMixedOveruseRule::analyse()",
+            "message": "PhpDocMixedOveruseRule::analyse() has a cognitive complexity of 25, above the error threshold of 20."
+        },
+        {
             "fingerprint": "55808d7ca38d5666",
             "ruleId": "docs.regex-comment",
             "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
@@ -163,12 +355,36 @@
             "message": "PhpDocMixedOveruseRule::topLevelColonIndex() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
         },
         {
+            "fingerprint": "5f20b56a6aa40ae1",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Modernisation/PhpDocMixedOveruseRule.php",
+            "line": 494,
+            "symbol": "PhpDocMixedOveruseRule::hasSignatureBroadTypeCoverage()",
+            "message": "PhpDocMixedOveruseRule::hasSignatureBroadTypeCoverage() has a cognitive complexity of 25, above the error threshold of 20."
+        },
+        {
+            "fingerprint": "074d0b668ea092e4",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Modernisation/ReadonlyPropertyCandidateRule.php",
+            "line": 56,
+            "symbol": "ReadonlyPropertyCandidateRule::analyse()",
+            "message": "ReadonlyPropertyCandidateRule::analyse() has a cognitive complexity of 21, above the error threshold of 20."
+        },
+        {
             "fingerprint": "76364d63e0a78fdf",
             "ruleId": "docs.missing-return-tag",
             "file": "src/Rule/Modernisation/ReadonlyPropertyCandidateRule.php",
             "line": 175,
             "symbol": "ReadonlyPropertyCandidateRule::recordPropertyMutation()",
             "message": "ReadonlyPropertyCandidateRule::recordPropertyMutation() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
+        },
+        {
+            "fingerprint": "5843f733fb8d3265",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Naming/AbbreviationAllowlistRule.php",
+            "line": 68,
+            "symbol": "AbbreviationAllowlistRule::analyse()",
+            "message": "AbbreviationAllowlistRule::analyse() has a cognitive complexity of 24, above the error threshold of 20."
         },
         {
             "fingerprint": "96ecada15c5ee0ed",
@@ -179,12 +395,44 @@
             "message": "IdentifierQualityRule::isGenericByPurposeHelper() has a docblock but needs an @return tag with a brief description (one plain-English clause; not a restatement of the type signature)."
         },
         {
+            "fingerprint": "ebb4c8cc652c4602",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Naming/SuffixHungarianRule.php",
+            "line": 88,
+            "symbol": "SuffixHungarianRule::analyse()",
+            "message": "SuffixHungarianRule::analyse() has a cognitive complexity of 25, above the error threshold of 20."
+        },
+        {
+            "fingerprint": "2e746b7e5854b4d0",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/Naming/TestNamingConsistencyRule.php",
+            "line": 55,
+            "symbol": "TestNamingConsistencyRule::analyse()",
+            "message": "TestNamingConsistencyRule::analyse() has a cognitive complexity of 21, above the error threshold of 20."
+        },
+        {
+            "fingerprint": "ed8ac128f7d6afd1",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Rule/TestQuality/EmptyDataProviderRule.php",
+            "line": 59,
+            "symbol": "EmptyDataProviderRule::analyse()",
+            "message": "EmptyDataProviderRule::analyse() has a cognitive complexity of 21, above the error threshold of 20."
+        },
+        {
             "fingerprint": "06fe8b6c30946e46",
             "ruleId": "docs.regex-comment",
             "file": "src/Rule/Waste/RedundantVariableRule.php",
             "line": 168,
             "symbol": "RedundantVariableRule::hasPhpStanNarrowingTag()",
             "message": "preg_match() should have a one-line comment above it explaining what the regex checks."
+        },
+        {
+            "fingerprint": "a5cd24d2cfe1759e",
+            "ruleId": "complexity.cognitive",
+            "file": "src/Source/SourceDiscovery.php",
+            "line": 96,
+            "symbol": "SourceDiscovery::discover()",
+            "message": "SourceDiscovery::discover() has a cognitive complexity of 26, above the error threshold of 20."
         },
         {
             "fingerprint": "80f46c0fe0bf44b6",
@@ -201,6 +449,38 @@
             "line": 403,
             "symbol": "ConfigLoaderTest::testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides()",
             "message": "ConfigLoaderTest::testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides() contains 3 act-then-assert cycles; consider splitting into focused tests."
+        },
+        {
+            "fingerprint": "1f178a7cd06f0d66",
+            "ruleId": "size.class-length",
+            "file": "tests/Console/AnalyseCliTest.php",
+            "line": 13,
+            "symbol": "AnalyseCliTest",
+            "message": "AnalyseCliTest is 916 lines, above the error threshold of 800."
+        },
+        {
+            "fingerprint": "cd04ac05e6cdffac",
+            "ruleId": "size.public-method-count",
+            "file": "tests/Console/AnalyseCliTest.php",
+            "line": 13,
+            "symbol": "AnalyseCliTest",
+            "message": "AnalyseCliTest has 27 public methods, above the error threshold of 25."
+        },
+        {
+            "fingerprint": "46d68d5fd89c8d58",
+            "ruleId": "modernisation.phpdoc-mixed-overuse",
+            "file": "tests/Console/AnalyseCliTest.php",
+            "line": 891,
+            "symbol": "AnalyseCliTest::symbolsFromJsonFindings()",
+            "message": "AnalyseCliTest::symbolsFromJsonFindings() has @param using mixed; prefer a narrower PHPDoc type."
+        },
+        {
+            "fingerprint": "da440a40ed05b348",
+            "ruleId": "docs.bare-phpdoc-tags",
+            "file": "tests/Console/AnalyseCliTest.php",
+            "line": 894,
+            "symbol": "AnalyseCliTest::symbolsFromJsonFindings()",
+            "message": "AnalyseCliTest::symbolsFromJsonFindings() has PHPDoc tags but no descriptive summary or tag descriptions."
         },
         {
             "fingerprint": "8b02bd804cf15a36",

@@ -31,7 +31,7 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff-php 0.2.0', $process->getOutput());
+        self::assertStringContainsString('gruff-php 1.0.0', $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 6', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());

@@ -15,12 +15,15 @@ stamps the tag.
 
 [semver]: https://semver.org/
 
-## Unreleased
+## 1.0.0 - 2026-05-30
+
+First stable release. gruff-php sharpens around a single mission — governing AI-generated code so a human who didn't write it can read, verify, and trust it — and commits to a stable rule and schema surface. The headline breaking change retires the noisy `complexity.npath` rule and recalibrates the complexity pillar toward the metrics that track human comprehension; changed-region analysis lands so coding-agent hooks can gate only the lines they touched.
 
 - **Changed-region analysis** - `analyse` now accepts `--changed-ranges`, `--since`, bare `--diff`, `--diff -`, and `--changed-scope=symbol|hunk` so hook consumers can request only findings attributable to the edited region. JSON reports include `suppressedCount` when this mode filters out pre-existing findings.
 - **BREAKING: Retired the `complexity.npath` rule** - NPath produced false positives on sequential-but-simple branching and is redundant with the cognitive, cyclomatic, and nesting metrics. Remove any `complexity.npath` block from your config (it now fails closed as an unknown rule id) and regenerate baselines to drop stale npath findings. The registry now exposes 118 rules.
 - **Complexity recalibration** - `complexity.halstead-volume` and `complexity.maintainability-index` are now `advisory` (informational, non-gating); `complexity.cognitive` tightened to a threshold of 20 and `complexity.nesting-depth` to 4; `complexity.cyclomatic` is now `warning`. The complexity pillar now gates on the metrics that track human comprehension rather than branch-counting proxies.
 - **Config accepts `advisory` severity** - the `rules.<id>.severity` config key now accepts `advisory` alongside `warning` and `error`, so rules that default to advisory can be pinned or overridden in `.gruff-php.yaml`.
+- **Mission documented** - a stated project mission (governing AI-generated code for human verifiability) now anchors `README.md`, `docs/mission.md`, and the agent instructions, recorded in ADR-017.
 
 ## 0.2.0 - 2026-05-28
 
