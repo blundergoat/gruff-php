@@ -8,6 +8,7 @@ use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Baseline\BaselineApplication;
 use GruffPhp\Baseline\BaselineException;
+use GruffPhp\Baseline\BaselineReport;
 use GruffPhp\Baseline\BaselineStore;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Console\Application;
@@ -74,6 +75,7 @@ final class AnalyseCommand extends Command
             ->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Rule execution profile: default or security.', default: 'default')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text, json, html, markdown, github, hotspot, or sarif.', default: OutputFormat::Text->value)
             ->addOption('fail-on', null, InputOption::VALUE_REQUIRED, 'Finding severity that fails the run: advisory, warning, error, or none.', default: FailThreshold::Advisory->value)
+            ->addOption('fail-on-new', null, InputOption::VALUE_NONE, 'Fail only on findings introduced by the change (requires --baseline or --diff-vs). Shorthand for failureConditions.newFindings.severityThresholds.error: 0.')
             ->addOption('report-editor-link', null, InputOption::VALUE_REQUIRED, 'Editor link style for HTML file:line references: vscode, phpstorm, or none.', default: 'none')
             ->addOption('report-interactive', null, InputOption::VALUE_OPTIONAL, 'Render opt-in interactive HTML finding filters. Accepts true or false.', default: null)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')
@@ -241,9 +243,11 @@ final class AnalyseCommand extends Command
             }
         }
 
-        $gate            = $this->resolveExitCode($diagnostics, $findings, $setup->failThresholds);
-        $exitCode        = $gate['exitCode'];
-        $failureReason   = $gate['trip'];
+        $newFindings      = $this->newFindingsForGate($findings, $review, $baselineReport);
+        $gate             = $this->resolveExitCode($diagnostics, $findings, $newFindings, $setup->failThresholds);
+        $exitCode         = $gate['exitCode'];
+        $failureReason    = $gate['trip'];
+        $newFindingsCount = $setup->failThresholds->newFindingsGate instanceof FailThresholds ? count($newFindings) : null;
         $displayFilter   = $options->displayFilter();
         $displayFindings = $displayFilter->apply($findings);
         $displayReview   = $review?->filtered(fn (array $reviewFindings): array => $displayFilter->apply($reviewFindings));
@@ -271,6 +275,7 @@ final class AnalyseCommand extends Command
             suppressedCount: $suppressedCount,
             baselineIncludeAbsent: $baselineIncludeAbsent,
             failureReason:   $failureReason,
+            newFindingsCount: $newFindingsCount,
         );
 
         $reportStart = hrtime(true);
@@ -630,21 +635,48 @@ final class AnalyseCommand extends Command
     /**
      * @param list<RunDiagnostic>             $diagnostics
      * @param list<\GruffPhp\Finding\Finding> $findings
+     * @param list<\GruffPhp\Finding\Finding> $newFindings
      *
      * @return array{exitCode: int, trip: ThresholdTrip|null} Exit code, with the breached gate threshold when one tripped.
      */
-    private function resolveExitCode(array $diagnostics, array $findings, FailThresholds $failThresholds): array
+    private function resolveExitCode(array $diagnostics, array $findings, array $newFindings, FailThresholds $failThresholds): array
     {
         if ($diagnostics !== []) {
             return ['exitCode' => Command::INVALID, 'trip' => null];
         }
 
-        $trip = $failThresholds->tripsOn($findings);
+        $trip = $failThresholds->tripsOnScope($findings, $newFindings);
 
         return [
             'exitCode' => $trip instanceof ThresholdTrip ? Command::FAILURE : Command::SUCCESS,
             'trip' => $trip,
         ];
+    }
+
+    /**
+     * Resolve the new-findings set the gate evaluates.
+     *
+     * When --diff-vs is active the branch-introduced set is used (already
+     * post-baseline ∩ branch-introduced, since the comparison runs on post-baseline
+     * findings); otherwise the post-baseline finding set is the baseline-new set.
+     * The setup builder guarantees a reference point exists before this runs.
+     *
+     * @param list<\GruffPhp\Finding\Finding> $findings Post-baseline findings for the run.
+     * @param BranchReviewResult|null         $review   Branch-review result when --diff-vs is active.
+     * @param BaselineReport|null             $baseline Baseline application result, when a baseline ran.
+     * @return list<\GruffPhp\Finding\Finding> Findings the new-findings gate evaluates.
+     */
+    private function newFindingsForGate(array $findings, ?BranchReviewResult $review, ?BaselineReport $baseline): array
+    {
+        if ($review instanceof BranchReviewResult) {
+            return $review->introduced;
+        }
+
+        if ($baseline instanceof BaselineReport && !$baseline->generated) {
+            return $findings;
+        }
+
+        return [];
     }
 
     /**

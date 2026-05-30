@@ -69,6 +69,10 @@ final readonly class TextReporter
             $lines[] = sprintf('  Failed: %s.', $report->failureReason->message());
         }
 
+        if ($report->newFindingsCount !== null) {
+            $lines[] = sprintf('  New findings: %d', $report->newFindingsCount);
+        }
+
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;

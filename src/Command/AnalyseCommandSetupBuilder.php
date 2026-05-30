@@ -139,6 +139,13 @@ final readonly class AnalyseCommandSetupBuilder
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
+        $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
+        if ($referenceError !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport($options, $formatResult, $failThreshold->value, $referenceError, 'config-error'),
+                $formatResult,
+            );
+        }
         $profileRuleSelection = $options->profileRuleSelection();
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
@@ -210,16 +217,45 @@ final readonly class AnalyseCommandSetupBuilder
         AnalysisConfig $config,
         FailThreshold $failThreshold,
     ): FailThresholds {
+        $configFailureConditions = $config->failureConditions();
+
         if ($input->hasParameterOption('--fail-on', true)) {
-            return FailThresholds::fromFailOn($failThreshold);
+            $totalGate = FailThresholds::fromFailOn($failThreshold);
+        } elseif ($configFailureConditions instanceof FailThresholds) {
+            $totalGate = $configFailureConditions;
+        } else {
+            $totalGate = FailThresholds::fromFailOn($failThreshold);
         }
 
-        $failureConditions = $config->failureConditions();
-        if ($failureConditions instanceof FailThresholds) {
-            return $failureConditions;
+        // New-findings gate is independent of the total gate: explicit --fail-on-new
+        // wins, else the config's failureConditions.newFindings sub-gate, else none.
+        $newFindingsGate = $input->hasParameterOption('--fail-on-new', true)
+            ? FailThresholds::fromFailOn(FailThreshold::Error)
+            : $configFailureConditions?->newFindingsGate;
+
+        return $totalGate->withNewFindingsGate($newFindingsGate);
+    }
+
+    /**
+     * Return the "no reference point" error when a new-findings gate is configured
+     * without a baseline or --diff-vs to define "new" against, else null.
+     *
+     * @param AnalyseCommandOptions $options        Validated options carrying baseline and diff-vs selections.
+     * @param FailThresholds        $failThresholds Resolved gate, whose new-findings sub-gate may be set.
+     * @return string|null Remediation message, or null when a reference point exists.
+     */
+    private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
+    {
+        if ($failThresholds->newFindingsGate === null) {
+            return null;
         }
 
-        return FailThresholds::fromFailOn($failThreshold);
+        $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
+        if ($baselineWillApply || $options->diffVs !== null) {
+            return null;
+        }
+
+        return 'The new-findings gate needs a reference point. Configure --baseline or --diff-vs <ref> before enabling --fail-on-new or failureConditions.newFindings.';
     }
 
     /**

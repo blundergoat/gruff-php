@@ -56,6 +56,10 @@ final readonly class MarkdownReporter
             $lines[] = sprintf('**Failed:** %s.', $report->failureReason->message());
         }
 
+        if ($report->newFindingsCount !== null) {
+            $lines[] = sprintf('**New findings:** %d', $report->newFindingsCount);
+        }
+
         if ($score !== null) {
             $lines[] = sprintf('**Score drivers:** %s', $score->explanation);
         }

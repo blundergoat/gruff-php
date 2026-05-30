@@ -58,6 +58,7 @@ final readonly class AnalysisReport
      * @param list<IgnoredPath>           $ignoredPathDetails Ignored paths enriched with source and matching pattern.
      * @param bool                        $baselineIncludeAbsent Whether reporters should list resolved (absent) baseline entries.
      * @param ThresholdTrip|null          $failureReason      Gate threshold that tripped, when the run failed a count threshold.
+     * @param int|null                    $newFindingsCount   Size of the new-findings set, when a new-findings gate is active.
      */
     public function __construct(
         public string $toolVersion,
@@ -83,6 +84,7 @@ final readonly class AnalysisReport
         public array $ignoredPathDetails = [],
         public bool $baselineIncludeAbsent = false,
         public ?ThresholdTrip $failureReason = null,
+        public ?int $newFindingsCount = null,
     ) {
     }
 
@@ -209,6 +211,10 @@ final readonly class AnalysisReport
 
         if ($this->failureReason instanceof ThresholdTrip) {
             $report['failureReason'] = $this->failureReason->toArray();
+        }
+
+        if ($this->newFindingsCount !== null) {
+            $report['newFindingsCount'] = $this->newFindingsCount;
         }
 
         if ($this->mutation instanceof MutationAnalysisResult) {
