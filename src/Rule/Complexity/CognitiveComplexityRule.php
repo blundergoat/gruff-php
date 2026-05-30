@@ -49,7 +49,7 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             tier:              RuleTier::V01,
             defaultSeverity:   Severity::Error,
             confidence:        Confidence::High,
-            severityThreshold: new SeverityThreshold(30, Severity::Error),
+            severityThreshold: new SeverityThreshold(20, Severity::Error),
         );
     }
 

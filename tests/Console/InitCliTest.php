@@ -457,7 +457,7 @@ final class InitCliTest extends CliTestCase
         $rules = $this->stringKeyedArray($decoded['rules'] ?? null);
         self::assertArrayHasKey('complexity.cognitive', $rules);
         self::assertSame(
-            ['enabled' => true, 'threshold' => 30, 'severity' => 'error'],
+            ['enabled' => true, 'threshold' => 20, 'severity' => 'error'],
             $rules['complexity.cognitive'],
         );
     }

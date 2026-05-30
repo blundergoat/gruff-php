@@ -60,27 +60,15 @@ selection:
 rules:
     complexity.cognitive:
         enabled: true
-        threshold: 30
+        threshold: 20
         severity: error
     complexity.cyclomatic:
         enabled: true
         threshold: 20
-        severity: error
-    complexity.halstead-volume:
-        enabled: true
-        threshold: 2000
-        severity: error
-    complexity.maintainability-index:
-        enabled: true
-        threshold: 35
-        severity: error
+        severity: warning
     complexity.nesting-depth:
         enabled: true
-        threshold: 6
-        severity: error
-    complexity.npath:
-        enabled: true
-        threshold: 500
+        threshold: 4
         severity: error
     dead-code.unused-private-method:
         enabled: true

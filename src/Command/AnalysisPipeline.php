@@ -122,6 +122,7 @@ final class AnalysisPipeline
         RuleContext $ruleContext,
     ): bool {
         return ($reviewDiff === null || !$reviewDiff->active)
+            && !$options->hasChangedRegionMode()
             && $options->diffVs === null
             && $this->registry->supportsStreaming($ruleContext);
     }

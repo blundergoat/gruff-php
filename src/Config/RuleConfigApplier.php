@@ -210,8 +210,8 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.threshold" must be numeric.', $ruleId));
         }
 
-        if (!is_string($severityValue) || !in_array($severityValue, [Severity::Warning->value, Severity::Error->value], true)) {
-            throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "warning" or "error".', $ruleId));
+        if (!is_string($severityValue) || !in_array($severityValue, [Severity::Advisory->value, Severity::Warning->value, Severity::Error->value], true)) {
+            throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "advisory", "warning", or "error".', $ruleId));
         }
 
         return new SeverityThreshold($thresholdValue, Severity::from($severityValue));

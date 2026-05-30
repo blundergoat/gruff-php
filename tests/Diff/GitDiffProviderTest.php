@@ -9,11 +9,15 @@ use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Diff\GitDiffProvider;
+use GruffPhp\Diff\UnifiedDiffParser;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -277,6 +281,85 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
+     * Verify symbol scope keeps a signature-line finding when the changed hunk is inside the method body.
+     *
+     * @return void
+     */
+    public function testDiffFindingFilterSymbolScopeKeepsSignatureFindingForChangedBody(): void
+    {
+        $unit       = $this->analysisUnit('src/Example.php', $this->symbolScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(11, 11)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+        $findings = [
+            $this->finding('src/Example.php', 4),
+            $this->finding('src/Example.php', 9),
+        ];
+
+        $result = (new DiffFindingFilter())->apply($findings, $diffResult, [$unit], DiffFindingFilter::SCOPE_SYMBOL);
+
+        self::assertCount(1, $result->findings);
+        self::assertSame(9, $result->findings[0]->line);
+        self::assertSame(1, $result->suppressedCount);
+    }
+
+    /**
+     * Verify hunk scope keeps only findings whose own location overlaps a changed hunk.
+     *
+     * @return void
+     */
+    public function testDiffFindingFilterHunkScopeExcludesSignatureFindingForChangedBody(): void
+    {
+        $unit       = $this->analysisUnit('src/Example.php', $this->symbolScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(11, 11)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+
+        $result = (new DiffFindingFilter())->apply(
+            [$this->finding('src/Example.php', 9)],
+            $diffResult,
+            [$unit],
+            DiffFindingFilter::SCOPE_HUNK,
+        );
+
+        self::assertSame([], $result->findings);
+        self::assertSame(1, $result->suppressedCount);
+    }
+
+    /**
+     * Verify unified diff stdin parsing exposes changed files and hunk ranges.
+     *
+     * @return void
+     */
+    public function testUnifiedDiffParserParsesPatchText(): void
+    {
+        $patch = <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -10,0 +11,2 @@
++        $value = 1;
++        echo $value;
+PATCH;
+
+        $parsed = (new UnifiedDiffParser())->parse($patch);
+
+        self::assertSame(['src/Example.php'], $parsed['files']);
+        self::assertCount(1, $parsed['lines']['src/Example.php'] ?? []);
+        self::assertSame(['start' => 11, 'end' => 12], $parsed['lines']['src/Example.php'][0]->toArray());
+    }
+
+    /**
      * Verify Git diff provider reports non Git directory.
      *
      * @return void
@@ -353,6 +436,46 @@ final class GitDiffProviderTest extends TestCase
             tier:       RuleTier::V01,
             confidence: Confidence::High,
         );
+    }
+
+    /**
+     * Build an analysis unit fixture for changed-region filtering assertions.
+     *
+     * @return AnalysisUnit
+     */
+    private function analysisUnit(string $displayPath, string $source): AnalysisUnit
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-unit-');
+        self::assertIsString($path);
+        file_put_contents($path, $source);
+
+        try {
+            return (new PhpFileParser())->parse(new SourceFile($path, $displayPath));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /**
+     * @return string PHP source with two sibling methods.
+     */
+    private function symbolScopeSource(): string
+    {
+        return <<<'PHP'
+<?php
+final class Example
+{
+    public function unchanged(): void
+    {
+        echo 'old';
+    }
+
+    public function changed(): void
+    {
+        echo 'new';
+    }
+}
+PHP;
     }
 
     /**

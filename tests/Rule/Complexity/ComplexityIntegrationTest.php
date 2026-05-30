@@ -12,14 +12,13 @@ use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers co-firing of complexity rules on cumulative fixtures, silence on simple inputs, response to config overrides, and N-path cap surfacing in metadata and messages.
+ * Covers co-firing of complexity rules on cumulative fixtures, silence on simple inputs, and response to config overrides.
  */
 final class ComplexityIntegrationTest extends TestCase
 {
@@ -41,7 +40,6 @@ final class ComplexityIntegrationTest extends TestCase
             ->withRuleSettings(CyclomaticComplexityRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 20]))
             ->withRuleSettings(CognitiveComplexityRule::ID, new RuleSettings(true, ['warning' => 2, 'error' => 30]))
             ->withRuleSettings(NestingDepthRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 6]))
-            ->withRuleSettings(NpathComplexityRule::ID, new RuleSettings(true, ['warning' => 3, 'error' => 500]))
             ->withRuleSettings(HalsteadVolumeRule::ID, new RuleSettings(true, ['warning' => 30, 'error' => 2000]))
             ->withRuleSettings(MaintainabilityIndexRule::ID, new RuleSettings(true, ['warning' => 70, 'error' => 40]));
 
@@ -104,7 +102,6 @@ final class ComplexityIntegrationTest extends TestCase
             ->withRuleSettings(CyclomaticComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 5]))
             ->withRuleSettings(CognitiveComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 5]))
             ->withRuleSettings(NestingDepthRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 3]))
-            ->withRuleSettings(NpathComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 5]))
             ->withRuleSettings(HalsteadVolumeRule::ID, new RuleSettings(true, ['warning' => 10, 'error' => 50]))
             ->withRuleSettings(MaintainabilityIndexRule::ID, new RuleSettings(true, ['warning' => 90, 'error' => 70]));
 
@@ -114,32 +111,5 @@ final class ComplexityIntegrationTest extends TestCase
         );
 
         self::assertGreaterThan(count($defaultFindings), count($tightFindings));
-    }
-
-    /**
-     * Verify NPath cap is explicit in metadata and message.
-     *
-     * @return void
-     */
-    public function testNpathCapIsExplicitInMetadataAndMessage(): void
-    {
-        $phpFileParser = new PhpFileParser();
-        $unit          = $phpFileParser->parse(new SourceFile(
-            __DIR__ . '/../../Fixtures/Complexity/npath-cap.php',
-            'tests/Fixtures/Complexity/npath-cap.php',
-        ));
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)
-            ->withRuleSettings(NpathComplexityRule::ID, new RuleSettings(true, ['warning' => 1, 'error' => 2]));
-
-        $findings = array_values(array_filter(
-            $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config)),
-            static fn ($finding): bool => $finding->ruleId === NpathComplexityRule::ID,
-        ));
-
-        self::assertCount(1, $findings);
-        self::assertSame(100000, $findings[0]->metadata['npath']);
-        self::assertTrue($findings[0]->metadata['capped']);
-        self::assertStringContainsString('>=100,000 (cap reached)', $findings[0]->message);
     }
 }

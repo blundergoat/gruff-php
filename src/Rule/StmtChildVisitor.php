@@ -16,8 +16,8 @@ use PhpParser\Node\Stmt;
  * inherit the new coverage automatically.
  *
  * Rules contribute per-block payload by switching on `StmtChildBlock::$kind`
- * and combining results in their own way (max for nesting depth, product for
- * npath, sum for cognitive score, recurse-only for waste).
+ * and combining results in their own way (max for nesting depth, sum for
+ * cognitive score, recurse-only for waste).
  */
 final readonly class StmtChildVisitor
 {

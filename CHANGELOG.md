@@ -15,6 +15,13 @@ stamps the tag.
 
 [semver]: https://semver.org/
 
+## Unreleased
+
+- **Changed-region analysis** - `analyse` now accepts `--changed-ranges`, `--since`, bare `--diff`, `--diff -`, and `--changed-scope=symbol|hunk` so hook consumers can request only findings attributable to the edited region. JSON reports include `suppressedCount` when this mode filters out pre-existing findings.
+- **BREAKING: Retired the `complexity.npath` rule** - NPath produced false positives on sequential-but-simple branching and is redundant with the cognitive, cyclomatic, and nesting metrics. Remove any `complexity.npath` block from your config (it now fails closed as an unknown rule id) and regenerate baselines to drop stale npath findings. The registry now exposes 118 rules.
+- **Complexity recalibration** - `complexity.halstead-volume` and `complexity.maintainability-index` are now `advisory` (informational, non-gating); `complexity.cognitive` tightened to a threshold of 20 and `complexity.nesting-depth` to 4; `complexity.cyclomatic` is now `warning`. The complexity pillar now gates on the metrics that track human comprehension rather than branch-counting proxies.
+- **Config accepts `advisory` severity** - the `rules.<id>.severity` config key now accepts `advisory` alongside `warning` and `error`, so rules that default to advisory can be pinned or overridden in `.gruff-php.yaml`.
+
 ## 0.2.0 - 2026-05-28
 
 gruff-php 0.2.0 tightens the CI gating philosophy, requires explicit config-schema versioning, and adds a per-rule triage surface so large scans stop being overwhelming. Five breaking changes (`schemaVersion:` required, `analyse` default lowered, JSON schemas v2, one rule retired, `waste.one-line-method` defaults tightened) motivate the minor bump from 0.1.x; each ships with a migration path below.

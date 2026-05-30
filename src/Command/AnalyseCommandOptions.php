@@ -36,6 +36,9 @@ final readonly class AnalyseCommandOptions
      * @param string                     $profile              Rule execution profile requested for the run.
      * @param MutationAnalysisOptions    $mutation             Parsed mutation-analysis options.
      * @param string|null                $diffMode             Requested diff mode, when diff analysis is enabled.
+     * @param string|null                $since                Git base ref used for changed-region analysis.
+     * @param string|null                $changedRanges        Explicit changed ranges used for changed-region analysis.
+     * @param string                     $changedScope         Changed-region scope: symbol or hunk.
      * @param string|null                $diffVs               Comparison ref used for diff and changed-only analysis.
      * @param bool                       $isChangedOnly        Whether analysis should be restricted to changed files.
      * @param string|null                $historyFile          Trend history file path, when configured.
@@ -59,6 +62,9 @@ final readonly class AnalyseCommandOptions
         public string $profile,
         public MutationAnalysisOptions $mutation,
         public ?string $diffMode,
+        public ?string $since,
+        public ?string $changedRanges,
+        public string $changedScope,
         public ?string $diffVs,
         public bool $isChangedOnly,
         public ?string $historyFile,
@@ -112,7 +118,14 @@ final readonly class AnalyseCommandOptions
             $isReportInteractive = false;
         }
 
-        $paths = array_merge($paths, $filePaths);
+        $paths    = array_merge($paths, $filePaths);
+        $diffMode = self::diffMode($input, $paths);
+        if ($diffMode === '-') {
+            $paths = array_values(array_filter(
+                $paths,
+                static fn (string $path): bool => $path !== '-',
+            ));
+        }
 
         return new self(
             paths:                         $paths,
@@ -129,7 +142,10 @@ final readonly class AnalyseCommandOptions
                 mutationBaselinePath:          self::optionalStringOption($input, 'mutation-baseline'),
                 mutationBudget:                null,
             ),
-            diffMode:      self::diffMode($input),
+            diffMode:      $diffMode,
+            since:         self::optionalStringOption($input, 'since'),
+            changedRanges: self::optionalStringOption($input, 'changed-ranges'),
+            changedScope:  self::optionalStringOption($input, 'changed-scope') ?? 'symbol',
             diffVs:        self::optionalStringOption($input, 'diff-vs'),
             isChangedOnly: (bool) $input->getOption('changed-only'),
             historyFile:   self::optionalStringOption($input, 'history-file'),
@@ -179,6 +195,9 @@ final readonly class AnalyseCommandOptions
                 mutationBudget:                $mutationBudget,
             ),
             diffMode:            $this->diffMode,
+            since:               $this->since,
+            changedRanges:       $this->changedRanges,
+            changedScope:        $this->changedScope,
             diffVs:              $this->diffVs,
             isChangedOnly:       $this->isChangedOnly,
             historyFile:         $this->historyFile,
@@ -221,6 +240,9 @@ final readonly class AnalyseCommandOptions
             profile:              $this->profile,
             mutation:             $this->mutation,
             diffMode:             $this->diffMode,
+            since:                $this->since,
+            changedRanges:        $this->changedRanges,
+            changedScope:         $this->changedScope,
             diffVs:               $this->diffVs,
             isChangedOnly:        $this->isChangedOnly,
             historyFile:          $this->historyFile,
@@ -304,6 +326,28 @@ final readonly class AnalyseCommandOptions
         }
 
         return [Pillar::Security, Pillar::SensitiveData];
+    }
+
+    /**
+     * Report whether an opt-in changed-region analysis mode is active.
+     *
+     * @return bool True when --diff, --since, or --changed-ranges was supplied.
+     */
+    public function hasChangedRegionMode(): bool
+    {
+        return $this->diffMode !== null
+            || $this->since !== null
+            || $this->changedRanges !== null;
+    }
+
+    /**
+     * Report whether changed file paths can be used to scope discovery.
+     *
+     * @return bool True when a Git/stdin diff supplies changed file paths.
+     */
+    public function usesChangedFilesForDiscovery(): bool
+    {
+        return $this->diffMode !== null || $this->since !== null;
     }
 
     /**
@@ -412,13 +456,19 @@ final readonly class AnalyseCommandOptions
      *
      * @return string|null
      */
-    private static function diffMode(InputInterface $input): ?string
+    /**
+     * @param list<string> $paths Parsed positional and --file paths.
+     */
+    private static function diffMode(InputInterface $input, array $paths): ?string
     {
         if (!$input->hasParameterOption('--diff', true)) {
             return null;
         }
 
         $optionValue = $input->getOption('diff');
+        if (in_array('-', $paths, true)) {
+            return '-';
+        }
 
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : 'working-tree';
     }
@@ -472,11 +522,29 @@ final readonly class AnalyseCommandOptions
      */
     private function diffUsageError(): ?string
     {
-        if ($this->diffMode === null || $this->diffVs === null) {
-            return null;
+        $changedModes = array_filter([
+            $this->diffMode,
+            $this->since,
+            $this->changedRanges,
+        ], static fn (?string $mode): bool => $mode !== null);
+
+        if (count($changedModes) > 1) {
+            return '--diff, --since, and --changed-ranges are mutually exclusive.';
         }
 
-        return '--diff and --diff-vs are mutually exclusive.';
+        if ($this->diffVs !== null && $changedModes !== []) {
+            return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
+        }
+
+        if (!in_array($this->changedScope, ['symbol', 'hunk'], true)) {
+            return '--changed-scope must be one of: symbol, hunk.';
+        }
+
+        if ($this->changedRanges !== null && $this->paths === []) {
+            return '--changed-ranges requires at least one file path.';
+        }
+
+        return null;
     }
 
     /**

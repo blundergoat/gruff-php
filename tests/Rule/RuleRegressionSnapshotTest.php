@@ -13,7 +13,6 @@ use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Complexity\NestingDepthRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
@@ -49,10 +48,10 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(150, $units);
-        self::assertCount(2272, $findings);
+        self::assertCount(149, $units);
+        self::assertCount(2234, $findings);
         self::assertSame(
-            '85833fbf29261b22f93ff3' . 'c0b559507ad87ae9a49e369dbda29cd63b5304da98',
+            'ff3d77319471a3a3ec940c' . '23c691723d761fa615d590736fd2a3f2dae1949844',
             hash('sha256', $json),
         );
     }
@@ -75,7 +74,6 @@ final class RuleRegressionSnapshotTest extends TestCase
             CyclomaticComplexityRule::ID,
             HalsteadVolumeRule::ID,
             MaintainabilityIndexRule::ID,
-            NestingDepthRule::ID,
             MissingReadmeRule::ID,
             AverageMethodLengthRule::ID,
             ClassLengthRule::ID,

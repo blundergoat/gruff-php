@@ -2,6 +2,12 @@
 
 This file is the quick-start surface for agents that need to inspect a PHP project with gruff. Prefer these commands over inventing flags or parsing human text output.
 
+## What gruff optimises for
+
+You are a coding agent, and a human who didn't write this code has to read, review, and trust it. gruff governs the code you produce so that reviewer can verify it does what was asked — legible enough to read, secure where the eye fails, and tested for real rather than padded with low-signal ceremony. Treat its findings as a checklist for "would a human sign this off?", not as arbitrary style nags.
+
+Doc comments are mandatory even on a private one-liner, and that is deliberate. Coding agents routinely produce code that superficially works while misunderstanding the requirement; stating intent, usage, contract, and failure behaviour in prose gives the reviewer something to check the implementation against. A mismatch between the doc comment and the code is itself a signal the change needs a deeper look — so write the intent, never a restatement of the signature.
+
 ## Ground Rules
 
 - Run commands from the repository root unless `--project` is documented for that command.
@@ -270,7 +276,7 @@ Display filters run after analysis and before rendering. They change report cont
 php bin/gruff-php analyse src --format markdown --fail-on none --min-severity warning
 php bin/gruff-php analyse src --format json --fail-on none --include-pillar security,sensitive-data
 php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
-php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.npath
+php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cyclomatic
 ```
 
 ## Dashboard

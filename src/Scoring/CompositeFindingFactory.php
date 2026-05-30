@@ -45,7 +45,6 @@ final readonly class CompositeFindingFactory
                     'complexity.cognitive',
                     'complexity.cyclomatic',
                     'complexity.nesting-depth',
-                    'complexity.npath',
                 ], true),
             ));
             $sizeRules = array_values(array_filter(

@@ -6,9 +6,6 @@ rules:
     complexity.cognitive:
         threshold: 1
         severity: warning
-    complexity.npath:
-        threshold: 1
-        severity: warning
     complexity.nesting-depth:
         threshold: 1
         severity: warning

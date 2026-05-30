@@ -44,9 +44,9 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             name:              'Halstead volume',
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Error,
+            defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
-            severityThreshold: new SeverityThreshold(8000, Severity::Error),
+            severityThreshold: new SeverityThreshold(8000, Severity::Advisory),
         );
     }
 

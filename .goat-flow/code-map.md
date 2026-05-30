@@ -128,8 +128,7 @@ src/
 |   |   |-- CyclomaticComplexityRule.php      = `complexity.cyclomatic`
 |   |   |-- HalsteadVolumeRule.php            = `complexity.halstead-volume`
 |   |   |-- MaintainabilityIndexRule.php      = `complexity.maintainability-index` (Maintainability pillar)
-|   |   |-- NestingDepthRule.php              = `complexity.nesting-depth`
-|   |   `-- NpathComplexityRule.php           = `complexity.npath`
+|   |   `-- NestingDepthRule.php              = `complexity.nesting-depth`
 |   |-- DeadCode/
 |   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`

@@ -144,7 +144,7 @@ final class CognitiveComplexityRuleTest extends TestCase
 
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
-        self::assertSame(30, $definition->severityThreshold->threshold);
+        self::assertSame(20, $definition->severityThreshold->threshold);
         self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
     }
 

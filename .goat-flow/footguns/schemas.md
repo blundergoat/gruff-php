@@ -1,6 +1,6 @@
 ---
 category: schemas
-last_reviewed: 2026-05-27
+last_reviewed: 2026-05-30
 ---
 
 # Schema Versioning Footguns
@@ -17,7 +17,7 @@ last_reviewed: 2026-05-27
 
 **Status:** active | **Created:** 2026-05-25 | **Evidence:** OBSERVED
 
-A `SCHEMA_VERSION` constant in PHP is just one of N stamps of the version string. The rest live in prose, compatibility tables, JSON examples in Markdown, and code-map descriptions — none of which the compiler can update when the constant moves. PR #6's `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` (search: `SCHEMA_VERSION = 'gruff.summary.v`) left four stale references behind: `docs/gruff-cli-summary.md` (search: `gruff.summary.v1`, three occurrences including a literal `schemaVersion` line in a JSON example) and `.goat-flow/architecture.md` (search: `gruff.summary.v1 digest`). No reviewer flagged this; it surfaced only on a manual sweep.
+A `SCHEMA_VERSION` constant in PHP is just one of N stamps of the version string. The rest live in prose, compatibility tables, JSON examples in Markdown, and code-map descriptions — none of which the compiler can update when the constant moves. PR #6's `gruff.summary.v1` → `v2` bump in `src/Command/SummaryCommand.php` (search: `SCHEMA_VERSION = 'gruff.summary.v`) left four stale references behind: `docs/gruff-cli-summary.md` (search: `gruff.summary.v1`, three occurrences including a literal `schemaVersion` line in a JSON example) and `.goat-flow/architecture.md` (search: `gruff.summary.v1 digest`). No reviewer flagged this; it surfaced only on a manual sweep. **Recurrence (2026-05-30):** the `.goat-flow/architecture.md` `gruff.summary.v1 digest` reference named above was still stale five days after being documented here — a "full re-audit" that bumped the doc's `Last reviewed` date to 2026-05-30 missed it, because it grep-checked the `gruff.analysis.v*` stamps but not the `gruff.summary.v*` one. It was caught only on a second manual schema-literal sweep and fixed to `v2` (the `docs/gruff-cli-summary.md` occurrences were resolved separately before then). The trap is sticky precisely because the doc reads fine in isolation.
 
 **Prevention:** Whenever you bump a `SCHEMA_VERSION` constant, grep the repo for the OLD version literal before claiming the bump complete. Concrete current map of `gruff.analysis.v*` stamps that must move together:
 
@@ -35,6 +35,8 @@ tests/Trend/TrendRecorderTest.php               3 hits (two are intentional v1 f
 ```
 
 Leave `CHANGELOG.md` historical entries and `history.json` alone — those are append-only record.
+
+Re-audits count too: bumping a doc's `Last reviewed` date asserts you reconciled its claims, so before stamping it, enumerate **every** `gruff.*.v*` literal in the doc (analysis, summary, baseline, config) and check each against its source `SCHEMA_VERSION` constant — do not spot-check from memory, and read this footgun first since the stale stamps are listed here by file. The 2026-05-30 recurrence happened because the re-audit checked the schema family it remembered (`analysis`) and not the one it didn't (`summary`).
 
 ## Footgun: The `gruff-php.config.v0.1` literal lives in two source-of-truth places plus user-facing surfaces
 

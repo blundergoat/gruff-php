@@ -1,5 +1,5 @@
 # AGENTS.md - project v1.5.1 / goat-flow 1.7.0 (2026-05-24)
-gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and commands grounded in real source/config files.
+gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
 
@@ -98,3 +98,4 @@ Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lesso
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/tasks/`, `.goat-flow/scratchpad/` |
 | Commit guidance | `.github/git-commit-instructions.md` |
 | Project entry docs | `README.md` |
+| Mission / philosophy | `docs/mission.md` (rationale); `ADR-017` (decision) |

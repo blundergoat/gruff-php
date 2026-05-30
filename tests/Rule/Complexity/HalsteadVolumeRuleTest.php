@@ -103,7 +103,7 @@ final class HalsteadVolumeRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(8000, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Finding\Severity::Advisory, $definition->severityThreshold->severity);
     }
 
     /**

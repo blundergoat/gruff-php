@@ -52,6 +52,7 @@ final readonly class AnalysisReport
      * @param BaselineReport|null         $baseline        Baseline application result attached to the report.
      * @param BranchReviewResult|null     $review          Branch review result attached to the report.
      * @param FindingDisplayFilter|null   $filters         Display filters applied to the report output.
+     * @param int|null                    $suppressedCount Findings excluded by changed-region filtering.
      */
     public function __construct(
         public string $toolVersion,
@@ -73,6 +74,7 @@ final readonly class AnalysisReport
         public ?BaselineReport $baseline = null,
         public ?BranchReviewResult $review = null,
         public ?FindingDisplayFilter $filters = null,
+        public ?int $suppressedCount = null,
     ) {
     }
 
@@ -188,6 +190,10 @@ final readonly class AnalysisReport
                 $this->findings,
             ),
         ];
+
+        if ($this->suppressedCount !== null) {
+            $report['suppressedCount'] = $this->suppressedCount;
+        }
 
         if ($this->mutation instanceof MutationAnalysisResult) {
             $report['mutation'] = $this->mutation->toArray();

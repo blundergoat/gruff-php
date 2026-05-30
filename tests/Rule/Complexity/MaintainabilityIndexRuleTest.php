@@ -89,7 +89,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(35, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Finding\Severity::Advisory, $definition->severityThreshold->severity);
     }
 
     /**

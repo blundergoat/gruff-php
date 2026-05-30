@@ -785,6 +785,96 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
+     * Verify changed-ranges mode reports only findings attributable to the changed symbol.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testAnalyseCommandChangedRangesUsesSymbolScopeAndSuppressedCount(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', $this->changedRegionSource());
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                'Example.php',
+                '--changed-ranges',
+                '11-11',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--no-config',
+            ], $tempDir);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+            $report   = $this->decodeJsonOutput($process);
+            $findings = $report['findings'] ?? null;
+
+            self::assertIsArray($findings);
+            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+            self::assertContains('Example::changed()', $this->symbolsFromJsonFindings($findings));
+            self::assertNotContains('Example::unchanged()', $this->symbolsFromJsonFindings($findings));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify unified diff stdin mode feeds the same changed-region filter.
+     *
+     * @throws JsonException
+     * @return void
+     */
+    public function testAnalyseCommandDiffStdinParsesUnifiedDiff(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', $this->changedRegionSource());
+
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'analyse',
+                'Example.php',
+                '--diff',
+                '-',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+                '--no-config',
+            ], $tempDir);
+            $process->setInput(<<<'PATCH'
+diff --git a/Example.php b/Example.php
+--- a/Example.php
++++ b/Example.php
+@@ -10,0 +11,1 @@
++        echo 'new';
+PATCH);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+            $report = $this->decodeJsonOutput($process);
+            $diff   = $report['diff'] ?? null;
+
+            self::assertIsArray($diff);
+            self::assertSame('stdin', $diff['mode'] ?? null);
+            self::assertGreaterThanOrEqual(1, $report['suppressedCount'] ?? null);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * Load an expected CLI golden output fixture.
      *
      * @return string Fixture contents.
@@ -795,5 +885,44 @@ final class AnalyseCliTest extends CliTestCase
         self::assertIsString($contents);
 
         return $contents;
+    }
+
+    /**
+     * @param array<mixed> $findings
+     * @return list<string>
+     */
+    private function symbolsFromJsonFindings(array $findings): array
+    {
+        $symbols = [];
+
+        foreach ($findings as $finding) {
+            if (is_array($finding) && is_string($finding['symbol'] ?? null)) {
+                $symbols[] = $finding['symbol'];
+            }
+        }
+
+        return $symbols;
+    }
+
+    /**
+     * @return string PHP source with a changed method body and an unchanged sibling.
+     */
+    private function changedRegionSource(): string
+    {
+        return <<<'PHP'
+<?php
+final class Example
+{
+    public function unchanged(): void
+    {
+        echo 'old';
+    }
+
+    public function changed(): void
+    {
+        echo 'new';
+    }
+}
+PHP;
     }
 }

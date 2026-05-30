@@ -85,7 +85,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
         'count',
         'methodcount',
         'msi',
-        'npath',
         'parameters',
         'parseerrors',
         'previousscore',

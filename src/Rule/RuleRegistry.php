@@ -12,7 +12,6 @@ use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
@@ -188,7 +187,6 @@ final class RuleRegistry
             new HalsteadVolumeRule(),
             new MaintainabilityIndexRule(),
             new NestingDepthRule(),
-            new NpathComplexityRule(),
             new UnusedPrivateMethodRule(),
             new UnusedPrivatePropertyRule(),
             new CommentedOutCodeRule(),

@@ -51,6 +51,10 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-012-size-rule-line-counting-metric.md`
 - `ADR-013-dogfood-scans-use-project-config.md`
 - `ADR-014-retire-naming-parameter-type-name.md`
+- `ADR-015-per-command-minimum-severity.md`
+- `ADR-016-visibility-only-rule-scoring-tier.md`
+- `ADR-017-mission-govern-ai-generated-code.md`
+- `ADR-018-retire-npath-and-recalibrate-complexity.md`
 
 ## Required Structure
 

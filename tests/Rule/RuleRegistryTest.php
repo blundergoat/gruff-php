@@ -18,7 +18,6 @@ use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rule\Complexity\NestingDepthRule;
-use GruffPhp\Rule\Complexity\NpathComplexityRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
@@ -116,7 +115,7 @@ final class RuleRegistryTest extends TestCase
         $expectedRuleIds = [
             CognitiveComplexityRule::ID, CyclomaticComplexityRule::ID,
             HalsteadVolumeRule::ID, MaintainabilityIndexRule::ID,
-            NestingDepthRule::ID, NpathComplexityRule::ID,
+            NestingDepthRule::ID,
             UnusedPrivateMethodRule::ID, UnusedPrivatePropertyRule::ID,
             CommentedOutCodeRule::ID, EmptyClassRule::ID,
             EmptyMethodRule::ID, OneLineMethodRule::ID,
@@ -301,9 +300,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(119, $definitions);
+        self::assertCount(118, $definitions);
         self::assertSame(
-            '11bf69ffbc0936b79ab2' . '30b6b05345d98971d6db05332649d02e6ca4ce9e0b09',
+            '018b763720a0b78d874d' . '0ebf166e19a3ba56ebcc0f479b30f0b65834157c175c',
             hash('sha256', $json),
         );
     }

@@ -576,7 +576,7 @@ final class AgentWorkflowCliTest extends TestCase
         $diffConflictProcess->run();
 
         self::assertSame(2, $diffConflictProcess->getExitCode(), $diffConflictProcess->getOutput() . $diffConflictProcess->getErrorOutput());
-        self::assertStringContainsString('--diff and --diff-vs are mutually exclusive.', $diffConflictProcess->getOutput());
+        self::assertStringContainsString('--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.', $diffConflictProcess->getOutput());
     }
 
     /**

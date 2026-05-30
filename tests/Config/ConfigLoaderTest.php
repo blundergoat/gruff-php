@@ -314,7 +314,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
         return [
             'severity threshold without severity' => [
                 '{"rules":{"size.file-length":{"threshold":70}}}',
-                'Config key "rules.size.file-length.severity" must be "warning" or "error".',
+                'Config key "rules.size.file-length.severity" must be "advisory", "warning", or "error".',
             ],
             'severity without threshold' => [
                 '{"rules":{"size.file-length":{"severity":"error"}}}',

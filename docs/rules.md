@@ -12,13 +12,13 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 119
+Total rules: 118
 
 ## Summary By Pillar
 
 | Pillar | Rules |
 | --- | ---: |
-| `complexity` | 5 |
+| `complexity` | 4 |
 | `dead-code` | 9 |
 | `design` | 1 |
 | `documentation` | 14 |
@@ -32,15 +32,14 @@ Total rules: 119
 
 ## Rule Catalogue
 
-### `complexity` (5)
+### `complexity` (4)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `complexity.cognitive` | Cognitive complexity | `error` | `high` | yes |
-| `complexity.cyclomatic` | Cyclomatic complexity | `error` | `high` | yes |
-| `complexity.halstead-volume` | Halstead volume | `error` | `medium` | yes |
+| `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `high` | yes |
+| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
-| `complexity.npath` | NPath complexity | `error` | `high` | yes |
 
 ### `dead-code` (9)
 
@@ -85,7 +84,7 @@ Total rules: 119
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `complexity.maintainability-index` | Maintainability index | `error` | `medium` | yes |
+| `complexity.maintainability-index` | Maintainability index | `advisory` | `medium` | yes |
 | `waste.one-line-method` | One-line method | `advisory` | `medium` | yes |
 
 `waste.one-line-method` ships with `minInFileCallers: 2` and

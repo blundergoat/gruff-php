@@ -74,9 +74,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             name:              'Cyclomatic complexity',
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Error,
+            defaultSeverity:   Severity::Warning,
             confidence:        Confidence::High,
-            severityThreshold: new SeverityThreshold(20, Severity::Error),
+            severityThreshold: new SeverityThreshold(20, Severity::Warning),
         );
     }
 

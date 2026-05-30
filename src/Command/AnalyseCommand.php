@@ -15,6 +15,8 @@ use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Diff\GitDiffProvider;
+use GruffPhp\Diff\ChangedLineRange;
+use GruffPhp\Diff\UnifiedDiffParser;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Command\Runtime\RuntimeTimingObserver;
@@ -80,7 +82,10 @@ final class AnalyseCommand extends Command
             ->addOption('infection-test-framework-options', null, InputOption::VALUE_REQUIRED, 'Options passed to Infection/PHPUnit for --infection-run.')
             ->addOption('mutation-baseline', null, InputOption::VALUE_REQUIRED, 'Path to a baseline Infection JSON report for MSI diff mode.')
             ->addOption('mutation-budget', null, InputOption::VALUE_REQUIRED, 'Maximum escaped/timed-out mutants allowed.')
-            ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed lines. Use working-tree, staged, unstaged, or a base ref.', default: null)
+            ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed regions. Bare uses working tree vs HEAD; use working-tree, staged, unstaged, a base ref, or "-" for unified diff on stdin.', default: null)
+            ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Filter findings to files and regions changed since this Git base ref.')
+            ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Filter findings to explicit line ranges, for example "3-3,8-10".')
+            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope: symbol or hunk.', default: DiffFindingFilter::SCOPE_SYMBOL)
             ->addOption('diff-vs', null, InputOption::VALUE_REQUIRED, 'Compare current findings against a base Git ref and report introduced/removed/unchanged findings.')
             ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
             ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
@@ -141,7 +146,8 @@ final class AnalyseCommand extends Command
         $registry      = $setup->registry;
         $diagnostics   = [];
         $reviewDiff    = $this->buildDiffResult($projectRoot, $options->diffVs, $diagnostics);
-        $analysisPaths = $this->currentAnalysisPaths($options, $reviewDiff);
+        $diff          = $this->buildChangedDiffResult($projectRoot, $options, $diagnostics);
+        $analysisPaths = $this->currentAnalysisPaths($projectRoot, $options, $reviewDiff, $diff);
         $discoverStart = hrtime(true);
 
         $ruleContext      = new RuleContext($projectRoot, $config);
@@ -180,9 +186,11 @@ final class AnalyseCommand extends Command
             $findings = $this->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }
 
-        $diff = $this->buildDiffResult($projectRoot, $options->diffMode, $diagnostics);
+        $suppressedCount = null;
         if ($diff instanceof DiffResult && $diff->active) {
-            $findings = (new DiffFindingFilter())->filter($findings, $diff);
+            $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changedScope);
+            $findings         = $diffFilterResult->findings;
+            $suppressedCount  = $diffFilterResult->suppressedCount;
         }
 
         $findings       = $this->filterAllowedSecretPreviews($findings, $config);
@@ -253,6 +261,7 @@ final class AnalyseCommand extends Command
             baseline:        $baselineReport,
             review:          $displayReview,
             filters:         $displayFilter,
+            suppressedCount: $suppressedCount,
         );
 
         $reportStart = hrtime(true);
@@ -395,11 +404,153 @@ final class AnalyseCommand extends Command
         }
     }
 
+    /**
+     * Build the changed-region diff result requested by --diff, --since, or --changed-ranges.
+     *
+     * @param list<RunDiagnostic> $diagnostics
+     * @return DiffResult|null Diff result, inactive result, or null when diff lookup fails.
+     */
+    private function buildChangedDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
+    {
+        if ($options->changedRanges !== null) {
+            return $this->buildExplicitRangesDiffResult($projectRoot, $options, $diagnostics);
+        }
+
+        if ($options->since !== null) {
+            return $this->buildDiffResult($projectRoot, $options->since, $diagnostics);
+        }
+
+        if ($options->diffMode === '-') {
+            $patch = stream_get_contents(STDIN);
+            if ($patch === false) {
+                $diagnostics[] = new RunDiagnostic(
+                    type:    'diff-mode-error',
+                    message: 'Unable to read unified diff from stdin.',
+                );
+
+                return null;
+            }
+
+            $parsed = (new UnifiedDiffParser())->parse($patch);
+
+            return new DiffResult(
+                active:       true,
+                mode:         'stdin',
+                base:         null,
+                changedLines: $parsed['lines'],
+                changedFiles: $parsed['files'],
+                message:      'Diff mode filters findings to changed regions from unified diff stdin.',
+            );
+        }
+
+        return $this->buildDiffResult($projectRoot, $options->diffMode, $diagnostics);
+    }
+
+    /**
+     * @param list<RunDiagnostic> $diagnostics
+     */
+    private function buildExplicitRangesDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
+    {
+        $changedFiles = $this->normaliseRequestedPaths($projectRoot, $options->paths);
+        if ($changedFiles === []) {
+            $diagnostics[] = new RunDiagnostic(
+                type:    'diff-mode-error',
+                message: '--changed-ranges requires at least one file path.',
+            );
+
+            return null;
+        }
+
+        try {
+            $ranges = $this->parseChangedRanges($options->changedRanges ?? '');
+        } catch (DiffException $exception) {
+            $diagnostics[] = new RunDiagnostic(
+                type:    'diff-mode-error',
+                message: $exception->getMessage(),
+            );
+
+            return null;
+        }
+
+        $changedLines = [];
+        foreach ($changedFiles as $changedFile) {
+            $changedLines[$changedFile] = $ranges;
+        }
+
+        return new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: $changedLines,
+            changedFiles: $changedFiles,
+            message:      'Diff mode filters findings to explicit changed line ranges.',
+        );
+    }
+
+    /**
+     * @return list<ChangedLineRange>
+     */
+    private function parseChangedRanges(string $ranges): array
+    {
+        $parsed = [];
+
+        foreach (explode(',', $ranges) as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
+            }
+
+            if (!preg_match('/^(\d+)(?:-(\d+))?$/', $part, $matches)) {
+                throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
+            }
+
+            $startLine = (int) $matches[1];
+            $endLine   = isset($matches[2]) ? (int) $matches[2] : $startLine;
+
+            if ($startLine < 1 || $endLine < $startLine) {
+                throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
+            }
+
+            $parsed[] = new ChangedLineRange($startLine, $endLine);
+        }
+
+        if ($parsed === []) {
+            throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
+        }
+
+        return $parsed;
+    }
+
     /** @return list<string>|null Null means an empty changed-only review diff has no files to scan. */
-    private function currentAnalysisPaths(AnalyseCommandOptions $options, ?DiffResult $reviewDiff): ?array
+    private function currentAnalysisPaths(
+        string $projectRoot,
+        AnalyseCommandOptions $options,
+        ?DiffResult $reviewDiff,
+        ?DiffResult $changedRegionDiff,
+    ): ?array
     {
         if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
             return null;
+        }
+
+        if ($options->usesChangedFilesForDiscovery() && $changedRegionDiff instanceof DiffResult && $changedRegionDiff->active) {
+            $changedFiles = $this->existingChangedFiles($projectRoot, $changedRegionDiff->changedFiles);
+            if ($changedFiles === []) {
+                return null;
+            }
+
+            if ($options->paths === []) {
+                return $changedFiles;
+            }
+
+            $requestedPaths = $this->normaliseRequestedPaths($projectRoot, $options->paths);
+            $analysisPaths  = array_values(array_filter(
+                $changedFiles,
+                fn (string $changedFile): bool => $this->matchesRequestedPath($changedFile, $requestedPaths),
+            ));
+            sort($analysisPaths, SORT_STRING);
+
+            return $analysisPaths === [] ? null : $analysisPaths;
         }
 
         if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
@@ -407,6 +558,25 @@ final class AnalyseCommand extends Command
         }
 
         return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
+    }
+
+    /**
+     * @param list<string> $changedFiles Project-relative paths from a diff.
+     * @return list<string> Existing paths that can be passed to source discovery.
+     */
+    private function existingChangedFiles(string $projectRoot, array $changedFiles): array
+    {
+        $existing = [];
+
+        foreach ($changedFiles as $changedFile) {
+            if (file_exists(PathHelper::resolveAgainst($projectRoot, $changedFile))) {
+                $existing[] = $changedFile;
+            }
+        }
+
+        sort($existing, SORT_STRING);
+
+        return array_values(array_unique($existing));
     }
 
     /**
