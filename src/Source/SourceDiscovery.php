@@ -45,38 +45,10 @@ final readonly class SourceDiscovery
         '.gitignore',
     ];
 
-    /** @var list<string> */
-    private const IGNORED_DIRECTORIES = [
-        '.fleet',
-        '.git',
-        '.goat-flow/logs',
-        '.goat-flow/scratchpad',
-        '.goat-flow/tasks',
-        '.hg',
-        '.idea',
-        '.phpunit.cache',
-        '.svn',
-        '.vscode',
-        'build',
-        'cache',
-        'coverage',
-        'dist',
-        'generated',
-        'node_modules',
-        'tmp',
-        'var/cache',
-        'vendor',
-    ];
-
-    /** @var list<string> */
-    private const IGNORED_FILENAMES = [
-        'bun.lockb',
-        'composer.lock',
-        'npm-shrinkwrap.json',
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        'yarn.lock',
-    ];
+    /**
+     * Shared ignore engine used for every exclusion decision.
+     */
+    private PathIgnoreResolver $ignoreResolver;
 
     /**
      * Build the source-discovery scanner for the given project root.
@@ -85,6 +57,7 @@ final readonly class SourceDiscovery
      */
     public function __construct(private string $projectRoot)
     {
+        $this->ignoreResolver = new PathIgnoreResolver($projectRoot);
     }
 
     /**
@@ -104,9 +77,9 @@ final readonly class SourceDiscovery
             }
         }
 
-        $files        = [];
-        $missingPaths = [];
-        $ignoredPaths = [];
+        $files          = [];
+        $missingPaths   = [];
+        $ignoredDetails = [];
 
         foreach ($requestedPaths as $path) {
             $absolutePath = $this->absolutePath($path);
@@ -116,13 +89,10 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            if ($this->isConfiguredIgnoredPath($absolutePath, $configuredIgnorePatterns)) {
-                $ignoredPaths[] = $this->displayPath($absolutePath);
-                continue;
-            }
-
-            if (!$shouldIncludeIgnored && $this->isDefaultIgnoredPath($absolutePath)) {
-                $ignoredPaths[] = $this->displayPath($absolutePath);
+            $displayPath = $this->displayPath($absolutePath);
+            $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
+            if ($decision->ignored) {
+                $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 continue;
             }
 
@@ -140,7 +110,7 @@ final readonly class SourceDiscovery
             }
 
             if (is_dir($absolutePath)) {
-                foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredPaths) as $file) {
+                foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredDetails) as $file) {
                     $canonicalPath = $this->canonicalPath($file->getPathname());
                     $type          = $this->sourceType($canonicalPath);
 
@@ -153,44 +123,44 @@ final readonly class SourceDiscovery
 
         ksort($files, SORT_STRING);
         sort($missingPaths, SORT_STRING);
-        sort($ignoredPaths, SORT_STRING);
+        $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        return new SourceDiscoveryResult(array_values($files), $missingPaths, array_values(array_unique($ignoredPaths)));
+        return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
     /**
      * Yield source files below a directory while applying ignore patterns.
      *
-     * @param list<string> $ignoredPaths
-     * @param list<string> $configuredIgnorePatterns
+     * @param list<IgnoredPath> $ignoredDetails
+     * @param list<string>      $configuredIgnorePatterns
      * @return iterable<SplFileInfo>
      */
     private function walkDirectory(
         string $directory,
         bool $shouldIncludeIgnored,
         array $configuredIgnorePatterns,
-        array &$ignoredPaths,
+        array &$ignoredDetails,
     ): iterable {
         $recursiveDirectoryIterator      = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
         $recursiveCallbackFilterIterator = new RecursiveCallbackFilterIterator(
             $recursiveDirectoryIterator,
-            function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($shouldIncludeIgnored, $configuredIgnorePatterns, &$ignoredPaths): bool {
-                $path  = $file->getPathname();
-                $isDir = $file->isDir();
+            function (SplFileInfo $file, mixed $key, RecursiveIterator $recursiveIterator) use ($shouldIncludeIgnored, $configuredIgnorePatterns, &$ignoredDetails): bool {
+                $path        = $file->getPathname();
+                $isDir       = $file->isDir();
+                $displayPath = $this->displayPath($path);
+                $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored);
 
-                if ($this->isConfiguredIgnoredPath($path, $configuredIgnorePatterns)) {
-                    $ignoredPaths[] = $this->displayPath($path);
-                    return false;
+                if (!$decision->ignored) {
+                    return true;
                 }
 
-                if (!$shouldIncludeIgnored && $this->isDefaultIgnoredPath($path)) {
-                    if ($isDir) {
-                        $ignoredPaths[] = $this->displayPath($path);
-                    }
-                    return false;
+                // Configured ignores are recorded for files and directories alike;
+                // built-in default/generated ignores are only surfaced for directories.
+                if ($decision->source === PathIgnoreResolver::SOURCE_CONFIG || $isDir) {
+                    $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 }
 
-                return true;
+                return false;
             },
         );
 
@@ -274,34 +244,6 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * Detect whether the path matches a built-in ignored directory or filename (vendor, node_modules, lock files, etc.).
-     *
-     * @return bool
-     */
-    private function isDefaultIgnoredPath(string $path): bool
-    {
-        $displayPath = str_replace('\\', '/', $this->displayPath($path));
-        $segments    = explode('/', trim($displayPath, '/'));
-
-        foreach (self::IGNORED_DIRECTORIES as $ignoredDirectory) {
-            $ignoredSegments = explode('/', $ignoredDirectory);
-            $ignoredCount    = count($ignoredSegments);
-
-            for ($i = 0, $max = count($segments) - $ignoredCount; $i <= $max; $i++) {
-                if (array_slice($segments, $i, $ignoredCount) === $ignoredSegments) {
-                    return true;
-                }
-            }
-        }
-
-        if (in_array(basename($path), self::IGNORED_FILENAMES, true)) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
      * Discover files through Git's tracked plus unignored-untracked view of the worktree.
      *
      * @param list<string> $requestedPaths
@@ -320,7 +262,7 @@ final readonly class SourceDiscovery
         }
 
         if ($request['pathspecs'] === []) {
-            return $this->emptyGitDiscoveryResult($request['missingPaths'], $request['ignoredPaths']);
+            return $this->emptyGitDiscoveryResult($request['missingPaths'], $request['ignoredDetails']);
         }
 
         $visiblePaths = $this->gitVisiblePathspecs($request['pathspecs']);
@@ -328,20 +270,20 @@ final readonly class SourceDiscovery
             return null;
         }
 
-        $ignoredPaths = array_merge(
-            $request['ignoredPaths'],
+        $ignoredDetails = array_merge(
+            $request['ignoredDetails'],
             $this->ignoredRequestedGitPaths($request['requestedExistingPaths'], $visiblePaths),
         );
-        $sourceResult = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns);
-        $files        = $sourceResult['files'];
-        $ignoredPaths = array_merge($ignoredPaths, $sourceResult['ignoredPaths']);
-        $missingPaths = $request['missingPaths'];
+        $sourceResult   = $this->sourceFilesFromGitVisiblePaths($visiblePaths, $configuredIgnorePatterns);
+        $files          = $sourceResult['files'];
+        $ignoredDetails = array_merge($ignoredDetails, $sourceResult['ignoredDetails']);
+        $missingPaths   = $request['missingPaths'];
 
         ksort($files, SORT_STRING);
         sort($missingPaths, SORT_STRING);
-        sort($ignoredPaths, SORT_STRING);
+        $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        return new SourceDiscoveryResult(array_values($files), $missingPaths, array_values(array_unique($ignoredPaths)));
+        return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
     /**
@@ -349,13 +291,13 @@ final readonly class SourceDiscovery
      *
      * @param list<string> $requestedPaths
      * @param list<string> $configuredIgnorePatterns
-     * @return array{missingPaths: list<string>, ignoredPaths: list<string>, pathspecs: list<string>, requestedExistingPaths: list<array{absolutePath: string, pathspec: string, isFile: bool}>}|null
+     * @return array{missingPaths: list<string>, ignoredDetails: list<IgnoredPath>, pathspecs: list<string>, requestedExistingPaths: list<array{absolutePath: string, pathspec: string, isFile: bool}>}|null
      */
     private function buildGitDiscoveryRequest(array $requestedPaths, array $configuredIgnorePatterns): ?array
     {
-        $missingPaths = [];
-        $ignoredPaths = [];
-        $pathspecs    = [];
+        $missingPaths   = [];
+        $ignoredDetails = [];
+        $pathspecs      = [];
         /** @var list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths Existing request metadata checked after Git visibility is known. */
         $requestedExistingPaths = [];
 
@@ -367,13 +309,10 @@ final readonly class SourceDiscovery
                 continue;
             }
 
-            if ($this->isConfiguredIgnoredPath($absolutePath, $configuredIgnorePatterns)) {
-                $ignoredPaths[] = $this->displayPath($absolutePath);
-                continue;
-            }
-
-            if ($this->isDefaultIgnoredPath($absolutePath)) {
-                $ignoredPaths[] = $this->displayPath($absolutePath);
+            $displayPath = $this->displayPath($absolutePath);
+            $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, false);
+            if ($decision->ignored) {
+                $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 continue;
             }
 
@@ -392,48 +331,53 @@ final readonly class SourceDiscovery
 
         return [
             'missingPaths' => $missingPaths,
-            'ignoredPaths' => $ignoredPaths,
+            'ignoredDetails' => $ignoredDetails,
             'pathspecs' => $pathspecs,
             'requestedExistingPaths' => $requestedExistingPaths,
         ];
     }
 
     /**
-     * @param list<string> $missingPaths
-     * @param list<string> $ignoredPaths
+     * @param list<string>      $missingPaths
+     * @param list<IgnoredPath> $ignoredDetails
      * @return SourceDiscoveryResult Empty Git discovery result.
      */
-    private function emptyGitDiscoveryResult(array $missingPaths, array $ignoredPaths): SourceDiscoveryResult
+    private function emptyGitDiscoveryResult(array $missingPaths, array $ignoredDetails): SourceDiscoveryResult
     {
         sort($missingPaths, SORT_STRING);
-        sort($ignoredPaths, SORT_STRING);
+        $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        return new SourceDiscoveryResult([], $missingPaths, array_values(array_unique($ignoredPaths)));
+        return new SourceDiscoveryResult([], $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
     /**
      * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths
      * @param list<string>                                                      $visiblePaths
-     * @return list<string> Existing requested paths skipped by Git or generated-file protection.
+     * @return list<IgnoredPath> Existing requested paths skipped by Git or generated-file protection.
      */
     private function ignoredRequestedGitPaths(array $requestedExistingPaths, array $visiblePaths): array
     {
-        $ignoredPaths = [];
+        $ignoredDetails = [];
 
         foreach ($requestedExistingPaths as $requestedPath) {
             if ($this->hasVisibleFileForPathspec($requestedPath['pathspec'], $visiblePaths, $requestedPath['isFile'])) {
                 continue;
             }
 
-            if (
-                $this->isGitIgnoredPath($requestedPath['pathspec'])
-                || in_array(basename($requestedPath['absolutePath']), self::IGNORED_FILENAMES, true)
-            ) {
-                $ignoredPaths[] = $this->displayPath($requestedPath['absolutePath']);
+            $displayPath = $this->displayPath($requestedPath['absolutePath']);
+            $gitRule     = $this->ignoreResolver->gitIgnoreRule($requestedPath['pathspec']);
+            if ($gitRule !== null) {
+                $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GITIGNORE, $gitRule);
+                continue;
+            }
+
+            $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($requestedPath['absolutePath']);
+            if ($generatedFilename !== null) {
+                $ignoredDetails[] = new IgnoredPath($displayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
             }
         }
 
-        return $ignoredPaths;
+        return $ignoredDetails;
     }
 
     /**
@@ -441,20 +385,20 @@ final readonly class SourceDiscovery
      *
      * @param list<string> $visiblePaths
      * @param list<string> $configuredIgnorePatterns
-     * @return array{files: array<string, SourceFile>, ignoredPaths: list<string>}
+     * @return array{files: array<string, SourceFile>, ignoredDetails: list<IgnoredPath>}
      */
     private function sourceFilesFromGitVisiblePaths(array $visiblePaths, array $configuredIgnorePatterns): array
     {
-        $files        = [];
-        $ignoredPaths = [];
+        $files          = [];
+        $ignoredDetails = [];
 
         foreach ($visiblePaths as $displayPath) {
-            $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredPaths);
+            $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredDetails);
         }
 
         return [
             'files' => $files,
-            'ignoredPaths' => $ignoredPaths,
+            'ignoredDetails' => $ignoredDetails,
         ];
     }
 
@@ -463,14 +407,14 @@ final readonly class SourceDiscovery
      *
      * @param list<string>              $configuredIgnorePatterns
      * @param array<string, SourceFile> $files
-     * @param list<string>              $ignoredPaths
+     * @param list<IgnoredPath>         $ignoredDetails
      * @return void
      */
     private function appendGitVisibleSourceFile(
         string $displayPath,
         array $configuredIgnorePatterns,
         array &$files,
-        array &$ignoredPaths,
+        array &$ignoredDetails,
     ): void {
         $absolutePath = $this->projectRoot . '/' . $displayPath;
 
@@ -478,18 +422,27 @@ final readonly class SourceDiscovery
             return;
         }
 
-        if ($this->isConfiguredIgnoredPath($absolutePath, $configuredIgnorePatterns)) {
-            $ignoredPaths[] = $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns);
+        $relativeDisplayPath = $this->displayPath($absolutePath);
+
+        $configuredPattern = $this->ignoreResolver->matchedConfiguredPattern($relativeDisplayPath, $configuredIgnorePatterns);
+        if ($configuredPattern !== null) {
+            $ignoredDetails[] = new IgnoredPath(
+                $this->configuredIgnoredDisplayPath($absolutePath, $configuredIgnorePatterns),
+                PathIgnoreResolver::SOURCE_CONFIG,
+                $configuredPattern,
+            );
             return;
         }
 
-        if ($this->isDefaultIgnoredPath($absolutePath)) {
-            $ignoredPaths[] = $this->displayPath($absolutePath);
+        $defaultDirectory = $this->ignoreResolver->matchedDefaultDirectory($relativeDisplayPath);
+        if ($defaultDirectory !== null) {
+            $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_DEFAULT, $defaultDirectory);
             return;
         }
 
-        if (in_array(basename($absolutePath), self::IGNORED_FILENAMES, true)) {
-            $ignoredPaths[] = $this->displayPath($absolutePath);
+        $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($absolutePath);
+        if ($generatedFilename !== null) {
+            $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
             return;
         }
 
@@ -587,17 +540,6 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @return bool True when Git excludes the pathspec by ignore rules.
-     */
-    private function isGitIgnoredPath(string $pathspec): bool
-    {
-        $process = new Process(['git', 'check-ignore', '--quiet', '--', $pathspec], $this->projectRoot);
-        $process->run();
-
-        return $process->getExitCode() === 0;
-    }
-
-    /**
      * Return a compact ignored path for configured glob patterns.
      *
      * @param list<string> $patterns
@@ -623,47 +565,32 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<string> $patterns
-     * @return bool True when the path matches a configured ignore pattern.
+     * Reduce ignored details to one entry per path, sorted for stable reporting.
+     *
+     * @param list<IgnoredPath> $ignoredDetails
+     * @return list<IgnoredPath> Deduplicated, path-sorted ignored details.
      */
-    private function isConfiguredIgnoredPath(string $path, array $patterns): bool
+    private function finalizeIgnored(array $ignoredDetails): array
     {
-        if ($patterns === []) {
-            return false;
+        $byPath = [];
+        foreach ($ignoredDetails as $ignoredPath) {
+            $byPath[$ignoredPath->path] ??= $ignoredPath;
         }
 
-        $displayPath = str_replace('\\', '/', $this->displayPath($path));
+        $deduped = array_values($byPath);
+        usort($deduped, static fn (IgnoredPath $left, IgnoredPath $right): int => strcmp($left->path, $right->path));
 
-        foreach ($patterns as $pattern) {
-            if ($this->matchesPathPattern($displayPath, $pattern)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $deduped;
     }
 
     /**
-     * Detect whether the display path matches a glob-style pattern (`*`, `**`, `?` supported).
+     * Project the ignored-path display strings from the enriched details.
      *
-     * @return bool
+     * @param list<IgnoredPath> $ignoredDetails
+     * @return list<string> Ignored display paths in detail order.
      */
-    private function matchesPathPattern(string $displayPath, string $pattern): bool
+    private function pathsFromDetails(array $ignoredDetails): array
     {
-        $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
-        $normalizedPath    = trim($displayPath, '/');
-
-        if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
-            return true;
-        }
-
-        $regex = '#^' . strtr(preg_quote($normalizedPattern, '#'), [
-            '\\*\\*' => '.*',
-            '\\*' => '[^/]*',
-            '\\?' => '[^/]',
-        ]) . '$#';
-
-        // Apply the converted glob pattern to the normalized project-relative path.
-        return preg_match($regex, $normalizedPath) === 1;
+        return array_map(static fn (IgnoredPath $ignoredPath): string => $ignoredPath->path, $ignoredDetails);
     }
 }

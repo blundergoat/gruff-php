@@ -305,6 +305,28 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
+     * Verify ignored path details carry the source category and matching pattern.
+     *
+     * @return void
+     */
+    public function testIgnoredPathDetailsCarrySourceAndPattern(): void
+    {
+        $root = $this->tempDir();
+        $this->writeFile($root, 'src/A.php', "<?php\n");
+        $this->writeFile($root, 'legacy/B.php', "<?php\n");
+        $this->writeFile($root, 'vendor/c.php', "<?php\n");
+
+        $result  = (new SourceDiscovery($root))->discover(['.'], configuredIgnorePatterns: ['legacy/**']);
+        $details = array_map(
+            static fn ($ignoredPath): array => [$ignoredPath->path, $ignoredPath->source, $ignoredPath->pattern],
+            $result->ignoredPathDetails,
+        );
+
+        self::assertContains(['legacy/B.php', 'config', 'legacy/**'], $details);
+        self::assertContains(['vendor', 'default', 'vendor'], $details);
+    }
+
+    /**
      * Resolve a source-discovery fixture root.
      *
      * @param string $name Fixture name.

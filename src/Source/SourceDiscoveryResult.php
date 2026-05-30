@@ -12,14 +12,16 @@ final readonly class SourceDiscoveryResult
     /**
      * Store discovered files plus missing and ignored path diagnostics.
      *
-     * @param list<SourceFile> $files
-     * @param list<string>     $missingPaths
-     * @param list<string>     $ignoredPaths
+     * @param list<SourceFile>  $files
+     * @param list<string>      $missingPaths
+     * @param list<string>      $ignoredPaths       Project-relative ignored paths (compatibility surface).
+     * @param list<IgnoredPath> $ignoredPathDetails Ignored paths enriched with source and matching pattern.
      */
     public function __construct(
         public array $files,
         public array $missingPaths,
         public array $ignoredPaths,
+        public array $ignoredPathDetails = [],
     ) {
     }
 

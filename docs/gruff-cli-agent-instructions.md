@@ -97,6 +97,18 @@ php bin/gruff-php analyse src --diff=<base-ref> --format json --fail-on none > /
 
 `--diff=<base>` semantics use Git diff filtering against that ref. It is still a changed-line/file filter, not base/current finding subtraction.
 
+## Ignored Paths
+
+`paths.ignore` is authoritative in every invocation mode, including the explicit-path and diff scans a hook uses: a matching path is excluded from analysis and produces no findings, however it was supplied. `--include-ignored` opts back into Git/default ignores only; it never overrides `paths.ignore`. Every ignored path is reported in the JSON report's `ignoredPathDetails` (each with `source` and `pattern`) alongside the `ignoredPaths` string list.
+
+Ask whether gruff would ignore a path, and why, without running an analysis:
+
+```bash
+php bin/gruff-php check-ignore --format json src/App.php legacy/Old.php
+```
+
+The JSON `[{ "path", "ignored", "source", "pattern" }]` is the agent contract; exit codes mirror `git check-ignore` (0 = at least one ignored, 1 = none, 2 = error). Use it to drop out-of-scope changed files before calling `analyse`.
+
 ## Branch Review / Introduced Findings
 
 Use branch-review mode when you need the answer to "what did this branch make worse?" Load [`gruff-cli-branch-review.md`](./gruff-cli-branch-review.md) for the full agent playbook, including the recommended no-path command.

@@ -27,6 +27,9 @@ final readonly class BaselineReport
      * @param string              $staleEvaluation    Stale-entry evaluation mode or summary.
      * @param list<BaselineEntry> $staleEntries       Baseline entries that no longer match findings.
      * @param string              $source             Baseline source classification.
+     * @param int                 $newCount           Findings present this run with no baseline match (the `new` bucket).
+     * @param int                 $unchangedCount     Findings matched by a baseline entry (the `unchanged` bucket; equals $suppressedFindings).
+     * @param int                 $absentCount        Baseline entries with no matching finding this run (the `absent`/resolved bucket; equals count($staleEntries)).
      */
     public function __construct(
         public string $path,
@@ -36,6 +39,9 @@ final readonly class BaselineReport
         public string $staleEvaluation,
         public array $staleEntries = [],
         public string $source = self::SOURCE_EXPLICIT,
+        public int $newCount = 0,
+        public int $unchangedCount = 0,
+        public int $absentCount = 0,
     ) {
     }
 
@@ -48,7 +54,8 @@ final readonly class BaselineReport
      *     staleEvaluation: string,
      *     staleEntries: int,
      *     source: string,
-     *     stale: list<array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string}>
+     *     stale: list<array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string}>,
+     *     buckets: array{new: int, unchanged: int, absent: int}
      * }
      */
     public function toArray(): array
@@ -65,6 +72,11 @@ final readonly class BaselineReport
                 static fn (BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
                 $this->staleEntries,
             ),
+            'buckets' => [
+                'new' => $this->newCount,
+                'unchanged' => $this->unchangedCount,
+                'absent' => $this->absentCount,
+            ],
         ];
     }
 }

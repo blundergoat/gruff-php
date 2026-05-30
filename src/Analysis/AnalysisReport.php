@@ -12,6 +12,7 @@ use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Reporting\FindingDisplayFilter;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Scoring\ScoreReport;
+use GruffPhp\Source\IgnoredPath;
 use GruffPhp\Trend\TrendReport;
 
 /**
@@ -51,8 +52,9 @@ final readonly class AnalysisReport
      * @param TrendReport|null            $trend           Trend history attached to the report.
      * @param BaselineReport|null         $baseline        Baseline application result attached to the report.
      * @param BranchReviewResult|null     $review          Branch review result attached to the report.
-     * @param FindingDisplayFilter|null   $filters         Display filters applied to the report output.
-     * @param int|null                    $suppressedCount Findings excluded by changed-region filtering.
+     * @param FindingDisplayFilter|null   $filters            Display filters applied to the report output.
+     * @param int|null                    $suppressedCount    Findings excluded by changed-region filtering.
+     * @param list<IgnoredPath>           $ignoredPathDetails Ignored paths enriched with source and matching pattern.
      */
     public function __construct(
         public string $toolVersion,
@@ -75,6 +77,7 @@ final readonly class AnalysisReport
         public ?BranchReviewResult $review = null,
         public ?FindingDisplayFilter $filters = null,
         public ?int $suppressedCount = null,
+        public array $ignoredPathDetails = [],
     ) {
     }
 
@@ -180,6 +183,10 @@ final readonly class AnalysisReport
                 'exitCode' => $this->exitCode,
             ],
             'ignoredPaths' => $this->ignoredPaths,
+            'ignoredPathDetails' => array_map(
+                static fn (IgnoredPath $ignoredPath): array => $ignoredPath->toArray(),
+                $this->ignoredPathDetails,
+            ),
             'missingPaths' => $this->missingPaths,
             'diagnostics' => array_map(
                 static fn (RunDiagnostic $diagnostic): array => $diagnostic->toArray(),

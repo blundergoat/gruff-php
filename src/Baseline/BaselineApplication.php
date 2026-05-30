@@ -134,6 +134,9 @@ final readonly class BaselineApplication
             staleEvaluation:    $report->staleEvaluation,
             staleEntries:       $report->staleEntries,
             source:             $options->isBaselineExplicit ? BaselineReport::SOURCE_EXPLICIT : BaselineReport::SOURCE_DEFAULT,
+            newCount:           $report->newCount,
+            unchangedCount:     $report->unchangedCount,
+            absentCount:        $report->absentCount,
         );
     }
 }

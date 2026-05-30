@@ -249,6 +249,7 @@ final class AnalyseCommand extends Command
             filesDiscovered: count($sources->discovery->files),
             filesParsed:     $sources->parsedFileCount(),
             ignoredPaths:    $sources->discovery->ignoredPaths,
+            ignoredPathDetails: $sources->discovery->ignoredPathDetails,
             missingPaths:    $sources->discovery->missingPaths,
             diagnostics:     $diagnostics,
             findings:        $displayFindings,
