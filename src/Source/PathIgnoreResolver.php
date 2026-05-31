@@ -119,7 +119,8 @@ final readonly class PathIgnoreResolver
     /**
      * Return the configured ignore glob that matches the path, or null when none match.
      *
-     * @param list<string> $patterns Configured paths.ignore glob patterns.
+     * @param string       $displayPath Project-relative display path being tested.
+     * @param list<string> $patterns    Configured paths.ignore glob patterns.
      * @return string|null Matching pattern, or null when the path is not configured-ignored.
      */
     public function matchedConfiguredPattern(string $displayPath, array $patterns): ?string
@@ -138,6 +139,7 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in ignored directory token that matches the path, or null when none match.
      *
+     * @param string $displayPath Project-relative display path being tested.
      * @return string|null Matching directory token, or null when the path is not default-ignored.
      */
     public function matchedDefaultDirectory(string $displayPath): ?string
@@ -162,6 +164,7 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in generated/lock filename that matches the path, or null when none match.
      *
+     * @param string $absolutePath Absolute filesystem path being tested.
      * @return string|null Matching filename, or null when the path is not a known generated artifact.
      */
     public function matchedGeneratedFilename(string $absolutePath): ?string

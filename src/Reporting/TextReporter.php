@@ -121,9 +121,9 @@ final readonly class TextReporter
             return;
         }
 
-        $improved  = array_slice(array_filter($rows, static fn (array $row): bool => $row['net'] < 0), 0, 5);
+        $improved  = array_slice(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] < 0), 0, 5);
         $regressed = array_slice(
-            array_reverse(array_filter($rows, static fn (array $row): bool => $row['net'] > 0)),
+            array_reverse(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] > 0)),
             0,
             5,
         );
@@ -140,7 +140,7 @@ final readonly class TextReporter
                 '  Top %d improved: %s',
                 count($improved),
                 implode(', ', array_map(
-                    static fn (array $row): string => sprintf('%d %s', $row['net'], $row['ruleId']),
+                    static fn (array $ruleDelta): string => sprintf('%d %s', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $improved,
                 )),
             );
@@ -151,7 +151,7 @@ final readonly class TextReporter
                 '  Top %d regressed: %s',
                 count($regressed),
                 implode(', ', array_map(
-                    static fn (array $row): string => sprintf('+%d %s', $row['net'], $row['ruleId']),
+                    static fn (array $ruleDelta): string => sprintf('+%d %s', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $regressed,
                 )),
             );
@@ -297,7 +297,7 @@ final readonly class TextReporter
             );
         }
 
-        if ($report->baselineIncludeAbsent && $report->baseline->staleEntries !== []) {
+        if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
             $lines[] = '  Resolved entries:';
             foreach ($report->baseline->staleEntries as $resolvedEntry) {
                 $lines[] = sprintf(

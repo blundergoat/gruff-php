@@ -56,7 +56,7 @@ final readonly class AnalysisReport
      * @param FindingDisplayFilter|null   $filters            Display filters applied to the report output.
      * @param int|null                    $suppressedCount    Findings excluded by changed-region filtering.
      * @param list<IgnoredPath>           $ignoredPathDetails Ignored paths enriched with source and matching pattern.
-     * @param bool                        $baselineIncludeAbsent Whether reporters should list resolved (absent) baseline entries.
+     * @param bool                        $shouldListAbsentBaseline Whether reporters should list resolved (absent) baseline entries.
      * @param ThresholdTrip|null          $failureReason      Gate threshold that tripped, when the run failed a count threshold.
      * @param int|null                    $newFindingsCount   Size of the new-findings set, when a new-findings gate is active.
      */
@@ -82,7 +82,7 @@ final readonly class AnalysisReport
         public ?FindingDisplayFilter $filters = null,
         public ?int $suppressedCount = null,
         public array $ignoredPathDetails = [],
-        public bool $baselineIncludeAbsent = false,
+        public bool $shouldListAbsentBaseline = false,
         public ?ThresholdTrip $failureReason = null,
         public ?int $newFindingsCount = null,
     ) {

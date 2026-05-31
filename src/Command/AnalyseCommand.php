@@ -7,10 +7,8 @@ namespace GruffPhp\Command;
 use GruffPhp\Analysis\AnalysisReport;
 use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Baseline\BaselineApplication;
-use GruffPhp\Baseline\BaselineException;
 use GruffPhp\Baseline\BaselineReport;
 use GruffPhp\Baseline\BaselineStore;
-use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Console\Application;
 use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
@@ -35,15 +33,13 @@ use GruffPhp\Reporting\OutputFormat;
 use GruffPhp\Reporting\SarifReporter;
 use GruffPhp\Reporting\TextReporter;
 use GruffPhp\Reporting\ThresholdTrip;
-use GruffPhp\Review\BranchReviewComparator;
 use GruffPhp\Review\BranchReviewResult;
-use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
-use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
-use GruffPhp\Support\PathHelper;
+use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Trend\TrendRecorder;
+use GruffPhp\Trend\TrendReport;
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -136,8 +132,9 @@ final class AnalyseCommand extends Command
         $runtimeModeOpt        = $input->getOption('runtime-mode');
         $runtimeDetailed       = $printRuntime && $runtimeModeOpt === 'detailed';
         $runtimeTimingObserver = $runtimeDetailed ? new RuntimeTimingObserver() : null;
-        $baselineIncludeAbsent = (bool) $input->getOption('baseline-include-absent');
-        $noCache               = (bool) $input->getOption('no-cache');
+        $shouldListAbsentBaseline = (bool) $input->getOption('baseline-include-absent');
+        $findingSupport           = new AnalysisFindingSupport();
+        $branchReviewBuilder      = new BranchReviewBuilder();
 
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
@@ -159,7 +156,7 @@ final class AnalyseCommand extends Command
         $discoverStart = hrtime(true);
 
         $ruleContext      = new RuleContext($projectRoot, $config);
-        $analysisPipeline = new AnalysisPipeline($registry, $this->projectContextUnits(...));
+        $analysisPipeline = new AnalysisPipeline($registry, $branchReviewBuilder->projectContextUnits(...));
         $analysisRun      = $analysisPipeline->runAnalysis(
             projectRoot:        $projectRoot,
             options:            $options,
@@ -169,7 +166,6 @@ final class AnalyseCommand extends Command
             analysisPaths:      $analysisPaths,
             discoverStart:      $discoverStart,
             ruleRunnerObserver: $runtimeTimingObserver,
-            noCache:            $noCache,
         );
         $sources             = $analysisRun['sources'];
         $findings            = $analysisRun['findings'];
@@ -192,7 +188,7 @@ final class AnalyseCommand extends Command
 
         $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
         if ($options->diffVs !== null && $options->isChangedOnly && $reviewDiff instanceof DiffResult) {
-            $findings = $this->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
+            $findings = $findingSupport->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }
 
         $suppressedCount = null;
@@ -202,7 +198,7 @@ final class AnalyseCommand extends Command
             $suppressedCount  = $diffFilterResult->suppressedCount;
         }
 
-        $findings       = $this->filterAllowedSecretPreviews($findings, $config);
+        $findings       = $findingSupport->filterAllowedSecretPreviews($findings, $config);
         $baselineReport = (new BaselineApplication())->apply(
             projectRoot: $projectRoot,
             options:     $options->baseline,
@@ -210,7 +206,7 @@ final class AnalyseCommand extends Command
             diff:        $diff,
             diagnostics: $diagnostics,
         );
-        $findings = $this->normalizeFindingPaths($findings, $options->pathsRelativeTo);
+        $findings = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
         $scoreStart     = hrtime(true);
         $score          = (new ScoreCalculator())->calculate($findings, $mutationAnalysis, $diff, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
@@ -222,7 +218,7 @@ final class AnalyseCommand extends Command
         $reviewScore = $options->diffVs === null
             ? $score->composite->score
             : (new ScoreCalculator())->calculate($reviewFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config)->composite->score;
-        $review = $this->buildBranchReview(
+        $review = $branchReviewBuilder->build(
             projectRoot:     $projectRoot,
             options:         $options,
             config:          $config,
@@ -232,19 +228,13 @@ final class AnalyseCommand extends Command
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,
         );
-        $trend = null;
-
-        if ($options->historyFile !== null) {
-            try {
-                $trend = (new TrendRecorder())->record($projectRoot, $options->historyFile, $score, count($findings));
-            } catch (JsonException | RuntimeException $exception) {
-                $diagnostics[] = new RunDiagnostic(
-                    type:    'history-error',
-                    message: $exception->getMessage(),
-                    path:    $options->historyFile,
-                );
-            }
-        }
+        $trend = $this->recordTrend(
+            projectRoot:  $projectRoot,
+            options:      $options,
+            score:        $score,
+            findingCount: count($findings),
+            diagnostics:  $diagnostics,
+        );
 
         $newFindings      = $this->newFindingsForGate($findings, $review, $baselineReport);
         $gate             = $this->resolveExitCode($diagnostics, $findings, $newFindings, $setup->failThresholds);
@@ -276,7 +266,7 @@ final class AnalyseCommand extends Command
             review:          $displayReview,
             filters:         $displayFilter,
             suppressedCount: $suppressedCount,
-            baselineIncludeAbsent: $baselineIncludeAbsent,
+            shouldListAbsentBaseline: $shouldListAbsentBaseline,
             failureReason:   $failureReason,
             newFindingsCount: $newFindingsCount,
         );
@@ -292,22 +282,21 @@ final class AnalyseCommand extends Command
         );
         $reportNs = hrtime(true) - $reportStart;
 
-        if ($printRuntime) {
-            $this->emitRuntimePayload(
-                output:           $output,
-                runtimeStart:     $runtimeStart,
-                phaseDurationsNs: [
-                    'discoverParseNs' => $discoverParseNs,
-                    'analyseNs' => $analyseNs,
-                    'scoreNs' => $scoreNs,
-                    'reportNs' => $reportNs,
-                ],
-                filesParsed:           $sources->parsedFileCount(),
-                rulesExecuted:         count($registry->enabledRules($config)),
-                runtimeTimingObserver: $runtimeTimingObserver,
-                isDetailed:            $runtimeDetailed,
-            );
-        }
+        $this->emitRuntimePayload(
+            shouldEmit:       $printRuntime,
+            output:           $output,
+            runtimeStart:     $runtimeStart,
+            phaseDurationsNs: [
+                'discoverParseNs' => $discoverParseNs,
+                'analyseNs' => $analyseNs,
+                'scoreNs' => $scoreNs,
+                'reportNs' => $reportNs,
+            ],
+            filesParsed:           $sources->parsedFileCount(),
+            rulesExecuted:         count($registry->enabledRules($config)),
+            runtimeTimingObserver: $runtimeTimingObserver,
+            isDetailed:            $runtimeDetailed,
+        );
 
         return $exitCode;
     }
@@ -315,10 +304,12 @@ final class AnalyseCommand extends Command
     /**
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
+     * @param bool $shouldEmit Whether --print-runtime requested the payload; a no-op when false.
      * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs Timed analyse phase durations in nanoseconds.
      * @return void
      */
     private function emitRuntimePayload(
+        bool $shouldEmit,
         OutputInterface $output,
         int $runtimeStart,
         array $phaseDurationsNs,
@@ -327,6 +318,10 @@ final class AnalyseCommand extends Command
         ?RuntimeTimingObserver $runtimeTimingObserver,
         bool $isDetailed,
     ): void {
+        if (!$shouldEmit) {
+            return;
+        }
+
         $totalNs = hrtime(true) - $runtimeStart;
         $payload = [
             'wallMs' => (int) round($totalNs / 1_000_000),
@@ -371,31 +366,6 @@ final class AnalyseCommand extends Command
         }
 
         return $result->exitCode;
-    }
-
-    /**
-     * Filter allowed secret previews for the current analysis scope.
-     *
-     * @param list<Finding> $findings
-     * @return list<Finding>
-     */
-    private function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
-    {
-        $allowedPreviews = $config->allowedSecretPreviews();
-        if ($allowedPreviews === []) {
-            return $findings;
-        }
-
-        return array_values(array_filter(
-            $findings,
-            static function (Finding $finding) use ($allowedPreviews): bool {
-                $preview = $finding->metadata['preview'] ?? null;
-
-                return $finding->pillar !== Pillar::SensitiveData
-                    || !is_string($preview)
-                    || !in_array($preview, $allowedPreviews, true);
-            },
-        ));
     }
 
     /**
@@ -464,11 +434,16 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * @param list<RunDiagnostic> $diagnostics
+     * Build the changed-region diff result from explicit --changed-ranges line ranges.
+     *
+     * @param string                $projectRoot Project root the requested paths resolve against.
+     * @param AnalyseCommandOptions $options     Effective CLI options carrying paths and the changed ranges.
+     * @param list<RunDiagnostic>   $diagnostics Run diagnostics; diff-mode errors are appended in place.
+     * @return DiffResult|null Diff result, or null when the ranges or requested paths are invalid.
      */
     private function buildExplicitRangesDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
     {
-        $changedFiles = $this->normaliseRequestedPaths($projectRoot, $options->paths);
+        $changedFiles = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
         if ($changedFiles === []) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'diff-mode-error',
@@ -505,7 +480,11 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * @return list<ChangedLineRange>
+     * Parse a --changed-ranges value like "3-3,8-10" into line ranges.
+     *
+     * @param string $ranges Comma-separated 1-based line ranges.
+     * @throws DiffException When a range token is malformed or the value yields no ranges.
+     * @return list<ChangedLineRange> Parsed line ranges in input order.
      */
     private function parseChangedRanges(string $ranges): array
     {
@@ -517,6 +496,7 @@ final class AnalyseCommand extends Command
                 continue;
             }
 
+            // Match a single line number or a "start-end" range, both 1-based.
             if (!preg_match('/^(\d+)(?:-(\d+))?$/', $part, $matches)) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -550,8 +530,10 @@ final class AnalyseCommand extends Command
             return null;
         }
 
+        $findingSupport = new AnalysisFindingSupport();
+
         if ($options->usesChangedFilesForDiscovery() && $changedRegionDiff instanceof DiffResult && $changedRegionDiff->active) {
-            $changedFiles = $this->existingChangedFiles($projectRoot, $changedRegionDiff->changedFiles);
+            $changedFiles = $findingSupport->existingChangedFiles($projectRoot, $changedRegionDiff->changedFiles);
             if ($changedFiles === []) {
                 return null;
             }
@@ -560,10 +542,10 @@ final class AnalyseCommand extends Command
                 return $changedFiles;
             }
 
-            $requestedPaths = $this->normaliseRequestedPaths($projectRoot, $options->paths);
+            $requestedPaths = $findingSupport->normaliseRequestedPaths($projectRoot, $options->paths);
             $analysisPaths  = array_values(array_filter(
                 $changedFiles,
-                fn (string $changedFile): bool => $this->matchesRequestedPath($changedFile, $requestedPaths),
+                fn (string $changedFile): bool => $findingSupport->matchesRequestedPath($changedFile, $requestedPaths),
             ));
             sort($analysisPaths, SORT_STRING);
 
@@ -575,25 +557,6 @@ final class AnalyseCommand extends Command
         }
 
         return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
-    }
-
-    /**
-     * @param list<string> $changedFiles Project-relative paths from a diff.
-     * @return list<string> Existing paths that can be passed to source discovery.
-     */
-    private function existingChangedFiles(string $projectRoot, array $changedFiles): array
-    {
-        $existing = [];
-
-        foreach ($changedFiles as $changedFile) {
-            if (file_exists(PathHelper::resolveAgainst($projectRoot, $changedFile))) {
-                $existing[] = $changedFile;
-            }
-        }
-
-        sort($existing, SORT_STRING);
-
-        return array_values(array_unique($existing));
     }
 
     /**
@@ -612,20 +575,22 @@ final class AnalyseCommand extends Command
             return $diagnostics;
         }
 
+        $findingSupport = new AnalysisFindingSupport();
+
         return array_values(array_filter(
             $diagnostics,
-            function (RunDiagnostic $diagnostic) use ($projectRoot, $reviewDiff): bool {
+            function (RunDiagnostic $diagnostic) use ($projectRoot, $reviewDiff, $findingSupport): bool {
                 if ($diagnostic->type !== 'missing-path' || $diagnostic->path === null) {
                     return true;
                 }
 
-                $requestedPaths = $this->normaliseRequestedPaths($projectRoot, [$diagnostic->path]);
+                $requestedPaths = $findingSupport->normaliseRequestedPaths($projectRoot, [$diagnostic->path]);
                 if ($requestedPaths === []) {
                     return true;
                 }
 
                 foreach ($reviewDiff->changedFiles as $changedFile) {
-                    if ($this->matchesRequestedPath($changedFile, $requestedPaths)) {
+                    if ($findingSupport->matchesRequestedPath($changedFile, $requestedPaths)) {
                         return false;
                     }
                 }
@@ -710,351 +675,36 @@ final class AnalyseCommand extends Command
     }
 
     /**
-     * Filter findings to changed files for the current analysis scope.
+     * Append a score-trend entry to the history file when one is configured.
      *
-     * @param list<Finding> $findings
-     * @param list<string>  $changedFiles
-     * @return list<Finding>
+     * @param string                $projectRoot  Project root the history file resolves against.
+     * @param AnalyseCommandOptions $options      Effective CLI options carrying the history-file path.
+     * @param ScoreReport           $score        Composite score recorded for this run.
+     * @param int                   $findingCount Number of findings recorded alongside the score.
+     * @param list<RunDiagnostic>   $diagnostics  Run diagnostics; a history error is appended in place.
+     * @return TrendReport|null Recorded trend entry, or null when no history file is set or recording failed.
      */
-    private function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
-    {
-        if ($changedFiles === []) {
-            return [];
-        }
-
-        $changed = array_fill_keys($changedFiles, true);
-
-        return array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => isset($changed[$finding->filePath]),
-        ));
-    }
-
-    /**
-     * @param list<Finding>       $currentFindings
-     * @param list<RunDiagnostic> $diagnostics
-     *
-     * @return BranchReviewResult|null Review comparison, or null when disabled/unavailable.
-     */
-    private function buildBranchReview(
+    private function recordTrend(
         string $projectRoot,
         AnalyseCommandOptions $options,
-        AnalysisConfig $config,
-        RuleRegistry $registry,
-        array $currentFindings,
-        float $currentScore,
-        ?DiffResult $reviewDiff,
+        ScoreReport $score,
+        int $findingCount,
         array &$diagnostics,
-    ): ?BranchReviewResult {
-        if ($options->diffVs === null || $reviewDiff === null) {
+    ): ?TrendReport {
+        if ($options->historyFile === null) {
             return null;
-        }
-
-        $gitArchiveSnapshot       = new GitArchiveSnapshot();
-        $baseRoot                 = null;
-        $shouldLoadProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
-        $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
-        $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
-
-        if ($options->isChangedOnly && !$shouldLoadProjectContext && $baseSnapshotPaths === []) {
-            $baseScore = (new ScoreCalculator())->calculate([], null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
-
-            return (new BranchReviewComparator())->compare(
-                current:       $currentFindings,
-                base:          [],
-                baseRef:       $options->diffVs,
-                isChangedOnly: true,
-                deltaScore:    $currentScore - $baseScore->composite->score,
-            );
         }
 
         try {
-            $baseRoot     = $gitArchiveSnapshot->create($projectRoot, $options->diffVs, $baseSnapshotPaths);
-            $basePaths    = $this->existingSnapshotPaths($baseRoot, $baseAnalysisPaths);
-            $baseFindings = [];
-
-            if ($basePaths !== []) {
-                $baseSources = (new AnalysisSourceLoader())->load(
-                    $baseRoot,
-                    $basePaths,
-                    $options->shouldIncludeIgnored,
-                    $config->ignoredPathPatterns(),
-                );
-                $baseRegistry            = RuleRegistry::defaults();
-                $baseProjectContextUnits = $shouldLoadProjectContext
-                    ? $this->baseProjectContextUnits($baseRoot, $options, $config)
-                    : $baseSources->analysisUnits;
-                $baseFindings = $baseRegistry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
-                $baseFindings = array_merge($baseFindings, (new CompositeFindingFactory())->build($baseFindings));
-                $baseFindings = $this->filterAllowedSecretPreviews($baseFindings, $config);
-            }
-
-            if ($options->isChangedOnly) {
-                $baseFindings = $this->filterFindingsToChangedFiles($baseFindings, $reviewDiff->changedFiles);
-            }
-
-            if ($options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null) {
-                try {
-                    $baseFindings = (new BaselineApplication())->filterExisting($projectRoot, $options->baseline->baselinePath, $baseFindings);
-                } catch (BaselineException $exception) {
-                    $diagnostics[] = new RunDiagnostic(
-                        type:    'baseline-error',
-                        message: $exception->getMessage(),
-                        path:    $options->baseline->baselinePath,
-                    );
-                }
-            }
-
-            $baseFindings = $this->normalizeFindingPaths($baseFindings, $options->pathsRelativeTo);
-            $baseScore    = (new ScoreCalculator())->calculate($baseFindings, null, null, scorePillars: $options->profileScorePillars(), analysisConfig: $config);
-
-            return (new BranchReviewComparator())->compare(
-                current:       $currentFindings,
-                base:          $baseFindings,
-                baseRef:       $options->diffVs,
-                isChangedOnly: $options->isChangedOnly,
-                deltaScore:    $currentScore - $baseScore->composite->score,
-            );
-        } catch (DiffException | RuntimeException $exception) {
+            return (new TrendRecorder())->record($projectRoot, $options->historyFile, $score, $findingCount);
+        } catch (JsonException | RuntimeException $exception) {
             $diagnostics[] = new RunDiagnostic(
-                type:    'review-mode-error',
+                type:    'history-error',
                 message: $exception->getMessage(),
+                path:    $options->historyFile,
             );
 
             return null;
-        } finally {
-            if ($baseRoot !== null) {
-                $gitArchiveSnapshot->remove($baseRoot);
-            }
         }
-    }
-
-    /** @return list<string> Paths that need to be copied from the base ref. */
-    private function baseSnapshotPaths(
-        string $projectRoot,
-        AnalyseCommandOptions $options,
-        DiffResult $reviewDiff,
-        bool $shouldLoadProjectContext,
-    ): array
-    {
-        if (!$options->isChangedOnly) {
-            return $this->normaliseRequestedPaths($projectRoot, $options->paths);
-        }
-
-        if ($shouldLoadProjectContext) {
-            return [];
-        }
-
-        if ($reviewDiff->changedFiles === []) {
-            return [];
-        }
-
-        if ($options->paths === []) {
-            return $reviewDiff->changedFiles;
-        }
-
-        $requestedPaths = $this->normaliseRequestedPaths($projectRoot, $options->paths);
-        if ($requestedPaths === []) {
-            return [];
-        }
-
-        $paths = array_values(array_filter(
-            $reviewDiff->changedFiles,
-            fn (string $changedFile): bool => $this->matchesRequestedPath($changedFile, $requestedPaths),
-        ));
-        sort($paths, SORT_STRING);
-
-        return $paths;
-    }
-
-    /** @return list<string> Paths that should be analysed from the base snapshot. */
-    private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
-    {
-        if ($options->isChangedOnly && $options->paths === []) {
-            return $reviewDiff->changedFiles;
-        }
-
-        if ($options->paths === []) {
-            return [];
-        }
-
-        return $this->normaliseRequestedPaths($projectRoot, $options->paths);
-    }
-
-    /**
-     * Keep requested paths that exist in the base snapshot.
-     *
-     * @param list<string> $paths
-     * @return list<string>
-     */
-    private function existingSnapshotPaths(string $baseRoot, array $paths): array
-    {
-        $requested = $paths === [] ? ['.'] : $paths;
-        $existing  = [];
-
-        foreach ($requested as $path) {
-            $absolute = PathHelper::resolveAgainst($baseRoot, $path);
-            if (file_exists($absolute)) {
-                $existing[] = PathHelper::relativeToRoot($absolute, $baseRoot) ?? $path;
-            }
-        }
-
-        return $existing === [] ? [] : $existing;
-    }
-
-    /** @return list<\GruffPhp\Parser\AnalysisUnit> Project files needed by project-wide rules. */
-    private function projectContextUnits(
-        string $projectRoot,
-        AnalyseCommandOptions $options,
-        AnalysisConfig $config,
-        RuleRegistry $registry,
-        ?DiffResult $reviewDiff,
-        AnalysisSourceSet $analysisSourceSet,
-    ): array {
-        if (!$this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
-            return $analysisSourceSet->analysisUnits;
-        }
-
-        return (new AnalysisSourceLoader())->load(
-            $projectRoot,
-            [],
-            $options->shouldIncludeIgnored,
-            $config->ignoredPathPatterns(),
-        )->analysisUnits;
-    }
-
-    /** @return list<\GruffPhp\Parser\AnalysisUnit> Base-snapshot files needed for branch-review comparison. */
-    private function baseProjectContextUnits(string $baseRoot, AnalyseCommandOptions $options, AnalysisConfig $config): array
-    {
-        return (new AnalysisSourceLoader())->load(
-            $baseRoot,
-            [],
-            $options->shouldIncludeIgnored,
-            $config->ignoredPathPatterns(),
-        )->analysisUnits;
-    }
-
-    /** @return bool True when changed-only mode still needs complete context for project-level rules. */
-    private function shouldLoadChangedOnlyProjectContext(
-        AnalyseCommandOptions $options,
-        RuleRegistry $registry,
-        AnalysisConfig $config,
-        ?DiffResult $reviewDiff,
-    ): bool {
-        return $options->isChangedOnly
-            && $reviewDiff instanceof DiffResult
-            && $reviewDiff->changedFiles !== []
-            && $registry->hasEnabledProjectRules($config);
-    }
-
-    /**
-     * @param list<string> $paths User-supplied path arguments.
-     * @return list<string> Project-relative paths sorted for stable matching.
-     */
-    private function normaliseRequestedPaths(string $projectRoot, array $paths): array
-    {
-        $root       = rtrim(PathHelper::canonical($projectRoot), '/');
-        $normalised = [];
-
-        foreach ($paths as $path) {
-            $candidate = PathHelper::normalizeSeparators($path);
-            if ($candidate === '') {
-                continue;
-            }
-
-            if (PathHelper::isAbsolute($candidate)) {
-                $candidate = rtrim(PathHelper::canonical($candidate), '/');
-                if ($candidate === $root) {
-                    $candidate = '.';
-                } elseif (str_starts_with($candidate, $root . '/')) {
-                    $candidate = substr($candidate, strlen($root) + 1);
-                } else {
-                    continue;
-                }
-            }
-
-            while (str_starts_with($candidate, './')) {
-                $candidate = substr($candidate, 2);
-            }
-
-            $candidate                                        = rtrim($candidate, '/');
-            $normalised[$candidate === '' ? '.' : $candidate] = $candidate === '' ? '.' : $candidate;
-        }
-
-        $paths = array_values($normalised);
-        sort($paths, SORT_STRING);
-
-        return $paths;
-    }
-
-    /**
-     * @param list<string> $requestedPaths
-     *
-     * @return bool True when a changed file is inside the requested path set.
-     */
-    private function matchesRequestedPath(string $changedFile, array $requestedPaths): bool
-    {
-        $changedFile = PathHelper::normalizeSeparators($changedFile);
-
-        foreach ($requestedPaths as $requestedPath) {
-            if ($requestedPath === '.') {
-                return true;
-            }
-
-            if ($changedFile === $requestedPath || str_starts_with($changedFile, $requestedPath . '/')) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Normalize finding paths for the CLI command.
-     *
-     * @param list<Finding> $findings
-     * @return list<Finding>
-     */
-    private function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
-    {
-        if ($pathsRelativeTo === null) {
-            return $findings;
-        }
-
-        $realRoot = realpath($pathsRelativeTo);
-        if ($realRoot === false) {
-            return $findings;
-        }
-
-        $root       = rtrim(PathHelper::normalizeSeparators($realRoot), '/');
-        $normalized = [];
-
-        foreach ($findings as $finding) {
-            $path = PathHelper::normalizeSeparators($finding->filePath);
-            if (!PathHelper::isAbsolute($path)) {
-                $normalized[] = $finding;
-                continue;
-            }
-
-            $filePath     = str_starts_with($path, $root . '/') ? substr($path, strlen($root) + 1) : $finding->filePath;
-            $normalized[] = new Finding(
-                ruleId:           $finding->ruleId,
-                message:          $finding->message,
-                filePath:         $filePath,
-                line:             $finding->line,
-                severity:         $finding->severity,
-                pillar:           $finding->pillar,
-                tier:             $finding->tier,
-                confidence:       $finding->confidence,
-                endLine:          $finding->endLine,
-                column:           $finding->column,
-                symbol:           $finding->symbol,
-                remediation:      $finding->remediation,
-                secondaryPillars: $finding->secondaryPillars,
-                metadata:         $finding->metadata,
-            );
-        }
-
-        return $normalized;
     }
 }

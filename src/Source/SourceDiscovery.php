@@ -82,43 +82,14 @@ final readonly class SourceDiscovery
         $ignoredDetails = [];
 
         foreach ($requestedPaths as $path) {
-            $absolutePath = $this->absolutePath($path);
-
-            if (!file_exists($absolutePath)) {
-                $missingPaths[] = $path;
-                continue;
-            }
-
-            $displayPath = $this->displayPath($absolutePath);
-            $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
-            if ($decision->ignored) {
-                $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
-                continue;
-            }
-
-            if (is_file($absolutePath)) {
-                $type = $this->sourceType($absolutePath);
-                if ($type !== null) {
-                    $files[$this->canonicalPath($absolutePath)] = new SourceFile(
-                        $this->canonicalPath($absolutePath),
-                        $this->displayPath($absolutePath),
-                        $type,
-                    );
-                }
-
-                continue;
-            }
-
-            if (is_dir($absolutePath)) {
-                foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredDetails) as $file) {
-                    $canonicalPath = $this->canonicalPath($file->getPathname());
-                    $type          = $this->sourceType($canonicalPath);
-
-                    if ($type !== null) {
-                        $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath), $type);
-                    }
-                }
-            }
+            $this->collectPath(
+                path:                     $path,
+                shouldIncludeIgnored:     $shouldIncludeIgnored,
+                configuredIgnorePatterns: $configuredIgnorePatterns,
+                files:                    $files,
+                missingPaths:             $missingPaths,
+                ignoredDetails:           $ignoredDetails,
+            );
         }
 
         ksort($files, SORT_STRING);
@@ -126,6 +97,64 @@ final readonly class SourceDiscovery
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
         return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
+    }
+
+    /**
+     * Resolve one requested path into discovered files, missing inputs, or ignore records.
+     *
+     * @param string       $path                     Requested path to resolve against the project root.
+     * @param bool         $shouldIncludeIgnored     Whether built-in ignored paths should still be included.
+     * @param list<string> $configuredIgnorePatterns Additional ignore patterns from config.
+     * @param array<string, SourceFile> $files       Discovered files keyed by canonical path; appended in place.
+     * @param list<string> $missingPaths             Requested paths that do not exist; appended in place.
+     * @param list<IgnoredPath> $ignoredDetails      Ignored-path records; appended in place.
+     * @return void
+     */
+    private function collectPath(
+        string $path,
+        bool $shouldIncludeIgnored,
+        array $configuredIgnorePatterns,
+        array &$files,
+        array &$missingPaths,
+        array &$ignoredDetails,
+    ): void {
+        $absolutePath = $this->absolutePath($path);
+
+        if (!file_exists($absolutePath)) {
+            $missingPaths[] = $path;
+            return;
+        }
+
+        $displayPath = $this->displayPath($absolutePath);
+        $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
+        if ($decision->ignored) {
+            $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
+            return;
+        }
+
+        if (is_file($absolutePath)) {
+            $type = $this->sourceType($absolutePath);
+            if ($type !== null) {
+                $files[$this->canonicalPath($absolutePath)] = new SourceFile(
+                    $this->canonicalPath($absolutePath),
+                    $this->displayPath($absolutePath),
+                    $type,
+                );
+            }
+
+            return;
+        }
+
+        if (is_dir($absolutePath)) {
+            foreach ($this->walkDirectory($absolutePath, $shouldIncludeIgnored, $configuredIgnorePatterns, $ignoredDetails) as $file) {
+                $canonicalPath = $this->canonicalPath($file->getPathname());
+                $type          = $this->sourceType($canonicalPath);
+
+                if ($type !== null) {
+                    $files[$canonicalPath] = new SourceFile($canonicalPath, $this->displayPath($canonicalPath), $type);
+                }
+            }
+        }
     }
 
     /**

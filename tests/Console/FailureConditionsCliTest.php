@@ -14,6 +14,11 @@ use Symfony\Component\Process\Process;
 final class FailureConditionsCliTest extends CliTestCase
 {
     /**
+     * Number of error findings the gate fixture's three undocumented methods emit.
+     */
+    private const FIXTURE_ERROR_COUNT = 3;
+
+    /**
      * Project root of the throwaway gate fixture created per test.
      */
     private string $project = '';
@@ -61,26 +66,42 @@ final class FailureConditionsCliTest extends CliTestCase
     }
 
     /**
-     * Verify exceeding a severity cap fails with a structured and rendered failure reason.
+     * Verify exceeding a severity cap reports a structured failure reason in JSON output.
      *
      * @throws JsonException
      * @return void
      */
-    public function testCountGateFailsWithFailureReason(): void
+    public function testCountGateReportsStructuredFailureReason(): void
     {
-        $this->writeProjectFile('gate.yaml', "schemaVersion: gruff-php.config.v0.1\nfailureConditions:\n  severityThresholds:\n    error: 2\n");
+        $errorCap = 2;
+        $this->writeProjectFile('gate.yaml', sprintf(
+            "schemaVersion: gruff-php.config.v0.1\nfailureConditions:\n  severityThresholds:\n    error: %d\n",
+            $errorCap,
+        ));
 
         $jsonRun = $this->runGruff(['analyse', 'src', '--config', 'gate.yaml', '--format', 'json']);
         $jsonRun->run();
+
         self::assertSame(1, $jsonRun->getExitCode());
         $failureReason = $this->decodeJsonOutput($jsonRun)['failureReason'] ?? null;
         self::assertIsArray($failureReason);
         self::assertSame('error', $failureReason['thresholdKind'] ?? null);
-        self::assertSame(3, $failureReason['count'] ?? null);
-        self::assertSame(2, $failureReason['cap'] ?? null);
+        self::assertSame(self::FIXTURE_ERROR_COUNT, $failureReason['count'] ?? null);
+        self::assertSame($errorCap, $failureReason['cap'] ?? null);
+    }
+
+    /**
+     * Verify the rendered text output explains the tripped severity cap.
+     *
+     * @return void
+     */
+    public function testCountGateRendersFailureReasonInText(): void
+    {
+        $this->writeProjectFile('gate.yaml', "schemaVersion: gruff-php.config.v0.1\nfailureConditions:\n  severityThresholds:\n    error: 2\n");
 
         $textRun = $this->runGruff(['analyse', 'src', '--config', 'gate.yaml', '--format', 'text']);
         $textRun->run();
+
         self::assertStringContainsString('Failed: 3 error finding(s) exceed the cap of 2.', $textRun->getOutput());
     }
 

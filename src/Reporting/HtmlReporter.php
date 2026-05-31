@@ -430,7 +430,7 @@ final readonly class HtmlReporter
                 $report->baseline->absentCount,
             );
 
-            if ($report->baselineIncludeAbsent) {
+            if ($report->shouldListAbsentBaseline) {
                 foreach ($report->baseline->staleEntries as $resolvedEntry) {
                     $items[] = sprintf(
                         'Resolved: %s %s%s',

@@ -79,7 +79,7 @@ final readonly class ResultCache
                 return null;
             }
 
-            /** @var array<string, mixed> $entry */
+            /** @var array<string, mixed> $entry A cached row is a string-keyed finding payload; the is_array guard cannot express that to PHPStan. */
             $findings[] = Finding::fromArray($entry);
         }
 

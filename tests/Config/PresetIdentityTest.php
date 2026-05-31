@@ -25,17 +25,17 @@ final class PresetIdentityTest extends TestCase
         $registry = RuleRegistry::defaults();
         $noConfig = AnalysisConfig::fromRegistry($registry);
 
-        $dir = sys_get_temp_dir() . '/gruff-preset-identity-' . bin2hex(random_bytes(6));
-        self::assertTrue(mkdir($dir));
+        $directory = sys_get_temp_dir() . '/gruff-preset-identity-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($directory));
 
         try {
-            file_put_contents($dir . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: gruff.recommended\n");
-            $extended = (new ConfigLoader($dir, ConfigLoader::packageRoot()))->load(null, $registry);
+            file_put_contents($directory . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: gruff.recommended\n");
+            $extended = (new ConfigLoader($directory, ConfigLoader::packageRoot()))->load(null, $registry);
 
             self::assertSame($this->snapshot($noConfig), $this->snapshot($extended));
         } finally {
-            unlink($dir . '/.gruff-php.yaml');
-            rmdir($dir);
+            unlink($directory . '/.gruff-php.yaml');
+            rmdir($directory);
         }
     }
 

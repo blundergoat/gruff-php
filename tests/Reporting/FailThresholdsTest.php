@@ -14,6 +14,8 @@ use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Reporting\FailThresholds;
 use GruffPhp\Reporting\ThresholdTrip;
 use InvalidArgumentException;
+use JsonException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -72,15 +74,17 @@ final class FailThresholdsTest extends TestCase
      */
     public function testSeverityCapAllowsUpToCapThenTrips(): void
     {
-        $gate = FailThresholds::fromConfig(['severityThresholds' => ['error' => 2]]);
+        $errorCap = 2;
+        $gate     = FailThresholds::fromConfig(['severityThresholds' => ['error' => $errorCap]]);
 
         self::assertNull($gate->tripsOn([$this->finding(Severity::Error), $this->finding(Severity::Error)]));
 
-        $trip = $gate->tripsOn([$this->finding(Severity::Error), $this->finding(Severity::Error), $this->finding(Severity::Error)]);
+        $overCap = [$this->finding(Severity::Error), $this->finding(Severity::Error), $this->finding(Severity::Error)];
+        $trip    = $gate->tripsOn($overCap);
         self::assertInstanceOf(ThresholdTrip::class, $trip);
         self::assertSame('error', $trip->thresholdKind);
-        self::assertSame(3, $trip->count);
-        self::assertSame(2, $trip->cap);
+        self::assertSame(count($overCap), $trip->count);
+        self::assertSame($errorCap, $trip->cap);
     }
 
     /**
@@ -117,39 +121,48 @@ final class FailThresholdsTest extends TestCase
     }
 
     /**
-     * Verify fromConfig rejects an unknown top-level key.
+     * Verify fromConfig rejects malformed failureConditions with a descriptive ConfigException.
      *
+     * @param string $configJson      Malformed failureConditions block encoded as JSON.
+     * @param string $expectedMessage ConfigException message the parser must report.
+     * @throws JsonException
      * @return void
      */
-    public function testFromConfigRejectsUnknownKey(): void
+    #[DataProvider('invalidFailureConditionsProvider')]
+    public function testFromConfigRejectsInvalidFailureConditions(string $configJson, string $expectedMessage): void
     {
-        $this->expectException(ConfigException::class);
+        /** @var array<array-key, mixed> $config Decoded failureConditions block fed to the parser under test. */
+        $config = json_decode($configJson, true, 16, JSON_THROW_ON_ERROR);
 
-        FailThresholds::fromConfig(['totals' => 1]);
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        FailThresholds::fromConfig($config);
     }
 
     /**
-     * Verify fromConfig rejects an unknown severity name.
+     * Malformed failureConditions blocks (as JSON) paired with the ConfigException message each must raise.
      *
-     * @return void
+     * @return iterable<string, array{string, string}>
      */
-    public function testFromConfigRejectsUnknownSeverity(): void
+    public static function invalidFailureConditionsProvider(): iterable
     {
-        $this->expectException(ConfigException::class);
-
-        FailThresholds::fromConfig(['severityThresholds' => ['critical' => 1]]);
-    }
-
-    /**
-     * Verify fromConfig rejects a non-integer threshold value.
-     *
-     * @return void
-     */
-    public function testFromConfigRejectsNonIntThreshold(): void
-    {
-        $this->expectException(ConfigException::class);
-
-        FailThresholds::fromConfig(['severityThresholds' => ['error' => 'lots']]);
+        yield 'unknown top-level key' => [
+            '{"totals": 1}',
+            'Unknown config key "failureConditions.totals".',
+        ];
+        yield 'unknown severity name' => [
+            '{"severityThresholds": {"critical": 1}}',
+            'Unknown severity "critical" in failureConditions.severityThresholds. Use advisory, warning, or error.',
+        ];
+        yield 'non-integer threshold' => [
+            '{"severityThresholds": {"error": "lots"}}',
+            'Config key "failureConditions.severityThresholds.error" must be a non-negative integer.',
+        ];
+        yield 'doubly-nested newFindings' => [
+            '{"newFindings": {"newFindings": {"total": 1}}}',
+            'Unknown config key "failureConditions.newFindings.newFindings".',
+        ];
     }
 
     /**
@@ -160,6 +173,7 @@ final class FailThresholdsTest extends TestCase
     public function testConstructorRejectsNegativeCap(): void
     {
         $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Severity cap for "error" must be a non-negative integer.');
 
         new FailThresholds(null, ['error' => -1]);
     }
@@ -230,18 +244,6 @@ final class FailThresholdsTest extends TestCase
 
         self::assertInstanceOf(FailThresholds::class, $gate->newFindingsGate);
         self::assertSame(['error' => 0], $gate->newFindingsGate->severityCounts);
-    }
-
-    /**
-     * Verify a doubly-nested newFindings block is rejected.
-     *
-     * @return void
-     */
-    public function testFromConfigRejectsNestedNewFindings(): void
-    {
-        $this->expectException(ConfigException::class);
-
-        FailThresholds::fromConfig(['newFindings' => ['newFindings' => ['total' => 1]]]);
     }
 
     /**

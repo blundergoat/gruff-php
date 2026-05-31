@@ -100,20 +100,20 @@ final readonly class Finding
      * The derived `fingerprint` / `stableIdentity` fields are recomputed from the
      * restored inputs, never read from the payload, so a round-trip is lossless.
      *
-     * @param array<string, mixed> $data Serialized finding produced by toArray().
+     * @param array<string, mixed> $serialized Serialized finding produced by toArray().
      * @return self Reconstructed finding.
      */
-    public static function fromArray(array $data): self
+    public static function fromArray(array $serialized): self
     {
         $secondaryPillars = [];
-        $rawSecondary     = $data['secondaryPillars'] ?? [];
+        $rawSecondary     = $serialized['secondaryPillars'] ?? [];
         if (is_array($rawSecondary)) {
             foreach ($rawSecondary as $pillarValue) {
                 $secondaryPillars[] = Pillar::from(self::stringField($pillarValue));
             }
         }
 
-        $rawMetadata = $data['metadata'] ?? [];
+        $rawMetadata = $serialized['metadata'] ?? [];
         $metadata    = [];
         if (is_array($rawMetadata)) {
             foreach ($rawMetadata as $metadataKey => $metadataValue) {
@@ -122,18 +122,18 @@ final readonly class Finding
         }
 
         return new self(
-            ruleId:           self::stringField($data['ruleId'] ?? null),
-            message:          self::stringField($data['message'] ?? null),
-            filePath:         self::stringField($data['file'] ?? null),
-            line:             self::nullableInt($data['line'] ?? null),
-            severity:         Severity::from(self::stringField($data['severity'] ?? null)),
-            pillar:           Pillar::from(self::stringField($data['pillar'] ?? null)),
-            tier:             RuleTier::from(self::stringField($data['tier'] ?? null)),
-            confidence:       Confidence::from(self::stringField($data['confidence'] ?? null)),
-            endLine:          self::nullableInt($data['endLine'] ?? null),
-            column:           self::nullableInt($data['column'] ?? null),
-            symbol:           self::nullableString($data['symbol'] ?? null),
-            remediation:      self::nullableString($data['remediation'] ?? null),
+            ruleId:           self::stringField($serialized['ruleId'] ?? null),
+            message:          self::stringField($serialized['message'] ?? null),
+            filePath:         self::stringField($serialized['file'] ?? null),
+            line:             self::nullableInt($serialized['line'] ?? null),
+            severity:         Severity::from(self::stringField($serialized['severity'] ?? null)),
+            pillar:           Pillar::from(self::stringField($serialized['pillar'] ?? null)),
+            tier:             RuleTier::from(self::stringField($serialized['tier'] ?? null)),
+            confidence:       Confidence::from(self::stringField($serialized['confidence'] ?? null)),
+            endLine:          self::nullableInt($serialized['endLine'] ?? null),
+            column:           self::nullableInt($serialized['column'] ?? null),
+            symbol:           self::nullableString($serialized['symbol'] ?? null),
+            remediation:      self::nullableString($serialized['remediation'] ?? null),
             secondaryPillars: $secondaryPillars,
             metadata:         $metadata,
         );

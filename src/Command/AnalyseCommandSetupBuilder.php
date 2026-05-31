@@ -142,7 +142,13 @@ final readonly class AnalyseCommandSetupBuilder
         $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
         if ($referenceError !== null) {
             return AnalyseCommandSetupResult::reportError(
-                $this->usageReport($options, $formatResult, $failThreshold->value, $referenceError, 'config-error'),
+                $this->usageReport(
+                    options: $options,
+                    format:  $formatResult,
+                    failOn:  $failThreshold->value,
+                    message: $referenceError,
+                    type:    'config-error',
+                ),
                 $formatResult,
             );
         }

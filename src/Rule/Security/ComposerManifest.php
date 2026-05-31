@@ -51,7 +51,7 @@ final class ComposerManifest
             return null;
         }
 
-        /** @var array<string, mixed> $decoded */
+        /** @var array<string, mixed> $decoded A decoded JSON object always has string keys; the is_array guard cannot express that to PHPStan. */
         return $decoded;
     }
 

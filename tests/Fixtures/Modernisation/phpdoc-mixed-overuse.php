@@ -248,6 +248,16 @@ final class PhpDocMixedOveruseFixture
     }
 
     /**
+     * Nullable unstructured bag at a JSON boundary - mixed leaves are the honest type.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function nullableArrayBagReturn(): ?array
+    {
+        return null;
+    }
+
+    /**
      * Psalm-flavoured tag.
      *
      * @psalm-param list<array<string, mixed>> $rows

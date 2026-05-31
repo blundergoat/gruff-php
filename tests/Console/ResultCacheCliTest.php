@@ -153,12 +153,12 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Source for the second file, optionally carrying a security finding.
      *
-     * @param bool $withFinding Whether to include a dynamic eval call.
+     * @param bool $shouldIncludeFinding Whether to include a dynamic eval call.
      * @return string PHP source.
      */
-    private function cleanSource(bool $withFinding): string
+    private function cleanSource(bool $shouldIncludeFinding): string
     {
-        $method = $withFinding
+        $method = $shouldIncludeFinding
             ? "\n    /**\n     * Run dynamic code.\n     *\n     * @param string \$code Code to evaluate.\n     * @return mixed Evaluation result.\n     */\n    public function run(string \$code): mixed\n    {\n        return eval(\$code);\n    }\n"
             : '';
 

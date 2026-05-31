@@ -314,19 +314,19 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      */
     public function testExtendsAppliesBundledPresetSettings(): void
     {
-        $dir = sys_get_temp_dir() . '/gruff-extends-strict-' . bin2hex(random_bytes(6));
-        self::assertTrue(mkdir($dir));
+        $directory = sys_get_temp_dir() . '/gruff-extends-strict-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($directory));
 
         try {
-            file_put_contents($dir . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: gruff.strict\n");
-            $config   = (new ConfigLoader($dir, ConfigLoader::packageRoot()))->load(null, RuleRegistry::defaults());
+            file_put_contents($directory . '/.gruff-php.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: gruff.strict\n");
+            $config   = (new ConfigLoader($directory, ConfigLoader::packageRoot()))->load(null, RuleRegistry::defaults());
             $settings = $config->ruleSettings('complexity.cognitive');
 
             self::assertInstanceOf(SeverityThreshold::class, $settings->severityThreshold);
             self::assertSame(15, $settings->severityThreshold->threshold);
         } finally {
-            unlink($dir . '/.gruff-php.yaml');
-            rmdir($dir);
+            unlink($directory . '/.gruff-php.yaml');
+            rmdir($directory);
         }
     }
 
@@ -337,20 +337,20 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      */
     public function testExtendsCycleThrows(): void
     {
-        $dir = sys_get_temp_dir() . '/gruff-extends-cycle-' . bin2hex(random_bytes(6));
-        self::assertTrue(mkdir($dir));
-        file_put_contents($dir . '/a.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./b.yaml\n");
-        file_put_contents($dir . '/b.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./a.yaml\n");
+        $directory = sys_get_temp_dir() . '/gruff-extends-cycle-' . bin2hex(random_bytes(6));
+        self::assertTrue(mkdir($directory));
+        file_put_contents($directory . '/a.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./b.yaml\n");
+        file_put_contents($directory . '/b.yaml', "schemaVersion: gruff-php.config.v0.1\nextends: ./a.yaml\n");
 
         try {
             $this->expectException(ConfigException::class);
             $this->expectExceptionMessageMatches('/extends.*cycle detected/');
 
-            (new ConfigLoader($dir, ConfigLoader::packageRoot()))->load('a.yaml', RuleRegistry::defaults());
+            (new ConfigLoader($directory, ConfigLoader::packageRoot()))->load('a.yaml', RuleRegistry::defaults());
         } finally {
-            unlink($dir . '/a.yaml');
-            unlink($dir . '/b.yaml');
-            rmdir($dir);
+            unlink($directory . '/a.yaml');
+            unlink($directory . '/b.yaml');
+            rmdir($directory);
         }
     }
 
@@ -512,26 +512,26 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify excludeFromScore defaults to false and accepts true/false overrides.
+     * Verify excludeFromScore defaults to false and honours explicit true/false overrides.
      *
      * @return void
      */
-    public function testExcludeFromScoreDefaultsToFalseAndAcceptsBooleanOverrides(): void
+    public function testExcludeFromScoreDefaultsToFalseAndHonoursOverrides(): void
     {
-        $registry      = RuleRegistry::defaults();
-        $defaultConfig = (new ConfigLoader(__DIR__ . '/../..'))->load(null, $registry);
-        self::assertFalse($defaultConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+        $registry = RuleRegistry::defaults();
 
-        $optInPath = $this->writeTempConfig(
+        $defaultConfig = (new ConfigLoader(__DIR__ . '/../..'))->load(null, $registry);
+        $optInPath     = $this->writeTempConfig(
             '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":true}}}',
         );
-        $optInConfig = (new ConfigLoader(dirname($optInPath)))->load(basename($optInPath), $registry);
-        self::assertTrue($optInConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
-
-        $optOutPath = $this->writeTempConfig(
+        $optInConfig  = (new ConfigLoader(dirname($optInPath)))->load(basename($optInPath), $registry);
+        $optOutPath   = $this->writeTempConfig(
             '{"schemaVersion":"gruff-php.config.v0.1","rules":{"size.file-length":{"excludeFromScore":false}}}',
         );
         $optOutConfig = (new ConfigLoader(dirname($optOutPath)))->load(basename($optOutPath), $registry);
+
+        self::assertFalse($defaultConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
+        self::assertTrue($optInConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
         self::assertFalse($optOutConfig->ruleSettings(FileLengthRule::ID)->isExcludedFromScore());
     }
 

@@ -90,6 +90,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
             'PhpDocMixedOveruseFixture::arrayShapeMixedParam()',
             'PhpDocMixedOveruseFixture::isMixedOnlyInReturnDescription()',
             'PhpDocMixedOveruseFixture::nestedArrayShapeMixed()',
+            'PhpDocMixedOveruseFixture::nullableArrayBagReturn()',
             'PhpDocMixedOveruseFixture::phpstanReturnMixed()',
             'PhpDocMixedOveruseFixture::psalmParamMixed()',
         ];

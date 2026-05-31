@@ -281,7 +281,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return false;
         }
 
-        $type = strtolower(preg_replace('/\s+/', '', $type) ?? $type);
+        $type = $this->stripTopLevelNullUnion(strtolower(preg_replace('/\s+/', '', $type) ?? $type));
 
         return $this->isArrayBagType($type);
     }
@@ -561,5 +561,27 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         }
 
         return 'unknown';
+    }
+
+    /**
+     * Drop a leading or trailing top-level `null` union member from a normalized type.
+     *
+     * A nullable bag such as `array<string, mixed>|null` is still an unstructured bag,
+     * so its `null` union member is removed before the array-bag exemption check.
+     *
+     * @param string $type Whitespace-stripped, lowercased type expression.
+     * @return string The type with a top-level `|null` / `null|` member removed, when present.
+     */
+    private function stripTopLevelNullUnion(string $type): string
+    {
+        if (str_ends_with($type, '|null')) {
+            return substr($type, 0, -strlen('|null'));
+        }
+
+        if (str_starts_with($type, 'null|')) {
+            return substr($type, strlen('null|'));
+        }
+
+        return $type;
     }
 }

@@ -116,9 +116,9 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
      */
     private function hasRiskyCommand(mixed $commands): bool
     {
-        $commandList = is_array($commands) ? $commands : [$commands];
+        $normalizedCommands = is_array($commands) ? $commands : [$commands];
 
-        foreach ($commandList as $command) {
+        foreach ($normalizedCommands as $command) {
             if (!is_string($command)) {
                 continue;
             }

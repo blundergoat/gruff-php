@@ -79,7 +79,6 @@ final class AnalysisPipeline
         ?array $analysisPaths,
         int $discoverStart,
         ?RuleRunnerObserver $ruleRunnerObserver,
-        bool $noCache = false,
     ): array {
         if ($analysisPaths === null) {
             return [
@@ -100,7 +99,6 @@ final class AnalysisPipeline
                 analysisPaths:      $analysisPaths,
                 discoverStart:      $discoverStart,
                 ruleRunnerObserver: $ruleRunnerObserver,
-                noCache:            $noCache,
             );
         }
 
@@ -153,7 +151,6 @@ final class AnalysisPipeline
         array $analysisPaths,
         int $discoverStart,
         ?RuleRunnerObserver $ruleRunnerObserver,
-        bool $noCache,
     ): array {
         $discovery = (new AnalysisSourceLoader())->discover(
             $projectRoot,
@@ -170,7 +167,7 @@ final class AnalysisPipeline
         // needs cross-file state: project rules (accumulators included) observe
         // every unit during analysis, so reusing a cached file's findings without
         // re-running them would corrupt the project-rule output.
-        $cacheable   = !$noCache && !$this->registry->hasEnabledProjectRules($config);
+        $cacheable   = !$options->noCache && !$this->registry->hasEnabledProjectRules($config);
         $cache       = $cacheable ? ResultCache::forProject($projectRoot) : null;
         $fingerprint = $cacheable ? AnalysisFingerprint::forRun($this->registry, $config, Application::VERSION) : null;
 

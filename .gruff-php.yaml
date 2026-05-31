@@ -19,6 +19,7 @@ allowlists:
     acceptedAbbreviations:
         - arg
         - arm
+        - cap
         - cb
         - cc
         - ccn
@@ -193,6 +194,7 @@ rules:
                 - disabled
                 - applicable
                 - generated
+                - ignored
                 - interactive
                 - emitted
                 - visible
@@ -261,8 +263,10 @@ rules:
             cliMirrorAllowlist:
                 - 'GruffPhp\Command\AnalyseCommandOptions::noConfig'
                 - 'GruffPhp\Command\AnalyseCommandOptions::noBaseline'
+                - 'GruffPhp\Command\AnalyseCommandOptions::noCache'
                 - 'GruffPhp\Command\SummaryCommand::hasConfigConflict::noConfig'
                 - 'GruffPhp\Command\SummaryCommand::analysisConfig::noConfig'
+                - 'GruffPhp\Command\CheckIgnoreCommand::ignorePatterns::noConfig'
     naming.short-variable:
         enabled: true
     naming.suffix-hungarian:
@@ -525,15 +529,21 @@ rules:
             minInFileCallers: 2
             namedAlternativeFactoryExempt: true
             allowedSymbols:
+                - AnalysisFingerprint::forFile()
                 - DashboardStateFactory::initialProjectRoot()
+                - FailThresholds::fromConfig()
+                - FailThresholds::withNewFindingsGate()
                 - FindingDisplayFilter::apply()
+                - IgnoredPath::from()
                 - NestingDepthRule::computeMaximumNestingDepth()
                 - NpathComplexityRule::computeNpathComplexity()
                 - ModernisationNodeHelper::supportsPhp()
+                - ResultCache::forProject()
                 - RuleContext::settingsFor()
                 - SecretScannerHelper::lineNumberForOffset()
                 - SecretScannerHelper::redactedKeyValue()
                 - TestQualityNodeHelper::calls()
+                - ThresholdTrip::withScope()
     waste.redundant-variable:
         enabled: true
     waste.unreachable-code:

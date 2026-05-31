@@ -84,59 +84,119 @@ final readonly class FailThresholds
     /**
      * Recursively parse a failureConditions block, optionally allowing a newFindings sub-gate.
      *
-     * @param array<array-key, mixed> $conditions       Decoded conditions block.
-     * @param string                  $keyPath          Config key path used for error messages.
-     * @param bool                    $allowNewFindings Whether a nested newFindings sub-gate is permitted at this level.
+     * @param array<array-key, mixed> $conditions        Decoded conditions block.
+     * @param string                  $keyPath           Config key path used for error messages.
+     * @param bool                    $allowsNewFindings Whether a nested newFindings sub-gate is permitted at this level.
      * @throws ConfigException When keys, severities, or values are invalid.
      * @return self Thresholds described by the block.
      */
-    private static function parseConditions(array $conditions, string $keyPath, bool $allowNewFindings): self
+    private static function parseConditions(array $conditions, string $keyPath, bool $allowsNewFindings): self
     {
-        $allowedKeys = $allowNewFindings ? ['total', 'severityThresholds', 'newFindings'] : ['total', 'severityThresholds'];
+        self::assertKnownKeys($conditions, $keyPath, $allowsNewFindings);
+
+        return new self(
+            self::parseTotal($conditions, $keyPath),
+            self::parseSeverityThresholds($conditions, $keyPath),
+            self::parseNewFindingsGate($conditions, $keyPath, $allowsNewFindings),
+        );
+    }
+
+    /**
+     * Reject any key the conditions block does not support at this nesting level.
+     *
+     * @param array<array-key, mixed> $conditions        Decoded conditions block.
+     * @param string                  $keyPath           Config key path used for error messages.
+     * @param bool                    $allowsNewFindings Whether the newFindings key is permitted at this level.
+     * @throws ConfigException When an unsupported key is present.
+     * @return void
+     */
+    private static function assertKnownKeys(array $conditions, string $keyPath, bool $allowsNewFindings): void
+    {
+        $allowedKeys = $allowsNewFindings ? ['total', 'severityThresholds', 'newFindings'] : ['total', 'severityThresholds'];
         foreach (array_keys($conditions) as $key) {
             if (!in_array($key, $allowedKeys, true)) {
                 throw new ConfigException(sprintf('Unknown config key "%s.%s".', $keyPath, (string) $key));
             }
         }
+    }
 
-        $total = null;
-        if (array_key_exists('total', $conditions)) {
-            $totalValue = $conditions['total'];
-            if (!is_int($totalValue) || $totalValue < 0) {
-                throw new ConfigException(sprintf('Config key "%s.total" must be a non-negative integer.', $keyPath));
-            }
-            $total = $totalValue;
+    /**
+     * Parse the optional total-finding cap.
+     *
+     * @param array<array-key, mixed> $conditions Decoded conditions block.
+     * @param string                  $keyPath    Config key path used for error messages.
+     * @throws ConfigException When the total value is not a non-negative integer.
+     * @return int|null Total cap, or null when the block omits it.
+     */
+    private static function parseTotal(array $conditions, string $keyPath): ?int
+    {
+        if (!array_key_exists('total', $conditions)) {
+            return null;
+        }
+
+        $totalValue = $conditions['total'];
+        if (!is_int($totalValue) || $totalValue < 0) {
+            throw new ConfigException(sprintf('Config key "%s.total" must be a non-negative integer.', $keyPath));
+        }
+
+        return $totalValue;
+    }
+
+    /**
+     * Parse the optional per-severity caps keyed by severity value.
+     *
+     * @param array<array-key, mixed> $conditions Decoded conditions block.
+     * @param string                  $keyPath    Config key path used for error messages.
+     * @throws ConfigException When a severity name or its cap value is invalid.
+     * @return array<string, int> Caps keyed by severity value.
+     */
+    private static function parseSeverityThresholds(array $conditions, string $keyPath): array
+    {
+        if (!array_key_exists('severityThresholds', $conditions)) {
+            return [];
+        }
+
+        $thresholds = $conditions['severityThresholds'];
+        if (!is_array($thresholds)) {
+            throw new ConfigException(sprintf('Config key "%s.severityThresholds" must be an object.', $keyPath));
         }
 
         $severityCounts = [];
-        if (array_key_exists('severityThresholds', $conditions)) {
-            $thresholds = $conditions['severityThresholds'];
-            if (!is_array($thresholds)) {
-                throw new ConfigException(sprintf('Config key "%s.severityThresholds" must be an object.', $keyPath));
+        foreach ($thresholds as $severity => $cap) {
+            $severityKey = (string) $severity;
+            if (Severity::tryFrom($severityKey) === null) {
+                throw new ConfigException(sprintf('Unknown severity "%s" in %s.severityThresholds. Use advisory, warning, or error.', $severityKey, $keyPath));
             }
-
-            foreach ($thresholds as $severity => $cap) {
-                $severityKey = (string) $severity;
-                if (Severity::tryFrom($severityKey) === null) {
-                    throw new ConfigException(sprintf('Unknown severity "%s" in %s.severityThresholds. Use advisory, warning, or error.', $severityKey, $keyPath));
-                }
-                if (!is_int($cap) || $cap < 0) {
-                    throw new ConfigException(sprintf('Config key "%s.severityThresholds.%s" must be a non-negative integer.', $keyPath, $severityKey));
-                }
-                $severityCounts[$severityKey] = $cap;
+            if (!is_int($cap) || $cap < 0) {
+                throw new ConfigException(sprintf('Config key "%s.severityThresholds.%s" must be a non-negative integer.', $keyPath, $severityKey));
             }
+            $severityCounts[$severityKey] = $cap;
         }
 
-        $newFindingsGate = null;
-        if ($allowNewFindings && array_key_exists('newFindings', $conditions)) {
-            $newFindings = $conditions['newFindings'];
-            if (!is_array($newFindings)) {
-                throw new ConfigException(sprintf('Config key "%s.newFindings" must be an object.', $keyPath));
-            }
-            $newFindingsGate = self::parseConditions($newFindings, $keyPath . '.newFindings', false);
+        return $severityCounts;
+    }
+
+    /**
+     * Parse the optional nested newFindings sub-gate.
+     *
+     * @param array<array-key, mixed> $conditions        Decoded conditions block.
+     * @param string                  $keyPath           Config key path used for error messages.
+     * @param bool                    $allowsNewFindings Whether a nested newFindings sub-gate is permitted at this level.
+     * @throws ConfigException When the newFindings block is present but not an object.
+     * @return self|null Sub-gate, or null when no nested newFindings block applies.
+     */
+    private static function parseNewFindingsGate(array $conditions, string $keyPath, bool $allowsNewFindings): ?self
+    {
+        if (!$allowsNewFindings || !array_key_exists('newFindings', $conditions)) {
+            return null;
         }
 
-        return new self($total, $severityCounts, $newFindingsGate);
+        $newFindings = $conditions['newFindings'];
+        if (!is_array($newFindings)) {
+            throw new ConfigException(sprintf('Config key "%s.newFindings" must be an object.', $keyPath));
+        }
+
+        return self::parseConditions($newFindings, $keyPath . '.newFindings', false);
     }
 
     /**

@@ -212,7 +212,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
 
-        /** @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded */
+        /** @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded The check-ignore JSON output is always a list of path-decision rows. */
         return $decoded;
     }
 

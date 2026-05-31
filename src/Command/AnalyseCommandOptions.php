@@ -33,6 +33,7 @@ final readonly class AnalyseCommandOptions
      * @param bool                       $shouldIncludeIgnored Whether ignored files should be included.
      * @param string|null                $configPath           Explicit config path supplied by the CLI.
      * @param bool                       $noConfig             Whether config loading is disabled.
+     * @param bool                       $noCache              Whether the on-disk result cache is disabled for the run.
      * @param string                     $profile              Rule execution profile requested for the run.
      * @param MutationAnalysisOptions    $mutation             Parsed mutation-analysis options.
      * @param string|null                $diffMode             Requested diff mode, when diff analysis is enabled.
@@ -59,6 +60,7 @@ final readonly class AnalyseCommandOptions
         public bool $shouldIncludeIgnored,
         public ?string $configPath,
         public bool $noConfig,
+        public bool $noCache,
         public string $profile,
         public MutationAnalysisOptions $mutation,
         public ?string $diffMode,
@@ -132,6 +134,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored:          (bool) $input->getOption('include-ignored'),
             configPath:                    is_string($configPath) && $configPath !== '' ? $configPath : null,
             noConfig:                      (bool) $input->getOption('no-config'),
+            noCache:                       (bool) $input->getOption('no-cache'),
             profile:                       self::optionalStringOption($input, 'profile') ?? self::PROFILE_DEFAULT,
             mutation:                      new MutationAnalysisOptions(
                 infectionReportPath:           self::optionalStringOption($input, 'infection-report'),
@@ -184,6 +187,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored:          $this->shouldIncludeIgnored,
             configPath:                    $this->configPath,
             noConfig:                      $this->noConfig,
+            noCache:                       $this->noCache,
             profile:                       $this->profile,
             mutation:                      new MutationAnalysisOptions(
                 infectionReportPath:           $this->mutation->infectionReportPath,
@@ -237,6 +241,7 @@ final readonly class AnalyseCommandOptions
             shouldIncludeIgnored: $this->shouldIncludeIgnored,
             configPath:           $this->configPath,
             noConfig:             $this->noConfig,
+            noCache:              $this->noCache,
             profile:              $this->profile,
             mutation:             $this->mutation,
             diffMode:             $this->diffMode,
@@ -452,12 +457,10 @@ final readonly class AnalyseCommandOptions
     }
 
     /**
-     * Parse the `--diff` option; null when absent, "working-tree" when bare, or the explicit value.
+     * Parse the `--diff` option: null when absent, "working-tree" when bare, or the explicit value.
      *
-     * @return string|null
-     */
-    /**
      * @param list<string> $paths Parsed positional and --file paths.
+     * @return string|null Requested diff mode, or null when --diff was not supplied.
      */
     private static function diffMode(InputInterface $input, array $paths): ?string
     {

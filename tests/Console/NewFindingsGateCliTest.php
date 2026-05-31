@@ -116,12 +116,12 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Write the Calc fixture, optionally with a second undocumented method.
      *
-     * @param bool $withBeta Whether to include a second undocumented public method.
+     * @param bool $shouldIncludeBeta Whether to include a second undocumented public method.
      * @return void
      */
-    private function writeCalc(bool $withBeta): void
+    private function writeCalc(bool $shouldIncludeBeta): void
     {
-        $beta = $withBeta
+        $beta = $shouldIncludeBeta
             ? "\n    public function beta(int \$amount): int\n    {\n        return \$amount - 1;\n    }\n"
             : '';
 
