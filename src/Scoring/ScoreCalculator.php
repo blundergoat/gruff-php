@@ -85,13 +85,8 @@ final readonly class ScoreCalculator
      * flow through reports (the scorer never sees them after this filter), but
      * they do not affect the composite or pillar penalty buckets. See ADR-016.
      *
-     * Synthetic composite findings (e.g. `design.god-method` from
-     * {@see CompositeFindingFactory}) are not in the registry; they carry their
-     * component rule IDs in `metadata.componentRules`. A composite is excluded
-     * iff EVERY component rule is excluded — otherwise a single non-excluded
-     * component should still let the composite penalty land.
-     *
-     * @param list<Finding> $findings
+     * @param list<Finding>       $findings       Findings produced for the run, before the scoring filter.
+     * @param AnalysisConfig|null $analysisConfig Config whose per-rule excludeFromScore flags drop informational findings from scoring; null keeps every finding.
      * @return list<Finding>
      */
     private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
@@ -110,23 +105,7 @@ final readonly class ScoreCalculator
                     return !$settings->isExcludedFromScore();
                 }
 
-                // Synthetic finding: walk componentRules metadata when present.
-                $componentRules = $finding->metadata['componentRules'] ?? null;
-                if (!is_array($componentRules) || $componentRules === []) {
-                    return true;
-                }
-
-                foreach ($componentRules as $componentRuleId) {
-                    if (!is_string($componentRuleId)) {
-                        continue;
-                    }
-                    $componentSettings = $rules[$componentRuleId] ?? null;
-                    if ($componentSettings === null || !$componentSettings->isExcludedFromScore()) {
-                        return true;
-                    }
-                }
-
-                return false;
+                return true;
             },
         ));
     }
@@ -148,8 +127,9 @@ final readonly class ScoreCalculator
     /**
      * Calculate per-pillar scores from the active finding set.
      *
-     * @param list<Finding>     $findings
-     * @param list<Pillar>|null $scorePillars
+     * @param list<Finding>               $findings               Scored findings bucketed into per-pillar penalties.
+     * @param MutationAnalysisResult|null $mutationAnalysisResult Mutation report that adds the Mutation pillar graded from its MSI; null omits that pillar.
+     * @param list<Pillar>|null           $scorePillars           Explicit pillar set to score, or null to derive pillars from the findings.
      * @return list<PillarScore>
      */
     private function pillarScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
@@ -226,7 +206,9 @@ final readonly class ScoreCalculator
     /**
      * Calculate per-file scores from the active finding set.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding>               $findings               Scored findings bucketed by file path.
+     * @param MutationAnalysisResult|null $mutationAnalysisResult Mutation report whose per-file MSI summaries enrich each file score; null leaves mutationScore unset.
+     * @param int                         $limit                  Maximum number of worst-scoring file scores to return.
      * @return list<FileScore>
      */
     private function fileScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, int $limit): array

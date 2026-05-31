@@ -16,13 +16,12 @@ use GruffPhp\Mutation\InfectionReport;
 use GruffPhp\Mutation\MutationAnalysisResult;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Size\FileLengthRule;
-use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\Grade;
 use GruffPhp\Scoring\ScoreCalculator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers score calculation: simple A-F grade boundaries, mutation-pillar omission when Infection data is absent, composite god-method detection, file-metric inclusion, and pillar-scoped composites.
+ * Covers score calculation: simple A-F grade boundaries, mutation-pillar omission when Infection data is absent, file-metric inclusion, and pillar-scoped composites.
  */
 final class ScoreCalculatorTest extends TestCase
 {
@@ -69,11 +68,11 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify composite god method finding requires size and complexity on same symbol.
+     * Verify overlapping size and complexity findings remain native findings.
      *
      * @return void
      */
-    public function testCompositeGodMethodFindingRequiresSizeAndComplexityOnSameSymbol(): void
+    public function testOverlappingSizeAndComplexityFindingsRemainNativeFindings(): void
     {
         $findings = [
             $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/TooMuch.php', line: 12, endLine: 30, symbol: 'TooMuch::run()'),
@@ -81,17 +80,14 @@ final class ScoreCalculatorTest extends TestCase
             $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Other.php', line: 9, symbol: 'Other::run()'),
         ];
 
-        $composites = (new CompositeFindingFactory())->build($findings);
+        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
-        self::assertCount(1, $composites);
-        self::assertSame('design.god-method', $composites[0]->ruleId);
-        self::assertSame(Pillar::Design, $composites[0]->pillar);
-        self::assertSame(12, $composites[0]->line);
-        $expectedCompositeEndLine = 30;
-        self::assertSame($expectedCompositeEndLine, $composites[0]->endLine);
-        self::assertSame('TooMuch::run()', $composites[0]->symbol);
-        self::assertSame(['complexity.cognitive', 'size.method-length'], $composites[0]->metadata['componentRules']);
-        self::assertSame([Pillar::Complexity, Pillar::Size], $composites[0]->secondaryPillars);
+        self::assertSame(['size.method-length', 'complexity.cognitive', 'complexity.cyclomatic'], array_map(
+            static fn (Finding $finding): string => $finding->ruleId,
+            $findings,
+        ));
+        self::assertArrayNotHasKey('design', $this->pillarMap($score->pillars));
+        self::assertLessThan(100.0, $score->composite->score);
     }
 
     /**
@@ -234,46 +230,6 @@ final class ScoreCalculatorTest extends TestCase
     }
 
     /**
-     * Verify synthetic composite findings honour `excludeFromScore` on their component rules.
-     *
-     * A composite finding ({@see \GruffPhp\Scoring\CompositeFindingFactory}) is dropped
-     * from scoring only when EVERY component rule listed in its metadata is excluded.
-     * A single non-excluded component keeps the composite penalty in play.
-     *
-     * @return void
-     */
-    public function testCompositeFindingHonoursExcludeFromScoreOnComponentRules(): void
-    {
-        $registry  = RuleRegistry::defaults();
-        $composite = $this->finding(
-            'design.god-method',
-            Pillar::Design,
-            Severity::Warning,
-            metadata: ['componentRules' => ['complexity.cognitive', 'size.method-length']],
-        );
-
-        $bothExcluded = AnalysisConfig::fromRegistry($registry);
-        foreach (['complexity.cognitive', 'size.method-length'] as $ruleId) {
-            $settings     = $bothExcluded->ruleSettings($ruleId);
-            $bothExcluded = $bothExcluded->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
-                enabled:           $settings->enabled,
-                thresholds:        $settings->thresholds,
-                options:           $settings->options,
-                severityThreshold: $settings->severityThreshold,
-                excludeFromScore:  true,
-            ));
-        }
-
-        $oneExcluded = $this->configWithExcludedRule($registry, 'complexity.cognitive');
-
-        $scoredBothExcluded = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $bothExcluded);
-        $scoredOneExcluded  = (new ScoreCalculator())->calculate([$composite], null, DiffResult::inactive(), analysisConfig: $oneExcluded);
-
-        self::assertSame(100.0, $scoredBothExcluded->composite->score);
-        self::assertLessThan(100.0, $scoredOneExcluded->composite->score);
-    }
-
-    /**
      * Build an AnalysisConfig with one rule marked excludeFromScore.
      *
      * @param string $ruleId Rule identifier to mark excluded.
@@ -291,6 +247,22 @@ final class ScoreCalculatorTest extends TestCase
             severityThreshold: $settings->severityThreshold,
             excludeFromScore:  true,
         ));
+    }
+
+    /**
+     * Key pillar scores by pillar name.
+     *
+     * @param list<\GruffPhp\Scoring\PillarScore> $pillars
+     * @return array<string, \GruffPhp\Scoring\PillarScore>
+     */
+    private function pillarMap(array $pillars): array
+    {
+        $map = [];
+        foreach ($pillars as $pillar) {
+            $map[$pillar->pillar] = $pillar;
+        }
+
+        return $map;
     }
 
     /**

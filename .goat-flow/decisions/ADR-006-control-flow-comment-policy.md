@@ -1,8 +1,11 @@
 # ADR-006: Control-Flow Comment Policy
 
-**Status:** Implemented
+**Status:** Partially reversed (2026-05-31) — `docs.return-comment` restored; `docs.continue-comment` stays deleted. See "Update" below.
 **Date:** 2026-05-13
-**Ticket/Context:** M37 modernisation, naming, and control-flow comment policy
+
+## Update (2026-05-31): return-comment restored
+
+`docs.return-comment` is reinstated as the original blanket rule: a one-line comment directly above every `return`. The earlier deletion treated it as low-signal ceremony, but that mis-read the rule's purpose. gruff governs AI-generated code so a human who didn't write it can verify it; a comment stating *why* each exit returns is a verification surface a reviewer diffs against the code — the same principle that makes doc comments mandatory. The rule stays advisory, and like other debt-heavy rules its existing-code findings are meant to be frozen via the baseline so it gates new and changed returns rather than forcing a backfill of gruff's own tree. `docs.continue-comment` remains deleted; only the return variant is restored, so the rest of this ADR's reasoning still applies to the continue rule.
 
 ## Context
 

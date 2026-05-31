@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule\Docs;
 
+use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\Docs\MissingParamTagRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
+use GruffPhp\Rule\Docs\ReturnCommentRule;
 
 /**
  * Covers documentation rule enforcement: missing PHPDoc on public/accessor/private/magic/interface-contract methods, and missing param and return tags across array, descriptive, void, and scalar-throws cases.
@@ -321,9 +323,9 @@ final class DocsRulesTest extends DocsRuleTestCase
     {
         // Policy lock: per .goat-flow/lessons/workflow.md "Respect explicit rule style
         // even when it restates native syntax", every documented method without @return
-        // must fire - including methods declared void or never. The pre-M31 short-circuit
-        // that skipped void was an unintended narrowing; M32 Phase 2 locks the broader
-        // contract with explicit fixtures so a future agent cannot silently re-narrow it.
+        // must fire - including methods declared void or never. Skipping void was an
+        // unintended narrowing; explicit void/never fixtures lock the broader contract
+        // so a future agent cannot silently re-narrow it.
         $findings = $this->analyseRule('phpdoc-tags.php', MissingReturnTagRule::ID);
 
         $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
@@ -331,4 +333,20 @@ final class DocsRulesTest extends DocsRuleTestCase
         self::assertContains('PhpdocTagsFixture::neverWithDocblock()', $symbols);
     }
 
+    /**
+     * Verify a return statement without a direct one-line comment is flagged advisory.
+     *
+     * @return void
+     */
+    public function testReturnRequiresDirectOneLineComment(): void
+    {
+        $findings = $this->analyseRule('control-flow-comments.php', ReturnCommentRule::ID);
+        $lines    = array_map(static fn ($finding): ?int => $finding->line, $findings);
+
+        self::assertSame([35, 46], $lines);
+
+        foreach ($findings as $finding) {
+            self::assertSame(Severity::Advisory, $finding->severity, 'return-comment findings are advisory');
+        }
+    }
 }

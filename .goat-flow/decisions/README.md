@@ -59,6 +59,7 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-020-incremental-result-cache.md`
 - `ADR-021-config-presets-and-extends.md`
 - `ADR-022-test-quality-gate-parity.md`
+- `ADR-023-retire-design-god-rubric.md`
 
 ## Required Structure
 

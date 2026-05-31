@@ -17,7 +17,6 @@ use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
 use RuntimeException;
 
@@ -88,7 +87,6 @@ final readonly class BranchReviewBuilder
                     ? $this->baseProjectContextUnits($baseRoot, $options, $config)
                     : $baseSources->analysisUnits;
                 $baseFindings = $baseRegistry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
-                $baseFindings = array_merge($baseFindings, (new CompositeFindingFactory())->build($baseFindings));
                 $baseFindings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($baseFindings, $config);
             }
 

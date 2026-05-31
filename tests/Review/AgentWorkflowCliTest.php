@@ -182,6 +182,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -211,6 +212,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -256,6 +258,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -307,6 +310,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -357,6 +361,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -470,6 +475,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $process->run();
 
@@ -494,6 +500,7 @@ final class AgentWorkflowCliTest extends TestCase
                 '--no-baseline',
                 '--diff-vs=HEAD',
                 '--changed-only',
+                '--exclude-rule=docs.return-comment',
             ], $repo);
             $explicitPathProcess->run();
 

@@ -3,11 +3,11 @@
 **Status:** Accepted
 **Date:** 2026-05-30
 **Author(s):** Matthew Hansen
-**Updated:** amends ADR-010
+**Updated:** amends ADR-010; synthetic design-rubric consequence superseded by ADR-023
 
 ## Context
 
-ADR-010 anchored the complexity defaults to industry violation/smell lines. ADR-017 then fixed the project mission — gruff governs AI-generated code so a human can verify it — and named "de-emphasising npath" as a follow-up. `complexity.npath` measures the multiplicative count of independent execution paths, so it explodes on sequential-but-simple branching: its *unique* findings are false positives (genuinely hard-to-verify code is already caught by `complexity.cognitive` and `complexity.nesting-depth`; test-surface by `complexity.cyclomatic`), and its cheapest fix is cosmetic. `src/Scoring/CompositeFindingFactory.php` already excluded `halstead-volume` and `maintainability-index` from the `design.god-method` complexity trigger, treating cognitive/cyclomatic/nesting/npath as the "real" complexity signals; this decision completes that direction.
+ADR-010 anchored the complexity defaults to industry violation/smell lines. ADR-017 then fixed the project mission — gruff governs AI-generated code so a human can verify it — and named "de-emphasising npath" as a follow-up. `complexity.npath` measures the multiplicative count of independent execution paths, so it explodes on sequential-but-simple branching: its *unique* findings are false positives (genuinely hard-to-verify code is already caught by `complexity.cognitive` and `complexity.nesting-depth`; test-surface by `complexity.cyclomatic`), and its cheapest fix is cosmetic. The former synthetic design trigger already excluded `halstead-volume` and `maintainability-index`, treating cognitive/cyclomatic/nesting/npath as the "real" complexity signals; this decision completed that direction. ADR-023 later retired that synthetic design rubric entirely.
 
 ## Decision
 
@@ -22,7 +22,7 @@ Retire `complexity.npath` entirely (breaking; rule-id removal, precedent ADR-014
 | `complexity.nesting-depth` | error @ 6 | error @ **4** |
 | `complexity.cyclomatic` | error @ 20 | **warning** @ 20 |
 
-Registry: 119 → 118 rules; complexity pillar 5 → 4. The `halstead-volume` and `maintainability-index` *computations* are retained (MI still consumes Halstead); only their severity changes. `design.god-method`'s complexity trigger becomes `{cognitive, cyclomatic, nesting}`.
+Registry: 119 → 118 rules; complexity pillar 5 → 4. The `halstead-volume` and `maintainability-index` *computations* are retained (MI still consumes Halstead); only their severity changes. At the time of ADR-018, the synthetic design trigger's complexity set became `{cognitive, cyclomatic, nesting}`; ADR-023 later retired that synthetic design rubric entirely.
 
 End state: `cognitive` (error, 20) + `nesting` (error, 4) are the legibility hard-gates; `cyclomatic` (warning, 20) is a secondary signal that misranks legibility; `halstead-volume` + `maintainability-index` (advisory) are informational.
 

@@ -35,7 +35,6 @@ use GruffPhp\Reporting\TextReporter;
 use GruffPhp\Reporting\ThresholdTrip;
 use GruffPhp\Review\BranchReviewResult;
 use GruffPhp\Rule\RuleContext;
-use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
 use GruffPhp\Scoring\ScoreReport;
 use GruffPhp\Trend\TrendRecorder;
@@ -186,7 +185,6 @@ final class AnalyseCommand extends Command
             $findings = array_merge($findings, (new MutationFindingFactory())->findingsFor($mutationAnalysis));
         }
 
-        $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
         if ($options->diffVs !== null && $options->isChangedOnly && $reviewDiff instanceof DiffResult) {
             $findings = $findingSupport->filterFindingsToChangedFiles($findings, $reviewDiff->changedFiles);
         }

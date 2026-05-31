@@ -457,10 +457,10 @@ final class AnalyseCliBaselineTest extends CliTestCase
         try {
             $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
 
-            // Fully document the public surface so the only baselined finding is resolved with no new findings.
+            // Fully document the public surface and comment the return so every baselined finding resolves with nothing new.
             file_put_contents(
                 $project . '/src/OrderCalculator.php',
-                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Calculates order totals for baseline movement tests.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     *\n     * @param int \$subtotal  Order subtotal in minor units.\n     * @param int \$taxAmount Tax to add in minor units.\n     * @return int Combined order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Calculates order totals for baseline movement tests.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     *\n     * @param int \$subtotal  Order subtotal in minor units.\n     * @param int \$taxAmount Tax to add in minor units.\n     * @return int Combined order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        // Order total is the subtotal plus tax, both already in minor units.\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
             );
 
             $defaultRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none']);

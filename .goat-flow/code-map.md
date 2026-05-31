@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-24. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-05-31. Captures the v0.3.0 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -261,7 +261,6 @@ src/
 |       |-- UnusedImportRule.php              = `waste.unused-import`
 |       `-- UnusedParameterRule.php           = `waste.unused-parameter`
 |-- Scoring/
-|   |-- CompositeFindingFactory.php           = emits `design.god-method` from overlapping size + complexity findings
 |   |-- FileScore.php                         = per-file top-offender score value
 |   |-- Grade.php                             = A-F grade helper around 0-100 scores
 |   |-- PillarScore.php                       = per-pillar score/count/penalty value
@@ -336,7 +335,7 @@ tests/
 |   `-- Waste/
 |       `-- WasteRulesTest.php
 |-- Scoring/
-|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring, design composite findings
+|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring
 `-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
     |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
     |-- Complexity/                           = complexity-rule source fixtures
@@ -424,5 +423,5 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality, Design. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

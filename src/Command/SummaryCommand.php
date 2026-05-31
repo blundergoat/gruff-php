@@ -12,7 +12,6 @@ use GruffPhp\Diff\DiffResult;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
-use GruffPhp\Scoring\CompositeFindingFactory;
 use GruffPhp\Scoring\ScoreCalculator;
 use JsonException;
 use Symfony\Component\Console\Command\Command;
@@ -269,8 +268,7 @@ final class SummaryCommand extends Command
             new RuleContext($projectRoot, $config),
             shouldReleaseUnitsAfterAnalysis: true,
         );
-        $findings = array_merge($findings, (new CompositeFindingFactory())->build($findings));
-        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
 
         return new SummaryReportData(
             paths:             $paths,

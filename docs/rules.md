@@ -76,6 +76,7 @@ Total rules: 118
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
 | `docs.regex-comment` | Regex comment | `advisory` | `medium` | yes |
+| `docs.return-comment` | Return comment | `advisory` | `high` | yes |
 | `docs.stale-param-tag` | Stale @param tag | `warning` | `high` | yes |
 | `docs.todo-density` | TODO/FIXME density | `error` | `high` | yes |
 | `docs.var-annotation-description` | Var annotation description | `warning` | `high` | yes |
