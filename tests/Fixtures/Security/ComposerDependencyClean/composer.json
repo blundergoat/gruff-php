@@ -1,0 +1,23 @@
+{
+    "name": "acme/clean-app",
+    "description": "Fixture manifest with only safe Composer dependency posture.",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "acme/pinned-lib": "^1.2",
+        "acme/ranged-lib": ">=1.2,<2.0"
+    },
+    "require-dev": {
+        "acme/test-helpers": "~3.1"
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://repo.acme.example"
+        }
+    ],
+    "scripts": {
+        "lint": "phpstan analyse",
+        "test": "phpunit"
+    }
+}

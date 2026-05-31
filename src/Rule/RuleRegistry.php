@@ -52,6 +52,11 @@ use GruffPhp\Rule\Naming\ShortVariableRule;
 use GruffPhp\Rule\Naming\SuffixHungarianRule;
 use GruffPhp\Rule\Naming\TestNamingConsistencyRule;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
+use GruffPhp\Rule\Security\DebugModeEnabledRule;
+use GruffPhp\Rule\Security\DependencyComposerPathRule;
+use GruffPhp\Rule\Security\DependencyComposerScriptRule;
+use GruffPhp\Rule\Security\DependencyComposerUnpinnedRule;
+use GruffPhp\Rule\Security\DependencyComposerVcsRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
@@ -59,7 +64,9 @@ use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rule\Security\HeaderInjectionRule;
 use GruffPhp\Rule\Security\InsecureRandomRule;
 use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rule\Security\PermissiveCorsRule;
 use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rule\Security\ReflectedXssRule;
 use GruffPhp\Rule\Security\RequestControlledUrlRule;
 use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rule\Security\SilentCatchRule;
@@ -72,12 +79,14 @@ use GruffPhp\Rule\Security\WeakCryptoRule;
 use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\SensitiveData\GcpServiceAccountKeyRule;
 use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
 use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rule\SensitiveData\JwtTokenRule;
 use GruffPhp\Rule\SensitiveData\PhiPatternRule;
 use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Rule\Size\AverageMethodLengthRule;
 use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
@@ -182,6 +191,7 @@ final class RuleRegistry
      */
     public static function defaults(): self
     {
+        // The built-in catalogue is centralised here so config, docs, and tests share one source.
         return new self([
             new CognitiveComplexityRule(),
             new CyclomaticComplexityRule(),
@@ -222,13 +232,20 @@ final class RuleRegistry
             new ApiKeyPatternRule(),
             new AwsAccessKeyRule(),
             new DatabaseUrlPasswordRule(),
+            new GcpServiceAccountKeyRule(),
             new HardcodedEnvValueRule(),
             new HighEntropyStringRule(),
             new JwtTokenRule(),
             new PhiPatternRule(),
             new PiiTestFixtureRule(),
             new PrivateKeyRule(),
+            new UrlEmbeddedCredentialsRule(),
             new DangerousFunctionCallRule(),
+            new DebugModeEnabledRule(),
+            new DependencyComposerPathRule(),
+            new DependencyComposerScriptRule(),
+            new DependencyComposerUnpinnedRule(),
+            new DependencyComposerVcsRule(),
             new DisabledSslVerificationRule(),
             new ErrorSuppressionRule(),
             new ExtractCompactUserInputRule(),
@@ -236,7 +253,9 @@ final class RuleRegistry
             new HeaderInjectionRule(),
             new InsecureRandomRule(),
             new PathTraversalFileAccessRule(),
+            new PermissiveCorsRule(),
             new ProcessCommandConstructionRule(),
+            new ReflectedXssRule(),
             new RequestControlledUrlRule(),
             new SensitiveDataLoggingRule(),
             new SilentCatchRule(),
@@ -312,6 +331,7 @@ final class RuleRegistry
      */
     public function all(): array
     {
+        // Callers consume rules as a list while the registry stores them by id.
         return array_values($this->rules);
     }
 
@@ -323,6 +343,7 @@ final class RuleRegistry
      */
     public function has(string $ruleId): bool
     {
+        // The constructor guarantees registered ids are unique array keys.
         return isset($this->rules[$ruleId]);
     }
 
@@ -335,6 +356,7 @@ final class RuleRegistry
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
+        // Unknown ids are caller/config mistakes, so surface them immediately.
         return $this->rules[$ruleId]
             ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
@@ -347,11 +369,13 @@ final class RuleRegistry
      */
     public function enabledRules(AnalysisConfig $config): array
     {
+        // The returned list is already filtered to rules that can run for this config.
         return array_values(array_filter(
             $this->rules,
             static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
                 $definition = $rule->definition();
 
+                // Enabled rules must pass both per-rule toggles and selection filters.
                 return $config->ruleSettings($definition->id)->enabled
                     && $config->ruleSelection()->allows($definition);
             },
@@ -368,10 +392,12 @@ final class RuleRegistry
     {
         foreach ($this->enabledRules($config) as $rule) {
             if ($rule instanceof ProjectRuleInterface) {
+                // One project rule is enough to require whole-project context.
                 return true;
             }
         }
 
+        // Pure per-unit rule sets can be analysed without project-level context.
         return false;
     }
 
@@ -389,10 +415,12 @@ final class RuleRegistry
     {
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
+                // Legacy project rules need all units at once, so streaming is unavailable.
                 return false;
             }
         }
 
+        // Per-unit rules and accumulator project rules can run incrementally.
         return true;
     }
 
@@ -430,6 +458,7 @@ final class RuleRegistry
     ): array {
         $findings = $this->runPerUnitRules($analysisUnit, $ruleContext, $ruleRunnerObserver);
         $this->accumulateForUnit($analysisUnit, $ruleContext, $ruleRunnerObserver);
+        // Streaming callers receive only immediate file-scoped findings for this unit.
         return $findings;
     }
 
@@ -447,6 +476,7 @@ final class RuleRegistry
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         if ($analysisUnit->hasParseErrors()) {
+            // Parse diagnostics are already recorded; rules should not inspect invalid AST.
             return [];
         }
 
@@ -473,6 +503,7 @@ final class RuleRegistry
             array_push($findings, ...$ruleFindings);
         }
 
+        // Per-unit findings are not final-sorted until the caller finalizes the full run.
         return $findings;
     }
 
@@ -490,6 +521,7 @@ final class RuleRegistry
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
         if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
+            // Project accumulators consume only parse-clean PHP units.
             return;
         }
 
@@ -540,6 +572,7 @@ final class RuleRegistry
             array_push($findings, ...$projectFindings);
         }
 
+        // Project accumulator findings are collected after all units have been seen.
         return $findings;
     }
 
@@ -571,6 +604,7 @@ final class RuleRegistry
             ],
         );
 
+        // Final ordering is part of the stable report contract.
         return $findings;
     }
 
@@ -626,10 +660,14 @@ final class RuleRegistry
             ));
         }
 
+        // The finalized list includes per-unit, accumulator, and legacy project-rule findings.
         return $this->finalizeFindings($findings);
     }
 
     /**
+     * Find enabled project rules that still need the full unit list.
+     *
+     * @param RuleContext $ruleContext Rule execution context.
      * @return list<ProjectRuleInterface> Enabled non-accumulator project rules.
      */
     private function legacyProjectRules(RuleContext $ruleContext): array
@@ -640,15 +678,18 @@ final class RuleRegistry
                 $rules[] = $rule;
             }
         }
+        // Legacy rules run after the per-unit phase with the complete context.
         return $rules;
     }
 
     /**
      * Run project-level rules that need the full analysis context.
      *
-     * @param list<ProjectRuleInterface> $rules
-     * @param list<AnalysisUnit>         $contextUnits
-     * @return list<Finding>
+     * @param list<ProjectRuleInterface> $rules              Project rules to run.
+     * @param list<AnalysisUnit>         $contextUnits       Candidate units available to project rules.
+     * @param RuleContext                $ruleContext        Rule execution context.
+     * @param RuleRunnerObserver|null    $ruleRunnerObserver Optional per-rule timing hook.
+     * @return list<Finding> Project-rule findings.
      */
     private function runLegacyProjectRules(
         array $rules,
@@ -662,6 +703,7 @@ final class RuleRegistry
         ));
 
         if ($analyseableUnits === []) {
+            // Project rules reason only over parse-clean PHP units.
             return [];
         }
 
@@ -679,14 +721,15 @@ final class RuleRegistry
             array_push($findings, ...$projectFindings);
         }
 
+        // Legacy project findings join the per-unit findings before final sorting.
         return $findings;
     }
 
     /**
      * Build deduplicate findings for the component.
      *
-     * @param list<Finding> $findings
-     * @return list<Finding>
+     * @param list<Finding> $findings Findings to collapse by full reporting identity.
+     * @return list<Finding> Findings with exact duplicates removed.
      */
     private function deduplicateFindings(array $findings): array
     {
@@ -713,6 +756,7 @@ final class RuleRegistry
             $uniqueFindings[] = $finding;
         }
 
+        // First occurrence wins so deterministic rule order remains stable.
         return $uniqueFindings;
     }
 
@@ -720,8 +764,8 @@ final class RuleRegistry
      * Keep only the highest-priority naming finding when multiple naming rules
      * report the same identifier at the same source location.
      *
-     * @param list<Finding> $findings
-     * @return list<Finding>
+     * @param list<Finding> $findings Findings that may contain overlapping naming reports.
+     * @return list<Finding> Findings with lower-priority naming overlaps removed.
      */
     private function deduplicateNamingFindings(array $findings): array
     {
@@ -747,25 +791,30 @@ final class RuleRegistry
 
         ksort($selectedIndexes, SORT_NUMERIC);
 
+        // Preserve original relative order for the selected findings.
         return array_values(array_intersect_key($findings, $selectedIndexes));
     }
 
     /**
      * Build the cross-rule identifier key used to collapse duplicate naming findings.
      *
+     * @param Finding $finding Finding to classify for naming-rule overlap.
      * @return string|null Deduplication key for naming findings.
      */
     private function namingOverlapKey(Finding $finding): ?string
     {
         if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
+            // Non-naming findings never participate in naming-overlap suppression.
             return null;
         }
 
         $identifierName = $this->findingIdentifierName($finding);
         if ($identifierName === null) {
+            // A naming finding without an identifier cannot be safely collapsed.
             return null;
         }
 
+        // File, location, symbol, and identifier define the overlap bucket.
         return implode("\0", [
             $finding->filePath,
             (string) ($finding->line ?? ''),
@@ -778,6 +827,7 @@ final class RuleRegistry
     /**
      * Extract the identifier name from finding metadata.
      *
+     * @param Finding $finding Finding whose metadata may carry an identifier.
      * @return string|null Identifier name if this finding carries one.
      */
     private function findingIdentifierName(Finding $finding): ?string
@@ -785,10 +835,12 @@ final class RuleRegistry
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
             $metadataValue = $finding->metadata[$metadataKey] ?? null;
             if (is_string($metadataValue)) {
+                // Explicit metadata is more precise than the optional finding symbol.
                 return $metadataValue;
             }
         }
 
+        // Symbol is the fallback for naming rules that report at declaration level.
         return $finding->symbol;
     }
 }

@@ -38,6 +38,11 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Security\DangerousFunctionCallRule;
+use GruffPhp\Rule\Security\DebugModeEnabledRule;
+use GruffPhp\Rule\Security\DependencyComposerPathRule;
+use GruffPhp\Rule\Security\DependencyComposerScriptRule;
+use GruffPhp\Rule\Security\DependencyComposerUnpinnedRule;
+use GruffPhp\Rule\Security\DependencyComposerVcsRule;
 use GruffPhp\Rule\Security\DisabledSslVerificationRule;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Rule\Security\ExtractCompactUserInputRule;
@@ -45,7 +50,9 @@ use GruffPhp\Rule\Security\GithubActionsRiskyWorkflowRule;
 use GruffPhp\Rule\Security\HeaderInjectionRule;
 use GruffPhp\Rule\Security\InsecureRandomRule;
 use GruffPhp\Rule\Security\PathTraversalFileAccessRule;
+use GruffPhp\Rule\Security\PermissiveCorsRule;
 use GruffPhp\Rule\Security\ProcessCommandConstructionRule;
+use GruffPhp\Rule\Security\ReflectedXssRule;
 use GruffPhp\Rule\Security\RequestControlledUrlRule;
 use GruffPhp\Rule\Security\SensitiveDataLoggingRule;
 use GruffPhp\Rule\Security\SilentCatchRule;
@@ -58,12 +65,14 @@ use GruffPhp\Rule\Security\WeakCryptoRule;
 use GruffPhp\Rule\SensitiveData\ApiKeyPatternRule;
 use GruffPhp\Rule\SensitiveData\AwsAccessKeyRule;
 use GruffPhp\Rule\SensitiveData\DatabaseUrlPasswordRule;
+use GruffPhp\Rule\SensitiveData\GcpServiceAccountKeyRule;
 use GruffPhp\Rule\SensitiveData\HardcodedEnvValueRule;
 use GruffPhp\Rule\SensitiveData\HighEntropyStringRule;
 use GruffPhp\Rule\SensitiveData\JwtTokenRule;
 use GruffPhp\Rule\SensitiveData\PhiPatternRule;
 use GruffPhp\Rule\SensitiveData\PiiTestFixtureRule;
 use GruffPhp\Rule\SensitiveData\PrivateKeyRule;
+use GruffPhp\Rule\SensitiveData\UrlEmbeddedCredentialsRule;
 use GruffPhp\Rule\Size\AverageMethodLengthRule;
 use GruffPhp\Rule\Size\ClassLengthRule;
 use GruffPhp\Rule\Size\FileLengthRule;
@@ -129,14 +138,21 @@ final class RuleRegistryTest extends TestCase
             NamedArgumentOpportunityRule::ID, PublicPropertyRule::ID,
             ReadonlyPropertyCandidateRule::ID, ApiKeyPatternRule::ID,
             AwsAccessKeyRule::ID, DatabaseUrlPasswordRule::ID,
+            GcpServiceAccountKeyRule::ID,
             HardcodedEnvValueRule::ID, HighEntropyStringRule::ID,
             JwtTokenRule::ID, PhiPatternRule::ID,
             PiiTestFixtureRule::ID, PrivateKeyRule::ID,
-            DangerousFunctionCallRule::ID, DisabledSslVerificationRule::ID,
+            UrlEmbeddedCredentialsRule::ID,
+            DangerousFunctionCallRule::ID, DebugModeEnabledRule::ID,
+            DependencyComposerPathRule::ID, DependencyComposerScriptRule::ID,
+            DependencyComposerUnpinnedRule::ID, DependencyComposerVcsRule::ID,
+            DisabledSslVerificationRule::ID,
             ErrorSuppressionRule::ID, ExtractCompactUserInputRule::ID,
             GithubActionsRiskyWorkflowRule::ID, HeaderInjectionRule::ID,
             InsecureRandomRule::ID, PathTraversalFileAccessRule::ID,
-            ProcessCommandConstructionRule::ID, RequestControlledUrlRule::ID,
+            PermissiveCorsRule::ID,
+            ProcessCommandConstructionRule::ID, ReflectedXssRule::ID,
+            RequestControlledUrlRule::ID,
             SensitiveDataLoggingRule::ID, SilentCatchRule::ID, SqlConcatenationRule::ID,
             UnsafeArchiveExtractionRule::ID, UnsafeXmlLoadingRule::ID,
             UnsafeUnserializeRule::ID, VariableIncludeRule::ID,
@@ -279,6 +295,7 @@ final class RuleRegistryTest extends TestCase
 
             $single = $definition->severityThreshold;
 
+            // The hash asserts the listable definition surface, not object identity.
             return [
                 'id' => $definition->id,
                 'name' => $definition->name,
@@ -300,9 +317,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(119, $definitions);
+        self::assertCount(128, $definitions);
         self::assertSame(
-            'd6d4e1c423104dee7c87' . '78fb385e00ce620cb80adadeee8e7412689930a6eab4',
+            'bc136cbaba6f3cfe6972' . '2b974e8246501f8a1e2f4f602bd0964cb31fd748ef37',
             hash('sha256', $json),
         );
     }
@@ -317,6 +334,7 @@ final class RuleRegistryTest extends TestCase
     {
         $absolutePath = __DIR__ . '/../..' . '/' . $displayPath;
 
+        // Tests need the same parser path production analysis uses.
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $displayPath));
     }
 
@@ -328,6 +346,7 @@ final class RuleRegistryTest extends TestCase
      */
     private function fakeRule(string $id): RuleInterface
     {
+        // Anonymous rule classes keep fixture behaviour local to this test.
         return new readonly class ($id) implements RuleInterface {
             /**
              * Build the anonymous fixture rule.
@@ -345,6 +364,7 @@ final class RuleRegistryTest extends TestCase
              */
             public function definition(): RuleDefinition
             {
+                // Fixture rules expose stable metadata so registry assertions are deterministic.
                 return new RuleDefinition(
                     id:              $this->id,
                     name:            'Fake rule',
@@ -364,6 +384,7 @@ final class RuleRegistryTest extends TestCase
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
+                // One synthetic finding is enough to exercise registry routing.
                 return [
                     new Finding(
                         ruleId:     $this->id,
@@ -387,6 +408,7 @@ final class RuleRegistryTest extends TestCase
      */
     private function duplicateProjectRule(): RuleInterface
     {
+        // This anonymous rule intentionally reuses the project-level fixture id.
         return new readonly class () implements RuleInterface {
             /**
              * Return metadata for the fixture rule.
@@ -395,6 +417,7 @@ final class RuleRegistryTest extends TestCase
              */
             public function definition(): RuleDefinition
             {
+                // The duplicate id intentionally collides with project-rule tests.
                 return new RuleDefinition(
                     id:              'test.project-level',
                     name:            'Project-level fixture',
@@ -414,6 +437,7 @@ final class RuleRegistryTest extends TestCase
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
+                // The README finding mimics a project-level documentation rule.
                 return [
                     new Finding(
                         ruleId:     'test.project-level',

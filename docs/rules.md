@@ -12,7 +12,7 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 118
+Total rules: 125
 
 ## Summary By Pillar
 
@@ -25,7 +25,7 @@ Total rules: 118
 | `maintainability` | 2 |
 | `modernisation` | 10 |
 | `naming` | 11 |
-| `security` | 18 |
+| `security` | 25 |
 | `sensitive-data` | 9 |
 | `size` | 7 |
 | `test-quality` | 33 |
@@ -142,11 +142,16 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
-### `security` (18)
+### `security` (25)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `security.dangerous-function-call` | Dangerous function calls | `warning` | `medium` | yes |
+| `security.debug-mode-enabled` | Debug error display enabled | `warning` | `medium` | yes |
+| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | yes |
+| `security.dependency-composer-script` | Composer install-time shell script | `warning` | `medium` | yes |
+| `security.dependency-composer-unpinned` | Unpinned Composer dependency constraint | `warning` | `medium` | yes |
+| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | yes |
 | `security.disabled-ssl-verification` | Disabled SSL verification | `warning` | `high` | yes |
 | `security.error-suppression` | Error suppression operator | `warning` | `high` | yes |
 | `security.extract-compact-user-input` | extract or compact on request data | `warning` | `medium` | yes |
@@ -154,7 +159,9 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `security.header-injection` | Header injection risk | `warning` | `medium` | yes |
 | `security.insecure-random` | Insecure random source | `warning` | `high` | yes |
 | `security.path-traversal-file-access` | Path traversal file access | `warning` | `medium` | yes |
+| `security.permissive-cors` | Permissive CORS with credentials | `warning` | `medium` | yes |
 | `security.process-command-construction` | Process command construction | `warning` | `medium` | yes |
+| `security.reflected-xss` | Reflected XSS sink | `warning` | `medium` | yes |
 | `security.request-controlled-url` | Request-controlled URL | `warning` | `medium` | yes |
 | `security.sensitive-data-logging` | Sensitive data logging | `warning` | `medium` | yes |
 | `security.silent-catch` | Silent catch block | `warning` | `high` | yes |
@@ -172,6 +179,7 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `sensitive-data.api-key-pattern` | Common API key pattern | `warning` | `high` | yes |
 | `sensitive-data.aws-access-key` | AWS access key | `warning` | `high` | yes |
 | `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | yes |
+| `sensitive-data.gcp-service-account-key` | GCP service-account key | `warning` | `high` | yes |
 | `sensitive-data.hardcoded-env-value` | Hardcoded environment value | `warning` | `medium` | yes |
 | `sensitive-data.high-entropy-string` | High entropy string | `warning` | `medium` | yes |
 | `sensitive-data.jwt-token` | JWT token literal | `warning` | `medium` | yes |
