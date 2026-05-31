@@ -73,6 +73,7 @@ final readonly class SourceDiscovery
         if (!$shouldIncludeIgnored) {
             $gitResult = $this->discoverGitVisible($requestedPaths, $configuredIgnorePatterns);
             if ($gitResult instanceof SourceDiscoveryResult) {
+                // Git's tracked/unignored view is authoritative when available, so skip the filesystem walk.
                 return $gitResult;
             }
         }
@@ -96,6 +97,7 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
+        // Sorted files plus the missing and ignored records the caller reports back to the user.
         return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -121,6 +123,7 @@ final readonly class SourceDiscovery
         $absolutePath = $this->absolutePath($path);
 
         if (!file_exists($absolutePath)) {
+            // A non-existent input is reported as missing rather than silently skipped.
             $missingPaths[] = $path;
             return;
         }
@@ -128,6 +131,7 @@ final readonly class SourceDiscovery
         $displayPath = $this->displayPath($absolutePath);
         $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
         if ($decision->ignored) {
+            // An ignored input contributes an ignore record but never a discovered file.
             $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
             return;
         }
@@ -142,6 +146,7 @@ final readonly class SourceDiscovery
                 );
             }
 
+            // A single requested file needs no directory walk; stop once it is classified.
             return;
         }
 
@@ -160,8 +165,10 @@ final readonly class SourceDiscovery
     /**
      * Yield source files below a directory while applying ignore patterns.
      *
-     * @param list<IgnoredPath> $ignoredDetails
-     * @param list<string>      $configuredIgnorePatterns
+     * @param string            $directory                Existing directory whose tree is recursively scanned.
+     * @param bool              $shouldIncludeIgnored     When true, default/generated ignores are bypassed so those files surface too.
+     * @param list<string>      $configuredIgnorePatterns Additional ignore patterns from config.
+     * @param list<IgnoredPath> $ignoredDetails           Ignore records discovered while walking; appended in place.
      * @return iterable<SplFileInfo>
      */
     private function walkDirectory(
@@ -180,6 +187,7 @@ final readonly class SourceDiscovery
                 $decision    = $this->ignoreResolver->decide($displayPath, $path, $configuredIgnorePatterns, $shouldIncludeIgnored);
 
                 if (!$decision->ignored) {
+                    // Keeping the node lets the iterator descend into it and yield its files.
                     return true;
                 }
 
@@ -189,6 +197,7 @@ final readonly class SourceDiscovery
                     $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
                 }
 
+                // Pruning the node here also prunes its whole subtree from the walk.
                 return false;
             },
         );
@@ -209,36 +218,43 @@ final readonly class SourceDiscovery
     /**
      * Resolve a user-supplied path against the project root, returning an absolute filesystem path.
      *
+     * @param string $path Relative or absolute path as typed by the user.
      * @return string
      */
     private function absolutePath(string $path): string
     {
+        // Relative inputs are anchored to the project root; absolute inputs pass through unchanged.
         return PathHelper::resolveAgainst($this->projectRoot, $path);
     }
 
     /**
      * Canonicalise a path via realpath(), falling back to the original string when the file does not exist.
      *
+     * @param string $path Absolute path to canonicalise; need not exist on disk.
      * @return string
      */
     private function canonicalPath(string $path): string
     {
+        // Symlink-resolved path when the file exists, otherwise the input verbatim so callers still get a key.
         return PathHelper::canonical($path);
     }
 
     /**
      * Format a path for user-facing output relative to the project root; the root itself renders as ".".
      *
+     * @param string $path Absolute path to render for display.
      * @return string
      */
     private function displayPath(string $path): string
     {
+        // Project-relative form for paths inside the root; paths outside it fall back to the canonical absolute path.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 
     /**
      * Classify the file as PHP, text-config, or unsupported (null) based on extension and env-like naming.
      *
+     * @param string $path Path whose extension and basename decide the source type.
      * @return string|null One of SourceFile::TYPE_PHP / TYPE_TEXT, or null when unsupported.
      */
     private function sourceType(string $path): ?string
@@ -246,6 +262,7 @@ final readonly class SourceDiscovery
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         if ($extension === self::PHP_EXTENSION) {
+            // A .php extension routes the file to the AST-based analysis path.
             return SourceFile::TYPE_PHP;
         }
 
@@ -254,21 +271,25 @@ final readonly class SourceDiscovery
             || in_array(basename($path), self::TEXT_FILENAMES, true)
             || $this->isEnvLikeFile($path)
         ) {
+            // Recognised config/dotfile extensions route to the text-based secret/content scanners.
             return SourceFile::TYPE_TEXT;
         }
 
+        // Unrecognised files are excluded from discovery rather than scanned blindly.
         return null;
     }
 
     /**
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
+     * @param string $path Path whose basename is tested against env-file naming.
      * @return bool
      */
     private function isEnvLikeFile(string $path): bool
     {
         $basename = basename($path);
 
+        // True for `.env` and variants like `.env.local`, which carry the secrets the text scanners target.
         return $basename === '.env' || str_starts_with($basename, '.env.');
     }
 
@@ -282,20 +303,24 @@ final readonly class SourceDiscovery
     private function discoverGitVisible(array $requestedPaths, array $configuredIgnorePatterns): ?SourceDiscoveryResult
     {
         if (!$this->isGitWorkTree()) {
+            // Outside a Git worktree there is no tracked view, so the caller falls back to the filesystem walk.
             return null;
         }
 
         $request = $this->buildGitDiscoveryRequest($requestedPaths, $configuredIgnorePatterns);
         if ($request === null) {
+            // A path that cannot be expressed as a pathspec (outside the root) forces the filesystem fallback.
             return null;
         }
 
         if ($request['pathspecs'] === []) {
+            // Every requested path was missing or ignored, so report that without invoking Git.
             return $this->emptyGitDiscoveryResult($request['missingPaths'], $request['ignoredDetails']);
         }
 
         $visiblePaths = $this->gitVisiblePathspecs($request['pathspecs']);
         if ($visiblePaths === null) {
+            // A failed `git ls-files` invocation is non-fatal here; the caller retries via the filesystem walk.
             return null;
         }
 
@@ -312,6 +337,7 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
+        // The Git-derived equivalent of discover()'s result: sorted files plus missing and ignored records.
         return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -347,6 +373,7 @@ final readonly class SourceDiscovery
 
             $pathspec = $this->gitPathspec($absolutePath);
             if ($pathspec === null) {
+                // A request reaching outside the project root cannot use Git discovery at all; abandon it wholesale.
                 return null;
             }
 
@@ -358,6 +385,7 @@ final readonly class SourceDiscovery
             ];
         }
 
+        // Pre-resolved inputs for the Git query: pathspecs to list, plus the missing/ignored records found so far.
         return [
             'missingPaths' => $missingPaths,
             'ignoredDetails' => $ignoredDetails,
@@ -376,6 +404,7 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
+        // No files matched, but missing and ignored inputs are still reported so the user sees why nothing ran.
         return new SourceDiscoveryResult([], $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -406,6 +435,7 @@ final readonly class SourceDiscovery
             }
         }
 
+        // Records explaining each explicitly-requested path that Git or generated-file protection withheld.
         return $ignoredDetails;
     }
 
@@ -425,6 +455,7 @@ final readonly class SourceDiscovery
             $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredDetails);
         }
 
+        // The Git-visible set split into accepted source files and the entries config/default/generated ignores held back.
         return [
             'files' => $files,
             'ignoredDetails' => $ignoredDetails,
@@ -434,9 +465,10 @@ final readonly class SourceDiscovery
     /**
      * Append git visible source file details to report output.
      *
-     * @param list<string>              $configuredIgnorePatterns
-     * @param array<string, SourceFile> $files
-     * @param list<IgnoredPath>         $ignoredDetails
+     * @param string                    $displayPath              Root-relative path emitted by `git ls-files` to classify.
+     * @param list<string>              $configuredIgnorePatterns Additional ignore patterns from config.
+     * @param array<string, SourceFile> $files                    Accepted files keyed by canonical path; appended in place.
+     * @param list<IgnoredPath>         $ignoredDetails           Ignore records for paths held back; appended in place.
      * @return void
      */
     private function appendGitVisibleSourceFile(
@@ -448,6 +480,7 @@ final readonly class SourceDiscovery
         $absolutePath = $this->projectRoot . '/' . $displayPath;
 
         if (!is_file($absolutePath)) {
+            // Git can list a path that is no longer a regular file (deleted or a directory); skip it.
             return;
         }
 
@@ -460,23 +493,27 @@ final readonly class SourceDiscovery
                 PathIgnoreResolver::SOURCE_CONFIG,
                 $configuredPattern,
             );
+            // Config ignores override Git visibility: record the ignore and never add the file.
             return;
         }
 
         $defaultDirectory = $this->ignoreResolver->matchedDefaultDirectory($relativeDisplayPath);
         if ($defaultDirectory !== null) {
             $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_DEFAULT, $defaultDirectory);
+            // Built-in default-directory ignores (vendor, node_modules, ...) likewise win over Git visibility.
             return;
         }
 
         $generatedFilename = $this->ignoreResolver->matchedGeneratedFilename($absolutePath);
         if ($generatedFilename !== null) {
             $ignoredDetails[] = new IgnoredPath($relativeDisplayPath, PathIgnoreResolver::SOURCE_GENERATED, $generatedFilename);
+            // Tracked generated files (lockfiles, etc.) are recorded as ignored rather than analysed.
             return;
         }
 
         $type = $this->sourceType($absolutePath);
         if ($type === null) {
+            // An unsupported extension is neither a source file nor an ignore worth reporting; drop it silently.
             return;
         }
 
@@ -492,6 +529,7 @@ final readonly class SourceDiscovery
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $this->projectRoot);
         $process->run();
 
+        // True only when Git both ran successfully and confirmed the root is inside a worktree.
         return $process->isSuccessful() && trim($process->getOutput()) === 'true';
     }
 
@@ -509,6 +547,7 @@ final readonly class SourceDiscovery
         $process->run();
 
         if (!$process->isSuccessful()) {
+            // Signal failure with null so the caller can fall back to the filesystem walk rather than report zero files.
             return null;
         }
 
@@ -519,12 +558,14 @@ final readonly class SourceDiscovery
         $paths = array_values(array_unique($paths));
         sort($paths, SORT_STRING);
 
+        // Deduplicated, sorted root-relative paths Git considers tracked or unignored-untracked.
         return $paths;
     }
 
     /**
      * Convert an existing project path into a Git pathspec relative to the project root.
      *
+     * @param string $absolutePath Existing absolute path to express relative to the project root.
      * @return string|null Git pathspec, or null when the path sits outside the project root.
      */
     private function gitPathspec(string $absolutePath): ?string
@@ -533,18 +574,23 @@ final readonly class SourceDiscovery
         $canonicalPath = $this->canonicalPath($absolutePath);
 
         if ($canonicalPath === $root) {
+            // The root maps to "." so Git scans the whole worktree.
             return '.';
         }
 
         if (str_starts_with($canonicalPath, $root . '/')) {
+            // Strip the root prefix to yield a path Git interprets relative to the worktree.
             return substr($canonicalPath, strlen($root) + 1);
         }
 
+        // Paths outside the worktree have no pathspec, signalling the caller to drop Git discovery.
         return null;
     }
 
     /**
-     * @param list<string> $visiblePaths
+     * @param string       $pathspec     Requested pathspec to look for among the visible paths.
+     * @param list<string> $visiblePaths Root-relative paths Git reported as visible.
+     * @param bool         $isFile       True when the request was a file, so only an exact match counts; directories also match by prefix.
      * @return bool True when a requested pathspec produced at least one visible file.
      */
     private function hasVisibleFileForPathspec(string $pathspec, array $visiblePaths, bool $isFile): bool
@@ -552,26 +598,31 @@ final readonly class SourceDiscovery
         $normalizedPathspec = trim($pathspec, '/');
 
         if ($normalizedPathspec === '' || $normalizedPathspec === '.') {
+            // A whole-root request is satisfied by any visible path at all.
             return $visiblePaths !== [];
         }
 
         foreach ($visiblePaths as $visiblePath) {
             if ($isFile && $visiblePath === $normalizedPathspec) {
+                // A file request matches only its own exact path.
                 return true;
             }
 
             if (!$isFile && ($visiblePath === $normalizedPathspec || str_starts_with($visiblePath, $normalizedPathspec . '/'))) {
+                // A directory request matches the directory itself or anything beneath it.
                 return true;
             }
         }
 
+        // No visible path matched, so the requested input was withheld by Git or ignore rules.
         return false;
     }
 
     /**
      * Return a compact ignored path for configured glob patterns.
      *
-     * @param list<string> $patterns
+     * @param string       $path     Absolute path of the ignored file to present compactly.
+     * @param list<string> $patterns Configured ignore globs whose `/**` directory form collapses the report.
      * @return string Ignored display path.
      */
     private function configuredIgnoredDisplayPath(string $path, array $patterns): string
@@ -586,10 +637,12 @@ final readonly class SourceDiscovery
 
             $base = substr($normalizedPattern, 0, -3);
             if ($displayPath === $base || str_starts_with($displayPath, $base . '/')) {
+                // Report the directory base once instead of every file under a `dir/**` ignore.
                 return $base;
             }
         }
 
+        // No directory glob covered this file, so report its own display path.
         return $displayPath;
     }
 
@@ -609,6 +662,7 @@ final readonly class SourceDiscovery
         $deduped = array_values($byPath);
         usort($deduped, static fn (IgnoredPath $left, IgnoredPath $right): int => strcmp($left->path, $right->path));
 
+        // One record per path in stable path order, so repeated runs and snapshots stay deterministic.
         return $deduped;
     }
 
@@ -620,6 +674,7 @@ final readonly class SourceDiscovery
      */
     private function pathsFromDetails(array $ignoredDetails): array
     {
+        // Just the path strings, for the legacy plain-list field alongside the richer detail records.
         return array_map(static fn (IgnoredPath $ignoredPath): string => $ignoredPath->path, $ignoredDetails);
     }
 }

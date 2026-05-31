@@ -25,6 +25,7 @@ final class SecurityNodeHelper
      */
     public static function userInputSuperglobals(): array
     {
+        // The canonical set every taint check treats as attacker-controlled; keep $_ENV/$_SESSION out by design.
         return ['_GET', '_POST', '_REQUEST', '_COOKIE', '_SERVER', '_FILES'];
     }
 
@@ -37,14 +38,17 @@ final class SecurityNodeHelper
     public static function globalFunctionName(FuncCall $call): ?string
     {
         if (!$call->name instanceof Name) {
+            // A dynamic callee (variable/expression) has no static name to match against the rule's allowlist.
             return null;
         }
 
         $parts = $call->name->getParts();
         if (count($parts) !== 1) {
+            // Namespaced calls are not the global builtins these rules guard, so they never match.
             return null;
         }
 
+        // Lower-case because PHP function names are case-insensitive; callers compare against lower-case literals.
         return strtolower($parts[0]);
     }
 
@@ -57,9 +61,11 @@ final class SecurityNodeHelper
     {
         $arg = $args[$index] ?? null;
         if (!$arg instanceof Node\Arg) {
+            // Missing slot or a variadic spread placeholder: no concrete argument expression to hand back.
             return null;
         }
 
+        // Unwrap to the bare value expression so callers inspect the argument, not its Arg wrapper.
         return $arg->value;
     }
 
@@ -72,14 +78,17 @@ final class SecurityNodeHelper
     public static function constantName(Node $node): ?string
     {
         if (!$node instanceof Expr\ConstFetch) {
+            // Only a bare constant fetch carries a name; anything else has no constant to normalise.
             return null;
         }
 
         $parts = $node->name->getParts();
         if (count($parts) !== 1) {
+            // Namespaced constants are out of scope for these flag checks, so report no name.
             return null;
         }
 
+        // Upper-case because PHP constant names are case-sensitive but callers compare against UPPER literals.
         return strtoupper($parts[0]);
     }
 
@@ -92,13 +101,16 @@ final class SecurityNodeHelper
     public static function isFalseLike(Node $node): bool
     {
         if ($node instanceof Expr\ConstFetch) {
+            // The literal `false` keyword (case-insensitive) is the disabled-flag value rules look for.
             return strtolower($node->name->toString()) === 'false';
         }
 
         if ($node instanceof Scalar\Int_) {
+            // Integer 0 is the other common "off" literal, e.g. CURLOPT_SSL_VERIFYPEER set to 0.
             return $node->value === 0;
         }
 
+        // Variables, constants, and computed values are not statically known to be false-like.
         return false;
     }
 
@@ -114,9 +126,11 @@ final class SecurityNodeHelper
     public static function containsUserInput(Node $node): bool
     {
         if (self::containsDirectUserInput($node)) {
+            // A direct superglobal read is request-tainted with no further analysis needed.
             return true;
         }
 
+        // Otherwise fall back to the costlier same-scope flow analysis for laundered locals.
         return self::containsTaintedLocal($node);
     }
 
@@ -130,7 +144,9 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
+        // True when any node in the tree is a superglobal read; presence of a match is the taint signal.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
+            // A variable whose name is one of the request superglobals is the attacker-controlled source.
             return $candidate instanceof Expr\Variable
                 && is_string($candidate->name)
                 && in_array($candidate->name, self::userInputSuperglobals(), true);
@@ -147,21 +163,25 @@ final class SecurityNodeHelper
     {
         $referencedVariables = self::referencedVariableNames($node);
         if ($referencedVariables === []) {
+            // No local variables to trace, so there is nothing that could have been laundered from a superglobal.
             return false;
         }
 
         $scope = self::enclosingFunctionLike($node);
         if (!$scope instanceof FunctionLike) {
+            // Without an owning function body the same-scope flow analysis has no statements to walk.
             return false;
         }
 
         $statements = $scope->getStmts();
         if ($statements === null) {
+            // Abstract or interface methods have no body, so no assignment could taint a local here.
             return false;
         }
 
         $sinkPosition = $node->getStartFilePos();
         if ($sinkPosition < 0) {
+            // A missing byte offset means we cannot order assignments before the sink; stay safe and bail.
             return false;
         }
 
@@ -169,10 +189,12 @@ final class SecurityNodeHelper
 
         foreach ($referencedVariables as $variableName) {
             if (isset($taintedVariables[$variableName])) {
+                // The sink reads a local that an earlier same-scope assignment filled from request input.
                 return true;
             }
         }
 
+        // None of the referenced locals were tainted before the sink, so the expression is clean.
         return false;
     }
 
@@ -218,6 +240,7 @@ final class SecurityNodeHelper
             unset($taintedVariables[$variableName]);
         }
 
+        // The tainted-name set as of just before the sink; a later clean reassignment drops a name above.
         return $taintedVariables;
     }
 
@@ -232,10 +255,12 @@ final class SecurityNodeHelper
     {
         foreach (self::referencedVariableNames($node) as $variableName) {
             if (isset($taintedVariables[$variableName])) {
+                // The expression reads an already-tainted local, so taint propagates to this assignment.
                 return true;
             }
         }
 
+        // The expression touches no known-tainted local, so it does not carry request input forward.
         return false;
     }
 
@@ -261,6 +286,7 @@ final class SecurityNodeHelper
             }
         }
 
+        // Deduplicated local names only; superglobals are excluded since they are sources, not laundered locals.
         return array_keys($names);
     }
 
@@ -275,6 +301,7 @@ final class SecurityNodeHelper
         $current = $node;
         while ($current instanceof Node) {
             if ($current instanceof FunctionLike) {
+                // The nearest enclosing function/method/closure; this is the scope taint analysis is bounded to.
                 return $current;
             }
 
@@ -282,6 +309,7 @@ final class SecurityNodeHelper
             $current = $parent instanceof Node ? $parent : null;
         }
 
+        // Walked past the top of the tree without a function-like ancestor: the node lives at file scope.
         return null;
     }
 
@@ -295,7 +323,9 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
+        // True when any node builds a string by joining parts, the shape that can splice untrusted data in.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
+            // A `.` concatenation or a "$var" interpolated string is the dynamic-construction signal.
             return $candidate instanceof Expr\BinaryOp\Concat
                 || $candidate instanceof Scalar\Encapsed;
         }) instanceof Node;
@@ -309,6 +339,7 @@ final class SecurityNodeHelper
      */
     public static function isStringLiteral(Node $node): bool
     {
+        // A bare string literal is statically trusted, so rules use this to exempt constant arguments.
         return $node instanceof Scalar\String_;
     }
 
@@ -322,6 +353,7 @@ final class SecurityNodeHelper
     {
         $name = self::globalFunctionName($call);
 
+        // Fall back to a human label when the callee is dynamic, so finding messages never show an empty name.
         return $name ?? 'dynamic function call';
     }
 
@@ -334,9 +366,11 @@ final class SecurityNodeHelper
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
         if (!$call->name instanceof Identifier) {
+            // A computed method name ($obj->$method()) cannot be matched statically, so report none.
             return null;
         }
 
+        // Lower-case because method names are case-insensitive in PHP; callers compare against lower-case literals.
         return strtolower($call->name->toString());
     }
 
@@ -349,14 +383,17 @@ final class SecurityNodeHelper
     public static function className(Node $class): ?string
     {
         if (!$class instanceof Name) {
+            // Anonymous classes and dynamic `new $cls` have no static name to resolve.
             return null;
         }
 
         $resolvedName = $class->getAttribute('resolvedName');
         if ($resolvedName instanceof Name) {
+            // Prefer the import/namespace-resolved FQCN so short aliases match their fully-qualified target.
             return strtolower($resolvedName->toString());
         }
 
+        // No resolver attribute (unresolved pass): fall back to the name as written in source.
         return strtolower($class->toString());
     }
 
@@ -371,20 +408,24 @@ final class SecurityNodeHelper
     {
         $resolvedName = self::className($class);
         if ($resolvedName === null) {
+            // An unresolvable class name can never equal a configured target, so it cannot match.
             return false;
         }
 
         foreach ($classNames as $className) {
             $normalized = strtolower(ltrim($className, '\\'));
             if ($resolvedName === $normalized) {
+                // Exact FQCN match against a configured fully-qualified target.
                 return true;
             }
 
             if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
+                // Short-name target: match any namespace whose final segment equals it (the `\Foo` suffix).
                 return true;
             }
         }
 
+        // None of the supplied names matched the resolved class.
         return false;
     }
 
@@ -398,8 +439,10 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
+        // True when any string literal in the tree is an outbound URL, used to gate URL-only sinks.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
             if (!$candidate instanceof Scalar\String_) {
+                // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
                 return false;
             }
 
@@ -418,27 +461,34 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
+        // True when any node in the tree names a secret; each branch maps a node kind to its identifier text.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
             if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
+                // A variable name like $apiKey signals secret context.
                 return self::hasSensitiveContext($candidate->name);
             }
 
             if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
+                // A property access like $config->secret signals secret context.
                 return self::hasSensitiveContext($candidate->name->toString());
             }
 
             if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
+                // A literal array key like $env['password'] signals secret context.
                 return self::hasSensitiveContext($candidate->dim->value);
             }
 
             if ($candidate instanceof Scalar\String_) {
+                // A bare string literal whose text itself names a secret signals secret context.
                 return self::hasSensitiveContext($candidate->value);
             }
 
             if ($candidate instanceof Expr\FuncCall) {
+                // A call may be an env reader pulling a secret-named key; defer to that check.
                 return self::isSensitiveEnvironmentRead($candidate);
             }
 
+            // Node kinds we do not classify carry no secret context.
             return false;
         }) instanceof Node;
     }
@@ -446,26 +496,31 @@ final class SecurityNodeHelper
     /**
      * Detect env-reader calls that request a sensitive key.
      *
+     * @param FuncCall $call Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
      * @return bool True when getenv/env reads a secret-like key.
      */
     private static function isSensitiveEnvironmentRead(FuncCall $call): bool
     {
         $name = self::globalFunctionName($call);
         if ($name === null || !in_array($name, ['apache_getenv', 'env', 'getenv'], true)) {
+            // Not one of the recognised env readers, so it cannot be a sensitive environment lookup.
             return false;
         }
 
         $firstArg = self::argumentValue($call->args, 0);
         if ($firstArg === null) {
+            // A no-argument getenv() returns the whole environment, which is treated as sensitive wholesale.
             return true;
         }
 
+        // A literal key argument is sensitive only when its text matches the secret-name pattern.
         return $firstArg instanceof Scalar\String_ && self::hasSensitiveContext($firstArg->value);
     }
 
     /**
      * Detect secret-like words in identifiers or string keys.
      *
+     * @param string $contextText Identifier or string-key text to scan; the value itself, never a read secret.
      * @return bool True when the text names likely sensitive data.
      */
     private static function hasSensitiveContext(string $contextText): bool

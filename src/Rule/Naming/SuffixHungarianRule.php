@@ -66,6 +66,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory by default: a suffix is a style smell, not a defect, so it should never gate a build.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Suffix Hungarian notation',
@@ -155,12 +156,18 @@ final readonly class SuffixHungarianRule implements RuleInterface
             }
         }
 
+        // Hand back every suffix-Hungarian finding gathered across properties, parameters, and locals.
         return $findings;
     }
 
     /**
-     * @param array{kind: string, name: string, symbol: string|null} $identifier
-     * @param array<string, string>                                  $suffixes   Map of lower-case suffix token to configured display suffix.
+     * @param RuleDefinition                                         $definition   Rule metadata supplying id, severity, pillar, and confidence for the finding.
+     * @param AnalysisUnit                                           $analysisUnit Parsed unit whose display path anchors the reported finding.
+     * @param Node                                                   $node         Declaration node whose start line locates the finding.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier   Identifier kind (property/parameter/variable), bare name, and owning symbol.
+     * @param array<string, string>                                  $suffixes     Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer                                    $tokenizer    Splits the name into camel/Pascal tokens to isolate the trailing suffix.
+     * @param Node|null                                              $type         Declared type to weigh against the suffix; null when no declaration constrains it.
      * @return Finding|null Finding for an identifier with a type suffix.
      */
     private function finding(
@@ -177,14 +184,17 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $symbol      = $identifier['symbol'];
         $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
         if ($suffixToken === null) {
+            // No configured suffix at the tail, so there is nothing to report on this identifier.
             return null;
         }
 
         $suffix = $suffixes[$suffixToken];
         if ($this->doesTypeContradictSuffix($type, $suffixToken)) {
+            // The declared type disagrees with the suffix, so the name is not restating its own type.
             return null;
         }
 
+        // The suffix duplicates the type with no contradicting evidence; emit the rename finding.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s encodes the type suffix "%s".', ucfirst($kind), $name, $suffix),
@@ -203,12 +213,15 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check local PHPDoc `@var` evidence when it exists.
      *
+     * @param Variable $variable Local variable node whose nearest `@var` annotation, if any, is consulted.
+     * @param string   $suffix   Display suffix the name carries, compared case-insensitively against the doc type.
      * @return bool True when no local doc type contradicts the suffix.
      */
     private function allowsLocalTypeSuffix(Variable $variable, string $suffix): bool
     {
         $docType = $this->localVarDocType($variable);
 
+        // Absent annotation is treated as permissive; only a present, mismatching `@var` clears the suffix.
         return $docType === null || $this->matchesDocTypeSuffix($docType, strtolower($suffix));
     }
 

@@ -122,6 +122,8 @@ final class AnalyseCommand extends Command
     /**
      * Run source discovery, rule analysis, optional mutation ingestion, and reporting.
      *
+     * @param InputInterface  $input  Parsed CLI arguments and options for this analyse run.
+     * @param OutputInterface $output Destination for the rendered report; stderr is used for runtime payloads.
      * @return int Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -138,6 +140,7 @@ final class AnalyseCommand extends Command
         $setupResult = (new AnalyseCommandSetupBuilder())->build($input, $output, $this->getApplication());
 
         if (!$setupResult->setup instanceof AnalyseCommandSetup) {
+            // Bail before any analysis when config/setup failed; the failure carries its own exit code and report.
             return $this->renderSetupFailure($setupResult, $output);
         }
 
@@ -296,6 +299,7 @@ final class AnalyseCommand extends Command
             isDetailed:            $runtimeDetailed,
         );
 
+        // Propagate the gate verdict so CI can fail the run on the configured severity or new-findings threshold.
         return $exitCode;
     }
 
@@ -303,7 +307,13 @@ final class AnalyseCommand extends Command
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
      * @param bool $shouldEmit Whether --print-runtime requested the payload; a no-op when false.
+     * @param OutputInterface $output Run output; the payload goes to its stderr stream, falling back to STDERR.
+     * @param int $runtimeStart hrtime(true) nanosecond marker captured at command start, used to derive wall time.
      * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs Timed analyse phase durations in nanoseconds.
+     * @param int $filesParsed Count of source files actually parsed this run.
+     * @param int $rulesExecuted Count of rules enabled for this run.
+     * @param RuntimeTimingObserver|null $runtimeTimingObserver Per-rule timings source; null unless detailed mode collected them.
+     * @param bool $isDetailed Whether to attach per-rule totals; requires a non-null observer to take effect.
      * @return void
      */
     private function emitRuntimePayload(
@@ -317,6 +327,7 @@ final class AnalyseCommand extends Command
         bool $isDetailed,
     ): void {
         if (!$shouldEmit) {
+            // No --print-runtime, so emit nothing and leave the report stream untouched.
             return;
         }
 
@@ -340,6 +351,7 @@ final class AnalyseCommand extends Command
         if ($stderr !== null) {
             $stderr->write($line);
 
+            // Console error stream handled the payload; skip the raw STDERR fallback to avoid a duplicate line.
             return;
         }
 
@@ -349,6 +361,8 @@ final class AnalyseCommand extends Command
     /**
      * Render setup errors using either plain console text or the requested report format.
      *
+     * @param AnalyseCommandSetupResult $result Failed setup outcome carrying the error, exit code, and any partial report.
+     * @param OutputInterface $output Destination the error text or formatted report is written to.
      * @return int Setup failure exit code.
      */
     private function renderSetupFailure(AnalyseCommandSetupResult $result, OutputInterface $output): int
@@ -356,6 +370,7 @@ final class AnalyseCommand extends Command
         if ($result->plainError !== null) {
             $output->writeln($result->plainError);
 
+            // A plain console message means config never resolved a format, so stop here with its exit code.
             return $result->exitCode;
         }
 
@@ -363,21 +378,27 @@ final class AnalyseCommand extends Command
             $this->renderReport($result->report, $result->format, $output);
         }
 
+        // Hand back the setup exit code after emitting whatever structured report the failure carried.
         return $result->exitCode;
     }
 
     /**
-     * @param list<RunDiagnostic> $diagnostics
+     * Resolve the Git diff for --diff-vs or --since against a single base ref.
      *
+     * @param string $projectRoot Project root the Git diff is computed within.
+     * @param string|null $diffMode Git ref or diff selector to compare against; null means no diff was requested.
+     * @param list<RunDiagnostic> $diagnostics Run diagnostics; a diff-mode error is appended in place on failure.
      * @return DiffResult|null Diff result, inactive result, or null when diff lookup fails.
      */
     private function buildDiffResult(string $projectRoot, ?string $diffMode, array &$diagnostics): ?DiffResult
     {
         if ($diffMode === null) {
+            // No ref requested, so report an inactive diff rather than a lookup failure.
             return DiffResult::inactive();
         }
 
         try {
+            // Success path: compute changed lines for the requested ref.
             return (new GitDiffProvider())->changedLines($projectRoot, $diffMode);
         } catch (DiffException $exception) {
             $diagnostics[] = new RunDiagnostic(
@@ -385,6 +406,7 @@ final class AnalyseCommand extends Command
                 message: $exception->getMessage(),
             );
 
+            // Null signals a hard diff failure (recorded as a diagnostic) versus an intentionally inactive diff.
             return null;
         }
     }
@@ -392,16 +414,20 @@ final class AnalyseCommand extends Command
     /**
      * Build the changed-region diff result requested by --diff, --since, or --changed-ranges.
      *
-     * @param list<RunDiagnostic> $diagnostics
+     * @param string $projectRoot Project root the diff and requested paths resolve against.
+     * @param AnalyseCommandOptions $options Effective CLI options selecting the changed-region source (ranges, since, or diff).
+     * @param list<RunDiagnostic> $diagnostics Run diagnostics; a diff-mode error is appended in place on failure.
      * @return DiffResult|null Diff result, inactive result, or null when diff lookup fails.
      */
     private function buildChangedDiffResult(string $projectRoot, AnalyseCommandOptions $options, array &$diagnostics): ?DiffResult
     {
         if ($options->changedRanges !== null) {
+            // Explicit ranges take precedence over Git-derived diffs.
             return $this->buildExplicitRangesDiffResult($projectRoot, $options, $diagnostics);
         }
 
         if ($options->since !== null) {
+            // --since names a single base ref, so reuse the single-ref diff path.
             return $this->buildDiffResult($projectRoot, $options->since, $diagnostics);
         }
 
@@ -413,11 +439,13 @@ final class AnalyseCommand extends Command
                     message: 'Unable to read unified diff from stdin.',
                 );
 
+                // Unreadable stdin is a hard failure; record it and signal no usable diff.
                 return null;
             }
 
             $parsed = (new UnifiedDiffParser())->parse($patch);
 
+            // Wrap the parsed stdin patch as an active diff so findings filter to its changed regions.
             return new DiffResult(
                 active:       true,
                 mode:         'stdin',
@@ -428,6 +456,7 @@ final class AnalyseCommand extends Command
             );
         }
 
+        // Remaining case: --diff with a ref (or bare), handled by the single-ref Git diff path.
         return $this->buildDiffResult($projectRoot, $options->diffMode, $diagnostics);
     }
 
@@ -448,6 +477,7 @@ final class AnalyseCommand extends Command
                 message: '--changed-ranges requires at least one file path.',
             );
 
+            // Explicit ranges are meaningless without a target file, so abort with the diagnostic above.
             return null;
         }
 
@@ -459,6 +489,7 @@ final class AnalyseCommand extends Command
                 message: $exception->getMessage(),
             );
 
+            // Malformed range syntax is recorded as a diagnostic; no usable diff to return.
             return null;
         }
 
@@ -467,6 +498,7 @@ final class AnalyseCommand extends Command
             $changedLines[$changedFile] = $ranges;
         }
 
+        // Apply the same parsed ranges to every requested file as an active explicit-ranges diff.
         return new DiffResult(
             active:       true,
             mode:         'explicit-ranges',
@@ -513,10 +545,19 @@ final class AnalyseCommand extends Command
             throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
         }
 
+        // Hand back the parsed ranges in input order; emptiness was already rejected above.
         return $parsed;
     }
 
-    /** @return list<string>|null Null means an empty changed-only review diff has no files to scan. */
+    /**
+     * Resolve which paths discovery should scan, narrowing to changed files when a diff-driven mode is active.
+     *
+     * @param string $projectRoot Project root the requested and changed paths resolve against.
+     * @param AnalyseCommandOptions $options Effective CLI options, including changed-only and requested-path flags.
+     * @param DiffResult|null $reviewDiff --diff-vs review diff; null when it failed or carries no changed files.
+     * @param DiffResult|null $changedRegionDiff Changed-region diff from --diff/--since/--changed-ranges, when active.
+     * @return list<string>|null Null means an empty changed-only review diff has no files to scan.
+     */
     private function currentAnalysisPaths(
         string $projectRoot,
         AnalyseCommandOptions $options,
@@ -525,6 +566,7 @@ final class AnalyseCommand extends Command
     ): ?array
     {
         if ($options->isChangedOnly && $options->paths === [] && $reviewDiff === null) {
+            // Changed-only with no paths and a failed review diff: nothing to scan, distinct from "scan everything".
             return null;
         }
 
@@ -533,10 +575,12 @@ final class AnalyseCommand extends Command
         if ($options->usesChangedFilesForDiscovery() && $changedRegionDiff instanceof DiffResult && $changedRegionDiff->active) {
             $changedFiles = $findingSupport->existingChangedFiles($projectRoot, $changedRegionDiff->changedFiles);
             if ($changedFiles === []) {
+                // Diff named only deleted/absent files, so there is nothing on disk left to scan.
                 return null;
             }
 
             if ($options->paths === []) {
+                // No path filter given, so scan every changed file that still exists.
                 return $changedFiles;
             }
 
@@ -547,20 +591,26 @@ final class AnalyseCommand extends Command
             ));
             sort($analysisPaths, SORT_STRING);
 
+            // Scan the changed files that also match the requested paths; null when the intersection is empty.
             return $analysisPaths === [] ? null : $analysisPaths;
         }
 
         if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
+            // Not a changed-only review, so let discovery handle the requested paths verbatim.
             return $options->paths;
         }
 
+        // Changed-only review fallback: scan the review's changed files, or nothing when it changed none.
         return $reviewDiff->changedFiles === [] ? null : $reviewDiff->changedFiles;
     }
 
     /**
      * Filter source diagnostics for the current analysis scope.
      *
-     * @param list<RunDiagnostic> $diagnostics
+     * @param list<RunDiagnostic> $diagnostics Source-discovery diagnostics gathered before scope narrowing.
+     * @param string $projectRoot Project root each diagnostic path is normalised against.
+     * @param AnalyseCommandOptions $options Effective CLI options; only changed-only review runs trigger filtering.
+     * @param DiffResult|null $reviewDiff --diff-vs review diff supplying the changed-file allowlist, when present.
      * @return list<RunDiagnostic>
      */
     private function filterSourceDiagnostics(
@@ -570,49 +620,60 @@ final class AnalyseCommand extends Command
         ?DiffResult $reviewDiff,
     ): array {
         if (!$options->isChangedOnly || !$reviewDiff instanceof DiffResult || $reviewDiff->changedFiles === []) {
+            // Outside a changed-only review there is no scope to narrow, so keep every diagnostic.
             return $diagnostics;
         }
 
         $findingSupport = new AnalysisFindingSupport();
 
+        // Drop missing-path noise for files the review didn't touch; keep everything else.
         return array_values(array_filter(
             $diagnostics,
             function (RunDiagnostic $diagnostic) use ($projectRoot, $reviewDiff, $findingSupport): bool {
                 if ($diagnostic->type !== 'missing-path' || $diagnostic->path === null) {
+                    // Only missing-path diagnostics are scope-sensitive; keep all other types.
                     return true;
                 }
 
                 $requestedPaths = $findingSupport->normaliseRequestedPaths($projectRoot, [$diagnostic->path]);
                 if ($requestedPaths === []) {
+                    // Path could not be normalised, so keep the diagnostic rather than silently hide it.
                     return true;
                 }
 
                 foreach ($reviewDiff->changedFiles as $changedFile) {
                     if ($findingSupport->matchesRequestedPath($changedFile, $requestedPaths)) {
+                        // The missing path is in the review scope, so suppress this out-of-scope noise.
                         return false;
                     }
                 }
 
+                // Path lies outside every changed file, so the diagnostic is relevant and stays.
                 return true;
             },
         ));
     }
 
     /**
-     * @param list<RunDiagnostic>             $diagnostics
-     * @param list<\GruffPhp\Finding\Finding> $findings
-     * @param list<\GruffPhp\Finding\Finding> $newFindings
+     * Decide the command exit code from run diagnostics and whether any fail threshold tripped.
+     *
+     * @param list<RunDiagnostic>             $diagnostics Run diagnostics; any present force an INVALID exit ahead of findings.
+     * @param list<\GruffPhp\Finding\Finding> $findings    Full post-baseline finding set the all-findings gate inspects.
+     * @param list<\GruffPhp\Finding\Finding> $newFindings Change-introduced subset the new-findings gate inspects.
+     * @param FailThresholds                  $failThresholds Configured gate that decides which findings cause failure.
      *
      * @return array{exitCode: int, trip: ThresholdTrip|null} Exit code, with the breached gate threshold when one tripped.
      */
     private function resolveExitCode(array $diagnostics, array $findings, array $newFindings, FailThresholds $failThresholds): array
     {
         if ($diagnostics !== []) {
+            // A run diagnostic means the analysis itself was unsound, so report INVALID regardless of findings.
             return ['exitCode' => Command::INVALID, 'trip' => null];
         }
 
         $trip = $failThresholds->tripsOnScope($findings, $newFindings);
 
+        // FAILURE only when a threshold tripped; carry the trip so the report can name the breached gate.
         return [
             'exitCode' => $trip instanceof ThresholdTrip ? Command::FAILURE : Command::SUCCESS,
             'trip' => $trip,
@@ -635,19 +696,28 @@ final class AnalyseCommand extends Command
     private function newFindingsForGate(array $findings, ?BranchReviewResult $review, ?BaselineReport $baseline): array
     {
         if ($review instanceof BranchReviewResult) {
+            // Under --diff-vs the branch-introduced set is what "new" means for the gate.
             return $review->introduced;
         }
 
         if ($baseline instanceof BaselineReport && !$baseline->generated) {
+            // An applied (not generated) baseline already removed known findings, so the survivors are the new set.
             return $findings;
         }
 
+        // No reference point applies, so the gate has no new findings to evaluate.
         return [];
     }
 
     /**
      * Render the report with the reporter selected by output format.
      *
+     * @param AnalysisReport $report Completed analysis result the chosen reporter serialises.
+     * @param OutputFormat $format Output format that selects which reporter renders the result.
+     * @param OutputInterface $output Stream the rendered report is written to, raw and unformatted.
+     * @param string|null $projectRoot Project root for HTML file:line links; defaults to empty when not supplied.
+     * @param string $reportEditorLink HTML editor-link style (vscode, phpstorm, or none); ignored by other formats.
+     * @param bool $isReportInteractive Whether HTML output renders the opt-in interactive finding filters.
      * @return void
      */
     private function renderReport(
@@ -690,10 +760,12 @@ final class AnalyseCommand extends Command
         array &$diagnostics,
     ): ?TrendReport {
         if ($options->historyFile === null) {
+            // No --history-file configured, so trend recording is simply skipped (null, not an error).
             return null;
         }
 
         try {
+            // Success path: persist this run's score and finding count, returning the appended entry.
             return (new TrendRecorder())->record($projectRoot, $options->historyFile, $score, $findingCount);
         } catch (JsonException | RuntimeException $exception) {
             $diagnostics[] = new RunDiagnostic(
@@ -702,6 +774,7 @@ final class AnalyseCommand extends Command
                 path:    $options->historyFile,
             );
 
+            // Recording failed; record a diagnostic and degrade to null rather than aborting the whole run.
             return null;
         }
     }

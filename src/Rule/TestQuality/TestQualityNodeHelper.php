@@ -33,11 +33,13 @@ final class TestQualityNodeHelper
         $displayPath = '/' . str_replace('\\', '/', $analysisUnit->file->displayPath);
 
         if (str_contains($displayPath, '/tests/') || str_contains($displayPath, '/Tests/')) {
+            // A tests/ directory is the strongest signal; classify without inspecting the basename.
             return true;
         }
 
         $basename = basename($analysisUnit->file->displayPath);
 
+        // Outside a tests dir, fall back to the PHPUnit *Test / *TestCase filename convention.
         return str_ends_with($basename, 'Test.php') || str_ends_with($basename, 'TestCase.php');
     }
 
@@ -53,6 +55,7 @@ final class TestQualityNodeHelper
         $cache = self::$scopeCache ??= new \WeakMap();
 
         if ($cache->offsetExists($analysisUnit)) {
+            // Reuse the memoised scopes; recomputing would re-walk the whole AST for no gain.
             return $cache->offsetGet($analysisUnit);
         }
 
@@ -108,6 +111,7 @@ final class TestQualityNodeHelper
 
         $cache->offsetSet($analysisUnit, $scopes);
 
+        // Hand back the test scopes discovered for this unit, in source order.
         return $scopes;
     }
 
@@ -120,16 +124,19 @@ final class TestQualityNodeHelper
     public static function isTestMethod(Stmt\ClassMethod $classMethod): bool
     {
         if (self::hasAttribute($classMethod, 'Test')) {
+            // An explicit #[Test] attribute is authoritative regardless of method name or base class.
             return true;
         }
 
         if (self::hasTestAnnotation($classMethod)) {
+            // A @test docblock tag is equally authoritative, independent of the test* prefix.
             return true;
         }
 
         $name = $classMethod->name->toString();
 
         if (!str_starts_with($name, 'test')) {
+            // No attribute, no annotation, no test* prefix: nothing marks this as a test method.
             return false;
         }
 
@@ -142,6 +149,7 @@ final class TestQualityNodeHelper
     /**
      * Detect a real PHPUnit `@test` annotation line.
      *
+     * @param Stmt\ClassMethod $classMethod Method node whose docblock is scanned for a standalone `@test` tag.
      * @return bool True when the method docblock declares `@test` as a tag.
      */
     private static function hasTestAnnotation(Stmt\ClassMethod $classMethod): bool
@@ -161,11 +169,13 @@ final class TestQualityNodeHelper
     public static function extendsTestCase(?Stmt\Class_ $class): bool
     {
         if ($class === null || $class->extends === null) {
+            // A detached method or a class with no parent cannot extend a TestCase base.
             return false;
         }
 
         $parent = strtolower($class->extends->getLast());
 
+        // Match by the `TestCase` suffix so vendor and custom base classes both qualify.
         return str_ends_with($parent, 'testcase');
     }
 
@@ -177,6 +187,7 @@ final class TestQualityNodeHelper
      */
     public static function calls(TestQualityScope $scope): array
     {
+        // Every call the scope makes, of any of the three call shapes the rules care about.
         return NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class]);
     }
 
@@ -188,6 +199,7 @@ final class TestQualityNodeHelper
      */
     public static function assertionCalls(TestQualityScope $scope): array
     {
+        // Keep only the subset of calls that count as assertions; array_values re-indexes to a list.
         return array_values(array_filter(
             self::calls($scope),
             static fn (Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => self::isAssertionCall($call),
@@ -204,10 +216,12 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
         if ($name === null) {
+            // A dynamic call target has no resolvable name, so it cannot be a known assertion.
             return false;
         }
 
         if (str_starts_with($name, 'assert') || $name === 'fail') {
+            // Every PHPUnit assertion is an assert* method, and fail() is a forced assertion failure.
             return true;
         }
 
@@ -234,9 +248,11 @@ final class TestQualityNodeHelper
             'expectdeprecationmessagematches',
             'expectnottoperformassertions',
         ], true)) {
+            // PHPUnit expect*() methods declare an expectation, which the rules treat as an assertion.
             return true;
         }
 
+        // Remaining matches are Pest expectation terminals (expect(...)->toBe*); anything else is not an assertion.
         return in_array($name, [
             'tobe',
             'tobearray',
@@ -304,9 +320,11 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
         if ($name === null) {
+            // A dynamic call target cannot be matched to a known tautological assertion shape.
             return false;
         }
 
+        // Only these specific assertions can be statically proven tautological; every other call is non-trivial.
         return match ($name) {
             'asserttrue' => self::literalValue(self::firstArgValue($call)) === true,
             'assertfalse' => self::literalValue(self::firstArgValue($call)) === false,
@@ -323,24 +341,28 @@ final class TestQualityNodeHelper
     /**
      * Detect whether the call's first two arguments are the same literal value.
      *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call assertSame/assertEquals call to compare.
      * @return bool True when both arguments resolve to the same scalar literal.
      */
     private static function hasSameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         $expected = self::literalValue(self::firstArgValue($call));
 
+        // A non-literal first argument yields null, so the strict equality below also gates out non-literals.
         return $expected !== null && $expected === self::literalValue(self::argValue($call, 1));
     }
 
     /**
      * Detect whether a Pest expectation's literal argument matches the expected value.
      *
+     * @param Expr\MethodCall $call toBe/toEqual matcher; its argument is compared with the expect()'d value.
      * @return bool True when expect($x)->toBe($x) has equal literal arguments.
      */
     private static function hasSamePestLiteralArguments(Expr\MethodCall $call): bool
     {
         $expected = self::literalValue(self::firstArgValue($call));
 
+        // A non-literal matcher argument yields null, so the strict equality also rules out non-literals.
         return $expected !== null && $expected === self::literalValue(self::pestExpectationValue($call));
     }
 
@@ -353,13 +375,16 @@ final class TestQualityNodeHelper
     public static function callName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
         if ($call instanceof Expr\FuncCall) {
+            // Function calls resolve their name through the Name-aware helper.
             return self::functionName($call);
         }
 
         if ($call->name instanceof Identifier) {
+            // Method and static calls expose a literal method name; lowercase it for case-insensitive matching.
             return strtolower($call->name->toString());
         }
 
+        // Dynamic targets such as $obj->$method() have no static name to return.
         return null;
     }
 
@@ -372,9 +397,11 @@ final class TestQualityNodeHelper
     public static function functionName(Expr\FuncCall $call): ?string
     {
         if ($call->name instanceof Name) {
+            // A static function name is present; lowercase it so callers can match case-insensitively.
             return strtolower($call->name->toString());
         }
 
+        // A variable function such as $fn() has no static name to return.
         return null;
     }
 
@@ -388,6 +415,7 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
 
+        // True only for the recognised mock/stub/spy factory names; a dynamic call (null name) never matches.
         return $name !== null && in_array($name, [
             'createmock',
             'createstub',
@@ -409,6 +437,7 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
 
+        // True only for the recognised expectation-wiring idioms; a dynamic call (null name) never matches.
         return $name !== null && in_array($name, [
             'expects',
             'shouldreceive',
@@ -428,6 +457,7 @@ final class TestQualityNodeHelper
      */
     public static function firstArgValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?Expr
     {
+        // The first argument is the expected value for most assertions; delegate to the index-0 lookup.
         return self::argValue($call, 0);
     }
 
@@ -441,9 +471,11 @@ final class TestQualityNodeHelper
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
     {
         if (!isset($call->args[$index]) || !$call->args[$index] instanceof Arg) {
+            // No argument at that position, or a spread (VariadicPlaceholder), has no single value to hand back.
             return null;
         }
 
+        // Unwrap the Arg node to the expression the caller actually passed.
         return $call->args[$index]->value;
     }
 
@@ -455,6 +487,7 @@ final class TestQualityNodeHelper
      */
     public static function argString(Arg $arg): ?string
     {
+        // Only a bare string literal yields text; an interpolated or computed argument reads back as null.
         return $arg->value instanceof Scalar\String_ ? $arg->value->value : null;
     }
 
@@ -467,12 +500,14 @@ final class TestQualityNodeHelper
     public static function literalValue(?Expr $expr): bool|int|float|string|null
     {
         if ($expr instanceof Scalar\String_ || $expr instanceof Scalar\LNumber || $expr instanceof Scalar\DNumber) {
+            // String/int/float literals carry their PHP value directly on the node.
             return $expr->value;
         }
 
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
+            // Only the three magic constants map to real literals; any other const fetch is not statically known.
             return match ($name) {
                 'true' => true,
                 'false' => false,
@@ -481,6 +516,7 @@ final class TestQualityNodeHelper
             };
         }
 
+        // Variables, calls, and other expressions have no compile-time literal value.
         return null;
     }
 
@@ -495,13 +531,16 @@ final class TestQualityNodeHelper
         $receiver = $call->var;
 
         if ($receiver instanceof Expr\FuncCall && self::functionName($receiver) === 'expect') {
+            // Base of the chain reached: the value under test is expect()'s first argument.
             return self::firstArgValue($receiver);
         }
 
         if ($receiver instanceof Expr\MethodCall) {
+            // Walk one link back through a chained modifier such as ->not->toBe(...).
             return self::pestExpectationValue($receiver);
         }
 
+        // Receiver is neither expect(...) nor a further method call, so this is not a Pest expectation chain.
         return null;
     }
 
@@ -517,11 +556,13 @@ final class TestQualityNodeHelper
         foreach ($node->attrGroups as $attributeGroup) {
             foreach ($attributeGroup->attrs as $attribute) {
                 if (strtolower($attribute->name->getLast()) === strtolower($shortName)) {
+                    // Match on the last name segment so both #[Test] and #[PHPUnit\...\Test] qualify.
                     return true;
                 }
             }
         }
 
+        // No attribute group on the method carried the requested short name.
         return false;
     }
 
@@ -535,6 +576,8 @@ final class TestQualityNodeHelper
     {
         $parent = $node->getAttribute('parent');
 
+        // The parent attribute is set by the parent-linking visitor; null here means the node is unattached
+        // or sits inside a trait/interface rather than a class.
         return $parent instanceof Stmt\Class_ ? $parent : null;
     }
 
@@ -548,6 +591,7 @@ final class TestQualityNodeHelper
     {
         $name = preg_replace('/^test[_]?/i', '', $name) ?? $name;
 
+        // Strip separators and casing so testFooBar / test_foo_bar / fooBar collapse to one comparable key.
         return strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $name));
     }
 
@@ -561,6 +605,7 @@ final class TestQualityNodeHelper
     {
         $name = self::callName($call);
         if ($name === null || !self::isAssertionCall($call)) {
+            // Only an actual assertion can carry a magic expected value; a dynamic name disqualifies it too.
             return null;
         }
 
@@ -570,6 +615,7 @@ final class TestQualityNodeHelper
 
         $literalValue = self::literalValue($candidate);
 
+        // -1/0/1 are too common to be "magic"; report any other integer literal, else null for non-int expecteds.
         return is_int($literalValue) && !in_array($literalValue, [-1, 0, 1], true) ? $literalValue : null;
     }
 

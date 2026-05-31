@@ -110,6 +110,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory-by-default identifier quality rule with its tunable placeholder/generic/ignore vocabulary.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Identifier quality',
@@ -157,7 +158,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     {
         $definition     = $this->definition();
         $findingContext = $this->findingContext($analysisUnit, $ruleContext, $definition);
-
+        // Union of the three identifier domains: class-likes, function-like scopes, and declared properties.
         return [
             ...$this->classLikeFindings($findingContext),
             ...$this->functionLikeFindings(
@@ -172,6 +173,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Build shared finding inputs from rule settings.
      *
+     * @param AnalysisUnit   $analysisUnit Unit threaded into the context so every check reports against the same file.
+     * @param RuleContext    $ruleContext  Source of the per-run settings and project-wide accepted abbreviations.
+     * @param RuleDefinition $definition    This rule's definition, used to look up its configured option overrides.
+     *
      * @return IdentifierFindingContext Shared context for identifier finding checks.
      */
     private function findingContext(
@@ -180,7 +185,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         RuleDefinition $definition,
     ): IdentifierFindingContext {
         $settings = $ruleContext->settingsFor($definition);
-
+        // Resolve the configured vocabulary once (lowercased) so per-identifier checks stay allocation-free.
         return new IdentifierFindingContext(
             definition:            $definition,
             analysisUnit:          $analysisUnit,
@@ -195,29 +200,37 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Resolve the minimum local-variable reference count needed before reporting.
      *
+     * @param RuleContext    $ruleContext Carries the per-run option overrides for this threshold.
+     * @param RuleDefinition $definition  This rule's definition, used to key into its option set.
+     *
      * @return int Minimum number of local variable reads.
      */
     private function minScopeReferences(RuleContext $ruleContext, RuleDefinition $definition): int
     {
         $minScopeOption = $ruleContext->settingsFor($definition)->option('minScopeReferences');
-
+        // Clamp to at least 1 and fall back to 1 for a non-int override, so a single read can never suppress reporting.
         return is_int($minScopeOption) ? max(1, $minScopeOption) : 1;
     }
 
     /**
      * Resolve the foreach body-size threshold before generic loop variables report.
      *
+     * @param RuleContext    $ruleContext Carries the per-run option overrides for this threshold.
+     * @param RuleDefinition $definition  This rule's definition, used to key into its option set.
+     *
      * @return int Minimum statement count for generic foreach loop-variable findings.
      */
     private function loopBodyThreshold(RuleContext $ruleContext, RuleDefinition $definition): int
     {
         $thresholdOption = $ruleContext->settingsFor($definition)->option('loopBodyThreshold');
-
+        // Clamp to at least 1 and default to 4 for a non-int override, matching defaultOptions.loopBodyThreshold.
         return is_int($thresholdOption) ? max(1, $thresholdOption) : 4;
     }
 
     /**
      * Find low-quality class, interface, trait, and enum names.
+     *
+     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-node checks.
      *
      * @return list<Finding> Findings for class-like identifiers.
      */
@@ -250,11 +263,16 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the class-like naming findings gathered for this unit.
         return $findings;
     }
 
     /**
      * Find low-quality function-like names, parameters, and local variables.
+     *
+     * @param IdentifierFindingContext $findingContext     Resolved vocabulary and unit shared across the per-scope checks.
+     * @param int                      $minScopeReferences Reference floor below which a local name is too rarely used to judge.
+     * @param int                      $loopBodyThreshold  Foreach body-size above which a generic loop variable becomes reportable.
      *
      * @return list<Finding> Findings for function-like identifier scopes.
      */
@@ -279,17 +297,22 @@ final readonly class IdentifierQualityRule implements RuleInterface
             );
         }
 
+        // Hand back the combined name, parameter, and local-variable findings for every function-like scope.
         return $findings;
     }
 
     /**
      * Find a low-quality method or function name.
      *
+     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-node checks.
+     * @param ClassMethod|Function_    $function       Named callable whose own declared name is judged here.
+     *
      * @return list<Finding> Empty when the function-like name is exempt or acceptable.
      */
     private function functionNameFindings(IdentifierFindingContext $findingContext, ClassMethod|Function_ $function): array
     {
         if ($this->shouldSkipFunctionLike($function)) {
+            // Magic, lifecycle, and data-provider names are exempt by contract, so skip without judging the name.
             return [];
         }
 
@@ -301,11 +324,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
             symbol:                   CyclomaticComplexityRule::resolveSymbol($function),
         );
 
+        // One finding when the name is low-quality, otherwise an empty list for the caller to splat.
         return $finding instanceof Finding ? [$finding] : [];
     }
 
     /**
      * Find low-quality parameter and promoted-property names in one function-like scope.
+     *
+     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-parameter checks.
+     * @param FunctionLikeScope        $scope          Single function-like scope whose declared parameters are judged.
      *
      * @return list<Finding> Findings for parameters and promoted properties.
      */
@@ -339,6 +366,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             $findings[] = $finding;
         }
 
+        // Hand back the parameter and promoted-property findings collected for this scope.
         return $findings;
     }
 
@@ -347,35 +375,47 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * legitimately needs a generic name. The shape covers helpers like
      * `private static function stringValue(mixed $value): string` whose intent is "coerce anything
      * into the documented return type"; a generic parameter name (`$value`) is the right name there.
+     *
+     * @param FunctionLikeScope $scope Scope whose underlying callable is matched against the coercion-helper shape.
      */
     private function isGenericByPurposeHelper(FunctionLikeScope $scope): bool
     {
         $node = $scope->node;
         if (!$node instanceof ClassMethod && !$node instanceof Function_) {
+            // Closures and arrow functions carry no name-able contract, so they never qualify for the carve-out.
             return false;
         }
 
         if (count($node->params) !== 1) {
+            // The carve-out only excuses the lone parameter of a converter; multi-parameter helpers must name each role.
             return false;
         }
 
         if (ModernisationNodeHelper::typeName($node->returnType) === 'void') {
+            // A void return means there is no documented output type for a generic input name to stand in for.
             return false;
         }
 
         $type = $node->params[0]->type;
 
         if ($type instanceof Node\UnionType && count($type->types) >= 3) {
+            // A 3+ member union is wide enough that "coerce anything" is the real intent, so a generic name fits.
             return true;
         }
 
         $typeName = ModernisationNodeHelper::typeName($type);
 
+        // mixed/scalar inputs are the canonical "accept anything" converters where a generic parameter name is correct.
         return $typeName === 'mixed' || $typeName === 'scalar';
     }
 
     /**
      * Find low-quality local variable names in one function-like scope.
+     *
+     * @param IdentifierFindingContext $findingContext     Resolved vocabulary and unit shared across the per-variable checks.
+     * @param FunctionLikeScope        $scope              Single scope whose locals (excluding loop/catch vars) are judged.
+     * @param int                      $minScopeReferences Reference floor below which a local is too rarely used to judge.
+     * @param int                      $loopBodyThreshold  Foreach body-size above which a generic loop variable becomes reportable.
      *
      * @return list<Finding> Findings for local variables.
      */
@@ -420,11 +460,14 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the plain-local findings plus the long-body loop-variable findings for this scope.
         return $findings;
     }
 
     /**
      * Find low-quality declared property names.
+     *
+     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-property checks.
      *
      * @return list<Finding> Findings for property identifiers.
      */
@@ -449,11 +492,17 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the declared-property naming findings gathered for this unit.
         return $findings;
     }
 
     /**
-     * @param list<string>|null $ignoredNamesOverride Optional ignored-name list for loop-variable checks.
+     * @param IdentifierFindingContext $identifierFindingContext Resolved vocabulary, definition, and unit used to classify and stamp the finding.
+     * @param Node                     $node                     Declaration node whose start line anchors the finding.
+     * @param string                   $kind                     Human-readable identifier kind (class, method, parameter, variable, property) for the message.
+     * @param string                   $name                     Raw identifier text being judged, with any leading `$` kept for variable-style names.
+     * @param string|null              $symbol                   Enclosing symbol label for grouping, or null when no symbol applies.
+     * @param list<string>|null        $ignoredNamesOverride     Optional ignored-name list for loop-variable checks.
      * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
@@ -466,11 +515,13 @@ final readonly class IdentifierQualityRule implements RuleInterface
     ): ?Finding {
         $ignoredNames = $ignoredNamesOverride ?? $identifierFindingContext->ignoredNames;
         if ($this->isIgnored($name, $ignoredNames, $identifierFindingContext->acceptedAbbreviations)) {
+            // Conventional and project-accepted names are exempt, so report nothing for them.
             return null;
         }
 
         $tokens = $identifierFindingContext->tokenizer->tokenize($name);
         if ($tokens === []) {
+            // A name that tokenizes to nothing (e.g. `$_`) carries no words to judge.
             return null;
         }
 
@@ -496,9 +547,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         if ($variant === null) {
+            // No placeholder, generic, or numbered variant matched, so the name communicates intent and passes.
             return null;
         }
 
+        // Emit the finding, stamping the matched variant and tokens into metadata for downstream filtering.
         return new Finding(
             ruleId:      $identifierFindingContext->definition->id,
             message:     sprintf('%s name "%s" is %s and does not communicate clear intent.', ucfirst($kind), $name, $variant),
@@ -521,8 +574,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $ignoredNames
-     * @param list<string> $acceptedAbbreviations
+     * @param string       $name                  Identifier text to test against the exemption lists, matched case-insensitively.
+     * @param list<string> $ignoredNames          Names exempt from all checks; the loop path may override the configured set.
+     * @param list<string> $acceptedAbbreviations Project-accepted abbreviations that should never be flagged.
      *
      * @return bool True when the name should be skipped by this rule.
      */
@@ -531,19 +585,22 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $lowerName = strtolower($name);
 
         if (str_starts_with($name, '_')) {
+            // A leading underscore signals a deliberately unused or convention-discard name, so never flag it.
             return true;
         }
 
         if (in_array($lowerName, $ignoredNames, true)) {
+            // Name is on the ignored list (loop counters, exception vars, $_), so it is exempt.
             return true;
         }
 
+        // Otherwise it is exempt only if the project has accepted it as a known abbreviation.
         return in_array($lowerName, $acceptedAbbreviations, true);
     }
 
     /**
-     * @param list<string> $tokens
-     * @param list<string> $genericTokens
+     * @param list<string> $tokens        Identifier tokens to test.
+     * @param list<string> $genericTokens Configured tokens treated as generic when they stand alone.
      *
      * @return bool True when every token is a configured generic token.
      */
@@ -551,18 +608,21 @@ final readonly class IdentifierQualityRule implements RuleInterface
     {
         foreach ($tokens as $token) {
             if (!in_array($token, $genericTokens, true)) {
+                // One non-generic token is enough to give the whole identifier meaning, so it is not all-generic.
                 return false;
             }
         }
 
+        // Every token was generic (an empty token list also satisfies this), so the identifier reads as generic.
         return true;
     }
 
     /**
-     * @param list<string> $tokens
-     * @param list<string> $genericTokens
-     * @param list<string> $placeholderNames
-     * @param list<string> $acceptedAbbreviations
+     * @param string       $name                  Raw identifier text, used to spot acronym-plus-number forms the tokens lose.
+     * @param list<string> $tokens                Identifier tokens whose trailing element must be the disambiguating number.
+     * @param list<string> $genericTokens         Configured generic tokens; a generic prefix makes the numbered name weak.
+     * @param list<string> $placeholderNames      Configured placeholder names; a placeholder prefix also makes it weak.
+     * @param list<string> $acceptedAbbreviations Project-accepted abbreviations that exempt the prefix from the check.
      *
      * @return bool True when the identifier is a weak numbered variant.
      */
@@ -574,6 +634,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         array $acceptedAbbreviations,
     ): bool {
         if (count($tokens) < 2 || !ctype_digit($tokens[array_key_last($tokens)])) {
+            // Without a prefix and a trailing all-digit token there is no "name + counter" shape to flag.
             return false;
         }
 
@@ -581,35 +642,47 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $prefix       = implode('', $prefixTokens);
 
         if (in_array($prefix, $acceptedAbbreviations, true)) {
+            // An accepted-abbreviation prefix (e.g. an approved acronym) is allowed to carry a numeric suffix.
             return false;
         }
 
         // Permit acronym-style identifiers that are only disambiguated by a trailing number.
         if (preg_match('/[A-Z]{2,}\d+$/', $name) === 1) {
+            // Trailing-number acronyms (e.g. UTF8) are intentional disambiguation, not a lazy counter.
             return false;
         }
 
+        // Weak only when the prefix itself carries no intent: a known placeholder, or an all-generic prefix.
         return in_array($prefix, $placeholderNames, true) || $this->allTokensMatch($prefixTokens, $genericTokens);
     }
 
-    /** @return bool True when framework lifecycle or data-provider methods should be skipped. */
+    /**
+     * @param ClassMethod|Function_ $node Callable whose name decides whether the rule exempts it from name judging.
+     *
+     * @return bool True when framework lifecycle or data-provider methods should be skipped.
+     */
     private function shouldSkipFunctionLike(ClassMethod|Function_ $node): bool
     {
         $name = $node->name->toString();
 
         if ($node instanceof ClassMethod && in_array($name, self::MAGIC_METHODS, true)) {
+            // Magic methods have language-mandated names the author cannot choose, so never judge them.
             return true;
         }
 
         if ($node instanceof ClassMethod && in_array($name, self::LIFECYCLE_METHODS, true)) {
+            // Framework lifecycle hooks (setUp, configure, execute) have fixed names the caller must keep.
             return true;
         }
 
+        // Data-provider methods follow the provide*/<*>Provider convention PHPUnit requires, so exempt them too.
         return str_starts_with($name, 'provide') || str_ends_with($name, 'Provider');
     }
 
     /**
-     * @param array<string, true> $excludedNames Names already exempted by surrounding rule logic.
+     * @param FunctionLikeScope   $scope              Scope whose declared locals are the candidate set.
+     * @param int                 $minScopeReferences Read-count floor; locals used fewer times are too transient to judge.
+     * @param array<string, true> $excludedNames      Names already exempted by surrounding rule logic.
      * @return array<string, Variable> Local variables that should be checked for naming quality.
      */
     private function localVariableNames(FunctionLikeScope $scope, int $minScopeReferences, array $excludedNames): array
@@ -627,10 +700,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back only the locals that survived exclusion and met the read-count floor.
         return $variables;
     }
 
-    /** @return array<string, true> Variables introduced by loop constructs. */
+    /**
+     * @param FunctionLikeScope $scope Scope to scan for loop-induction and foreach key/value variables.
+     *
+     * @return array<string, true> Variables introduced by loop constructs.
+     */
     private function loopVariables(FunctionLikeScope $scope): array
     {
         $variables = [];
@@ -649,10 +727,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the loop-introduced names so the local-variable pass can exclude them from generic judging.
         return $variables;
     }
 
-    /** @return array<string, true> Variables introduced by catch clauses. */
+    /**
+     * @param FunctionLikeScope $scope Scope to scan for catch-clause exception variables.
+     *
+     * @return array<string, true> Variables introduced by catch clauses.
+     */
     private function catchVariables(FunctionLikeScope $scope): array
     {
         $variables = [];

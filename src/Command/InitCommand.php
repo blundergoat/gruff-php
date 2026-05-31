@@ -106,12 +106,15 @@ final class InitCommand extends Command
     /**
      * Generate the default config file at the project root.
      *
+     * @param InputInterface  $input  Console input; only the --project-root and --force options are read.
+     * @param OutputInterface $output Console output; carries the wrote-path notice, next-steps guidance, and any error.
      * @return int Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->projectRoot($input, $output);
         if ($projectRoot === null) {
+            // projectRoot already reported the cause; just propagate the failure exit code.
             return Command::FAILURE;
         }
 
@@ -120,6 +123,7 @@ final class InitCommand extends Command
 
         $guardExitCode = $this->guardExistingConfig($projectRoot, $targetPath, $shouldForce, $output);
         if ($guardExitCode !== null) {
+            // A non-null guard verdict means init refused (existing config, no --force); honour it.
             return $guardExitCode;
         }
 
@@ -134,6 +138,7 @@ final class InitCommand extends Command
         } catch (ConfigException $exception) {
             $output->writeln(sprintf('<error>%s</error>', $exception->getMessage()));
 
+            // A preserved gating/schema entry was invalid; abort rather than overwrite it with defaults.
             return Command::FAILURE;
         }
 
@@ -145,6 +150,7 @@ final class InitCommand extends Command
         if (file_put_contents($targetPath, $contents) === false) {
             $output->writeln(sprintf('<error>Unable to write %s.</error>', $targetPath));
 
+            // The config file could not be written (permissions, full disk); fail so CI does not assume success.
             return Command::FAILURE;
         }
 
@@ -156,12 +162,15 @@ final class InitCommand extends Command
         $output->writeln('  3. Optional after review: `gruff-php analyse --generate-baseline` records current findings as known debt.');
         $output->writeln('     Use `gruff-php analyse --no-baseline` to audit without that baseline.');
 
+        // The config was written and all preserved values validated; report a clean success exit.
         return Command::SUCCESS;
     }
 
     /**
      * Resolve the directory the new config file will be written to.
      *
+     * @param InputInterface  $input  Console input; an explicit --project-root wins, else the current working directory is used.
+     * @param OutputInterface $output Console output used to report a missing directory or an undeterminable working directory.
      * @return string|null Directory to use, or null after emitting an error.
      */
     private function projectRoot(InputInterface $input, OutputInterface $output): ?string
@@ -171,9 +180,11 @@ final class InitCommand extends Command
             if (!is_dir($explicit)) {
                 $output->writeln(sprintf('<error>--project-root must be an existing directory: %s</error>', $explicit));
 
+                // An explicit --project-root that is not a directory is a user error, not a fall-through to cwd.
                 return null;
             }
 
+            // Strip any trailing slash so the caller can join `/` + filename without doubling it.
             return rtrim($explicit, '/');
         }
 
@@ -181,20 +192,27 @@ final class InitCommand extends Command
         if ($cwd === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
+            // getcwd can fail if the directory was unlinked; null signals "could not resolve a root".
             return null;
         }
 
+        // No explicit root given, so default to the directory init was invoked from.
         return $cwd;
     }
 
     /**
      * Refuse to overwrite a preferred or legacy config file without --force.
      *
+     * @param string          $projectRoot Directory checked for a sibling legacy .gruff.yaml that --force would shadow.
+     * @param string          $targetPath  Full path of the .gruff-php.yaml about to be written; refused when it already exists.
+     * @param bool            $shouldForce True bypasses both guards; the caller derives it from the --force option.
+     * @param OutputInterface $output      Console output used to explain why init refused.
      * @return int|null Exit code when init must refuse, or null when writing may proceed.
      */
     private function guardExistingConfig(string $projectRoot, string $targetPath, bool $shouldForce, OutputInterface $output): ?int
     {
         if ($shouldForce) {
+            // --force opts out of both guards; null lets the caller proceed to write.
             return null;
         }
 
@@ -204,6 +222,7 @@ final class InitCommand extends Command
                 ConfigLoader::DEFAULT_CONFIG_FILE,
             ));
 
+            // Refuse to clobber an existing preferred config when the user did not pass --force.
             return Command::FAILURE;
         }
 
@@ -215,9 +234,11 @@ final class InitCommand extends Command
                 ConfigLoader::DEFAULT_CONFIG_FILE,
             ));
 
+            // A legacy .gruff.yaml is present; writing the new file would silently change which config wins, so refuse.
             return Command::FAILURE;
         }
 
+        // No preferred or legacy config blocks the write, so allow init to proceed.
         return null;
     }
 
@@ -234,6 +255,7 @@ final class InitCommand extends Command
      */
     private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $minimumSeverity): array
     {
+        // Hand back the scaffold document in the key order init emits above the rules block.
         return [
             'schemaVersion' => ConfigLoader::SCHEMA_VERSION,
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
@@ -261,6 +283,7 @@ final class InitCommand extends Command
      * display name when no description is set). Output is appended to the
      * scaffold YAML; the existing 4-space indent contract is preserved.
      *
+     * @param RuleRegistry $ruleRegistry Source of the rules to render and the descriptions that become their comments.
      * @return string Rendered `rules:` block including trailing newline.
      */
     private static function renderRulesSection(RuleRegistry $ruleRegistry): string
@@ -277,6 +300,7 @@ final class InitCommand extends Command
             }
         }
 
+        // Hand back the fully rendered rules block (header line plus every commented rule entry).
         return $output;
     }
 
@@ -286,12 +310,14 @@ final class InitCommand extends Command
      * gating-command + threshold-value contract the loader applies so an invalid
      * block surfaces a useful error before init blindly preserves it.
      *
+     * @param string $targetPath Path of the config file being regenerated, read for a hand-edited block to carry forward.
      * @throws ConfigException When a preserved entry is not a valid gating command or threshold value.
      * @return array<string, string>|null Existing block (command => threshold), or null when none can be preserved.
      */
     private static function existingMinimumSeverity(string $targetPath): ?array
     {
         if (!self::hasMinimumSeverityBlock($targetPath)) {
+            // No block to carry forward, so signal "use the scaffold default" rather than an empty map.
             return null;
         }
 
@@ -301,6 +327,7 @@ final class InitCommand extends Command
             $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string) $command, $threshold);
         }
 
+        // Hand back the existing entries, now re-validated, so --force keeps the user's gating thresholds.
         return $preserved;
     }
 
@@ -310,26 +337,31 @@ final class InitCommand extends Command
      * so the two-stage call avoids returning a nullable mixed-array shape from
      * a single helper (which trips `modernisation.phpdoc-mixed-overuse`).
      *
+     * @param string $targetPath Path of the existing config file to probe; a missing or unparseable file counts as absent.
      * @return bool True when the YAML loads and contains a top-level `minimumSeverity:` key.
      */
     private static function hasMinimumSeverityBlock(string $targetPath): bool
     {
         if (!is_file($targetPath)) {
+            // A first-run init with no file on disk has nothing to preserve.
             return false;
         }
 
         try {
             $decoded = Yaml::parseFile($targetPath);
         } catch (ParseException) {
+            // Unparseable YAML can't yield a block to preserve; let the scaffold defaults take over.
             return false;
         }
 
+        // Only worth a second read pass when the decoded document actually carries the key.
         return is_array($decoded) && array_key_exists('minimumSeverity', $decoded);
     }
 
     /**
      * Read and shape-validate the `minimumSeverity:` block from the existing config.
      *
+     * @param string $targetPath Path of the config file to read; the caller has already confirmed the block is present.
      * @throws ConfigException When the key is not a map shape.
      * @return array<array-key, mixed> Decoded YAML map; per-entry validation happens in the caller.
      */
@@ -337,6 +369,7 @@ final class InitCommand extends Command
     {
         $decoded = Yaml::parseFile($targetPath);
         if (!is_array($decoded) || !array_key_exists('minimumSeverity', $decoded)) {
+            // Key vanished between the hasMinimumSeverityBlock probe and now; treat as nothing to preserve.
             return [];
         }
 
@@ -345,12 +378,14 @@ final class InitCommand extends Command
             throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
         }
 
+        // Hand back the raw map; the caller validates each command/threshold pair before trusting it.
         return $existing;
     }
 
     /**
      * Confirm the user-supplied key names a real gating command.
      *
+     * @param mixed $command Raw YAML map key; must be a string naming one of ConfigLoader::GATING_COMMANDS.
      * @throws ConfigException When the key is not a string or names a non-gating command.
      * @return string Validated gating-command name.
      */
@@ -368,12 +403,15 @@ final class InitCommand extends Command
             ));
         }
 
+        // Key passed both checks, so it is safe to use as a preserved gating-command name.
         return $command;
     }
 
     /**
      * Confirm the user-supplied threshold names a canonical `FailThreshold` value.
      *
+     * @param string $command   Owning command name, used only to point the rejection message at the offending key.
+     * @param mixed  $threshold Raw YAML value; must be a string accepted by FailThreshold::fromInput.
      * @throws ConfigException When the value is not a string or not in the canonical four.
      * @return string Validated threshold string (one of advisory|warning|error|none).
      */
@@ -388,6 +426,7 @@ final class InitCommand extends Command
             ));
         }
 
+        // Value is one of the canonical FailThreshold strings, so it is safe to preserve verbatim.
         return $threshold;
     }
 
@@ -397,27 +436,32 @@ final class InitCommand extends Command
      * overwrite a deliberate downgrade; the scaffold always writes the canonical
      * value, so a mismatch is treated as a user intent worth confirming.
      *
+     * @param string $targetPath Path of the config file to inspect; a missing, unparseable, or unset schemaVersion is allowed.
      * @throws ConfigException When the existing schemaVersion is set but does not match the canonical value.
      * @return void
      */
     private static function existingSchemaVersion(string $targetPath): void
     {
         if (!is_file($targetPath)) {
+            // First-run init writes a fresh file, so there is no prior schemaVersion to reconcile.
             return;
         }
 
         try {
             $decoded = Yaml::parseFile($targetPath);
         } catch (ParseException) {
+            // Unparseable YAML carries no enforceable schemaVersion; --force will overwrite it anyway.
             return;
         }
 
         if (!is_array($decoded) || !array_key_exists('schemaVersion', $decoded)) {
+            // No schemaVersion key means no deliberate override to protect.
             return;
         }
 
         $existing = $decoded['schemaVersion'];
         if (!is_string($existing) || $existing === '') {
+            // A blank or non-string value is not a deliberate downgrade, so leave it for the scaffold to replace.
             return;
         }
 
@@ -433,43 +477,51 @@ final class InitCommand extends Command
     /**
      * Read an existing config's path ignores so --force does not wipe local policy.
      *
+     * @param string $targetPath Path of the config file to read; any non-list or blank-entry ignore block is rejected wholesale.
      * @return list<string>|null Existing ignore paths, or null when none can be preserved.
      */
     private static function existingIgnoredPaths(string $targetPath): ?array
     {
         if (!is_file($targetPath)) {
+            // First-run init has no prior ignore list, so fall back to the seeded defaults.
             return null;
         }
 
         try {
             $decoded = Yaml::parseFile($targetPath);
         } catch (ParseException) {
+            // Unparseable YAML yields no trustworthy ignore list; defer to the defaults.
             return null;
         }
 
         if (!is_array($decoded)) {
+            // A scalar or empty document carries no paths block to preserve.
             return null;
         }
 
         $paths = $decoded['paths'] ?? null;
         if (!is_array($paths)) {
+            // No paths section means there is nothing to carry forward.
             return null;
         }
 
         $ignore = $paths['ignore'] ?? null;
         if (!is_array($ignore) || !array_is_list($ignore)) {
+            // A map-shaped or missing ignore key is malformed; fall back rather than guess its intent.
             return null;
         }
 
         $ignoredPaths = [];
         foreach ($ignore as $path) {
             if (!is_string($path) || trim($path) === '') {
+                // One bad entry voids the whole list so init never silently drops part of the user's policy.
                 return null;
             }
 
             $ignoredPaths[] = trim($path);
         }
 
+        // Hand back the trimmed, fully validated ignore list so --force preserves the user's path policy.
         return $ignoredPaths;
     }
 
@@ -496,6 +548,7 @@ final class InitCommand extends Command
             $ruleEntry['options'] = $ruleDefinition->defaultOptions;
         }
 
+        // Hand back the entry carrying only the keys this rule actually defines defaults for.
         return $ruleEntry;
     }
 }

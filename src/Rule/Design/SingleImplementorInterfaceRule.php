@@ -105,6 +105,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
      */
     public function definition(): RuleDefinition
     {
+        // Advisory-by-default metadata plus the prefix/attribute/path allowlists callers can override.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Single-implementor interface',
@@ -136,6 +137,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             $this->accumulate($unit, $ruleContext);
         }
 
+        // finishProject() both emits the findings and clears the accumulator, so the pass leaves no residual state.
         return $this->finishProject($ruleContext);
     }
 
@@ -170,6 +172,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
     {
         if ($this->isExcludedUnit($analysisUnit)) {
+            // Vendor and configured-out units contribute no facts, so leave the accumulator untouched.
             return;
         }
 
@@ -207,11 +210,14 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         ];
         $this->accumulationExcludedPaths = null;
 
+        // Hand back the single-implementor findings built from this project pass.
         return $findings;
     }
 
     /**
      * Apply path exclusions that previously gated filterEligibleUnits.
+     *
+     * @param AnalysisUnit $analysisUnit Unit whose display path is matched against vendor and configured exclusions.
      *
      * @return bool True when the unit should be skipped from accumulation.
      */
@@ -220,25 +226,31 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         $display = $analysisUnit->file->displayPath;
 
         if (str_starts_with($display, 'vendor/')) {
+            // Third-party interfaces are out of scope; we only judge the project's own contracts.
             return true;
         }
 
         foreach ($this->accumulationExcludedPaths ?? [] as $excluded) {
             if (str_starts_with($display, $excluded)) {
+                // Caller opted this path prefix out via additionalExcludedPaths.
                 return true;
             }
         }
 
+        // No exclusion matched, so the unit's types feed the project-level analysis.
         return false;
     }
 
     /**
+     * Index one unit's interfaces, implementations, and type references into the project-level facts.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit to scan; its AST may be released once this returns.
      * @param array{
      *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
-     * } $projectTypes
+     * } $projectTypes Accumulator mutated in place with the facts found in this unit.
      * @return void
      */
     private function collectUnitTypes(AnalysisUnit $analysisUnit, array &$projectTypes): void

@@ -129,6 +129,7 @@ final readonly class AnalyseCommandOptions
             ));
         }
 
+        // Hand back the fully normalised options bag; any usage error found above rides along in optionError.
         return new self(
             paths:                         $paths,
             shouldIncludeIgnored:          (bool) $input->getOption('include-ignored'),
@@ -182,6 +183,7 @@ final readonly class AnalyseCommandOptions
      */
     public function withMutationBudget(?int $mutationBudget): self
     {
+        // Readonly value object: copy every field, swapping only the mutation budget into a fresh options bag.
         return new self(
             paths:                         $this->paths,
             shouldIncludeIgnored:          $this->shouldIncludeIgnored,
@@ -233,9 +235,11 @@ final readonly class AnalyseCommandOptions
             || $this->noBaseline
             || !is_file(rtrim($projectRoot, '/') . '/' . BaselineStore::DEFAULT_FILENAME)
         ) {
+            // An explicit baseline flag, generate request, opt-out, or absent default file all forbid auto-applying.
             return $this;
         }
 
+        // Inject the implicit (non-explicit) default baseline so an unflagged run still honours the on-disk file.
         return new self(
             paths:                $this->paths,
             shouldIncludeIgnored: $this->shouldIncludeIgnored,
@@ -276,6 +280,7 @@ final readonly class AnalyseCommandOptions
      */
     public function usageError(): ?string
     {
+        // First failing check wins; null means every flag combination validated, so the run may proceed.
         return $this->optionError
             ?? $this->configUsageError()
             ?? $this->profileUsageError()
@@ -293,6 +298,7 @@ final readonly class AnalyseCommandOptions
      */
     public function displayFilter(): FindingDisplayFilter
     {
+        // Translate the validated string options into the enum-typed filter the reporter consumes.
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
             includePillars: array_map(static fn (string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
@@ -310,9 +316,11 @@ final readonly class AnalyseCommandOptions
     public function profileRuleSelection(): ?RuleSelection
     {
         if ($this->profile !== self::PROFILE_SECURITY) {
+            // Only the security profile overrides selection; every other profile keeps the configured rule set.
             return null;
         }
 
+        // Security profile narrows execution to the two security-facing pillars and nothing else.
         return new RuleSelection(pillars: [
             Pillar::Security->value,
             Pillar::SensitiveData->value,
@@ -327,9 +335,11 @@ final readonly class AnalyseCommandOptions
     public function profileScorePillars(): ?array
     {
         if ($this->profile !== self::PROFILE_SECURITY) {
+            // Non-security profiles fall back to the default all-pillar composite score.
             return null;
         }
 
+        // Security profile scores only the security-facing pillars so unrun pillars do not dilute the grade.
         return [Pillar::Security, Pillar::SensitiveData];
     }
 
@@ -340,6 +350,7 @@ final readonly class AnalyseCommandOptions
      */
     public function hasChangedRegionMode(): bool
     {
+        // True when any of the three changed-region opt-ins is set; usageError guarantees at most one of them.
         return $this->diffMode !== null
             || $this->since !== null
             || $this->changedRanges !== null;
@@ -352,34 +363,41 @@ final readonly class AnalyseCommandOptions
      */
     public function usesChangedFilesForDiscovery(): bool
     {
+        // Only diff and since derive a concrete file list; changed-ranges names paths the caller already supplied.
         return $this->diffMode !== null || $this->since !== null;
     }
 
     /**
      * Parse the `--report-interactive` option; returns true/false or a usage-error message string.
      *
+     * @param InputInterface $input Console input whose `--report-interactive` flag and value are inspected.
      * @return bool|string True/false when the option is well-formed, or the error message string.
      */
     private static function reportInteractive(InputInterface $input): bool|string
     {
         if (!$input->hasParameterOption('--report-interactive', true)) {
+            // Flag never passed: interactive reporting stays off by default.
             return false;
         }
 
         $optionValue = $input->getOption('report-interactive');
 
         if ($optionValue === null || $optionValue === true || $optionValue === '') {
+            // A bare --report-interactive (no value) reads as an explicit opt-in.
             return true;
         }
 
         if (is_bool($optionValue)) {
+            // Already a boolean from the input layer; pass it straight through.
             return $optionValue;
         }
 
         if (!is_string($optionValue)) {
+            // Anything non-boolean and non-string can't be a flag value, so report the usage error.
             return '--report-interactive must be true or false.';
         }
 
+        // Accept the common truthy/falsy spellings; an unrecognised string is a usage error, not a silent default.
         return match (strtolower($optionValue)) {
             '1', 'true', 'yes', 'on' => true,
             '0', 'false', 'no', 'off' => false,
@@ -390,25 +408,31 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a string option and return it only when non-empty; otherwise null.
      *
-     * @return string|null
+     * @param InputInterface $input Console input the option is read from.
+     * @param string         $name  Option name without the leading dashes.
+     * @return string|null Trimmed-of-emptiness value, or null when absent, empty, or not a string.
      */
     private static function optionalStringOption(InputInterface $input, string $name): ?string
     {
         $optionValue = $input->getOption($name);
 
+        // Empty string is treated as "not supplied" so callers can use the null-coalescing default.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
     /**
      * Read a repeatable string option without comma expansion.
      *
-     * @return list<string>|string Non-empty option values, or a usage-error message.
+     * @param InputInterface $input Console input the repeated option is read from.
+     * @param string         $name  Option name without the leading dashes; named in the error on a blank entry.
+     * @return list<string>|string Non-empty option values, or a usage-error message when any occurrence is empty.
      */
     private static function repeatedStringOption(InputInterface $input, string $name): array|string
     {
         $values = $input->getOption($name);
 
         if (!is_array($values)) {
+            // Option was never given (no array of occurrences), so there is nothing to collect.
             return [];
         }
 
@@ -416,25 +440,30 @@ final readonly class AnalyseCommandOptions
 
         foreach ($values as $optionValue) {
             if (!is_string($optionValue) || $optionValue === '') {
+                // A blank occurrence is rejected outright rather than silently dropped, surfacing the mistake.
                 return sprintf('--%s requires a non-empty value.', $name);
             }
 
             $items[] = $optionValue;
         }
 
+        // Every occurrence was a non-empty string; hand back the values verbatim, no comma splitting.
         return $items;
     }
 
     /**
      * Read a repeatable CLI option as a list of strings.
      *
-     * @return list<string>
+     * @param InputInterface $input Console input the repeated option is read from.
+     * @param string         $name  Option name without the leading dashes; each occurrence is comma-split and trimmed.
+     * @return list<string> Deduplicated non-empty values, comma-expanded from every occurrence.
      */
     private static function stringListOption(InputInterface $input, string $name): array
     {
         $values = $input->getOption($name);
 
         if (!is_array($values)) {
+            // Option was never given, so there are no occurrences to comma-expand.
             return [];
         }
 
@@ -453,26 +482,31 @@ final readonly class AnalyseCommandOptions
             }
         }
 
+        // Re-key after de-duplication so the result is a clean list with each value appearing once.
         return array_values(array_unique($items));
     }
 
     /**
      * Parse the `--diff` option: null when absent, "working-tree" when bare, or the explicit value.
      *
-     * @param list<string> $paths Parsed positional and --file paths.
+     * @param InputInterface $input Console input whose `--diff` flag and value are inspected.
+     * @param list<string>   $paths Parsed positional and --file paths; a bare "-" entry selects stdin diff mode.
      * @return string|null Requested diff mode, or null when --diff was not supplied.
      */
     private static function diffMode(InputInterface $input, array $paths): ?string
     {
         if (!$input->hasParameterOption('--diff', true)) {
+            // No --diff flag at all means diff analysis is not requested.
             return null;
         }
 
         $optionValue = $input->getOption('diff');
         if (in_array('-', $paths, true)) {
+            // A "-" path signals stdin; that takes precedence over any explicit --diff ref value.
             return '-';
         }
 
+        // A bare --diff defaults to the working tree; otherwise honour the explicit ref the user passed.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : 'working-tree';
     }
 
@@ -484,9 +518,11 @@ final readonly class AnalyseCommandOptions
     private function configUsageError(): ?string
     {
         if (!$this->noConfig || $this->configPath === null) {
+            // Either flag alone is fine; only the both-set combination is contradictory.
             return null;
         }
 
+        // Disabling config while also pointing at one is contradictory, so reject the run.
         return '--no-config cannot be combined with --config.';
     }
 
@@ -498,9 +534,11 @@ final readonly class AnalyseCommandOptions
     private function profileUsageError(): ?string
     {
         if (in_array($this->profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
+            // Profile is one of the two recognised names, so it is accepted.
             return null;
         }
 
+        // Reject unknown profiles loudly rather than silently falling back to default behaviour.
         return sprintf('Unsupported profile "%s". Use default or security.', $this->profile);
     }
 
@@ -512,9 +550,11 @@ final readonly class AnalyseCommandOptions
     private function baselineUsageError(): ?string
     {
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
+            // At most one baseline mode is set, so there is no conflict to report.
             return null;
         }
 
+        // Reading and (re)writing a baseline in the same run would race on the same file, so forbid it.
         return '--baseline and --generate-baseline are mutually exclusive.';
     }
 
@@ -532,21 +572,26 @@ final readonly class AnalyseCommandOptions
         ], static fn (?string $mode): bool => $mode !== null);
 
         if (count($changedModes) > 1) {
+            // Each mode derives the changed region differently; combining them has no coherent meaning.
             return '--diff, --since, and --changed-ranges are mutually exclusive.';
         }
 
         if ($this->diffVs !== null && $changedModes !== []) {
+            // --diff-vs is its own comparison mode and cannot stack on top of a changed-region mode.
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
         if (!in_array($this->changedScope, ['symbol', 'hunk'], true)) {
+            // Scope drives how ranges map to findings; an unknown value would silently mis-scope, so reject it.
             return '--changed-scope must be one of: symbol, hunk.';
         }
 
         if ($this->changedRanges !== null && $this->paths === []) {
+            // Ranges are line spans within files, so they are meaningless without at least one target path.
             return '--changed-ranges requires at least one file path.';
         }
 
+        // Every diff-related constraint held, so there is no usage error from this group.
         return null;
     }
 
@@ -558,9 +603,11 @@ final readonly class AnalyseCommandOptions
     private function changedOnlyUsageError(): ?string
     {
         if (!$this->isChangedOnly || $this->diffVs !== null) {
+            // Valid when changed-only is off, or when it is on and has the comparison ref it needs.
             return null;
         }
 
+        // Changed-only needs a comparison ref to decide which files changed; --diff-vs supplies it.
         return '--changed-only requires --diff-vs.';
     }
 
@@ -572,9 +619,11 @@ final readonly class AnalyseCommandOptions
     private function noBaselineUsageError(): ?string
     {
         if (!$this->noBaseline || $this->baseline->baselinePath === null) {
+            // Either flag alone is fine; only asking to both ignore and apply a baseline is contradictory.
             return null;
         }
 
+        // Disabling the baseline while also pointing at one to apply is contradictory, so reject the run.
         return '--no-baseline cannot be combined with --baseline.';
     }
 
@@ -586,17 +635,20 @@ final readonly class AnalyseCommandOptions
     private function displayFilterError(): ?string
     {
         if ($this->minSeverity !== null && Severity::tryFrom($this->minSeverity) === null) {
+            // Catch the bad value here, before displayFilter() would hard-fail on Severity::from().
             return sprintf('Unsupported min severity "%s". Use advisory, warning, or error.', $this->minSeverity);
         }
 
         foreach (['--include-pillar' => $this->includePillars, '--exclude-pillar' => $this->excludePillars] as $option => $values) {
             foreach ($values as $optionValue) {
                 if (Pillar::tryFrom($optionValue) === null) {
+                    // First unrecognised pillar wins; reporting which option it came from aids the fix.
                     return sprintf('Unsupported pillar "%s" for %s.', $optionValue, $option);
                 }
             }
         }
 
+        // Severity and every pillar resolved, so displayFilter() can safely build the enum-typed filter.
         return null;
     }
 }
