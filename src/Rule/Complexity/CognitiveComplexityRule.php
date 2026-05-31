@@ -71,6 +71,10 @@ final readonly class CognitiveComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
+                continue;
+            }
+
             $cc             = self::computeCognitiveComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($cc);
 

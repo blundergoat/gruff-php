@@ -35,6 +35,25 @@ final readonly class ScoreCalculator
     ];
 
     /**
+     * Size and complexity rules that describe one over-large method as separate
+     * symptoms of a single root cause (P5 / ADR-024).
+     *
+     * When two or more of these fire on the same `(file, symbol, line)` they are
+     * the same god-method seen from different angles: too long, too nested, too
+     * branchy, too many parameters. Scoring bills that cluster once instead of
+     * once per symptom so one root cause cannot tank the grade four times. The
+     * set deliberately omits the retired `design.god-method` composite (ADR-023);
+     * the real component findings now carry the signal directly.
+     */
+    private const CORRELATED_COMPLEXITY_RULES = [
+        'complexity.cognitive',
+        'complexity.cyclomatic',
+        'complexity.nesting-depth',
+        'size.method-length',
+        'size.parameter-count',
+    ];
+
+    /**
      * @param list<Finding>               $findings               Findings included in the score calculation.
      * @param MutationAnalysisResult|null $mutationAnalysisResult Optional mutation result included in scoring.
      * @param DiffResult|null             $diffResult             Optional diff result limiting the scoring scope label.
@@ -52,7 +71,8 @@ final readonly class ScoreCalculator
         ?AnalysisConfig $analysisConfig = null,
     ): ScoreReport {
         $findings   = $this->scoredFindings($findings, $analysisConfig);
-        $pillars    = $this->pillarScores($findings, $mutationAnalysisResult, $scorePillars);
+        $penalties  = $this->findingPenalties($findings);
+        $pillars    = $this->pillarScores($findings, $penalties, $mutationAnalysisResult, $scorePillars);
         $scoreTotal = 0.0;
         $scoreCount = 0;
 
@@ -72,7 +92,7 @@ final readonly class ScoreCalculator
         return new ScoreReport(
             composite:              Grade::fromScore($averageScore),
             pillars:                $pillars,
-            topOffenders:           $this->fileScores($findings, $mutationAnalysisResult, $fileScoreLimit),
+            topOffenders:           $this->fileScores($findings, $penalties, $mutationAnalysisResult, $fileScoreLimit),
             complexityDistribution: $this->complexityDistribution($findings),
             scope:                  $scope,
             explanation:            $this->scoreExplanation($mutationAnalysisResult),
@@ -115,7 +135,7 @@ final readonly class ScoreCalculator
      */
     private function scoreExplanation(?MutationAnalysisResult $mutationAnalysisResult): string
     {
-        $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores.';
+        $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores.';
 
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
             return $base . ' Mutation uses the supplied Infection MSI as the mutation pillar score.';
@@ -128,11 +148,12 @@ final readonly class ScoreCalculator
      * Calculate per-pillar scores from the active finding set.
      *
      * @param list<Finding>               $findings               Scored findings bucketed into per-pillar penalties.
+     * @param array<int, float>           $penalties              Clustered penalty per finding keyed by spl_object_id() (see findingPenalties()).
      * @param MutationAnalysisResult|null $mutationAnalysisResult Mutation report that adds the Mutation pillar graded from its MSI; null omits that pillar.
      * @param list<Pillar>|null           $scorePillars           Explicit pillar set to score, or null to derive pillars from the findings.
      * @return list<PillarScore>
      */
-    private function pillarScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
+    private function pillarScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, ?array $scorePillars): array
     {
         $pillarNames = $scorePillars === null
             ? self::STATIC_PILLARS
@@ -185,7 +206,7 @@ final readonly class ScoreCalculator
                 $findings,
                 static fn (Finding $finding): bool => $finding->pillar->value === $pillarName,
             ));
-            $penalty = array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $pillarFindings)) * 4.0;
+            $penalty = $this->sumPenalties($pillarFindings, $penalties) * 4.0;
             $counts  = $this->severityCounts($pillarFindings);
 
             $scores[] = new PillarScore(
@@ -207,11 +228,12 @@ final readonly class ScoreCalculator
      * Calculate per-file scores from the active finding set.
      *
      * @param list<Finding>               $findings               Scored findings bucketed by file path.
+     * @param array<int, float>           $penalties              Clustered penalty per finding keyed by spl_object_id() (see findingPenalties()).
      * @param MutationAnalysisResult|null $mutationAnalysisResult Mutation report whose per-file MSI summaries enrich each file score; null leaves mutationScore unset.
      * @param int                         $limit                  Maximum number of worst-scoring file scores to return.
      * @return list<FileScore>
      */
-    private function fileScores(array $findings, ?MutationAnalysisResult $mutationAnalysisResult, int $limit): array
+    private function fileScores(array $findings, array $penalties, ?MutationAnalysisResult $mutationAnalysisResult, int $limit): array
     {
         /** @var array<string, list<Finding>> $byFile Accumulator shape is built incrementally from finding file paths. */
         $byFile = [];
@@ -233,7 +255,7 @@ final readonly class ScoreCalculator
 
         foreach ($byFile as $filePath => $fileFindings) {
             $counts          = $this->severityCounts($fileFindings);
-            $penalty         = array_sum(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $fileFindings)) * 5.0;
+            $penalty         = $this->sumPenalties($fileFindings, $penalties) * 5.0;
             $mutationSummary = $mutationByFile[$filePath] ?? null;
 
             $scores[] = new FileScore(
@@ -322,6 +344,77 @@ final readonly class ScoreCalculator
         };
 
         return $severityWeight * $confidenceWeight;
+    }
+
+    /**
+     * Weight every finding for scoring, clustering correlated complexity/size
+     * findings so one root cause is billed once (P5 / ADR-024).
+     *
+     * Findings that share a `(file, symbol, line)` and whose rule is in
+     * {@see self::CORRELATED_COMPLEXITY_RULES} describe one over-large method
+     * from different angles. Each such cluster of two or more contributes a
+     * single shared weight — the largest member penalty divided by the member
+     * count — so a method that is long *and* nested *and* cyclomatically complex
+     * subtracts roughly one penalty rather than four. Every finding stays in the
+     * report; only its scoring weight is divided across the cluster. Lone
+     * findings, and any rule outside the correlated set, keep their full base
+     * penalty. The map is keyed by spl_object_id() because the same penalty must
+     * follow each finding into both the pillar and file penalty buckets.
+     *
+     * @param list<Finding> $findings Scored findings to weight.
+     * @return array<int, float> Penalty per finding, keyed by spl_object_id().
+     */
+    private function findingPenalties(array $findings): array
+    {
+        $penalties = [];
+        foreach ($findings as $finding) {
+            $penalties[spl_object_id($finding)] = $this->penaltyFor($finding);
+        }
+
+        /** @var array<string, list<Finding>> $clusters Correlated findings grouped by file|symbol|line key. */
+        $clusters = [];
+        foreach ($findings as $finding) {
+            if (
+                !in_array($finding->ruleId, self::CORRELATED_COMPLEXITY_RULES, true)
+                || $finding->symbol === null
+                || $finding->line === null
+            ) {
+                continue;
+            }
+
+            $key              = $finding->filePath . "\0" . $finding->symbol . "\0" . $finding->line;
+            $clusters[$key][] = $finding;
+        }
+
+        foreach ($clusters as $cluster) {
+            if (count($cluster) < 2) {
+                continue;
+            }
+
+            $shared = max(array_map(fn (Finding $finding): float => $this->penaltyFor($finding), $cluster)) / count($cluster);
+            foreach ($cluster as $finding) {
+                $penalties[spl_object_id($finding)] = $shared;
+            }
+        }
+
+        return $penalties;
+    }
+
+    /**
+     * Total the clustered penalties for a subset of findings.
+     *
+     * @param list<Finding>     $findings  Findings whose weights to total.
+     * @param array<int, float> $penalties Penalty per finding keyed by spl_object_id(), from findingPenalties().
+     * @return float Summed scoring weight for the subset.
+     */
+    private function sumPenalties(array $findings, array $penalties): float
+    {
+        $total = 0.0;
+        foreach ($findings as $finding) {
+            $total += $penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding);
+        }
+
+        return $total;
     }
 
     /**

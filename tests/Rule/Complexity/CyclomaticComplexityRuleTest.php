@@ -133,6 +133,51 @@ final class CyclomaticComplexityRuleTest extends TestCase
     }
 
     /**
+     * Verify hasExecutableBody separates bodyless signatures from real bodies (P6).
+     *
+     * This is the shared predicate the cyclomatic, cognitive, and nesting-depth
+     * rules use to skip declarations with no control flow, so a regression here
+     * would let any of them measure an abstract or interface method.
+     *
+     * @return void
+     */
+    public function testHasExecutableBodyDistinguishesBodylessSignatures(): void
+    {
+        $unit       = $this->parseFixture('bodyless.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
+
+        $hasBodyByName = [];
+        foreach ($methods as $method) {
+            $hasBodyByName[$method->name->toString()] = CyclomaticComplexityRule::hasExecutableBody($method);
+        }
+
+        self::assertFalse($hasBodyByName['declaredCount'] ?? null, 'Interface method has no body.');
+        self::assertFalse($hasBodyByName['abstractTotal'] ?? null, 'Abstract method has no body.');
+        self::assertTrue($hasBodyByName['concreteTotal'] ?? null, 'Concrete method has a body.');
+    }
+
+    /**
+     * Verify bodyless declarations are skipped even at a zero threshold (P6).
+     *
+     * A warning threshold of 0 would flag every measured node, since base
+     * cyclomatic complexity is 1, so without the bodyless guard the abstract and
+     * interface methods would each report a finding. Only the concrete method is
+     * reported, proving the rule filters bodyless signatures rather than leaning
+     * on "no body folds to baseline complexity".
+     *
+     * @return void
+     */
+    public function testBodylessDeclarationsAreNotMeasured(): void
+    {
+        $findings = $this->analyse('bodyless.php', ['warning' => 0, 'error' => 20]);
+
+        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+
+        self::assertSame(['BodylessFixture::concreteTotal()'], $symbols);
+    }
+
+    /**
      * Analyse complexity fixtures and return findings for assertions.
      *
      * @param array<string, int> $thresholds

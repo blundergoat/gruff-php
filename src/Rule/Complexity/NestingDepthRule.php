@@ -71,6 +71,10 @@ final readonly class NestingDepthRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
+            if (!CyclomaticComplexityRule::hasExecutableBody($node)) {
+                continue;
+            }
+
             $maxDepth       = self::computeMaximumNestingDepth($node);
             $thresholdMatch = $settings->highValueThresholdMatch($maxDepth);
 

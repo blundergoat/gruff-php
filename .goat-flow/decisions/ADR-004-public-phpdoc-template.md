@@ -13,7 +13,7 @@ The adjacent rules and their cascade behaviour against newly-added docblocks:
 
 - **`docs.bare-phpdoc-tags`** - fires when a docblock contains ONLY bare `@param` / `@return` tags with no purpose line or tag descriptions. Suppressed by any descriptive (non-tag) line or by prose after a parameter/return tag.
 - **`docs.missing-return-tag`** - fires when a documented method's docblock omits `@return`. Override-aware via `DocsInheritanceHelper`. Constructors and destructors are exempt by `isReturnlessMagicMethod`.
-- **`docs.missing-param-tag`** - fires when a documented PUBLIC method has parameters but the docblock omits `@param` tags for them. Non-public methods are exempt. Requires `hasContractDoc` (prose OR any docs tag) to fire.
+- **`docs.missing-param-tag`** - fires when a documented method or function has parameters but the docblock omits `@param` tags for them. (Updated 2026-05-31: originally public-only; the visibility gate was dropped so private and protected methods are checked too, matching the mandatory-doc-on-every-unit stance.) Requires `hasContractDoc` (prose OR any docs tag) to fire.
 - **`docs.missing-throws-tag`** - fires when a documented public method's body contains `Throw_` AST nodes but the docblock lacks `@throws`. Override-aware.
 
 This ADR captures the per-archetype template that satisfies `docs.missing-public-phpdoc` without re-firing the bare-PHPDoc rule, while keeping `@param` / `@throws` work scoped to M35.
@@ -29,7 +29,7 @@ M34 extends the same principle to structural PHPDoc. In this codebase every `src
 - `docs.missing-public-phpdoc` is satisfied by ANY non-null `getDocComment()`. Even a single-line `/** Build the X. */` suffices.
 - `docs.bare-phpdoc-tags` is suppressed by ANY descriptive (non-`@`-starting) line or a tag description. A docblock with one prose line plus `@return Type Description.` is safe.
 - `docs.missing-return-tag` is suppressed by ANY `@return` substring in the docblock text. Override-aware.
-- `docs.missing-param-tag` checks documented public methods and functions with parameters. It requires an `@param` line whose final `$name` token matches each signature parameter.
+- `docs.missing-param-tag` checks documented methods and functions with parameters, at any visibility (the public-only gate was dropped 2026-05-31). It requires an `@param` line whose final `$name` token matches each signature parameter.
 - `docs.missing-throws-tag` checks documented public methods and functions whose body contains a `throw` expression. It is satisfied by any `@throws` line and skips inherited contract documentation.
 - `docs.var-annotation-description` checks local `@var` assertions only. Declaration docblocks are skipped; a local assertion must either carry prose after the variable name or have a separate descriptive line in the same docblock.
 

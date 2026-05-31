@@ -54,7 +54,7 @@ final class ScoreCalculatorTest extends TestCase
         self::assertLessThan(100.0, $score->composite->score);
         self::assertSame('full-project', $score->scope);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. '
+            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
             . 'Mutation is omitted when no Infection report is supplied.',
             $score->explanation,
         );
@@ -88,6 +88,81 @@ final class ScoreCalculatorTest extends TestCase
         ));
         self::assertArrayNotHasKey('design', $this->pillarMap($score->pillars));
         self::assertLessThan(100.0, $score->composite->score);
+    }
+
+    /**
+     * Verify correlated findings on one symbol are billed once, not per symptom.
+     *
+     * The same three findings score better when they pile onto a single method
+     * (one root cause, clustered) than when spread across three distinct methods
+     * (three independent root causes), while every finding still counts toward
+     * its pillar.
+     *
+     * @return void
+     */
+    public function testCorrelatedFindingsOnOneSymbolShareOnePenalty(): void
+    {
+        $clustered = (new ScoreCalculator())->calculate([
+            $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+        ], null, DiffResult::inactive());
+
+        $spread = (new ScoreCalculator())->calculate([
+            $this->finding('size.method-length', Pillar::Size, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 40, symbol: 'Big::other()'),
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 70, symbol: 'Big::third()'),
+        ], null, DiffResult::inactive());
+
+        self::assertGreaterThan($spread->composite->score, $clustered->composite->score);
+
+        $pillars = $this->pillarMap($clustered->pillars);
+        self::assertSame(2, $pillars['complexity']->findings);
+        self::assertSame(1, $pillars['size']->findings);
+    }
+
+    /**
+     * Verify a cluster contributes max(member penalty) / member count, not the sum.
+     *
+     * An Error (base 12), a Warning (base 4), and an Advisory (base 1) on one
+     * method share max(12, 4, 1) / 3 = 4.0 each. Three findings × 4.0 × the 4.0
+     * pillar multiplier = 48.0, proving the largest symptom sets the bill and the
+     * weaker overlapping symptoms do not stack on top of it.
+     *
+     * @return void
+     */
+    public function testClusterPenaltyIsMaxMemberPenaltyDividedByCount(): void
+    {
+        $score = (new ScoreCalculator())->calculate([
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Error, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('complexity.cognitive', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('complexity.nesting-depth', Pillar::Complexity, Severity::Advisory, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+        ], null, DiffResult::inactive());
+
+        $complexity = $this->pillarMap($score->pillars)['complexity'];
+        self::assertEqualsWithDelta(48.0, $complexity->penalty, 0.0001);
+        self::assertSame(3, $complexity->findings);
+    }
+
+    /**
+     * Verify a lone correlated finding and an unrelated rule on the same symbol keep full penalty.
+     *
+     * Clustering needs two or more correlated findings, so a single complexity
+     * finding keeps its base penalty; a naming finding sharing the symbol is a
+     * different root cause and is never folded into the cluster.
+     *
+     * @return void
+     */
+    public function testLoneCorrelatedAndUnrelatedFindingsKeepFullPenalty(): void
+    {
+        $score = (new ScoreCalculator())->calculate([
+            $this->finding('complexity.cyclomatic', Pillar::Complexity, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+            $this->finding('naming.generic-method-name', Pillar::Naming, Severity::Warning, filePath: 'src/Big.php', line: 10, symbol: 'Big::run()'),
+        ], null, DiffResult::inactive());
+
+        $pillars = $this->pillarMap($score->pillars);
+        self::assertEqualsWithDelta(16.0, $pillars['complexity']->penalty, 0.0001);
+        self::assertEqualsWithDelta(16.0, $pillars['naming']->penalty, 0.0001);
     }
 
     /**
@@ -134,7 +209,7 @@ final class ScoreCalculatorTest extends TestCase
         self::assertSame(['1-5' => 1, '6-10' => 1, '11-15' => 0, '16-20' => 0, '21+' => 0], $score->complexityDistribution);
         self::assertSame('diff', $payload['scope']);
         self::assertSame(
-            'Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. '
+            'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. '
             . 'Mutation uses the supplied Infection MSI as the mutation pillar score.',
             $payload['explanation'],
         );

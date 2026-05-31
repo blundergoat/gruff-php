@@ -98,6 +98,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            if (!self::hasExecutableBody($node)) {
+                continue;
+            }
+
             $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
@@ -229,6 +233,26 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         }
 
         return $node->name->toString() . '()';
+    }
+
+    /**
+     * Whether a function-like node has an executable body to measure.
+     *
+     * Abstract methods, interface methods, and other bodyless signatures parse as
+     * a {@see ClassMethod} with `stmts === null`: they declare a contract but
+     * contain no control flow. The executable-complexity rules (cyclomatic,
+     * cognitive, nesting depth) skip them so they never score a type-shaped
+     * declaration as if it had branches to simplify (DESIGN-PRINCIPLES P6),
+     * replacing the previous reliance on "no body folds to baseline complexity".
+     * A free {@see Function_} always carries a body, so this only ever filters
+     * bodyless methods.
+     *
+     * @param ClassMethod|Function_ $node Function-like node under inspection.
+     * @return bool True when the node has a statement body the rule can measure.
+     */
+    public static function hasExecutableBody(ClassMethod|Function_ $node): bool
+    {
+        return $node->stmts !== null;
     }
 
     /**

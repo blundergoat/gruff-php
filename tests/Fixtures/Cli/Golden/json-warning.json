@@ -247,7 +247,7 @@
             "21+": 0
         },
         "scope": "full-project",
-        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
+        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
     },
     "diff": {
         "active": false,

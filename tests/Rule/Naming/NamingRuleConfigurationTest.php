@@ -129,6 +129,38 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     }
 
     /**
+     * Verify acceptedBooleanNames clears exact boolean names without a rename (P3).
+     *
+     * A boolean-returning method named `active()` is normally flagged, and the
+     * only in-code fix is the caller-breaking rename to `isActive()`. Listing the
+     * exact name in acceptedBooleanNames clears the finding while leaving the
+     * public name intact, the non-breaking resolution P3 requires; an unlisted
+     * name such as `enabled()` still fires.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixAcceptedBooleanNamesCanBeConfigured(): void
+    {
+        $unit     = $this->parseFixture('boolean-prefix.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['active', 'check']])),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, array_filter(
+            $findings,
+            static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+        ));
+
+        self::assertNotContains('BooleanPrefixFixture::active()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
+        self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
+        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
+    }
+
+    /**
      * Verify Hungarian notation type prefixes can be limited to structural types.
      *
      * @return void

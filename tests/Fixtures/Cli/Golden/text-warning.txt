@@ -12,7 +12,7 @@ Files
 Score
   Composite: A (96.50/100)
   Scope: full-project
-  Score drivers: Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
+  Score drivers: Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
   Pillars:
     size: B (84.00) findings=1
     complexity: A (100.00) findings=0

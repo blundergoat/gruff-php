@@ -20,7 +20,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects documented public methods whose parameters lack matching @param tags.
+ * Detects documented methods and functions whose parameters lack matching @param tags.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -47,7 +47,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Find documented public function-like declarations with undocumented parameters.
+     * Find documented function-like declarations with undocumented parameters, at any visibility.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
@@ -62,10 +62,6 @@ final readonly class MissingParamTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            if ($node instanceof ClassMethod && !$node->isPublic()) {
-                continue;
-            }
-
             $docComment = $node->getDocComment();
 
             if ($docComment === null || $node->params === []) {

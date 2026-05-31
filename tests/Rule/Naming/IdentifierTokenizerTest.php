@@ -27,4 +27,26 @@ final class IdentifierTokenizerTest extends TestCase
         self::assertSame(['order', 'item', '2'], $identifierTokenizer->tokenize('order_item2'));
         self::assertSame(['temp'], $identifierTokenizer->tokenize('_temp'));
     }
+
+    /**
+     * Verify digit runs survive tokenization as their own tokens (P1).
+     *
+     * Digits and acronyms carry identity: `sha256`, `utf8`, `v2` are exact,
+     * correct names. The tokenizer must keep each digit run as a standalone token
+     * rather than deleting it or folding it into the stem, so a downstream naming
+     * rule never mistakes `sha256` for a `foo1`-style numbered placeholder. This
+     * is the DESIGN-PRINCIPLES P1 rubric.
+     *
+     * @return void
+     */
+    public function testIdentifierTokenizerPreservesDigitIdentity(): void
+    {
+        $identifierTokenizer = new IdentifierTokenizer();
+
+        self::assertSame(['sha', '256'], $identifierTokenizer->tokenize('sha256'));
+        self::assertSame(['utf', '8'], $identifierTokenizer->tokenize('utf8'));
+        self::assertSame(['base', '64'], $identifierTokenizer->tokenize('base64'));
+        self::assertSame(['v', '2'], $identifierTokenizer->tokenize('v2'));
+        self::assertSame(['adr', '020'], $identifierTokenizer->tokenize('adr020'));
+    }
 }
