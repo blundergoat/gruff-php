@@ -62,7 +62,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Describe the suffix-Hungarian rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -81,9 +81,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Find properties, parameters, and locals that encode type suffixes.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for configured suffixes.
-     * @return list<Finding> Findings for suffix-Hungarian identifiers.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for configured suffixes.
+     *
+     * @return list<Finding> - Findings for suffix-Hungarian identifiers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -93,65 +94,67 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings            = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
-            foreach ($property->props as $prop) {
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $prop,
-                    identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         $property->type,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+            array_push(
+                $findings,
+                ...$this->propertyFindings(
+                    definition:        $definition,
+                    analysisUnit:      $analysisUnit,
+                    property:          $property,
+                    suffixes:          $suffixes,
+                    tokenizer:         $identifierTokenizer,
+                ),
+            );
         }
 
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
-            $symbol = $this->symbol($scope);
+            array_push(
+                $findings,
+                ...$this->scopeFindings(
+                    definition:        $definition,
+                    analysisUnit:      $analysisUnit,
+                    scope:             $scope,
+                    suffixes:          $suffixes,
+                    tokenizer:         $identifierTokenizer,
+                ),
+            );
+        }
 
-            foreach ($scope->node->params as $param) {
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
+        return $findings;
+    }
 
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $param,
-                    identifier:   ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         $param->type,
-                );
+    /**
+     * Build suffix-Hungarian findings for properties declared in one property statement.
+     *
+     * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the property declaration.
+     * @param Property              $property - Property statement whose individual props are inspected.
+     * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer - Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - property suffix findings in declaration order
+     */
+    private function propertyFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        Property $property,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
 
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+        foreach ($property->props as $prop) {
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $prop,
+                identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         $property->type,
+            );
 
-            foreach ($scope->localVariables as $name => $variable) {
-                $suffixToken = $this->suffixToken($name, $suffixes, $identifierTokenizer);
-                if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
-                    continue;
-                }
-
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $variable,
-                    identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         null,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
             }
         }
 
@@ -159,9 +162,140 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @param array{kind: string, name: string, symbol: string|null} $identifier
-     * @param array<string, string>                                  $suffixes   Map of lower-case suffix token to configured display suffix.
-     * @return Finding|null Finding for an identifier with a type suffix.
+     * Build suffix-Hungarian findings for parameters and locals inside one callable scope.
+     *
+     * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope - Callable scope whose identifiers are inspected.
+     * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer - Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - parameter and local suffix findings in source order
+     */
+    private function scopeFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        return [
+            ...$this->parameterFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+            ),
+            ...$this->localVariableFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+            ),
+        ];
+    }
+
+    /**
+     * Build suffix-Hungarian findings for parameters inside one callable scope.
+     *
+     * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope - Callable scope whose parameters are inspected.
+     * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer - Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - parameter suffix findings in declaration order
+     */
+    private function parameterFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->node->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $param,
+                identifier:   ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         $param->type,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build suffix-Hungarian findings for local variables inside one callable scope.
+     *
+     * @param RuleDefinition        $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope - Callable scope whose locals are inspected.
+     * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer - Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - local variable suffix findings in discovery order
+     */
+    private function localVariableFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->localVariables as $name => $variable) {
+            $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+            if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $variable,
+                identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         null,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, pillar, and confidence for the finding.
+     * @param AnalysisUnit                                           $analysisUnit - Parsed unit whose display path anchors the reported finding.
+     * @param Node                                                   $node - Declaration node whose start line locates the finding.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier - Identifier kind (property/parameter/variable), bare name, and owning symbol.
+     * @param array<string, string>                                  $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer                                    $tokenizer - Splits the name into camel/Pascal tokens to isolate the trailing suffix.
+     * @param Node|null                                              $type - Declared type to weigh against the suffix; null when no declaration constrains it.
+     *
+     * @return Finding|null - Finding for an identifier with a type suffix.
      */
     private function finding(
         RuleDefinition $definition,
@@ -203,7 +337,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check local PHPDoc `@var` evidence when it exists.
      *
-     * @return bool True when no local doc type contradicts the suffix.
+     * @param Variable $variable - Local variable node whose nearest `@var` annotation, if any, is consulted.
+     * @param string   $suffix - Display suffix the name carries, compared case-insensitively against the doc type.
+     *
+     * @return bool - True when no local doc type contradicts the suffix.
      */
     private function allowsLocalTypeSuffix(Variable $variable, string $suffix): bool
     {
@@ -213,8 +350,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @param array<string, string> $suffixes
-     * @return string|null Lower-case suffix token matched at the end of the name.
+     * @param string                $name - Identifier (without leading `$`) whose trailing token is examined.
+     * @param array<string, string> $suffixes - Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer - Splits the name into tokens so the final word can be matched.
+     *
+     * @return string|null - Lower-case suffix token matched at the end of the name.
      */
     private function suffixToken(string $name, array $suffixes, IdentifierTokenizer $tokenizer): ?string
     {
@@ -231,7 +371,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Read the nearest local `@var` type attached to a variable assignment.
      *
-     * @return string|null PHPDoc type text when present.
+     * @param Variable $variable - Local variable node; the walk climbs its `parent` chain looking for a `@var` doc.
+     *
+     * @return string|null - PHPDoc type text when present.
      */
     private function localVarDocType(Variable $variable): ?string
     {
@@ -255,7 +397,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @return bool True when the declared type exists and does not support the suffix.
+     * @param Node|null $type - Declared type node to test, or null when the declaration omits a type.
+     * @param string    $suffix - Lower-case suffix token the name carries (e.g. `string`, `array`).
+     *
+     * @return bool - True when the declared type exists and does not support the suffix.
      */
     private function doesTypeContradictSuffix(?Node $type, string $suffix): bool
     {
@@ -271,7 +416,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check whether a single-arm PHPDoc type supports the configured suffix.
      *
-     * @return bool True when the PHPDoc type matches the suffix.
+     * @param string $type - Raw PHPDoc type text from a `@var` tag, possibly nullable or a union.
+     * @param string $suffix - Lower-case suffix token to confirm against the type's sole non-null arm.
+     *
+     * @return bool - True when the PHPDoc type matches the suffix.
      */
     private function matchesDocTypeSuffix(string $type, string $suffix): bool
     {
@@ -291,7 +439,12 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Check whether a native or short type name supports the configured suffix.
      *
-     * @return bool True when the type name matches the suffix.
+     * @param string $typeName - Declared or PHPDoc type name; namespace, generics, and `[]` are stripped first.
+     * @param string $suffix - Lower-case suffix token the identifier carries, naming the native type it claims to
+     *                         be; the `match ($suffix)` expression is the authoritative set of recognised tokens and
+     *                         the type names each one admits. An unrecognised token can never match (`default` arm).
+     *
+     * @return bool - True when the type name matches the suffix.
      */
     private function matchesTypeNameSuffix(string $typeName, string $suffix): bool
     {
@@ -314,7 +467,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Resolve nullable or simple single-arm types to one type name.
      *
-     * @return string|null Type name when the declaration has exactly one non-null arm.
+     * @param Node $type - Type-hint node from a declaration: nullable, plain, or union form.
+     *
+     * @return string|null - Type name when the declaration has exactly one non-null arm.
      */
     private function singleTypeName(Node $type): ?string
     {
@@ -341,8 +496,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Normalize configured suffixes to case-insensitive lookup keys.
      *
-     * @param list<string> $suffixes
-     * @return array<string, string>
+     * @param list<string> $suffixes - Configured display suffixes as authored in `.gruff-php.yaml`, any casing.
+     *
+     * @return array<string, string> - Lower-case token keyed to the original display suffix; blanks dropped.
      */
     private function normalisedSuffixes(array $suffixes): array
     {
@@ -359,8 +515,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $tokens
-     * @return bool True when the suffix is part of an explicit conversion idiom.
+     * @param list<string> $tokens - Lower-case name tokens in source order; the last is the candidate suffix.
+     *
+     * @return bool - True when the suffix is part of an explicit conversion idiom.
      */
     private function isConversionIdiom(array $tokens): bool
     {
@@ -376,7 +533,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @return string Named callable symbol or synthetic closure/arrow label.
+     * @param FunctionLikeScope $scope - Scope being reported; its node and kind name the owning callable.
+     *
+     * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {

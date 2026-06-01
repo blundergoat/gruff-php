@@ -25,7 +25,7 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 /**
- * Detects local @var assertions that omit the reason the assertion is needed.
+ * Detects local var assertions that omit the reason the assertion is needed.
  */
 final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
@@ -35,12 +35,13 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public const ID = 'docs.var-annotation-description';
 
     /**
-     * Describe the local @var annotation description rule.
+     * Describe the local var-annotation description rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - metadata and defaults the registry uses to wire this rule
      */
     public function definition(): RuleDefinition
     {
+        // Warning at high confidence: a bare local @var is an unambiguous documentation gap, so it should be loud.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Var annotation description',
@@ -53,17 +54,18 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local @var assertions that do not explain why the assertion is needed.
+     * Find local var assertions that do not explain why the assertion is needed.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - parsed unit to inspect
+     * @param RuleContext $ruleContext - rule context for this analysis pass
      *
-     * @return list<Finding> Findings for bare local @var annotations.
+     * @return list<Finding> - one finding per bare local var assertion; empty when every assertion carries a reason
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // Fast bail: nothing to find when the file has no @var tag.
         if (!str_contains($analysisUnit->source, '@var')) {
+            // No @var anywhere means no annotation to judge, so report nothing.
             return [];
         }
 
@@ -80,7 +82,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 
         $candidates = $nodeFinder->find(
             $analysisUnit->statements,
-            static fn (Node $node): bool => $node->getDocComment() instanceof Doc,
+            static fn(Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
         foreach ($candidates as $node) {
@@ -121,23 +123,30 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     /**
      * Distinguish declaration docblocks from local variable assertion docblocks.
      *
-     * @return bool True when the docblock belongs to a declaration node.
+     * @param Node $node - AST node carrying the @var docblock; a declaration node means the tag documents that
+     *                   declaration rather than a local assertion, so it is exempt from this rule.
+     *
+     * @return bool - true when the docblock documents a declaration (exempt); false for a local @var assertion to judge.
      */
     private function isDeclarationNode(Node $node): bool
     {
+        // A @var on any of these declaration shapes documents the declaration, not a local assertion to flag.
         return $node instanceof Property
-            || $node instanceof ClassMethod
-            || $node instanceof Function_
-            || $node instanceof ClassConst
-            || $node instanceof Const_
-            || $node instanceof ClassLike
-            || $node instanceof Param;
+               || $node instanceof ClassMethod
+               || $node instanceof Function_
+               || $node instanceof ClassConst
+               || $node instanceof Const_
+               || $node instanceof ClassLike
+               || $node instanceof Param;
     }
 
     /**
-     * Find local @var annotations that name a type without explaining intent.
+     * Find local var assertion tags that name a type without explaining intent.
      *
-     * @return list<string>
+     * @param string $docText - raw docblock text, including the comment markers
+     *
+     * @return list<string> - variable names whose local var assertion stated a type but no reason; empty
+     *   when the docblock carries any prose line
      */
     private function bareVarAnnotations(string $docText): array
     {
@@ -169,9 +178,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         }
 
         if ($descriptiveLines !== []) {
+            // Any prose line already explains the docblock, so suppress every bare-@var finding for it.
             return [];
         }
 
+        // Only tag-only docblocks reach here, so surface the variables whose @var carried no reason.
         return $bareVariables;
     }
 }

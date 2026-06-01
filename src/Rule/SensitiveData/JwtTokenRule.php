@@ -26,10 +26,12 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Describe the JWT token sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning at medium confidence: the three-segment shape is distinctive,
+        // but test fixtures legitimately embed sample tokens.
         return new RuleDefinition(
             id:              self::ID,
             name:            'JWT token literal',
@@ -43,14 +45,15 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble embedded JWT tokens.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for JWT-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for JWT-like literals.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'eyJ')) {
+            // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
             return [];
         }
 

@@ -9,7 +9,7 @@ interface DocumentedContract
     /**
      * Contract docs live here.
      *
-     * @return int The accepted value.
+     * @return int - The accepted value.
      * @throws \RuntimeException when the value is invalid.
      */
     public function inheritedThrows(int $value): int;
@@ -20,8 +20,9 @@ class PhpdocTagsFixture
     /**
      * Has all tags.
      *
-     * @param int $x The value.
-     * @return int The result.
+     * @param int $x - The value.
+     *
+     * @return int - The result.
      */
     public function complete(int $x): int
     {
@@ -31,7 +32,8 @@ class PhpdocTagsFixture
     /**
      * Missing one @param tag.
      *
-     * @param int $x The first value.
+     * @param int $x - The first value.
+     *
      * @return int
      */
     public function missingParam(int $x, int $y): int
@@ -56,7 +58,8 @@ class PhpdocTagsFixture
     /**
      * Missing the array @param tag.
      *
-     * @param int $x The first value.
+     * @param int $x - The first value.
+     *
      * @return int
      */
     public function missingArrayParam(int $x, array $y): int
@@ -67,7 +70,7 @@ class PhpdocTagsFixture
     /**
      * Does not document the return value.
      *
-     * @param int $x The value.
+     * @param int $x - The value.
      */
     public function missingReturn(int $x): int
     {
@@ -83,7 +86,7 @@ class PhpdocTagsFixture
     /**
      * Does not document the array return shape.
      *
-     * @param int $x The value.
+     * @param int $x - The value.
      */
     public function missingArrayReturn(int $x): array
     {
@@ -117,8 +120,9 @@ class PhpdocTagsFixture
     /**
      * Stale param.
      *
-     * @param int $x Exists.
-     * @param string $oldParam No longer exists.
+     * @param int $x - Exists.
+     * @param string $oldParam - No longer exists.
+     *
      * @return int
      */
     public function staleParam(int $x): int
@@ -144,7 +148,7 @@ class PhpdocTagsFixture
     }
 
     /**
-     * @param int $x The value being doubled.
+     * @param int $x - The value being doubled.
      */
     public function describedTagDoc(int $x): int
     {
@@ -152,7 +156,7 @@ class PhpdocTagsFixture
     }
 
     /**
-     * @return int The stable count.
+     * @return int - The stable count.
      */
     public function describedReturnTagDoc(): int
     {
@@ -173,6 +177,7 @@ class PhpdocTagsFixture
 
     /**
      * @param int $x
+     *
      * @return int
      */
     public function uselessDoc(int $x): int
@@ -207,7 +212,7 @@ class PhpdocTagsFixture
     /**
      * Private helpers are clean when the return tag is present.
      *
-     * @return string The resolved value.
+     * @return string - The resolved value.
      */
     private function privateCompleteReturnTag(): string
     {

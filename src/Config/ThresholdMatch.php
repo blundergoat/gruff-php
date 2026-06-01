@@ -14,8 +14,8 @@ final readonly class ThresholdMatch
     /**
      * Capture the threshold and severity selected for a measured value.
      *
-     * @param int|float $threshold Threshold value that matched.
-     * @param Severity  $severity  Severity assigned to the threshold.
+     * @param int|float $threshold - Threshold value that matched.
+     * @param Severity  $severity - Severity assigned to the threshold.
      */
     public function __construct(
         public int|float $threshold,

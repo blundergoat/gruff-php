@@ -8,7 +8,8 @@ use GruffPhp\Command\DashboardScanCommandBuilder;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dashboard scan command building: dash-prefixed and quoted path token preservation, owned-option separation, and prevention of option-like paths reaching the argument vector.
+ * Covers dashboard scan command building: dash-prefixed and quoted path token preservation, owned-option separation, and prevention of option-like
+ * paths reaching the argument vector.
  */
 final class DashboardScanCommandBuilderTest extends TestCase
 {
@@ -76,20 +77,24 @@ final class DashboardScanCommandBuilderTest extends TestCase
     /**
      * Build the dashboard scan state used by command-builder tests.
      *
-     * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string}
+     * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
+     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - a fully-populated valid scan state fixture; flag
+     *                        fields ('noBaseline', 'noConfig', 'includeIgnored', 'reportInteractive') use '0'/'1' string toggles and 'baseline' is
+     *                        empty when no baseline applies
      */
     private function state(): array
     {
+        // Canonical valid scan state the builder turns into a command line.
         return [
-            'project' => __DIR__,
-            'paths' => '.',
-            'scanScope' => 'full',
-            'failOn' => 'none',
-            'config' => '.gruff-php.yaml',
-            'baseline' => '',
-            'noBaseline' => '0',
-            'noConfig' => '0',
-            'includeIgnored' => '0',
+            'project'           => __DIR__,
+            'paths'             => '.',
+            'scanScope'         => 'full',
+            'failOn'            => 'none',
+            'config'            => '.gruff-php.yaml',
+            'baseline'          => '',
+            'noBaseline'        => '0',
+            'noConfig'          => '0',
+            'includeIgnored'    => '0',
             'reportInteractive' => '0',
         ];
     }

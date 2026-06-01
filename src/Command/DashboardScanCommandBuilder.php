@@ -14,7 +14,7 @@ final readonly class DashboardScanCommandBuilder
     /**
      * Build dashboard-triggered analyse commands for the given gruff-php binary.
      *
-     * @param string $gruffBinary Absolute gruff-php binary path used in dashboard scans.
+     * @param string $gruffBinary - Absolute gruff-php binary path used in dashboard scans.
      */
     public function __construct(private string $gruffBinary)
     {
@@ -23,8 +23,9 @@ final readonly class DashboardScanCommandBuilder
     /**
      * Parse a dashboard paths string into command arguments.
      *
-     * @param string $paths Space-separated paths from the dashboard form, with double quotes for paths containing spaces.
-     * @return list<string>
+     * @param string $paths - Space-separated paths from the dashboard form, with double quotes for paths containing spaces.
+     *
+     * @return list<string> - parsed path operands in form order; defaults to ['.'] when input is blank or all-empty
      */
     public function parsePaths(string $paths): array
     {
@@ -49,20 +50,26 @@ final readonly class DashboardScanCommandBuilder
     /**
      * Decode only the quote and backslash escapes emitted by the dashboard path tokenizer.
      *
-     * @return string Path with wrapper-level escapes removed.
+     * @param string $quotedPath - Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
+     *
+     * @return string - decoded path with the wrapper \" and \\ escapes resolved; inner content otherwise untouched
      */
     private function unescapeQuotedPath(string $quotedPath): string
     {
         $unescapedPath = preg_replace('/\\\\(["\\\\])/', '$1', $quotedPath);
 
+        // preg_replace returns null only on engine error; fall back to the input so a path is always produced.
         return is_string($unescapedPath) ? $unescapedPath : $quotedPath;
     }
 
     /**
-     * @param         list<string>                                                                                                                                                                                        $paths
-     * @param         array<string, string>                                                                                                                                                                               $state
-     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
-     * @return list<string>
+     * @param list<string>           $paths - Source paths selected in the dashboard form; appended after `--`.
+     * @param array<string, string>  $state - Sanitised dashboard form state used to build analyse flags.
+     *
+     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
+     *                noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     *
+     * @return list<string> - full argv for the analyse run: PHP binary, gruff binary, flags, then path operands after the -- separator
      */
     public function analyseCommand(array $paths, array $state): array
     {

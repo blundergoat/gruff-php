@@ -17,11 +17,12 @@ final readonly class InfectionRunner
     /**
      * Execute Infection and capture its process result.
      *
-     * @param string      $projectRoot          Project root where Infection should run.
-     * @param string      $binary               Infection binary path or command name.
-     * @param string|null $configPath           Infection config path, when supplied.
-     * @param string|null $testFrameworkOptions Extra test-framework options passed to Infection.
-     * @return InfectionRunResult Process result and optional diagnostic.
+     * @param string      $projectRoot - Project root where Infection should run.
+     * @param string      $binary - Infection binary path or command name.
+     * @param string|null $configPath - Infection config path, when supplied.
+     * @param string|null $testFrameworkOptions - Extra test-framework options passed to Infection.
+     *
+     * @return InfectionRunResult - Process result and optional diagnostic.
      */
     public function runInfection(
         string $projectRoot,
@@ -32,6 +33,7 @@ final readonly class InfectionRunner
         $resolvedBinary = $this->resolveBinary($projectRoot, $binary);
 
         if ($resolvedBinary === null) {
+            // No executable means no run; report the failure as a result rather than throwing.
             return new InfectionRunResult(
                 exitCode:    2,
                 output:      '',
@@ -72,38 +74,49 @@ final readonly class InfectionRunner
     /**
      * Resolve an Infection executable from a path, vendor bin, or PATH lookup.
      *
-     * @return string|null Executable path, or null when not found.
+     * @param string $projectRoot - Anchor for relative binary paths and the vendor/bin lookup.
+     * @param string $binary - Configured binary; a slash means an explicit path, otherwise a PATH/vendor name.
+     *
+     * @return string|null - Executable path, or null when not found.
      */
     private function resolveBinary(string $projectRoot, string $binary): ?string
     {
         if ($binary === '') {
+            // Empty config gives nothing to resolve; let the caller surface the not-found diagnostic.
             return null;
         }
 
         if (str_contains($binary, '/') || str_contains($binary, '\\')) {
             $candidate = $this->absolutePath($projectRoot, $binary);
 
+            // An explicit path is honoured only when it actually points at a runnable file.
             return is_file($candidate) && is_executable($candidate) ? $candidate : null;
         }
 
         $localBinary = rtrim($projectRoot, '/') . '/vendor/bin/' . $binary;
 
         if (is_file($localBinary) && is_executable($localBinary)) {
+            // Prefer the project-local Infection over any global one on PATH.
             return $localBinary;
         }
 
         $resolved = (new ExecutableFinder())->find($binary);
 
+        // Fall back to PATH; null here means resolution failed and the run cannot proceed.
         return is_string($resolved) ? $resolved : null;
     }
 
     /**
      * Resolve a path relative to the project root when needed.
      *
-     * @return string Absolute path.
+     * @param string $projectRoot - Base directory an already-relative path is joined onto.
+     * @param string $path - Candidate path; returned unchanged when already absolute.
+     *
+     * @return string - Absolute path.
      */
     private function absolutePath(string $projectRoot, string $path): string
     {
+        // Already-absolute paths pass through; only relative ones get anchored to the project root.
         return PathHelper::resolveAgainst($projectRoot, $path);
     }
 }

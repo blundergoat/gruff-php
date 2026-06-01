@@ -36,7 +36,7 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Describe the SQL concatenation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -53,10 +53,10 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Find query method calls whose first argument uses concatenation or interpolation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for heuristic SQL concatenation.
+     * @return list<Finding> - Findings for heuristic SQL concatenation.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -81,10 +81,14 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Build the SQL concatenation finding for a call node.
      *
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node - Query call flagged as concatenating SQL; its start line locates the finding.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {
+        // Heuristic match only, so emit a medium-confidence warning rather than a hard error.
         return new Finding(
             ruleId:      self::ID,
             message:     'Heuristic SQL query string concatenation detected.',

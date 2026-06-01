@@ -29,10 +29,11 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Describe the empty class rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory and medium confidence: an empty class is sometimes a deliberate stub, so this only nudges.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Empty class',
@@ -46,10 +47,10 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Find concrete classes that declare no members and are not exception markers.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for empty classes.
+     * @return list<Finding> - One finding per concrete, member-less class that is not an exception marker.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -94,16 +95,20 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Allow empty classes that exist as exception marker types.
      *
-     * @return bool True when the class extends an exception/throwable type.
+     * @param Class_ $class - Class declaration to test; only a parent type can make an empty body legitimate.
+     *
+     * @return bool - True when the class extends an exception/throwable type.
      */
     private function isEmptyExceptionMarker(Class_ $class): bool
     {
         if ($class->extends === null) {
+            // No parent means it cannot be a marker subtype, so an empty body is not excused.
             return false;
         }
 
         $parent = $class->extends->toString();
 
+        // Marker exceptions add nothing but a distinct type; an empty body is the intended shape, so exempt them.
         return $parent === 'Exception'
             || $parent === 'Throwable'
             || str_ends_with($parent, 'Exception')

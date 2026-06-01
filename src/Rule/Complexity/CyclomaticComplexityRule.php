@@ -65,27 +65,29 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Describe the cyclomatic complexity rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
+        // Default threshold of 20 is the CCN above which a function-like is flagged; .gruff-php.yaml can override it.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Cyclomatic complexity',
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Error,
+            defaultSeverity:   Severity::Warning,
             confidence:        Confidence::High,
-            severityThreshold: new SeverityThreshold(20, Severity::Error),
+            severityThreshold: new SeverityThreshold(20, Severity::Warning),
         );
     }
 
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
-     * @return list<Finding> Findings for complex function-like declarations.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying thresholds.
+     *
+     * @return list<Finding> - Findings for complex function-like declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -98,6 +100,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node NodeIndex query is constrained to function-like classes. */
+            if (!self::hasExecutableBody($node)) {
+                continue;
+            }
+
             $ccn            = self::computeCyclomaticComplexity($node);
             $thresholdMatch = $settings->highValueThresholdMatch($ccn);
 
@@ -138,9 +144,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node
+     * @param ClassMethod|Function_ $node - Function-like node whose control-flow constructs are counted.
      *
-     * @return int Cyclomatic complexity number.
+     * @return int - Cyclomatic complexity number.
      */
     public static function computeCyclomaticComplexity(Node $node): int
     {
@@ -152,6 +158,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
             if (is_int($cached)) {
+                // Reuse the memoised score so a node walked by several complexity rules is only counted once.
                 return $cached;
             }
         }
@@ -180,10 +187,13 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node contributes one cyclomatic complexity point.
      *
-     * @return bool True when the node is counted as a decision point.
+     * @param Node $child - Body descendant being classified as a decision point or not.
+     *
+     * @return bool - True when the node is counted as a decision point.
      */
     private static function isDecisionNode(Node $child): bool
     {
+        // Branch statements and short-circuit operators each fork control flow; a `default` case (cond null) does not.
         return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
             || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
             || ($child instanceof Stmt\Case_ && $child->cond !== null);
@@ -192,14 +202,16 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node is an instance of any configured class.
      *
-     * @param list<class-string<Node>> $classes Candidate node classes.
+     * @param Node                      $node - Node whose runtime class is tested against the candidates.
+     * @param list<class-string<Node>> $classes - Candidate node classes.
      *
-     * @return bool True when the node matches one candidate class.
+     * @return bool - True when the node matches one candidate class.
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
         foreach ($classes as $class) {
             if ($node instanceof $class) {
+                // First matching class is enough; the caller only needs membership, not which class matched.
                 return true;
             }
         }
@@ -210,8 +222,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Build a display symbol for a function-like node.
      *
-     * @param ClassMethod|Function_ $node Function-like node to describe.
-     * @return string Function or method display symbol.
+     * @param ClassMethod|Function_ $node - Function-like node to describe.
+     *
+     * @return string - Function or method display symbol.
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
@@ -232,9 +245,33 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     }
 
     /**
+     * Whether a function-like node has an executable body to measure.
+     *
+     * Abstract methods, interface methods, and other bodyless signatures parse as
+     * a {@see ClassMethod} with `stmts === null`: they declare a contract but
+     * contain no control flow. The executable-complexity rules (cyclomatic,
+     * cognitive, nesting depth) skip them so they never score a type-shaped
+     * declaration as if it had branches to simplify (DESIGN-PRINCIPLES P6),
+     * replacing the previous reliance on "no body folds to baseline complexity".
+     * A free {@see Function_} always carries a body, so this only ever filters
+     * bodyless methods.
+     *
+     * @param ClassMethod|Function_ $node - Function-like node under inspection.
+     *
+     * @return bool - True when the node has a statement body the rule can measure.
+     */
+    public static function hasExecutableBody(ClassMethod|Function_ $node): bool
+    {
+        // A null statement list marks a bodyless declaration (abstract/interface), which has no control flow to score.
+        return $node->stmts !== null;
+    }
+
+    /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Configured threshold to render; whole floats are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {

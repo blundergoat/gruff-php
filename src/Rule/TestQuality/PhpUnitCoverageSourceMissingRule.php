@@ -36,7 +36,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Create the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -46,7 +46,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Describe the PHPUnit coverage source rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -63,23 +63,27 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Report a project once when its PHPUnit config lacks coverage source configuration.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext  Rule context carrying project root.
-     * @return list<Finding> Findings for missing PHPUnit coverage source settings.
+     * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext - Rule context carrying project root.
+     *
+     * @return list<Finding> - Findings for missing PHPUnit coverage source settings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $root = $ruleContext->projectRoot;
         if (isset($this->emittedRoots[$root])) {
+            // One config maps to many test files; emit per project root once so the finding is not duplicated.
             return [];
         }
 
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
+            // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
             return [];
         }
 
         $config = $this->discovery->discover($root);
         if ($config === null) {
+            // No discoverable phpunit.xml means there is no coverage config to fault; treat as not applicable.
             return [];
         }
 
@@ -88,9 +92,11 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
         if ($this->hasCoverageSource($config->root)
             || isset($config->root->filter->whitelist) && $config->root->filter->whitelist->count() > 0
         ) {
+            // Either a modern <source> or a legacy <filter><whitelist> scopes coverage, so the config is fine.
             return [];
         }
 
+        // Neither include mechanism is present, so coverage would measure nothing meaningful; report it once.
         return [
             new Finding(
                 ruleId:  self::ID,
@@ -113,22 +119,28 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Check for PHPUnit 10 coverage source declarations.
      *
-     * @return bool True when a supported coverage source/include block exists.
+     * @param \SimpleXMLElement $root - Parsed <phpunit> root element whose coverage children are probed.
+     *
+     * @return bool - True when a supported coverage source/include block exists.
      */
     private function hasCoverageSource(\SimpleXMLElement $root): bool
     {
         if (isset($root->source) && $root->source->count() > 0) {
+            // Newer schemas place <source> directly on the root; its presence alone scopes coverage.
             return true;
         }
 
         if (isset($root->coverage->source) && $root->coverage->source->count() > 0) {
+            // Some schemas nest <source> under <coverage>; accept that placement as equivalent.
             return true;
         }
 
         if (isset($root->coverage->include) && $root->coverage->include->count() > 0) {
+            // The older <coverage><include> form still declares an include path, so honour it too.
             return true;
         }
 
+        // None of the supported include shapes matched, so coverage scope is undeclared.
         return false;
     }
 

@@ -12,7 +12,8 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers function-like scope walking: isolation of nested closures, shadowed parameters, separate scopes for arrow functions inside foreach, and method-before-body-closure yield order.
+ * Covers function-like scope walking: isolation of nested closures, shadowed parameters, separate scopes for arrow functions inside foreach, and
+ * method-before-body-closure yield order.
  */
 final class FunctionLikeScopeWalkerTest extends TestCase
 {
@@ -40,10 +41,11 @@ final class FunctionLikeScopeWalkerTest extends TestCase
                     return $insideValue;
                 };
             }
-            PHP);
+            PHP
+        );
 
         self::assertSame(['function', 'closure', 'closure'], array_map(
-            static fn (FunctionLikeScope $scope): string => $scope->kind,
+            static fn(FunctionLikeScope $scope): string => $scope->kind,
             $scopes,
         ));
 
@@ -78,10 +80,11 @@ final class FunctionLikeScopeWalkerTest extends TestCase
 
                 return $callbacks;
             }
-            PHP);
+            PHP
+        );
 
         self::assertSame(['function', 'arrow'], array_map(
-            static fn (FunctionLikeScope $scope): string => $scope->kind,
+            static fn(FunctionLikeScope $scope): string => $scope->kind,
             $scopes,
         ));
 
@@ -112,10 +115,11 @@ final class FunctionLikeScopeWalkerTest extends TestCase
                     };
                 }
             }
-            PHP);
+            PHP
+        );
 
         self::assertSame(['method', 'closure'], array_map(
-            static fn (FunctionLikeScope $scope): string => $scope->kind,
+            static fn(FunctionLikeScope $scope): string => $scope->kind,
             $scopes,
         ));
 
@@ -129,19 +133,25 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Build function-like scopes for a test fixture.
      *
-     * @return list<FunctionLikeScope>
+     * @param string $source - Inline PHP source defining the functions and closures to walk.
+     *
+     * @return list<FunctionLikeScope> - the fixture's scopes in depth-first declaration order, the positions tests index by
      */
     private function scopesFor(string $source): array
     {
         $unit = $this->parseSource($source);
 
+        // FunctionLikeScopeWalker yields in depth-first declaration order; callers index $scopes
+        // by fixed position, so that order is the contract this helper hands back unchanged.
         return (new FunctionLikeScopeWalker())->scopes($unit->statements);
     }
 
     /**
      * Parse inline PHP source through the production parser.
      *
-     * @return AnalysisUnit Parsed source fixture.
+     * @param string $source - Inline PHP written to a throwaway temp file before parsing.
+     *
+     * @return AnalysisUnit - parsed statements plus diagnostics, asserted diagnostic-free so callers walk valid input
      */
     private function parseSource(string $source): AnalysisUnit
     {

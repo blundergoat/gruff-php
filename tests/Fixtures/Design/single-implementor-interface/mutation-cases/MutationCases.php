@@ -182,7 +182,7 @@ final class InstanceofUsageImpl implements InstanceofUsageInterface
     /**
      * Return a stable value so the fixture class is not empty.
      *
-     * @return string Non-empty marker value.
+     * @return string - Non-empty marker value.
      */
     public function fixtureMarker(): string
     {
@@ -198,8 +198,9 @@ final class InstanceofUsageConsumer
     /**
      * Check whether the candidate exposes the interface contract.
      *
-     * @param object $candidate Value to inspect.
-     * @return bool True when the candidate implements InstanceofUsageInterface.
+     * @param object $candidate - Value to inspect.
+     *
+     * @return bool - True when the candidate implements InstanceofUsageInterface.
      */
     public function matches(object $candidate): bool
     {

@@ -12,7 +12,7 @@ final class AgentWorkflowFixtureSources
     /**
      * Return source code for the base review fixture.
      *
-     * @return string
+     * @return string - PHP source for the clean Example class used as the "before" side of a branch-review diff
      */
     public static function baseExampleSource(): string
     {
@@ -35,7 +35,7 @@ PHP;
     /**
      * Return source code for the changed review fixture.
      *
-     * @return string
+     * @return string - PHP source for the Example class with an added newRisk() method, landing in changed-only diff scope
      */
     public static function changedExampleSource(): string
     {
@@ -65,7 +65,7 @@ PHP;
     /**
      * Return source code for the removed-base review fixture.
      *
-     * @return string
+     * @return string - PHP source for the Example class carrying oldRisk(), present only on the base side so it reads as a removed finding
      */
     public static function removedBaseExampleSource(): string
     {
@@ -93,7 +93,7 @@ PHP;
     /**
      * Return source code for an added risky review fixture.
      *
-     * @return string
+     * @return string - PHP source for the NewRisk class whose unserialize() of caller input trips a real security rule
      */
     public static function addedRiskSource(): string
     {
@@ -116,7 +116,7 @@ PHP;
     /**
      * Return source code for a project-rule interface review fixture.
      *
-     * @return string
+     * @return string - PHP source for the BookingGatewayInterface with a single implementor, the base side of the single-implementor scenario
      */
     public static function bookingGatewayInterfaceSource(): string
     {
@@ -135,7 +135,8 @@ PHP;
     /**
      * Return changed source code for a project-rule interface review fixture.
      *
-     * @return string
+     * @return string - PHP source for the same BookingGatewayInterface with a trivial edit, pulling it into changed-only scope without altering its
+     *                contract
      */
     public static function changedBookingGatewayInterfaceSource(): string
     {
@@ -155,7 +156,7 @@ PHP;
     /**
      * Return source code for the unchanged implementor side of a project-rule review fixture.
      *
-     * @return string
+     * @return string - PHP source for the unchanged BookingOtpGateway, the lone implementor that keeps the interface paired one-to-one
      */
     public static function bookingOtpGatewaySource(): string
     {
@@ -172,6 +173,95 @@ final class BookingOtpGateway implements BookingGatewayInterface
     {
         return $phoneNumber;
     }
+}
+PHP;
+    }
+
+    /**
+     * Return composer metadata for project-wide dead-code review fixtures.
+     *
+     * @return string - composer JSON declaring App\ as project-owned PSR-4 source
+     */
+    public static function projectDeadCodeComposerSource(): string
+    {
+        return <<<'JSON'
+{"autoload":{"psr-4":{"App\\":"src/"}}}
+JSON;
+    }
+
+    /**
+     * Return a project-owned class declaration used by an unchanged context file.
+     *
+     * @return string - PHP source for a referenced internal class
+     */
+    public static function referencedInternalClassSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class UsedOnlyFromContext
+{
+}
+PHP;
+    }
+
+    /**
+     * Return the changed declaration source for a referenced internal class.
+     *
+     * @return string - PHP source with a trivial edit that keeps the class referenced by an unchanged file
+     */
+    public static function changedReferencedInternalClassSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+// Branch edit keeps this declaration in changed-only scope.
+final class UsedOnlyFromContext
+{
+}
+PHP;
+    }
+
+    /**
+     * Return an unchanged reference to the project-owned class fixture.
+     *
+     * @return string - PHP source that references UsedOnlyFromContext from an unchanged file
+     */
+    public static function internalClassReferenceSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class ContextCaller
+{
+    public function make(): UsedOnlyFromContext
+    {
+        return new UsedOnlyFromContext();
+    }
+}
+PHP;
+    }
+
+    /**
+     * Return an added dead internal class fixture.
+     *
+     * @return string - PHP source for a new project-owned class with no references
+     */
+    public static function addedDeadInternalClassSource(): string
+    {
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class AddedDeadInternal
+{
 }
 PHP;
     }

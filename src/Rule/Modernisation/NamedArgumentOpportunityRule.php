@@ -31,7 +31,7 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Describe the named argument opportunity rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -49,14 +49,15 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find calls with many positional arguments that would read better named.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for named argument opportunities.
+     * @return list<Finding> - Findings for named argument opportunities.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
+            // Named arguments are a PHP 8.0 feature; below that target the suggestion would be unactionable.
             return [];
         }
 
@@ -98,8 +99,13 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
-     * @return string|null Explanation when the call should use named arguments.
+     * Decide whether a call carries enough positional arguments to recommend named arguments.
+     *
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Raw call arguments; spreads and named
+     *   arguments are present but do not count toward the positional total.
+     * @param int $minPositionalArguments - Inclusive lower bound below which the call is left alone.
+     *
+     * @return string|null - Explanation when the call should use named arguments.
      */
     private function reason(array $args, int $minPositionalArguments): ?string
     {
@@ -114,13 +120,16 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
 
         }
 
+        // Below the threshold the call stays silent (null); at or above it the count becomes the finding message.
         return $positionalCount >= $minPositionalArguments ? sprintf('%d positional arguments', $positionalCount) : null;
     }
 
     /**
      * Find method names declared with variadic parameters in the same file.
      *
-     * @return array<string, true> Lowercase variadic method names.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose own method declarations are scanned for variadic params.
+     *
+     * @return array<string, true> - Lowercase variadic method names.
      */
     private function variadicMethodNames(AnalysisUnit $analysisUnit): array
     {
@@ -135,21 +144,26 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             }
         }
 
+        // The set of same-file variadic method names, used later to suppress misleading suggestions on them.
         return $names;
     }
 
     /**
      * Detect calls to same-file variadic methods, where named arguments would be misleading.
      *
-     * @param array<string, true> $variadicMethodNames Lowercase method names declared with variadic params.
-     * @return bool True when the call target is variadic.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Call whose method name is matched against the variadic set.
+     * @param array<string, true> $variadicMethodNames - Lowercase method names declared with variadic params.
+     *
+     * @return bool - True when the call target is variadic.
      */
     private function isVariadicMethodCall(Expr\MethodCall|Expr\StaticCall $call, array $variadicMethodNames): bool
     {
         if (!$call->name instanceof Node\Identifier) {
+            // A dynamic method name cannot be resolved to a declaration, so it cannot be matched as variadic.
             return false;
         }
 
+        // True only when this exact method name was recorded as variadic earlier in the same file.
         return isset($variadicMethodNames[strtolower($call->name->toString())]);
     }
 }

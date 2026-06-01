@@ -37,10 +37,11 @@ final readonly class ConfusingNameRule implements RuleInterface
     /**
      * Describe the confusing name rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory with medium confidence: the standalone-name heuristic flags suspects, not certainties.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Confusing standalone class name',
@@ -54,10 +55,10 @@ final readonly class ConfusingNameRule implements RuleInterface
     /**
      * Find identifiers whose names are ambiguous or visually confusing.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for confusing identifiers.
+     * @return list<Finding> - Findings for confusing identifiers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

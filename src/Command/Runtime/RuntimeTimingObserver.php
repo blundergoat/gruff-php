@@ -17,8 +17,9 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     /**
      * Accumulate one rule invocation's duration into the per-rule totals.
      *
-     * @param string $ruleId     Rule identifier as declared in the rule's RuleDefinition.
-     * @param int    $durationNs Wall-clock nanoseconds the rule spent in analyse().
+     * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
+     * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
+     *
      * @return void
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void
@@ -34,7 +35,7 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
     /**
      * Emit the collected per-rule totals as a stable, sorted list.
      *
-     * @return list<array{ruleId: string, totalNs: int, invocations: int}> Ordered by descending total time.
+     * @return list<array{ruleId: string, totalNs: int, invocations: int}> - Ordered by descending total time.
      */
     public function snapshot(): array
     {

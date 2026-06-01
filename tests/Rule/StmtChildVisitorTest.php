@@ -21,7 +21,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Provide PHP source fragments classified as control-flow statements.
      *
-     * @return iterable<string, array{0: string}>
+     * @return iterable<string, array{0: string}> - data-provider rows keyed by statement type; each row holds one source fragment
      */
     public static function controlFlowSampleProvider(): iterable
     {
@@ -37,7 +37,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Provide PHP source fragments NOT classified as control-flow statements.
      *
-     * @return iterable<string, array{0: string}>
+     * @return iterable<string, array{0: string}> - data-provider rows keyed by statement type; each row holds one non-control-flow source fragment
      */
     public static function nonControlFlowSampleProvider(): iterable
     {
@@ -50,7 +50,8 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify the visitor identifies a control-flow statement type.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
+     *
      * @return void
      */
     #[DataProvider('controlFlowSampleProvider')]
@@ -64,7 +65,8 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify the visitor rejects a non-control-flow statement type.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
+     *
      * @return void
      */
     #[DataProvider('nonControlFlowSampleProvider')]
@@ -98,7 +100,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Provide loop-statement source fragments.
      *
-     * @return iterable<string, array{0: string}>
+     * @return iterable<string, array{0: string}> - data-provider rows keyed by loop type; each row holds one loop source fragment
      */
     public static function loopSampleProvider(): iterable
     {
@@ -111,7 +113,8 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify each loop type yields exactly one loop-body block.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
+     *
      * @return void
      */
     #[DataProvider('loopSampleProvider')]
@@ -137,19 +140,19 @@ final class StmtChildVisitorTest extends TestCase
         $blocks = $this->blocksOf($stmt);
 
         self::assertCount(3, $blocks);
-        $kinds  = array_map(static fn (StmtChildBlock $block): string => $block->kind, $blocks);
-        $owners = array_map(static fn (StmtChildBlock $block): string => $block->owner::class, $blocks);
+        $kinds  = array_map(static fn(StmtChildBlock $block): string => $block->kind, $blocks);
+        $owners = array_map(static fn(StmtChildBlock $block): string => $block->owner::class, $blocks);
 
         self::assertSame([
-            StmtChildBlock::KIND_SWITCH_CASE,
-            StmtChildBlock::KIND_SWITCH_CASE,
-            StmtChildBlock::KIND_SWITCH_CASE,
-        ], $kinds);
+                             StmtChildBlock::KIND_SWITCH_CASE,
+                             StmtChildBlock::KIND_SWITCH_CASE,
+                             StmtChildBlock::KIND_SWITCH_CASE,
+                         ], $kinds);
         self::assertSame([
-            Stmt\Case_::class,
-            Stmt\Case_::class,
-            Stmt\Case_::class,
-        ], $owners);
+                             Stmt\Case_::class,
+                             Stmt\Case_::class,
+                             Stmt\Case_::class,
+                         ], $owners);
     }
 
     /**
@@ -203,8 +206,9 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Parse a single statement from source.
      *
-     * @param string $source PHP source fragment without the open tag.
-     * @return Node Parsed first statement.
+     * @param string $source - PHP source fragment without the open tag.
+     *
+     * @return Node - the first parsed statement node; helper asserts the parse is non-empty before returning it
      */
     private function firstStatement(string $source): Node
     {
@@ -220,8 +224,9 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Materialise the visitor's iterable as a numeric list of blocks.
      *
-     * @param Node $node Statement to inspect.
-     * @return list<StmtChildBlock> Child blocks in source order.
+     * @param Node $node - Statement to inspect.
+     *
+     * @return list<StmtChildBlock> - child blocks drained from the generator in source order so tests can index and count them
      */
     private function blocksOf(Node $node): array
     {

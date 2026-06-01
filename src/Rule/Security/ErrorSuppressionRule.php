@@ -29,10 +29,11 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Describe the error suppression security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the `@` operator is an unambiguous AST node, so the gate can rely on this warning.
         return new RuleDefinition(
             id:               self::ID,
             name:             'Error suppression operator',
@@ -47,10 +48,10 @@ final class ErrorSuppressionRule implements RuleInterface
     /**
      * Find uses of PHP error suppression that can hide failures.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for suppressed expressions.
+     * @return list<Finding> - One finding per `@`-suppressed expression in the unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

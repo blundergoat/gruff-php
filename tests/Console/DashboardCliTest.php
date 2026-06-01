@@ -12,6 +12,13 @@ use Symfony\Component\Process\Process;
 final class DashboardCliTest extends CliTestCase
 {
     /**
+     * Raw sensitive snippets that dashboard scans must never render.
+     *
+     * @var list<string>
+     */
+    private const SENSITIVE_SNIPPETS = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
+
+    /**
      * Verify dashboard command serves refreshable HTML report.
      *
      * @return void
@@ -109,6 +116,48 @@ final class DashboardCliTest extends CliTestCase
             self::assertStringContainsString('Mutation is omitted when no Infection report is supplied.', $scan);
             self::assertStringNotContainsString('<div class="name">mutation</div>', $scan);
             self::assertStringNotContainsString('MSI', $scan);
+        } finally {
+            $process->stop(1);
+        }
+    }
+
+    /**
+     * Verify dashboard scans do not leak raw sensitive-data snippets.
+     *
+     * @return void
+     */
+    public function testDashboardScanDoesNotLeakSensitiveDataSecrets(): void
+    {
+        $port    = $this->unusedPort();
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'dashboard',
+            'tests/Fixtures/SensitiveData/gcp-service-account-key.json',
+            'tests/Fixtures/SensitiveData/url-credentials.php',
+            '--host',
+            '127.0.0.1',
+            '--port',
+            (string) $port,
+            '--scan-timeout',
+            '30',
+            '--fail-on',
+            'none',
+            '--no-config',
+        ], self::PROJECT_ROOT);
+        $process->setTimeout(null);
+        $process->start();
+
+        try {
+            $this->waitForHttpServer($port, $process);
+
+            $scan = $this->fetchHttp($port, '/scan');
+
+            self::assertStringContainsString('HTTP/1.1 200 OK', $scan);
+            foreach (self::SENSITIVE_SNIPPETS as $sensitiveSnippet) {
+                self::assertStringNotContainsString($sensitiveSnippet, $scan, 'Dashboard scan leaked a raw secret.');
+            }
+            self::assertStringContainsString('redacted', $scan);
         } finally {
             $process->stop(1);
         }

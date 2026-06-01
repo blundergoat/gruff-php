@@ -2,6 +2,12 @@
 
 This file is the quick-start surface for agents that need to inspect a PHP project with gruff. Prefer these commands over inventing flags or parsing human text output.
 
+## What gruff optimises for
+
+You are a coding agent, and a human who didn't write this code has to read, review, and trust it. gruff governs the code you produce so that reviewer can verify it does what was asked — legible enough to read, secure where the eye fails, and tested for real rather than padded with low-signal ceremony. Treat its findings as a checklist for "would a human sign this off?", not as arbitrary style nags.
+
+Doc comments are mandatory even on a private one-liner, and that is deliberate. Coding agents routinely produce code that superficially works while misunderstanding the requirement; stating intent, usage, contract, and failure behaviour in prose gives the reviewer something to check the implementation against. A mismatch between the doc comment and the code is itself a signal the change needs a deeper look — so write the intent, never a restatement of the signature.
+
 ## Ground Rules
 
 - Run commands from the repository root unless `--project` is documented for that command.
@@ -90,6 +96,18 @@ php bin/gruff-php analyse src --diff=<base-ref> --format json --fail-on none > /
 ```
 
 `--diff=<base>` semantics use Git diff filtering against that ref. It is still a changed-line/file filter, not base/current finding subtraction.
+
+## Ignored Paths
+
+`paths.ignore` is authoritative in every invocation mode, including the explicit-path and diff scans a hook uses: a matching path is excluded from analysis and produces no findings, however it was supplied. `--include-ignored` opts back into Git/default ignores only; it never overrides `paths.ignore`. Every ignored path is reported in the JSON report's `ignoredPathDetails` (each with `source` and `pattern`) alongside the `ignoredPaths` string list.
+
+Ask whether gruff would ignore a path, and why, without running an analysis:
+
+```bash
+php bin/gruff-php check-ignore --format json src/App.php legacy/Old.php
+```
+
+The JSON `[{ "path", "ignored", "source", "pattern" }]` is the agent contract; exit codes mirror `git check-ignore` (0 = at least one ignored, 1 = none, 2 = error). Use it to drop out-of-scope changed files before calling `analyse`.
 
 ## Branch Review / Introduced Findings
 
@@ -218,6 +236,18 @@ php bin/gruff-php analyse src --generate-baseline --format text --fail-on none
 
 Only update `gruff-baseline.json` when accepting known findings is intentional and reviewable.
 
+Read baseline movement to see how debt changed. Every applied-baseline run classifies findings into three buckets, exposed in JSON at `baseline.buckets` and summarised as a one-line "Movement" view in text, markdown, and HTML:
+
+- **new** — present this run, not in the baseline (the set a new-findings gate would block);
+- **unchanged** — matched a baseline entry (accepted debt, removed before scoring);
+- **absent** — a baseline entry with no matching finding this run (a resolved/fixed item).
+
+```bash
+php bin/gruff-php analyse src --baseline --format json --fail-on none | jq '.baseline.buckets'
+```
+
+Pass `--baseline-include-absent` to list the absent/resolved entries in text, markdown, and HTML output (off by default to keep PR comments short). In diff-scoped runs the absent bucket is reported as zero, because baseline entries outside the diff are not evaluated.
+
 ## Output Formats for Agents
 
 Use JSON for post-processing:
@@ -270,7 +300,7 @@ Display filters run after analysis and before rendering. They change report cont
 php bin/gruff-php analyse src --format markdown --fail-on none --min-severity warning
 php bin/gruff-php analyse src --format json --fail-on none --include-pillar security,sensitive-data
 php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
-php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.npath
+php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cyclomatic
 ```
 
 ## Dashboard
@@ -307,6 +337,66 @@ For CI gating, choose the policy explicitly:
 --fail-on warning
 --fail-on error
 ```
+
+## Failure Conditions (count gate)
+
+`--fail-on <severity>` is a binary gate. For a count-based policy — "allow N findings at a severity, fail above" — set `failureConditions:` in `.gruff-php.yaml`:
+
+```yaml
+failureConditions:
+  total: 200
+  severityThresholds:
+    error: 0
+    warning: 5
+    advisory: 50
+```
+
+"allow N" means the run passes at count ≤ N and fails at count > N; `error: 0` is the legacy "fail on any error". Any threshold that trips — a severity cap or the `total` cap — fails the run. An explicit `--fail-on` flag overrides `failureConditions`; with neither set, the gate is unchanged from before. When the gate trips, the JSON report carries a top-level `failureReason` (`{thresholdKind, count, cap, message}`) and text/markdown print a one-line `Failed: …`, so CI logs explain *why* without a re-run. Baselined findings are excluded from the count (the gate sees the post-baseline set).
+
+## New-findings-only gate (`--fail-on-new`)
+
+The highest-value hook policy: fail only on the debt a change *introduces*, leaving pre-existing findings visible but non-blocking. Provide a reference point — a committed baseline or a `--diff-vs` ref — and enable the gate:
+
+```bash
+# Against a committed baseline (existing debt frozen in gruff-baseline.json):
+php bin/gruff-php analyse src --baseline --fail-on-new
+
+# Against a base ref, no baseline file (PR-check style):
+php bin/gruff-php analyse src --diff-vs origin/main --fail-on-new
+```
+
+`--fail-on-new` is shorthand for `failureConditions.newFindings.severityThresholds.error: 0`; the YAML form takes the same `severityThresholds`/`total` shape as the total gate:
+
+```yaml
+failureConditions:
+  severityThresholds: { error: 0 }     # total gate (all findings)
+  newFindings:
+    severityThresholds: { error: 0 }   # new-findings gate
+```
+
+"New" is `baselineNew ∩ branchIntroduced`: the post-baseline set with `--baseline`, the branch-introduced set with `--diff-vs`, their intersection with both — never "all findings". The total gate and the new-findings gate are independent (either can fail the run); the new-findings reason wins when both trip and renders as `Failed: N new <severity> finding(s)…` with JSON `failureReason.scope: "new"` and a top-level `newFindingsCount`. Enabling the gate with no reference point (no baseline and no `--diff-vs`) errors at setup rather than treating every finding as new.
+
+## Config presets (`extends:`)
+
+Instead of hand-maintaining a long `.gruff-php.yaml`, extend a bundled preset and add only your deltas:
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+extends: gruff.recommended   # or gruff.starter (lean) / gruff.strict (tighter)
+rules:
+  complexity.cognitive:
+    threshold: 25            # your override on top of the preset
+```
+
+- `gruff.recommended` — gruff's default rule set; `extends: gruff.recommended` with no overrides behaves exactly like no config at all.
+- `gruff.starter` — the highest-signal pillars only (security, sensitive-data, size, complexity) for first adoption; far fewer findings.
+- `gruff.strict` — recommended plus tighter complexity/size thresholds.
+
+`extends:` also accepts a relative or absolute path (`extends: ./shared.gruff-php.yaml`) so a team can share one base. Chains resolve ancestor-first (a child's section overrides the inherited one); cycles, chains deeper than five hops, and unknown preset names fail fast with a clear error. Use `--config <path>` to point at a specific config file.
+
+## Result cache
+
+Cache-eligible runs (no project rules active — e.g. `--profile security`, or a config that excludes the design/dead-code rules) reuse unchanged files' findings across runs from a content-addressed, gitignored `.gruff-cache/`. The cache is automatic and correctness-safe: it keys on file bytes + the resolved rule settings + the gruff version, so any change is a fresh analysis, and a cold cache or `--no-cache` is byte-identical to a cached run. Runs that use project rules (the default rule set) bypass the cache. Pass `--no-cache` to force a fresh analysis of every file. Add `.gruff-cache/` to `.gitignore` (gruff already ignores it during discovery).
 
 ## Current Gaps to Avoid Assuming
 

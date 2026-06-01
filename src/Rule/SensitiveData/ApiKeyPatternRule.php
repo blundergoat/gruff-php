@@ -26,10 +26,12 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
-     * @return list<array{name: string, pattern: string}>
+     * @return list<array{name: string, pattern: string}> - each entry pairs a provider label with its detection regex; ordering is the scan order
+     *                          applied per source unit
      */
     private function patterns(): array
     {
+        // Each pattern anchors on a provider's published key prefix and minimum length, keeping false positives low.
         return [
             ['name' => 'stripe', 'pattern' => '/\bsk_live_[A-Za-z0-9]{16,}\b/'],
             ['name' => 'github', 'pattern' => '/\bghp_[A-Za-z0-9]{36}\b/'],
@@ -49,10 +51,12 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Describe the API key pattern sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar, tier, and the Warning/High defaults the engine applies unless a config override raises or silences
+     *                        this rule
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: provider prefixes are distinctive enough that a non-dummy match is very likely a real key.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Common API key pattern',
@@ -66,10 +70,11 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble hardcoded API keys.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for API key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - one finding per non-dummy key-like literal outside comments; empty means clean (no prefix hit, or
+     *                                         every match was a comment or dummy value), not an error
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -79,6 +84,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         // of these distinctive prefixes. Skipping the per-pattern regex when
         // none are present makes this rule near-free for the common case.
         if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
+            // No supported prefix in the source means no provider pattern can match, so skip the per-pattern scan.
             return [];
         }
 

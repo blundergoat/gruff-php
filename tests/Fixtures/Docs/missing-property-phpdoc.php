@@ -25,7 +25,7 @@ final class PromotedPropertyWithPartialDoc
     /**
      * Construct with one documented promoted param.
      *
-     * @param int $documentedPromoted The known value.
+     * @param int $documentedPromoted - The known value.
      */
     public function __construct(
         public int $documentedPromoted,

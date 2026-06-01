@@ -1,72 +1,88 @@
 # Changelog
 
-All notable user-visible changes to `gruff-php` are documented here. The shape
-is themed-narrative: a `## X.Y.Z - YYYY-MM-DD` heading, a one-paragraph intro
-naming the release theme, and themed bullets (`- **{Theme}** - {what changed}`)
-where each `BREAKING:` theme carries an inline migration path.
+Notable user-facing changes to `gruff-php` are listed here.
 
-While the project remains on 0.x, [semver][semver]'s post-1.0 stability
-guarantees do not apply: minor bumps may break. The `BREAKING:` marker and
-migration path are still required so callers know exactly what to update.
-End-user release narrative for the latest version lives in
-[`.goat-flow/scratchpad/release.md`](.goat-flow/scratchpad/release.md).
-Development builds report a `-dev` suffix until `scripts/bump-version.sh`
-stamps the tag.
+This project is still pre-1.0, so minor releases may break behaviour. Breaking
+changes are marked and include the action to take.
 
-[semver]: https://semver.org/
+## 0.3.0 - 2026-05-31
+
+0.3.0 focuses on agent-friendly CI: scan only changed code, respect ignored paths everywhere, and fail on newly introduced debt instead of old baseline debt. It also removes noisy complexity/design checks and tightens the rules that support human review of AI-written code.
+
+- **Changed-code scanning** - `analyse` can now report only findings tied to edited ranges or symbols. JSON reports say how many older findings were suppressed.
+- **Ignore handling is stricter** - `paths.ignore` now applies to explicit files, diff scans, and changed-region scans. `check-ignore` explains why a path is ignored.
+- **Better baseline reporting** - Baseline output now separates findings into `new`, `unchanged`, and `resolved`, so teams can see debt movement instead of only muting old issues.
+- **Count-based gates** - `failureConditions:` can fail a run by total finding count or by advisory/warning/error counts. Existing `--fail-on` behaviour still works.
+- **New-findings gate** - `--fail-on-new` fails only on findings introduced by the current change. It requires a baseline, `--diff-vs`, or both.
+- **Incremental cache** - Eligible runs reuse findings for unchanged files through `.gruff-cache/`. Runs that need whole-project analysis still bypass the cache.
+- **Config presets** - `extends: gruff.recommended`, `gruff.starter`, or `gruff.strict` can replace most local config boilerplate.
+- **BREAKING: Removed `complexity.npath`** - Delete any `rules.complexity.npath` config and regenerate baselines. The rule was noisy and overlapped with clearer complexity metrics.
+- **BREAKING: Removed synthetic `design.god-method` findings** - Size and complexity findings still report normally, but gruff no longer adds a duplicate design finding. Remove stale baseline entries.
+- **Fairer scoring** - Related size and complexity findings on the same method now count as one scoring penalty, while still appearing as separate findings.
+- **Boolean-name allowlist** - `naming.boolean-prefix` can now accept intentional names like `valid()` without forcing a public API rename.
+- **Complexity rules recalibrated** - Halstead volume and maintainability index are advisory; cognitive and nesting thresholds are tighter; cyclomatic complexity is warning-level.
+- **Fake-test rules are stricter** - Tests with no real assertion, no subject call, or tautological type assertions now fail at error level.
+- **Config supports `advisory`** - Rule severity overrides now accept `advisory`.
+- **More dead-code checks** - gruff can now flag unused private constants and unused project-owned internal classes, functions, and constants.
+- **More secret checks** - gruff now detects GCP service-account keys and credentials embedded in HTTP(S) URLs, with reporter tests to keep raw secrets redacted.
+- **Mission documented** - README, docs, agent instructions, and ADR-017 now state the project goal: help humans verify AI-written code.
+- **PHPDoc mixed rule relaxed** - Nullable JSON bags such as `array<string, mixed>|null` no longer trigger `phpdoc-mixed-overuse`.
+- **Internal cleanup** - Large command and analysis classes were split up. CLI behaviour and output schemas are unchanged.
+- **`docs.return-comment` changed meaning** - Same rule id, new behaviour: value-returning `@return` tags need a real description. Baselines may shift.
+- **`docs.missing-param-tag` covers more methods** - Documented private/protected methods and functions now need `@param` tags. Baseline old gaps if needed.
 
 ## 0.2.0 - 2026-05-28
 
-gruff-php 0.2.0 tightens the CI gating philosophy, requires explicit config-schema versioning, and adds a per-rule triage surface so large scans stop being overwhelming. Five breaking changes (`schemaVersion:` required, `analyse` default lowered, JSON schemas v2, one rule retired, `waste.one-line-method` defaults tightened) motivate the minor bump from 0.1.x; each ships with a migration path below.
+0.2.0 makes CI policy more explicit, adds rule triage help, and introduces several breaking config/schema changes.
 
-- **BREAKING: `schemaVersion:` required in `.gruff-php.yaml`** - Every config must declare `schemaVersion: gruff-php.config.v0.1` at the top, or `gruff-php analyse` and friends refuse to load with `Config key "schemaVersion" is required. Add 'schemaVersion: gruff-php.config.v0.1' to the top of .gruff-php.yaml, or regenerate with 'gruff-php init --force'.` Migration: add the line by hand, or run `gruff-php init --force` (preserves your existing `paths.ignore`, rule tunings, and `allowlists`). Rationale and pre-public-adoption window in [ADR-015](.goat-flow/decisions/ADR-015-per-command-minimum-severity.md).
-- **BREAKING: `analyse --fail-on` default lowered from `error` to `advisory`** - CI jobs that previously exited 0 on advisory- or warning-tier findings now exit 1 by default. Matches the cross-port "show everything, fail on anything for gating commands" philosophy. Migration: pass `--fail-on error` on every CI invocation, or pin `minimumSeverity.analyse: error` in `.gruff-php.yaml` to restore the prior gate. To opt into the new default explicitly, pin `minimumSeverity.analyse: advisory`.
-- **BREAKING: `summary` and `analyse` JSON schemas bumped to v2** - `summary` is now `gruff.summary.v2`, `analyse` is now `gruff.analysis.v2`. Per-severity counts in `findings`, `pillars`, and `topOffenders` payloads switch from plural (`advisories` / `warnings` / `errors`) to singular (`advisory` / `warning` / `error`). Migration: update consumer parsers for both the schemaVersion literal and the key renames. No backward-compatible aliases ship; v1 consumers must update.
-- **BREAKING: `naming.parameter-type-name` retired** - Rule class, fixture, `RuleRegistry::NAMING_RULE_PRIORITY` slot, `docs/rules.md` row, and dogfood tuning block deleted. Adopters with a `rules.naming.parameter-type-name` block in their config hit `Unknown rule id "naming.parameter-type-name".` at load time. Migration: delete the block from `.gruff-php.yaml`; findings disappear from baselines and reports automatically. The gruff-py port retires the sibling in lockstep (their ADR-018). PHP naming rules drop 12 to 11. Rationale in [ADR-014](.goat-flow/decisions/ADR-014-retire-naming-parameter-type-name.md).
-- **BREAKING: `waste.one-line-method` defaults tightened** - `minInFileCallers: 0 → 2`, `namedAlternativeFactoryExempt: false → true` (matches gruff-php's own self-tuning). Most projects see *fewer* findings: named factory pairs like `Money::fromCents()` / `Money::fromDollars()` and same-file wrappers stop reporting. Migration: no action required for adopters relying on defaults. To preserve the prior loose defaults explicitly, pin `options.minInFileCallers: 0` and `options.namedAlternativeFactoryExempt: false` under `rules.waste.one-line-method`.
-- **Per-command exit-code thresholds** - New `minimumSeverity:` block in `.gruff-php.yaml` pins CI policy per command (`analyse | report | dashboard`) once instead of remembering `--fail-on` on every invocation. Accepted values: `advisory | warning | error | none`. Non-gating keys (`summary`, `init`, `list-rules`) and non-canonical values (including gruff-go's `never`) are rejected with explicit errors. Precedence: explicit CLI `--fail-on` > YAML > binary default. `AnalysisConfig::failThresholdFor()`, `ConfigLoader::SCHEMA_VERSION`, and `ConfigLoader::GATING_COMMANDS` are the new accessor / constants.
-- **Visibility-only rule tier (`excludeFromScore`)** - `rules.<id>.excludeFromScore: true` keeps a rule running and surfaces its findings in every report, but those findings stop penalising the composite/pillar score. Distinct from `enabled: false` (which silences the rule entirely). Composite findings honour the flag transitively via `metadata.componentRules`. Useful when a team has decided a rule is informational but still wants to see what it catches. Design and failure-mode comparison in [ADR-016](.goat-flow/decisions/ADR-016-visibility-only-rule-scoring-tier.md).
-- **Per-rule triage surface for large scans** - `list-rules <ruleId>` renders default options, escape-hatch config paths (`rules.<id>.options.*`, `enabled`, `excludeFromScore`), and catalogued false-positive shapes for the named rule; typos suggest near matches via Levenshtein and exit 2. `analyse --format=text` adds a footer hint pointing at `gruff-php summary` when findings ≥ 50. Branch-review reporters (`TextReporter` + `MarkdownReporter`) render "Top 5 improved / Top 5 regressed" rules before the composite score; `BranchReviewResult::perRuleDelta()` is the JSON-exposed source. `AnalysisReport::findingCountsByRule()` is the new accessor for triage views.
-- **Line-shift-resilient finding identity** - `Finding::stableIdentity` is a 16-character SHA-256 sibling to `fingerprint`, keyed by `[ruleId, file, symbol]` (or `[ruleId, file, message]` when symbol is null). Line-insensitive so external diff tooling can track "the same finding" across unrelated edits. Baselines and SARIF stay keyed on `fingerprint`; the new field is additive metadata in JSON output.
-- **Precise `array{...}` envelope exemption** - `modernisation.phpdoc-mixed-overuse` no longer fires on shapes like `array{entries: list<array<string, mixed>>, total: int|null, complete: bool}` when at least one named sibling field has a non-mixed type. Loose shapes still fire: `array<string|int, mixed>`, `Collection<mixed>`, `array{value: mixed}`.
-- **Cleaner first-run experience** - `init` now scaffolds default accepted abbreviations for `naming.abbreviation-allowlist` (`id`, `url`, `db`, etc.) so fresh `.gruff-php.yaml` files no longer flood with universal tokens. HTML and Markdown reporters render per-pillar summaries as a table with per-severity columns instead of single-count rows. 11 rule remediations now name their escape-hatch config path ("If this is intentional, add it to `rules.<id>.options.<key>` in `.gruff-php.yaml`") so users can act on a finding without grepping for the right knob.
-- **Config and CLI wiring fixes** - `ReportCommand::resolveFailOn()` now correctly detects whether `--fail-on` was passed explicitly (via `hasParameterOption`) instead of treating the option's `'none'` default as explicit; `minimumSeverity.report` actually takes effect now. `DashboardStateFactory::loadConfigFailThreshold()` reads `.gruff-php.yaml` from the resolved `--project-root` instead of `getcwd()`. `AnalysisConfig` no longer clobbers universal `acceptedAbbreviations` defaults when a user's `allowlists:` block declares only `secretPreviews`. `MissingParamTagRule` no longer treats `@param-out` or `@param-immutable` as `@param` matches (word-boundary check prevents PHPStan/Psalm out-only tags from suppressing missing-input-param findings).
-- **Regression coverage for the new contracts** - `tests/Reporting/FailThresholdTest.php` locks the `FailThreshold::fromInput` parser contract; `tests/Console/AnalyseMinimumSeverityPrecedenceTest.php` covers the precedence chain end-to-end; `tests/Analysis/AnalysisReportTest.php`, `tests/Reporting/TextReporterTest.php`, and `tests/Review/BranchReviewResultTest.php` cover the new accessors and volume-hint behaviour.
+- **BREAKING: `schemaVersion:` is required** - Add `schemaVersion: gruff-php.config.v0.1` to `.gruff-php.yaml`, or run `gruff-php init --force`.
+- **BREAKING: `analyse --fail-on` default changed** - `analyse` now fails on advisory findings by default. Pass `--fail-on error` or set `minimumSeverity.analyse: error` to keep the old gate.
+- **BREAKING: JSON schemas moved to v2** - `summary` and `analyse` now emit v2 schemas and singular severity count keys. Update JSON consumers.
+- **BREAKING: Removed `naming.parameter-type-name`** - Delete any config for this rule. Findings disappear automatically.
+- **BREAKING: `waste.one-line-method` defaults tightened** - Most projects see fewer findings. Pin the old options only if you need the old behaviour.
+- **Per-command severity config** - `minimumSeverity:` lets config set fail thresholds for `analyse`, `report`, and `dashboard`.
+- **Visibility-only rules** - `excludeFromScore: true` keeps a rule visible in reports without affecting scores.
+- **Rule triage help** - `list-rules <ruleId>` now shows options, escape hatches, and false-positive notes. Large text reports point users toward `summary`.
+- **Stable finding identity** - JSON adds a line-shift-resistant `stableIdentity` field for external diff tooling.
+- **Fewer mixed-type false positives** - Precise `array{...}` PHPDoc shapes with useful sibling fields no longer trip `phpdoc-mixed-overuse`.
+- **Cleaner first run** - `init` now seeds common abbreviations, reports are easier to scan, and rule messages point at config escape hatches.
+- **Bug fixes** - Fixed report/dashboard fail-threshold loading, abbreviation defaults, and `@param-out` / `@param-immutable` handling.
+- **Regression tests** - Added coverage for fail-threshold parsing, precedence, report hints, and new accessors.
 
 ## 0.1.3 - 2026-05-24
 
-Patch release for the installed Composer binary bootstrap.
+Patch release for Composer installs.
 
-- **`vendor/bin/gruff-php` works in consuming projects** - The installed binary now prefers Composer's generated `_composer_autoload_path` before source-checkout fallbacks. Unblocks `composer require --dev blundergoat/gruff-php` followed by `vendor/bin/gruff-php init`, which previously failed at the autoload lookup.
-- **Regression test for the packaged dependency layout** - New test installs `gruff-php` into a throwaway consumer project and runs `vendor/bin/gruff-php init`, so the packaged path is covered separately from `php bin/gruff-php` source-checkout runs.
+- **Installed binary fixed** - `vendor/bin/gruff-php` now finds Composer's generated autoload path in consuming projects.
+- **Packaging regression test** - Tests now cover installing and running `vendor/bin/gruff-php init` from a throwaway project.
 
 ## 0.1.2 - 2026-05-24
 
 Harness and documentation maintenance for goat-flow 1.7.0.
 
-- **Updated instruction files for the goat-flow 1.7.0 audit CLI** - Codex and Claude instructions now use the packaged `@blundergoat/goat-flow` audit CLI and list the real app/quality surface (`.gruff-php.yaml`, `phpstan.neon.dist`, scripts, `package-lock.json`, GitHub workflows).
-- **Consolidated goat-security reference stubs** - Legacy Claude `goat-security` reference files now redirect to `identity-and-data.md` and `supply-chain-and-cicd.md`, preventing stale guidance from loading accidentally.
-- **Refreshed architecture and code-map docs** - Coverage for the current CLI surface (the `init` command, dedicated Console test files, `skill-playbooks` routing, and resolved CLI footguns around config creation).
-- **Hook self-tests use real fixtures** - `dangerous-command` hook self-tests now use the real `healthkit/healthkit` repository identifier instead of `example-org/example-repo` placeholders.
-- **Broadened symfony/yaml constraint** - Runtime constraint now matches the other Symfony components: `^6.4 || ^7.0 || ^8.0`.
+- **Agent instructions updated** - Codex and Claude docs now use the packaged goat-flow audit CLI and list the real project quality surface.
+- **Security references cleaned up** - Old goat-security stubs now redirect to the current identity/data and supply-chain/CICD references.
+- **Architecture docs refreshed** - Code map and architecture docs now cover the current CLI and local workflow.
+- **Hook fixtures fixed** - Dangerous-command hook tests now use the real fixture repository name.
+- **Symfony YAML range widened** - Runtime support now matches the other Symfony components: `^6.4 || ^7.0 || ^8.0`.
 
 ## 0.1.1 - 2026-05-24
 
 Onboarding-focused follow-up to 0.1.0.
 
-- **`init` scaffolds `.gruff-php.yaml` from registry defaults** - New `gruff-php init` command writes a config with registry defaults plus a curated `paths.ignore` list (agent harness dirs, generated reports, fixtures, vendored copies). `--force` regeneration preserves any existing `paths.ignore`; `init` refuses to silently shadow a legacy `.gruff.yaml` without `--force`. `--project-root <dir>` writes into a directory other than the current shell.
-- **Interactive missing-config prompt** - When `analyse`, `summary`, `report`, or `dashboard` runs in a TTY against a project without `.gruff-php.yaml` or `.gruff.yaml`, the command offers to run `init`. The prompt fires only after option validation so malformed invocations no longer leave a stray config file behind, and prompt chatter routes to STDERR so JSON, SARIF, and HTML payloads on STDOUT stay parseable.
-- **Test-quality rules enabled by default** - `test-quality.multiple-aaa-cycles` (minCycles 3), `test-quality.mocking-domain-object`, and `test-quality.testdox-readability` (minWords 2) now run unless explicitly disabled. Existing projects see new advisory findings on these rules after upgrade; configure or disable per project as needed.
-- **Baseline guidance in `summary` output** - Text output now points users at `analyse --generate-baseline` to record current findings as known debt, and `--no-baseline` to audit without one.
-- **Composer dependency audit in `composer check` and CI** - `composer audit:dependencies` runs inside `composer check` and the CI verify job, failing the build on known security advisories in the lockfile. `scripts/dependency-install.sh` and `dependency-update.sh` wrap the Composer commands used during installs and refreshes; the release preflight script is stricter.
-- **README and `docs/` rewrite** - New documentation covers rule catalogue (`docs/rules.md`), CI integration (`docs/ci-integration.md`), configuration reference (`docs/configuration.md`), output formats (`docs/output-formats.md`), dashboard usage (`docs/dashboard.md`), naming conventions (`docs/naming-conventions.md`), and the release process (`docs/releasing.md`).
+- **`init` command added** - `gruff-php init` creates `.gruff-php.yaml`, preserves ignore patterns with `--force`, and supports `--project-root`.
+- **Missing-config prompt** - TTY runs can offer to create config before scanning.
+- **More test-quality rules enabled** - New default advisory rules catch common weak-test patterns.
+- **Baseline guidance added** - `summary` now points users to baseline generation and no-baseline audit modes.
+- **Dependency audit added** - Composer audit now runs in `composer check` and CI.
+- **Docs expanded** - README and docs now cover rules, CI, config, output formats, dashboard, naming, and release process.
 
 ## 0.1.0 - 2026-05-23
 
 First public release.
 
-- **120 rules across 11 pillars** - Coverage spans size, complexity, maintainability, dead-code, naming, documentation, modernisation, security, sensitive-data, test-quality, and design. Run `php bin/gruff-php list-rules` to inspect the catalogue.
-- **Five commands** - `analyse`, `summary`, `report`, `dashboard`, `list-rules`. Each carries `--help` for option discovery.
-- **Seven output formats with stable schemas** - `text`, `json`, `html`, `markdown`, `github`, `hotspot`, `sarif`. Initial machine-readable schemas: `gruff.analysis.v1`, `gruff.summary.v1`, `gruff.baseline.v1`.
-- **YAML config with strict unknown-key rejection** - `.gruff-php.yaml` supports baselines, branch-review (`--diff`, `--diff-vs`, `--changed-only`), opt-in Infection mutation analysis, and a local dashboard. Unknown top-level keys fail to load.
-- **PHP `^8.3`, MIT licensed** - Minimum runtime is PHP 8.3.0; the project is MIT-licensed.
+- **120 rules** - Coverage spans size, complexity, maintainability, dead code, naming, docs, modernisation, security, sensitive data, test quality, and design.
+- **Five commands** - `analyse`, `summary`, `report`, `dashboard`, and `list-rules`.
+- **Seven output formats** - `text`, `json`, `html`, `markdown`, `github`, `hotspot`, and `sarif`.
+- **Strict YAML config** - `.gruff-php.yaml` supports baselines, branch review, mutation analysis, and dashboard settings.
+- **PHP 8.3 and MIT** - Minimum runtime is PHP 8.3.0; license is MIT.

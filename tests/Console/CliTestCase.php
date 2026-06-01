@@ -10,7 +10,8 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 
 /**
- * Base class for CLI integration tests; provides baseline project scaffolding, temp directories, package-tree copying, port allocation, and HTTP server helpers.
+ * Base class for CLI integration tests; provides baseline project scaffolding, temp directories, package-tree copying, port allocation, and HTTP
+ * server helpers.
  */
 abstract class CliTestCase extends TestCase
 {
@@ -20,7 +21,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Create an isolated project fixture for baseline CLI tests.
      *
-     * @return string
+     * @return string - absolute path to the freshly created project root the CLI test should scan
      */
     protected function createBaselineProject(): string
     {
@@ -37,7 +38,11 @@ abstract class CliTestCase extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * Decode a finished CLI process's stdout as the JSON report object.
+     *
+     * @param Process $process - Completed CLI process whose stdout holds the JSON report.
+     *
+     * @return array<string, mixed> - the decoded report keyed by its string field names; empty array when stdout held an empty JSON object
      * @throws JsonException
      */
     protected function decodeJsonOutput(Process $process): array
@@ -59,7 +64,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to the newly created, empty temp directory the caller owns and must clean up
      */
     protected function tempDir(): string
     {
@@ -73,12 +78,14 @@ abstract class CliTestCase extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
+     *
      * @return void
      */
     protected function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 
@@ -105,8 +112,9 @@ abstract class CliTestCase extends TestCase
     /**
      * Copy the package tree into an isolated test project.
      *
-     * @param string $source      Source directory.
-     * @param string $destination Destination directory.
+     * @param string $source - Source directory.
+     * @param string $destination - Destination directory.
+     *
      * @return void
      */
     protected function copyPackageTree(string $source, string $destination): void
@@ -121,6 +129,7 @@ abstract class CliTestCase extends TestCase
                     $name = $file->getFilename();
 
                     if ($file->isDir() && in_array($name, ['.git', 'vendor', 'node_modules', '.idea'], true)) {
+                        // Prune heavy or environment-specific trees the fixture must not carry.
                         return false;
                     }
 
@@ -129,10 +138,12 @@ abstract class CliTestCase extends TestCase
 
                     foreach (['.goat-flow/logs/', '.goat-flow/scratchpad/', '.goat-flow/tasks/'] as $ignoredPrefix) {
                         if (str_starts_with($relativePath, $ignoredPrefix)) {
+                            // Drop volatile workspace state so the copied fixture stays deterministic.
                             return false;
                         }
                     }
 
+                    // Keep every other entry; it belongs in the copied package tree.
                     return true;
                 },
             ),
@@ -159,7 +170,7 @@ abstract class CliTestCase extends TestCase
     /**
      * Return an unused local TCP port for dashboard tests.
      *
-     * @return int
+     * @return int - an OS-assigned ephemeral TCP port that was free at allocation time and is no longer bound, for the dashboard test to bind
      * @throws RuntimeException When the helper cannot complete the fixture operation.
      */
     protected function unusedPort(): int
@@ -168,6 +179,7 @@ abstract class CliTestCase extends TestCase
         set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
             $warningMessage = $message;
 
+            // Returning true suppresses PHP's default warning so the bind failure surfaces via our message.
             return true;
         });
 
@@ -179,10 +191,10 @@ abstract class CliTestCase extends TestCase
 
         if ($server === false) {
             throw new RuntimeException(sprintf(
-                'Unable to allocate test port: %s (%d)',
-                $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
-                $errorCode,
-            ));
+                                           'Unable to allocate test port: %s (%d)',
+                                           $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
+                                           $errorCode,
+                                       ));
         }
 
         $name = stream_socket_get_name($server, false);
@@ -193,14 +205,15 @@ abstract class CliTestCase extends TestCase
             throw new RuntimeException('Unable to read allocated test port.');
         }
 
-        return (int) $matches[1];
+        return (int)$matches[1];
     }
 
     /**
      * Wait for the dashboard HTTP server to accept connections.
      *
-     * @param int     $port    Local TCP port.
-     * @param Process $process Dashboard server process.
+     * @param int     $port - Local TCP port.
+     * @param Process $process - Dashboard server process.
+     *
      * @return void
      */
     protected function waitForHttpServer(int $port, Process $process): void
@@ -216,6 +229,8 @@ abstract class CliTestCase extends TestCase
                 $response = $this->fetchHttp($port, '/health');
 
                 if (str_contains($response, "HTTP/1.1 200 OK\r\n")) {
+                    // A TCP connect can succeed before the request handler is wired; only a 200 from
+                    // /health proves the full pipeline serves, so later dashboard requests cannot race startup.
                     return;
                 }
             } catch (RuntimeException) {
@@ -229,9 +244,10 @@ abstract class CliTestCase extends TestCase
     /**
      * Fetch a raw response from the local dashboard server.
      *
-     * @param int    $port Local TCP port.
-     * @param string $path Filesystem path.
-     * @return string
+     * @param int    $port - Local TCP port.
+     * @param string $path - Filesystem path.
+     *
+     * @return string - the raw HTTP response text including the status line, headers, and body for the caller to inspect
      * @throws RuntimeException When the helper cannot complete the fixture operation.
      */
     protected function fetchHttp(int $port, string $path): string
@@ -240,6 +256,7 @@ abstract class CliTestCase extends TestCase
         set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
             $warningMessage = $message;
 
+            // Returning true suppresses PHP's default warning so the connect failure surfaces via our message.
             return true;
         });
 
@@ -251,10 +268,10 @@ abstract class CliTestCase extends TestCase
 
         if ($socket === false) {
             throw new RuntimeException(sprintf(
-                'Unable to connect to report server: %s (%d)',
-                $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
-                $errorCode,
-            ));
+                                           'Unable to connect to report server: %s (%d)',
+                                           $errorMessage !== '' ? $errorMessage : ($warningMessage ?? 'unknown error'),
+                                           $errorCode,
+                                       ));
         }
 
         stream_set_timeout($socket, 5);

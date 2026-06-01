@@ -31,10 +31,12 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Describe the bare PHPDoc tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: a tags-only docblock can be deliberate on a trivial unit, so this nudges
+        // toward describing intent rather than gating a build.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Bare PHPDoc tags',
@@ -48,10 +50,10 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Find docblocks that only list parameter or return tags.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for bare PHPDoc blocks.
+     * @return list<Finding> - Findings for bare PHPDoc blocks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -74,7 +76,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
             $lines = array_filter(
                 array_map('trim', explode("\n", $stripped)),
-                static fn (string $line): bool => $line !== '',
+                static fn(string $line): bool => $line !== '',
             );
 
             $hasNonTagContent = false;
@@ -133,50 +135,24 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Check whether one PHPDoc tag has a type but no description.
      *
-     * @return bool True when the tag is a bare parameter or return tag.
+     * @param string $line - Single trimmed docblock line, already stripped of comment markers, to classify.
+     *
+     * @return bool - True when the tag is a bare parameter or return tag.
      */
     private function isBareParamOrReturnTag(string $line): bool
     {
         // Match @param tags that end at the variable name with no descriptive prose.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
+            // A @param stopping at the variable name carries no description, so it is bare.
             return true;
         }
 
         if (!str_starts_with($line, '@return ')) {
+            // Lines that are neither a bare @param nor a @return cannot be a bare return tag.
             return false;
         }
 
-        return !$this->hasReturnTagDescription(trim(substr($line, strlen('@return '))));
-    }
-
-    /**
-     * Detect prose after a return type while tolerating spaces inside PHPDoc generic types.
-     *
-     * @return bool True when text follows the type.
-     */
-    private function hasReturnTagDescription(string $body): bool
-    {
-        $depth  = 0;
-        $length = strlen($body);
-
-        for ($offset = 0; $offset < $length; $offset++) {
-            $character = $body[$offset];
-
-            if (str_contains('<{[(', $character)) {
-                $depth++;
-                continue;
-            }
-
-            if (str_contains('>}])', $character) && $depth > 0) {
-                $depth--;
-                continue;
-            }
-
-            if ($depth === 0 && ctype_space($character)) {
-                return trim(substr($body, $offset + 1)) !== '';
-            }
-        }
-
-        return false;
+        // A @return is bare exactly when no prose follows its type, so negate the shared description check.
+        return !PhpdocTagText::hasReturnTagDescription(trim(substr($line, strlen('@return '))));
     }
 }

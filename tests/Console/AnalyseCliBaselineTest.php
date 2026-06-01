@@ -16,6 +16,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command writes trend history file.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandWritesTrendHistoryFile(): void
@@ -57,6 +58,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command generates and applies baseline.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandGeneratesAndAppliesBaseline(): void
@@ -156,6 +158,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command writes and auto applies default baseline file.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandWritesAndAutoAppliesDefaultBaselineFile(): void
@@ -221,6 +224,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command skips auto baseline with no baseline flag.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandSkipsAutoBaselineWithNoBaselineFlag(): void
@@ -272,6 +276,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command shows new findings after baseline generation.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandShowsNewFindingsAfterBaselineGeneration(): void
@@ -333,6 +338,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
      * Verify analyse command reports stale baseline entries.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandReportsStaleBaselineEntries(): void
@@ -442,5 +448,145 @@ final class AnalyseCliBaselineTest extends CliTestCase
         } finally {
             $this->removeDir($project);
         }
+    }
+
+    /**
+     * Verify resolving a baselined finding reports it as a resolved bucket and lists it only with the flag.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testBaselineIncludeAbsentListsResolvedEntries(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+
+            // Fully document the public surface and comment the return so every baselined finding resolves with nothing new.
+            file_put_contents(
+                $project . '/src/OrderCalculator.php',
+                "<?php\n\ndeclare(strict_types=1);\n\nnamespace Fixtures\\Source\\Code;\n\n/**\n * Calculates order totals for baseline movement tests.\n */\nfinal readonly class OrderCalculator\n{\n    /**\n     * Sum the subtotal and tax to produce the order total.\n     *\n     * @param int \$subtotal  Order subtotal in minor units.\n     * @param int \$taxAmount Tax to add in minor units.\n     * @return int Combined order total.\n     */\n    public function calculateTotal(int \$subtotal, int \$taxAmount): int\n    {\n        // Order total is the subtotal plus tax, both already in minor units.\n        return \$subtotal + \$taxAmount;\n    }\n}\n",
+            );
+
+            $defaultRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none']);
+            self::assertStringContainsString('Movement: 0 new, 0 unchanged, 1 resolved', $defaultRun->getOutput());
+            self::assertStringNotContainsString('Resolved entries:', $defaultRun->getOutput());
+
+            $textRun = $this->runInProject($project, ['analyse', 'src', '--format', 'text', '--fail-on', 'none', '--baseline-include-absent']);
+            self::assertStringContainsString('Resolved entries:', $textRun->getOutput());
+            self::assertStringContainsString('docs.missing-public-phpdoc', $textRun->getOutput());
+
+            $markdownRun = $this->runInProject($project, ['analyse', 'src', '--format', 'markdown', '--fail-on', 'none', '--baseline-include-absent']);
+            self::assertStringContainsString('**Baseline:** 0 new, 0 unchanged, 1 resolved', $markdownRun->getOutput());
+            self::assertStringContainsString('<details><summary>Resolved baseline entries</summary>', $markdownRun->getOutput());
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify a new finding and a still-matching finding land in the new and unchanged buckets.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testBaselineMovementCountsNewAndUnchanged(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+
+            file_put_contents(
+                $project . '/src/Newcomer.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Newcomer fixture introduced after baseline generation.\n */\nfinal readonly class Newcomer\n{\n    public function arrive(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+
+            $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none']);
+            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            $buckets = $baseline['buckets'] ?? null;
+            self::assertIsArray($buckets);
+            self::assertSame(1, $buckets['unchanged'] ?? null);
+            self::assertSame(0, $buckets['absent'] ?? null);
+            self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Verify changed-only runs do not mark unscanned baseline entries absent.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testChangedOnlyBaselineDoesNotMarkUnscannedEntriesAbsent(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            file_put_contents(
+                $project . '/src/Changed.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Clean file used for changed-only baseline scope.\n */\nfinal readonly class Changed\n{\n    /**\n     * Return the input amount.\n     *\n     * @param int \$amount Input amount.\n     * @return int Same amount.\n     */\n    public function amount(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+            $this->gitInProject($project, ['init', '-q']);
+            $this->gitInProject($project, ['add', 'README.md', 'src/OrderCalculator.php', 'src/Changed.php', 'gruff-baseline.json']);
+            $this->gitInProject($project, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base']);
+
+            file_put_contents(
+                $project . '/src/Changed.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * File changed after baseline generation.\n */\nfinal readonly class Changed\n{\n    public function amount(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+
+            $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--diff-vs', 'HEAD', '--changed-only']);
+            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            self::assertSame('not-evaluated-diff-scope', $baseline['staleEvaluation'] ?? null);
+            $buckets = $baseline['buckets'] ?? null;
+            self::assertIsArray($buckets);
+            self::assertSame(0, $buckets['absent'] ?? null);
+            self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
+     * Run the analyse CLI inside a project directory and return the finished process.
+     *
+     * @param string       $project - Working directory the binary runs in, so relative paths resolve against it.
+     * @param list<string> $args - CLI arguments passed after the binary.
+     *
+     * @return Process - Completed analyse process.
+     */
+    private function runInProject(string $project, array $args): Process
+    {
+        $process = new Process(array_merge([PHP_BINARY, __DIR__ . '/../../bin/gruff-php'], $args), $project);
+        $process->run();
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        return $process;
+    }
+
+    /**
+     * Run git inside a fixture project.
+     *
+     * @param string       $project - Fixture repository root.
+     * @param list<string> $args - Git arguments.
+     *
+     * @return void
+     */
+    private function gitInProject(string $project, array $args): void
+    {
+        $process = new Process(array_merge(['git'], $args), $project);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
     }
 }

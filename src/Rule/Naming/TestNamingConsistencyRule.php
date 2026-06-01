@@ -30,10 +30,11 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Describe the test naming consistency rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Confidence High but Advisory severity: mixed casing is unambiguous, yet teams pick the style to enforce.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test method naming consistency',
@@ -47,10 +48,10 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find test method names that do not follow the configured convention.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for inconsistent test names.
+     * @return list<Finding> - Findings for inconsistent test names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -61,37 +62,15 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
 
         foreach ($classes as $class) {
             /** @var Class_ $class Finder predicate restricts results to class declarations. */
-            $testMethods = [];
-
-            foreach ($class->stmts as $stmt) {
-                if ($stmt instanceof ClassMethod && str_starts_with($stmt->name->toString(), 'test')) {
-                    $testMethods[] = $stmt;
-                }
-            }
+            $testMethods = $this->testMethods($class);
 
             if (count($testMethods) < 2) {
                 continue;
             }
 
-            $camelCount = 0;
-            $snakeCount = 0;
+            $counts = $this->namingCounts($testMethods);
 
-            foreach ($testMethods as $method) {
-                $name      = $method->name->toString();
-                $afterTest = substr($name, 4);
-
-                if ($afterTest === '') {
-                    continue;
-                }
-
-                if (str_contains($afterTest, '_')) {
-                    $snakeCount++;
-                } else {
-                    $camelCount++;
-                }
-            }
-
-            if ($camelCount > 0 && $snakeCount > 0) {
+            if ($counts['camelCase'] > 0 && $counts['snake_case'] > 0) {
                 $className = $class->name?->toString() ?? sprintf('class@anonymous:%d', $class->getStartLine());
 
                 $findings[] = new Finding(
@@ -99,8 +78,8 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                     message: sprintf(
                         '%s mixes camelCase (%d) and snake_case (%d) test method naming.',
                         $className,
-                        $camelCount,
-                        $snakeCount,
+                        $counts['camelCase'],
+                        $counts['snake_case'],
                     ),
                     filePath:    $analysisUnit->file->displayPath,
                     line:        $class->getStartLine(),
@@ -110,11 +89,59 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
                     confidence:  $definition->confidence,
                     symbol:      $className,
                     remediation: 'Pick one naming style for test methods and apply it consistently.',
-                    metadata:    ['camelCase' => $camelCount, 'snake_case' => $snakeCount],
+                    metadata:    $counts,
                 );
             }
         }
 
         return $findings;
+    }
+
+    /**
+     * Collect test methods declared directly on a class.
+     *
+     * @param Class_ $class - Class declaration whose statement list is scanned.
+     *
+     * @return list<ClassMethod> - methods whose names start with `test`, in declaration order
+     */
+    private function testMethods(Class_ $class): array
+    {
+        $testMethods = [];
+
+        foreach ($class->stmts as $stmt) {
+            if ($stmt instanceof ClassMethod && str_starts_with($stmt->name->toString(), 'test')) {
+                $testMethods[] = $stmt;
+            }
+        }
+
+        return $testMethods;
+    }
+
+    /**
+     * Count camelCase and snake_case test method names.
+     *
+     * @param list<ClassMethod> $testMethods - Test methods being classified by naming style.
+     *
+     * @return array{camelCase: int, snake_case: int} - method counts keyed by naming style
+     */
+    private function namingCounts(array $testMethods): array
+    {
+        $counts = ['camelCase' => 0, 'snake_case' => 0];
+
+        foreach ($testMethods as $method) {
+            $afterTest = substr($method->name->toString(), 4);
+
+            if ($afterTest === '') {
+                continue;
+            }
+
+            if (str_contains($afterTest, '_')) {
+                $counts['snake_case']++;
+            } else {
+                $counts['camelCase']++;
+            }
+        }
+
+        return $counts;
     }
 }

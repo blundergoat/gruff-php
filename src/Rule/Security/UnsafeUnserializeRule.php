@@ -30,10 +30,11 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Describe the unsafe unserialize security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a non-literal first argument is heuristic, not proof of attacker control; warn not error.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unsafe unserialize usage',
@@ -47,10 +48,10 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Find unserialize calls that can deserialize untrusted data.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unsafe unserialize calls.
+     * @return list<Finding> - Findings for unsafe unserialize calls; empty when none take untrusted input.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,12 +90,15 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
      *
-     * @return bool True when object deserialization has been disabled by options.
+     * @param Expr\FuncCall $call - unserialize() call whose second argument is checked for an options array.
+     *
+     * @return bool - True when object deserialization has been disabled by options.
      */
     private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
     {
         $options = SecurityNodeHelper::argumentValue($call->args, 1);
         if (!$options instanceof Expr\Array_) {
+            // No literal options array means we cannot prove the guardrail is set, so treat the call as unguarded.
             return false;
         }
 
@@ -104,10 +108,12 @@ final class UnsafeUnserializeRule implements RuleInterface
             }
 
             if ($item->key->value === 'allowed_classes' && SecurityNodeHelper::isFalseLike($item->value)) {
+                // allowed_classes => false disables object hydration entirely, which neutralises the gadget-chain risk.
                 return true;
             }
         }
 
+        // The options array exists but never sets allowed_classes to false, so object hydration is still possible.
         return false;
     }
 }

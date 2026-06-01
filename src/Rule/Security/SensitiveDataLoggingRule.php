@@ -41,7 +41,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Describe the sensitive data logging rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar, tier, and default severity/confidence the registry
+     *   uses to list and configure this rule
      */
     public function definition(): RuleDefinition
     {
@@ -58,10 +59,11 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Find log sinks that include request or secret-like values.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for sensitive data logging.
+     * @return list<Finding> - one finding per flagged log sink across function, method, and static
+     *   calls; empty when nothing leaks request or secret data
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -92,16 +94,21 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Build logger call findings for the security rule.
      *
-     * @return list<Finding>
+     * @param AnalysisUnit                    $analysisUnit - Unit being scanned; supplies the display path for findings.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Possible logger call whose name and arguments are checked.
+     *
+     * @return list<Finding> - zero or one finding; a single logger call is one sink, flagged once
      */
     private function loggerCallFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $method = SecurityNodeHelper::methodName($call);
         if ($method === null || !in_array($method, self::LOG_METHODS, true)) {
+            // The callee is not one of the modelled logger methods, so it cannot be a sink we track.
             return [];
         }
 
         if (!$this->hasSensitiveArgument($call->args)) {
+            // Every argument is static or non-sensitive, so nothing request-controlled can leak here.
             return [];
         }
 
@@ -109,8 +116,10 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
-     * @return bool True when any argument contains request or sensitive data.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Logger-call arguments to scan for request-tainted or secret-bearing values.
+     *
+     * @return bool - true on the first argument carrying request-tainted or secret-bearing data;
+     *   false when every argument is static or non-sensitive
      */
     private function hasSensitiveArgument(array $args): bool
     {
@@ -124,58 +133,76 @@ final class SensitiveDataLoggingRule implements RuleInterface
             }
 
             if (SecurityNodeHelper::containsUserInput($arg->value) || SecurityNodeHelper::containsSensitiveReference($arg->value)) {
+                // One request-tainted or secret-bearing argument is enough to flag the log call.
                 return true;
             }
         }
 
+        // No argument carried request or sensitive data, so this log call is safe to ignore.
         return false;
     }
 
     /**
      * Detect logger arguments that contain only static message/context values.
      *
-     * @return bool True when no runtime value can be leaked.
+     * @param Expr $expr - Argument expression to classify; recursed into for arrays and concatenations.
+     *
+     * @return bool - true when the argument resolves to only compile-time constant message/context
+     *   values; false when any part can hold runtime data
      */
     private function isStaticLogArgument(Expr $expr): bool
     {
         if ($expr instanceof Scalar) {
+            // A literal value carries no runtime data, so it can never leak request input.
             return true;
         }
 
         if ($expr instanceof Expr\ClassConstFetch) {
+            // Class constants are compile-time fixed, so they are safe message tokens.
             return true;
         }
 
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
+            // Only the language literals are static; any other constant may resolve to runtime data.
             return in_array($name, ['false', 'null', 'true'], true);
         }
 
         if ($expr instanceof Expr\Array_) {
             foreach ($expr->items as $item) {
                 if ($item->unpack || !$this->isStaticLogArgument($item->value)) {
+                    // A spread or any non-static element can carry runtime data, so the whole array is unsafe.
                     return false;
                 }
             }
 
+            // Every element is itself static, so the array as a whole leaks nothing.
             return true;
         }
 
         if ($expr instanceof Expr\BinaryOp\Concat) {
+            // A concatenation is static only when both operands are; either dynamic side taints the result.
             return $this->isStaticLogArgument($expr->left) && $this->isStaticLogArgument($expr->right);
         }
 
+        // Anything not matched above (variables, calls, fetches) may hold runtime data, so treat it as dynamic.
         return false;
     }
 
     /**
      * Build the sensitive data logging finding.
      *
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node - Log call flagged as leaking; its start line locates the finding.
+     * @param string       $sink - Name of the log function or method, surfaced in the message and metadata.
+     *
+     * @return Finding - medium-confidence security warning located at the call's start line, naming
+     *   the sink in its message and metadata
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Detection is heuristic, so emit a medium-confidence warning naming the sink for the reviewer.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Logging or dumping of request-controlled or sensitive-looking data detected: %s.', $sink),
@@ -187,8 +214,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
             confidence:  Confidence::Medium,
             remediation: 'Log stable identifiers or redacted summaries instead of request payloads, tokens, passwords, or secret-bearing env values.',
             metadata:    [
-                'sink' => $sink,
-            ],
+                             'sink' => $sink,
+                         ],
         );
     }
 }

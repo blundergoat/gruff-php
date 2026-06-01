@@ -1,0 +1,13 @@
+# gruff.recommended — gruff's default-enabled rule set with its default thresholds.
+#
+# This is the standard profile. Extend it and add only your overrides:
+#
+#   extends: gruff.recommended
+#   rules:
+#     complexity.cognitive:
+#       threshold: 25
+#
+# With no overrides, `extends: gruff.recommended` behaves identically to running
+# gruff with no config file at all — it is the registry defaults, made explicit and
+# extensible. Tier criteria: every rule the catalogue enables by default lives here.
+schemaVersion: gruff-php.config.v0.1

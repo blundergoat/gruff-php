@@ -35,7 +35,7 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Describe the property-count rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -53,10 +53,10 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Find class-like scopes whose declared property count exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for classes, traits, or enums with too many properties.
+     * @return list<Finding> - Findings for classes, traits, or enums with too many properties.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -109,9 +109,9 @@ final readonly class PropertyCountRule implements RuleInterface
     }
 
     /**
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose properties and promoted constructor params are counted.
      *
-     * @return int Declared and promoted property count.
+     * @return int - Declared and promoted property count.
      */
     private function countProperties(Node $classLike): int
     {
@@ -131,35 +131,44 @@ final readonly class PropertyCountRule implements RuleInterface
             }
         }
 
+        // Sum of declared properties plus promoted constructor params; both own instance state.
         return $count;
     }
 
     /**
      * Build a display symbol for a class-like node.
      *
-     * @return string Class-like display symbol.
+     * @param Node $node - Class, trait, or enum declaration to render as a finding symbol.
+     *
+     * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
+            // Named class shows its name; an anonymous class falls back to its start line.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
         if ($node instanceof Trait_) {
+            // Traits are always named, but guard the nullable name and anchor to the line if absent.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
         if ($node instanceof Enum_) {
+            // Enums are always named, but guard the nullable name and anchor to the line if absent.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
+        // Unreachable for the finder's class-like set; kept so an unexpected node still renders a symbol.
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {

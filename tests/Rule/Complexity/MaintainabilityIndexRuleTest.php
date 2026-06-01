@@ -40,33 +40,35 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Provide index cases for parameterized tests.
      *
-     * @return array<string, array{string, float}>
+     * @return array<string, array{string, float}> - data-provider rows keyed by case label, each pairing a fixture method name with its
+     *                       hand-computed expected maintainability index
      */
     public static function indexProvider(): array
     {
         return [
-            'flat' => ['flat', 97.7576810884],
-            'one if' => ['oneIf', 80.4379624235],
-            'nested if' => ['nestedIf', 71.0516801408],
-            'boolean chain' => ['booleanChain', 77.5205272398],
-            'same operator chain' => ['sameOperatorChain', 77.6880695371],
-            'switch only' => ['switchOnly', 71.5978619526],
-            'deeply nested' => ['deeplyNested', 64.3131216050],
-            'while condition' => ['whileWithBooleanCondition', 78.7577563175],
-            'do while condition' => ['doWhileWithBooleanCondition', 78.7577563175],
-            'try catch finally' => ['tryCatchFinallyBranches', 65.0628829064],
-            'jumps and goto' => ['jumpsAndGoto', 65.0943288022],
+            'flat'                  => ['flat', 97.7576810884],
+            'one if'                => ['oneIf', 80.4379624235],
+            'nested if'             => ['nestedIf', 71.0516801408],
+            'boolean chain'         => ['booleanChain', 77.5205272398],
+            'same operator chain'   => ['sameOperatorChain', 77.6880695371],
+            'switch only'           => ['switchOnly', 71.5978619526],
+            'deeply nested'         => ['deeplyNested', 64.3131216050],
+            'while condition'       => ['whileWithBooleanCondition', 78.7577563175],
+            'do while condition'    => ['doWhileWithBooleanCondition', 78.7577563175],
+            'try catch finally'     => ['tryCatchFinallyBranches', 65.0628829064],
+            'jumps and goto'        => ['jumpsAndGoto', 65.0943288022],
             'logical keyword chain' => ['logicalKeywordChain', 79.5916507046],
-            'expression ternaries' => ['expressionAndReturnTernaries', 81.3917012156],
-            'closure arrow' => ['closureAndArrowFunction', 69.7139149775],
+            'expression ternaries'  => ['expressionAndReturnTernaries', 81.3917012156],
+            'closure arrow'         => ['closureAndArrowFunction', 69.7139149775],
         ];
     }
 
     /**
      * Verify maintainability index values match expected formula output.
      *
-     * @param string $methodName    Fixture method name.
-     * @param float  $expectedIndex Expected maintainability index.
+     * @param string $methodName - Fixture method name.
+     * @param float  $expectedIndex - Expected maintainability index.
+     *
      * @return void
      */
     #[DataProvider('indexProvider')]
@@ -89,7 +91,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
         self::assertSame([], $definition->defaultThresholds);
         self::assertNotNull($definition->severityThreshold);
         self::assertSame(35, $definition->severityThreshold->threshold);
-        self::assertSame(\GruffPhp\Finding\Severity::Error, $definition->severityThreshold->severity);
+        self::assertSame(\GruffPhp\Finding\Severity::Advisory, $definition->severityThreshold->severity);
     }
 
     /**
@@ -99,16 +101,16 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public function testFindingsIncludeRoundedMetadata(): void
     {
-        $unit   = $this->parseFixture();
-        $config = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
+        $unit     = $this->parseFixture();
+        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 70, 'error' => 65]),
         );
         $findings = $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
         $finding  = array_values(array_filter(
-            $findings,
-            static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::deeplyNested()',
-        ))[0] ?? null;
+                                     $findings,
+                                     static fn($candidate): bool => $candidate->symbol === 'CognitiveFixture::deeplyNested()',
+                                 ))[0] ?? null;
 
         self::assertNotNull($finding);
         self::assertSame(64.3, $finding->metadata['maintainabilityIndex'] ?? null);
@@ -124,16 +126,16 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public function testFractionalThresholdIsPreservedInMessage(): void
     {
-        $unit   = $this->parseFixture();
-        $config = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
+        $unit     = $this->parseFixture();
+        $config   = AnalysisConfig::fromRegistry(\GruffPhp\Rule\RuleRegistry::defaults())->withRuleSettings(
             MaintainabilityIndexRule::ID,
             new RuleSettings(true, ['warning' => 80.5, 'error' => 35]),
         );
         $findings = $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
         $finding  = array_values(array_filter(
-            $findings,
-            static fn ($candidate): bool => $candidate->symbol === 'CognitiveFixture::oneIf()',
-        ))[0] ?? null;
+                                     $findings,
+                                     static fn($candidate): bool => $candidate->symbol === 'CognitiveFixture::oneIf()',
+                                 ))[0] ?? null;
 
         self::assertNotNull($finding);
         self::assertStringContainsString('below the warning threshold of 80.5.', $finding->message);
@@ -142,9 +144,10 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Return a named method from the cognitive fixture.
      *
-     * @param AnalysisUnit $analysisUnit Parsed fixture.
-     * @param string       $methodName   Fixture method name.
-     * @return ClassMethod Fixture method node.
+     * @param AnalysisUnit $analysisUnit - Parsed fixture.
+     * @param string       $methodName - Fixture method name.
+     *
+     * @return ClassMethod - the fixture's AST node whose name matches $methodName; fails the test when no such method exists
      */
     private function fixtureMethod(AnalysisUnit $analysisUnit, string $methodName): ClassMethod
     {
@@ -152,6 +155,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
 
         foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
+                // Fixture method names are unique, so the first match is the node under test; stop scanning here.
                 return $method;
             }
         }
@@ -162,7 +166,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Parse the cognitive fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - parsed cognitive fixture carrying its repo-relative display path, ready for rule analysis
      */
     private function parseFixture(): AnalysisUnit
     {

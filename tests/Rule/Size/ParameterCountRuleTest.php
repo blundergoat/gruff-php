@@ -16,7 +16,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers parameter-count thresholds for methods, constructor variants (promoted, value-object exemption, configured ceiling), exempt callables, and interfaces.
+ * Covers parameter-count thresholds for methods, constructor variants (promoted, value-object exemption, configured ceiling), exempt callables, and
+ * interfaces.
  */
 final class ParameterCountRuleTest extends TestCase
 {
@@ -57,13 +58,13 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $warnings = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Warning));
-        $errors   = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
+        $warnings = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Warning));
+        $errors   = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Error));
 
         self::assertCount(2, $warnings);
         self::assertCount(1, $errors);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('ManyParamsFixture::sixParams()', $symbols);
         self::assertContains('ManyParamsFixture::nineParams()', $symbols);
         self::assertContains('ManyParamsFixture::__construct()', $symbols);
@@ -78,7 +79,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
-        $errors = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
+        $errors = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Error));
         self::assertCount(1, $errors);
         self::assertSame('ManyParamsFixture::nineParams()', $errors[0]->symbol);
         self::assertSame(9, $errors[0]->metadata['parameters']);
@@ -87,31 +88,32 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Provide fixture/symbol pairs that must remain exempt from parameter-count findings.
      *
-     * @return iterable<string, array{fixture: string, symbol: string}>
+     * @return iterable<string, array{fixture: string, symbol: string}> - one case per exempt callable, keyed by the PHPUnit data-set label
      */
     public static function exemptCallableProvider(): iterable
     {
         yield 'variadic function exempt' => [
             'fixture' => 'many-params.php',
-            'symbol' => 'ManyParamsFixture::variadicParams()',
+            'symbol'  => 'ManyParamsFixture::variadicParams()',
         ];
 
         yield 'promoted readonly DTO exempt' => [
             'fixture' => 'promoted-payload.php',
-            'symbol' => 'PromotedPayloadFixture::__construct()',
+            'symbol'  => 'PromotedPayloadFixture::__construct()',
         ];
 
         yield 'promoted DTO at ceiling stays exempt' => [
             'fixture' => 'promoted-payload-at-ceiling.php',
-            'symbol' => 'PromotedPayloadAtCeilingFixture::__construct()',
+            'symbol'  => 'PromotedPayloadAtCeilingFixture::__construct()',
         ];
     }
 
     /**
      * Verify exempt callables are not reported under the standard threshold.
      *
-     * @param string $fixture Fixture filename to parse.
-     * @param string $symbol  Symbol whose absence from findings is asserted.
+     * @param string $fixture - Fixture filename to parse.
+     * @param string $symbol - Symbol whose absence from findings is asserted.
+     *
      * @return void
      */
     #[DataProvider('exemptCallableProvider')]
@@ -119,7 +121,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $findings = $this->analyse($fixture, ['warning' => 5, 'error' => 8]);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains($symbol, $symbols);
     }
 
@@ -135,9 +137,9 @@ final class ParameterCountRuleTest extends TestCase
         $findings = $this->analyse('many-params.php', ['warning' => 5, 'error' => 8]);
 
         $constructorFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
-        ));
+                                                $findings,
+                                                static fn($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
+                                            ));
 
         self::assertCount(1, $constructorFindings);
         self::assertSame($expectedPromotedCount, $constructorFindings[0]->metadata['parameters']);
@@ -156,7 +158,7 @@ final class ParameterCountRuleTest extends TestCase
             ['constructorMaxParameters' => 6],
         );
 
-        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('ManyParamsFixture::sixParams()', $symbols);
         self::assertContains('ManyParamsFixture::nineParams()', $symbols);
@@ -180,9 +182,9 @@ final class ParameterCountRuleTest extends TestCase
         );
 
         $constructorFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
-        ));
+                                                $findings,
+                                                static fn($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
+                                            ));
 
         self::assertCount(1, $constructorFindings);
         self::assertSame(Severity::Warning, $constructorFindings[0]->severity);
@@ -210,9 +212,9 @@ final class ParameterCountRuleTest extends TestCase
         );
 
         $constructorFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
-        ));
+                                                $findings,
+                                                static fn($finding) => $finding->symbol === 'ManyParamsFixture::__construct()',
+                                            ));
 
         self::assertCount(1, $constructorFindings);
         self::assertSame(Severity::Error, $constructorFindings[0]->severity);
@@ -232,9 +234,9 @@ final class ParameterCountRuleTest extends TestCase
         $findings = $this->analyse('promoted-payload-above-ceiling.php', ['warning' => 5, 'error' => 8]);
 
         $ceilingFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->symbol === 'PromotedPayloadAboveCeilingFixture::__construct()',
-        ));
+                                            $findings,
+                                            static fn($finding) => $finding->symbol === 'PromotedPayloadAboveCeilingFixture::__construct()',
+                                        ));
 
         self::assertCount(1, $ceilingFindings);
         self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
@@ -260,9 +262,9 @@ final class ParameterCountRuleTest extends TestCase
         );
 
         $ceilingFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->symbol === 'PromotedPayloadFixture::__construct()',
-        ));
+                                            $findings,
+                                            static fn($finding) => $finding->symbol === 'PromotedPayloadFixture::__construct()',
+                                        ));
 
         self::assertCount(1, $ceilingFindings);
         self::assertSame($expectedParams, $ceilingFindings[0]->metadata['parameters']);
@@ -283,7 +285,7 @@ final class ParameterCountRuleTest extends TestCase
             ['constructorMaxParameters' => 5],
         );
 
-        $symbols = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
         self::assertNotContains('PromotedPayloadFixture::__construct()', $symbols);
     }
 
@@ -303,9 +305,14 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param array<string, int>                                                           $thresholds
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
+     *                                                                                                 scan.
+     * @param array<string, int>                                                           $thresholds - Warning/error parameter-count limits for this
+     *                                                                                     case.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Extra rule options merged over the rule
+     *                                                             defaults.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture, empty when nothing tripped the threshold
      */
     private function analyse(string $fixture, array $thresholds, array $options = []): array
     {
@@ -316,7 +323,7 @@ final class ParameterCountRuleTest extends TestCase
             ParameterCountRule::ID,
             new RuleSettings(true, $thresholds, array_merge($defaultOptions, $options)),
         );
-        $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
+        $ruleContext    = new RuleContext(__DIR__ . '/../../..', $config);
 
         return $this->rule->analyse($unit, $ruleContext);
     }
@@ -324,8 +331,12 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
+     *                                                                                              scan.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Option overrides layered onto the shipped
+     *                                                             defaults, thresholds untouched.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings produced under the default thresholds, empty when none fired
      */
     private function analyseWithDefaultSettings(string $fixture, array $options): array
     {
@@ -348,8 +359,9 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

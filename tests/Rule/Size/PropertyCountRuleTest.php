@@ -94,14 +94,17 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param array<string, int> $thresholds
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int> $thresholds - Warning/error property-count limits for this case.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - property-count findings the rule raised for this fixture; empty when the count stays under both
+     *                                         thresholds
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit     = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $unit        = $this->parseFixture($fixture);
+        $registry    = RuleRegistry::defaults();
+        $config      = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             PropertyCountRule::ID,
             new RuleSettings(true, $thresholds),
         );
@@ -113,8 +116,9 @@ final class PropertyCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with its display path set repo-relative for finding reports
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

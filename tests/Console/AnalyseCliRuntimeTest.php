@@ -124,7 +124,9 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     /**
      * Decode the trailing JSON line of an analyse command's stderr output.
      *
-     * @return array<string, mixed> Parsed runtime payload.
+     * @param string $stderr - Captured stderr whose final non-blank line is the --print-runtime JSON payload.
+     *
+     * @return array<string, mixed> - Parsed runtime payload.
      */
     private function decodeRuntimePayload(string $stderr): array
     {
@@ -134,7 +136,7 @@ final class AnalyseCliRuntimeTest extends CliTestCase
         $payload = json_decode($lines[count($lines) - 1], true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($payload);
 
-        /** @var array<string, mixed> $payload decoded JSON payload is validated key by key below. */
+        /** @var array<string, mixed> $payload decoded JSON payload is validated key by key by the caller. */
         return $payload;
     }
 }

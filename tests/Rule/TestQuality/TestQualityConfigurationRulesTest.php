@@ -63,8 +63,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/mocking-domain-object.php');
         self::assertRuleCount(MockingDomainObjectRule::ID, 0, $defaultFindings);
 
-        $registry = RuleRegistry::defaults();
-        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry        = RuleRegistry::defaults();
+        $config          = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-mocking-domain-object.yaml',
             $registry,
         );
@@ -184,10 +184,10 @@ final class TestQualityConfigurationRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/non-test-class.php');
 
         $testQualityFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.')
-                && str_contains($finding->filePath, 'non-test-class.php'),
-        ));
+                                                $findings,
+                                                static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.')
+                                                                                     && str_contains($finding->filePath, 'non-test-class.php'),
+                                            ));
 
         self::assertSame([], $testQualityFindings, 'Library code with test* method names must not trigger test-quality rules.');
     }
@@ -200,23 +200,23 @@ final class TestQualityConfigurationRulesTest extends TestCase
     public function testCumulativeFixtureRepresentsEveryStaticTestQualityRule(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/cumulative-test-quality.php'),
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/cumulative-test-quality.php'),
+                                     static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'test-quality.'),
+                                 ));
 
-        $ruleIds        = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
+        $ruleIds        = array_map(static fn(Finding $finding): string => $finding->ruleId, $findings);
         $missingRuleIds = array_values(array_diff($this->expectedRuleIds(), $ruleIds));
 
         self::assertSame([], $missingRuleIds);
 
-        $fingerprints = array_map(static fn (Finding $finding): string => $finding->fingerprint(), $findings);
+        $fingerprints = array_map(static fn(Finding $finding): string => $finding->fingerprint(), $findings);
         self::assertCount(count($fingerprints), array_unique($fingerprints));
     }
 
     /**
      * Build a dummy PHPUnit analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - a parsed unit with no test-quality candidates, used as a placeholder subject for config-only rule checks
      */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
@@ -226,8 +226,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Build a rule context for PHPUnit helper tests.
      *
-     * @param string $relativeRoot
-     * @return RuleContext
+     * @param string $relativeRoot - Project-root-relative directory used as the context root.
+     *
+     * @return RuleContext - context anchored at the project root joined with the relative root, carrying default-registry config
      */
     private function phpUnitContext(string $relativeRoot): RuleContext
     {
@@ -242,14 +243,17 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param list<Finding> $findings
+     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param int           $expectedCount - Exact number of findings the rule must emit.
+     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -257,7 +261,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * List rule IDs expected in enabled test-quality scans.
      *
-     * @return list<string>
+     * @return list<string> - every test-quality rule id an enabled scan must surface; a missing entry means a rule was dropped
      */
     private function expectedRuleIds(): array
     {
@@ -295,7 +299,10 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @return list<Finding>
+     * @param string              $path - Single fixture path to analyse.
+     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     *
+     * @return list<Finding> - all findings the default registry emits for the single fixture; empty when the fixture is clean
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -305,13 +312,15 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string> $paths
-     * @return list<Finding>
+     * @param list<string>        $paths - Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
+     *
+     * @return list<Finding> - findings the default registry emits across all parsed fixtures combined; empty when none fire
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
         return $registry->analyse(
             $units,
@@ -322,8 +331,9 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     * @param string $path - Filesystem path.
+     *
+     * @return AnalysisUnit - the fixture parsed from the project-root-relative path, retaining that path as its display name
      */
     private function unitForPath(string $path): AnalysisUnit
     {

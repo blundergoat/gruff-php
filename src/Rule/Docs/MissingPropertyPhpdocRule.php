@@ -37,10 +37,12 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Describe the missing property PHPDoc rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory by default so property-doc enforcement is opt-in; Medium confidence because a missing
+        // local docblock is unambiguous but the value of documenting trivial properties is team-dependent.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing property PHPDoc',
@@ -54,10 +56,10 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find declared and promoted properties that lack local documentation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for undocumented properties.
+     * @return list<Finding> - Findings for undocumented properties.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,10 +84,15 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Check whether a class-like node can own declared or promoted properties.
      *
-     * @return bool True when the node should be inspected.
+     * @param ClassLike $classLike - class-like node from the parsed unit; the caller must still
+     *   guard `$classLike->name` separately, since anonymous classes are supported but unnamed.
+     *
+     * @return bool - True when the node should be inspected.
      */
     private function isSupportedClassLike(ClassLike $classLike): bool
     {
+        // Only these four kinds can declare properties or a promoting constructor; other ClassLike
+        // subtypes (none today, but future parser additions) are skipped rather than mis-inspected.
         return $classLike instanceof Class_
             || $classLike instanceof Trait_
             || $classLike instanceof Interface_
@@ -95,7 +102,15 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find declared properties without PHPDoc.
      *
-     * @return list<Finding> Findings for undocumented declared properties.
+     * @param ClassLike      $classLike    - node whose `getProperties()` declarations are scanned; a
+     *   docblock on the `Property` statement (not the individual prop) is what suppresses the finding.
+     * @param string         $className    - short class name the caller already resolved, used to build
+     *   the `Class::$prop` symbol; passed in so this method does not re-null-check `$classLike->name`.
+     * @param RuleDefinition $definition   - this rule's metadata, copied into each emitted finding so
+     *   severity and pillar stay consistent without re-deriving them per property.
+     * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on findings.
+     *
+     * @return list<Finding> - Findings for undocumented declared properties.
      */
     private function declaredPropertyFindings(
         ClassLike $classLike,
@@ -127,7 +142,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Build one declared-property PHPDoc finding.
      *
-     * @return Finding Finding for an undocumented declared property.
+     * @param string         $propertyName - bare property name without the leading `$`; combined with
+     *   `$className` to form the `Class::$prop` symbol shown to the reviewer.
+     * @param string         $className    - short class name owning the property, for the same symbol.
+     * @param int            $line         - 1-based start line of the property statement, so the finding
+     *   anchors at the declaration the author must annotate, not at the individual prop expression.
+     * @param RuleDefinition $definition   - rule metadata source for the finding's id, severity, pillar,
+     *   tier, and confidence.
+     * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on the finding.
+     *
+     * @return Finding - Finding for an undocumented declared property.
      */
     private function declaredPropertyFinding(
         string $propertyName,
@@ -160,7 +184,14 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find promoted constructor properties without matching constructor `@param` docs.
      *
-     * @return list<Finding> Findings for undocumented promoted properties.
+     * @param ClassLike      $classLike    - node whose constructor is searched for promoted parameters;
+     *   a promoted param is documented (and so suppressed) by a constructor `@param` of the same name.
+     * @param string         $className    - short class name used to build the `Class::__construct($x)`
+     *   symbol; passed in so this method need not re-resolve `$classLike->name`.
+     * @param RuleDefinition $definition   - rule metadata copied into each emitted finding.
+     * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on findings.
+     *
+     * @return list<Finding> - Findings for undocumented promoted properties.
      */
     private function promotedPropertyFindings(
         ClassLike $classLike,
@@ -170,6 +201,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     ): array {
         $constructor = $this->findConstructor($classLike);
         if ($constructor === null) {
+            // No constructor means no promoted properties to check, so report nothing for this class.
             return [];
         }
 
@@ -197,11 +229,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Return the property name for a promoted constructor parameter.
      *
-     * @return string|null Property name, or null when the parameter is not promoted.
+     * @param Param $param - a single constructor parameter node; treated as promoted only when it carries
+     *   visibility flags (`public`/`protected`/`private`), which is what turns a param into a property.
+     *
+     * @return string|null - Property name, or null when the parameter is not promoted.
      */
     private function promotedPropertyName(Param $param): ?string
     {
         if ($param->flags === 0 || !$param->var instanceof Variable || !is_string($param->var->name)) {
+            // Not promoted (no visibility flags) or a variadic/destructured form without a plain name, so
+            // there is no property to attribute; null signals "skip", an expected miss rather than an error.
             return null;
         }
 
@@ -211,7 +248,16 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Build one promoted-property PHPDoc finding.
      *
-     * @return Finding Finding for an undocumented promoted property.
+     * @param string         $propertyName - bare promoted-parameter name without the leading `$`, used in
+     *   the `Class::__construct($prop)` symbol and the remediation text.
+     * @param string         $className    - short class name owning the constructor, for the same symbol.
+     * @param int            $line         - 1-based start line of the promoted parameter, so the finding
+     *   anchors on the constructor signature where the `@param` tag must be added.
+     * @param RuleDefinition $definition   - rule metadata source for the finding's id, severity, pillar,
+     *   tier, and confidence.
+     * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on the finding.
+     *
+     * @return Finding - Finding for an undocumented promoted property.
      */
     private function promotedPropertyFinding(
         string $propertyName,
@@ -244,12 +290,17 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Return the constructor method for a class-like declaration.
      *
-     * @return ClassMethod|null Constructor, or null when absent.
+     * @param ClassLike $classLike - node whose direct methods are scanned; inherited constructors are not
+     *   resolved, since promotion only annotates the constructor physically declared in this class body.
+     *
+     * @return ClassMethod|null - Constructor, or null when absent.
      */
     private function findConstructor(ClassLike $classLike): ?ClassMethod
     {
         foreach ($classLike->getMethods() as $method) {
             if (strtolower($method->name->toString()) === '__construct') {
+                // Match case-insensitively because PHP method names are case-insensitive; hand back the
+                // first `__construct` found, which is the only constructor a valid class can declare.
                 return $method;
             }
         }
@@ -260,15 +311,22 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * List promoted constructor parameters that already have property documentation.
      *
-     * @return list<string>
+     * @param ClassMethod $constructor - the constructor whose docblock `@param` tags are read; only its
+     *   own docblock counts, so a param documented on a parent constructor is not considered covered here.
+     *
+     * @return list<string> - Names (without `$`) of parameters the constructor docblock already documents;
+     *   empty when the constructor has no docblock, which the caller reads as "nothing documented yet".
      */
     private function documentedConstructorParams(ClassMethod $constructor): array
     {
         $doc = $constructor->getDocComment();
         if ($doc === null) {
+            // No docblock means no `@param` tags, so every promoted property is treated as undocumented.
             return [];
         }
 
+        // Reuse the shared `@param` parser so promoted-property coverage matches exactly what the
+        // missing-param-tag rule recognises, keeping the two documentation rules consistent.
         return MissingParamTagRule::extractParamNames($doc->getText());
     }
 }

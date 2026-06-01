@@ -13,7 +13,9 @@ use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
-use GruffPhp\Rule\Complexity\NestingDepthRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalConstantRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalFunctionRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
@@ -49,10 +51,10 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(150, $units);
-        self::assertCount(2272, $findings);
+        self::assertCount(169, $units);
+        self::assertCount(2410, $findings);
         self::assertSame(
-            '85833fbf29261b22f93ff3' . 'c0b559507ad87ae9a49e369dbda29cd63b5304da98',
+            'ae32f2419065a7eb' . 'af9795dcd8eae2855e58ec4e93a6b896a35c6fd10fb8d93f',
             hash('sha256', $json),
         );
     }
@@ -64,28 +66,30 @@ final class RuleRegressionSnapshotTest extends TestCase
      */
     public function testDefaultAndSupplementalCalibrationScenariosCoverEveryRegisteredRule(): void
     {
-        $registry            = RuleRegistry::defaults();
+        $registry = RuleRegistry::defaults();
         [, $defaultFindings] = $this->analysePaths(['tests/Fixtures']);
-        $registeredRuleIds   = array_map(static fn ($rule): string => $rule->definition()->id, $registry->all());
-        $defaultRuleIds      = $this->uniqueRuleIds($defaultFindings);
-        $defaultMissing      = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
+        $registeredRuleIds = array_map(static fn($rule): string => $rule->definition()->id, $registry->all());
+        $defaultRuleIds    = $this->uniqueRuleIds($defaultFindings);
+        $defaultMissing    = array_values(array_diff($registeredRuleIds, $defaultRuleIds));
 
         self::assertSame([
-            CognitiveComplexityRule::ID,
-            CyclomaticComplexityRule::ID,
-            HalsteadVolumeRule::ID,
-            MaintainabilityIndexRule::ID,
-            NestingDepthRule::ID,
-            MissingReadmeRule::ID,
-            AverageMethodLengthRule::ID,
-            ClassLengthRule::ID,
-            FileLengthRule::ID,
-            MethodLengthRule::ID,
-            MockingDomainObjectRule::ID,
-            PhpUnitCoverageSourceMissingRule::ID,
-            PhpUnitDeprecationsNotFatalRule::ID,
-            PhpUnitStrictFlagsMissingRule::ID,
-        ], $defaultMissing);
+                             CognitiveComplexityRule::ID,
+                             CyclomaticComplexityRule::ID,
+                             HalsteadVolumeRule::ID,
+                             MaintainabilityIndexRule::ID,
+                             UnusedInternalClassRule::ID,
+                             UnusedInternalConstantRule::ID,
+                             UnusedInternalFunctionRule::ID,
+                             MissingReadmeRule::ID,
+                             AverageMethodLengthRule::ID,
+                             ClassLengthRule::ID,
+                             FileLengthRule::ID,
+                             MethodLengthRule::ID,
+                             MockingDomainObjectRule::ID,
+                             PhpUnitCoverageSourceMissingRule::ID,
+                             PhpUnitDeprecationsNotFatalRule::ID,
+                             PhpUnitStrictFlagsMissingRule::ID,
+                         ], $defaultMissing);
 
         $supplementalRuleIds = $this->uniqueRuleIds($this->supplementalCalibrationFindings());
 
@@ -95,30 +99,31 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param list<string>        $paths
-     * @param AnalysisConfig|null $config
-     * @param string              $projectRoot
-     * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string}
+     * @param list<string>        $paths - Fixture paths to parse and analyse.
+     * @param AnalysisConfig|null $config - Optional config override, or null to use default-registry config.
+     * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
+     *
+     * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
+     *                  that order
      */
     private function analysePaths(
-        array $paths,
+        array           $paths,
         ?AnalysisConfig $config = null,
-        string $projectRoot = self::PROJECT_ROOT,
-    ): array
-    {
+        string          $projectRoot = self::PROJECT_ROOT,
+    ): array {
         $registry      = RuleRegistry::defaults();
         $phpFileParser = new PhpFileParser();
         $files         = (new SourceDiscovery($projectRoot))->discover($paths, true)->files;
         $units         = array_map(
-            static fn (SourceFile $file): AnalysisUnit => $phpFileParser->parse($file),
+            static fn(SourceFile $file): AnalysisUnit => $phpFileParser->parse($file),
             $files,
         );
-        $findings = $registry->analyse($units, new RuleContext(
+        $findings      = $registry->analyse($units, new RuleContext(
             $projectRoot,
             $config ?? AnalysisConfig::fromRegistry($registry),
         ));
-        $payload = $this->canonicalFindingPayload($findings);
-        $json    = json_encode($payload, JSON_THROW_ON_ERROR);
+        $payload       = $this->canonicalFindingPayload($findings);
+        $json          = json_encode($payload, JSON_THROW_ON_ERROR);
 
         self::assertSame(count($files), count($units));
 
@@ -128,7 +133,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build supplemental calibration findings for the test fixture.
      *
-     * @return list<Finding>
+     * @return list<Finding> - the extra findings the baseline corpus scan cannot reach, merged into one calibration list
      */
     private function supplementalCalibrationFindings(): array
     {
@@ -136,35 +141,36 @@ final class RuleRegressionSnapshotTest extends TestCase
         $findings = [];
 
         array_push(
-            $findings,
+               $findings,
             ...$this->analysePaths(
-                ['tests/Fixtures/Complexity'],
-                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
-            )[1],
+            ['tests/Fixtures/Complexity'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/complexity-low-thresholds.yaml', $registry),
+        )[1],
         );
         array_push(
-            $findings,
+               $findings,
             ...$this->analysePaths(
-                ['tests/Fixtures/Size'],
-                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/size-low-thresholds.yaml', $registry),
-            )[1],
+            ['tests/Fixtures/Size'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/size-low-thresholds.yaml', $registry),
+        )[1],
         );
         array_push(
-            $findings,
+               $findings,
             ...$this->missingReadmeFindings(),
+            ...$this->projectWideDeadCodeCalibrationFindings(),
             ...$this->phpUnitConfigCalibrationFindings(),
             ...$this->analysePaths(
-                ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
-                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-mocking-domain-object.yaml', $registry),
-            )[1],
+            ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-mocking-domain-object.yaml', $registry),
+        )[1],
             ...$this->analysePaths(
-                ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
-                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml', $registry),
-            )[1],
+            ['tests/Fixtures/TestQuality/multiple-aaa-cycles.php'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml', $registry),
+        )[1],
             ...$this->analysePaths(
-                ['tests/Fixtures/TestQuality/testdox-readability.php'],
-                (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
-            )[1],
+            ['tests/Fixtures/TestQuality/testdox-readability.php'],
+            (new ConfigLoader(self::PROJECT_ROOT))->load('tests/Fixtures/Config/enable-testdox-readability.yaml', $registry),
+        )[1],
         );
 
         return $findings;
@@ -173,7 +179,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build missing readme findings for the test fixture.
      *
-     * @return list<Finding>
+     * @return list<Finding> - findings from a synthetic src tree with no README, isolating the docs.missing-readme signal
      */
     private function missingReadmeFindings(): array
     {
@@ -190,17 +196,29 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
+     * Build project-wide dead-code findings for the fixture project.
+     *
+     * @return list<Finding> - findings from the fixture project whose composer.json defines App\ as internal
+     */
+    private function projectWideDeadCodeCalibrationFindings(): array
+    {
+        $projectRoot = self::PROJECT_ROOT . '/tests/Fixtures/DeadCode/project-wide';
+
+        return $this->analysePaths(['src', 'entrypoints', 'tests'], projectRoot: $projectRoot)[1];
+    }
+
+    /**
      * Build php unit config calibration findings for the test fixture.
      *
-     * @return list<Finding>
+     * @return list<Finding> - findings produced against the lax phpunit-config fixture root so the phpunit.* config rules fire
      */
     private function phpUnitConfigCalibrationFindings(): array
     {
         $registry = RuleRegistry::defaults();
         $unit     = (new PhpFileParser())->parse(new SourceFile(
-            self::PROJECT_ROOT . '/tests/Fixtures/TestQuality/non-candidates.php',
-            'tests/Fixtures/TestQuality/non-candidates.php',
-        ));
+                                                     self::PROJECT_ROOT . '/tests/Fixtures/TestQuality/non-candidates.php',
+                                                     'tests/Fixtures/TestQuality/non-candidates.php',
+                                                 ));
 
         return $registry->analyse(
             [$unit],
@@ -214,15 +232,16 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * List unique rule identifiers present in finding output.
      *
-     * @param list<Finding> $findings
-     * @return list<string>
+     * @param list<Finding> $findings - Findings whose rule ids feed the supplemental coverage assertion.
+     *
+     * @return list<string> - the de-duplicated rule ids in stable ascending string order; empty when no findings
      */
     private function uniqueRuleIds(array $findings): array
     {
         $ruleIds = array_values(array_unique(array_map(
-            static fn (Finding $finding): string => $finding->ruleId,
-            $findings,
-        )));
+                                                 static fn(Finding $finding): string => $finding->ruleId,
+                                                 $findings,
+                                             )));
         sort($ruleIds, SORT_STRING);
 
         return $ruleIds;
@@ -231,17 +250,18 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Normalize findings to stable arrays for regression snapshots.
      *
-     * @param list<Finding> $findings
-     * @return list<FindingArray>
+     * @param list<Finding> $findings - Findings to convert into canonical snapshot payload rows.
+     *
+     * @return list<FindingArray> - rows sorted into a canonical order so reordered findings still hash identically
      */
     private function canonicalFindingPayload(array $findings): array
     {
         $payload = array_map(
-            static fn (Finding $finding): array => self::canonicalFindingArray($finding),
+            static fn(Finding $finding): array => self::canonicalFindingArray($finding),
             $findings,
         );
 
-        usort($payload, static fn (array $left, array $right): int => $left <=> $right);
+        usort($payload, static fn(array $left, array $right): int => $left <=> $right);
 
         return $payload;
     }
@@ -249,7 +269,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Build a stable finding payload row for snapshot hashing.
      *
-     * @return FindingArray Canonical finding payload.
+     * @param Finding $finding - single finding to flatten; its metadata is recursively key-sorted for stability
+     *
+     * @return FindingArray - the flattened finding with top-level keys sorted so equal findings serialise byte-for-byte alike
      */
     private static function canonicalFindingArray(Finding $finding): array
     {
@@ -265,8 +287,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     }
 
     /**
-     * @param FindingMetadata $metadata Finding metadata payload.
-     * @return FindingMetadata Canonical metadata payload.
+     * @param FindingMetadata $metadata - Finding metadata payload.
+     *
+     * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash
      */
     private static function canonicalMetadata(array $metadata): array
     {
@@ -286,7 +309,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to a freshly created, uniquely named temp directory for the caller to populate
      */
     private function tempDir(): string
     {
@@ -300,12 +323,14 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the path was never created; treat removal as a no-op.
             return;
         }
 

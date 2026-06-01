@@ -29,10 +29,11 @@ final class WeakCryptoRule implements RuleInterface
     /**
      * Describe the weak cryptography security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: md5/sha1/mcrypt_* are unambiguous names, so a match is a near-certain weak-primitive use.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Weak cryptography primitives',
@@ -46,10 +47,10 @@ final class WeakCryptoRule implements RuleInterface
     /**
      * Find weak hashing and cryptography primitives in source code.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for weak cryptography usage.
+     * @return list<Finding> - Findings for weak cryptography usage; empty when the file calls none.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

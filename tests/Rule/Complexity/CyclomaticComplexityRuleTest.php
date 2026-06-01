@@ -41,26 +41,28 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Provide method ccn cases for parameterized tests.
      *
-     * @return array<string, array{string, int}>
+     * @return array<string, array{string, int}> - data rows keyed by case label, each pairing a fixture method name with its expected cyclomatic
+     *                       count
      */
     public static function methodCcnProvider(): array
     {
         return [
-            'flat method' => ['flat', 1],
-            'if/elseif' => ['ifElseIf', 3],
+            'flat method'         => ['flat', 1],
+            'if/elseif'           => ['ifElseIf', 3],
             'loop with condition' => ['loopWithCondition', 4],
-            'switch block' => ['switchBlock', 4],
-            'match block' => ['matchBlock', 4],
-            'mixed operators' => ['mixedOperators', 7],
-            'try/catch loop' => ['tryCatchLoop', 4],
+            'switch block'        => ['switchBlock', 4],
+            'match block'         => ['matchBlock', 4],
+            'mixed operators'     => ['mixedOperators', 7],
+            'try/catch loop'      => ['tryCatchLoop', 4],
         ];
     }
 
     /**
      * Verify cyclomatic count matches expected.
      *
-     * @param string $methodName  Fixture method name.
-     * @param int    $expectedCcn Expected cyclomatic complexity.
+     * @param string $methodName - Fixture method name.
+     * @param int    $expectedCcn - Expected cyclomatic complexity.
+     *
      * @return void
      */
     #[DataProvider('methodCcnProvider')]
@@ -107,12 +109,12 @@ final class CyclomaticComplexityRuleTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $ruleIds             = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
-        $complexities        = array_map(static fn ($finding): mixed => $finding->metadata['complexity'] ?? null, $findings);
+        $ruleIds             = array_values(array_unique(array_map(static fn($finding): string => $finding->ruleId, $findings)));
+        $complexities        = array_map(static fn($finding): mixed => $finding->metadata['complexity'] ?? null, $findings);
         $invalidComplexities = array_values(array_filter(
-            $complexities,
-            static fn (mixed $complexity): bool => !is_int($complexity) || $complexity <= 3,
-        ));
+                                                $complexities,
+                                                static fn(mixed $complexity): bool => !is_int($complexity) || $complexity <= 3,
+                                            ));
 
         self::assertSame([CyclomaticComplexityRule::ID], $ruleIds);
         self::assertSame([], $invalidComplexities);
@@ -127,16 +129,64 @@ final class CyclomaticComplexityRuleTest extends TestCase
     {
         $findings = $this->analyse('cyclomatic.php', ['warning' => 3, 'error' => 4]);
 
-        $errors = array_values(array_filter($findings, static fn ($finding) => $finding->severity === Severity::Error));
+        $errors = array_values(array_filter($findings, static fn($finding) => $finding->severity === Severity::Error));
 
         self::assertNotSame([], $errors);
     }
 
     /**
+     * Verify hasExecutableBody separates bodyless signatures from real bodies (P6).
+     *
+     * This is the shared predicate the cyclomatic, cognitive, and nesting-depth
+     * rules use to skip declarations with no control flow, so a regression here
+     * would let any of them measure an abstract or interface method.
+     *
+     * @return void
+     */
+    public function testHasExecutableBodyDistinguishesBodylessSignatures(): void
+    {
+        $unit       = $this->parseFixture('bodyless.php');
+        $nodeFinder = new NodeFinder();
+        $methods    = $nodeFinder->findInstanceOf($unit->statements, ClassMethod::class);
+
+        $hasBodyByName = [];
+        foreach ($methods as $method) {
+            $hasBodyByName[$method->name->toString()] = CyclomaticComplexityRule::hasExecutableBody($method);
+        }
+
+        self::assertFalse($hasBodyByName['declaredCount'] ?? null, 'Interface method has no body.');
+        self::assertFalse($hasBodyByName['abstractTotal'] ?? null, 'Abstract method has no body.');
+        self::assertTrue($hasBodyByName['concreteTotal'] ?? null, 'Concrete method has a body.');
+    }
+
+    /**
+     * Verify bodyless declarations are skipped even at a zero threshold (P6).
+     *
+     * A warning threshold of 0 would flag every measured node, since base
+     * cyclomatic complexity is 1, so without the bodyless guard the abstract and
+     * interface methods would each report a finding. Only the concrete method is
+     * reported, proving the rule filters bodyless signatures rather than leaning
+     * on "no body folds to baseline complexity".
+     *
+     * @return void
+     */
+    public function testBodylessDeclarationsAreNotMeasured(): void
+    {
+        $findings = $this->analyse('bodyless.php', ['warning' => 0, 'error' => 20]);
+
+        $symbols = array_map(static fn($finding): ?string => $finding->symbol, $findings);
+
+        self::assertSame(['BodylessFixture::concreteTotal()'], $symbols);
+    }
+
+    /**
      * Analyse complexity fixtures and return findings for assertions.
      *
-     * @param array<string, int> $thresholds
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
+     * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
+     *                                       emitting, so a test can force or suppress findings on the same fixture.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -153,8 +203,9 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rule reports findings against
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

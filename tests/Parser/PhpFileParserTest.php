@@ -49,8 +49,9 @@ final class PhpFileParserTest extends TestCase
     /**
      * Resolve a parser fixture path.
      *
-     * @param string $path Filesystem path.
-     * @return string
+     * @param string $path - Filesystem path.
+     *
+     * @return string - absolute, realpath-resolved path to the named fixture; the assertion guarantees the file exists
      */
     private function fixturePath(string $path): string
     {

@@ -29,7 +29,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Describe the long-test-versus-SUT rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Find long tests that appear to exercise only one SUT call.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for tests with disproportionate setup/assertion size.
+     * @return list<Finding> - Findings for tests with disproportionate setup/assertion size.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,7 +89,9 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Count apparent non-assertion SUT calls in a test scope.
      *
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Apparent SUT calls.
+     * @param TestQualityScope $scope - Single test method whose call sites are filtered down to candidate SUT calls.
+     *
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - Apparent SUT calls.
      */
     private function sutCalls(TestQualityScope $scope): array
     {
@@ -97,6 +99,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isAssertionCall($call) || TestQualityNodeHelper::isMockCreationCall($call) || TestQualityNodeHelper::isMockVerificationCall($call)) {
+                // Assertions and mock plumbing are test scaffolding, never the system under test.
                 continue;
             }
 
@@ -112,31 +115,39 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Detect integration-test harness calls that naturally need more arrangement than the SUT call itself.
      *
-     * @return bool True when the single call is a command/process/application harness invocation.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - The sole SUT call, examined to exempt harness drivers.
+     *
+     * @return bool - True when the single call is a command/process/application harness invocation.
      */
     private function isIntegrationHarnessCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
         if (!$call instanceof Expr\MethodCall) {
+            // Only instance-method drivers (tester/process objects) qualify; free functions never count as harnesses.
             return false;
         }
 
         $name = TestQualityNodeHelper::callName($call);
         if ($name === 'execute') {
+            // `$tester->execute(...)` drives a command/application harness, whose setup dwarfs the call.
             return $this->isHarnessReceiver($call->var, ['tester']);
         }
 
         if ($name === 'run') {
+            // `$process->run()` / `$tester->run()` likewise wrap heavy arrangement around one call.
             return $this->isHarnessReceiver($call->var, ['process', 'tester']);
         }
 
+        // Any other method name is treated as ordinary SUT exercise, so the advisory still applies.
         return false;
     }
 
     /**
      * Detect harness-looking receiver variables and direct new expressions.
      *
-     * @param list<string> $variableTokens Lowercase variable-name fragments accepted as harnesses.
-     * @return bool True when the receiver looks like a test harness.
+     * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
+     * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
+     *
+     * @return bool - True when the receiver looks like a test harness.
      */
     private function isHarnessReceiver(Expr $receiver, array $variableTokens): bool
     {
@@ -144,6 +155,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             $variableName = strtolower($receiver->name);
             foreach ($variableTokens as $token) {
                 if (str_contains($variableName, $token)) {
+                    // Receiver variable name contains an allowed harness fragment, so treat the call as a driver.
                     return true;
                 }
             }
@@ -152,9 +164,11 @@ final readonly class TestLongerThanSutRule implements RuleInterface
         if ($receiver instanceof Expr\New_ && $receiver->class instanceof Name) {
             $className = strtolower($receiver->class->getLast());
 
+            // Inline `new ApplicationTester(...)` etc. is a harness even without a telltale variable name.
             return in_array($className, ['applicationtester', 'commandtester', 'process'], true);
         }
 
+        // Property fetches, calls, and unrecognised shapes are not treated as harness drivers.
         return false;
     }
 }

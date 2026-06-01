@@ -33,10 +33,11 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Describe the class-file mismatch naming rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning rather than advisory: a name that disagrees with PSR-4 autoloading is a concrete defect, not a smell.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Class/file name mismatch',
@@ -50,16 +51,17 @@ final readonly class ClassFileMismatchRule implements RuleInterface
     /**
      * Find primary class names that do not match their file names.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for class and file name mismatches.
+     * @return list<Finding> - Findings for class and file name mismatches.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         $definition = $this->definition();
         $nodeFinder = new NodeFinder();
         $classLikes = $nodeFinder->find($analysisUnit->statements, static function (Node $node): bool {
+            // Anonymous classes have no name to compare against the file, so they never qualify as the declaration.
             return ($node instanceof Class_ && !$node->isAnonymous())
                 || $node instanceof Interface_
                 || $node instanceof Trait_
@@ -67,6 +69,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         });
 
         if (count($classLikes) !== 1) {
+            // The one-file-one-class convention only has meaning when exactly one declaration owns the file.
             return [];
         }
 
@@ -75,6 +78,7 @@ final readonly class ClassFileMismatchRule implements RuleInterface
         $className = $classLike->name?->toString();
 
         if ($className === null) {
+            // A null name means the finder matched an unnamed declaration; nothing to compare to the file name.
             return [];
         }
 
@@ -83,13 +87,16 @@ final readonly class ClassFileMismatchRule implements RuleInterface
 
         // Compare only filenames that are valid PHP class identifiers.
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $fileName) !== 1) {
+            // Non-identifier file names (scripts, hyphenated entrypoints) can never equal a class name, so skip them.
             return [];
         }
 
         if ($fileName === $className) {
+            // Names already agree, the expected case; emitting nothing keeps the rule silent on conforming files.
             return [];
         }
 
+        // Surface the disagreement so the reviewer can rename either side back into PSR-4 alignment.
         return [
             new Finding(
                 ruleId:      $definition->id,

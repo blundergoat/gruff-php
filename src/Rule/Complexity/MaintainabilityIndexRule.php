@@ -32,27 +32,31 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Describe the maintainability index rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory: a low index flags a refactor candidate to weigh, not a confirmed defect, so it ships at the
+        // lowest severity tier and sorts below warnings/errors. The shipped --fail-on default is advisory, so this
+        // does fail the gate; a consumer who wants it non-blocking raises --fail-on to warning.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Maintainability index',
             pillar:            Pillar::Maintainability,
             tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Error,
+            defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
-            severityThreshold: new SeverityThreshold(35, Severity::Error),
+            severityThreshold: new SeverityThreshold(35, Severity::Advisory),
         );
     }
 
     /**
      * Find function-like declarations whose maintainability index falls below thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
-     * @return list<Finding> Findings for low maintainability index scores.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying thresholds.
+     *
+     * @return list<Finding> - One finding per node below the maintainability threshold; empty when all nodes pass.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -105,10 +109,10 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node         Function-like node to score.
-     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the node.
+     * @param ClassMethod|Function_ $node - Function-like node to score.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the node.
      *
-     * @return float Maintainability index score.
+     * @return float - Maintainability index score.
      */
     public static function computeMaintainabilityIndex(Node $node, AnalysisUnit $analysisUnit): float
     {
@@ -116,6 +120,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $endLine   = $node->getEndLine();
 
         if ($startLine < 0 || $endLine < 0) {
+            // No line info to measure (synthetic node), so award a perfect score rather than penalise on no evidence.
             return 100.0;
         }
 
@@ -126,13 +131,16 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;
 
+        // Clamp at zero: the normalised SEI index has a 0-100 floor, so a very dense method cannot report negative.
         return max(0.0, $mi);
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
+     *
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private static function formatNumber(int|float $number): string
     {

@@ -30,10 +30,12 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * Describe the mixed type overuse rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - registry identity for this rule, fixed at Advisory severity and Medium
+     *   confidence so narrowing mixed reads as a contract suggestion rather than a build-breaking failure
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: narrowing mixed is a contract improvement to weigh, not a build-breaker.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Mixed type overuse',
@@ -47,14 +49,16 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * Find parameters and returns that overuse explicit mixed types.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for broad type usage.
+     * @return list<Finding> - one finding per public function-like that declares mixed on a parameter or
+     *   return; empty when nothing offends or the target predates PHP 8.0 (mixed did not exist before then)
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
+            // The explicit mixed type arrived in PHP 8.0, so stay silent on targets that predate it.
             return [];
         }
 
@@ -86,9 +90,9 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
                 symbol:      $functionLike->name->toString() . '()',
                 remediation: 'Replace `mixed` with the actual input shape. For JSON-boundary helpers (parameters consuming `json_decode` output), use `array|bool|float|int|string|null` - the supertype of any top-level decoded value. When only one input shape is meaningful, narrow further to that concrete type (`?string`, `int|float|null`, a named class).',
                 metadata:    [
-                    'requiresPhp' => 8.0,
-                    'locations' => $locations,
-                ],
+                                 'requiresPhp' => 8.0,
+                                 'locations'   => $locations,
+                             ],
             );
         }
 
@@ -98,7 +102,10 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * List source locations where broad mixed types appear.
      *
-     * @return list<string>
+     * @param Stmt\ClassMethod|Stmt\Function_ $functionLike - Function-like whose parameter and return types are scanned
+     *                                                      for mixed; the labels feed the finding message verbatim.
+     *
+     * @return list<string> - human-readable labels for each mixed site ($param names and 'return type'), in source order; empty when none use mixed
      */
     private function mixedLocations(Stmt\ClassMethod|Stmt\Function_ $functionLike): array
     {
@@ -106,7 +113,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
 
         foreach ($functionLike->params as $parameter) {
             if (ModernisationNodeHelper::typeName($parameter->type) === 'mixed') {
-                $name = $parameter->var instanceof \PhpParser\Node\Expr\Variable && is_string($parameter->var->name)
+                $name        = $parameter->var instanceof \PhpParser\Node\Expr\Variable && is_string($parameter->var->name)
                     ? '$' . $parameter->var->name
                     : 'parameter';
                 $locations[] = $name;

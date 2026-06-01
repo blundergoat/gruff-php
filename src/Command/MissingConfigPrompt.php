@@ -35,13 +35,14 @@ final readonly class MissingConfigPrompt
      * address a non-CWD root (notably `dashboard --project ...`) write the new
      * config in the right directory.
      *
-     * @param InputInterface          $input              Console input for the calling command.
-     * @param OutputInterface         $output             Console output for the calling command.
-     * @param SymfonyApplication|null $symfonyApplication Console application used to dispatch the init command.
-     * @param string                  $projectRoot        Project root used to look for an existing config.
-     * @param string|null             $explicitConfigPath Explicit --config path, when supplied.
-     * @param bool                    $shouldSkipConfig   Whether the caller passed --no-config.
-     * @return int|null Exit code when init was run and failed; null when the caller may continue.
+     * @param InputInterface          $input - Console input for the calling command.
+     * @param OutputInterface         $output - Console output for the calling command.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
+     * @param string                  $projectRoot - Project root used to look for an existing config.
+     * @param string|null             $explicitConfigPath - Explicit --config path, when supplied.
+     * @param bool                    $shouldSkipConfig - Whether the caller passed --no-config.
+     *
+     * @return int|null - Exit code when init was run and failed; null when the caller may continue.
      */
     public static function maybeOffer(
         InputInterface $input,
@@ -52,20 +53,25 @@ final readonly class MissingConfigPrompt
         bool $shouldSkipConfig,
     ): ?int {
         if ($shouldSkipConfig || $explicitConfigPath !== null) {
+            // Caller already chose a config path (or opted out), so offering init would override their intent.
             return null;
         }
         if (!$input->isInteractive()) {
+            // No TTY to read a y/N answer from, so never block a piped or CI run on a prompt.
             return null;
         }
         if (ConfigLoader::hasProjectConfig($projectRoot)) {
+            // A project config already exists; init has nothing to scaffold here.
             return null;
         }
         if (!$symfonyApplication instanceof SymfonyApplication) {
+            // Without the application we cannot locate and dispatch the init command, so stay silent.
             return null;
         }
 
         $questionHelper = $symfonyApplication->getHelperSet()->get('question');
         if (!$questionHelper instanceof QuestionHelper) {
+            // No question helper registered means we cannot ask, so skip rather than guess consent.
             return null;
         }
 
@@ -77,6 +83,7 @@ final readonly class MissingConfigPrompt
             new ConfirmationQuestion(self::PROMPT_TEXT, false),
         );
         if (!$accepted) {
+            // User declined the offer, so let the original command continue without scaffolding config.
             return null;
         }
 
@@ -89,6 +96,7 @@ final readonly class MissingConfigPrompt
             $promptOutput,
         );
 
+        // Surface a failed init as the caller's exit code; on success return null so the caller proceeds.
         return $exitCode === Command::SUCCESS ? null : $exitCode;
     }
 
@@ -99,15 +107,18 @@ final readonly class MissingConfigPrompt
      * error stream so JSON, SARIF, and HTML payloads written to STDOUT stay
      * uncorrupted.
      *
-     * @param OutputInterface $output Console output supplied by the caller.
-     * @return OutputInterface Error stream when available; otherwise the supplied output.
+     * @param OutputInterface $output - Console output supplied by the caller.
+     *
+     * @return OutputInterface - Error stream when available; otherwise the supplied output.
      */
     private static function promptOutput(OutputInterface $output): OutputInterface
     {
         if ($output instanceof ConsoleOutputInterface) {
+            // Prefer STDERR so prompt and init chatter never corrupt machine-readable STDOUT payloads.
             return $output->getErrorOutput();
         }
 
+        // No separate error stream available, so fall back to the caller's single output stream.
         return $output;
     }
 }

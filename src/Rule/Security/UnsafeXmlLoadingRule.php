@@ -31,10 +31,11 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Describe the unsafe XML loading rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: taint tracking is heuristic and LIBXML_NONET may be set out of view, so warn not error.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unsafe XML loading',
@@ -48,10 +49,10 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Find XML loaders that receive request-controlled data without LIBXML_NONET.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unsafe XML loading.
+     * @return list<Finding> - Findings for network-capable XML loaders fed request data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -81,33 +82,45 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Build xml method findings for the security rule.
+     * Build XML-loading findings for DOMDocument/XMLReader-style method and static calls.
      *
-     * @return list<Finding>
+     * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying the display path for any finding.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Loader call to inspect (`load`, `loadXML`, `open`, `xml`).
+     *
+     * @return list<Finding> - One finding when the loader takes request-controlled data without LIBXML_NONET, else empty.
      */
     private function xmlMethodFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
         $method = SecurityNodeHelper::methodName($call);
         if (!in_array($method, ['load', 'loadxml', 'open', 'xml'], true)) {
+            // Not an XML-loading entry point, so it cannot trigger external-entity or network fetches; skip it.
             return [];
         }
 
         $xmlArg = SecurityNodeHelper::argumentValue($call->args, 0);
         if ($xmlArg === null || !SecurityNodeHelper::containsUserInput($xmlArg)) {
+            // The XML payload is trusted (or absent), so an unrestricted loader carries no injection risk here.
             return [];
         }
 
+        // DOMDocument load/loadXML put options at index 1; XMLReader open/xml take encoding first, so options sit at 2.
         $optionsIndex = in_array($method, ['open', 'xml'], true) ? 2 : 1;
         if ($this->hasLibxmlNonetArgument($call->args, $optionsIndex)) {
+            // The caller passed LIBXML_NONET, which blocks the network fetch this rule guards against; not a finding.
             return [];
         }
 
+        // Request-controlled XML reaches a network-capable loader with no LIBXML_NONET: the exact unsafe shape to flag.
         return [$this->finding($analysisUnit, $call, $method)];
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
-     * @return bool True when an argument from the given index contains LIBXML_NONET.
+     * Check whether any positional options argument at or after the given index passes LIBXML_NONET.
+     *
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call args; string-keyed named args are skipped.
+     * @param int $startIndex - First positional index the options flags can appear at; varies by loader signature.
+     *
+     * @return bool - True when an argument from the given index contains LIBXML_NONET.
      */
     private function hasLibxmlNonetArgument(array $args, int $startIndex): bool
     {
@@ -117,20 +130,27 @@ final class UnsafeXmlLoadingRule implements RuleInterface
             }
 
             if ($this->containsLibxmlNonet($arg->value)) {
+                // A flags argument carries LIBXML_NONET, so the network-blocking guardrail is present; report safe.
                 return true;
             }
         }
 
+        // No positional flags argument referenced LIBXML_NONET, so the call is treated as network-enabled.
         return false;
     }
 
     /**
-     * @return bool True when the node contains the LIBXML_NONET constant.
+     * Test whether an argument expression mentions the LIBXML_NONET constant anywhere in its subtree.
+     *
+     * @param Node $node - Argument value node to search (a bare constant, a bitmask expression, etc.).
+     *
+     * @return bool - True when the node contains the LIBXML_NONET constant.
      */
     private function containsLibxmlNonet(Node $node): bool
     {
         $nodeFinder = new NodeFinder();
 
+        // Search the whole subtree so the flag is honoured even inside a `LIBXML_NONET | LIBXML_NOENT` bitmask.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
             // Match the explicit network-blocking flag accepted by PHP XML loaders.
             return SecurityNodeHelper::constantName($candidate) === 'LIBXML_NONET';
@@ -138,12 +158,17 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     }
 
     /**
-     * Build the unsafe XML loading finding.
+     * Build the unsafe XML loading finding for one flagged loader call.
      *
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
+     * @param Node $node - Loader call node; its start line locates the finding in source.
+     * @param string $sink - Loader name (e.g. `loadXML`) put in the message and metadata so triage knows the call.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Warning, not Error: a flagged loader may still be safe if entity loading is disabled elsewhere.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('XML loading with request-controlled data and no LIBXML_NONET detected: %s.', $sink),

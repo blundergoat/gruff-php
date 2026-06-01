@@ -20,11 +20,11 @@ use PhpParser\Token;
 final class AnalysisUnit
 {
     /**
-     * @param SourceFile            $file        Source file that produced this analysis unit.
-     * @param string                $source      Raw source text.
-     * @param list<Stmt>            $statements  Parsed top-level statements.
-     * @param list<Token>           $tokens      Comment tokens emitted by the parser.
-     * @param list<ParseDiagnostic> $diagnostics Parse diagnostics collected for the file.
+     * @param SourceFile            $file - Source file that produced this analysis unit.
+     * @param string                $source - Raw source text.
+     * @param list<Stmt>            $statements - Parsed top-level statements.
+     * @param list<Token>           $tokens - Comment tokens emitted by the parser.
+     * @param list<ParseDiagnostic> $diagnostics - Parse diagnostics collected for the file.
      */
     public function __construct(
         public readonly SourceFile $file,
@@ -38,24 +38,27 @@ final class AnalysisUnit
     /**
      * Report whether parsing produced diagnostics for the source file.
      *
-     * @return bool True when the unit has at least one parse diagnostic.
+     * @return bool - True when the unit has at least one parse diagnostic.
      */
     public function hasParseErrors(): bool
     {
+        // A non-empty diagnostics list is the recorded signal that parsing failed for this file.
         return $this->diagnostics !== [];
     }
 
     /**
      * Count source lines in the raw file contents.
      *
-     * @return int Number of lines, or zero for an empty source string.
+     * @return int - Number of lines, or zero for an empty source string.
      */
     public function lineCount(): int
     {
         if ($this->source === '') {
+            // An empty file has no lines; count zero rather than reporting a phantom first line.
             return 0;
         }
 
+        // Add one because the final line carries no trailing newline, so newline count undercounts by one.
         return substr_count($this->source, "\n") + 1;
     }
 
@@ -65,7 +68,7 @@ final class AnalysisUnit
      * need from this unit will not touch it again; the `file` and `diagnostics`
      * shell stays intact for reporting.
      *
-     * @return void Unit is left in a released state with empty contents.
+     * @return void - Unit is left in a released state with empty contents.
      */
     public function release(): void
     {
@@ -85,6 +88,9 @@ final class AnalysisUnit
     /**
      * Recursively clear the `parent` attribute every node carries from
      * ParentConnectingVisitor so the AST is no longer a cycle.
+     *
+     * @param Node $node - Subtree root to descend; its `parent` back-edge and every descendant's are nulled in
+     * place.
      *
      * @return void
      */

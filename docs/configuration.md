@@ -83,6 +83,27 @@ paths:
     - var/cache/
 ```
 
+`paths.ignore` is authoritative in every invocation mode: a matching path is
+excluded from analysis and produces no findings however it was supplied — a
+directory walk, an explicit file operand, or any diff/changed-region scan
+(`--diff`, `--diff -`, `--changed-ranges`, `--since`, `--diff-vs`).
+`--include-ignored` opts back into Git/default-ignored paths only; it never
+overrides `paths.ignore`.
+
+Each excluded path is reported in the JSON report's additive `ignoredPathDetails`
+array (alongside the compatibility `ignoredPaths` string list) with the `source`
+that excluded it (`config`, `default`, `generated`, or `gitignore`) and the
+matching `pattern`:
+
+```json
+"ignoredPathDetails": [
+  { "path": "legacy/Report.php", "source": "config", "pattern": "legacy/**" }
+]
+```
+
+Use `gruff-php check-ignore <path>...` to ask whether gruff would ignore a path,
+and why, without running an analysis (see [CI integration](ci-integration.md)).
+
 ## Allowlists
 
 Use allowlists for deliberate naming or sensitive-data exceptions:

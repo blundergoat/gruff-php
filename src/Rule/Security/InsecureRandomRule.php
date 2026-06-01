@@ -34,10 +34,11 @@ final class InsecureRandomRule implements RuleInterface
     /**
      * Describe the insecure random security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the flagged function names are unambiguous, so the gate can trust this warning.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Insecure random source',
@@ -51,10 +52,10 @@ final class InsecureRandomRule implements RuleInterface
     /**
      * Find random APIs that are unsuitable for security-sensitive values.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for insecure random usage.
+     * @return list<Finding> - One finding per non-cryptographic random call in the unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

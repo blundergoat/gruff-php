@@ -43,10 +43,11 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     /**
      * Describe the exception type-only assertion rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a bare expectException is sometimes intentional, so this stays advisory.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Exception type-only assertion',
@@ -60,10 +61,10 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
     /**
      * Find tests that assert only an exception type without message or state.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for type-only exception tests.
+     * @return list<Finding> - Findings for type-only exception tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

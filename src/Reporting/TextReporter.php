@@ -25,8 +25,9 @@ final readonly class TextReporter
     /**
      * Render an analysis report as the default human-readable text output.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string Text report with summary, diagnostics, and findings.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - Text report with summary, diagnostics, and findings.
      */
     public function render(AnalysisReport $report): string
     {
@@ -65,6 +66,14 @@ final readonly class TextReporter
         );
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
+        if ($report->failureReason !== null) {
+            $lines[] = sprintf('  Failed: %s.', $report->failureReason->message());
+        }
+
+        if ($report->newFindingsCount !== null) {
+            $lines[] = sprintf('  New findings: %d', $report->newFindingsCount);
+        }
+
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
         return implode(PHP_EOL, $lines) . PHP_EOL;
@@ -76,7 +85,9 @@ final readonly class TextReporter
      * hint short-circuits the "open a Python summariser to triage" workaround
      * that consumers were writing externally. See M08.
      *
-     * @param list<string> $lines
+     * @param list<string> $lines - Output buffer appended in place; the hint is added only past the floor.
+     * @param int          $findingCount - Total finding count this report rendered; gates whether the hint appears.
+     *
      * @return void
      */
     private function appendOutputVolumeHint(array &$lines, int $findingCount): void
@@ -99,7 +110,9 @@ final readonly class TextReporter
      * attention to which rules actually shifted since the base. Block is silent when no
      * branch-review is in scope. See M06 / ADR-016.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines - Output buffer appended in place; left untouched when no review is attached.
+     * @param AnalysisReport $report - Report whose attached branch-review supplies the per-rule deltas, if any.
+     *
      * @return void
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
@@ -113,9 +126,9 @@ final readonly class TextReporter
             return;
         }
 
-        $improved  = array_slice(array_filter($rows, static fn (array $row): bool => $row['net'] < 0), 0, 5);
+        $improved  = array_slice(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] < 0), 0, 5);
         $regressed = array_slice(
-            array_reverse(array_filter($rows, static fn (array $row): bool => $row['net'] > 0)),
+            array_reverse(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] > 0)),
             0,
             5,
         );
@@ -132,7 +145,7 @@ final readonly class TextReporter
                 '  Top %d improved: %s',
                 count($improved),
                 implode(', ', array_map(
-                    static fn (array $row): string => sprintf('%d %s', $row['net'], $row['ruleId']),
+                    static fn (array $ruleDelta): string => sprintf('%d %s', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $improved,
                 )),
             );
@@ -143,7 +156,7 @@ final readonly class TextReporter
                 '  Top %d regressed: %s',
                 count($regressed),
                 implode(', ', array_map(
-                    static fn (array $row): string => sprintf('+%d %s', $row['net'], $row['ruleId']),
+                    static fn (array $ruleDelta): string => sprintf('+%d %s', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $regressed,
                 )),
             );
@@ -153,7 +166,9 @@ final readonly class TextReporter
     /**
      * Append review details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines - Output buffer appended in place; left untouched when no review is attached.
+     * @param AnalysisReport $report - Report whose attached branch-review supplies the base ref and finding sets.
+     *
      * @return void
      */
     private function appendReview(array &$lines, AnalysisReport $report): void
@@ -196,7 +211,9 @@ final readonly class TextReporter
     /**
      * Append score details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines - Output buffer appended in place; left untouched when the report has no score.
+     * @param AnalysisReport $report - Report supplying the composite score, per-pillar grades, and diff context.
+     *
      * @return void
      */
     private function appendScore(array &$lines, AnalysisReport $report): void
@@ -245,7 +262,9 @@ final readonly class TextReporter
     /**
      * Append baseline details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines - Output buffer appended in place; left untouched when no baseline was applied.
+     * @param AnalysisReport $report - Report supplying baseline movement counts and the stale-entry resolution flag.
+     *
      * @return void
      */
     private function appendBaseline(array &$lines, AnalysisReport $report): void
@@ -261,6 +280,12 @@ final readonly class TextReporter
         $lines[] = sprintf('  Entries: %d', $report->baseline->totalEntries);
         $lines[] = sprintf('  Generated: %s', $report->baseline->generated ? 'yes' : 'no');
         $lines[] = sprintf('  Suppressed findings: %d', $report->baseline->suppressedFindings);
+        $lines[] = sprintf(
+            '  Movement: %d new, %d unchanged, %d resolved',
+            $report->baseline->newCount,
+            $report->baseline->unchangedCount,
+            $report->baseline->absentCount,
+        );
         $lines[] = sprintf('  Stale evaluation: %s', $report->baseline->staleEvaluation);
         $lines[] = sprintf('  Stale entries: %d', count($report->baseline->staleEntries));
         $lines[] = '  Note: suppressed findings are accepted debt and are removed before scoring.';
@@ -282,12 +307,27 @@ final readonly class TextReporter
                 $report->baseline->path,
             );
         }
+
+        if ($report->shouldListAbsentBaseline && $report->baseline->staleEntries !== []) {
+            $lines[] = '  Resolved entries:';
+            foreach ($report->baseline->staleEntries as $resolvedEntry) {
+                $lines[] = sprintf(
+                    '    %s %s%s',
+                    $resolvedEntry->ruleId,
+                    $resolvedEntry->filePath,
+                    $resolvedEntry->line !== null ? ':' . $resolvedEntry->line : '',
+                );
+            }
+        }
     }
 
     /**
      * Append mutation details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>                $lines - Output buffer appended in place.
+     * @param MutationAnalysisResult|null $mutation - Mutation-testing result, or null when no mutation run is in scope
+     *                                              (null produces no Mutation section at all).
+     *
      * @return void
      */
     private function appendMutation(array &$lines, ?MutationAnalysisResult $mutation): void
@@ -358,8 +398,9 @@ final readonly class TextReporter
     }
 
     /**
-     * @param array<string, int> $counts
-     * @return string Human-readable mutation status summary.
+     * @param array<string, int> $counts - Mutation status counts keyed by status label; empty means no mutants ran.
+     *
+     * @return string - Human-readable mutation status summary.
      */
     private function mutationStatusSummary(array $counts): string
     {
@@ -376,8 +417,9 @@ final readonly class TextReporter
     }
 
     /**
-     * @param array<string, int> $counts
-     * @return string|null Context-only status summary, or null when absent.
+     * @param array<string, int> $counts - Mutation status counts keyed by status label; only context-only statuses are emitted.
+     *
+     * @return string|null - Context-only status summary, or null when absent.
      */
     private function mutationContextSummary(array $counts): ?string
     {
@@ -396,8 +438,10 @@ final readonly class TextReporter
     /**
      * Append path section details to report output.
      *
-     * @param list<string> $lines
-     * @param list<string> $paths
+     * @param list<string> $lines - Output buffer appended in place; left untouched when $paths is empty.
+     * @param string       $title - Section heading printed once above the paths (for example "Ignored paths").
+     * @param list<string> $paths - Paths to list under the heading; an empty list suppresses the whole section.
+     *
      * @return void
      */
     private function appendPathSection(array &$lines, string $title, array $paths): void
@@ -417,8 +461,9 @@ final readonly class TextReporter
     /**
      * Append diagnostics details to report output.
      *
-     * @param list<string>        $lines
-     * @param list<RunDiagnostic> $diagnostics
+     * @param list<string>        $lines - Output buffer appended in place after the Diagnostics heading.
+     * @param list<RunDiagnostic> $diagnostics - Run diagnostics to render; empty suppresses the whole section.
+     *
      * @return void
      */
     private function appendDiagnostics(array &$lines, array $diagnostics): void
@@ -451,8 +496,9 @@ final readonly class TextReporter
     /**
      * Append findings details to report output.
      *
-     * @param list<string>  $lines
-     * @param list<Finding> $findings
+     * @param list<string>  $lines - Output buffer appended in place after the Findings heading.
+     * @param list<Finding> $findings - Findings to render; empty emits the explicit "none" line.
+     *
      * @return void
      */
     private function appendFindings(array &$lines, array $findings): void

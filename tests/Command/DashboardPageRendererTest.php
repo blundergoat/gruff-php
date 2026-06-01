@@ -8,7 +8,8 @@ use GruffPhp\Command\DashboardPageRenderer;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers dashboard HTML rendering: escaping, checkbox state markers, metadata payload injection around the body tag, JSON-encoding fallback, and error-page formatting.
+ * Covers dashboard HTML rendering: escaping, checkbox state markers, metadata payload injection around the body tag, JSON-encoding fallback, and
+ * error-page formatting.
  */
 final class DashboardPageRendererTest extends TestCase
 {
@@ -23,16 +24,16 @@ final class DashboardPageRendererTest extends TestCase
     public function testDashboardHtmlRendersEscapedControlsInOrder(): void
     {
         $html = $this->renderer()->dashboardHtml($this->state([
-            'project' => '/tmp/gruff <root>',
-            'paths' => 'src tests',
-            'scanScope' => 'diff',
-            'failOn' => 'warning',
-            'config' => '.gruff "quoted".yaml',
-            'baseline' => 'base&line.json',
-            'noBaseline' => '1',
-            'includeIgnored' => '',
-            'reportInteractive' => '1',
-        ]));
+                                                                  'project'           => '/tmp/gruff <root>',
+                                                                  'paths'             => 'src tests',
+                                                                  'scanScope'         => 'diff',
+                                                                  'failOn'            => 'warning',
+                                                                  'config'            => '.gruff "quoted".yaml',
+                                                                  'baseline'          => 'base&line.json',
+                                                                  'noBaseline'        => '1',
+                                                                  'includeIgnored'    => '',
+                                                                  'reportInteractive' => '1',
+                                                              ]));
 
         self::assertStringStartsWith('<!DOCTYPE html><html lang="en-NZ"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>gruff-php dashboard</title><style>:root{', $html);
         self::assertStringContainsString('</style></head><body><button type="button" id="controls-toggle" class="controls-toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="controls-panel" title="Dashboard controls">&#9881;</button>', $html);
@@ -158,7 +159,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Build a renderer fixture.
      *
-     * @return DashboardPageRenderer
+     * @return DashboardPageRenderer - a fresh, collaborator-free renderer instance for each test invocation
      */
     private function renderer(): DashboardPageRenderer
     {
@@ -168,30 +169,35 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Build complete dashboard state with targeted overrides.
      *
-     * @param array<string, string> $overrides Values to override.
-     * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} Dashboard state.
+     * @param array<string, string> $overrides - Values to override.
+     *
+     * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
+     *                        noConfig: string, includeIgnored: string, reportInteractive: string} - every form field defaulted, with the caller's
+     *                        overrides merged on top so each test asserts on a fully populated state
      */
     private function state(array $overrides = []): array
     {
         return array_merge([
-            'project' => '/repo',
-            'paths' => '',
-            'scanScope' => 'full',
-            'failOn' => 'none',
-            'config' => '.gruff-php.yaml',
-            'baseline' => '',
-            'noBaseline' => '',
-            'noConfig' => '',
-            'includeIgnored' => '',
-            'reportInteractive' => '',
-        ], $overrides);
+                               'project' => '/repo',
+                                                                                                                                                                                                                      'paths' => '',
+                                                                                                                                                                                                                      'scanScope' => 'full',
+                                                                                                                                                                                                                                                          'failOn' => 'none',
+                                                                                                                                                                                                                                                          'config' => '.gruff-php.yaml',
+                                                                                                                                                                                                                                                          'baseline' => '',
+                                                                                                                                                                                                                                                                   'noBaseline' => '',
+                                                                                                                                                                                                                                                                                                                            'noConfig' => '',
+                                                                                                                                                                                                                                                                                                                                                 'includeIgnored' => '',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          'reportInteractive' => '',
+                           ], $overrides);
     }
 
     /**
      * Extract the embedded dashboard metadata payload.
      *
-     * @param string $html HTML containing the metadata script.
-     * @return array<string, int|string> Decoded metadata payload.
+     * @param string $html - HTML containing the metadata script.
+     *
+     * @return array<string, int|string> - the JSON payload pulled from the meta script tag, decoded and asserted to contain only string keys mapping
+     *                       to int or string values
      */
     private function metadataPayload(string $html): array
     {

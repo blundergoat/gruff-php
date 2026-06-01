@@ -12,17 +12,20 @@ use GruffPhp\Finding\Finding;
 final readonly class BaselineFilter
 {
     /**
-     * @param BaselineData  $baseline     Loaded baseline data to apply.
-     * @param list<Finding> $findings     Findings to compare against the baseline.
-     * @param bool          $hasDiffScope Whether diff filtering is active for this baseline pass.
-     * @return array{findings: list<Finding>, report: BaselineReport}
+     * @param BaselineData  $baseline - Loaded baseline data to apply.
+     * @param list<Finding> $findings - Findings to compare against the baseline.
+     * @param bool          $hasDiffScope - Whether diff filtering is active for this baseline pass.
+     *
+     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, report: BaselineReport} - partitioned result: "findings"
+     *                         and "new" both hold the unsuppressed findings callers act on (empty when every finding matched the baseline),
+     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with stale-entry accounting
      */
     public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
     {
         $entriesByFingerprint = $baseline->byFingerprint();
         $matchedFingerprints  = [];
-        $filtered             = [];
-        $suppressed           = 0;
+        $newFindings          = [];
+        $unchangedFindings    = [];
 
         foreach ($findings as $finding) {
             $fingerprint = $finding->fingerprint();
@@ -33,14 +36,14 @@ final readonly class BaselineFilter
                 && $entry->filePath === $finding->filePath
             ) {
                 $matchedFingerprints[$fingerprint] = true;
-                $suppressed++;
+                $unchangedFindings[]               = $finding;
                 continue;
             }
 
-            $filtered[] = $finding;
+            $newFindings[] = $finding;
         }
 
-        $staleEntries    = [];
+        $absentEntries   = [];
         $staleEvaluation = 'full-project';
 
         if ($hasDiffScope) {
@@ -48,20 +51,26 @@ final readonly class BaselineFilter
         } else {
             foreach ($baseline->entries as $entry) {
                 if (!isset($matchedFingerprints[$entry->fingerprint])) {
-                    $staleEntries[] = $entry;
+                    $absentEntries[] = $entry;
                 }
             }
         }
 
+        // "findings" carries the unsuppressed (new) set callers act on; the buckets and report drive reporting.
         return [
-            'findings' => $filtered,
-            'report' => new BaselineReport(
+            'findings'  => $newFindings,
+            'new'       => $newFindings,
+            'unchanged' => $unchangedFindings,
+            'report'    => new BaselineReport(
                 path:               $baseline->path,
                 generated:          false,
                 totalEntries:       count($baseline->entries),
-                suppressedFindings: $suppressed,
+                suppressedFindings: count($unchangedFindings),
                 staleEvaluation:    $staleEvaluation,
-                staleEntries:       $staleEntries,
+                staleEntries:       $absentEntries,
+                newCount:           count($newFindings),
+                unchangedCount:     count($unchangedFindings),
+                absentCount:        count($absentEntries),
             ),
         ];
     }

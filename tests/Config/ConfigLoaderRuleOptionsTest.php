@@ -14,6 +14,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -49,9 +50,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     {
         $ruleRegistry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
         $path         = $this->writeTempConfig(sprintf(
-            '{"rules":{"%s":{"enabled":true}}}',
-            FixtureDefaultDisabledRule::ID,
-        ));
+                                                   '{"rules":{"%s":{"enabled":true}}}',
+                                                   FixtureDefaultDisabledRule::ID,
+                                               ));
 
         $config = (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
 
@@ -67,9 +68,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     {
         $ruleRegistry = new RuleRegistry([new FixtureOptionsRule()]);
         $path         = $this->writeTempConfig(sprintf(
-            '{"rules":{"%s":{"options":{"patterns":["foo","bar"],"ratio":0.75,"flag":false,"label":"custom","names":["alpha"],"levels":[1,2]}}}}',
-            FixtureOptionsRule::ID,
-        ));
+                                                   '{"rules":{"%s":{"options":{"patterns":["foo","bar"],"ratio":0.75,"flag":false,"label":"custom","names":["alpha"],"levels":[1,2]}}}}',
+                                                   FixtureOptionsRule::ID,
+                                               ));
 
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
         $settings = $config->ruleSettings(FixtureOptionsRule::ID);
@@ -83,6 +84,30 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Verify loads project-wide dead-code rule options.
+     *
+     * @return void
+     */
+    public function testLoadsProjectWideDeadCodeOptions(): void
+    {
+        $path = $this->writeTempConfig(sprintf(
+                                           '{"rules":{"%s":{"options":{"internalNamespacePrefixes":["App\\\\"],"entrypointSymbols":["App\\\\Console"],"entrypointPathPrefixes":["bin/"],"additionalExcludedPaths":["vendor-copy/"],"externalNamespacePrefixes":["Psr\\\\"],"frameworkAttributePrefixes":["Symfony\\\\"],"treatTestsAsReferences":false}}}}',
+                                           UnusedInternalClassRule::ID,
+                                       ));
+
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(UnusedInternalClassRule::ID);
+
+        self::assertSame(['App\\'], $settings->stringListOption('internalNamespacePrefixes'));
+        self::assertSame(['App\\Console'], $settings->stringListOption('entrypointSymbols'));
+        self::assertSame(['bin/'], $settings->stringListOption('entrypointPathPrefixes'));
+        self::assertSame(['vendor-copy/'], $settings->stringListOption('additionalExcludedPaths'));
+        self::assertSame(['Psr\\'], $settings->stringListOption('externalNamespacePrefixes'));
+        self::assertSame(['Symfony\\'], $settings->stringListOption('frameworkAttributePrefixes'));
+        self::assertFalse($settings->option('treatTestsAsReferences'));
+    }
+
+    /**
      * Verify rejects unknown rule option key.
      *
      * @return void
@@ -91,9 +116,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     {
         $ruleRegistry = new RuleRegistry([new FixtureOptionsRule()]);
         $path         = $this->writeTempConfig(sprintf(
-            '{"rules":{"%s":{"options":{"unknown":[]}}}}',
-            FixtureOptionsRule::ID,
-        ));
+                                                   '{"rules":{"%s":{"options":{"unknown":[]}}}}',
+                                                   FixtureOptionsRule::ID,
+                                               ));
 
         $this->expectException(ConfigException::class);
         $this->expectExceptionMessage(sprintf('Unknown option "rules.%s.options.unknown".', FixtureOptionsRule::ID));
@@ -109,9 +134,9 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     public function testRejectsInvalidRuleOptionType(): void
     {
         $path = $this->writeTempConfig(sprintf(
-            '{"rules":{"%s":{"options":{"minScopeReferences":"two"}}}}',
-            IdentifierQualityRule::ID,
-        ));
+                                           '{"rules":{"%s":{"options":{"minScopeReferences":"two"}}}}',
+                                           IdentifierQualityRule::ID,
+                                       ));
 
         $this->expectException(ConfigException::class);
         $this->expectExceptionMessage(sprintf('Option "rules.%s.options.minScopeReferences" must be an integer.', IdentifierQualityRule::ID));
@@ -122,24 +147,25 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Provide invalid rule option type cases for parameterized tests.
      *
-     * @return array<string, array{string, string}>
+     * @return array<string, array{string, string}> - keyed by case label; each value pairs the config JSON template with the expected validation
+     *                       message template
      */
     public static function invalidRuleOptionTypeProvider(): array
     {
         return [
-            'float option' => [
+            'float option'                   => [
                 '{"rules":{"%s":{"options":{"ratio":"high"}}}}',
                 'Option "rules.%s.options.ratio" must be numeric.',
             ],
-            'boolean option' => [
+            'boolean option'                 => [
                 '{"rules":{"%s":{"options":{"flag":"yes"}}}}',
                 'Option "rules.%s.options.flag" must be boolean.',
             ],
-            'string option' => [
+            'string option'                  => [
                 '{"rules":{"%s":{"options":{"label":false}}}}',
                 'Option "rules.%s.options.label" must be a string.',
             ],
-            'list option' => [
+            'list option'                    => [
                 '{"rules":{"%s":{"options":{"patterns":"foo"}}}}',
                 'Option "rules.%s.options.patterns" must be a list.',
             ],
@@ -147,11 +173,11 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
                 '{"rules":{"%s":{"options":{"patterns":[123]}}}}',
                 'Option "rules.%s.options.patterns.0" must be a string.',
             ],
-            'string list item' => [
+            'string list item'               => [
                 '{"rules":{"%s":{"options":{"names":["alpha",2]}}}}',
                 'Option "rules.%s.options.names.1" must be a string.',
             ],
-            'integer list item' => [
+            'integer list item'              => [
                 '{"rules":{"%s":{"options":{"levels":[1,"two"]}}}}',
                 'Option "rules.%s.options.levels.1" must be an integer.',
             ],
@@ -159,10 +185,34 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Provide invalid project-wide dead-code option type cases.
+     *
+     * @return array<string, array{string, string}> - config payload and expected validation message
+     */
+    public static function invalidProjectWideDeadCodeOptionProvider(): array
+    {
+        return [
+            'entrypoint symbols list shape'       => [
+                '{"rules":{"%s":{"options":{"entrypointSymbols":"App\\\\Console"}}}}',
+                'Option "rules.%s.options.entrypointSymbols" must be a list.',
+            ],
+            'internal namespace string item'      => [
+                '{"rules":{"%s":{"options":{"internalNamespacePrefixes":[123]}}}}',
+                'Option "rules.%s.options.internalNamespacePrefixes.0" must be a string.',
+            ],
+            'treat tests as references boolean'   => [
+                '{"rules":{"%s":{"options":{"treatTestsAsReferences":"false"}}}}',
+                'Option "rules.%s.options.treatTestsAsReferences" must be boolean.',
+            ],
+        ];
+    }
+
+    /**
      * Verify rejects invalid rule option type variants.
      *
-     * @param string $configTemplate  Config JSON template.
-     * @param string $messageTemplate Expected exception message template.
+     * @param string $configTemplate - Config JSON template.
+     * @param string $messageTemplate - Expected exception message template.
+     *
      * @return void
      */
     #[DataProvider('invalidRuleOptionTypeProvider')]
@@ -175,6 +225,25 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
         $this->expectExceptionMessage(sprintf($messageTemplate, FixtureOptionsRule::ID));
 
         (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
+    }
+
+    /**
+     * Verify rejects invalid project-wide dead-code option variants.
+     *
+     * @param string $configTemplate - Config JSON template.
+     * @param string $messageTemplate - Expected exception message template.
+     *
+     * @return void
+     */
+    #[DataProvider('invalidProjectWideDeadCodeOptionProvider')]
+    public function testRejectsInvalidProjectWideDeadCodeOptionVariants(string $configTemplate, string $messageTemplate): void
+    {
+        $path = $this->writeTempConfig(sprintf($configTemplate, UnusedInternalClassRule::ID));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(sprintf($messageTemplate, UnusedInternalClassRule::ID));
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 }
 
@@ -189,7 +258,7 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return metadata for the fixture rule.
      *
-     * @return RuleDefinition
+     * @return RuleDefinition - the default-disabled metadata identifying this fixture rule to the registry and loader
      */
     public function definition(): RuleDefinition
     {
@@ -207,9 +276,10 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit Analysis unit.
-     * @param RuleContext  $ruleContext  Rule context for the fixture.
-     * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+     * @param AnalysisUnit $analysisUnit - Analysis unit.
+     * @param RuleContext  $ruleContext - Rule context for the fixture.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -228,7 +298,7 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return metadata for the fixture rule.
      *
-     * @return RuleDefinition
+     * @return RuleDefinition - metadata whose defaultOptions declare one option of each type for the validation tests to exercise
      */
     public function definition(): RuleDefinition
     {
@@ -240,22 +310,23 @@ final readonly class FixtureOptionsRule implements RuleInterface
             defaultSeverity: Severity::Advisory,
             confidence:      Confidence::Low,
             defaultOptions:  [
-                'patterns' => [],
-                'ratio' => 0.5,
-                'flag' => true,
-                'label' => 'default',
-                'names' => ['default'],
-                'levels' => [1],
-            ],
+                                 'patterns' => [],
+                                 'ratio'    => 0.5,
+                                 'flag'     => true,
+                                 'label'    => 'default',
+                                 'names'    => ['default'],
+                                 'levels'   => [1],
+                             ],
         );
     }
 
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit Analysis unit.
-     * @param RuleContext  $ruleContext  Rule context for the fixture.
-     * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+     * @param AnalysisUnit $analysisUnit - Analysis unit.
+     * @param RuleContext  $ruleContext - Rule context for the fixture.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -32,7 +32,10 @@ abstract class DocsRuleTestCase extends TestCase
     /**
      * Analyse documentation fixtures and return findings for assertions.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - every finding the default rule set raises against the fixture, unfiltered; empty when the fixture is
+     *                                         clean
      */
     protected function analyseFixture(string $fixture): array
     {
@@ -46,21 +49,25 @@ abstract class DocsRuleTestCase extends TestCase
     /**
      * Analyse documentation fixtures and return findings for assertions.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string $fixture - Fixture filename under tests/Fixtures/Docs.
+     * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings from the named rule only, in encounter order; empty when that rule raises nothing
      */
     protected function analyseRule(string $fixture, string $ruleId): array
     {
         return array_values(array_filter(
-            $this->analyseFixture($fixture),
-            static fn ($finding): bool => $finding->ruleId === $ruleId,
-        ));
+                                $this->analyseFixture($fixture),
+                                static fn($finding): bool => $finding->ruleId === $ruleId,
+                            ));
     }
 
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with a repo-relative display path so finding output matches a real checkout
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

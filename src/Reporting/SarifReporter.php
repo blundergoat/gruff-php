@@ -20,8 +20,10 @@ final readonly class SarifReporter
     /**
      * Render findings as a SARIF 2.1.0 JSON document.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string SARIF JSON document or encoded error payload.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - the SARIF 2.1.0 JSON document with trailing newline; on encode failure a minimal JSON
+     *                  error object instead, so the caller always gets parseable output rather than an exception
      */
     public function render(AnalysisReport $report): string
     {
@@ -33,16 +35,16 @@ final readonly class SarifReporter
 
         foreach ($report->findings as $finding) {
             $rules[$finding->ruleId] ??= [
-                'id' => $finding->ruleId,
-                'name' => $finding->ruleId,
+                'id'               => $finding->ruleId,
+                'name'             => $finding->ruleId,
                 'shortDescription' => [
                     'text' => $finding->ruleId,
                 ],
-                'properties' => [
-                    'pillar' => $finding->pillar->value,
-                    'severity' => $finding->severity->value,
+                'properties'       => [
+                    'pillar'     => $finding->pillar->value,
+                    'severity'   => $finding->severity->value,
                     'confidence' => $finding->confidence->value,
-                    'tier' => $finding->tier->value,
+                    'tier'       => $finding->tier->value,
                 ],
             ];
         }
@@ -61,22 +63,24 @@ final readonly class SarifReporter
         $payload = [
             '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
             'version' => '2.1.0',
-            'runs' => [[
-                'tool' => [
-                    'driver' => [
-                        'name' => AnalysisReport::TOOL_NAME,
-                        'semanticVersion' => $report->toolVersion,
-                        'rules' => array_values($rules),
-                    ],
-                ],
-                'results' => array_map(fn (Finding $finding): array => $this->result($finding, (int) $ruleIndexes[$finding->ruleId]), $report->findings),
-                'properties' => $properties,
-            ]],
+            'runs'    => [[
+                              'tool'       => [
+                                  'driver' => [
+                                      'name'            => AnalysisReport::TOOL_NAME,
+                                      'semanticVersion' => $report->toolVersion,
+                                      'rules'           => array_values($rules),
+                                  ],
+                              ],
+                              'results'    => array_map(fn(Finding $finding): array => $this->result($finding, (int)$ruleIndexes[$finding->ruleId]), $report->findings),
+                              'properties' => $properties,
+                          ]],
         ];
 
         try {
+            // Trailing newline keeps the document POSIX-line-terminated when redirected to a .sarif file.
             return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
         } catch (JsonException $exception) {
+            // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
         }
     }
@@ -84,7 +88,8 @@ final readonly class SarifReporter
     /**
      * Render one registry definition as a SARIF driver rule.
      *
-     * @param RuleDefinition $definition Native rule definition.
+     * @param RuleDefinition $definition - Native rule definition.
+     *
      * @return array{
      *     id: string,
      *     name: string,
@@ -92,20 +97,21 @@ final readonly class SarifReporter
      *     fullDescription: array{text: string},
      *     help: array{text: string},
      *     properties: array<string, bool|float|int|string|array<array-key, bool|float|int|string|array<array-key, bool|float|int|string>>>
-     * }
+     * } - one SARIF `reportingDescriptor` for the driver `rules` list; `help`/`fullDescription` duplicate the one-line rule description, and
+     * `properties` carries gruff-specific metadata (pillar, tier, threshold) only when set
      */
     private function rule(RuleDefinition $definition): array
     {
         $properties = [
-            'pillar' => $definition->pillar->value,
-            'tier' => $definition->tier->value,
+            'pillar'          => $definition->pillar->value,
+            'tier'            => $definition->tier->value,
             'defaultSeverity' => $definition->defaultSeverity->value,
-            'confidence' => $definition->confidence->value,
-            'defaultEnabled' => $definition->isEnabledByDefault,
+            'confidence'      => $definition->confidence->value,
+            'defaultEnabled'  => $definition->isEnabledByDefault,
         ];
         if ($definition->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
-                static fn (Pillar $pillar): string => $pillar->value,
+                static fn(Pillar $pillar): string => $pillar->value,
                 $definition->secondaryPillars,
             );
         }
@@ -120,31 +126,37 @@ final readonly class SarifReporter
             $properties['options'] = $definition->defaultOptions;
         }
 
+        // Help and full description reuse the one-line rule description; gruff has no separate long-form help text.
         return [
-            'id' => $definition->id,
-            'name' => $definition->name,
+            'id'               => $definition->id,
+            'name'             => $definition->name,
             'shortDescription' => [
                 'text' => $definition->name,
             ],
-            'fullDescription' => [
+            'fullDescription'  => [
                 'text' => $definition->description(),
             ],
-            'help' => [
+            'help'             => [
                 'text' => $definition->description(),
             ],
-            'properties' => $properties,
+            'properties'       => $properties,
         ];
     }
 
     /**
      * Build one SARIF result payload for a finding.
      *
-     * @return array<string, mixed>
+     * @param Finding $finding - Finding to serialize into a single SARIF result entry.
+     * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
+     *                           result can reference its rule by index rather than repeating the descriptor.
+     *
+     * @return array<string, mixed> - one SARIF `result` entry for the run's `results` list, with `region` keys present only when the finding carries
+     *                       line/column data and `partialFingerprints` set so consumers can track the finding across line drift
      */
     private function result(Finding $finding, int $ruleIndex): array
     {
         $uri = str_replace('\\', '/', $finding->filePath);
-        $uri = (string) preg_replace('/^(?:\\.\\/)+/', '', $uri);
+        $uri = (string)preg_replace('/^(?:\\.\\/)+/', '', $uri);
 
         $physicalLocation = [
             'artifactLocation' => [
@@ -165,14 +177,14 @@ final readonly class SarifReporter
         }
 
         $properties = [
-            'severity' => $finding->severity->value,
-            'pillar' => $finding->pillar->value,
-            'tier' => $finding->tier->value,
+            'severity'   => $finding->severity->value,
+            'pillar'     => $finding->pillar->value,
+            'tier'       => $finding->tier->value,
             'confidence' => $finding->confidence->value,
         ];
         if ($finding->secondaryPillars !== []) {
             $properties['secondaryPillars'] = array_map(
-                static fn (Pillar $pillar): string => $pillar->value,
+                static fn(Pillar $pillar): string => $pillar->value,
                 $finding->secondaryPillars,
             );
         }
@@ -186,30 +198,34 @@ final readonly class SarifReporter
             $properties['metadata'] = $finding->metadata;
         }
 
+        // partialFingerprints carries the gruff fingerprint so SARIF tooling can track a finding across line drift.
         return [
-            'ruleId' => $finding->ruleId,
-            'ruleIndex' => $ruleIndex,
-            'level' => $this->level($finding->severity),
-            'message' => [
+            'ruleId'              => $finding->ruleId,
+            'ruleIndex'           => $ruleIndex,
+            'level'               => $this->level($finding->severity),
+            'message'             => [
                 'text' => $finding->message,
             ],
-            'locations' => [[
-                'physicalLocation' => $physicalLocation,
-            ]],
+            'locations'           => [[
+                                          'physicalLocation' => $physicalLocation,
+                                      ]],
             'partialFingerprints' => [
                 'gruffFingerprint' => $finding->fingerprint(),
             ],
-            'properties' => $properties,
+            'properties'          => $properties,
         ];
     }
 
     /**
      * Map gruff-php severities onto SARIF result levels.
      *
-     * @return string SARIF level name.
+     * @param Severity $severity - Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
+     *
+     * @return string - one of SARIF's `error`/`warning`/`note` level names; advisory collapses to `note`
      */
     private function level(Severity $severity): string
     {
+        // SARIF defines no "advisory" level, so gruff's advisory maps onto its closest peer, `note`.
         return match ($severity) {
             Severity::Error => 'error',
             Severity::Warning => 'warning',

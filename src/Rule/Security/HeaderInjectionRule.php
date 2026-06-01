@@ -29,10 +29,11 @@ final class HeaderInjectionRule implements RuleInterface
     /**
      * Describe the header injection security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence by default: a request-fed header() is a likely response-splitting sink, not certain.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Header injection risk',
@@ -46,10 +47,10 @@ final class HeaderInjectionRule implements RuleInterface
     /**
      * Find header calls that may receive unsanitized user input.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for possible header injection.
+     * @return list<Finding> - One finding per header() call reached by request data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -10,7 +10,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers git archive snapshotting: requested-path scoping, absolute-path canonicalisation, empty snapshots, cleanup on failure, and rejection of unsafe refs.
+ * Covers git archive snapshotting: requested-path scoping, absolute-path canonicalisation, empty snapshots, cleanup on failure, and rejection of
+ * unsafe refs.
  */
 final class GitArchiveSnapshotTest extends TestCase
 {
@@ -127,22 +128,24 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Provide unsafe ref cases for parameterized tests.
      *
-     * @return array<string, array{string}>
+     * @return array<string, array{string}> - data-provider rows keyed by scenario name; each row holds one unsafe ref string git must reject before
+     *                       archiving
      */
     public static function unsafeRefProvider(): array
     {
         return [
-            'no-renames option' => ['--no-renames'],
+            'no-renames option'  => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
             'leading hyphen ref' => ['-x'],
-            'whitespace ref' => ['feature branch'],
+            'whitespace ref'     => ['feature branch'],
         ];
     }
 
     /**
      * Verify create rejects unsafe refs before archiving.
      *
-     * @param string $ref Unsafe git ref input.
+     * @param string $ref - Unsafe git ref input.
+     *
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeRefProvider')]
@@ -164,7 +167,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Create a Git repository fixture with committed base files.
      *
-     * @return string
+     * @return string - absolute path to the committed repo root; the caller snapshots from it and owns teardown
      */
     private function repoWithBaseFiles(): string
     {
@@ -189,7 +192,10 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * List files below a temporary test directory.
      *
-     * @return list<string>
+     * @param string $path - directory root to walk; paths are returned relative to it, so callers
+     *                     compare against expected layout without leaking the random temp prefix.
+     *
+     * @return list<string> - file paths found under the root, relative to it and sorted ascending; empty when the dir holds no files
      */
     private function filesBelow(string $path): array
     {
@@ -214,7 +220,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * List temporary branch-review directories created by a test.
      *
-     * @return list<string>
+     * @return list<string> - absolute paths to matching gruff-review-* temp dirs, sorted ascending; empty when none exist
      */
     private function reviewTempDirs(): array
     {
@@ -243,8 +249,9 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
+     *
      * @return void
      */
     private function runGit(string $cwd, string ...$args): void
@@ -258,8 +265,9 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @param string $prefix Temporary directory prefix.
-     * @return string
+     * @param string $prefix - Temporary directory prefix.
+     *
+     * @return string - absolute path to the freshly created directory; the caller owns it and must tear it down via removeDir()
      */
     private function tempDir(string $prefix): string
     {
@@ -273,12 +281,14 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove (path absent or never created); stay a no-op so finally-block cleanup is idempotent.
             return;
         }
 

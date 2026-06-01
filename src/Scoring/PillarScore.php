@@ -12,24 +12,24 @@ final readonly class PillarScore
     /**
      * Capture score and finding totals for one quality pillar.
      *
-     * @param string     $pillar     Pillar identifier represented by this score.
-     * @param bool       $applicable Whether the pillar had any applicable inputs.
-     * @param Grade|null $grade      Letter grade and numeric score, when applicable.
-     * @param int        $findings   Total findings counted for the pillar.
-     * @param int        $advisory   Advisory findings counted for the pillar.
-     * @param int        $warning    Warning findings counted for the pillar.
-     * @param int        $error      Error findings counted for the pillar.
-     * @param float      $penalty    Score penalty applied to the pillar.
+     * @param string     $pillar - Pillar identifier represented by this score.
+     * @param bool       $applicable - Whether the pillar had any applicable inputs.
+     * @param Grade|null $grade - Letter grade and numeric score, when applicable.
+     * @param int        $findings - Total findings counted for the pillar.
+     * @param int        $advisory - Advisory findings counted for the pillar.
+     * @param int        $warning - Warning findings counted for the pillar.
+     * @param int        $error - Error findings counted for the pillar.
+     * @param float      $penalty - Score penalty applied to the pillar.
      */
     public function __construct(
         public string $pillar,
-        public bool $applicable,
+        public bool   $applicable,
         public ?Grade $grade,
-        public int $findings,
-        public int $advisory,
-        public int $warning,
-        public int $error,
-        public float $penalty,
+        public int    $findings,
+        public int    $advisory,
+        public int    $warning,
+        public int    $error,
+        public float  $penalty,
     ) {
     }
 
@@ -44,20 +44,21 @@ final readonly class PillarScore
      *     warning: int,
      *     error: int,
      *     penalty: float
-     * }
+     * } - report-ready snapshot of this pillar; score and grade are null when the pillar is inapplicable, and penalty is rounded to 2 decimals to
+     * match report precision
      */
     public function toArray(): array
     {
         return [
-            'pillar' => $this->pillar,
+            'pillar'     => $this->pillar,
             'applicable' => $this->applicable,
-            'score' => $this->grade?->score,
-            'grade' => $this->grade?->letter,
-            'findings' => $this->findings,
-            'advisory' => $this->advisory,
-            'warning' => $this->warning,
-            'error' => $this->error,
-            'penalty' => round($this->penalty, 2),
+            'score'      => $this->grade?->score,
+            'grade'      => $this->grade?->letter,
+            'findings'   => $this->findings,
+            'advisory'   => $this->advisory,
+            'warning'    => $this->warning,
+            'error'      => $this->error,
+            'penalty'    => round($this->penalty, 2),
         ];
     }
 }

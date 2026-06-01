@@ -27,7 +27,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
     /**
      * Describe the mock-only test rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -44,10 +44,10 @@ final readonly class MockOnlyTestRule implements RuleInterface
     /**
      * Find tests that exercise only mocks without a concrete subject.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for mock-only tests.
+     * @return list<Finding> - Findings for mock-only tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

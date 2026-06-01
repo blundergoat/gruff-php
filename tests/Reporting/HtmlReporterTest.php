@@ -21,7 +21,8 @@ use GruffPhp\Scoring\ScoreReport;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers HTML report rendering: escaping, severity vocabulary, editor links (VS Code, PhpStorm, Windows), diagnostics ordering, snapshot stability, and interactive controls.
+ * Covers HTML report rendering: escaping, severity vocabulary, editor links (VS Code, PhpStorm, Windows), diagnostics ordering, snapshot stability,
+ * and interactive controls.
  */
 final class HtmlReporterTest extends TestCase
 {
@@ -32,7 +33,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterEscapesRunDataAndRendersReportSections(): void
     {
-        $findings = [
+        $findings       = [
             new Finding(
                 ruleId:     'docs.missing-public-phpdoc',
                 message:    '<script>alert("x")</script>',
@@ -374,17 +375,17 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersCustomScoreReportEdgeCases(): void
     {
         $scoreReport = new ScoreReport(
-            composite: new Grade(88.25, 'B'),
-            pillars:   [
-                new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
-                new PillarScore('documentation', true, null, 0, 0, 0, 0, 0.0),
-            ],
+            composite:              new Grade(88.25, 'B'),
+            pillars:                [
+                                        new PillarScore('Mutation', true, new Grade(99.0, 'A'), 1, 0, 0, 1, 1.0),
+                                        new PillarScore('documentation', true, null, 0, 0, 0, 0, 0.0),
+                                    ],
             topOffenders:           [],
             complexityDistribution: ['0-5' => 1, '11-15' => 2],
             scope:                  'fixture',
             explanation:            'custom score',
         );
-        $report = $this->report([], [], $scoreReport);
+        $report      = $this->report([], [], $scoreReport);
 
         $html = (new HtmlReporter())->render($report);
 
@@ -405,11 +406,11 @@ final class HtmlReporterTest extends TestCase
     public function testHtmlReporterRendersOffenderMetricColumnsInOrder(): void
     {
         $scoreReport = new ScoreReport(
-            composite:    new Grade(72.0, 'C'),
-            pillars:      [],
-            topOffenders: [
-                new FileScore('src/Metrics.php', new Grade(72.0, 'C'), 4, 1, 2, 1, 28.0, 3, 5, 8, null),
-            ],
+            composite:              new Grade(72.0, 'C'),
+            pillars:                [],
+            topOffenders:           [
+                                        new FileScore('src/Metrics.php', new Grade(72.0, 'C'), 4, 1, 2, 1, 28.0, 3, 5, 8, null),
+                                    ],
             complexityDistribution: ['0-5' => 1, '11-15' => 2, '16-20' => 3],
             scope:                  'fixture',
             explanation:            'custom score',
@@ -433,7 +434,7 @@ final class HtmlReporterTest extends TestCase
      */
     public function testHtmlReporterInteractivePillarSelectSizeIsBounded(): void
     {
-        $finding = new Finding(
+        $finding     = new Finding(
             ruleId:     'docs.missing-public-phpdoc',
             message:    'Public method has no PHPDoc.',
             filePath:   'src/Example.php',
@@ -463,50 +464,51 @@ final class HtmlReporterTest extends TestCase
     /**
      * Build a sample analysis report for renderer assertions.
      *
-     * @return AnalysisReport
+     * @return AnalysisReport - html-format report carrying one finding per pillar so every renderer section is exercised
      */
     private function sampleReport(): AnalysisReport
     {
         return $this->report([
-            new Finding(
-                ruleId:     'docs.missing-public-phpdoc',
-                message:    'Public method has no PHPDoc.',
-                filePath:   'src/Example.php',
-                line:       9,
-                severity:   Severity::Warning,
-                pillar:     Pillar::Documentation,
-                tier:       RuleTier::V01,
-                confidence: Confidence::High,
-            ),
-            new Finding(
-                ruleId:     'complexity.cyclomatic',
-                message:    'Method run() has cyclomatic complexity 12.',
-                filePath:   'src/Complex.php',
-                line:       12,
-                severity:   Severity::Error,
-                pillar:     Pillar::Complexity,
-                tier:       RuleTier::V01,
-                confidence: Confidence::High,
-                metadata:   ['complexity' => 12],
-            ),
-            new Finding(
-                ruleId:     'modernisation.named-argument-opportunity',
-                message:    'Call could use named arguments.',
-                filePath:   'src/Example.php',
-                line:       20,
-                severity:   Severity::Advisory,
-                pillar:     Pillar::Modernisation,
-                tier:       RuleTier::V01,
-                confidence: Confidence::Medium,
-            ),
-        ]);
+                                 new Finding(
+                                     ruleId:     'docs.missing-public-phpdoc',
+                                     message:    'Public method has no PHPDoc.',
+                                     filePath:   'src/Example.php',
+                                     line:       9,
+                                     severity:   Severity::Warning,
+                                     pillar:     Pillar::Documentation,
+                                     tier:       RuleTier::V01,
+                                     confidence: Confidence::High,
+                                 ),
+                                 new Finding(
+                                     ruleId:     'complexity.cyclomatic',
+                                     message:    'Method run() has cyclomatic complexity 12.',
+                                     filePath:   'src/Complex.php',
+                                     line:       12,
+                                     severity:   Severity::Error,
+                                     pillar:     Pillar::Complexity,
+                                     tier:       RuleTier::V01,
+                                     confidence: Confidence::High,
+                                     metadata:   ['complexity' => 12],
+                                 ),
+                                 new Finding(
+                                     ruleId:     'modernisation.named-argument-opportunity',
+                                     message:    'Call could use named arguments.',
+                                     filePath:   'src/Example.php',
+                                     line:       20,
+                                     severity:   Severity::Advisory,
+                                     pillar:     Pillar::Modernisation,
+                                     tier:       RuleTier::V01,
+                                     confidence: Confidence::Medium,
+                                 ),
+                             ]);
     }
 
     /**
-     * @param list<Finding>       $findings
-     * @param list<RunDiagnostic> $diagnostics
-     * @param ScoreReport|null    $score
-     * @return AnalysisReport Report fixture.
+     * @param list<Finding>       $findings - Findings to render in the HTML fixture report.
+     * @param list<RunDiagnostic> $diagnostics - Diagnostics to render alongside the findings.
+     * @param ScoreReport|null    $score - Precomputed score to use, or null to derive one from the findings.
+     *
+     * @return AnalysisReport - html-format report wired with the given findings, diagnostics, and resolved score, ready to render
      */
     private function report(array $findings, array $diagnostics = [], ?ScoreReport $score = null): AnalysisReport
     {
@@ -532,8 +534,9 @@ final class HtmlReporterTest extends TestCase
     /**
      * Load an expected fixture snapshot.
      *
-     * @param string $name Fixture name.
-     * @return string
+     * @param string $name - Fixture name.
+     *
+     * @return string - raw committed snapshot text for the named fixture, used as the expected HTML in snapshot assertions
      */
     private function fixture(string $name): string
     {

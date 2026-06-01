@@ -32,10 +32,11 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Describe the stale @param tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning, not advisory: a @param naming a parameter that no longer exists actively misleads a reader.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Stale @param tag',
@@ -49,10 +50,10 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Find @param tags that no longer match function parameters.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for stale @param tags.
+     * @return list<Finding> - Findings for stale @param tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -48,7 +48,7 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Describe the negative boolean rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -67,9 +67,10 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Find bool properties and parameters that use negative flag names.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for CLI mirror allowlist.
-     * @return list<Finding> Findings for negative boolean flags.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for CLI mirror allowlist.
+     *
+     * @return list<Finding> - Findings for negative boolean flags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -114,8 +115,12 @@ final readonly class NegativeBooleanRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $allowlist
-     * @return Finding|null Finding for a negative boolean property.
+     * @param RuleDefinition   $definition - Rule metadata threaded into any emitted finding.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path and line for the finding.
+     * @param PropertyProperty $propertyProperty - Single declared property whose name is tested for a negative prefix.
+     * @param list<string>     $allowlist - Fully qualified property keys that opt out as deliberate CLI mirrors.
+     *
+     * @return Finding|null - Finding for a negative boolean property.
      */
     private function propertyFinding(
         RuleDefinition $definition,
@@ -144,8 +149,13 @@ final readonly class NegativeBooleanRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $allowlist
-     * @return Finding|null Finding for a negative boolean parameter.
+     * @param RuleDefinition    $definition - Rule metadata threaded into any emitted finding.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and line for the finding.
+     * @param FunctionLikeScope $scope - Enclosing function-like scope, used to build the symbol and allowlist key.
+     * @param Param             $param - Single parameter (possibly a promoted property) whose name is tested.
+     * @param list<string>      $allowlist - Fully qualified parameter keys that opt out as deliberate CLI mirrors.
+     *
+     * @return Finding|null - Finding for a negative boolean parameter.
      */
     private function parameterFinding(
         RuleDefinition $definition,
@@ -181,7 +191,16 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Build a negative boolean finding.
      *
-     * @return Finding Finding for a negative boolean identifier.
+     * @param RuleDefinition $definition - Source of the rule id, severity, pillar, tier, and confidence on the finding.
+     * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path reported as the finding location.
+     * @param Node           $node - Declaration node whose start line locates the finding.
+     * @param string         $kind - Either 'property' or 'parameter'; shapes the message and metadata.
+     * @param string         $name - Offending identifier without its leading sigil.
+     * @param string         $prefix - Matched negative prefix, recorded in metadata for downstream grouping.
+     * @param string|null    $symbol - Enclosing callable symbol, or null for a class property outside any method.
+     * @param string|null    $allowlistKey - Key a project would add to cliMirrorAllowlist to suppress this finding.
+     *
+     * @return Finding - Finding for a negative boolean identifier.
      */
     private function finding(
         RuleDefinition $definition,
@@ -216,7 +235,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Detect the configured negative prefix at a camel-case word boundary.
      *
-     * @return string|null Matched prefix, or null when the name is acceptable.
+     * @param string $name - Identifier to test, without its leading sigil.
+     *
+     * @return string|null - Matched prefix, or null when the name is acceptable.
      */
     private function negativePrefix(string $name): ?string
     {
@@ -237,7 +258,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Build the allowlist key for a property when its declaring class is known.
      *
-     * @return string|null Fully qualified property key.
+     * @param PropertyProperty $propertyProperty - Declared property whose fully qualified key is being built.
+     *
+     * @return string|null - Fully qualified property key.
      */
     private function propertyAllowlistKey(PropertyProperty $propertyProperty): ?string
     {
@@ -250,7 +273,10 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Build the allowlist key for a parameter or promoted property.
      *
-     * @return string|null Fully qualified parameter key.
+     * @param FunctionLikeScope $scope - Enclosing scope whose node resolves the declaring class and method name.
+     * @param Param             $param - Parameter whose name and promotion flags shape the key.
+     *
+     * @return string|null - Fully qualified parameter key.
      */
     private function parameterAllowlistKey(FunctionLikeScope $scope, Param $param): ?string
     {
@@ -278,7 +304,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Resolve a class-like node to its namespace-qualified name.
      *
-     * @return string|null Fully qualified class-like name.
+     * @param ClassLike $class - Class, interface, trait, or enum node being qualified.
+     *
+     * @return string|null - Fully qualified class-like name.
      */
     private function classLikeFqn(ClassLike $class): ?string
     {
@@ -297,7 +325,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Walk parent attributes to find the enclosing class-like declaration.
      *
-     * @return ClassLike|null Enclosing class, interface, trait, or enum.
+     * @param Node $node - Starting node whose ancestors are walked; relies on the parent attribute being set.
+     *
+     * @return ClassLike|null - Enclosing class, interface, trait, or enum.
      */
     private function enclosingClassLike(Node $node): ?ClassLike
     {
@@ -317,7 +347,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Walk parent attributes to find the enclosing namespace.
      *
-     * @return Namespace_|null Enclosing namespace node.
+     * @param Node $node - Starting node whose ancestors are walked; relies on the parent attribute being set.
+     *
+     * @return Namespace_|null - Enclosing namespace node.
      */
     private function enclosingNamespace(Node $node): ?Namespace_
     {
@@ -337,7 +369,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Check whether a declaration type is bool or nullable bool.
      *
-     * @return bool True when the type resolves to bool, including ?bool and bool|null.
+     * @param Node|null $type - Declared type node, or null for an untyped declaration the rule ignores.
+     *
+     * @return bool - True when the type resolves to bool, including ?bool and bool|null.
      */
     private function isBoolType(?Node $type): bool
     {
@@ -368,7 +402,9 @@ final readonly class NegativeBooleanRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @return string Named callable symbol or synthetic closure/arrow label.
+     * @param FunctionLikeScope $scope - Scope whose node names the finding; named callables and closures differ.
+     *
+     * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {

@@ -15,8 +15,9 @@ final readonly class HotspotReporter
     /**
      * Render top file offenders as a hotspot JSON payload.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string Pretty-printed hotspot JSON document.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - Pretty-printed hotspot JSON document.
      */
     public function render(AnalysisReport $report): string
     {
@@ -32,6 +33,7 @@ final readonly class HotspotReporter
             ),
         ];
 
+        // Pretty-printed with a trailing newline so the hotspot map stays diffable and shell-redirection clean.
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
     }
 }

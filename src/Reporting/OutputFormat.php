@@ -47,11 +47,13 @@ enum OutputFormat: string
     /**
      * Convert a CLI format string into the matching output format.
      *
-     * @param string $rawInput CLI format value to parse.
-     * @return self|null Matching format, or null for unsupported input.
+     * @param string $rawInput - CLI format value to parse.
+     *
+     * @return self|null - Matching format, or null for unsupported input.
      */
     public static function fromInput(string $rawInput): ?self
     {
+        // Unrecognised format strings yield null so the caller can reject CLI input rather than guess a default.
         return match ($rawInput) {
             self::Text->value => self::Text,
             self::Json->value => self::Json,

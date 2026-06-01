@@ -27,13 +27,13 @@ final class AnalysisReportTest extends TestCase
     public function testFindingCountsByRuleAggregatesAndRanks(): void
     {
         $report = $this->reportFor([
-            $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
-            $this->finding('docs.missing-public-phpdoc', Severity::Warning),
-            $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
-            $this->finding('size.method-length', Severity::Error),
-            $this->finding('size.method-length', Severity::Error),
-            $this->finding('alpha.rule', Severity::Advisory),
-        ]);
+                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
+                                       $this->finding('docs.missing-public-phpdoc', Severity::Warning),
+                                       $this->finding('docs.missing-public-phpdoc', Severity::Advisory),
+                                       $this->finding('size.method-length', Severity::Error),
+                                       $this->finding('size.method-length', Severity::Error),
+                                       $this->finding('alpha.rule', Severity::Advisory),
+                                   ]);
 
         self::assertSame(
             [
@@ -53,20 +53,21 @@ final class AnalysisReportTest extends TestCase
     public function testFindingCountsByRuleBreaksTotalTiesByRuleId(): void
     {
         $report = $this->reportFor([
-            $this->finding('zeta.rule', Severity::Advisory),
-            $this->finding('alpha.rule', Severity::Advisory),
-            $this->finding('beta.rule', Severity::Advisory),
-        ]);
+                                       $this->finding('zeta.rule', Severity::Advisory),
+                                       $this->finding('alpha.rule', Severity::Advisory),
+                                       $this->finding('beta.rule', Severity::Advisory),
+                                   ]);
 
-        $ruleIds = array_map(static fn (array $row): string => $row['ruleId'], $report->findingCountsByRule());
+        $ruleIds = array_map(static fn(array $ruleCount): string => $ruleCount['ruleId'], $report->findingCountsByRule());
         self::assertSame(['alpha.rule', 'beta.rule', 'zeta.rule'], $ruleIds);
     }
 
     /**
      * Build an AnalysisReport from the supplied findings.
      *
-     * @param list<Finding> $findings
-     * @return AnalysisReport
+     * @param list<Finding> $findings - Findings to expose through the report under test.
+     *
+     * @return AnalysisReport - report whose findings are the supplied list, with all other fields inert fixtures
      */
     private function reportFor(array $findings): AnalysisReport
     {
@@ -88,7 +89,10 @@ final class AnalysisReportTest extends TestCase
     /**
      * Build a finding fixture for aggregation tests.
      *
-     * @return Finding
+     * @param string   $ruleId - Rule id that drives the grouping/ordering under assertion.
+     * @param Severity $severity - Severity the fixture should carry for the case being exercised.
+     *
+     * @return Finding - finding carrying the given ruleId and severity; all other fields are fixed fixture values
      */
     private function finding(string $ruleId, Severity $severity): Finding
     {

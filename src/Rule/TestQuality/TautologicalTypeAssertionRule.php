@@ -31,7 +31,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Describe the tautological type assertion rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -40,7 +40,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
             name:            'Tautological type assertion',
             pillar:          Pillar::TestQuality,
             tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
+            defaultSeverity: Severity::Error,
             confidence:      Confidence::High,
         );
     }
@@ -48,10 +48,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Find `assertInstanceOf` calls where the value type is already proven locally.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for redundant type assertions.
+     * @return list<Finding> - Findings for redundant type assertions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -87,7 +87,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
                     ),
                     filePath:    $analysisUnit->file->displayPath,
                     line:        $call->getStartLine(),
-                    severity:    Severity::Warning,
+                    severity:    Severity::Error,
                     pillar:      Pillar::TestQuality,
                     tier:        RuleTier::V01,
                     confidence:  Confidence::High,
@@ -104,7 +104,9 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Map local variables to the class names assigned to them.
      *
-     * @return array<string, string>
+     * @param TestQualityScope $scope - Single test method whose direct `$var = new X()` assignments are scanned.
+     *
+     * @return array<string, string> - Variable name to constructed class name; only locals built via `new` appear.
      */
     private function collectLocalAssignmentTypes(TestQualityScope $scope): array
     {
@@ -121,66 +123,83 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
             }
         }
 
+        // Locally-proven types only; later reassignment is not tracked, so callers treat this as a lower bound.
         return $types;
     }
 
     /**
-     * @param array<string, string> $localTypes
+     * @param Expr                  $expr - Value expression from the assertion's second argument to resolve.
+     * @param array<string, string> $localTypes - Map of variable name to class built by collectLocalAssignmentTypes().
      *
-     * @return string|null Proven class name, or null when it cannot be inferred.
+     * @return string|null - Proven class name, or null when it cannot be inferred.
      */
     private function provenClass(Expr $expr, array $localTypes): ?string
     {
         $direct = $this->newClassName($expr);
         if ($direct !== null) {
+            // Inline `new X()` proves its own type without consulting the local map.
             return $direct;
         }
 
         if ($expr instanceof Expr\Variable && is_string($expr->name)) {
+            // Plain variable: trust the earlier assignment scan, null when the variable was never tracked.
             return $localTypes[$expr->name] ?? null;
         }
 
+        // Property fetches, calls, and other dynamic shapes are treated as unproven on purpose.
         return null;
     }
 
     /**
      * Extract the class name from a direct `new ClassName` expression.
      *
-     * @return string|null Constructed class name, or null for dynamic/unsupported expressions.
+     * @param Expr $expr - Candidate expression; only a `new` with a static class name yields a result.
+     *
+     * @return string|null - Constructed class name, or null for dynamic/unsupported expressions.
      */
     private function newClassName(Expr $expr): ?string
     {
         if ($expr instanceof Expr\New_ && $expr->class instanceof Name) {
+            // The literal class token as written, so the caller can string-compare it to the expected type.
             return $expr->class->toString();
         }
 
+        // Not a direct construction (variable class, anonymous class, factory call) so no static type is known.
         return null;
     }
 
     /**
      * Extract a `ClassName::class` argument from an assertion call.
      *
-     * @return string|null Class name string, or null when the argument is not a class constant.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose argument list is read.
+     * @param int $index - Zero-based argument position the caller expects to hold a `X::class` constant.
+     *
+     * @return string|null - Class name string, or null when the argument is not a class constant.
      */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
         $classConstFetch = TestQualityNodeHelper::argValue($call, $index);
         if (!$classConstFetch instanceof Expr\ClassConstFetch || !$classConstFetch->class instanceof Name) {
+            // Missing argument or non-class-constant: caller cannot rely on a known expected type.
             return null;
         }
 
         $name = $classConstFetch->name;
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
+            // A constant fetch other than `::class` (e.g. `::FOO`) is not a type reference.
             return null;
         }
 
+        // The class portion of `X::class`, normalised to its written name for type comparison.
         return $classConstFetch->class->toString();
     }
 
     /**
      * Describe the asserted value for the finding message.
      *
-     * @return string Variable name or a generic value label.
+     * @param Expr $expr - Asserted value expression rendered for human-readable finding text.
+     *
+     * @return string - Variable name or a generic value label.
      */
     private function describeValue(Expr $expr): string
     {

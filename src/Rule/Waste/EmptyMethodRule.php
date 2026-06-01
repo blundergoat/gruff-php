@@ -31,10 +31,11 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Describe the empty method rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence because an empty body is unambiguous; advisory keeps the finding opt-in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Empty method',
@@ -48,9 +49,10 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Find function-like declarations with empty bodies.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for empty methods or functions.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - One finding per non-abstract empty body, excluding promoted constructors.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -96,20 +98,25 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Allow empty constructors that only define promoted properties.
      *
-     * @return bool True when the constructor exists solely for property promotion.
+     * @param ClassMethod $classMethod - Method to test; only `__construct` with promoted params earns the exemption.
+     *
+     * @return bool - True when the constructor exists solely for property promotion.
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
         if ($classMethod->name->toString() !== '__construct') {
+            // Non-constructors gain nothing from an empty body, so they stay reportable.
             return false;
         }
 
         foreach ($classMethod->params as $param) {
             if ($param->isPromoted()) {
+                // A promoted param means the empty body is doing real work (assigning the property); exempt it.
                 return true;
             }
         }
 
+        // A parameterless or non-promoting empty constructor carries no behaviour, so it remains a finding.
         return false;
     }
 }

@@ -12,18 +12,18 @@ namespace GruffPhp\Trend;
 final readonly class TrendReport
 {
     /**
-     * @param string           $path          Trend history file path.
-     * @param float            $currentScore  Current composite score.
-     * @param float|null       $previousScore Previous composite score, when available.
-     * @param float|null       $delta         Score delta from the previous snapshot.
-     * @param list<TrendEntry> $entries       Historical trend entries.
+     * @param string           $path - Trend history file path.
+     * @param float            $currentScore - Current composite score.
+     * @param float|null       $previousScore - Previous composite score, when available.
+     * @param float|null       $delta - Score delta from the previous snapshot.
+     * @param list<TrendEntry> $entries - Historical trend entries.
      */
     public function __construct(
         public string $path,
-        public float $currentScore,
+        public float  $currentScore,
         public ?float $previousScore,
         public ?float $delta,
-        public array $entries,
+        public array  $entries,
     ) {
     }
 
@@ -34,16 +34,16 @@ final readonly class TrendReport
      *     previousScore: float|null,
      *     delta: float|null,
      *     entries: list<TrendEntry>
-     * }
+     * } - JSON-ready snapshot keys for report writers; previousScore and delta are null on the first snapshot
      */
     public function toArray(): array
     {
         return [
-            'path' => $this->path,
-            'currentScore' => $this->currentScore,
+            'path'          => $this->path,
+            'currentScore'  => $this->currentScore,
             'previousScore' => $this->previousScore,
-            'delta' => $this->delta,
-            'entries' => $this->entries,
+            'delta'         => $this->delta,
+            'entries'       => $this->entries,
         ];
     }
 }

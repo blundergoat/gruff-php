@@ -34,10 +34,11 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Describe the forbidden global access rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning at medium confidence: reading superglobals in domain code is a real leak, not a mere style smell.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Forbidden direct global access',
@@ -51,14 +52,15 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Find direct superglobal access outside controller boundaries.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for forbidden global reads.
+     * @return list<Finding> - Findings for forbidden global reads.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if ($this->isControllerPath($analysisUnit->file->displayPath)) {
+            // Controllers are the sanctioned boundary for superglobals, so exempt the whole file there.
             return [];
         }
 
@@ -98,12 +100,15 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Check whether a file path is treated as a controller boundary.
      *
-     * @return bool True when direct request/session access is allowed.
+     * @param string $displayPath - File path as shown in findings; matched by convention to spot controller code.
+     *
+     * @return bool - True when direct request/session access is allowed.
      */
     private function isControllerPath(string $displayPath): bool
     {
         $normalized = '/' . str_replace('\\', '/', $displayPath);
 
+        // Treat a Controller/Controllers directory or a *Controller.php suffix as the request-handling boundary.
         return str_contains($normalized, '/Controller/')
             || str_contains($normalized, '/Controllers/')
             || str_ends_with($displayPath, 'Controller.php');

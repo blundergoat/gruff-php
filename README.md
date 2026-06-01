@@ -8,6 +8,16 @@
 
 `gruff-php` is an opinionated PHP code-quality analyzer. It scans PHP projects, scores findings across quality pillars, and emits reports for terminals, CI annotations, SARIF consumers, static HTML, and a local dashboard. It is heuristic static analysis; run it beside PHPStan, Psalm, PHPUnit, PHP-CS-Fixer, PHPCS, security scanners, and code review, not instead of them.
 
+## Mission
+
+gruff-php exists to make AI-generated code safe for a human to sign off on. When a coding agent writes the code, someone who didn't write it still has to read, review, and trust it — and agents routinely produce code that superficially works while quietly misunderstanding the requirement. gruff governs that code so a reviewer can actually verify it does what was asked:
+
+- **Legible enough to verify.** Complexity and nesting are capped, and every method — public or private — must carry an intent-bearing doc comment that states what it is for, what it returns at the edges, and what the caller must satisfy. The comment gives the reviewer a plain-English contract to check the code against; a doc comment that contradicts the implementation is a signal the change needs a deeper look.
+- **Secure where the eye fails.** Security and sensitive-data rules catch the classes of mistake a human reviewer skims past.
+- **Tested for real, not padded.** Test-quality rules reward genuine assertions and flag low-signal ceremony, so a green suite means the behaviour is actually exercised rather than mocked into a tautology.
+
+Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on`), or the agent's own verification step — gruff pushes the agent to keep producing code a human can confidently approve, not just code that compiles and passes. See [`docs/mission.md`](docs/mission.md) for the full rationale.
+
 ## Status At A Glance
 
 | Field | Value |
@@ -16,7 +26,7 @@
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
-| Rule catalogue | 119 rules across 11 pillars |
+| Rule catalogue | 118 rules across 11 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
 | Analysis schema | `gruff.analysis.v2` |
 | Baseline schema | `gruff.baseline.v1` |
@@ -175,15 +185,15 @@ Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresho
 
 ## Rules And Pillars
 
-The v0.1 catalogue contains 119 registry rules:
+The v0.1 catalogue contains 118 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
 | `size` | 7 |
-| `complexity` | 5 |
+| `complexity` | 4 |
 | `maintainability` | 2 |
 | `dead-code` | 9 |
-| `naming` | 12 |
+| `naming` | 11 |
 | `documentation` | 14 |
 | `modernisation` | 10 |
 | `security` | 18 |
@@ -203,10 +213,19 @@ vendor/bin/gruff-php analyse --baseline=gruff-baseline.json --fail-on warning
 vendor/bin/gruff-php analyse --no-baseline --fail-on none
 ```
 
-Changed-code scans can filter to changed lines or compare against a base ref:
+Changed-code scans can filter to symbol-aware changed regions and report how many findings were suppressed as out of scope:
 
 ```bash
-vendor/bin/gruff-php analyse --diff=staged --format github --fail-on warning
+vendor/bin/gruff-php analyse --format json --changed-ranges "3-3,8-10" src/Example.php --fail-on none
+vendor/bin/gruff-php analyse --format json --since HEAD src/Example.php --fail-on none
+git diff | vendor/bin/gruff-php analyse --format json --diff - --fail-on none
+```
+
+Bare `--diff` compares the working tree to `HEAD`. `--changed-scope=symbol` is the default and keeps findings whose own location or enclosing declaration overlaps a changed hunk; use `--changed-scope=hunk` for strict line-span filtering. JSON output includes top-level `suppressedCount` when changed-region mode is active.
+
+Branch review compares against a base ref:
+
+```bash
 vendor/bin/gruff-php analyse --diff-vs=origin/main --changed-only --fail-on none
 ```
 
@@ -266,6 +285,7 @@ Performance checks are available with `composer perf`; mutation workflows live i
 
 ## Documentation
 
+- [Mission](docs/mission.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)

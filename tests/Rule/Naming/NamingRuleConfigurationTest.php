@@ -32,11 +32,11 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $config                = AnalysisConfig::fromRegistry($registry)->withAcceptedAbbreviations(['a']);
         $findings              = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
         $shortVariableFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === ShortVariableRule::ID,
-        ));
+                                                  $findings,
+                                                  static fn($finding): bool => $finding->ruleId === ShortVariableRule::ID,
+                                              ));
 
-        $vars = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $shortVariableFindings);
+        $vars = array_map(static fn($finding): mixed => $finding->metadata['variable'] ?? null, $shortVariableFindings);
         self::assertContains('x', $vars);
         self::assertNotContains('a', $vars);
     }
@@ -49,7 +49,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     public function testAbbreviationAllowlistDetectsUndeclaredNames(): void
     {
         $findings = $this->abbreviationFindings(['id', 'fqn', 'raw', 'uri']);
-        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
 
         self::assertContains('cfg', $names);
         self::assertContains('db', $names);
@@ -80,11 +80,11 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
             BooleanPrefixRule::ID,
             new RuleSettings(true, $settings->thresholds, ['allowedPrefixes' => $prefixes]),
         );
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-        ));
+        $findings   = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $symbols    = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
+                                                                                      $findings,
+                                                                                      static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+                                                                                  ));
 
         self::assertNotContains('BooleanPrefixFixture::didRun()', $symbols);
         self::assertContains('BooleanPrefixFixture::active()', $symbols);
@@ -98,7 +98,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     public function testBooleanPrefixDetectsPropertiesAndParameters(): void
     {
         $findings = $this->booleanPrefixPropertyFindings();
-        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
 
         self::assertContains('changedOnly', $names);
         self::assertContains('infectionRun', $names);
@@ -120,12 +120,44 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     public function testBooleanPrefixStateAdjectiveAllowlistCanBeConfigured(): void
     {
         $findings = $this->booleanPrefixPropertyFindings(['stateAdjectiveAllowlist' => ['active']]);
-        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
 
         self::assertContains('emitted', $names);
         self::assertContains('interactive', $names);
         self::assertNotContains('active', $names);
         self::assertNotContains('isPest', $names);
+    }
+
+    /**
+     * Verify acceptedBooleanNames clears exact boolean names without a rename (P3).
+     *
+     * A boolean-returning method named `active()` is normally flagged, and the
+     * only in-code fix is the caller-breaking rename to `isActive()`. Listing the
+     * exact name in acceptedBooleanNames clears the finding while leaving the
+     * public name intact, the non-breaking resolution P3 requires; an unlisted
+     * name such as `enabled()` still fires.
+     *
+     * @return void
+     */
+    public function testBooleanPrefixAcceptedBooleanNamesCanBeConfigured(): void
+    {
+        $unit     = $this->parseFixture('boolean-prefix.php');
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(BooleanPrefixRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            BooleanPrefixRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['acceptedBooleanNames' => ['active', 'check']])),
+        );
+        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, array_filter(
+                                                                                    $findings,
+                                                                                    static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+                                                                                ));
+
+        self::assertNotContains('BooleanPrefixFixture::active()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::check()', $symbols);
+        self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
+        self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
     }
 
     /**
@@ -136,7 +168,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     public function testHungarianNotationTypePrefixesCanBeConfigured(): void
     {
         $findings = $this->hungarianFindings(['arr', 'obj']);
-        $names    = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
+        $names    = array_map(static fn($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
 
         self::assertContains('arrItems', $names);
         self::assertContains('objUser', $names);
@@ -153,8 +185,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     public function testNegativeBooleanDetectsFlagsAndHonoursCliMirrorAllowlist(): void
     {
         $findings = $this->negativeBooleanFindings();
-        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
-        $keys     = array_map(static fn ($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $findings);
+        $names    = array_map(static fn($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+        $keys     = array_map(static fn($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $findings);
 
         self::assertContains('noConfig', $names);
         self::assertContains('disableCache', $names);
@@ -167,7 +199,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $keys);
 
         $allowlistedFindings = $this->negativeBooleanFindings(['Fixtures\\Naming\\CliMirrorOptions::noConfig']);
-        $allowlistedKeys     = array_map(static fn ($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $allowlistedFindings);
+        $allowlistedKeys     = array_map(static fn($finding): mixed => $finding->metadata['allowlistKey'] ?? null, $allowlistedFindings);
 
         self::assertContains('Fixtures\\Naming\\NegativeBooleanFixture::noConfig', $allowlistedKeys);
         self::assertNotContains('Fixtures\\Naming\\CliMirrorOptions::noConfig', $allowlistedKeys);
@@ -205,8 +237,10 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Build abbreviation findings for the naming rule.
      *
-     * @param list<string> $acceptedAbbreviations
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param list<string> $acceptedAbbreviations - Accepted abbreviation values to apply before analysing the fixture.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - surviving abbreviation-allowlist findings after the supplied accepted abbreviations are applied;
+     *                                         empty when every short name is accepted
      */
     private function abbreviationFindings(array $acceptedAbbreviations): array
     {
@@ -221,16 +255,18 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
-        ));
+                                $findings,
+                                static fn($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
+                            ));
     }
 
     /**
      * Build hungarian findings for the naming rule.
      *
-     * @param list<string> $typePrefixes
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param list<string> $typePrefixes - Hungarian prefixes treated as type markers for this assertion.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - Hungarian-notation findings produced under the supplied type prefixes; empty when no prefixed
+     *                                         variable matches
      */
     private function hungarianFindings(array $typePrefixes): array
     {
@@ -244,16 +280,18 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
-        ));
+                                $findings,
+                                static fn($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
+                            ));
     }
 
     /**
      * Build boolean prefix property findings for the naming rule.
      *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Boolean-prefix rule option overrides.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - boolean-prefix findings for the fixture's properties and parameters under the supplied options;
+     *                                         empty when every bool name is exempt
      */
     private function booleanPrefixPropertyFindings(array $options = []): array
     {
@@ -267,24 +305,26 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
         return array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
-        ));
+                                $findings,
+                                static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
+                            ));
     }
 
     /**
      * Build negative boolean findings for the naming rule.
      *
-     * @param list<string> $cliMirrorAllowlist
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param list<string> $cliMirrorAllowlist - Negated boolean names exempted as CLI mirror flags.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - negative-boolean findings with BooleanPrefixRule disabled so each negated name is counted once;
+     *                                         empty when the allowlist exempts them all
      */
     private function negativeBooleanFindings(array $cliMirrorAllowlist = []): array
     {
-        $unit     = $this->parseFixture('negative-boolean.php');
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
-        $settings = $config->ruleSettings(NegativeBooleanRule::ID);
-        $config   = $config->withRuleSettings(
+        $unit            = $this->parseFixture('negative-boolean.php');
+        $registry        = RuleRegistry::defaults();
+        $config          = AnalysisConfig::fromRegistry($registry);
+        $settings        = $config->ruleSettings(NegativeBooleanRule::ID);
+        $config          = $config->withRuleSettings(
             NegativeBooleanRule::ID,
             new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['cliMirrorAllowlist' => $cliMirrorAllowlist])),
         );
@@ -293,19 +333,22 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
             BooleanPrefixRule::ID,
             new RuleSettings(false, $booleanSettings->thresholds, $booleanSettings->options),
         );
-        $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
+        $findings        = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Keeps only NegativeBooleanRule findings; this config disables BooleanPrefixRule so the two
+        // rules cannot both flag the same negated boolean name and inflate the result.
         return array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->ruleId === NegativeBooleanRule::ID,
-        ));
+                                $findings,
+                                static fn($finding): bool => $finding->ruleId === NegativeBooleanRule::ID,
+                            ));
     }
 
     /**
      * Group naming findings by reported identifier name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings
-     * @return array<string, list<string>>
+     * @param list<\GruffPhp\Finding\Finding> $findings - Naming findings to group by reported identifier name.
+     *
+     * @return array<string, list<string>> - identifier name mapped to the rule ids that flagged it, for asserting which names overlap across rules
      */
     private function rulesByIdentifierName(array $findings): array
     {
@@ -313,9 +356,9 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
 
         foreach ($findings as $finding) {
             $name = $finding->metadata['identifierName']
-                ?? $finding->metadata['variable']
-                ?? $finding->metadata['parameter']
-                ?? null;
+                    ?? $finding->metadata['variable']
+                       ?? $finding->metadata['parameter']
+                          ?? null;
 
             if (!is_string($name)) {
                 continue;

@@ -9,7 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile exclusion, glob patterns, missing-path reporting, and canonical deduplication.
+ * Covers source discovery: deterministic non-git scanning, git-aware visibility, ignore overrides, lockfile exclusion, glob patterns, missing-path
+ * reporting, and canonical deduplication.
  */
 final class SourceDiscoveryTest extends TestCase
 {
@@ -46,9 +47,9 @@ final class SourceDiscoveryTest extends TestCase
         $result = (new SourceDiscovery($root))->discover(['.']);
 
         self::assertSame([
-            'alpha.php',
-            'nested/beta.php',
-        ], array_map(static fn ($file): string => $file->displayPath, $result->files));
+                             'alpha.php',
+                             'nested/beta.php',
+                         ], array_map(static fn($file): string => $file->displayPath, $result->files));
 
         self::assertContains('vendor', $result->ignoredPaths);
         self::assertContains('cache', $result->ignoredPaths);
@@ -95,18 +96,18 @@ final class SourceDiscoveryTest extends TestCase
         ]);
 
         $result = (new SourceDiscovery($root))->discover(['.']);
-        $paths  = array_map(static fn ($file): string => $file->displayPath, $result->files);
+        $paths  = array_map(static fn($file): string => $file->displayPath, $result->files);
 
         self::assertSame([
-            '.agents/skills/goat/SKILL.md',
-            '.claude/hooks/deny-dangerous.sh',
-            '.claude/settings.json',
-            '.codex/config.toml',
-            '.github/workflows/ci.yml',
-            '.gitignore',
-            'src/Tracked.php',
-            'src/Untracked.php',
-        ], $paths);
+                             '.agents/skills/goat/SKILL.md',
+                             '.claude/hooks/deny-dangerous.sh',
+                             '.claude/settings.json',
+                             '.codex/config.toml',
+                             '.github/workflows/ci.yml',
+                             '.gitignore',
+                             'src/Tracked.php',
+                             'src/Untracked.php',
+                         ], $paths);
         self::assertNotContains('.claude/settings.local.json', $paths);
         self::assertNotContains('.goat-flow/dashboard-state.json', $paths);
         self::assertNotContains('.goat-flow/tasks/.gitignore', $paths);
@@ -135,7 +136,7 @@ final class SourceDiscoveryTest extends TestCase
         self::assertContains('secret.local.json', $default->ignoredPaths);
 
         $included = (new SourceDiscovery($root))->discover(['secret.local.json'], shouldIncludeIgnored: true);
-        self::assertSame(['secret.local.json'], array_map(static fn ($file): string => $file->displayPath, $included->files));
+        self::assertSame(['secret.local.json'], array_map(static fn($file): string => $file->displayPath, $included->files));
     }
 
     /**
@@ -149,14 +150,14 @@ final class SourceDiscoveryTest extends TestCase
         $result = (new SourceDiscovery($root))->discover(['.'], shouldIncludeIgnored: true);
 
         self::assertSame([
-            'alpha.php',
-            'build/ignored.php',
-            'cache/ignored.php',
-            'generated/ignored.php',
-            'nested/beta.php',
-            'package-lock.json',
-            'vendor/ignored.php',
-        ], array_map(static fn ($file): string => $file->displayPath, $result->files));
+                             'alpha.php',
+                             'build/ignored.php',
+                             'cache/ignored.php',
+                             'generated/ignored.php',
+                             'nested/beta.php',
+                             'package-lock.json',
+                             'vendor/ignored.php',
+                         ], array_map(static fn($file): string => $file->displayPath, $result->files));
     }
 
     /**
@@ -169,7 +170,7 @@ final class SourceDiscoveryTest extends TestCase
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(['.']);
 
-        $paths = array_map(static fn ($file): string => $file->displayPath, $result->files);
+        $paths = array_map(static fn($file): string => $file->displayPath, $result->files);
         self::assertNotContains('package-lock.json', $paths, 'package-lock.json must be ignored by default.');
         self::assertNotContains('composer.lock', $paths, 'composer.lock must be ignored by default.');
     }
@@ -197,19 +198,19 @@ final class SourceDiscoveryTest extends TestCase
     {
         $root   = $this->fixtureRoot('mixed');
         $result = (new SourceDiscovery($root))->discover(
-            ['.'],
+                                      ['.'],
             shouldIncludeIgnored:     true,
             configuredIgnorePatterns: ['nested/**', 'build'],
         );
 
         self::assertSame([
-            'alpha.php',
-            'cache/ignored.php',
-            'generated/ignored.php',
-            'package-lock.json',
-            'vendor/ignored.php',
-        ], array_map(static fn ($file): string => $file->displayPath, $result->files));
-        self::assertContains('nested/beta.php', $result->ignoredPaths);
+                             'alpha.php',
+                             'cache/ignored.php',
+                             'generated/ignored.php',
+                             'package-lock.json',
+                             'vendor/ignored.php',
+                         ], array_map(static fn($file): string => $file->displayPath, $result->files));
+        self::assertContains('nested', $result->ignoredPaths);
         self::assertContains('build', $result->ignoredPaths);
     }
 
@@ -248,20 +249,20 @@ final class SourceDiscoveryTest extends TestCase
 
         $result = (new SourceDiscovery($root))->discover(['']);
         $files  = array_map(
-            static fn ($file): array => [$file->displayPath, $file->type, $file->isPhp()],
+            static fn($file): array => [$file->displayPath, $file->type, $file->isPhp()],
             $result->files,
         );
 
         self::assertSame([
-            ['.editorconfig', 'text', false],
-            ['.env.local', 'text', false],
-            ['.gitignore', 'text', false],
-            ['README.md', 'text', false],
-            ['bin/hook.sh', 'text', false],
-            ['config.toml', 'text', false],
-            ['index.php', 'php', true],
-            ['settings.yaml', 'text', false],
-        ], $files);
+                             ['.editorconfig', 'text', false],
+                             ['.env.local', 'text', false],
+                             ['.gitignore', 'text', false],
+                             ['README.md', 'text', false],
+                             ['bin/hook.sh', 'text', false],
+                             ['config.toml', 'text', false],
+                             ['index.php', 'php', true],
+                             ['settings.yaml', 'text', false],
+                         ], $files);
         self::assertSame([], $result->missingPaths);
         self::assertSame([], $result->ignoredPaths);
         self::assertFalse($result->hasInputErrors());
@@ -279,7 +280,7 @@ final class SourceDiscoveryTest extends TestCase
 
         $result = (new SourceDiscovery($root))->discover(['alpha.php', $root . '/alpha.php', './alpha.php']);
 
-        self::assertSame(['alpha.php'], array_map(static fn ($file): string => $file->displayPath, $result->files));
+        self::assertSame(['alpha.php'], array_map(static fn($file): string => $file->displayPath, $result->files));
     }
 
     /**
@@ -305,10 +306,33 @@ final class SourceDiscoveryTest extends TestCase
     }
 
     /**
+     * Verify ignored path details carry the source category and matching pattern.
+     *
+     * @return void
+     */
+    public function testIgnoredPathDetailsCarrySourceAndPattern(): void
+    {
+        $root = $this->tempDir();
+        $this->writeFile($root, 'src/A.php', "<?php\n");
+        $this->writeFile($root, 'legacy/B.php', "<?php\n");
+        $this->writeFile($root, 'vendor/c.php', "<?php\n");
+
+        $result  = (new SourceDiscovery($root))->discover(['.'], configuredIgnorePatterns: ['legacy/**']);
+        $details = array_map(
+            static fn($ignoredPath): array => [$ignoredPath->path, $ignoredPath->source, $ignoredPath->pattern],
+            $result->ignoredPathDetails,
+        );
+
+        self::assertContains(['legacy', 'config', 'legacy/**'], $details);
+        self::assertContains(['vendor', 'default', 'vendor'], $details);
+    }
+
+    /**
      * Resolve a source-discovery fixture root.
      *
-     * @param string $name Fixture name.
-     * @return string
+     * @param string $name - Fixture name.
+     *
+     * @return string - canonical absolute path to the fixture root with symlinks resolved
      */
     private function fixtureRoot(string $name): string
     {
@@ -322,7 +346,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Create a temporary source-discovery project.
      *
-     * @return string
+     * @return string - absolute path to the freshly created project root, registered for teardown
      */
     private function tempDir(): string
     {
@@ -352,8 +376,9 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Run a git command inside a temporary fixture project.
      *
-     * @param string       $root Fixture root.
-     * @param list<string> $args Git arguments.
+     * @param string       $root - Fixture root.
+     * @param list<string> $args - Git arguments.
+     *
      * @return void
      */
     private function runGit(string $root, array $args): void
@@ -367,9 +392,10 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $root     Fixture root.
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $root - Fixture root.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
+     *
      * @return void
      */
     private function writeFile(string $root, string $path, string $contents): void
@@ -387,12 +413,14 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Directory path.
+     * @param string $path - Directory path.
+     *
      * @return void
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 

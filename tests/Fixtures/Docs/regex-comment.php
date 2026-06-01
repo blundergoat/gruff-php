@@ -12,8 +12,9 @@ final class RegexCommentFixture
     /**
      * Validate the candidate against the fixture identifier shape.
      *
-     * @param string $candidateName Name being checked.
-     * @return bool True when the candidate uses the fixture format.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return bool - True when the candidate uses the fixture format.
      */
     public function isUndocumentedRegexMatch(string $candidateName): bool
     {
@@ -27,8 +28,9 @@ final class RegexCommentFixture
     /**
      * Check the candidate with direct explanatory context.
      *
-     * @param string $candidateName Name being checked.
-     * @return bool True when the candidate uses the fixture format.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return bool - True when the candidate uses the fixture format.
      */
     public function isDocumentedRegexMatch(string $candidateName): bool
     {
@@ -43,8 +45,9 @@ final class RegexCommentFixture
     /**
      * Confirm the candidate uses the fixture identifier shape after blank-line separation.
      *
-     * @param string $candidateName Name being checked.
-     * @return bool True when the candidate uses the fixture format.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return bool - True when the candidate uses the fixture format.
      */
     public function isSeparatedRegexMatch(string $candidateName): bool
     {
@@ -61,8 +64,9 @@ final class RegexCommentFixture
      * Apply the fixture identifier regex described in this docblock; no inline comment is needed
      * because the function-level docblock already explains the pattern's purpose.
      *
-     * @param string $candidateName Name being checked.
-     * @return bool True when the candidate uses the fixture format.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return bool - True when the candidate uses the fixture format.
      */
     public function exemptByFunctionDocKeyword(string $candidateName): bool
     {
@@ -77,8 +81,9 @@ final class RegexCommentFixture
      * Classify the candidate by the labelled match arm; the string label acts as the call's
      * explanation, so the per-call inline comment is not required.
      *
-     * @param string $candidateName Name being checked.
-     * @return string|null Label describing the matched shape, or null when no arm matches.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return string|null - Label describing the matched shape, or null when no arm matches.
      */
     public function exemptByMatchArmLabel(string $candidateName): ?string
     {
@@ -93,8 +98,9 @@ final class RegexCommentFixture
      * Match the candidate name to a fixture key in ordinary English usage.
      * The word "match" here is incidental prose and must not exempt the call below.
      *
-     * @param string $candidateName Name being checked.
-     * @return bool True when the candidate uses the fixture format.
+     * @param string $candidateName - Name being checked.
+     *
+     * @return bool - True when the candidate uses the fixture format.
      */
     public function matchTheRouteUncommentedRegex(string $candidateName): bool
     {

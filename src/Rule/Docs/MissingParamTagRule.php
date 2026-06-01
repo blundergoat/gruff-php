@@ -20,7 +20,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Function_;
 
 /**
- * Detects documented public methods whose parameters lack matching @param tags.
+ * Detects documented methods and functions whose parameters lack matching @param tags.
  */
 final readonly class MissingParamTagRule implements RuleInterface
 {
@@ -32,7 +32,7 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Describe the missing @param tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,11 +47,12 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Find documented public function-like declarations with undocumented parameters.
+     * Find documented function-like declarations with undocumented parameters, at any visibility.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for missing parameter tags.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - Findings for missing parameter tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -62,10 +63,6 @@ final readonly class MissingParamTagRule implements RuleInterface
 
         foreach ($nodes as $node) {
             /** @var ClassMethod|Function_ $node Finder predicate restricts results to function-like nodes. */
-            if ($node instanceof ClassMethod && !$node->isPublic()) {
-                continue;
-            }
-
             $docComment = $node->getDocComment();
 
             if ($docComment === null || $node->params === []) {
@@ -112,12 +109,12 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes
-     * (`@param array{key:string,...} $payload` spanning N physical lines) match the closing
-     * `$payload` even though it sits on a different line from the `@param` token.
+     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes match the
+     * closing documented variable even when it sits on a different line from the `@param` token.
      *
-     * @param string $docText Raw docblock text.
-     * @return list<string> Parameter names found in the docblock.
+     * @param string $docText - Raw docblock text.
+     *
+     * @return list<string> - Parameter names found in the docblock.
      */
     public static function extractParamNames(string $docText): array
     {
@@ -156,13 +153,14 @@ final readonly class MissingParamTagRule implements RuleInterface
 
     /**
      * Walk forward from a `@param` token through balanced `{} <> [] ()` brackets and return the
-     * first `$varname` reached at depth zero. Stops at the next `@tag` (next docblock entry) or
+     * first parameter variable token reached at depth zero. Stops at the next `@tag` (next docblock entry) or
      * end of input.
      *
-     * @param string $stripped Docblock text with `/**`, ` * `, and `*\/` framing removed.
-     * @param int    $length   Pre-computed `strlen($stripped)` to avoid recomputation per call.
-     * @param int    $position Cursor position (mutated to point past the matched variable).
-     * @return string|null Variable name when found, null when the `@param` tag has no closing `$varname`.
+     * @param string $stripped - Docblock text with `/**`, ` * `, and `*\/` framing removed.
+     * @param int    $length - Pre-computed `strlen($stripped)` to avoid recomputation per call.
+     * @param int    $position - Cursor position (mutated to point past the matched variable).
+     *
+     * @return string|null - Variable name when found, null when the `@param` tag has no closing variable token.
      */
     private static function scanForParamVariable(string $stripped, int $length, int &$position): ?string
     {
@@ -185,6 +183,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             if ($depth === 0 && $character === '@') {
+                // Reached the next tag before a variable; this @param has no input name.
                 return null;
             }
 
@@ -206,7 +205,9 @@ final readonly class MissingParamTagRule implements RuleInterface
      * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
      * for caller inspection; only the per-line `*` decoration is stripped.
      *
-     * @return string Docblock text without framing characters.
+     * @param string $docText - Raw docblock text including its `/**`, ` * `, and `*\/` framing.
+     *
+     * @return string - Docblock text without framing characters.
      */
     private static function stripDocFraming(string $docText): string
     {
@@ -219,7 +220,9 @@ final readonly class MissingParamTagRule implements RuleInterface
     /**
      * Check whether a docblock carries enough contract text to require @param tags.
      *
-     * @return bool True when parameter tags should be enforced.
+     * @param string $docText - Raw docblock text scanned for prose or contract-bearing tags.
+     *
+     * @return bool - True when parameter tags should be enforced.
      */
     private function hasContractDoc(string $docText): bool
     {
@@ -229,6 +232,7 @@ final readonly class MissingParamTagRule implements RuleInterface
                 continue;
             }
 
+            // A non-empty, non-tag line is prose: the docblock states a contract.
             return true;
         }
 

@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-05-27
+last_reviewed: 2026-06-01
 ---
 
 # Rule Footguns
@@ -88,6 +88,36 @@ grep -rn 'exposes [0-9]* rule\|Rule catalogue\|^|`naming`\|^### `naming` (' \
 
 Update every hit before claiming retirement done; do not rely on a single PR review to surface all of them — outside-diff coverage is bounded by which files the PR touches.
 
+## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
+
+**Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
+
+`src/Rule/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
+
+**Evidence:** Healthkit reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
+
+**Prevention:** When extending a type-shape exemption beyond a single canonical form, write the counter-fixture first. Every "loose" shape (mixed-keyed bag, single-mixed-field shape, mixed-only generic) gets a `*StillFires` fixture method that asserts the exemption did NOT swallow it. Only after the counter-fixtures are in place add the positive `*IsAllowed` cases. The shape-detector must use a depth-aware splitter (commas inside `<>{}()[]` belong to the inner shape, not the outer one); a naive `explode(',', ...)` would split `array{entries: list<array<string, mixed>>, total: int}` mid-list and corrupt the parse.
+
+## Footgun: PHPStan rejects prose attached to multiline array-shape tags
+
+**Status:** active | **Created:** 2026-06-01 | **Evidence:** OBSERVED
+
+`docs.return-comment` only needs to know whether an `@return` tag has prose after the type, and
+`src/Rule/Docs/PhpdocTagText.php` (search: `returnTagBody`) now reads multiline array-shape tags
+through their closing line. That made comments such as `@return array{ ... } - description` clear
+the gruff rule, but PHPStan treats the whole structural tag body as type syntax; prose after the
+closing `}` produced `phpDoc.parseError` in `src/Command/ListRulesCommand.php` (search:
+`ruleDetailPayload`) and `src/Source/SourceDiscovery.php` (search: `buildGitDiscoveryRequest`),
+which then cascaded into `missingType.iterableValue` and `argument.type` errors.
+
+**Prevention:** For multiline precise array shapes, keep the human-facing `@return` tag broad and
+described (`@return array - ...` or `@return array|null - ...`), then put the precise shape in a
+separate `@phpstan-return array{...}` tag with one complete `key: type` pair per line. Do not put a
+description after the closing `}` of an `@return` or `@phpstan-return` array shape; PHPStan reads it
+as malformed type syntax, not prose. When composing long PHPStan type aliases, avoid splitting the
+alias name from its type body across physical lines; `tests/Mutation/InfectionReportParserTest.php`
+(search: `InvalidReportNestedA`) uses smaller intermediate aliases instead.
+
 ## Resolved Entries
 
 ## Footgun: Project rules need full project context, not `--changed-only`
@@ -127,13 +157,3 @@ Until `SourceDiscovery::IGNORED_FILENAMES` was added, well-known lockfiles with 
 **Resolution:** `lateAssignments` now walks `Expr\ArrayDimFetch` chains down to the underlying expression via `recordPropertyMutation()` before consulting the helper, AND iterates `Stmt\Unset_` nodes separately so `unset($this->prop['k'])` is treated as the same kind of post-constructor mutation. The shared helper (`ModernisationNodeHelper::propertyFetchName`/`isThisPropertyFetch`) stays untouched because only one rule needs the walk today; expanding the helper to do it would change the behaviour of every consumer for no current benefit.
 
 **Prevention:** When a modernisation rule reasons about "this property mutates after the constructor", it must check every AST shape that PHP allows to mutate the container without textually mentioning the property: plain `Expr\Assign` whose LHS is a `PropertyFetch`, `Expr\Assign` whose LHS is one-or-more `ArrayDimFetch` wrapping a `PropertyFetch`, and `Stmt\Unset_` whose arg list contains the same shape. `Expr\AssignOp::*` (compound assigns like `$this->count += 1`) is `Expr\AssignOp::class`, not `Expr\Assign::class`, and the same nodeFinder query would miss it — when a future rule needs compound-assign awareness, extend `recordPropertyMutation()` to be called from the `AssignOp` walker as well. The fixture lives at `tests/Fixtures/Modernisation/non-candidates.php` `MessageInboxFixture` covering all three sub-cases. Pass-by-reference detection (`func(&$this->prop)`) is deliberately deferred; see `.goat-flow/tasks/0.1.4/M01-modernisation-waste-false-positive-fixes.md` "## Deferred".
-
-## Footgun: PHPStan/Psalm array-shape exemptions need a "concrete sibling" gate, not "any nested mixed"
-
-**Status:** active | **Created:** 2026-05-27 | **Evidence:** OBSERVED
-
-`src/Rule/Modernisation/PhpDocMixedOveruseRule.php` (search: `isPreciseArrayShape`) exempts `array{...}` shapes that name at least one sibling field with a non-mixed type, on the basis that the nested `mixed` describes a heterogeneous leaf inside a typed envelope. The naive form of this rule — "any nested mixed inside any parametric type is fine" — silently exempts `array<string|int, mixed>` (mixed-keyed bag), `Collection<mixed>` (single-leaf generic), and `array{value: mixed}` (single-mixed-field shape), all of which are genuine type sloppiness the rule should keep flagging. The discriminator is "is there at least one CONCRETE sibling field?"; without it the exemption swallows real signal.
-
-**Evidence:** Healthkit reviewer report section 7 (`.goat-flow/scratchpad/gruff-php-improvement-feedback.md`). The reviewer's original phrasing was "nested mixed inside any parametric type should be fine"; applied literally that exempts `Collection<mixed>` which is clearly not a precise envelope. The implemented rule reads the array-shape body, splits on top-level commas (depth-aware via `splitTopLevelComma`), finds the first top-level colon per pair (depth-aware via `topLevelColonIndex`), and returns true only when at least one pair's value type is NOT exactly `mixed` (case-insensitive). Fixtures at `tests/Fixtures/Modernisation/phpdoc-mixed-overuse.php` `preciseArrayShape*` cover both directions.
-
-**Prevention:** When extending a type-shape exemption beyond a single canonical form, write the counter-fixture first. Every "loose" shape (mixed-keyed bag, single-mixed-field shape, mixed-only generic) gets a `*StillFires` fixture method that asserts the exemption did NOT swallow it. Only after the counter-fixtures are in place add the positive `*IsAllowed` cases. The shape-detector must use a depth-aware splitter (commas inside `<>{}()[]` belong to the inner shape, not the outer one); a naive `explode(',', ...)` would split `array{entries: list<array<string, mixed>>, total: int}` mid-list and corrupt the parse.

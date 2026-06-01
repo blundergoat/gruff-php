@@ -17,20 +17,22 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Identify the in-repo named-argument alignment fixer.
      *
-     * @return string
+     * @return string - the fixer's registration key (`GruffPhp/align_named_arguments`) that setRules() must reference
      */
     public function getName(): string
     {
+        // This literal string is PHP-CS-Fixer's registration key; setRules() must reference the same value.
         return 'GruffPhp/align_named_arguments';
     }
 
     /**
      * Describe the named-argument alignment fixer for PHP-CS-Fixer.
      *
-     * @return FixerDefinitionInterface
+     * @return FixerDefinitionInterface - the summary and worked code sample PHP-CS-Fixer displays for this fixer
      */
     public function getDefinition(): FixerDefinitionInterface
     {
+        // Summary plus a worked sample is the metadata PHP-CS-Fixer shows for a custom fixer.
         return new FixerDefinition(
             'Aligns values in consecutive multiline named-argument groups.',
             [
@@ -44,10 +46,11 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Run after built-in whitespace fixers so alignment sees final argument layout.
      *
-     * @return int
+     * @return int - run priority; negative (-100) sequences this fixer after the whitespace fixers
      */
     public function getPriority(): int
     {
+        // Negative priority sequences this fixer after the whitespace fixers, so it aligns final layout.
         return -100;
     }
 
@@ -55,12 +58,13 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether the token stream may contain named arguments.
      *
      * @param Tokens $tokens Token stream to fix.
-     * @return bool
+     * @return bool - true when the code contains a colon (a possible named argument); false skips the full pass
      */
     public function isCandidate(Tokens $tokens): bool
     {
         $code = $tokens->generateCode();
 
+        // A colon is the cheapest necessary signal of a named argument; skip the full pass without one.
         return str_contains($code, ':');
     }
 
@@ -85,13 +89,14 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Align consecutive multiline named-argument groups in source code.
      *
      * @param string $code Source code to inspect.
-     * @return string
+     * @return string - the source with named-argument groups aligned; the input unchanged when nothing aligns or the split fails
      */
     private function alignNamedArgumentGroups(string $code): string
     {
         $parts = preg_split('/(\R)/', $code, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if (!is_array($parts)) {
+            // Split failed, so hand back the source unchanged rather than corrupt it.
             return $code;
         }
 
@@ -120,6 +125,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
 
         $this->alignGroup($lines, $group);
 
+        // Each entry already carries its own line ending, so join with no separator; '\R' would double them.
         return implode('', $lines);
     }
 
@@ -127,7 +133,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether a source line contains a named argument.
      *
      * @param string $line Source line to inspect.
-     * @return bool
+     * @return bool - true when the line is an indented `name: value` argument; false for any other line, including `::` calls
      */
     private function isNamedArgumentLine(string $line): bool
     {
@@ -147,6 +153,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     private function alignGroup(array &$lines, array $group): void
     {
         if (count($group) < 2) {
+            // A lone named argument has nothing to align against, so leave it as written.
             return;
         }
 
@@ -156,6 +163,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
         foreach ($group as $index) {
             // Capture indentation, argument name, value, and line ending before aligning the group.
             if (preg_match('/^(?<indent>[ \t]+)(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*:(?!:)\s*(?<value>\S.*?)(?<eol>\R?)$/', $lines[$index], $matches) !== 1) {
+                // One unparsable row means we cannot align the block safely, so abandon the whole group.
                 return;
             }
 
@@ -183,6 +191,7 @@ $finder = Finder::create()
 $config = new Config();
 $config->registerCustomFixers([new AlignNamedArgumentsFixer()]);
 
+// PHP-CS-Fixer loads this file expecting the fully configured Config; hand back the rule set and finder.
 return $config
     ->setRiskyAllowed(false)
     ->setRules([

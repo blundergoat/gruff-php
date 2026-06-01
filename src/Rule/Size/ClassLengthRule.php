@@ -37,10 +37,11 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Describe the class-length rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
+        // Error at 1000 physical lines: the catalogue default callers inherit unless .gruff-php.yaml overrides it.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Class length',
@@ -55,10 +56,10 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose physical line length exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized classes, traits, or enums.
+     * @return list<Finding> - One finding per oversized class-like scope; empty when every type is within budget.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -119,29 +120,37 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Build a display symbol for a class-like node.
      *
-     * @return string Class-like display symbol.
+     * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
+     *
+     * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
+            // Anonymous classes carry no name node, so synthesise a label keyed to the declaration line.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
         if ($node instanceof Trait_) {
+            // Traits are always named in valid PHP; the fallback only guards against an unparsed name node.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
         if ($node instanceof Enum_) {
+            // Enums are always named in valid PHP; the fallback only guards against an unparsed name node.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
+        // Unreachable for the finder's class-like inputs; a line-keyed label keeps findings traceable if it ever fires.
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {

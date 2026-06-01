@@ -22,10 +22,11 @@ abstract class ConfigLoaderTestCase extends TestCase
      * wrong-schemaVersion error path include a non-canonical value
      * explicitly and the auto-injection sees `schemaVersion` and skips.
      *
-     * @param string $contents             Config file contents.
-     * @param string $suffix               File suffix.
-     * @param bool   $shouldInjectSchemaVersion  When false, write contents verbatim (used by schemaVersion-rejection tests).
-     * @return string
+     * @param string $contents - Config file contents.
+     * @param string $suffix - File suffix.
+     * @param bool   $shouldInjectSchemaVersion - When false, write contents verbatim (used by schemaVersion-rejection tests).
+     *
+     * @return string - absolute on-disk path of the freshly written temp config file, ready to feed a ConfigLoader
      */
     protected function writeTempConfig(string $contents, string $suffix = '.yaml', bool $shouldInjectSchemaVersion = true): string
     {
@@ -50,12 +51,14 @@ abstract class ConfigLoaderTestCase extends TestCase
     /**
      * Prepend the canonical schemaVersion when the test contents omit it.
      *
-     * @param string $contents Raw config contents supplied by the test.
-     * @return string Contents with schemaVersion present.
+     * @param string $contents - Raw config contents supplied by the test.
+     *
+     * @return string - the config body guaranteed to carry a schemaVersion; returned unchanged when one was already present
      */
     private function ensureSchemaVersion(string $contents): string
     {
         if (str_contains($contents, 'schemaVersion')) {
+            // Test already declares a schemaVersion (often a wrong one on purpose); leave it untouched.
             return $contents;
         }
 
@@ -65,10 +68,12 @@ abstract class ConfigLoaderTestCase extends TestCase
         if ($trimmed !== '' && $trimmed[0] === '{') {
             $decoded = json_decode($contents, true);
             if (is_array($decoded)) {
-                return (string) json_encode(['schemaVersion' => $version] + $decoded, JSON_THROW_ON_ERROR);
+                // Inline JSON config: splice schemaVersion in as the first key, keeping the original payload.
+                return (string)json_encode(['schemaVersion' => $version] + $decoded, JSON_THROW_ON_ERROR);
             }
         }
 
+        // YAML (or non-JSON) contents: prepend the schemaVersion line above the test's original body.
         return sprintf("schemaVersion: %s\n%s", $version, $contents);
     }
 }

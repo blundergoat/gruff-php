@@ -86,10 +86,10 @@ final class TestQualityCalibrationRulesTest extends TestCase
         self::assertRuleCount(ConditionalTestLogicRule::ID, 1, $baseline);
 
         $config = AnalysisConfig::fromRegistry($registry)
-            ->withRuleSettings(
-                ConditionalTestLogicRule::ID,
-                new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
-            );
+                                ->withRuleSettings(
+                                    ConditionalTestLogicRule::ID,
+                                    new RuleSettings(true, [], ['ignoredPathPatterns' => ['tests/Fixtures/TestQuality/**']]),
+                                );
 
         $findings = $this->analysePath($fixture, $config);
 
@@ -117,14 +117,17 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Assert how many findings one rule emitted.
      *
-     * @param list<Finding> $findings
+     * @param string        $ruleId - Rule whose findings are isolated before counting.
+     * @param int           $expectedCount - Findings the rule must report for this fixture.
+     * @param list<Finding> $findings - Full analysis output to filter by rule id.
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -132,7 +135,10 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @return list<Finding>
+     * @param string          $path - Project-relative fixture path to parse and scan.
+     * @param ?AnalysisConfig $config - Override config; null applies the registry defaults.
+     *
+     * @return list<Finding> - every finding the full default rule set emitted for the fixture, unfiltered; empty when clean
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -148,8 +154,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     * @param string $path - Filesystem path.
+     *
+     * @return AnalysisUnit - the parsed fixture, repo-relative display path preserved, ready to feed the rule registry
      */
     private function unitForPath(string $path): AnalysisUnit
     {

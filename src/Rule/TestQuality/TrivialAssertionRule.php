@@ -27,10 +27,11 @@ final readonly class TrivialAssertionRule implements RuleInterface
     /**
      * Describe the trivial assertion rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning by default: an assertion that passes by construction gives false confidence, so flag it loudly.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Trivial assertion',
@@ -44,10 +45,10 @@ final readonly class TrivialAssertionRule implements RuleInterface
     /**
      * Find assertions that can pass without checking meaningful behavior.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for trivial assertions.
+     * @return list<Finding> - Findings for trivial assertions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

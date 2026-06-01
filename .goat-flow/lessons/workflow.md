@@ -1,9 +1,19 @@
 ---
 category: workflow
-last_reviewed: 2026-05-27
+last_reviewed: 2026-05-31
 ---
 
 # Workflow Lessons
+
+## Lesson: Don't `git stash` to probe pre-existing state — it's not read-only and can entangle other stashes
+
+**Created:** 2026-05-31
+
+**What happened:** While verifying whether three `docs.stale-param-tag` warnings from the dogfood `analyse` were pre-existing or introduced this session, the agent ran `git stash push --keep-index --include-untracked -m "probe"` to "see the repo without my changes." That moved the session's uncommitted work into a new stash entry; the working tree reverted several edits (the relocated `acceptedBooleanNames` test, the `CHANGELOG.md` / decisions `README.md` additions, and the untracked `ADR-024` file). Recovery needed `git stash pop` plus re-applying one edit that did not survive the round-trip (a duplicate test then existed in two classes), while taking care not to disturb a pre-existing, unrelated `stash@{0}` ("WIP on dev: Add docblocks to test classes") that belonged to someone else. A risky, multi-step detour to recover information that was already available read-only.
+
+**Root cause:** Treating `git stash` as a "show me the tree without my changes" inspector. Stash mutates both the working tree and the index, so in a session with many uncommitted edits it is a destructive operation, and `--include-untracked` also sweeps up new files like a fresh ADR. It also collides with any pre-existing stash the user left. The actual question — "is this finding pre-existing or mine?" — is answerable without changing anything.
+
+**Prevention:** To decide whether a finding or file state is pre-existing versus introduced this session, stay read-only: (a) re-read the session-start `git status` snapshot already in the task context; (b) `git diff HEAD -- <file>` or `git log -1 -- <file>` to see whether the file was modified or committed before your edits; (c) check whether the finding's file is in your own changed-files list — here all three warnings were in `src/Rule/Docs/MissingParamTagRule.php` and `tests/Rule/Docs/DocsRulesTest.php`, neither of which the agent had touched, which settled it immediately. Never `git stash` to compare. If you genuinely must build against a clean tree, use a throwaway `git worktree add`, which leaves the working copy and any existing stashes untouched.
 
 ## Lesson: Universal defaults that ship via `init` must also flow through `AnalysisConfig` so existing projects benefit
 

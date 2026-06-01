@@ -34,11 +34,13 @@ enum FailThreshold: string
     /**
      * Convert a CLI fail threshold string into the matching enum case.
      *
-     * @param string $rawInput CLI fail-on value to parse.
-     * @return self|null Matching threshold, or null for unsupported input.
+     * @param string $rawInput - CLI fail-on value to parse.
+     *
+     * @return self|null - Matching threshold, or null for unsupported input.
      */
     public static function fromInput(string $rawInput): ?self
     {
+        // Exact-match the CLI string to a case; anything else is an unsupported value the caller reports, hence null.
         return match ($rawInput) {
             self::None->value => self::None,
             self::Advisory->value => self::Advisory,
@@ -51,11 +53,13 @@ enum FailThreshold: string
     /**
      * Decide whether a finding severity should fail for this threshold.
      *
-     * @param Severity $severity Finding severity to compare with this threshold.
-     * @return bool True when the severity meets or exceeds the threshold.
+     * @param Severity $severity - Finding severity to compare with this threshold.
+     *
+     * @return bool - True when the severity meets or exceeds the threshold.
      */
     public function isTriggeredBy(Severity $severity): bool
     {
+        // Each case names the floor: a severity trips the gate only when it is at least as severe as the threshold.
         return match ($this) {
             self::None => false,
             self::Advisory => true,

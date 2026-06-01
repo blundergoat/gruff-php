@@ -13,11 +13,11 @@ use LogicException;
 final readonly class RuleSettings
 {
     /**
-     * @param bool                                                                         $enabled           Whether the rule should run for this config.
-     * @param array<string, int|float>                                                     $thresholds        Named numeric thresholds available to the rule.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options           Rule-specific option values from config.
-     * @param SeverityThreshold|null                                                       $severityThreshold Optional single threshold/severity override.
-     * @param bool                                                                         $excludeFromScore  When true, the rule still runs and surfaces findings in reports but its findings do not penalise the composite score. See ADR-016.
+     * @param bool                                                                         $enabled - Whether the rule should run for this config.
+     * @param array<string, int|float>                                                     $thresholds - Named numeric thresholds available to the rule.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Rule-specific option values from config.
+     * @param SeverityThreshold|null                                                       $severityThreshold - Optional single threshold/severity override.
+     * @param bool                                                                         $excludeFromScore - When true, the rule still runs and surfaces findings in reports but its findings do not penalise the composite score. See ADR-016.
      */
     public function __construct(
         public bool $enabled,
@@ -29,7 +29,7 @@ final readonly class RuleSettings
     }
 
     /**
-     * @return bool True when this rule's findings should be reported but not scored.
+     * @return bool - True when this rule's findings should be reported but not scored.
      */
     public function isExcludedFromScore(): bool
     {
@@ -39,9 +39,10 @@ final readonly class RuleSettings
     /**
      * Return a configured numeric threshold by name.
      *
-     * @param string $name Threshold key to read.
+     * @param string $name - Threshold key to read.
      * @throws LogicException When the configured value is missing or non-numeric.
-     * @return int|float Threshold value.
+     *
+     * @return int|float - Threshold value.
      */
     public function numericThreshold(string $name): int|float
     {
@@ -57,12 +58,14 @@ final readonly class RuleSettings
     /**
      * Match a value where higher numbers are worse against configured thresholds.
      *
-     * @param int|float $measuredValue Measured rule value to compare.
-     * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
+     * @param int|float $measuredValue - Measured rule value to compare.
+     *
+     * @return ThresholdMatch|null - Matching severity threshold, or null when the value is allowed.
      */
     public function highValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
+            // Single-threshold override: breach only once the value strictly exceeds it.
             return $measuredValue > $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -70,12 +73,14 @@ final readonly class RuleSettings
 
         $warningThreshold = $this->numericThreshold('warning');
         if ($measuredValue <= $warningThreshold) {
+            // Metric is within budget; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
         $severity       = $measuredValue > $errorThreshold ? Severity::Error : Severity::Warning;
 
+        // Report at the highest band the value crossed so the finding names the breached limit.
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
             $severity,
@@ -85,12 +90,14 @@ final readonly class RuleSettings
     /**
      * Match a value where lower numbers are worse against configured thresholds.
      *
-     * @param int|float $measuredValue Measured rule value to compare.
-     * @return ThresholdMatch|null Matching severity threshold, or null when the value is allowed.
+     * @param int|float $measuredValue - Measured rule value to compare.
+     *
+     * @return ThresholdMatch|null - Matching severity threshold, or null when the value is allowed.
      */
     public function lowValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
+            // Single-threshold override: breach only once the value falls strictly below it.
             return $measuredValue < $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -98,12 +105,14 @@ final readonly class RuleSettings
 
         $warningThreshold = $this->numericThreshold('warning');
         if ($measuredValue >= $warningThreshold) {
+            // Metric meets the required floor; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
         $severity       = $measuredValue < $errorThreshold ? Severity::Error : Severity::Warning;
 
+        // Report at the lowest band the value undershot so the finding names the breached floor.
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
             $severity,
@@ -113,9 +122,10 @@ final readonly class RuleSettings
     /**
      * Return a configured option by name.
      *
-     * @param string $name Option key to read.
+     * @param string $name - Option key to read.
      * @throws LogicException When the option key is missing.
-     * @return int|float|bool|string|array<array-key, int|float|bool|string> Option value.
+     *
+     * @return int|float|bool|string|array<array-key, int|float|bool|string> - Option value.
      */
     public function option(string $name): int|float|bool|string|array
     {
@@ -123,15 +133,17 @@ final readonly class RuleSettings
             throw new LogicException(sprintf('Missing option "%s".', $name));
         }
 
+        // The rule's configured option value in its raw union type; callers narrow it (see stringListOption).
         return $this->options[$name];
     }
 
     /**
      * Return a configured option as a string list.
      *
-     * @param string $name Option key to read.
+     * @param string $name - Option key to read.
      * @throws LogicException When the option value is not a list of strings.
-     * @return list<string> String option values.
+     *
+     * @return list<string> - String option values.
      */
     public function stringListOption(string $name): array
     {
@@ -151,6 +163,7 @@ final readonly class RuleSettings
             $stringOptions[] = $optionItem;
         }
 
+        // The option's configured string values; an unset option yields the empty list, not an error.
         return $stringOptions;
     }
 }

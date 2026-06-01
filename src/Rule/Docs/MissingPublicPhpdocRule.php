@@ -30,7 +30,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Describe the missing method PHPDoc rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Find method declarations that do not have a local PHPDoc block.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for undocumented methods.
+     * @return list<Finding> - Findings for undocumented methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -72,12 +72,17 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     /**
      * Build the missing PHPDoc finding for one method.
      *
-     * @return Finding Documentation finding.
+     * @param AnalysisUnit  $analysisUnit - Parsed unit supplying the display path reported in the finding.
+     * @param RuleDefinition $definition - Rule metadata supplying severity, pillar, tier, and confidence.
+     * @param ClassMethod   $classMethod - Undocumented method whose name and start line are reported.
+     *
+     * @return Finding - Documentation finding.
      */
     private function findingForMethod(AnalysisUnit $analysisUnit, RuleDefinition $definition, ClassMethod $classMethod): Finding
     {
         $symbol = CyclomaticComplexityRule::resolveSymbol($classMethod);
 
+        // Finding anchored at the method declaration line, flagging its absent docblock.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Method %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).', $symbol),

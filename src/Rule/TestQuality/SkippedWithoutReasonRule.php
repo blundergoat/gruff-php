@@ -27,10 +27,11 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     /**
      * Describe the skipped test without reason rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning at high confidence: a missing skip reason is unambiguous, and a silent skip erodes the suite.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Skipped test without reason',
@@ -44,10 +45,10 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
     /**
      * Find skipped or incomplete tests without an explanatory reason.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unexplained skipped tests.
+     * @return list<Finding> - Findings for unexplained skipped tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -28,10 +28,11 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Describe the commented-out code rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence and advisory: the code-shape heuristic can misread prose, so teams opt in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Commented-out code',
@@ -45,10 +46,10 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Find comment tokens that appear to contain disabled executable code.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for suspicious comment blocks.
+     * @return list<Finding> - One finding per comment token whose stripped body crosses the code-shape threshold.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -90,17 +91,22 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Check whether a parser token is a regular comment.
      *
-     * @return bool True for non-docblock comment tokens.
+     * @param Token $token - Lexer token to classify; only line and inline block comments qualify, never docblocks.
+     *
+     * @return bool - True for non-docblock comment tokens.
      */
     private function isCommentToken(Token $token): bool
     {
+        // Docblocks lex as T_DOC_COMMENT, so matching only T_COMMENT excludes `/**` from this rule.
         return $token->id === T_COMMENT;
     }
 
     /**
      * Remove PHP comment delimiters before code-shape checks.
      *
-     * @return string Trimmed comment body.
+     * @param string $text - Raw comment token text, still carrying its leading slashes, hash, or block delimiters.
+     *
+     * @return string - Trimmed comment body.
      */
     private function stripCommentMarkers(string $text): string
     {
@@ -108,23 +114,28 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
         $text = preg_replace('/^\/\/\s?/m', '', $text) ?? $text;
 
+        // Inner content with every delimiter and per-line decoration removed, ready for the shape scan.
         return trim($text);
     }
 
     /**
      * Detect whether comment content has enough PHP-like syntax signals.
      *
-     * @return bool True when the content looks like disabled code.
+     * @param string $content - Delimiter-stripped comment body to scan for disabled-code signals.
+     *
+     * @return bool - True when the content looks like disabled code.
      */
     private function isCodeLike(string $content): bool
     {
         if (strlen($content) < 5) {
+            // Too short to carry a meaningful statement; never treat tiny comments as code.
             return false;
         }
 
         $lines = array_filter(explode("\n", $content), static fn (string $line): bool => trim($line) !== '');
 
         if ($lines === []) {
+            // Only blank lines remained after filtering, so there is nothing to classify.
             return false;
         }
 
@@ -154,6 +165,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             }
         }
 
+        // Require at least two signals so a single `$`-mention or stray keyword in prose stays below the bar.
         return $codeIndicators >= 2;
     }
 }

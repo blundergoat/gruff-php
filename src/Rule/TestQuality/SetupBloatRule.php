@@ -29,10 +29,11 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Describe the setup bloat rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: a heavy setUp may be deliberate, so this nudges rather than gates.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Setup bloat',
@@ -47,10 +48,10 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Find setup methods that exceed the configured size threshold.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized setup methods.
+     * @return list<Finding> - Findings for oversized setup methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

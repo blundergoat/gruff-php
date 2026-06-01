@@ -30,10 +30,11 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Describe the variable include security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a dynamic path is suspicious but often safe (allow-listed upstream), so warn not error.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Variable include or require path',
@@ -47,10 +48,10 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Find include and require expressions using dynamic paths.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for variable include paths.
+     * @return list<Finding> - Findings for variable include paths; empty when every include uses a fixed path.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -80,15 +81,19 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Treat literal paths and paths derived only from magic constants as fixed bootstrap includes.
      *
-     * @return bool True when the include path cannot vary from request or runtime data.
+     * @param Expr $expression - Include/require path expression, recursed into for concatenation and dirname() wrappers.
+     *
+     * @return bool - True when the include path cannot vary from request or runtime data.
      */
     private function isFixedIncludeExpression(Expr $expression): bool
     {
         if (SecurityNodeHelper::isStringLiteral($expression) || $expression instanceof Scalar\MagicConst\Dir || $expression instanceof Scalar\MagicConst\File) {
+            // String literals and __DIR__/__FILE__ resolve at compile time, so the path is fixed and attacker-proof.
             return true;
         }
 
         if ($expression instanceof Expr\BinaryOp\Concat) {
+            // A concatenation is only as fixed as its parts, so both sides must independently resolve to fixed paths.
             return $this->isFixedIncludeExpression($expression->left)
                 && $this->isFixedIncludeExpression($expression->right);
         }
@@ -96,14 +101,17 @@ final class VariableIncludeRule implements RuleInterface
         if ($expression instanceof Expr\FuncCall && SecurityNodeHelper::globalFunctionName($expression) === 'dirname') {
             $path = SecurityNodeHelper::argumentValue($expression->args, 0);
             if (!$path instanceof Expr || !$this->isFixedIncludeExpression($path)) {
+                // dirname() of a dynamic path is still dynamic, so the whole expression is not a fixed include.
                 return false;
             }
 
             $levels = SecurityNodeHelper::argumentValue($expression->args, 1);
 
+            // dirname() stays fixed only when the optional levels arg is omitted or an int literal, never a variable.
             return $levels === null || $levels instanceof Scalar\Int_;
         }
 
+        // Variables, function results, and other dynamic expressions can carry request data, so the path is not fixed.
         return false;
     }
 }

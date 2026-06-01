@@ -18,7 +18,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers single-implementor interface detection: internal one-impl flagging, mock-only flagging, configured exemptions, hierarchy and external-usage exemption, framework-attribute exemptions, and finding metadata.
+ * Covers single-implementor interface detection: internal one-impl flagging, mock-only flagging, configured exemptions, hierarchy and external-usage
+ * exemption, framework-attribute exemptions, and finding metadata.
  */
 final class SingleImplementorInterfaceRuleTest extends TestCase
 {
@@ -36,7 +37,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
         sort($symbols);
 
         self::assertContains(
@@ -58,7 +59,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertContains(
             'Fixtures\\Design\\SingleImplementor\\MockOnly\\BookingEventSinkInterface',
@@ -69,7 +70,8 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify configured interface exemption cases are not flagged.
      *
-     * @param string $symbol Interface symbol expected to be absent from findings.
+     * @param string $symbol - Interface symbol expected to be absent from findings.
+     *
      * @return void
      */
     #[DataProvider('configuredInterfaceExemptionProvider')]
@@ -77,7 +79,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains($symbol, $symbols);
     }
@@ -85,7 +87,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Provide interface symbols that are exempt from single-implementor findings.
      *
-     * @return iterable<string, array{0: string}>
+     * @return iterable<string, array{0: string}> - named PHPUnit data sets, each wrapping one interface FQCN that must stay absent from findings
      */
     public static function configuredInterfaceExemptionProvider(): iterable
     {
@@ -103,7 +105,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains(
             'Fixtures\\Design\\SingleImplementor\\InterfaceHierarchy\\CacheInterface',
@@ -136,7 +138,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\ReturnUsageInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\PropertyUsageInterface', $symbols);
@@ -155,7 +157,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     {
         $findings = $this->analyseFixtures();
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\MultipleAttributeInterface', $symbols);
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\MutationCases\\ContainsAttributeInterface', $symbols);
@@ -171,28 +173,30 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         $findings = $this->analyseFixtures();
 
         self::assertNotEmpty($findings);
-        $severityValues    = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
-        $pillarValues      = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
-        $implementorCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
+        $severityValues         = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
+        $pillarValues           = array_values(array_unique(array_map(static fn($finding): string => $finding->pillar->value, $findings)));
+        $implementorCounts      = array_values(array_unique(array_map(static function (Finding $finding): int {
             $implementorCount = $finding->metadata['implementorCount'] ?? null;
 
             self::assertIsInt($implementorCount);
 
+            // Yield the per-finding count so the outer unique() collapses it; the test asserts one value holds.
             return $implementorCount;
         }, $findings)));
-        $externalUsageCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
+        $externalUsageCounts    = array_values(array_unique(array_map(static function (Finding $finding): int {
             $externalUsageCount = $finding->metadata['externalUsageCount'] ?? null;
 
             self::assertIsInt($externalUsageCount);
 
+            // Yield the per-finding count so the outer unique() collapses it; the test asserts one value holds.
             return $externalUsageCount;
         }, $findings)));
-        $missingImplementorFqns = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['implementorFqn'] ?? null) === null));
-        $missingDecisions       = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['decision'] ?? null) === null));
+        $missingImplementorFqns = array_values(array_filter($findings, static fn($finding): bool => ($finding->metadata['implementorFqn'] ?? null) === null));
+        $missingDecisions       = array_values(array_filter($findings, static fn($finding): bool => ($finding->metadata['decision'] ?? null) === null));
         $missingExclusionHint   = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => !str_contains($finding->remediation ?? '', 'additionalExcludedPaths'),
-        ));
+                                                   $findings,
+                                                   static fn(Finding $finding): bool => !str_contains($finding->remediation ?? '', 'additionalExcludedPaths'),
+                                               ));
 
         self::assertSame([Severity::Advisory->value], $severityValues);
         self::assertSame([Pillar::Design->value], $pillarValues);
@@ -202,9 +206,9 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         self::assertSame([], $missingDecisions);
         self::assertSame([], $missingExclusionHint);
         self::assertSame([], array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => ($finding->metadata['interfaceFqn'] ?? null) !== $finding->symbol,
-        )));
+                                              $findings,
+                                              static fn(Finding $finding): bool => ($finding->metadata['interfaceFqn'] ?? null) !== $finding->symbol,
+                                          )));
     }
 
     /**
@@ -234,12 +238,12 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
                 enabled:    true,
                 thresholds: $settings->thresholds,
                 options:    array_merge($settings->options, [
-                    'additionalExcludedPaths' => [self::FIXTURE_DIR . '/internal-one-impl'],
-                ]),
+                                'additionalExcludedPaths' => [self::FIXTURE_DIR . '/internal-one-impl'],
+                            ]),
             ),
         );
         $findings = $this->analyseFixtures($config);
-        $symbols  = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $findings);
+        $symbols  = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $findings);
 
         self::assertNotContains('Fixtures\\Design\\SingleImplementor\\InternalOneImpl\\BookingOtpGatewayInterface', $symbols);
     }
@@ -247,12 +251,15 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Analyse design-rule fixtures and return findings for assertions.
      *
-     * @return list<Finding>
+     * @param AnalysisConfig|null $config - optional config override; null means stock rule defaults, so only the
+     *                                    exclusion-path test passes a custom one and every other test exercises the shipped behaviour.
+     *
+     * @return list<Finding> - findings from the single-implementor rule alone, re-indexed for assertions.
      */
     private function analyseFixtures(?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        $config ??= AnalysisConfig::fromRegistry($registry);
+        $config   ??= AnalysisConfig::fromRegistry($registry);
 
         $units       = $this->fixtureUnits();
         $allFindings = $registry->analyse(
@@ -261,15 +268,16 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
         );
 
         return array_values(array_filter(
-            $allFindings,
-            static fn (Finding $finding): bool => $finding->ruleId === SingleImplementorInterfaceRule::ID,
-        ));
+                                $allFindings,
+                                static fn(Finding $finding): bool => $finding->ruleId === SingleImplementorInterfaceRule::ID,
+                            ));
     }
 
     /**
      * Parse design-rule fixtures into analysis units.
      *
-     * @return list<AnalysisUnit>
+     * @return list<AnalysisUnit> - one parsed unit per fixture file, in declaration order, fed as a single batch so the rule can resolve
+     *                            implementors across files
      */
     private function fixtureUnits(): array
     {

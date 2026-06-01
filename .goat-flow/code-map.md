@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-24. Captures the v0.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-06-01. Captures the v0.3.0 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -128,9 +128,18 @@ src/
 |   |   |-- CyclomaticComplexityRule.php      = `complexity.cyclomatic`
 |   |   |-- HalsteadVolumeRule.php            = `complexity.halstead-volume`
 |   |   |-- MaintainabilityIndexRule.php      = `complexity.maintainability-index` (Maintainability pillar)
-|   |   |-- NestingDepthRule.php              = `complexity.nesting-depth`
-|   |   `-- NpathComplexityRule.php           = `complexity.npath`
+|   |   `-- NestingDepthRule.php              = `complexity.nesting-depth`
 |   |-- DeadCode/
+|   |   |-- AbstractUnusedInternalSymbolRule.php = shared `ProjectRuleAccumulator` base for internal class/function/constant dead-code rules
+|   |   |-- DeadCodeNameResolver.php       = declaration/reference FQN resolver for project-wide dead-code summaries
+|   |   |-- DeadCodeProjectIndex.php        = project-wide declaration/reference summary index derived from Composer/configured internal namespace ownership
+|   |   |-- DeadCodeProjectScope.php        = per-run ownership, entrypoint, exclusion, framework-attribute, and test-reference policy for project-wide dead-code checks
+|   |   |-- DeadCodeSymbolDeclaration.php   = typed declaration summary used by the project-wide dead-code index
+|   |   |-- DeadCodeSymbolReference.php     = typed reference summary used by the project-wide dead-code index
+|   |   |-- UnusedInternalClassRule.php     = `dead-code.unused-internal-class`
+|   |   |-- UnusedInternalConstantRule.php  = `dead-code.unused-internal-constant`
+|   |   |-- UnusedInternalFunctionRule.php  = `dead-code.unused-internal-function`
+|   |   |-- UnusedPrivateConstantRule.php   = `dead-code.unused-private-constant`
 |   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
 |   |-- Design/
@@ -145,7 +154,9 @@ src/
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag` (flags any documented method/function without `@return`, excluding constructors/destructors)
 |   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
+|   |   |-- PhpdocTagText.php                 = shared PHPDoc tag-text parsing for docs.bare-phpdoc-tags and docs.return-comment
 |   |   |-- RegexCommentRule.php              = `docs.regex-comment` (requires an immediate one-line comment explaining configured regex matcher calls, defaulting to `preg_match`)
+|   |   |-- ReturnCommentRule.php             = `docs.return-comment` (flags value-returning function-like declarations whose existing `@return` tag has no description)
 |   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
 |   |   |-- TodoDensityRule.php               = `docs.todo-density`
 |   |   |-- BarePhpdocTagsRule.php            = `docs.bare-phpdoc-tags`
@@ -181,13 +192,15 @@ src/
 |   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern` (common provider token patterns)
 |   |   |-- AwsAccessKeyRule.php              = `sensitive-data.aws-access-key`
 |   |   |-- DatabaseUrlPasswordRule.php       = `sensitive-data.database-url-password`
+|   |   |-- GcpServiceAccountKeyRule.php     = `sensitive-data.gcp-service-account-key`
 |   |   |-- HardcodedEnvValueRule.php         = `sensitive-data.hardcoded-env-value`
 |   |   |-- HighEntropyStringRule.php         = `sensitive-data.high-entropy-string`
 |   |   |-- JwtTokenRule.php                  = `sensitive-data.jwt-token`
 |   |   |-- PhiPatternRule.php                = `sensitive-data.phi-pattern`
 |   |   |-- PiiTestFixtureRule.php            = `sensitive-data.pii-test-fixture`
 |   |   |-- PrivateKeyRule.php                = `sensitive-data.private-key`
-|   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the sensitive-data pack
+|   |   |-- SecretScannerHelper.php           = shared regex/entropy/redaction helpers for the sensitive-data pack
+|   |   `-- UrlEmbeddedCredentialsRule.php    = `sensitive-data.url-credentials`
 |   |-- Security/                             = AST-driven heuristic rules plus scoped source-text workflow checks
 |   |   |-- DangerousFunctionCallRule.php     = `security.dangerous-function-call`
 |   |   |-- DisabledSslVerificationRule.php   = `security.disabled-ssl-verification`
@@ -262,7 +275,6 @@ src/
 |       |-- UnusedImportRule.php              = `waste.unused-import`
 |       `-- UnusedParameterRule.php           = `waste.unused-parameter`
 |-- Scoring/
-|   |-- CompositeFindingFactory.php           = emits `design.god-method` from overlapping size + complexity findings
 |   |-- FileScore.php                         = per-file top-offender score value
 |   |-- Grade.php                             = A-F grade helper around 0-100 scores
 |   |-- PillarScore.php                       = per-pillar score/count/penalty value
@@ -306,7 +318,8 @@ tests/
 |-- Reporting/
 |   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
 |-- Review/
-|   `-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
+|   |-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
+|   `-- AgentWorkflowDeadCodeCliTest.php      = branch-review changed-only coverage for project-wide dead-code rules
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
@@ -317,12 +330,14 @@ tests/
 |   |   |-- CyclomaticComplexityRuleTest.php
 |   |   `-- NestingDepthRuleTest.php
 |   |-- DeadCode/
-|   |   `-- DeadCodeRulesTest.php
+|   |   |-- DeadCodeRulesTest.php
+|   |   `-- ProjectDeadCodeRulesTest.php
 |   |-- Docs/
 |   |   `-- DocsRulesTest.php
 |   |-- Naming/
 |   |   `-- NamingRulesTest.php
 |   |-- SensitiveData/
+|   |   |-- SensitiveDataExpansionRulesTest.php
 |   |   `-- SensitiveDataRulesTest.php
 |   |-- Security/
 |   |   `-- SecurityRulesTest.php
@@ -337,7 +352,7 @@ tests/
 |   `-- Waste/
 |       `-- WasteRulesTest.php
 |-- Scoring/
-|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring, design composite findings
+|   `-- ScoreCalculatorTest.php               = grade boundaries, optional mutation behavior, security penalties, profile-scoped scoring
 `-- Fixtures/                                 = pillar-organised fixture tree (no milestone prefixes; descriptive subdirs)
     |-- Cli/Golden/                           = CLI reporting: text + json golden snapshots
     |-- Complexity/                           = complexity-rule source fixtures
@@ -425,5 +440,5 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
-- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings, and scoring composites can emit Design findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality, Design. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

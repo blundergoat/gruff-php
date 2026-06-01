@@ -14,8 +14,9 @@ final readonly class FindingReviewIdentity
     /**
      * Build the comparison key used to match findings across branch reviews.
      *
-     * @param Finding $finding Finding to identify for branch review comparison.
-     * @return string Null-delimited finding identity key.
+     * @param Finding $finding - Finding to identify for branch review comparison.
+     *
+     * @return string - Null-delimited finding identity key.
      */
     public function key(Finding $finding): string
     {
@@ -27,6 +28,7 @@ final readonly class FindingReviewIdentity
                 (string) ($finding->column ?? 0),
             ]);
 
+        // NUL joins fields so a path or message containing a colon cannot collide with another finding's key.
         return implode("\0", [
             $finding->filePath,
             $finding->ruleId,

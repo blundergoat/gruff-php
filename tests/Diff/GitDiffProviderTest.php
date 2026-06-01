@@ -9,16 +9,21 @@ use GruffPhp\Diff\DiffException;
 use GruffPhp\Diff\DiffFindingFilter;
 use GruffPhp\Diff\DiffResult;
 use GruffPhp\Diff\GitDiffProvider;
+use GruffPhp\Diff\UnifiedDiffParser;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
+use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Parser\PhpFileParser;
+use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter scope, and rejection of unsafe base refs.
+ * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter
+ * scope, and rejection of unsafe base refs.
  */
 final class GitDiffProviderTest extends TestCase
 {
@@ -37,7 +42,7 @@ final class GitDiffProviderTest extends TestCase
             changedFiles: ['src/Example.php'],
             message:      'test',
         );
-        $findings = [
+        $findings   = [
             $this->finding('src/Example.php', 11),
             $this->finding('src/Example.php', 20),
             $this->finding('src/Other.php', 11),
@@ -253,7 +258,7 @@ final class GitDiffProviderTest extends TestCase
             changedFiles: ['src/Example.php'],
             message:      'test',
         );
-        $findings = [
+        $findings   = [
             $this->finding('src/Example.php', 20),
             $this->finding('src/Other.php', 20),
         ];
@@ -274,6 +279,159 @@ final class GitDiffProviderTest extends TestCase
         $findings = [$this->finding('src/Example.php', 20)];
 
         self::assertSame($findings, (new DiffFindingFilter())->filter($findings, DiffResult::inactive()));
+    }
+
+    /**
+     * Verify symbol scope keeps a signature-line finding when the changed hunk is inside the method body.
+     *
+     * @return void
+     */
+    public function testDiffFindingFilterSymbolScopeKeepsSignatureFindingForChangedBody(): void
+    {
+        $unit       = $this->analysisUnit('src/Example.php', $this->symbolScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(11, 11)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+        $findings   = [
+            $this->finding('src/Example.php', 4),
+            $this->finding('src/Example.php', 9),
+        ];
+
+        $result = (new DiffFindingFilter())->apply($findings, $diffResult, [$unit], DiffFindingFilter::SCOPE_SYMBOL);
+
+        self::assertCount(1, $result->findings);
+        self::assertSame(9, $result->findings[0]->line);
+        self::assertSame(1, $result->suppressedCount);
+    }
+
+    /**
+     * Verify hunk scope keeps only findings whose own location overlaps a changed hunk.
+     *
+     * @return void
+     */
+    public function testDiffFindingFilterHunkScopeExcludesSignatureFindingForChangedBody(): void
+    {
+        $unit       = $this->analysisUnit('src/Example.php', $this->symbolScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(11, 11)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+
+        $result = (new DiffFindingFilter())->apply(
+            [$this->finding('src/Example.php', 9)],
+            $diffResult,
+            [$unit],
+            DiffFindingFilter::SCOPE_HUNK,
+        );
+
+        self::assertSame([], $result->findings);
+        self::assertSame(1, $result->suppressedCount);
+    }
+
+    /**
+     * Verify symbol scope widens to the owning method, not an inner control-flow block.
+     *
+     * @return void
+     */
+    public function testDiffFindingFilterSymbolScopeUsesOwningMethodNotControlFlowBlock(): void
+    {
+        $unit       = $this->analysisUnit('src/Example.php', $this->controlFlowScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(9, 9)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+
+        $result = (new DiffFindingFilter())->apply(
+            [$this->finding('src/Example.php', 7)],
+            $diffResult,
+            [$unit],
+            DiffFindingFilter::SCOPE_SYMBOL,
+        );
+
+        self::assertCount(1, $result->findings);
+        self::assertSame(7, $result->findings[0]->line);
+        self::assertSame(0, $result->suppressedCount);
+    }
+
+    /**
+     * Provide unified-diff parser cases for changed-line range assertions.
+     *
+     * @return array<string, array{string, int, int}> - patch text plus the expected start and end line.
+     */
+    public static function unifiedDiffPatchProvider(): array
+    {
+        return [
+            'added lines' => [
+                <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -10,0 +11,2 @@
++        $value = 1;
++        echo $value;
+PATCH,
+                11,
+                12,
+            ],
+            'context lines ignored' => [
+                <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -10,3 +10,3 @@
+         $before = 1;
+-        $value = 1;
++        $value = 2;
+         $after = 3;
+PATCH,
+                11,
+                11,
+            ],
+            'deletion-only anchor' => [
+                <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -20,2 +20,0 @@
+-        $old = 1;
+-        $gone = 2;
+PATCH,
+                20,
+                20,
+            ],
+        ];
+    }
+
+    /**
+     * Verify unified diff parsing exposes changed files and added-line ranges.
+     *
+     * @param string $patch - Unified diff patch text.
+     * @param int    $expectedStart - Expected range start line.
+     * @param int    $expectedEnd - Expected range end line.
+     *
+     * @return void
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('unifiedDiffPatchProvider')]
+    public function testUnifiedDiffParserParsesChangedLineRanges(string $patch, int $expectedStart, int $expectedEnd): void
+    {
+        $parsed = (new UnifiedDiffParser())->parse($patch);
+
+        self::assertSame(['src/Example.php'], $parsed['files']);
+        self::assertCount(1, $parsed['lines']['src/Example.php'] ?? []);
+        self::assertSame(['start' => $expectedStart, 'end' => $expectedEnd], $parsed['lines']['src/Example.php'][0]->toArray());
     }
 
     /**
@@ -298,22 +456,23 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Provide unsafe diff mode cases for parameterized tests.
      *
-     * @return array<string, array{string}>
+     * @return array<string, array{string}> - dataset keyed by case label, each row holding one ref the provider must reject as unsafe
      */
     public static function unsafeDiffModeProvider(): array
     {
         return [
-            'no-renames option' => ['--no-renames'],
+            'no-renames option'  => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
             'leading hyphen ref' => ['-x'],
-            'whitespace ref' => ['feature branch'],
+            'whitespace ref'     => ['feature branch'],
         ];
     }
 
     /**
      * Verify Git diff provider rejects unsafe base refs.
      *
-     * @param string $mode Unsafe diff mode argument.
+     * @param string $mode - Unsafe diff mode argument.
+     *
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
@@ -337,9 +496,10 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string $filePath Finding file path.
-     * @param int    $line     Finding line number.
-     * @return Finding
+     * @param string $filePath - Finding file path.
+     * @param int    $line - Finding line number.
+     *
+     * @return Finding - an advisory missing-public-phpdoc finding fixed at the given path and line for filter assertions
      */
     private function finding(string $filePath, int $line): Finding
     {
@@ -353,6 +513,69 @@ final class GitDiffProviderTest extends TestCase
             tier:       RuleTier::V01,
             confidence: Confidence::High,
         );
+    }
+
+    /**
+     * Build an analysis unit fixture for changed-region filtering assertions.
+     *
+     * @param string $displayPath - Reporting path the parsed unit should carry in findings.
+     * @param string $source - PHP source the fixture unit is parsed from.
+     *
+     * @return AnalysisUnit - the unit parsed from the source, reported under the supplied display path
+     */
+    private function analysisUnit(string $displayPath, string $source): AnalysisUnit
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-unit-');
+        self::assertIsString($path);
+        file_put_contents($path, $source);
+
+        try {
+            return (new PhpFileParser())->parse(new SourceFile($path, $displayPath));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /**
+     * @return string - PHP source declaring one edited and one untouched sibling method for scope filtering
+     */
+    private function symbolScopeSource(): string
+    {
+        return <<<'PHP'
+<?php
+final class Example
+{
+    public function unchanged(): void
+    {
+        echo 'old';
+    }
+
+    public function changed(): void
+    {
+        echo 'new';
+    }
+}
+PHP;
+    }
+
+    /**
+     * @return string - PHP source with a finding inside an if block and an edit elsewhere in the same method
+     */
+    private function controlFlowScopeSource(): string
+    {
+        return <<<'PHP'
+<?php
+final class Example
+{
+    public function changed(): void
+    {
+        if (true) {
+            echo 'old';
+        }
+        echo 'new';
+    }
+}
+PHP;
     }
 
     /**
@@ -373,7 +596,7 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to a freshly created, unique temporary directory for a fixture repository
      */
     private function tempDir(): string
     {
@@ -387,8 +610,9 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
+     *
      * @return void
      */
     private function runGit(string $cwd, string ...$args): void
@@ -402,7 +626,8 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Initialise a repository with two committed PHP files.
      *
-     * @param string $tempDir Fixture repository root.
+     * @param string $tempDir - Fixture repository root.
+     *
      * @return void
      */
     private function initialiseRepository(string $tempDir): void
@@ -419,12 +644,14 @@ final class GitDiffProviderTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 

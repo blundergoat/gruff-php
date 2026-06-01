@@ -12,40 +12,43 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 119
+Total rules: 132
 
 ## Summary By Pillar
 
 | Pillar | Rules |
 | --- | ---: |
-| `complexity` | 5 |
-| `dead-code` | 9 |
+| `complexity` | 4 |
+| `dead-code` | 13 |
 | `design` | 1 |
-| `documentation` | 14 |
+| `documentation` | 15 |
 | `maintainability` | 2 |
 | `modernisation` | 10 |
 | `naming` | 11 |
-| `security` | 18 |
-| `sensitive-data` | 9 |
+| `security` | 25 |
+| `sensitive-data` | 11 |
 | `size` | 7 |
 | `test-quality` | 33 |
 
 ## Rule Catalogue
 
-### `complexity` (5)
+### `complexity` (4)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `complexity.cognitive` | Cognitive complexity | `error` | `high` | yes |
-| `complexity.cyclomatic` | Cyclomatic complexity | `error` | `high` | yes |
-| `complexity.halstead-volume` | Halstead volume | `error` | `medium` | yes |
+| `complexity.cyclomatic` | Cyclomatic complexity | `warning` | `high` | yes |
+| `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
-| `complexity.npath` | NPath complexity | `error` | `high` | yes |
 
-### `dead-code` (9)
+### `dead-code` (13)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
+| `dead-code.unused-internal-class` | Unused internal class-like | `advisory` | `medium` | yes |
+| `dead-code.unused-internal-constant` | Unused internal constant | `advisory` | `medium` | yes |
+| `dead-code.unused-internal-function` | Unused internal function | `advisory` | `medium` | yes |
+| `dead-code.unused-private-constant` | Unused private constant | `warning` | `high` | yes |
 | `dead-code.unused-private-method` | Unused private method | `warning` | `high` | yes |
 | `dead-code.unused-private-property` | Unused private property | `warning` | `high` | yes |
 | `waste.commented-out-code` | Commented-out code | `advisory` | `medium` | yes |
@@ -77,6 +80,7 @@ Total rules: 119
 | `docs.missing-return-tag` | Missing @return tag | `advisory` | `high` | yes |
 | `docs.missing-throws-tag` | Missing @throws tag | `advisory` | `medium` | yes |
 | `docs.regex-comment` | Regex comment | `advisory` | `medium` | yes |
+| `docs.return-comment` | Described return tag | `advisory` | `high` | yes |
 | `docs.stale-param-tag` | Stale @param tag | `warning` | `high` | yes |
 | `docs.todo-density` | TODO/FIXME density | `error` | `high` | yes |
 | `docs.var-annotation-description` | Var annotation description | `warning` | `high` | yes |
@@ -85,7 +89,7 @@ Total rules: 119
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `complexity.maintainability-index` | Maintainability index | `error` | `medium` | yes |
+| `complexity.maintainability-index` | Maintainability index | `advisory` | `medium` | yes |
 | `waste.one-line-method` | One-line method | `advisory` | `medium` | yes |
 
 `waste.one-line-method` ships with `minInFileCallers: 2` and
@@ -142,11 +146,16 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
 
-### `security` (18)
+### `security` (25)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `security.dangerous-function-call` | Dangerous function calls | `warning` | `medium` | yes |
+| `security.debug-mode-enabled` | Debug error display enabled | `warning` | `medium` | yes |
+| `security.dependency-composer-path` | Composer path repository | `warning` | `medium` | yes |
+| `security.dependency-composer-script` | Composer install-time shell script | `warning` | `medium` | yes |
+| `security.dependency-composer-unpinned` | Unpinned Composer dependency constraint | `warning` | `medium` | yes |
+| `security.dependency-composer-vcs` | Composer VCS repository | `warning` | `medium` | yes |
 | `security.disabled-ssl-verification` | Disabled SSL verification | `warning` | `high` | yes |
 | `security.error-suppression` | Error suppression operator | `warning` | `high` | yes |
 | `security.extract-compact-user-input` | extract or compact on request data | `warning` | `medium` | yes |
@@ -154,7 +163,9 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `security.header-injection` | Header injection risk | `warning` | `medium` | yes |
 | `security.insecure-random` | Insecure random source | `warning` | `high` | yes |
 | `security.path-traversal-file-access` | Path traversal file access | `warning` | `medium` | yes |
+| `security.permissive-cors` | Permissive CORS with credentials | `warning` | `medium` | yes |
 | `security.process-command-construction` | Process command construction | `warning` | `medium` | yes |
+| `security.reflected-xss` | Reflected XSS sink | `warning` | `medium` | yes |
 | `security.request-controlled-url` | Request-controlled URL | `warning` | `medium` | yes |
 | `security.sensitive-data-logging` | Sensitive data logging | `warning` | `medium` | yes |
 | `security.silent-catch` | Silent catch block | `warning` | `high` | yes |
@@ -165,19 +176,21 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
 | `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
 
-### `sensitive-data` (9)
+### `sensitive-data` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
 | `sensitive-data.api-key-pattern` | Common API key pattern | `warning` | `high` | yes |
 | `sensitive-data.aws-access-key` | AWS access key | `warning` | `high` | yes |
 | `sensitive-data.database-url-password` | Database URL password | `warning` | `high` | yes |
+| `sensitive-data.gcp-service-account-key` | GCP service-account key | `warning` | `high` | yes |
 | `sensitive-data.hardcoded-env-value` | Hardcoded environment value | `warning` | `medium` | yes |
 | `sensitive-data.high-entropy-string` | High entropy string | `warning` | `medium` | yes |
 | `sensitive-data.jwt-token` | JWT token literal | `warning` | `medium` | yes |
 | `sensitive-data.phi-pattern` | PHI identifier pattern | `warning` | `medium` | yes |
 | `sensitive-data.pii-test-fixture` | PII in test fixture | `warning` | `medium` | yes |
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
+| `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
 
 ### `size` (7)
 

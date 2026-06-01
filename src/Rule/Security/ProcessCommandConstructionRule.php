@@ -30,10 +30,11 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Describe the process command construction rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning severity at medium confidence: request-tainted process commands are a likely RCE sink, not certain.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Process command construction',
@@ -47,10 +48,10 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Find process commands that include request-controlled expressions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for request-controlled process commands.
+     * @return list<Finding> - Findings for request-controlled process commands.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -93,10 +94,16 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Build the process command finding.
      *
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
+     * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
+     * @param string       $sink - Sink discriminator (shell-exec, symfony-process, process-shell-commandline)
+     *                                   echoed into the message and metadata so a reviewer sees which construct fired.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Emit a fixed warning: every caller already confirmed the sink carries request-controlled data.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Process command construction with request-controlled data detected: %s.', $sink),

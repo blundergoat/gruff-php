@@ -43,15 +43,15 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     public function testRepeatedStructuresAreFoundAfterNonCandidates(): void
     {
         $findings = $this->analyse('repeated-structure-mutation-cases.php');
-        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertSame([
-            'ContinuePastNonTestMethodTest::testAlpha()',
-            'ContinuePastShortMethodTest::testAlpha()',
-            'ContinuePastProviderTest::testShapeAlpha()',
-            'ContinuePastSmallGroupTest::testRealAlpha()',
-            'NonProviderAttributeStillAnalysedTest::testDecoratedAlpha()',
-        ], $symbols);
+                             'ContinuePastNonTestMethodTest::testAlpha()',
+                             'ContinuePastShortMethodTest::testAlpha()',
+                             'ContinuePastProviderTest::testShapeAlpha()',
+                             'ContinuePastSmallGroupTest::testRealAlpha()',
+                             'NonProviderAttributeStillAnalysedTest::testDecoratedAlpha()',
+                         ], $symbols);
     }
 
     /**
@@ -77,8 +77,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse and analyse a repeated-structure fixture.
      *
-     * @param string $fixture Fixture filename.
-     * @return list<Finding> Findings emitted by the rule.
+     * @param string $fixture - Fixture filename.
+     *
+     * @return list<Finding> - rule findings for the fixture, ordered as the rule emits them, empty when none match
      */
     private function analyse(string $fixture): array
     {
@@ -93,8 +94,9 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return AnalysisUnit - the parsed fixture with its display path kept repo-relative for finding output
      */
     private function parseFixture(string $filename): AnalysisUnit
     {

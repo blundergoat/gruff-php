@@ -32,7 +32,10 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string $fixture - Fixture filename under tests/Fixtures/Naming.
+     * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings emitted by the named rule, in detection order; empty when the fixture is clean
      */
     protected function analyseRule(string $fixture, string $ruleId): array
     {
@@ -41,13 +44,18 @@ abstract class NamingRuleTestCase extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        return array_values(array_filter($findings, static fn ($finding): bool => $finding->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn($finding): bool => $finding->ruleId === $ruleId));
     }
 
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string $source - Inline PHP written to a throwaway temp file before parsing.
+     * @param string $ruleId - Rule id to keep; findings from every other rule are discarded.
+     * @param string $displayPath - Path the rule sees, letting a test exercise path-sensitive naming checks.
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings emitted by the named rule for the inline source, in detection order; empty when no
+     *                                         violation fires
      */
     protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
     {
@@ -62,7 +70,7 @@ abstract class NamingRuleTestCase extends TestCase
             $config   = AnalysisConfig::fromRegistry($registry);
             $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-            return array_values(array_filter($findings, static fn ($finding): bool => $finding->ruleId === $ruleId));
+            return array_values(array_filter($findings, static fn($finding): bool => $finding->ruleId === $ruleId));
         } finally {
             if (is_file($path)) {
                 unlink($path);
@@ -73,8 +81,9 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename.
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for rule analysis, carrying its repo-relative display path
      */
     protected function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

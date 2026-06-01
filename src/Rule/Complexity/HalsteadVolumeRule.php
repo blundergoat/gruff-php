@@ -35,28 +35,31 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Describe the Halstead-volume rule for the registry and reports.
      *
-     * @return RuleDefinition Rule metadata and default thresholds.
+     * @return RuleDefinition - identity, pillar, tier, and the default advisory volume threshold the registry reads
      */
     public function definition(): RuleDefinition
     {
+        // Advisory: high volume is a weigh-it signal, not proof of a defect, so it ships at the lowest severity tier
+        // and sorts below warnings/errors. The shipped --fail-on default is advisory, so this does fail the gate;
+        // a consumer who wants it non-blocking raises --fail-on to warning.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Halstead volume',
             pillar:            Pillar::Complexity,
             tier:              RuleTier::V01,
-            defaultSeverity:   Severity::Error,
+            defaultSeverity:   Severity::Advisory,
             confidence:        Confidence::Medium,
-            severityThreshold: new SeverityThreshold(8000, Severity::Error),
+            severityThreshold: new SeverityThreshold(8000, Severity::Advisory),
         );
     }
 
     /**
      * Detect functions and methods whose Halstead volume exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Halstead-volume findings for the analysed unit.
+     * @return list<Finding> - one finding per function-like node over threshold, empty when every node stayed under
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -80,14 +83,14 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
             $findings[] = new Finding(
-                ruleId:  $definition->id,
-                message: sprintf(
-                    '%s has a Halstead volume of %.1f, above the %s threshold of %s.',
-                    $symbol,
-                    $volume,
-                    $thresholdMatch->severity->value,
-                    self::formatNumber($thresholdMatch->threshold),
-                ),
+                ruleId:           $definition->id,
+                message:          sprintf(
+                                      '%s has a Halstead volume of %.1f, above the %s threshold of %s.',
+                                      $symbol,
+                                      $volume,
+                                      $thresholdMatch->severity->value,
+                                      self::formatNumber($thresholdMatch->threshold),
+                                  ),
                 filePath:         $analysisUnit->file->displayPath,
                 line:             $node->getStartLine(),
                 severity:         $thresholdMatch->severity,
@@ -99,14 +102,14 @@ final readonly class HalsteadVolumeRule implements RuleInterface
                 remediation:      'Simplify logic or extract sub-expressions to reduce information content.',
                 secondaryPillars: $definition->secondaryPillars,
                 metadata:         [
-                    'volume' => round($volume, 1),
-                    'difficulty' => round($metrics['difficulty'], 1),
-                    'effort' => round($metrics['effort'], 1),
-                    'vocabulary' => $metrics['vocabulary'],
-                    'length' => $metrics['length'],
-                    'threshold' => $thresholdMatch->threshold,
-                    'thresholdType' => $thresholdMatch->severity->value,
-                ],
+                                      'volume'        => round($volume, 1),
+                                      'difficulty'    => round($metrics['difficulty'], 1),
+                                      'effort'        => round($metrics['effort'], 1),
+                                      'vocabulary'    => $metrics['vocabulary'],
+                                      'length'        => $metrics['length'],
+                                      'threshold'     => $thresholdMatch->threshold,
+                                      'thresholdType' => $thresholdMatch->severity->value,
+                                  ],
             );
         }
 
@@ -116,8 +119,10 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Compute Halstead volume inputs for one function-like node.
      *
-     * @param ClassMethod|Function_ $node
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
+     * @param ClassMethod|Function_ $node - Function-like node whose body supplies the operator and operand counts.
+     *
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the full Halstead set for the node; a trivial
+     *                       body yields all-zero figures that trip no threshold
      */
     public static function computeHalsteadMetrics(Node $node): array
     {
@@ -129,6 +134,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         if (isset($metricsCache[$node])) {
             $cached = self::validatedMetrics($metricsCache[$node]);
             if ($cached !== null) {
+                // Reuse the prior result for this node; the maintainability rule re-asks for the same metrics.
                 return $cached;
             }
         }
@@ -161,11 +167,16 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Return Halstead metrics only when enough operands and operators exist.
      *
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null
+     * @param mixed $rawMetrics - Value previously stored in the WeakMap cache; trusted to be a metrics array but
+     *                          re-validated because the cache is untyped and a malformed entry must be recomputed.
+     *
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null - the validated metrics, or null when the
+     *                       cache entry is missing a field or mistyped and must be recomputed
      */
     private static function validatedMetrics(mixed $rawMetrics): ?array
     {
         if (!is_array($rawMetrics)) {
+            // Cache entry is not even an array; null tells the caller to recompute from scratch.
             return null;
         }
 
@@ -176,37 +187,41 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $length     = $rawMetrics['length'] ?? null;
 
         if (!is_float($volume) || !is_float($difficulty) || !is_float($effort) || !is_int($vocabulary) || !is_int($length)) {
+            // A field is missing or mistyped, so the entry is unusable; null forces a recompute.
             return null;
         }
 
         return [
-            'volume' => $volume,
+            'volume'     => $volume,
             'difficulty' => $difficulty,
-            'effort' => $effort,
+            'effort'     => $effort,
             'vocabulary' => $vocabulary,
-            'length' => $length,
+            'length'     => $length,
         ];
     }
 
     /**
      * Classify a node as a Halstead operator when it contributes executable structure.
      *
-     * @return string|null Stable operator key, or null when the node is not an operator.
+     * @param Node $node - Any AST node visited while walking the body; only control-flow and operator nodes count.
+     *
+     * @return string|null - operator class name keying each distinct operator kind, or null when the node is not an operator
      */
     private static function operatorKey(Node $node): ?string
     {
+        // Binary/assign ops and control-flow statements are the operators; the class name keys each distinct kind.
         return match (true) {
             $node instanceof BinaryOp,
-            $node instanceof Expr\AssignOp,
-            $node instanceof Expr\Assign,
-            $node instanceof Stmt\If_,
-            $node instanceof Stmt\For_,
-            $node instanceof Stmt\Foreach_,
-            $node instanceof Stmt\While_,
-            $node instanceof Stmt\Do_,
-            $node instanceof Stmt\Switch_,
-            $node instanceof Stmt\Catch_,
-            $node instanceof Stmt\Return_ => $node::class,
+                $node instanceof Expr\AssignOp,
+                $node instanceof Expr\Assign,
+                $node instanceof Stmt\If_,
+                $node instanceof Stmt\For_,
+                $node instanceof Stmt\Foreach_,
+                $node instanceof Stmt\While_,
+                $node instanceof Stmt\Do_,
+                $node instanceof Stmt\Switch_,
+                $node instanceof Stmt\Catch_,
+                $node instanceof Stmt\Return_ => $node::class,
             default => null,
         };
     }
@@ -214,10 +229,13 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Classify a node as a Halstead operand when it contributes a value reference.
      *
-     * @return string|null Stable operand key, or null when the node is not an operand.
+     * @param Node $node - Any AST node visited while walking the body; only variables, scalars, and params count.
+     *
+     * @return string|null - operand key collapsing repeats of the same value, or null when the node is not an operand
      */
     private static function operandKey(Node $node): ?string
     {
+        // Operands are named variables, scalar literals, and params; the key collapses repeats of the same value.
         return match (true) {
             $node instanceof Expr\Variable => is_string($node->name) ? '$' . $node->name : null,
             $node instanceof Node\Scalar => 'scalar:' . $node::class,
@@ -229,21 +247,33 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Build the operand key for a function or method parameter.
      *
-     * @return string|null Parameter operand key, or null for unsupported parameter shapes.
+     * @param Node\Param $parameter - Declared parameter; only a plain `$name` variable yields a key, so destructured
+     *                              or expression-named params are skipped.
+     *
+     * @return string|null - the `$name` operand key, or null for destructured or dynamic-named params with no name
      */
     private static function parameterOperandKey(Node\Param $parameter): ?string
     {
         if (!$parameter->var instanceof Expr\Variable) {
+            // Not a simple variable (e.g. an error-recovery node), so it carries no operand name.
             return null;
         }
 
+        // Share the variable operand key shape ($name); a dynamic ${$expr} name has no static key, so null.
         return is_string($parameter->var->name) ? '$' . $parameter->var->name : null;
     }
 
     /**
      * Calculate Halstead metrics from operator and operand counts.
      *
-     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}
+     * @param int $uniqueOperators - Distinct operator kinds (n1); drives vocabulary and the difficulty numerator.
+     * @param int $uniqueOperands - Distinct operand names (n2); a zero short-circuits to the empty-metrics result
+     *                             to avoid dividing by it in the difficulty term.
+     * @param int $totalOperators - Every operator occurrence (N1), counting repeats; feeds program length.
+     * @param int $totalOperands - Every operand occurrence (N2), counting repeats; a zero also yields empty metrics.
+     *
+     * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the computed metrics; all-zero when vocabulary
+     *                       or operand counts are zero so log() and the difficulty division stay defined
      */
     private static function metricsForCounts(int $uniqueOperators, int $uniqueOperands, int $totalOperators, int $totalOperands): array
     {
@@ -251,6 +281,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $vocabulary = $uniqueOperators + $uniqueOperands;
 
         if ($vocabulary === 0 || $uniqueOperands === 0 || $totalOperands === 0) {
+            // Trivial body: zeroes keep log() and the difficulty division below defined, never tripping a threshold.
             return ['volume' => 0.0, 'difficulty' => 0.0, 'effort' => 0.0, 'vocabulary' => 0, 'length' => 0];
         }
 
@@ -258,25 +289,27 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $difficulty = ($uniqueOperators / 2) * ($totalOperands / $uniqueOperands);
 
         return [
-            'volume' => $volume,
+            'volume'     => $volume,
             'difficulty' => $difficulty,
-            'effort' => $volume * $difficulty,
+            'effort'     => $volume * $difficulty,
             'vocabulary' => $vocabulary,
-            'length' => $length,
+            'length'     => $length,
         ];
     }
 
     /**
      * Render a configured numeric threshold for finding messages.
      *
-     * @return string The threshold without unnecessary decimal places.
+     * @param int|float $number - Configured volume threshold; an integral float is shown without its ".0" tail.
+     *
+     * @return string - the threshold for the message, with an integral float's ".0" dropped and real fractions kept
      */
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            return (string) $number;
+            return (string)$number;
         }
 
-        return (string) (int) $number;
+        return (string)(int)$number;
     }
 }

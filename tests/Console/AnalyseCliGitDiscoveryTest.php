@@ -92,8 +92,9 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Run a git command in a temporary project.
      *
-     * @param string       $project Project root.
-     * @param list<string> $args    Git arguments.
+     * @param string       $project - Project root.
+     * @param list<string> $args - Git arguments.
+     *
      * @return void
      */
     private function runGit(string $project, array $args): void
@@ -107,9 +108,10 @@ final class AnalyseCliGitDiscoveryTest extends CliTestCase
     /**
      * Write a temporary project file, creating parent directories as needed.
      *
-     * @param string $project  Project root.
-     * @param string $path     Project-relative path.
-     * @param string $contents File contents.
+     * @param string $project - Project root.
+     * @param string $path - Project-relative path.
+     * @param string $contents - File contents.
+     *
      * @return void
      */
     private function writeProjectFile(string $project, string $path, string $contents): void

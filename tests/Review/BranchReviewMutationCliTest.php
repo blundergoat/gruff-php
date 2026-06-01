@@ -20,6 +20,7 @@ final class BranchReviewMutationCliTest extends TestCase
      * Verify branch review score delta ignores mutation-only score inputs.
      *
      * @throws JsonException When CLI JSON output cannot be decoded.
+     *
      * @return void
      */
     public function testBranchReviewDeltaExcludesMutationInput(): void
@@ -71,10 +72,11 @@ final class BranchReviewMutationCliTest extends TestCase
     /**
      * Return a minimal Infection report with non-perfect mutation score.
      *
-     * @return string JSON report fixture.
+     * @return string - JSON report fixture.
      */
     private function infectionReportJson(): string
     {
+        // One killed and one escaped mutant pin msi to 50.0, the non-perfect score the delta-score assertion expects.
         return <<<'JSON'
 {
   "stats": {
@@ -121,7 +123,9 @@ JSON;
     /**
      * Decode CLI JSON output into a string-keyed payload.
      *
-     * @return array<string, mixed> Decoded CLI report.
+     * @param Process $process - finished CLI process whose stdout must hold the report JSON; caller runs it first.
+     *
+     * @return array<string, mixed> - Decoded CLI report.
      * @throws JsonException When CLI output is invalid JSON.
      */
     private function decodeJson(Process $process): array
@@ -134,8 +138,10 @@ JSON;
     /**
      * Read a nested string-keyed array from a payload.
      *
-     * @param array<string, mixed> $payload Source payload.
-     * @return array<string, mixed> Nested payload.
+     * @param array<string, mixed> $payload - Source payload.
+     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
+     *
+     * @return array<string, mixed> - Nested payload.
      */
     private function arrayValue(array $payload, string $key): array
     {
@@ -145,21 +151,26 @@ JSON;
     /**
      * Read a numeric value from a payload as float.
      *
-     * @param array<string, mixed> $payload Source payload.
-     * @return float Numeric payload value.
+     * @param array<string, mixed> $payload - Source payload.
+     * @param string               $key     - key whose value must be int or float; a non-numeric value fails the test.
+     *
+     * @return float - Numeric payload value.
      */
     private function floatValue(array $payload, string $key): float
     {
         $payloadValue = $payload[$key] ?? null;
         self::assertTrue(is_int($payloadValue) || is_float($payloadValue));
 
+        // Cast int-or-float to float so JSON whole numbers (e.g. 0) compare cleanly against float expectations.
         return (float) $payloadValue;
     }
 
     /**
      * Assert a decoded JSON value is an array with string keys.
      *
-     * @return array<string, mixed> String-keyed payload.
+     * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
+     *
+     * @return array<string, mixed> - String-keyed payload.
      */
     private function stringKeyedArray(mixed $payload): array
     {
@@ -192,8 +203,9 @@ JSON;
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
+     *
      * @return void
      */
     private function runGit(string $cwd, string ...$args): void
@@ -207,7 +219,7 @@ JSON;
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string Fixture directory.
+     * @return string - Fixture directory.
      */
     private function tempDir(): string
     {
@@ -221,12 +233,14 @@ JSON;
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path to delete.
+     * @param string $path - Filesystem path to delete.
+     *
      * @return void
      */
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the fixture directory was never created (e.g. an early test failure).
             return;
         }
 

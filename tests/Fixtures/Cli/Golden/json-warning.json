@@ -2,7 +2,7 @@
     "schemaVersion": "gruff.analysis.v2",
     "tool": {
         "name": "gruff-php",
-        "version": "0.2.0"
+        "version": "0.3.0"
     },
     "run": {
         "format": "json",
@@ -27,14 +27,15 @@
         "missingPaths": 0,
         "parseErrors": 0,
         "findings": {
-            "advisory": 1,
+            "advisory": 2,
             "warning": 2,
             "error": 0,
-            "total": 3
+            "total": 4
         },
         "exitCode": 0
     },
     "ignoredPaths": [],
+    "ignoredPathDetails": [],
     "missingPaths": [],
     "diagnostics": [],
     "findings": [
@@ -79,6 +80,24 @@
             "metadata": {}
         },
         {
+            "ruleId": "docs.return-comment",
+            "message": "Alpha::value() has a bare @return tag; describe what the returned value represents, not just its type.",
+            "file": "tests/Fixtures/Source/mixed/alpha.php",
+            "line": 19,
+            "endLine": null,
+            "column": null,
+            "symbol": "Alpha::value()",
+            "severity": "advisory",
+            "pillar": "documentation",
+            "secondaryPillars": [],
+            "tier": "v0.1",
+            "confidence": "high",
+            "remediation": "Describe the result after the @return type, e.g. `@return Foo - parsed result; null when the lookup misses`, so the contract states what the value means at the edges.",
+            "fingerprint": "3043a43c48c8541d",
+            "stableIdentity": "20f27d197b4777d9",
+            "metadata": {}
+        },
+        {
             "ruleId": "naming.identifier-quality",
             "message": "Method name \"value\" is generic and does not communicate clear intent.",
             "file": "tests/Fixtures/Source/mixed/alpha.php",
@@ -107,7 +126,7 @@
     ],
     "score": {
         "composite": {
-            "score": 96.5,
+            "score": 96.1,
             "grade": "A"
         },
         "pillars": [
@@ -169,13 +188,13 @@
             {
                 "pillar": "documentation",
                 "applicable": true,
-                "score": 100,
+                "score": 96,
                 "grade": "A",
-                "findings": 0,
-                "advisory": 0,
+                "findings": 1,
+                "advisory": 1,
                 "warning": 0,
                 "error": 0,
-                "penalty": 0
+                "penalty": 4
             },
             {
                 "pillar": "modernisation",
@@ -225,13 +244,13 @@
         "topOffenders": [
             {
                 "file": "tests/Fixtures/Source/mixed/alpha.php",
-                "score": 56.25,
+                "score": 51.25,
                 "grade": "F",
-                "findings": 3,
-                "advisory": 1,
+                "findings": 4,
+                "advisory": 2,
                 "warning": 2,
                 "error": 0,
-                "penalty": 43.75,
+                "penalty": 48.75,
                 "maxCyclomatic": null,
                 "maxCognitive": null,
                 "maxLines": 27,
@@ -246,7 +265,7 @@
             "21+": 0
         },
         "scope": "full-project",
-        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
+        "explanation": "Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied."
     },
     "diff": {
         "active": false,

@@ -45,7 +45,7 @@ final class FileCache implements TaggedCacheInterface
 final class CacheClient
 {
     /**
-     * @param TaggedCacheInterface $cache The cache to read from.
+     * @param TaggedCacheInterface $cache - The cache to read from.
      */
     public function __construct(private readonly TaggedCacheInterface $cache)
     {

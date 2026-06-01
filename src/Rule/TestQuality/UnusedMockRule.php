@@ -31,10 +31,12 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Describe the unused mock rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar, tier, and the advisory severity plus high confidence callers register
+     *                          and surface this rule by
      */
     public function definition(): RuleDefinition
     {
+        // Advisory keeps unused-mock cleanup opt-in; high confidence because an unread assignment is unambiguous.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused mock variable',
@@ -48,10 +50,11 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Find mock variables that are assigned but never read.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unused mock assignments.
+     * @return list<Finding> - one finding per mock created but never read across all test scopes in the unit; empty
+     *                         when every mock is used
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -77,12 +80,17 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Collect mock variables created in the test scope.
      *
-     * @param array<int, true> $assignedVarObjectIds
-     * @return array<string, array{line: int, name: string}>
+     * @param TestQualityScope $scope - Test method scope whose assignments are scanned for mock creation.
+     * @param array<int, true> $assignedVarObjectIds - Receives, by reference, the object id of every assigned variable
+     *                                                 node so reads can later exclude the assignment target itself.
+     *
+     * @return array<string, array{line: int, name: string}> - mock creations keyed by variable name, each holding the
+     *                                                          first assignment line and the variable name; empty when
+     *                                                          the scope creates no mocks
      */
     private function mockAssignments(
         TestQualityScope $scope,
-        array &$assignedVarObjectIds,
+        array            &$assignedVarObjectIds,
     ): array {
         $mockAssignments = [];
         $assignments     = NodeIndex::descendantsOfAny($scope->node, [Expr\Assign::class]);
@@ -98,7 +106,7 @@ final readonly class UnusedMockRule implements RuleInterface
                 continue;
             }
 
-            $varName = $assign->var->name;
+            $varName                   = $assign->var->name;
             $mockAssignments[$varName] ??= [
                 'line' => $assign->getStartLine(),
                 'name' => $varName,
@@ -111,8 +119,12 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Collect reads of variables created as mocks.
      *
-     * @param array<int, true> $assignedVarObjectIds
-     * @return array<string, true>
+     * @param TestQualityScope $scope - Test method scope to scan for variable reads.
+     * @param array<int, true> $assignedVarObjectIds - Object ids of assignment-target variable nodes to skip, so the
+     *                                                 left-hand side of `$mock = ...` is not mistaken for a read.
+     *
+     * @return array<string, true> - set keyed by every variable name read somewhere other than its own assignment
+     *                               target; absence of a name means that variable is never read
      */
     private function variableReads(TestQualityScope $scope, array $assignedVarObjectIds): array
     {
@@ -136,15 +148,20 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Build findings for unread mocks in the test-quality rule.
      *
-     * @param array<string, array{line: int, name: string}> $mockAssignments
-     * @param array<string, true>                           $reads
-     * @return list<Finding>
+     * @param AnalysisUnit                                  $analysisUnit - Unit supplying the display path for findings.
+     * @param TestQualityScope                              $scope - Test scope whose symbol names the offending test.
+     * @param array<string, array{line: int, name: string}> $mockAssignments - Mock creations keyed by variable name,
+     *                                                                       each carrying the assignment line to report.
+     * @param array<string, true>                           $reads - Variable names observed as reads; a mock present here is considered used
+     *                                                                       and is therefore not reported.
+     *
+     * @return list<Finding> - one advisory finding per mock created but never read back; empty when every mock is used
      */
     private function findingsForUnreadMocks(
-        AnalysisUnit $analysisUnit,
+        AnalysisUnit     $analysisUnit,
         TestQualityScope $scope,
-        array $mockAssignments,
-        array $reads,
+        array            $mockAssignments,
+        array            $reads,
     ): array {
         $findings = [];
 
@@ -174,7 +191,10 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Detect whether an expression contains a recognised mock creation call.
      *
-     * @return bool True when the expression creates a mock.
+     * @param Expr $expr - Right-hand side of an assignment to test for a nested mock-creation call.
+     *
+     * @return bool - true as soon as any descendant call is a recognised mock factory, so creators wrapped in other
+     *                calls still count; false when no such call is present
      */
     private function isMockCreationExpression(Expr $expr): bool
     {
@@ -182,10 +202,11 @@ final readonly class UnusedMockRule implements RuleInterface
 
         $matches = $nodeFinder->find(
             [$expr],
-            static fn (Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
-                && TestQualityNodeHelper::isMockCreationCall($node),
+            static fn(Node $node): bool => ($node instanceof Expr\FuncCall || $node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
+                                           && TestQualityNodeHelper::isMockCreationCall($node),
         );
 
+        // True as soon as any descendant call is a recognised mock factory, so wrapped creators still count.
         return $matches !== [];
     }
 }

@@ -66,7 +66,7 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Describe the one-line method rule.
      *
-     * @return RuleDefinition Rule metadata, defaults, and options.
+     * @return RuleDefinition - Rule metadata, defaults, and options.
      */
     public function definition(): RuleDefinition
     {
@@ -106,10 +106,10 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find trivial methods that only wrap a single call expression.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for one-line wrapper methods.
+     * @return list<Finding> - Findings for one-line wrapper methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -187,10 +187,13 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Decide whether a method shape is exempt from one-line wrapper checks.
      *
-     * @param int                $selfCallerCount  Count of in-class `$this->name()` / `self::name()` / `static::name()` / `parent::name()` calls.
-     * @param array<int, true>   $factoryMethodIds Alternative named-factory method object ids.
+     * @param ClassMethod        $classMethod - Candidate whose own param count, single-statement body, and factory membership decide exemption (caller count is supplied separately).
+     * @param int                $minParameters - Methods declaring fewer parameters are skipped as zero/low-arg accessors.
+     * @param int                $minInFileCallers - Skip threshold: reached this many in-file self-callers exempts the wrapper (0 disables).
+     * @param int                $selfCallerCount - Count of in-class `$this->name()` / `self::name()` / `static::name()` / `parent::name()` calls.
+     * @param array<int, true>   $factoryMethodIds - Alternative named-factory method object ids.
      *
-     * @return bool True when the method should not be reported.
+     * @return bool - True when the method should not be reported.
      */
     private function shouldSkip(
         ClassMethod $classMethod,
@@ -203,21 +206,27 @@ final readonly class OneLineMethodRule implements RuleInterface
         $name = $classMethod->name->toString();
 
         if ($classMethod->isAbstract() || in_array($name, self::SKIPPED_METHODS, true)) {
+            // Abstract methods have no body to inline; magic/lifecycle signatures are framework-owned, not wrappers.
             return true;
         }
 
         if (str_starts_with($name, 'test') || str_starts_with($name, 'provide') || str_ends_with($name, 'Provider')) {
+            // Test cases and data providers are scaffolding the rule never treats as delegating wrappers.
             return true;
         }
 
         if (count($classMethod->params) < $minParameters || $classMethod->stmts === null || count($classMethod->stmts) !== 1) {
+            // A zero/low-arg method is an accessor, not a delegating wrapper; and only an exactly-one-statement
+            // body can be the "one-line" call this rule targets, so neither shape is a wrapper to flag.
             return true;
         }
 
         if (isset($factoryMethodIds[spl_object_id($classMethod)])) {
+            // Named-alternative factory pairs are intentional thin constructors, exempt by design.
             return true;
         }
 
+        // Only exempt when configured to honour in-file callers and the method clears that caller count.
         return $minInFileCallers > 0 && $selfCallerCount >= $minInFileCallers;
     }
 
@@ -227,29 +236,38 @@ final readonly class OneLineMethodRule implements RuleInterface
      * enclosed by a class/trait/enum (e.g. interface methods, which the rule
      * already skips via `isAbstract()`).
      *
-     * @return int|null Object id of the enclosing class-like, or null when unresolved.
+     * @param ClassMethod $classMethod - Method whose owning class-like declaration we resolve.
+     *
+     * @return int|null - Object id of the enclosing class-like, or null when unresolved.
      */
     private function enclosingClassId(ClassMethod $classMethod): ?int
     {
         $node = $classMethod->getAttribute('parent');
         while ($node instanceof Node) {
             if ($node instanceof Class_ || $node instanceof Trait_ || $node instanceof Enum_) {
+                // First class/trait/enum ancestor owns the method; its id scopes the caller counts.
                 return spl_object_id($node);
             }
             $node = $node->getAttribute('parent');
         }
 
+        // No class-like ancestor: the method is interface-level, so it has no caller scope here.
         return null;
     }
 
     /**
      * Detect whether an expression contains any call or object creation.
      *
-     * @return bool True when the expression contains callable work.
+     * @param Expr       $expression - Single-statement body expression being classified as real work or not.
+     * @param NodeFinder $nodeFinder - Shared finder reused across methods to avoid per-call allocation.
+     *
+     * @return bool - True when the expression contains callable work.
      */
     private function containsCall(Expr $expression, NodeFinder $nodeFinder): bool
     {
+        // A wrapper only counts when its one expression actually delegates work, so look for any call node.
         return $nodeFinder->findFirst([$expression], static function (Node $node): bool {
+            // Method/static/function calls and `new` are the delegations that make a one-liner a wrapper.
             return $node instanceof Expr\MethodCall
                 || $node instanceof Expr\StaticCall
                 || $node instanceof Expr\FuncCall
@@ -266,7 +284,10 @@ final readonly class OneLineMethodRule implements RuleInterface
      * with no callers would otherwise see `B::save()` silently exempted under
      * the `minInFileCallers: 2` default.
      *
-     * @return array<int, array<string, int>> Counts keyed by class object id, then lowercase method name.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose class-like declarations are tallied.
+     * @param NodeFinder   $nodeFinder - Shared finder reused across methods to avoid per-call allocation.
+     *
+     * @return array<int, array<string, int>> - Counts keyed by class object id, then lowercase method name.
      */
     private function selfCallCountsByClass(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
@@ -285,12 +306,15 @@ final readonly class OneLineMethodRule implements RuleInterface
 
                 $calls = $nodeFinder->find($method->stmts, static function (Node $node): bool {
                     if ($node instanceof Expr\MethodCall && $node->var instanceof Expr\Variable && $node->var->name === 'this') {
+                        // A `$this->name()` call counts only with a literal method name we can key on.
                         return $node->name instanceof Node\Identifier;
                     }
                     if ($node instanceof Expr\StaticCall && $node->class instanceof Name && $node->name instanceof Node\Identifier) {
+                        // self/static/parent calls are still in-class dispatch; dynamic targets are not.
                         return in_array(strtolower($node->class->toString()), ['self', 'static', 'parent'], true);
                     }
 
+                    // Any other node is not a self-targeted call, so it must not inflate the tally.
                     return false;
                 });
 
@@ -311,7 +335,9 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find public static self-factory methods when a class exposes multiple named alternatives.
      *
-     * @return array<int, true> Method object ids that are exempt.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose classes are scanned for named-factory pairs.
+     *
+     * @return array<int, true> - Method object ids that are exempt.
      */
     private function namedAlternativeFactoryMethodIds(AnalysisUnit $analysisUnit): array
     {
@@ -341,31 +367,39 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Detect public static methods that return a new instance of their own class.
      *
-     * @return bool True when the method is a named constructor/factory candidate.
+     * @param ClassMethod $classMethod - Candidate method being tested as a named constructor.
+     * @param Class_      $class - Declaring class, used to match `new ClassName()` against its own name.
+     *
+     * @return bool - True when the method is a named constructor/factory candidate.
      */
     private function isNamedAlternativeFactory(ClassMethod $classMethod, Class_ $class): bool
     {
         if (!$classMethod->isPublic() || !$classMethod->isStatic() || $classMethod->stmts === null || count($classMethod->stmts) !== 1) {
+            // A named constructor must be a public static one-liner; anything else cannot be one of the pair.
             return false;
         }
 
         $statement = $classMethod->stmts[0];
         if (!$statement instanceof Return_ || !$statement->expr instanceof Expr\New_) {
+            // The lone statement has to be `return new ...`; without that there is no instance to vend.
             return false;
         }
 
         $target = $statement->expr->class;
         if (!$target instanceof Name) {
+            // A dynamic `new $class()` target cannot be matched to this class statically, so reject it.
             return false;
         }
 
         $targetName = strtolower($target->toString());
         if ($targetName === 'self' || $targetName === 'static') {
+            // `new self`/`new static` always vends the declaring class, so this is a named constructor.
             return true;
         }
 
         $className = $class->name?->toString();
 
+        // Otherwise it qualifies only when the `new` target spells out this same class by name.
         return $className !== null && strtolower($className) === $targetName;
     }
 }

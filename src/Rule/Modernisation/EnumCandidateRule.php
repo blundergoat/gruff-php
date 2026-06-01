@@ -30,10 +30,11 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Describe the enum candidate modernisation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: the enum rewrite is a judgement call, so it suggests rather than gates.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Enum candidate',
@@ -47,14 +48,15 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Find string or integer constant groups that could become enums.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for enum candidate classes.
+     * @return list<Finding> - Findings for enum candidate classes.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
+            // Enums need PHP 8.1, so stay silent when the target version cannot adopt the suggestion.
             return [];
         }
 
@@ -92,8 +94,9 @@ final readonly class EnumCandidateRule implements RuleInterface
     }
 
     /**
-     * @param list<Stmt\ClassConst> $constants
-     * @return bool True when every constant value is a string-or-integer scalar AND every constant in the group is of the same backed-enum scalar type.
+     * @param list<Stmt\ClassConst> $constants - Constant groups declared by the candidate class.
+     *
+     * @return bool - True when every constant value is a string-or-integer scalar AND every constant in the group is of the same backed-enum scalar type.
      */
     private function allConstantsShareOneBackedEnumType(array $constants): bool
     {
@@ -106,11 +109,13 @@ final readonly class EnumCandidateRule implements RuleInterface
                 } elseif ($constant->value instanceof Scalar\Int_) {
                     $observedScalarTypes['int'] = true;
                 } else {
+                    // A non-string, non-int constant cannot back an enum, so reject the whole group.
                     return false;
                 }
             }
         }
 
+        // A backed enum is single-typed, so accept only when one scalar type (all string or all int) was seen.
         return count($observedScalarTypes) === 1;
     }
 }

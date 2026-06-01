@@ -12,18 +12,20 @@ use GruffPhp\Finding\Finding;
 final readonly class BranchReviewComparator
 {
     /**
-     * @param list<Finding> $current       Current branch findings to compare.
-     * @param list<Finding> $base          Base branch findings to compare against.
-     * @param string        $baseRef       Base ref used to produce the comparison.
-     * @param bool          $isChangedOnly Whether unchanged changed-file scope applies.
-     * @param float|null    $deltaScore    Optional score delta between base and current runs.
-     * @return BranchReviewResult Introduced, removed, and unchanged finding sets.
+     * @param list<Finding> $current - Current branch findings to compare.
+     * @param list<Finding> $base - Base branch findings to compare against.
+     * @param string        $baseRef - Base ref used to produce the comparison.
+     * @param bool          $isChangedOnly - Whether unchanged changed-file scope applies.
+     * @param float|null    $deltaScore - Optional score delta between base and current runs.
+     *
+     * @return BranchReviewResult - findings partitioned into introduced, removed, and unchanged sets plus the
+     *   score delta, ready for the caller to render the branch review
      */
     public function compare(
-        array $current,
-        array $base,
+        array  $current,
+        array  $base,
         string $baseRef,
-        bool $isChangedOnly,
+        bool   $isChangedOnly,
         ?float $deltaScore,
     ): BranchReviewResult {
         $findingReviewIdentity = new FindingReviewIdentity();
@@ -61,8 +63,11 @@ final readonly class BranchReviewComparator
     /**
      * Index findings by branch-review identity.
      *
-     * @param list<Finding> $findings
-     * @return array<string, list<Finding>>
+     * @param list<Finding>         $findings - Findings to bucket by review identity before comparison.
+     * @param FindingReviewIdentity $identity - Key strategy that buckets findings so matching ignores line drift.
+     *
+     * @return array<string, list<Finding>> - findings bucketed by review-identity key, keys sorted ascending so iteration order is deterministic;
+     *                       empty when no findings
      */
     private function index(array $findings, FindingReviewIdentity $identity): array
     {

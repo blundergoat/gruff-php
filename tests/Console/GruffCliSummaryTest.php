@@ -10,7 +10,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the summary CLI command: digest section output, suppression of per-finding lines, JSON-schema-conformant output, invalid-option rejection, and registration in the command list.
+ * Covers the summary CLI command: digest section output, suppression of per-finding lines, JSON-schema-conformant output, invalid-option rejection,
+ * and registration in the command list.
  */
 final class GruffCliSummaryTest extends TestCase
 {
@@ -25,18 +26,18 @@ final class GruffCliSummaryTest extends TestCase
     public function testSummaryRunsAndShowsDigestSections(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'summary',
+                                   'tests/Fixtures/Source/mixed',
+                                   '--no-config',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $output = $process->getOutput();
 
-        self::assertStringContainsString('gruff-php 0.2.0 - summary', $output);
+        self::assertStringContainsString('gruff-php 0.3.0 - summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
         self::assertStringContainsString('Composite', $output);
         self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
@@ -55,12 +56,12 @@ final class GruffCliSummaryTest extends TestCase
     public function testSummaryDoesNotEmitPerFindingLines(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'summary',
+                                   'tests/Fixtures/Source/mixed',
+                                   '--no-config',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode());
@@ -75,22 +76,22 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify summary JSON output matches schema.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSummaryJsonOutputMatchesSchema(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-            '--format',
-            'json',
-            '--top',
-            '3',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'summary',
+                                   'tests/Fixtures/Source/mixed',
+                                   '--no-config',
+                                   '--format',
+                                   'json',
+                                   '--top',
+                                   '3',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -102,7 +103,7 @@ final class GruffCliSummaryTest extends TestCase
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);
-        self::assertSame('0.2.0', $tool['version'] ?? null);
+        self::assertSame('0.3.0', $tool['version'] ?? null);
 
         $scope = $decoded['scope'] ?? null;
         self::assertIsArray($scope);
@@ -131,20 +132,21 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify summary rejects invalid option combinations.
      *
-     * @param list<string> $arguments CLI arguments appended after the base command.
-     * @param string       $message   Expected usage error excerpt.
+     * @param list<string> $arguments - CLI arguments appended after the base command.
+     * @param string       $message - Expected usage error excerpt.
+     *
      * @return void
      */
     #[DataProvider('invalidSummaryOptionProvider')]
     public function testSummaryRejectsInvalidOptions(array $arguments, string $message): void
     {
         $process = new Process(array_merge([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'summary',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-        ], $arguments), self::PROJECT_ROOT);
+                                               PHP_BINARY,
+                                               self::PROJECT_ROOT . '/bin/gruff-php',
+                                               'summary',
+                                               'tests/Fixtures/Source/mixed',
+                                               '--no-config',
+                                           ], $arguments), self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -168,7 +170,8 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Provide invalid summary option combinations and their usage errors.
      *
-     * @return iterable<string, array{0: list<string>, 1: string}>
+     * @return iterable<string, array{0: list<string>, 1: string}> - one named case per yield, each pairing the extra CLI arguments with the
+     *                          usage-error excerpt expected on stdout
      */
     public static function invalidSummaryOptionProvider(): iterable
     {

@@ -15,17 +15,18 @@ use GruffPhp\Source\SourceDiscoveryResult;
 final readonly class AnalysisSourceLoader
 {
     /**
-     * @param string       $projectRoot          Root used for source discovery and parsing.
-     * @param list<string> $paths                Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  Configured path patterns to skip unless ignored files are included.
-     * @return AnalysisSourceSet Discovered files, parsed units, and load diagnostics.
+     * @param string       $projectRoot - Root used for source discovery and parsing.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns - Configured path patterns to skip unless ignored files are included.
+     *
+     * @return AnalysisSourceSet - discovered files, their parsed units, and missing-path plus parse-error diagnostics
      */
     public function load(
         string $projectRoot,
-        array $paths,
-        bool $shouldIncludeIgnored,
-        array $ignoredPathPatterns,
+        array  $paths,
+        bool   $shouldIncludeIgnored,
+        array  $ignoredPathPatterns,
     ): AnalysisSourceSet {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
         $phpFileParser   = new PhpFileParser();
@@ -54,22 +55,24 @@ final readonly class AnalysisSourceLoader
      * file at a time so each unit's AST can be released immediately after
      * analysis, keeping peak memory close to one unit's worth.
      *
-     * @param string       $projectRoot          Root used for source discovery.
-     * @param list<string> $paths                Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  Configured path patterns to skip unless ignored files are included.
-     * @return array{discovery: SourceDiscoveryResult, diagnostics: list<RunDiagnostic>}
+     * @param string       $projectRoot - Root used for source discovery.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns - Configured path patterns to skip unless ignored files are included.
+     *
+     * @return array{discovery: SourceDiscoveryResult, diagnostics: list<RunDiagnostic>} - unparsed discovery result paired with missing-path
+     *                          diagnostics; the caller parses each file itself
      */
     public function discover(
         string $projectRoot,
-        array $paths,
-        bool $shouldIncludeIgnored,
-        array $ignoredPathPatterns,
+        array  $paths,
+        bool   $shouldIncludeIgnored,
+        array  $ignoredPathPatterns,
     ): array {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
 
         return [
-            'discovery' => $discoveryResult,
+            'discovery'   => $discoveryResult,
             'diagnostics' => $this->missingPathDiagnostics($discoveryResult),
         ];
     }
@@ -78,7 +81,9 @@ final readonly class AnalysisSourceLoader
      * Build the diagnostics list for paths that disappeared between argument
      * parsing and discovery.
      *
-     * @return list<RunDiagnostic>
+     * @param SourceDiscoveryResult $sourceDiscoveryResult - Discovery output; each missing path yields one diagnostic.
+     *
+     * @return list<RunDiagnostic> - one missing-path diagnostic per vanished input path, in discovery order; empty when every path resolved
      */
     private function missingPathDiagnostics(SourceDiscoveryResult $sourceDiscoveryResult): array
     {

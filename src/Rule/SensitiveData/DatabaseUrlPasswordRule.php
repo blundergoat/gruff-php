@@ -26,10 +26,13 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Describe the database URL password sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence is justified because a literal `:password@` inside a recognised DB scheme is an
+        // unambiguous credential, not a heuristic guess; the dummy-value and comment filters below cut the
+        // residual false positives, so callers can gate on these findings without manual triage.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Database URL password',
@@ -43,16 +46,17 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Find database connection URLs that embed passwords.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for credential-bearing database URLs.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for credential-bearing database URLs.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
         // Skip the alternation when no supported scheme prefix appears.
         if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
+            // No supported DB scheme in the source means there can be no inline credential to report.
             return [];
         }
 

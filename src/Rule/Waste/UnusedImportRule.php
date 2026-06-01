@@ -30,10 +30,11 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Describe the unused import rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning, not advisory: an unreferenced import is almost always dead code a reviewer should drop.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused import',
@@ -47,9 +48,10 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for unused import statements.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - One finding per import alias unused after its own import line is ignored.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -57,6 +59,7 @@ final readonly class UnusedImportRule implements RuleInterface
         $uses       = NodeIndex::nodesOf($analysisUnit, Use_::class);
 
         if ($uses === []) {
+            // No imports to check, so skip the source-text scan entirely rather than blank a file with no use lines.
             return [];
         }
 
@@ -95,9 +98,14 @@ final readonly class UnusedImportRule implements RuleInterface
     }
 
     /**
-     * @param list<Use_> $uses
+     * Blank out the source lines occupied by import declarations so the alias search cannot match an
+     * import against its own `use` statement. Lines are replaced with empty strings rather than removed
+     * so every other line keeps its original 1-based number for any later position lookup.
      *
-     * @return string Source text with use-statement lines blanked out.
+     * @param string     $source - Full source text of the unit, used only as the haystack to blank and scan.
+     * @param list<Use_> $uses - Import statements whose line spans must be erased before the alias search.
+     *
+     * @return string - Source text with each import statement's lines replaced by empty strings.
      */
     private function removeUseStatements(string $source, array $uses): string
     {
@@ -116,6 +124,7 @@ final readonly class UnusedImportRule implements RuleInterface
             }
         }
 
+        // Re-join with "\n" so line offsets are preserved; the result is searched, never written back to disk.
         return implode("\n", $lines);
     }
 

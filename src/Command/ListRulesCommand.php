@@ -43,7 +43,10 @@ final class ListRulesCommand extends Command
     /**
      * Render rule metadata as either a table or JSON document, or a per-rule detail view.
      *
-     * @return int Symfony command exit code.
+     * @param InputInterface  $input - Parsed invocation; supplies the `format` option and optional `ruleId` argument.
+     * @param OutputInterface $output - Destination the rendered catalogue, detail view, or error is written to.
+     *
+     * @return int - Symfony exit code: SUCCESS once output is written, INVALID for a bad format, FAILURE if JSON encoding fails
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -59,7 +62,13 @@ final class ListRulesCommand extends Command
         $ruleId   = $input->getArgument('ruleId');
 
         if (is_string($ruleId) && $ruleId !== '') {
-            return $this->renderRuleDetail($ruleId, $registry, $config, $format, $output);
+            return $this->renderRuleDetail(
+                ruleId:   $ruleId,
+                registry: $registry,
+                config:   $config,
+                format:   $format,
+                output:   $output,
+            );
         }
 
         /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
@@ -88,15 +97,15 @@ final class ListRulesCommand extends Command
 
         foreach ($rows as $ruleMetadata) {
             $output->writeln(sprintf(
-                '%s | %s | %s | %s | %s | %s | %s',
-                $ruleMetadata['id'],
-                $ruleMetadata['pillar'],
-                $ruleMetadata['tier'],
-                $ruleMetadata['defaultSeverity'],
-                $ruleMetadata['confidence'],
-                $ruleMetadata['defaultEnabled'] ? 'yes' : 'no',
-                $ruleMetadata['description'],
-            ));
+                                 '%s | %s | %s | %s | %s | %s | %s',
+                                 $ruleMetadata['id'],
+                                 $ruleMetadata['pillar'],
+                                 $ruleMetadata['tier'],
+                                 $ruleMetadata['defaultSeverity'],
+                                 $ruleMetadata['confidence'],
+                                 $ruleMetadata['defaultEnabled'] ? 'yes' : 'no',
+                                 $ruleMetadata['description'],
+                             ));
         }
 
         return Command::SUCCESS;
@@ -105,7 +114,14 @@ final class ListRulesCommand extends Command
     /**
      * Render the per-rule detail view, or report a typo with near-match suggestions.
      *
-     * @return int Symfony command exit code.
+     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly against the registry.
+     * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
+     * @param AnalysisConfig  $config - Effective config supplying whether the matched rule is enabled for this project.
+     * @param string          $format - Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
+     * @param OutputInterface $output - Destination the detail view or unknown-rule message is written to.
+     *
+     * @return int - Symfony exit code: SUCCESS once the detail view is written, FAILURE if JSON encoding fails; an unknown id defers to the
+     *             not-found path's INVALID
      */
     private function renderRuleDetail(string $ruleId, RuleRegistry $registry, AnalysisConfig $config, string $format, OutputInterface $output): int
     {
@@ -144,7 +160,11 @@ final class ListRulesCommand extends Command
     /**
      * Print a friendly typo response with up to three near-match suggestions, exit INVALID.
      *
-     * @return int Symfony command exit code.
+     * @param string          $ruleId - Unrecognised rule id the caller typed; echoed back and used as the match anchor.
+     * @param RuleRegistry    $registry - Source of known rule ids the Levenshtein suggestions are drawn from.
+     * @param OutputInterface $output - Destination the unknown-rule error and any suggestions are written to.
+     *
+     * @return int - always Symfony INVALID, signalling a bad rule-id argument so callers can branch on misuse
      */
     private function renderRuleNotFound(string $ruleId, RuleRegistry $registry, OutputInterface $output): int
     {
@@ -152,7 +172,7 @@ final class ListRulesCommand extends Command
 
         $candidates = [];
         foreach ($registry->all() as $rule) {
-            $candidateId = $rule->definition()->id;
+            $candidateId              = $rule->definition()->id;
             $candidates[$candidateId] = levenshtein($ruleId, $candidateId);
         }
 
@@ -178,28 +198,48 @@ final class ListRulesCommand extends Command
     /**
      * Serialise the per-rule detail payload for JSON output.
      *
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, description: string, thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, optionDescriptions: array<string, string>|\stdClass, escapeHatches: list<array{path: string, description: string}>, falsePositiveShapes: list<array{shape: string, mitigation: string}>}
+     * @param RuleDefinition $definition - Rule whose metadata, thresholds, options, and escape hatches are serialised.
+     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
+     *
+     * @return array - JSON-ready detail document; empty option/threshold maps are stdClass so they
+     *                   encode as `{}` rather than `[]`
+     * @phpstan-return array{
+     *     id: string,
+     *     name: string,
+     *     pillar: string,
+     *     tier: string,
+     *     defaultSeverity: string,
+     *     confidence: string,
+     *     defaultEnabled: bool,
+     *     description: string,
+     *     thresholds: array<string, int|float|string>|\stdClass,
+     *     options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass,
+     *     optionDescriptions: array<string, string>|\stdClass,
+     *     escapeHatches: list<array{path: string, description: string}>,
+     *     falsePositiveShapes: list<array{shape: string, mitigation: string}>
+     * }
      */
     private function ruleDetailPayload(RuleDefinition $definition, bool $enabled): array
     {
         $single     = $definition->severityThreshold;
         $thresholds = $single instanceof \GruffPhp\Config\SeverityThreshold
             ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
-            : ($definition->defaultThresholds === [] ? (object) [] : $definition->defaultThresholds);
+            : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
 
+        // Empty maps become stdClass above so JSON encodes them as `{}` not `[]`, keeping the schema object-typed.
         return [
-            'id' => $definition->id,
-            'name' => $definition->name,
-            'pillar' => $definition->pillar->value,
-            'tier' => $definition->tier->value,
-            'defaultSeverity' => $definition->defaultSeverity->value,
-            'confidence' => $definition->confidence->value,
-            'defaultEnabled' => $enabled,
-            'description' => $definition->description(),
-            'thresholds' => $thresholds,
-            'options' => $definition->defaultOptions === [] ? (object) [] : $definition->defaultOptions,
-            'optionDescriptions' => $definition->optionDescriptions === [] ? (object) [] : $definition->optionDescriptions,
-            'escapeHatches' => $this->escapeHatchesFor($definition),
+            'id'                  => $definition->id,
+            'name'                => $definition->name,
+            'pillar'              => $definition->pillar->value,
+            'tier'                => $definition->tier->value,
+            'defaultSeverity'     => $definition->defaultSeverity->value,
+            'confidence'          => $definition->confidence->value,
+            'defaultEnabled'      => $enabled,
+            'description'         => $definition->description(),
+            'thresholds'          => $thresholds,
+            'options'             => $definition->defaultOptions === [] ? (object)[] : $definition->defaultOptions,
+            'optionDescriptions'  => $definition->optionDescriptions === [] ? (object)[] : $definition->optionDescriptions,
+            'escapeHatches'       => $this->escapeHatchesFor($definition),
             'falsePositiveShapes' => $definition->falsePositiveShapes,
         ];
     }
@@ -207,11 +247,14 @@ final class ListRulesCommand extends Command
     /**
      * Render a per-rule detail view as multi-line text.
      *
-     * @return string Detail text with a trailing newline.
+     * @param RuleDefinition $definition - Rule whose name, pillar, options, hatches, and false-positive shapes render.
+     * @param bool           $enabled - Effective project enabled state; printed on the "Enabled by default" line.
+     *
+     * @return string - the full multi-line detail block, newline-joined and terminated with a trailing newline so it writes cleanly raw
      */
     private function renderDetailText(RuleDefinition $definition, bool $enabled): string
     {
-        $lines = [];
+        $lines   = [];
         $lines[] = sprintf('Rule: %s', $definition->id);
         $lines[] = sprintf('  Name:               %s', $definition->name);
         $lines[] = sprintf('  Pillar:             %s', $definition->pillar->value);
@@ -225,13 +268,13 @@ final class ListRulesCommand extends Command
         $lines[] = '  ' . $definition->description();
 
         if ($definition->defaultOptions !== []) {
-            $lines[] = '';
-            $lines[] = 'Default options:';
+            $lines[]  = '';
+            $lines[]  = 'Default options:';
             $keyWidth = max(array_map('strlen', array_keys($definition->defaultOptions)));
             foreach ($definition->defaultOptions as $key => $defaultValue) {
-                $valueRender  = $this->formatOptionValue($defaultValue);
-                $description  = $definition->optionDescriptions[$key] ?? '';
-                $lines[] = sprintf(
+                $valueRender = $this->formatOptionValue($defaultValue);
+                $description = $definition->optionDescriptions[$key] ?? '';
+                $lines[]     = sprintf(
                     '  %-' . $keyWidth . 's  %s%s',
                     $key,
                     $valueRender,
@@ -242,9 +285,9 @@ final class ListRulesCommand extends Command
 
         $hatches = $this->escapeHatchesFor($definition);
         if ($hatches !== []) {
-            $lines[] = '';
-            $lines[] = 'Escape hatches:';
-            $pathWidth = max(array_map(static fn (array $row): int => strlen($row['path']), $hatches));
+            $lines[]   = '';
+            $lines[]   = 'Escape hatches:';
+            $pathWidth = max(array_map(static fn(array $escapeHatch): int => strlen($escapeHatch['path']), $hatches));
             foreach ($hatches as $hatch) {
                 $lines[] = sprintf(
                     '  %-' . $pathWidth . 's  %s',
@@ -263,13 +306,17 @@ final class ListRulesCommand extends Command
             }
         }
 
+        // Join the accumulated lines and add a trailing newline so the block ends cleanly when written raw.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
     /**
      * Derive the escape-hatch config paths a user can set for a rule.
      *
-     * @return list<array{path: string, description: string}>
+     * @param RuleDefinition $definition - Rule whose option keys, severity threshold, and id seed the config paths.
+     *
+     * @return list<array{path: string, description: string}> - settable `.gruff-php.yaml` config paths with help text, per-option paths first then
+     *                          the always-present enable/score/threshold hatches; empty only when the rule has no options and no threshold
      */
     private function escapeHatchesFor(RuleDefinition $definition): array
     {
@@ -278,79 +325,92 @@ final class ListRulesCommand extends Command
         foreach (array_keys($definition->defaultOptions) as $optionKey) {
             $description = $definition->optionDescriptions[$optionKey] ?? 'See `Default options` above.';
             $hatches[]   = [
-                'path' => sprintf('rules.%s.options.%s', $definition->id, $optionKey),
+                'path'        => sprintf('rules.%s.options.%s', $definition->id, $optionKey),
                 'description' => $description,
             ];
         }
 
         $hatches[] = [
-            'path' => sprintf('rules.%s.enabled', $definition->id),
+            'path'        => sprintf('rules.%s.enabled', $definition->id),
             'description' => 'Set to false to disable the rule entirely.',
         ];
         $hatches[] = [
-            'path' => sprintf('rules.%s.excludeFromScore', $definition->id),
+            'path'        => sprintf('rules.%s.excludeFromScore', $definition->id),
             'description' => 'Set to true to keep findings visible without penalising the composite score (ADR-016).',
         ];
 
         if ($definition->severityThreshold !== null || $definition->defaultThresholds !== []) {
             $hatches[] = [
-                'path' => sprintf('rules.%s.threshold + severity', $definition->id),
+                'path'        => sprintf('rules.%s.threshold + severity', $definition->id),
                 'description' => 'Override the threshold/severity pair for tunable rules (ADR-008).',
             ];
         }
 
+        // Order matters: per-option paths first, then the always-present enable/score/threshold hatches listed last.
         return $hatches;
     }
 
     /**
      * Format an option default value for inline display in the detail view.
      *
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $value
-     * @return string Compact, single-line representation.
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $value - Raw default option value from a rule definition.
+     *
+     * @return string - single-line config-style rendering: booleans as true/false, strings quoted, lists bracketed, numbers bare
      */
     private function formatOptionValue(int|float|bool|string|array $value): string
     {
         if (is_bool($value)) {
+            // Render booleans as YAML keywords, not PHP's `1`/empty-string cast, so the value mirrors config syntax.
             return $value ? 'true' : 'false';
         }
 
         if (is_array($value)) {
+            // List options render as a bracketed, comma-joined line; string items stay quoted to read like the source.
             return $value === [] ? '[]' : sprintf('[%s]', implode(', ', array_map(
-                static fn ($item): string => is_string($item) ? '"' . $item . '"' : (string) $item,
+                static fn($optionValue): string => is_string($optionValue) ? '"' . $optionValue . '"' : (string)$optionValue,
                 $value,
             )));
         }
 
         if (is_string($value)) {
+            // Quote string scalars so the reader can tell an empty string from an unset value.
             return '"' . $value . '"';
         }
 
-        return (string) $value;
+        // Remaining int/float scalars print bare; their textual form is already unambiguous.
+        return (string)$value;
     }
 
     /**
      * Build the machine-readable row emitted by list-rules.
      *
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}
+     * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
+     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
+     *
+     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool,
+     *                   thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key,
+     *                   int|float|bool|string>>|\stdClass, description: string} - one catalogue row of rule metadata for table or JSON output; empty
+     *                   option/threshold maps are stdClass so they encode as `{}` rather than `[]`
      */
     private function ruleMetadataRow(RuleDefinition $definition, bool $enabled): array
     {
         $single     = $definition->severityThreshold;
         $thresholds = $single instanceof \GruffPhp\Config\SeverityThreshold
             ? ['threshold' => $single->threshold, 'severity' => $single->severity->value]
-            : ($definition->defaultThresholds === [] ? (object) [] : $definition->defaultThresholds);
+            : ($definition->defaultThresholds === [] ? (object)[] : $definition->defaultThresholds);
 
+        // Empty maps become stdClass above so JSON encodes them as `{}` not `[]`, keeping the row schema stable.
         return [
-            'id' => $definition->id,
-            'name' => $definition->name,
-            'pillar' => $definition->pillar->value,
-            'tier' => $definition->tier->value,
+            'id'              => $definition->id,
+            'name'            => $definition->name,
+            'pillar'          => $definition->pillar->value,
+            'tier'            => $definition->tier->value,
             'defaultSeverity' => $definition->defaultSeverity->value,
-            'confidence' => $definition->confidence->value,
-            'defaultEnabled' => $enabled,
-            'thresholds' => $thresholds,
-            'options' => $definition->defaultOptions === [] ? (object) [] : $definition->defaultOptions,
-            'description' => $definition->description(),
+            'confidence'      => $definition->confidence->value,
+            'defaultEnabled'  => $enabled,
+            'thresholds'      => $thresholds,
+            'options'         => $definition->defaultOptions === [] ? (object)[] : $definition->defaultOptions,
+            'description'     => $definition->description(),
         ];
     }
 }

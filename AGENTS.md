@@ -1,5 +1,5 @@
-# AGENTS.md - project v1.5.1 / goat-flow 1.7.0 (2026-05-24)
-gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and commands grounded in real source/config files.
+# AGENTS.md - project v1.5.1 / goat-flow 1.9.0 (2026-06-01)
+gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
 
@@ -29,8 +29,13 @@ gruff-php is a PHP CLI package scaffold. Current invariant: keep app claims and 
 ## Key Resources
 
 - Learning loop: `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/`
-- Tool playbooks: `.goat-flow/skill-playbooks/browser-use.md`, `.goat-flow/skill-playbooks/page-capture.md`
+- Skill reference: `.goat-flow/skill-reference/`
+- Tool playbooks: `.goat-flow/skill-playbooks/README.md`, `.goat-flow/skill-playbooks/browser-use.md`, `.goat-flow/skill-playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
+
+## Commit Messages
+
+Use concise free-form subjects unless the project owner chooses a stricter convention. Full guidance lives in `docs/coding-standards/git-commit.md`.
 
 ## Essential Commands
 
@@ -91,10 +96,12 @@ Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lesso
 | Codex instruction file | `AGENTS.md` |
 | Claude peer instruction file | `CLAUDE.md` |
 | Learning loop | `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/` |
+| Skill reference (meta) | `.goat-flow/skill-reference/` |
 | Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
 | Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/tasks/`, `.goat-flow/scratchpad/` |
-| Commit guidance | `.github/git-commit-instructions.md` |
+| Commit guidance | `docs/coding-standards/git-commit.md` |
 | Project entry docs | `README.md` |
+| Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |

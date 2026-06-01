@@ -26,10 +26,11 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Describe the AWS access key sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the AKIA/ASIA prefix plus a fixed 16-char body is a near-unique AWS shape, rarely noise.
         return new RuleDefinition(
             id:              self::ID,
             name:            'AWS access key',
@@ -43,14 +44,15 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble AWS access key IDs.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for AWS key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for AWS keys; empty when matches are comments or dummy values.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
+            // Neither AWS key-id prefix is present, so the regex cannot match; skip it to keep the rule near-free.
             return [];
         }
 

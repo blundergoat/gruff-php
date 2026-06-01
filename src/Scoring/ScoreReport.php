@@ -10,18 +10,18 @@ namespace GruffPhp\Scoring;
 final readonly class ScoreReport
 {
     /**
-     * @param Grade              $composite              Overall grade for the analysis run.
-     * @param list<PillarScore>  $pillars                Pillar scores included in the report.
-     * @param list<FileScore>    $topOffenders           Lowest-scoring files shown in reports.
-     * @param array<string, int> $complexityDistribution Cyclomatic complexity buckets.
-     * @param string             $scope                  Score scope description.
-     * @param string             $explanation            Human-readable scoring explanation.
+     * @param Grade              $composite - Overall grade for the analysis run.
+     * @param list<PillarScore>  $pillars - Pillar scores included in the report.
+     * @param list<FileScore>    $topOffenders - Lowest-scoring files shown in reports.
+     * @param array<string, int> $complexityDistribution - Cyclomatic complexity buckets.
+     * @param string             $scope - Score scope description.
+     * @param string             $explanation - Human-readable scoring explanation.
      */
     public function __construct(
-        public Grade $composite,
-        public array $pillars,
-        public array $topOffenders,
-        public array $complexityDistribution,
+        public Grade  $composite,
+        public array  $pillars,
+        public array  $topOffenders,
+        public array  $complexityDistribution,
         public string $scope,
         public string $explanation,
     ) {
@@ -58,23 +58,23 @@ final readonly class ScoreReport
      *     complexityDistribution: array<string, int>,
      *     scope: string,
      *     explanation: string
-     * }
+     * } - JSON-serialisable snapshot of the full report; nested value objects rendered via their own toArray, distribution keyed by complexity bucket
      */
     public function toArray(): array
     {
         return [
-            'composite' => $this->composite->toArray(),
-            'pillars' => array_map(
-                static fn (PillarScore $pillar): array => $pillar->toArray(),
+            'composite'              => $this->composite->toArray(),
+            'pillars'                => array_map(
+                static fn(PillarScore $pillar): array => $pillar->toArray(),
                 $this->pillars,
             ),
-            'topOffenders' => array_map(
-                static fn (FileScore $file): array => $file->toArray(),
+            'topOffenders'           => array_map(
+                static fn(FileScore $file): array => $file->toArray(),
                 $this->topOffenders,
             ),
             'complexityDistribution' => $this->complexityDistribution,
-            'scope' => $this->scope,
-            'explanation' => $this->explanation,
+            'scope'                  => $this->scope,
+            'explanation'            => $this->explanation,
         ];
     }
 }

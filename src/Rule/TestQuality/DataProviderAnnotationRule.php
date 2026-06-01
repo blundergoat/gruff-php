@@ -28,10 +28,11 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     /**
      * Describe the data provider annotation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory tier: attribute providers need PHPUnit 10+, so the annotation form stays valid on older suites.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Data provider annotation',
@@ -45,10 +46,10 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
     /**
      * Find legacy data provider annotations in PHPUnit tests.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for data provider annotation usage.
+     * @return list<Finding> - Findings for data provider annotation usage.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

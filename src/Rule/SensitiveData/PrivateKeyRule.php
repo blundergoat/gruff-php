@@ -26,10 +26,11 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Describe the private key sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Warning, high confidence: a PEM private-key header is an unambiguous signal, rarely a false positive.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Private key material',
@@ -43,14 +44,15 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that appear to contain private key material.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - One finding per private-key header; the key body is not stored.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
+            // Without a PEM armor prefix the key regex cannot match, so skip the scan entirely.
             return [];
         }
 

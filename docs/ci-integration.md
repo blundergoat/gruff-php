@@ -77,3 +77,30 @@ vendor/bin/gruff-php analyse src --diff-vs=origin/main --changed-only --fail-on 
 ```
 
 Document project-specific diff policy in the repository that runs the job.
+
+## Ignored Paths
+
+`paths.ignore` is authoritative in every mode — including diff and explicit-path
+scans, the shapes a coding-agent hook uses. A matching path is excluded from
+analysis and produces no findings, so a hook that passes the agent's changed
+files never surfaces findings for code the project deliberately excluded.
+`--include-ignored` opts back into Git/default ignores only; it never overrides
+`paths.ignore`.
+
+Ask whether gruff would ignore a path — and why — without running an analysis,
+using `check-ignore`:
+
+```sh
+vendor/bin/gruff-php check-ignore --format json src/App.php legacy/Old.php
+```
+
+```json
+[
+  { "path": "src/App.php", "ignored": false, "source": null, "pattern": null },
+  { "path": "legacy/Old.php", "ignored": true, "source": "config", "pattern": "legacy/**" }
+]
+```
+
+Exit codes mirror `git check-ignore`: `0` when at least one path is ignored, `1`
+when none are, `2` on error. A hook can use this to drop out-of-scope changed
+files before it calls `analyse`.

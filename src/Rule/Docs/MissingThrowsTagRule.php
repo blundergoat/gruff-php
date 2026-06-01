@@ -33,10 +33,11 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Describe the missing @throws tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
+        // Advisory because an undocumented throw is a contract gap, not a defect; callers tune severity in config.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @throws tag',
@@ -50,10 +51,10 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Find documented public functions that throw without an @throws tag.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for missing @throws documentation.
+     * @return list<Finding> - Findings for missing @throws documentation.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

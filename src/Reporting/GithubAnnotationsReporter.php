@@ -15,8 +15,9 @@ final readonly class GithubAnnotationsReporter
     /**
      * Render findings as GitHub Actions workflow commands.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string GitHub annotation output.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - GitHub annotation output.
      */
     public function render(AnalysisReport $report): string
     {
@@ -26,13 +27,16 @@ final readonly class GithubAnnotationsReporter
             $lines[] = $this->annotation($finding);
         }
 
+        // Append the trailing newline only when there is output, so a clean report emits nothing, not a blank line.
         return implode(PHP_EOL, $lines) . ($lines === [] ? '' : PHP_EOL);
     }
 
     /**
      * Render one finding as a GitHub annotation command.
      *
-     * @return string GitHub annotation line.
+     * @param Finding $finding - Finding to encode; severity selects the command level and a null line is omitted.
+     *
+     * @return string - GitHub annotation line.
      */
     private function annotation(Finding $finding): string
     {
@@ -54,16 +58,20 @@ final readonly class GithubAnnotationsReporter
             $properties[] = 'endLine=' . $finding->endLine;
         }
 
+        // Properties join the message via the `::level props::data` shape GitHub's workflow-command parser requires.
         return sprintf('::%s %s::%s', $level, implode(',', $properties), $this->escapeData($finding->message));
     }
 
     /**
      * Escape annotation property text according to GitHub command rules.
      *
-     * @return string Escaped property value.
+     * @param string $text - Raw property value; property context also reserves `:` and `,` as delimiters.
+     *
+     * @return string - Escaped property value.
      */
     private function escapeProperty(string $text): string
     {
+        // Property values additionally escape `:` and `,` because those delimit the property list itself.
         return str_replace(
             ['%', "\r", "\n", ':', ','],
             ['%25', '%0D', '%0A', '%3A', '%2C'],
@@ -74,10 +82,13 @@ final readonly class GithubAnnotationsReporter
     /**
      * Escape annotation message text according to GitHub command rules.
      *
-     * @return string Escaped data value.
+     * @param string $text - Raw message body; only `%` and newlines are reserved in the data segment.
+     *
+     * @return string - Escaped data value.
      */
     private function escapeData(string $text): string
     {
+        // The data segment only reserves `%` and newlines, so `:` and `,` pass through unescaped here.
         return str_replace(
             ['%', "\r", "\n"],
             ['%25', '%0D', '%0A'],

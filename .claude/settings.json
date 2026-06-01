@@ -1,6 +1,9 @@
 {
   "permissions": {
-    "allow": ["Read(.env.example)", "Read(**/.env.example)"],
+    "allow": [
+      "Read(.env.example)",
+      "Read(**/.env.example)"
+    ],
     "deny": [
       "Bash(*git commit*)",
       "Bash(*git push*)",
@@ -69,7 +72,36 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/deny-dangerous.sh\""
+            "command": "gcd=\"$(git rev-parse --git-common-dir 2>/dev/null)\" || { printf 'BLOCKED: Guard cannot start: git repository root unavailable.\\n' >&2; exit 2; }; case \"$gcd\" in /*) root=\"$(dirname \"$gcd\")\" ;; *) root=\"$(git rev-parse --show-toplevel)\" ;; esac; bash \"$root/.claude/hooks/deny-dangerous.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "gcd=\"$(git rev-parse --git-common-dir 2>/dev/null)\" || { printf 'BLOCKED: Guard cannot start: git repository root unavailable.\\n' >&2; exit 2; }; case \"$gcd\" in /*) root=\"$(dirname \"$gcd\")\" ;; *) root=\"$(git rev-parse --show-toplevel)\" ;; esac; bash \"$root/.claude/hooks/gruff-code-quality.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "gcd=\"$(git rev-parse --git-common-dir 2>/dev/null)\" || { printf 'BLOCKED: Guard cannot start: git repository root unavailable.\\n' >&2; exit 2; }; case \"$gcd\" in /*) root=\"$(dirname \"$gcd\")\" ;; *) root=\"$(git rev-parse --show-toplevel)\" ;; esac; bash \"$root/.claude/hooks/gruff-code-quality.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "gcd=\"$(git rev-parse --git-common-dir 2>/dev/null)\" || { printf 'BLOCKED: Guard cannot start: git repository root unavailable.\\n' >&2; exit 2; }; case \"$gcd\" in /*) root=\"$(dirname \"$gcd\")\" ;; *) root=\"$(git rev-parse --show-toplevel)\" ;; esac; bash \"$root/.claude/hooks/gruff-code-quality.sh\""
           }
         ]
       }

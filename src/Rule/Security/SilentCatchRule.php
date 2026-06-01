@@ -29,7 +29,7 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Describe the silent catch rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +46,10 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Find catch blocks that only contain no-op statements.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for swallowed exceptions.
+     * @return list<Finding> - Findings for swallowed exceptions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -79,16 +79,20 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Check whether a catch block has no executable handling statements.
      *
-     * @return bool True when the catch body is silent.
+     * @param Stmt\Catch_ $catch - Parsed catch block whose body statements are inspected for any real handling.
+     *
+     * @return bool - True when the catch body is silent.
      */
     private function isSilent(Stmt\Catch_ $catch): bool
     {
         foreach ($catch->stmts as $statement) {
             if (!$statement instanceof Stmt\Nop) {
+                // A non-Nop statement is real handling, so the catch is not silent.
                 return false;
             }
         }
 
+        // Only Nop placeholders remain, so the exception is caught and dropped without action.
         return true;
     }
 }

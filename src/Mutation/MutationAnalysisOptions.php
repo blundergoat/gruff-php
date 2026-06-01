@@ -12,13 +12,13 @@ final readonly class MutationAnalysisOptions
     /**
      * Capture mutation-analysis inputs requested for an analyse invocation.
      *
-     * @param string|null $infectionReportPath           Path to an existing Infection report.
-     * @param bool        $shouldRunInfection            Whether gruff should invoke Infection directly.
-     * @param string      $infectionBin                  Infection executable path or command name.
-     * @param string|null $infectionConfigPath           Infection config path, when supplied.
-     * @param string|null $infectionTestFrameworkOptions Extra test-framework options passed to Infection.
-     * @param string|null $mutationBaselinePath          Mutation baseline path, when supplied.
-     * @param int|null    $mutationBudget                Allowed mutation score budget, when configured.
+     * @param string|null $infectionReportPath - Path to an existing Infection report.
+     * @param bool        $shouldRunInfection - Whether gruff should invoke Infection directly.
+     * @param string      $infectionBin - Infection executable path or command name.
+     * @param string|null $infectionConfigPath - Infection config path, when supplied.
+     * @param string|null $infectionTestFrameworkOptions - Extra test-framework options passed to Infection.
+     * @param string|null $mutationBaselinePath - Mutation baseline path, when supplied.
+     * @param int|null    $mutationBudget - Allowed mutation score budget, when configured.
      */
     public function __construct(
         public ?string $infectionReportPath,
