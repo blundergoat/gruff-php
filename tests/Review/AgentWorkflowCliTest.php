@@ -592,7 +592,8 @@ final class AgentWorkflowCliTest extends TestCase
      *
      * @param Process $process - finished CLI process whose stdout holds the report JSON; caller must run it first.
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed> - decoded top-level JSON object keyed by report field; non-object
+     *   payloads fail the test
      * @throws JsonException
      */
     private function decodeJson(Process $process): array

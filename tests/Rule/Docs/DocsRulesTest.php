@@ -8,6 +8,7 @@ use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\Docs\MissingParamTagRule;
 use GruffPhp\Rule\Docs\MissingPublicPhpdocRule;
 use GruffPhp\Rule\Docs\MissingReturnTagRule;
+use GruffPhp\Rule\Docs\PhpdocTagText;
 use GruffPhp\Rule\Docs\ReturnCommentRule;
 
 /**
@@ -378,6 +379,43 @@ final class DocsRulesTest extends DocsRuleTestCase
                  ] as $silentSymbol) {
             self::assertNotContains($silentSymbol, $symbols, $silentSymbol . ' must not be flagged by docs.return-comment');
         }
+    }
+
+    /**
+     * Verify multiline array-shape return tags are scanned through their closing type line.
+     *
+     * @return void
+     */
+    public function testReturnTagTextReadsMultilineReturnDescriptions(): void
+    {
+        $described = <<<'PHPDOC'
+/**
+ * Build payload.
+ *
+ * @return array{
+ *     id: string,
+ *     rows: list<string>
+ * } - payload keyed by id with rows in display order
+ */
+PHPDOC;
+        $bare      = <<<'PHPDOC'
+/**
+ * Build payload.
+ *
+ * @return array{
+ *     id: string,
+ *     rows: list<string>
+ * }
+ */
+PHPDOC;
+
+        $describedBody = PhpdocTagText::returnTagBody($described);
+        $bareBody      = PhpdocTagText::returnTagBody($bare);
+
+        self::assertNotNull($describedBody);
+        self::assertNotNull($bareBody);
+        self::assertTrue(PhpdocTagText::hasReturnTagDescription($describedBody));
+        self::assertFalse(PhpdocTagText::hasReturnTagDescription($bareBody));
     }
 
     /**

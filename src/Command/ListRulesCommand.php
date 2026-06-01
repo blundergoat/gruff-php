@@ -205,12 +205,23 @@ final class ListRulesCommand extends Command
      * @param RuleDefinition $definition Rule whose metadata, thresholds, options, and escape hatches are serialised.
      * @param bool           $enabled    Effective project enabled state; emitted as the `defaultEnabled` field.
      *
-     * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool,
-     *                   description: string, thresholds: array<string, int|float|string>|\stdClass, options: array<string,
-     *                   int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, optionDescriptions: array<string,
-     *                   string>|\stdClass, escapeHatches: list<array{path: string, description: string}>, falsePositiveShapes: list<array{shape:
-     *                   string, mitigation: string}>} - the JSON-ready detail document; empty option/threshold maps are stdClass so they encode as
-     *                   `{}` rather than `[]`
+     * @return array - JSON-ready detail document; empty option/threshold maps are stdClass so they
+     *                   encode as `{}` rather than `[]`
+     * @phpstan-return array{
+     *     id: string,
+     *     name: string,
+     *     pillar: string,
+     *     tier: string,
+     *     defaultSeverity: string,
+     *     confidence: string,
+     *     defaultEnabled: bool,
+     *     description: string,
+     *     thresholds: array<string, int|float|string>|\stdClass,
+     *     options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass,
+     *     optionDescriptions: array<string, string>|\stdClass,
+     *     escapeHatches: list<array{path: string, description: string}>,
+     *     falsePositiveShapes: list<array{shape: string, mitigation: string}>
+     * }
      */
     private function ruleDetailPayload(RuleDefinition $definition, bool $enabled): array
     {

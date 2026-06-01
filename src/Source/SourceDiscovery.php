@@ -361,10 +361,15 @@ final readonly class SourceDiscovery
      * @param list<string> $requestedPaths
      * @param list<string> $configuredIgnorePatterns
      *
-     * @return array{missingPaths: list<string>, ignoredDetails: list<IgnoredPath>, pathspecs: list<string>, requestedExistingPaths:
-     *                             list<array{absolutePath: string, pathspec: string, isFile: bool}>}|null - pre-resolved Git query inputs (pathspecs
-     *                             to list plus missing/ignored records found so far), or null when any request reaches outside the project root and
-     *                             Git discovery must be abandoned
+     * @return array|null - pre-resolved Git query inputs (pathspecs to list plus missing/ignored
+     *                      records found so far), or null when any request reaches outside the
+     *                      project root and Git discovery must be abandoned
+     * @phpstan-return array{
+     *     missingPaths: list<string>,
+     *     ignoredDetails: list<IgnoredPath>,
+     *     pathspecs: list<string>,
+     *     requestedExistingPaths: list<array{absolutePath: string, pathspec: string, isFile: bool}>
+     * }|null
      */
     private function buildGitDiscoveryRequest(array $requestedPaths, array $configuredIgnorePatterns): ?array
     {

@@ -9,5 +9,13 @@ if ! command -v composer >/dev/null 2>&1; then
   exit 127
 fi
 
+if ! command -v npm >/dev/null 2>&1; then
+  echo "error: npm is not available on PATH" >&2
+  exit 127
+fi
+
 composer update --no-interaction --with-all-dependencies --no-progress --no-audit "$@"
 composer audit:dependencies
+
+npm update --no-audit
+npm audit

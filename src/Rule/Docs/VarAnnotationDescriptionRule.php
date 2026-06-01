@@ -25,7 +25,7 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\NodeFinder;
 
 /**
- * Detects local @var assertions that omit the reason the assertion is needed.
+ * Detects local var assertions that omit the reason the assertion is needed.
  */
 final readonly class VarAnnotationDescriptionRule implements RuleInterface
 {
@@ -35,10 +35,9 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public const ID = 'docs.var-annotation-description';
 
     /**
-     * Describe the local @return RuleDefinition - metadata and defaults the registry uses to wire this rule (id, pillar, tier, severity).
+     * Describe the local var-annotation description rule.
      *
-     * @var annotation description rule.
-     *
+     * @return RuleDefinition - metadata and defaults the registry uses to wire this rule
      */
     public function definition(): RuleDefinition
     {
@@ -55,13 +54,12 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * Find local var assertions that do not explain why the assertion is needed.
      *
-     * @param RuleContext $ruleContext Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - parsed unit to inspect
+     * @param RuleContext $ruleContext - rule context for this analysis pass
      *
-     * @return list<Finding> - one finding per bare local @var assertion; empty when every assertion carries a reason.
-     * @var assertions that do not explain why the assertion is needed.
-     *
+     * @return list<Finding> - one finding per bare local var assertion; empty when every assertion carries a reason
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -144,12 +142,12 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local @param string $docText Raw docblock text, including the comment markers, that trim() strips line by line.
+     * Find local var assertion tags that name a type without explaining intent.
      *
-     * @return list<string> - variable names whose local @var stated a type but no reason; empty when the docblock
-     *                         carries any prose line or every @var annotations that name a type without explaining intent.
+     * @param string $docText - raw docblock text, including the comment markers
      *
-     * @var already explains itself
+     * @return list<string> - variable names whose local var assertion stated a type but no reason; empty
+     *   when the docblock carries any prose line
      */
     private function bareVarAnnotations(string $docText): array
     {

@@ -28,8 +28,13 @@ use SplFileInfo;
  * @phpstan-type InvalidReportLevel3 array<array-key, InvalidReportScalar|InvalidReportLevel4>
  * @phpstan-type InvalidReportLevel2 array<array-key, InvalidReportScalar|InvalidReportLevel3>
  * @phpstan-type InvalidReportLevel1 array<array-key, InvalidReportScalar|InvalidReportLevel2>
- * @phpstan-type InvalidReportValue
- *               InvalidReportScalar|InvalidReportLevel1|InvalidReportLevel2|InvalidReportLevel3|InvalidReportLevel4|InvalidReportLevel5|InvalidReportLevel6|InvalidReportLevel7|InvalidReportLevel8|InvalidReportLevel9|InvalidReportLevel10
+ * @phpstan-type InvalidReportLevel1To3 InvalidReportLevel1|InvalidReportLevel2|InvalidReportLevel3
+ * @phpstan-type InvalidReportLevel4To6 InvalidReportLevel4|InvalidReportLevel5|InvalidReportLevel6
+ * @phpstan-type InvalidReportLevel7To8 InvalidReportLevel7|InvalidReportLevel8
+ * @phpstan-type InvalidReportLevel9To10 InvalidReportLevel9|InvalidReportLevel10
+ * @phpstan-type InvalidReportNestedA InvalidReportLevel1To3|InvalidReportLevel4To6
+ * @phpstan-type InvalidReportNestedB InvalidReportLevel7To8|InvalidReportLevel9To10
+ * @phpstan-type InvalidReportValue InvalidReportScalar|InvalidReportNestedA|InvalidReportNestedB
  * @phpstan-type InvalidReportShape array<string, InvalidReportValue>
  */
 final class InfectionReportParserTest extends TestCase

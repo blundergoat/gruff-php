@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-05-31. Captures the v0.3.0 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-06-01. Captures the v0.3.0 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -144,7 +144,9 @@ src/
 |   |   |-- MissingReadmeRule.php             = `docs.missing-readme` (project-root scoped; runs on every unit but emits at most once per run via short-circuit)
 |   |   |-- MissingReturnTagRule.php          = `docs.missing-return-tag` (flags any documented method/function without `@return`, excluding constructors/destructors)
 |   |   |-- MissingThrowsTagRule.php          = `docs.missing-throws-tag`
+|   |   |-- PhpdocTagText.php                 = shared PHPDoc tag-text parsing for docs.bare-phpdoc-tags and docs.return-comment
 |   |   |-- RegexCommentRule.php              = `docs.regex-comment` (requires an immediate one-line comment explaining configured regex matcher calls, defaulting to `preg_match`)
+|   |   |-- ReturnCommentRule.php             = `docs.return-comment` (flags value-returning function-like declarations whose existing `@return` tag has no description)
 |   |   |-- StaleParamTagRule.php             = `docs.stale-param-tag`
 |   |   |-- TodoDensityRule.php               = `docs.todo-density`
 |   |   |-- BarePhpdocTagsRule.php            = `docs.bare-phpdoc-tags`
