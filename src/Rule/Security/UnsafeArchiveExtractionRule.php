@@ -30,11 +30,10 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     /**
      * Describe the unsafe archive extraction rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unsafe archive extraction',
@@ -48,10 +47,10 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     /**
      * Find archive extraction calls with request-controlled destinations or entries.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unsafe archive extraction.
+     * @return list<Finding> - Findings for unsafe archive extraction.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -80,17 +79,16 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per extractTo() call whose destination or entry list came from request data.
         return $findings;
     }
 
     /**
      * Check whether an extractTo() call draws its destination or entry list from request input.
      *
-     * @param Expr\MethodCall|Expr\StaticCall $call extractTo() call whose first two arguments (destination, entries)
+     * @param Expr\MethodCall|Expr\StaticCall $call - extractTo() call whose first two arguments (destination, entries)
      *                                              are taint-checked against request data.
      *
-     * @return bool True when destination or selected entries come from request data.
+     * @return bool - True when destination or selected entries come from request data.
      */
     private function hasRequestControlledExtractionArgument(Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -109,10 +107,10 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
     /**
      * Build the unsafe archive extraction finding.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path recorded on the finding.
-     * @param Node         $node         extractTo() call flagged as unsafe; its start line locates the finding.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node - extractTo() call flagged as unsafe; its start line locates the finding.
      *
-     * @return Finding Security finding.
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {

@@ -12,8 +12,8 @@ use GruffPhp\Finding\Finding;
 final readonly class DiffFilterResult
 {
     /**
-     * @param list<Finding> $findings        Findings retained in the changed scope.
-     * @param int           $suppressedCount Findings excluded as out of scope.
+     * @param list<Finding> $findings - Findings retained in the changed scope.
+     * @param int           $suppressedCount - Findings excluded as out of scope.
      */
     public function __construct(
         public array $findings,

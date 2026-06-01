@@ -30,7 +30,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Describe the test naming consistency rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Find test method names that do not follow the configured convention.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for inconsistent test names.
+     * @return list<Finding> - Findings for inconsistent test names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -94,14 +94,13 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per class that mixed both casings; consistent classes contribute nothing.
         return $findings;
     }
 
     /**
      * Collect test methods declared directly on a class.
      *
-     * @param Class_ $class Class declaration whose statement list is scanned.
+     * @param Class_ $class - Class declaration whose statement list is scanned.
      *
      * @return list<ClassMethod> - methods whose names start with `test`, in declaration order
      */
@@ -121,7 +120,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     /**
      * Count camelCase and snake_case test method names.
      *
-     * @param list<ClassMethod> $testMethods Test methods being classified by naming style.
+     * @param list<ClassMethod> $testMethods - Test methods being classified by naming style.
      *
      * @return array{camelCase: int, snake_case: int} - method counts keyed by naming style
      */

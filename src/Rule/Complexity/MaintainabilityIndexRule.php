@@ -32,7 +32,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Describe the maintainability index rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -53,9 +53,10 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Find function-like declarations whose maintainability index falls below thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
-     * @return list<Finding> Findings for low maintainability index scores.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying thresholds.
+     *
+     * @return list<Finding> - Findings for low maintainability index scores.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -109,10 +110,10 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node         Function-like node to score.
-     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the node.
+     * @param ClassMethod|Function_ $node - Function-like node to score.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit that owns the node.
      *
-     * @return float Maintainability index score.
+     * @return float - Maintainability index score.
      */
     public static function computeMaintainabilityIndex(Node $node, AnalysisUnit $analysisUnit): float
     {
@@ -138,9 +139,9 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Configured maintainability threshold; an integral float drops its ".0" tail.
+     * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
      *
-     * @return string Human-readable threshold value.
+     * @return string - Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {

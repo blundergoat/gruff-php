@@ -35,7 +35,7 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Describe the request-controlled URL rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -53,10 +53,10 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Find URL sinks that receive request-controlled expressions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for request-controlled URL access.
+     * @return list<Finding> - Findings for request-controlled URL access.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -74,17 +74,16 @@ final class RequestControlledUrlRule implements RuleInterface
             array_push($findings, ...$this->httpClientFindings($analysisUnit, $call));
         }
 
-        // Hand back the merged findings from every curl/stream-wrapper call and every HTTP-client method invocation.
         return $findings;
     }
 
     /**
      * Build http client findings for the security rule.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path for any finding.
-     * @param Expr\MethodCall|Expr\StaticCall $call Client call whose URL argument is checked for request taint.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path for any finding.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Client call whose URL argument is checked for request taint.
      *
-     * @return list<Finding> One finding when an HTTP-client URL argument is request-controlled, otherwise empty.
+     * @return list<Finding> - One finding when an HTTP-client URL argument is request-controlled, otherwise empty.
      */
     private function httpClientFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
@@ -108,10 +107,10 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Build function findings for the security rule.
      *
-     * @param AnalysisUnit  $analysisUnit Unit being scanned; supplies the display path for any finding.
-     * @param Expr\FuncCall $call         Global-function call routed by name to the matching curl/stream-wrapper check.
+     * @param AnalysisUnit  $analysisUnit - Unit being scanned; supplies the display path for any finding.
+     * @param Expr\FuncCall $call - Global-function call routed by name to the matching curl/stream-wrapper check.
      *
-     * @return list<Finding> A single finding when the matched function reads a request-controlled URL, otherwise empty.
+     * @return list<Finding> - A single finding when the matched function reads a request-controlled URL, otherwise empty.
      */
     private function functionFindings(AnalysisUnit $analysisUnit, Expr\FuncCall $call): array
     {
@@ -148,9 +147,9 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Detect curl_init() with a request-controlled URL.
      *
-     * @param Expr\FuncCall $call curl_init() call whose first (URL) argument is inspected for request taint.
+     * @param Expr\FuncCall $call - curl_init() call whose first (URL) argument is inspected for request taint.
      *
-     * @return bool True when the first argument reads request data.
+     * @return bool - True when the first argument reads request data.
      */
     private function hasCurlInitRequestUrl(Expr\FuncCall $call): bool
     {
@@ -163,9 +162,9 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Detect curl_setopt(CURLOPT_URL, ...) with a request-controlled URL.
      *
-     * @param Expr\FuncCall $call curl_setopt() call whose option (arg 1) and value (arg 2) are checked for URL taint.
+     * @param Expr\FuncCall $call - curl_setopt() call whose option (arg 1) and value (arg 2) are checked for URL taint.
      *
-     * @return bool True when the URL option value reads request data.
+     * @return bool - True when the URL option value reads request data.
      */
     private function hasCurlSetoptRequestUrl(Expr\FuncCall $call): bool
     {
@@ -182,9 +181,9 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Detect CURLOPT_URL entries in curl_setopt_array().
      *
-     * @param Expr\FuncCall $call curl_setopt_array() call whose option-map (arg 1) is scanned for a tainted URL.
+     * @param Expr\FuncCall $call - curl_setopt_array() call whose option-map (arg 1) is scanned for a tainted URL.
      *
-     * @return bool True when the option map contains a request-controlled URL.
+     * @return bool - True when the option map contains a request-controlled URL.
      */
     private function hasCurlSetoptArrayRequestUrl(Expr\FuncCall $call): bool
     {
@@ -212,9 +211,9 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Detect stream-wrapper URL fetches with request-controlled URL pieces.
      *
-     * @param Expr\FuncCall $call file_get_contents()/fopen()/readfile() call whose path (arg 0) is taint-checked.
+     * @param Expr\FuncCall $call - file_get_contents()/fopen()/readfile() call whose path (arg 0) is taint-checked.
      *
-     * @return bool True when a stream wrapper call uses request-controlled URL construction.
+     * @return bool - True when a stream wrapper call uses request-controlled URL construction.
      */
     private function hasStreamWrapperRequestUrl(Expr\FuncCall $call): bool
     {
@@ -229,12 +228,12 @@ final class RequestControlledUrlRule implements RuleInterface
     /**
      * Build the request-controlled URL finding.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path reported to the reviewer.
-     * @param Node         $node         Tainted sink node whose start line anchors the finding for the reviewer.
-     * @param string       $sink         Sink discriminator (the curl/stream function name or HTTP verb) echoed into the
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
+     * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
+     * @param string       $sink - Sink discriminator (the curl/stream function name or HTTP verb) echoed into the
      *                                   message and metadata so callers can tell which construct fired.
      *
-     * @return Finding Security finding.
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {

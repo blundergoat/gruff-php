@@ -16,11 +16,12 @@ final readonly class BaselineApplication
     /**
      * Apply an existing baseline file without building report metadata.
      *
-     * @param string        $projectRoot  Project root used to resolve the baseline path.
-     * @param string        $baselinePath Baseline path to read.
-     * @param list<Finding> $findings     Findings to filter.
+     * @param string        $projectRoot - Project root used to resolve the baseline path.
+     * @param string        $baselinePath - Baseline path to read.
+     * @param list<Finding> $findings - Findings to filter.
      * @throws BaselineException When the baseline cannot be read or validated.
-     * @return list<Finding> Filtered findings.
+     *
+     * @return list<Finding> - Filtered findings.
      */
     public function filterExisting(string $projectRoot, string $baselinePath, array $findings): array
     {
@@ -31,12 +32,13 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param string                     $projectRoot Project root used to resolve baseline paths.
-     * @param BaselineApplicationOptions $options     Baseline application options selected for this run.
-     * @param list<Finding>              $findings    Findings to generate from or filter in place.
-     * @param DiffResult|null            $diff        Diff scope used to preserve changed-line findings when present.
-     * @param list<RunDiagnostic>        $diagnostics Diagnostics collected during baseline handling.
-     * @return BaselineReport|null Baseline report when a baseline was generated or applied.
+     * @param string                     $projectRoot - Project root used to resolve baseline paths.
+     * @param BaselineApplicationOptions $options - Baseline application options selected for this run.
+     * @param list<Finding>              $findings - Findings to generate from or filter in place.
+     * @param DiffResult|null            $diff - Diff scope used to preserve changed-line findings when present.
+     * @param list<RunDiagnostic>        $diagnostics - Diagnostics collected during baseline handling.
+     *
+     * @return BaselineReport|null - Baseline report when a baseline was generated or applied.
      */
     public function apply(
         string $projectRoot,
@@ -68,11 +70,12 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param BaselineStore       $store                Store that writes and locates the baseline file.
-     * @param string              $generateBaselinePath Destination path to write the new baseline to.
-     * @param list<Finding>       $findings             Findings to record as the new baseline snapshot.
-     * @param list<RunDiagnostic> $diagnostics          Accumulator; a write failure appends a baseline-error entry.
-     * @return BaselineReport|null Generated baseline report, or null when writing fails.
+     * @param BaselineStore       $store - Store that writes and locates the baseline file.
+     * @param string              $generateBaselinePath - Destination path to write the new baseline to.
+     * @param list<Finding>       $findings - Findings to record as the new baseline snapshot.
+     * @param list<RunDiagnostic> $diagnostics - Accumulator; a write failure appends a baseline-error entry.
+     *
+     * @return BaselineReport|null - Generated baseline report, or null when writing fails.
      */
     private function generate(
         BaselineStore $store,
@@ -107,12 +110,13 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param BaselineStore              $store       Store that reads the baseline file from disk.
-     * @param BaselineApplicationOptions $options     Baseline path plus whether it was explicitly set or defaulted.
-     * @param list<Finding>              $findings    Filtered in place; replaced with the surviving (unmatched) set.
-     * @param DiffResult|null            $diff        Changed-line findings stay unsuppressed; null disables diff scope.
-     * @param list<RunDiagnostic>        $diagnostics Accumulator; a read failure appends a baseline-error entry.
-     * @return BaselineReport|null Applied baseline report, or null when reading fails.
+     * @param BaselineStore              $store - Store that reads the baseline file from disk.
+     * @param BaselineApplicationOptions $options - Baseline path plus whether it was explicitly set or defaulted.
+     * @param list<Finding>              $findings - Filtered in place; replaced with the surviving (unmatched) set.
+     * @param DiffResult|null            $diff - Changed-line findings stay unsuppressed; null disables diff scope.
+     * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read failure appends a baseline-error entry.
+     *
+     * @return BaselineReport|null - Applied baseline report, or null when reading fails.
      */
     private function applyExistingBaseline(
         BaselineStore $store,

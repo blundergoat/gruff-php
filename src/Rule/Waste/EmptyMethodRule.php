@@ -31,7 +31,7 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Describe the empty method rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -49,9 +49,10 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Find function-like declarations with empty bodies.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for empty methods or functions.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - Findings for empty methods or functions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -98,8 +99,9 @@ final readonly class EmptyMethodRule implements RuleInterface
     /**
      * Allow empty constructors that only define promoted properties.
      *
-     * @param ClassMethod $classMethod Method to test; only `__construct` with promoted params earns the exemption.
-     * @return bool True when the constructor exists solely for property promotion.
+     * @param ClassMethod $classMethod - Method to test; only `__construct` with promoted params earns the exemption.
+     *
+     * @return bool - True when the constructor exists solely for property promotion.
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {

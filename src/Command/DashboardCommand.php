@@ -58,9 +58,10 @@ final class DashboardCommand extends Command
     /**
      * Validate dashboard options and start the local dashboard server.
      *
-     * @param InputInterface  $input  Parsed dashboard arguments and options: paths, host, port, and scan flags.
-     * @param OutputInterface $output Destination for validation error messages shown before the server starts.
-     * @return int Symfony command exit code.
+     * @param InputInterface  $input - Parsed dashboard arguments and options: paths, host, port, and scan flags.
+     * @param OutputInterface $output - Destination for validation error messages shown before the server starts.
+     *
+     * @return int - Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -114,16 +115,16 @@ final class DashboardCommand extends Command
         $dashboardRequestContext = new DashboardRequestContext($input, $cwd, $projectRoot, $scanTimeout, $host, $port);
         $dashboardServer         = new DashboardServer($dashboardStateFactory, $this->gruffBinary());
 
-        // Hand back the server's own exit code; it blocks serving requests until the dashboard is stopped.
         return $dashboardServer->serve($output, $host, $port, $dashboardRequestContext);
     }
 
     /**
      * Parse and validate the dashboard port option.
      *
-     * @param InputInterface  $input  Source of the raw --port option, expected to be a digit string.
-     * @param OutputInterface $output Destination for the validation error shown when the port is out of range.
-     * @return int|false Valid port, or false when input is invalid.
+     * @param InputInterface  $input - Source of the raw --port option, expected to be a digit string.
+     * @param OutputInterface $output - Destination for the validation error shown when the port is out of range.
+     *
+     * @return int|false - Valid port, or false when input is invalid.
      */
     private function port(InputInterface $input, OutputInterface $output): int|false
     {
@@ -145,16 +146,16 @@ final class DashboardCommand extends Command
             return false;
         }
 
-        // Hand back the validated port, guaranteed to be within the bindable 1-65535 range.
         return $port;
     }
 
     /**
      * Parse and validate the dashboard scan timeout option.
      *
-     * @param InputInterface  $input  Source of the raw --scan-timeout option, expected to be a non-negative integer.
-     * @param OutputInterface $output Destination for the validation error shown when the timeout is invalid.
-     * @return float|false|null Timeout seconds, null for disabled timeout, or false for invalid input.
+     * @param InputInterface  $input - Source of the raw --scan-timeout option, expected to be a non-negative integer.
+     * @param OutputInterface $output - Destination for the validation error shown when the timeout is invalid.
+     *
+     * @return float|false|null - Timeout seconds, null for disabled timeout, or false for invalid input.
      */
     private function scanTimeout(InputInterface $input, OutputInterface $output): float|false|null
     {
@@ -176,7 +177,7 @@ final class DashboardCommand extends Command
     /**
      * Return the package-local gruff-php executable path.
      *
-     * @return string Absolute gruff-php binary path.
+     * @return string - Absolute gruff-php binary path.
      */
     private function gruffBinary(): string
     {

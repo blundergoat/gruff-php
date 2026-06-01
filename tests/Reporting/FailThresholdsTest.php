@@ -123,8 +123,8 @@ final class FailThresholdsTest extends TestCase
     /**
      * Verify fromConfig rejects malformed failureConditions with a descriptive ConfigException.
      *
-     * @param string $configJson      Malformed failureConditions block encoded as JSON.
-     * @param string $expectedMessage ConfigException message the parser must report.
+     * @param string $configJson - Malformed failureConditions block encoded as JSON.
+     * @param string $expectedMessage - ConfigException message the parser must report.
      *
      * @return void
      * @throws JsonException
@@ -251,13 +251,12 @@ final class FailThresholdsTest extends TestCase
     /**
      * Build a finding at the requested severity for gate evaluation.
      *
-     * @param Severity $severity Severity to attach to the finding.
+     * @param Severity $severity - Severity to attach to the finding.
      *
      * @return Finding - a fixed documentation-pillar finding so a test can exercise one severity band of the gate
      */
     private function finding(Severity $severity): Finding
     {
-        // Hand back a finding fixed at the requested severity so a test can drive one threshold band.
         return new Finding(
             ruleId:     'rule.example',
             message:    'Example finding.',

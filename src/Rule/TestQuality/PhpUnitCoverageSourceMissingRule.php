@@ -36,7 +36,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Create the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -46,7 +46,7 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Describe the PHPUnit coverage source rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -64,9 +64,10 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Report a project once when its PHPUnit config lacks coverage source configuration.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext  Rule context carrying project root.
-     * @return list<Finding> Findings for missing PHPUnit coverage source settings.
+     * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext - Rule context carrying project root.
+     *
+     * @return list<Finding> - Findings for missing PHPUnit coverage source settings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -119,8 +120,9 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
     /**
      * Check for PHPUnit 10 coverage source declarations.
      *
-     * @param \SimpleXMLElement $root Parsed <phpunit> root element whose coverage children are probed.
-     * @return bool True when a supported coverage source/include block exists.
+     * @param \SimpleXMLElement $root - Parsed <phpunit> root element whose coverage children are probed.
+     *
+     * @return bool - True when a supported coverage source/include block exists.
      */
     private function hasCoverageSource(\SimpleXMLElement $root): bool
     {

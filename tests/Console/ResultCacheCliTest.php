@@ -109,8 +109,9 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Run a cache-eligible security-profile scan, returning the completed process.
      *
-     * @param list<string> $extraArgs Additional CLI arguments.
-     * @return Process Completed analyse process.
+     * @param list<string> $extraArgs - Additional CLI arguments.
+     *
+     * @return Process - Completed analyse process.
      */
     private function runScan(array $extraArgs = []): Process
     {
@@ -123,15 +124,15 @@ final class ResultCacheCliTest extends CliTestCase
         );
         $process->run();
 
-        // Hand back the already-run scan process so the caller can assert on its cache behaviour.
         return $process;
     }
 
     /**
      * Decode the findings array from an analyse JSON report.
      *
-     * @param Process $process Completed analyse process whose stdout holds the JSON report.
-     * @return list<mixed> Findings list.
+     * @param Process $process - Completed analyse process whose stdout holds the JSON report.
+     *
+     * @return list<mixed> - Findings list.
      */
     private function decodeFindings(Process $process): array
     {
@@ -146,19 +147,19 @@ final class ResultCacheCliTest extends CliTestCase
     /**
      * Source for a file carrying one security finding (a dynamic eval call).
      *
-     * @return string PHP source.
+     * @return string - PHP source.
      */
     private function dangerSource(): string
     {
-        // Hand back fixture source that deliberately trips exactly one security finding.
         return "<?php\n\nnamespace Demo;\n\n/**\n * Danger fixture with a security finding.\n */\nclass Danger\n{\n    /**\n     * Run dynamic code.\n     *\n     * @param string \$code Code to evaluate.\n     * @return mixed Evaluation result.\n     */\n    public function run(string \$code): mixed\n    {\n        return eval(\$code);\n    }\n}\n";
     }
 
     /**
      * Source for the second file, optionally carrying a security finding.
      *
-     * @param bool $shouldIncludeFinding Whether to include a dynamic eval call.
-     * @return string PHP source.
+     * @param bool $shouldIncludeFinding - Whether to include a dynamic eval call.
+     *
+     * @return string - PHP source.
      */
     private function cleanSource(bool $shouldIncludeFinding): string
     {
@@ -166,15 +167,15 @@ final class ResultCacheCliTest extends CliTestCase
             ? "\n    /**\n     * Run dynamic code.\n     *\n     * @param string \$code Code to evaluate.\n     * @return mixed Evaluation result.\n     */\n    public function run(string \$code): mixed\n    {\n        return eval(\$code);\n    }\n"
             : '';
 
-        // Hand back fixture source that is clean unless the caller opted to inject the finding.
         return "<?php\n\nnamespace Demo;\n\n/**\n * Clean fixture.\n */\nclass Clean\n{\n    /**\n     * Add one to the amount.\n     *\n     * @param int \$amount Amount to increment.\n     * @return int Incremented amount.\n     */\n    public function add(int \$amount): int\n    {\n        return \$amount + 1;\n    }\n{$method}}\n";
     }
 
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
+     *
      * @return void
      */
     private function writeProjectFile(string $path, string $contents): void

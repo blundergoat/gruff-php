@@ -133,7 +133,6 @@ final class GitArchiveSnapshotTest extends TestCase
      */
     public static function unsafeRefProvider(): array
     {
-        // Each row is a ref git must reject before archiving: option flags, or names argv could pass as options.
         return [
             'no-renames option'  => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
@@ -145,7 +144,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Verify create rejects unsafe refs before archiving.
      *
-     * @param string $ref Unsafe git ref input.
+     * @param string $ref - Unsafe git ref input.
      *
      * @return void
      */
@@ -187,7 +186,6 @@ final class GitArchiveSnapshotTest extends TestCase
         $this->runGit($repo, ...['add', 'src/Target.php', 'src/Unrelated.php', 'big/Unrelated.txt']);
         $this->runGit($repo, 'commit', '-m', 'base');
 
-        // Hand back the committed repo root; the caller snapshots from it and owns teardown via removeDir().
         return $repo;
     }
 
@@ -253,8 +251,8 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
      *
      * @return void
      */
@@ -269,7 +267,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @param string $prefix Temporary directory prefix.
+     * @param string $prefix - Temporary directory prefix.
      *
      * @return string - absolute path to the freshly created directory; the caller owns it and must tear it down via removeDir()
      */
@@ -286,7 +284,7 @@ final class GitArchiveSnapshotTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

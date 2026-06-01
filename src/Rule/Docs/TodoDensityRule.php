@@ -29,7 +29,7 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Describe the TODO density rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Count TODO-style markers in comments and report files above threshold.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for excessive TODO density.
+     * @return list<Finding> - Findings for excessive TODO density.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -108,8 +108,9 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Check whether a token is a normal comment or docblock.
      *
-     * @param Token $token Lexer token from the parsed unit; only comment-bearing kinds can hold a marker.
-     * @return bool True when the token can contain TODO markers.
+     * @param Token $token - Lexer token from the parsed unit; only comment-bearing kinds can hold a marker.
+     *
+     * @return bool - True when the token can contain TODO markers.
      */
     private function isCommentToken(Token $token): bool
     {

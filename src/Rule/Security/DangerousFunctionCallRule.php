@@ -50,7 +50,7 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Describe the dangerous function call rule.
      *
-     * @return RuleDefinition the registry entry the engine keys this rule by; severity stays Warning
+     * @return RuleDefinition - the registry entry the engine keys this rule by; severity stays Warning
      *   (not Error) because a flagged call may be a legitimate constrained wrapper a human must judge
      */
     public function definition(): RuleDefinition
@@ -69,12 +69,12 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find dynamic execution, eval, assert-string, and dangerous shell calls.
      *
-     * @param AnalysisUnit $analysisUnit single parsed file the caller wants scanned; its AST and token
+     * @param AnalysisUnit $analysisUnit - single parsed file the caller wants scanned; its AST and token
      *   stream are the only source consulted, so cross-file callable definitions are invisible here
-     * @param RuleContext  $ruleContext  shared per-run context; this rule reads no settings from it but
+     * @param RuleContext  $ruleContext - shared per-run context; this rule reads no settings from it but
      *   the interface requires it, so callers pass the same instance used for every rule in the pass
      *
-     * @return list<Finding> one Finding per suspicious call site, empty when none match; callers treat
+     * @return list<Finding> - one Finding per suspicious call site, empty when none match; callers treat
      *   the list as advisory evidence for review, not a proven vulnerability
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
@@ -118,9 +118,9 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find local variables assigned a closure, arrow function, or static callable array.
      *
-     * @param AnalysisUnit $analysisUnit file to scan for `$x = fn/closure/[obj, 'method']` assignments
+     * @param AnalysisUnit $analysisUnit - file to scan for `$x = fn/closure/[obj, 'method']` assignments
      *
-     * @return array<string, true> set of variable names known to hold callables, used as a name allow-list
+     * @return array<string, true> - set of variable names known to hold callables, used as a name allow-list
      *   so a later `$x(...)` is not flagged as an unknown dynamic call; values are always true (set semantics)
      */
     private function callableLocalVariableNames(AnalysisUnit $analysisUnit): array
@@ -146,9 +146,9 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find foreach value variables that iterate a property known to hold callables.
      *
-     * @param AnalysisUnit $analysisUnit file to scan for `foreach ($this->handlers as $h)` loops
+     * @param AnalysisUnit $analysisUnit - file to scan for `foreach ($this->handlers as $h)` loops
      *
-     * @return array<string, true> set of loop-variable names treated as callables, so invoking `$h(...)`
+     * @return array<string, true> - set of loop-variable names treated as callables, so invoking `$h(...)`
      *   inside the loop body is not flagged; values are always true (set semantics)
      */
     private function callableForeachVariableNames(AnalysisUnit $analysisUnit): array
@@ -175,9 +175,9 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find properties populated as callable collections via `$this->prop[] = fn(...)`.
      *
-     * @param AnalysisUnit $analysisUnit file to scan for array-append writes of callables onto a property
+     * @param AnalysisUnit $analysisUnit - file to scan for array-append writes of callables onto a property
      *
-     * @return array<string, true> set of property names whose elements are callables; feeds
+     * @return array<string, true> - set of property names whose elements are callables; feeds
      *   callableForeachVariableNames so a foreach over one of them is recognised; values are always true
      */
     private function callableCollectionPropertyNames(AnalysisUnit $analysisUnit): array
@@ -204,9 +204,9 @@ final class DangerousFunctionCallRule implements RuleInterface
     /**
      * Find function and method parameters declared with a callable-like type hint.
      *
-     * @param AnalysisUnit $analysisUnit file to scan for `callable`/`Closure`/`*Callable`-typed parameters
+     * @param AnalysisUnit $analysisUnit - file to scan for `callable`/`Closure`/`*Callable`-typed parameters
      *
-     * @return array<string, true> set of parameter names that arrive already typed as callables, so a call
+     * @return array<string, true> - set of parameter names that arrive already typed as callables, so a call
      *   through one is trusted rather than flagged; names are not scoped per-function, so a callable name in
      *   one method suppresses the same name everywhere in the file (a deliberate over-suppress to avoid noise)
      */
@@ -236,9 +236,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Find properties that hold callables, via a callable type hint, a `@var callable` docblock, or
      * a promoted constructor parameter typed as callable.
      *
-     * @param AnalysisUnit $analysisUnit file to scan for callable-typed or callable-documented properties
+     * @param AnalysisUnit $analysisUnit - file to scan for callable-typed or callable-documented properties
      *
-     * @return array<string, true> set of property names treated as callables, so `$this->prop(...)` is
+     * @return array<string, true> - set of property names treated as callables, so `$this->prop(...)` is
      *   trusted; values are always true (set semantics)
      */
     private function callablePropertyNames(AnalysisUnit $analysisUnit): array
@@ -280,13 +280,13 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Decide whether a dynamic call target ($var() or $this->prop()) resolves to a slot already
      * proven to hold a callable, which is the gate that turns a finding off.
      *
-     * @param Node                $name               the callee expression from a FuncCall whose
+     * @param Node                $name - the callee expression from a FuncCall whose
      *   `name` is not a plain function Name; only Variable and PropertyFetch forms can be vindicated
-     * @param array<string, true> $callableParameters callable-typed parameter names from the file
-     * @param array<string, true> $callableProperties callable-typed or callable-documented property names
-     * @param array<string, true> $callableLocals     local and foreach variable names assigned callables
+     * @param array<string, true> $callableParameters - callable-typed parameter names from the file
+     * @param array<string, true> $callableProperties - callable-typed or callable-documented property names
+     * @param array<string, true> $callableLocals - local and foreach variable names assigned callables
      *
-     * @return bool true means "trusted callable, do not flag"; false means the target is unproven and the
+     * @return bool - true means "trusted callable, do not flag"; false means the target is unproven and the
      *   caller should record a dynamic-call finding (false is the safe default, not a positive denial)
      */
     private function isKnownCallableInvocation(Node $name, array $callableParameters, array $callableProperties, array $callableLocals): bool
@@ -309,9 +309,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Recognise a property whose type is untyped or too loose for isCallableType but whose `@var`
      * docblock still promises a callable, so the property can join the trusted set.
      *
-     * @param Property $property property declaration node whose attached docblock (if any) is examined
+     * @param Property $property - property declaration node whose attached docblock (if any) is examined
      *
-     * @return bool true when the docblock's `@var` names callable or Closure; false when there is no
+     * @return bool - true when the docblock's `@var` names callable or Closure; false when there is no
      *   docblock or the declared type is not callable-like, leaving the property subject to flagging
      */
     private function hasCallableDocblock(Property $property): bool
@@ -330,9 +330,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Decide whether an assigned expression definitely produces a callable, so the assignment target
      * can be added to a trusted-callable name set.
      *
-     * @param Expr $expr right-hand side of an assignment to classify
+     * @param Expr $expr - right-hand side of an assignment to classify
      *
-     * @return bool true only for syntactic callables visible at this node: a closure, an arrow function,
+     * @return bool - true only for syntactic callables visible at this node: a closure, an arrow function,
      *   or a `[receiver, 'method']` array; a string function name or a returned callable reads as false here
      *   (deliberately strict, to keep the trusted set to forms we can prove)
      */
@@ -348,9 +348,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Recognise the two-element array callable form, `[$receiver, 'method']` or
      * `[ClassName::class, 'method']`, where the second element is a literal method name.
      *
-     * @param Expr $expr expression to test for the array-callable shape
+     * @param Expr $expr - expression to test for the array-callable shape
      *
-     * @return bool true when the node is a two-item array whose second item is a non-unpacked string
+     * @return bool - true when the node is a two-item array whose second item is a non-unpacked string
      *   literal; the first item is not type-checked because any receiver expression is acceptable here
      */
     private function isStaticCallableArray(Expr $expr): bool
@@ -372,11 +372,11 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Decide whether a foreach subject is a property already known to hold callables, so the loop
      * value variable can be trusted as callable.
      *
-     * @param Expr                $expr                         the `foreach (... as $v)` subject expression
-     * @param array<string, true> $callableCollectionProperties property names proven to contain callables,
+     * @param Expr                $expr - the `foreach (... as $v)` subject expression
+     * @param array<string, true> $callableCollectionProperties - property names proven to contain callables,
      *   as produced by callableCollectionPropertyNames
      *
-     * @return bool true when the subject is `$this->prop` for a known-callable property; false for any other
+     * @return bool - true when the subject is `$this->prop` for a known-callable property; false for any other
      *   subject (a local array, a method call, a dynamic property name), leaving the loop variable untrusted
      */
     private function isCallableCollectionExpression(Expr $expr, array $callableCollectionProperties): bool
@@ -394,9 +394,9 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Decide whether a declared type node permits callable invocation, recursing through union and
      * nullable wrappers so `callable|null` or `?Closure` still count.
      *
-     * @param Node|null $type the parameter or property type node, or null when the declaration is untyped
+     * @param Node|null $type - the parameter or property type node, or null when the declaration is untyped
      *
-     * @return bool true when the type is `callable`, a `Closure`/`*Callable` class name, or a union or
+     * @return bool - true when the type is `callable`, a `Closure`/`*Callable` class name, or a union or
      *   nullable that contains one; false (including for a null/untyped declaration) means not callable
      */
     private function isCallableType(?Node $type): bool
@@ -435,12 +435,12 @@ final class DangerousFunctionCallRule implements RuleInterface
      * Assemble the Finding for one flagged call site, fixing severity, pillar, and remediation so every
      * detection path reports identically.
      *
-     * @param AnalysisUnit $analysisUnit unit being scanned; supplies the display path recorded on the finding
-     * @param Node         $node         the offending node (call or eval) whose start line locates the report
-     * @param string       $function     human-readable label for the pattern (e.g. `exec`, `eval`,
+     * @param AnalysisUnit $analysisUnit - unit being scanned; supplies the display path recorded on the finding
+     * @param Node         $node - the offending node (call or eval) whose start line locates the report
+     * @param string       $function - human-readable label for the pattern (e.g. `exec`, `eval`,
      *   `dynamic function call`); flows into both the message and the `function` metadata key for grouping
      *
-     * @return Finding the populated finding the caller appends to its result list; never null, since this is
+     * @return Finding - the populated finding the caller appends to its result list; never null, since this is
      *   only called once a pattern has already matched
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $function): Finding

@@ -37,7 +37,7 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Describe the nesting-depth rule for the registry and reports.
      *
-     * @return RuleDefinition Rule metadata and default thresholds.
+     * @return RuleDefinition - Rule metadata and default thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Detect functions and methods whose control flow nests too deeply.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Nesting-depth findings for the analysed unit.
+     * @return list<Finding> - Nesting-depth findings for the analysed unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -117,8 +117,9 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node Function-like node whose body is measured.
-     * @return int The maximum nesting depth inside the function-like node.
+     * @param ClassMethod|Function_ $node - Function-like node whose body is measured.
+     *
+     * @return int - The maximum nesting depth inside the function-like node.
      */
     public static function computeMaximumNestingDepth(Node $node): int
     {
@@ -127,9 +128,10 @@ final readonly class NestingDepthRule implements RuleInterface
     }
 
     /**
-     * @param array<Node> $stmts Statements to measure in sequence.
-     * @param int         $depth Nesting depth this statement list sits at.
-     * @return int The maximum nesting depth inside the statement list.
+     * @param array<Node> $stmts - Statements to measure in sequence.
+     * @param int         $depth - Nesting depth this statement list sits at.
+     *
+     * @return int - The maximum nesting depth inside the statement list.
      */
     private static function walkStatements(array $stmts, int $depth): int
     {
@@ -146,9 +148,10 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Measure nesting contribution for a statement node.
      *
-     * @param Node $node  Statement node to measure.
-     * @param int  $depth Nesting depth this node sits at.
-     * @return int The maximum nested depth reached from this node.
+     * @param Node $node - Statement node to measure.
+     * @param int  $depth - Nesting depth this node sits at.
+     *
+     * @return int - The maximum nested depth reached from this node.
      */
     private static function walkNode(Node $node, int $depth): int
     {
@@ -180,9 +183,10 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Measure nested closures inside expression statements.
      *
-     * @param Expr $expr  Expression to measure; only a closure body adds nesting.
-     * @param int  $depth Nesting depth this expression sits at.
-     * @return int The maximum expression nesting depth.
+     * @param Expr $expr - Expression to measure; only a closure body adds nesting.
+     * @param int  $depth - Nesting depth this expression sits at.
+     *
+     * @return int - The maximum expression nesting depth.
      */
     private static function walkExprNesting(Expr $expr, int $depth): int
     {
@@ -208,8 +212,9 @@ final readonly class NestingDepthRule implements RuleInterface
     /**
      * Render a configured numeric threshold for finding messages.
      *
-     * @param int|float $number Threshold to render; a genuine fraction is kept, a whole value loses its ".0".
-     * @return string The threshold without unnecessary decimal places.
+     * @param int|float $number - Threshold to render; a genuine fraction is kept, a whole value loses its ".0".
+     *
+     * @return string - The threshold without unnecessary decimal places.
      */
     private static function formatNumber(int|float $number): string
     {

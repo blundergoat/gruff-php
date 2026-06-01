@@ -10,8 +10,8 @@ namespace GruffPhp\Baseline;
 final readonly class BaselineData
 {
     /**
-     * @param string              $path    Baseline file path the data came from.
-     * @param list<BaselineEntry> $entries Baseline entries loaded from disk.
+     * @param string              $path - Baseline file path the data came from.
+     * @param list<BaselineEntry> $entries - Baseline entries loaded from disk.
      */
     public function __construct(
         public string $path,

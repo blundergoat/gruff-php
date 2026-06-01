@@ -15,8 +15,8 @@ final readonly class RuleContext
     /**
      * Capture project-level context and effective rule configuration.
      *
-     * @param string         $projectRoot Project root for the analysis run.
-     * @param AnalysisConfig $config      Effective analysis configuration.
+     * @param string         $projectRoot - Project root for the analysis run.
+     * @param AnalysisConfig $config - Effective analysis configuration.
      */
     public function __construct(
         public string $projectRoot,
@@ -27,8 +27,9 @@ final readonly class RuleContext
     /**
      * Look up effective settings for a rule definition.
      *
-     * @param RuleDefinition $definition Rule definition whose settings should be read.
-     * @return RuleSettings Enabled flag, thresholds, and options for the rule.
+     * @param RuleDefinition $definition - Rule definition whose settings should be read.
+     *
+     * @return RuleSettings - Enabled flag, thresholds, and options for the rule.
      */
     public function settingsFor(RuleDefinition $definition): RuleSettings
     {

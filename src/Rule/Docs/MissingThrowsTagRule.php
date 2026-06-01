@@ -33,7 +33,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Describe the missing @throws tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -51,10 +51,10 @@ final readonly class MissingThrowsTagRule implements RuleInterface
     /**
      * Find documented public functions that throw without an @throws tag.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for missing @throws documentation.
+     * @return list<Finding> - Findings for missing @throws documentation.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -106,7 +106,6 @@ final readonly class MissingThrowsTagRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per documented public throw-site that omits the matching @throws contract.
         return $findings;
     }
 }

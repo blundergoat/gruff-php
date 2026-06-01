@@ -16,8 +16,9 @@ class CleanDocsFixture
     /**
      * Calculate the sum of items.
      *
-     * @param list<int> $items The items to sum.
-     * @return int The total.
+     * @param list<int> $items - The items to sum.
+     *
+     * @return int - The total.
      */
     public function calculateTotal(array $items): int
     {

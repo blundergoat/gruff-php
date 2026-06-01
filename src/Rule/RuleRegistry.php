@@ -167,7 +167,7 @@ final class RuleRegistry
     private readonly array $rules;
 
     /**
-     * @param list<RuleInterface|ProjectRuleInterface> $rules Rule instances to index by id.
+     * @param list<RuleInterface|ProjectRuleInterface> $rules - Rule instances to index by id.
      *
      * @throws InvalidArgumentException When two rules declare the same id.
      */
@@ -347,7 +347,7 @@ final class RuleRegistry
     /**
      * Check whether a rule id is registered.
      *
-     * @param string $ruleId Rule identifier to check.
+     * @param string $ruleId - Rule identifier to check.
      *
      * @return bool - true when a rule with this id is registered; false for unknown or misspelled ids
      */
@@ -360,7 +360,7 @@ final class RuleRegistry
     /**
      * Return a registered rule by id.
      *
-     * @param string $ruleId Rule identifier to look up.
+     * @param string $ruleId - Rule identifier to look up.
      *
      * @return RuleInterface|ProjectRuleInterface - the shared rule instance registered under this id; never null (throws on miss)
      * @throws InvalidArgumentException When the rule id is unknown.
@@ -375,7 +375,7 @@ final class RuleRegistry
     /**
      * Return rules enabled by the effective analysis config.
      *
-     * @param AnalysisConfig $config Config used to filter registered rules.
+     * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
      *                                                  disables all
@@ -398,7 +398,7 @@ final class RuleRegistry
     /**
      * Check whether the effective config enables at least one project-level rule.
      *
-     * @param AnalysisConfig $config Config used to filter registered rules.
+     * @param AnalysisConfig $config - Config used to filter registered rules.
      *
      * @return bool - true when at least one enabled rule needs whole-project context; false when a per-unit pass suffices
      */
@@ -422,7 +422,7 @@ final class RuleRegistry
      * implements ProjectRuleAccumulator. Per-unit rules are always
      * streaming-friendly.
      *
-     * @param RuleContext $ruleContext Rule execution context.
+     * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return bool - true when the run can stream unit-by-unit; false when a legacy project rule forces buffering all units
      */
@@ -442,7 +442,7 @@ final class RuleRegistry
     /**
      * Initialise project-rule accumulators before a streaming analysis pass.
      *
-     * @param RuleContext $ruleContext Rule execution context.
+     * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return void
      */
@@ -462,9 +462,9 @@ final class RuleRegistry
      * parse → analyse → release pipeline that keeps peak memory close to
      * one unit's worth on large codebases.
      *
-     * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - file-scoped findings for this unit only; accumulator output is deferred to endStreaming()
      */
@@ -483,9 +483,9 @@ final class RuleRegistry
     /**
      * Run only the per-unit (file-scoped) rules against a single unit.
      *
-     * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @param AnalysisUnit            $analysisUnit - Parsed unit to analyse.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from per-unit rules in rule-execution order, not yet deduped or final-sorted
      */
@@ -529,9 +529,9 @@ final class RuleRegistry
     /**
      * Push one unit through every enabled streaming project rule.
      *
-     * @param AnalysisUnit            $analysisUnit       Parsed unit to accumulate.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @param AnalysisUnit            $analysisUnit - Parsed unit to accumulate.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return void
      */
@@ -565,8 +565,8 @@ final class RuleRegistry
     /**
      * Finalise project-rule accumulators after streaming analysis completes.
      *
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
      */
@@ -603,7 +603,7 @@ final class RuleRegistry
      * themselves should call this once at the end so the output matches
      * the non-streaming analyse() flow byte-for-byte.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Raw findings collected by the streaming analysis path.
      *
      * @return list<Finding> - deduped findings in canonical report order (file, line, rule id, message); empty when no findings survive
      */
@@ -633,11 +633,11 @@ final class RuleRegistry
     /**
      * Run all enabled file and project rules against parsed units.
      *
-     * @param list<AnalysisUnit>      $units                           Parsed units to analyse with file-scoped rules.
-     * @param RuleContext             $ruleContext                     Rule execution context.
-     * @param list<AnalysisUnit>|null $projectUnits                    Parsed units available to project-level rules.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver              Optional per-rule timing hook; default analyse runs leave this null.
-     * @param bool                    $shouldReleaseUnitsAfterAnalysis Whether units can release AST contents after analysis.
+     * @param list<AnalysisUnit>      $units - Parsed units to analyse with file-scoped rules.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param list<AnalysisUnit>|null $projectUnits - Parsed units available to project-level rules.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing hook; default analyse runs leave this null.
+     * @param bool                    $shouldReleaseUnitsAfterAnalysis - Whether units can release AST contents after analysis.
      *
      * @return list<Finding> - all per-unit, accumulator, and legacy project findings, deduped and in canonical report order
      */
@@ -690,7 +690,7 @@ final class RuleRegistry
     /**
      * Find enabled project rules that still need the full unit list.
      *
-     * @param RuleContext $ruleContext Rule execution context.
+     * @param RuleContext $ruleContext - Rule execution context.
      *
      * @return list<ProjectRuleInterface> - enabled project rules lacking accumulator support, which must run with the full unit list; empty when all
      *                                    stream
@@ -711,10 +711,10 @@ final class RuleRegistry
     /**
      * Run project-level rules that need the full analysis context.
      *
-     * @param list<ProjectRuleInterface> $rules              Project rules to run.
-     * @param list<AnalysisUnit>         $contextUnits       Candidate units available to project rules.
-     * @param RuleContext                $ruleContext        Rule execution context.
-     * @param RuleRunnerObserver|null    $ruleRunnerObserver Optional per-rule timing hook.
+     * @param list<ProjectRuleInterface> $rules - Project rules to run.
+     * @param list<AnalysisUnit>         $contextUnits - Candidate units available to project rules.
+     * @param RuleContext                $ruleContext - Rule execution context.
+     * @param RuleRunnerObserver|null    $ruleRunnerObserver - Optional per-rule timing hook.
      *
      * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean PHP units remain to analyse
      */
@@ -755,7 +755,7 @@ final class RuleRegistry
     /**
      * Build deduplicate findings for the component.
      *
-     * @param list<Finding> $findings Findings to collapse by full reporting identity.
+     * @param list<Finding> $findings - Findings to collapse by full reporting identity.
      *
      * @return list<Finding> - input order preserved with later exact-identity duplicates dropped (first occurrence wins)
      */
@@ -792,7 +792,7 @@ final class RuleRegistry
      * Keep only the highest-priority naming finding when multiple naming rules
      * report the same identifier at the same source location.
      *
-     * @param list<Finding> $findings Findings that may contain overlapping naming reports.
+     * @param list<Finding> $findings - Findings that may contain overlapping naming reports.
      *
      * @return list<Finding> - relative order preserved, keeping only the highest-priority naming finding per overlapping identifier
      */
@@ -827,7 +827,7 @@ final class RuleRegistry
     /**
      * Build the cross-rule identifier key used to collapse duplicate naming findings.
      *
-     * @param Finding $finding Finding to classify for naming-rule overlap.
+     * @param Finding $finding - Finding to classify for naming-rule overlap.
      *
      * @return string|null - overlap-bucket key (file, line, column, symbol, identifier); null when the finding cannot participate in naming dedup
      */
@@ -857,7 +857,7 @@ final class RuleRegistry
     /**
      * Extract the identifier name from finding metadata.
      *
-     * @param Finding $finding Finding whose metadata may carry an identifier.
+     * @param Finding $finding - Finding whose metadata may carry an identifier.
      *
      * @return string|null - identifier from metadata, falling back to the finding symbol; null when neither is present
      */

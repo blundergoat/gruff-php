@@ -12,7 +12,7 @@ final readonly class UnifiedDiffParser
     /**
      * Parse unified diff text.
      *
-     * @param string $diff Raw `git diff` output; only added-line hunks contribute to the returned ranges.
+     * @param string $diff - Raw `git diff` output; only added-line hunks contribute to the returned ranges.
      *
      * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>} - changed file paths sorted ascending, plus per-file
      *                      added-line ranges keyed by path; both empty when the diff has no qualifying hunks
@@ -78,9 +78,9 @@ final readonly class UnifiedDiffParser
     /**
      * Add a changed file once and prepare its range bucket.
      *
-     * @param string|null                           $filePath     Project-relative changed path.
-     * @param list<string>                          $changedFiles Changed files collected so far.
-     * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     * @param string|null                           $filePath - Project-relative changed path.
+     * @param list<string>                          $changedFiles - Changed files collected so far.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
      * @return void
      */
@@ -98,7 +98,7 @@ final readonly class UnifiedDiffParser
     /**
      * Parse the destination path from a unified diff header.
      *
-     * @param string $line A `+++ ` header line; its `b/` prefix is stripped to a project-relative path.
+     * @param string $line - A `+++ ` header line; its `b/` prefix is stripped to a project-relative path.
      *
      * @return string|null - project-relative destination path, or null when the header points at /dev/null (a deleted file)
      */
@@ -123,7 +123,7 @@ final readonly class UnifiedDiffParser
     /**
      * Parse the source path from a unified diff header.
      *
-     * @param string $line A `--- ` header line; its `a/` prefix is stripped to a project-relative path.
+     * @param string $line - A `--- ` header line; its `a/` prefix is stripped to a project-relative path.
      *
      * @return string|null - project-relative source path, or null when the header points at /dev/null (a newly added file)
      */
@@ -151,7 +151,7 @@ final readonly class UnifiedDiffParser
      * Handles git's quoted form (core.quotePath / non-ASCII filenames) and strips
      * trailing tab-separated metadata that some patch formats append.
      *
-     * @param string $rawPath Path slice from a diff header, still possibly C-quoted or tab-suffixed.
+     * @param string $rawPath - Path slice from a diff header, still possibly C-quoted or tab-suffixed.
      *
      * @return string - the path with any trailing tab-metadata removed and git C-quoting decoded, ready to use as a project-relative path
      */

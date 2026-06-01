@@ -37,7 +37,7 @@ final readonly class ConfusingNameRule implements RuleInterface
     /**
      * Describe the confusing name rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -55,10 +55,10 @@ final readonly class ConfusingNameRule implements RuleInterface
     /**
      * Find identifiers whose names are ambiguous or visually confusing.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for confusing identifiers.
+     * @return list<Finding> - Findings for confusing identifiers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -93,7 +93,6 @@ final readonly class ConfusingNameRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per confusingly-named class; empty when the unit holds no flagged names.
         return $findings;
     }
 }

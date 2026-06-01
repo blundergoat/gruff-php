@@ -35,7 +35,7 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Describe the missing README rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -53,10 +53,10 @@ final class MissingReadmeRule implements RuleInterface
     /**
      * Emit one finding when the project root has no README.md file.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Missing README finding, or an empty list.
+     * @return list<Finding> - Missing README finding, or an empty list.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

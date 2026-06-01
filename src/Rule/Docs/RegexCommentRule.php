@@ -63,7 +63,7 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Describe the regex-comment rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -83,9 +83,10 @@ final readonly class RegexCommentRule implements RuleInterface
     /**
      * Find configured regex matcher calls that lack a preceding comment.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for configured regex functions.
-     * @return list<Finding> Findings for uncommented regex calls.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for configured regex functions.
+     *
+     * @return list<Finding> - Findings for uncommented regex calls.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -128,14 +129,14 @@ final readonly class RegexCommentRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per configured regex call left unexplained by an inline comment, match label, or doc.
         return $findings;
     }
 
     /**
-     * @param list<string> $sourceLines  Whole-file source split on newlines, indexed from zero.
-     * @param int          $regexCallLine 1-based line of the regex call whose preceding line is checked.
-     * @return bool True when the previous physical line is a comment.
+     * @param list<string> $sourceLines - Whole-file source split on newlines, indexed from zero.
+     * @param int          $regexCallLine - 1-based line of the regex call whose preceding line is checked.
+     *
+     * @return bool - True when the previous physical line is a comment.
      */
     private function hasImmediateCommentAbove(array $sourceLines, int $regexCallLine): bool
     {
@@ -154,8 +155,9 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * @param FuncCall $funcCall Call node whose callee name is being resolved for the configured-function check.
-     * @return string|null Lowercase function name, or null for dynamic calls.
+     * @param FuncCall $funcCall - Call node whose callee name is being resolved for the configured-function check.
+     *
+     * @return string|null - Lowercase function name, or null for dynamic calls.
      */
     private function functionName(FuncCall $funcCall): ?string
     {
@@ -169,8 +171,9 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * @param Node $node Regex call node; the walk starts here and climbs parents to find its enclosing callable.
-     * @return string|null Function or method symbol containing the regex call.
+     * @param Node $node - Regex call node; the walk starts here and climbs parents to find its enclosing callable.
+     *
+     * @return string|null - Function or method symbol containing the regex call.
      */
     private function symbol(Node $node): ?string
     {
@@ -194,8 +197,9 @@ final readonly class RegexCommentRule implements RuleInterface
      * label. The string literal already acts as the human-readable explanation, so per-call comments
      * would duplicate it. Requires at least one literal-string arm condition reachable from the call.
      *
-     * @param FuncCall $regexCallNode Regex call under inspection; its ancestor match arms are scanned for a label.
-     * @return bool True when the call sits inside a string-labelled match arm.
+     * @param FuncCall $regexCallNode - Regex call under inspection; its ancestor match arms are scanned for a label.
+     *
+     * @return bool - True when the call sits inside a string-labelled match arm.
      */
     private function isInsideStringLabelledMatchArm(FuncCall $regexCallNode): bool
     {
@@ -222,9 +226,10 @@ final readonly class RegexCommentRule implements RuleInterface
      * Determine whether a node subtree contains the target regex call. Used to confirm the
      * surrounding match-arm condition actually owns the call we're about to emit a finding for.
      *
-     * @param Node     $condition     Match-arm condition subtree to search for the target call.
-     * @param FuncCall $regexCallNode Exact call node being matched by identity, not by structural equality.
-     * @return bool True when the condition subtree reaches the target call.
+     * @param Node     $condition - Match-arm condition subtree to search for the target call.
+     * @param FuncCall $regexCallNode - Exact call node being matched by identity, not by structural equality.
+     *
+     * @return bool - True when the condition subtree reaches the target call.
      */
     private function containsRegexCall(Node $condition, FuncCall $regexCallNode): bool
     {
@@ -247,9 +252,10 @@ final readonly class RegexCommentRule implements RuleInterface
      * wording. `match` was previously included but proved too broad — see the FUNCTION_DOC_KEYWORDS
      * docblock for the rationale.
      *
-     * @param FuncCall $regexCallNode Regex call whose nearest enclosing callable docblock is examined.
-     * @param string   $functionName  Lowercased call name, added as a keyword so a doc naming it counts as coverage.
-     * @return bool True when the enclosing docblock already references the regex behaviour.
+     * @param FuncCall $regexCallNode - Regex call whose nearest enclosing callable docblock is examined.
+     * @param string   $functionName - Lowercased call name, added as a keyword so a doc naming it counts as coverage.
+     *
+     * @return bool - True when the enclosing docblock already references the regex behaviour.
      */
     private function hasEnclosingFunctionDocReferencingRegex(FuncCall $regexCallNode, string $functionName): bool
     {
@@ -284,8 +290,9 @@ final readonly class RegexCommentRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $functionNames Configured regex function names.
-     * @return list<string> Lowercase regex function names.
+     * @param list<string> $functionNames - Configured regex function names.
+     *
+     * @return list<string> - Lowercase regex function names.
      */
     private function normalisedFunctionNames(array $functionNames): array
     {

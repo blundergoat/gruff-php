@@ -252,13 +252,12 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Build phpdoc mixed findings for the modernisation rule.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Mixed modernisation findings to narrow to PHPDoc-mixed reports.
      *
      * @return list<Finding> - only the PHPDoc-mixed rule's findings, in input order; empty when none matched
      */
     private function phpdocMixedFindings(array $findings): array
     {
-        // Keep only the PHPDoc-mixed rule's findings so other modernisation noise stays out of the assertion.
         return array_values(array_filter(
                                 $findings,
                                 static fn(Finding $finding): bool => $finding->ruleId === PhpDocMixedOveruseRule::ID,
@@ -285,7 +284,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisUnit - the parsed fixture whose display path mirrors the project-relative input
      */

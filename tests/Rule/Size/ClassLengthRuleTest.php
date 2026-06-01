@@ -104,8 +104,8 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
-     * @param array<string, int> $thresholds Rule option overrides applied before the fixture runs.
+     * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture; empty when the class stays within thresholds
      */
@@ -126,7 +126,7 @@ final class ClassLengthRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture ready to feed to the rule, with its display path kept repo-relative
      */

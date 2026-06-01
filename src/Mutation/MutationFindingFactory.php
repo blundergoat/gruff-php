@@ -16,7 +16,7 @@ use GruffPhp\Finding\Severity;
 final readonly class MutationFindingFactory
 {
     /**
-     * @param MutationAnalysisResult $result Mutation analysis result to convert into findings.
+     * @param MutationAnalysisResult $result - Mutation analysis result to convert into findings.
      *
      * @return list<Finding> - findings for any survived mutants, budget breach, and MSI regression this result produced; empty when all three gate
      *                       signals are clear
@@ -99,7 +99,7 @@ final readonly class MutationFindingFactory
     /**
      * Render a survived-mutant message that distinguishes escaped and timed-out statuses.
      *
-     * @param InfectionMutant $infectionMutant  Survived mutant whose status selects the wording; status is the
+     * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the wording; status is the
      *                                          raw Infection label, so only 'timed out' diverges from the escaped case.
      *
      * @return string - finding message naming the mutator; phrased to mark a timeout as "ran out of time" rather than a clean test pass
@@ -125,7 +125,7 @@ final readonly class MutationFindingFactory
     /**
      * Render remediation guidance that matches the survived-mutant status.
      *
-     * @param InfectionMutant $infectionMutant  Survived mutant whose status selects the guidance; a 'timed out'
+     * @param InfectionMutant $infectionMutant - Survived mutant whose status selects the guidance; a 'timed out'
      *                                          status points the developer at performance before test strength.
      *
      * @return string - remediation guidance; a timeout steers the reader to performance first, an escape to test strength

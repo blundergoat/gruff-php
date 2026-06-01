@@ -42,8 +42,9 @@ final class PresetIdentityTest extends TestCase
     /**
      * Build a comparable snapshot of a config's rule settings and global knobs.
      *
-     * @param AnalysisConfig $config Config to snapshot.
-     * @return array<string, mixed> Deterministic snapshot for equality comparison.
+     * @param AnalysisConfig $config - Config to snapshot.
+     *
+     * @return array<string, mixed> - Deterministic snapshot for equality comparison.
      */
     private function snapshot(AnalysisConfig $config): array
     {
@@ -60,7 +61,6 @@ final class PresetIdentityTest extends TestCase
         }
         ksort($rules);
 
-        // Hand back a key-sorted, fully resolved view so two configs compare equal regardless of rule ordering.
         return [
             'rules' => $rules,
             'minimumPhpVersion' => $config->minimumPhpVersion(),

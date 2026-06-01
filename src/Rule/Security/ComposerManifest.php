@@ -21,8 +21,9 @@ final class ComposerManifest
     /**
      * Decide whether a display path refers to a Composer manifest.
      *
-     * @param string $displayPath File display path, as reported by the source file.
-     * @return bool True when the path's basename is exactly `composer.json`.
+     * @param string $displayPath - File display path, as reported by the source file.
+     *
+     * @return bool - True when the path's basename is exactly `composer.json`.
      */
     public static function isManifest(string $displayPath): bool
     {
@@ -37,8 +38,9 @@ final class ComposerManifest
     /**
      * Decode manifest JSON into an associative array, tolerating malformed input.
      *
-     * @param string $source Raw manifest contents.
-     * @return array<string, mixed>|null Decoded top-level object, or null when the source is not a JSON object.
+     * @param string $source - Raw manifest contents.
+     *
+     * @return array<string, mixed>|null - Decoded top-level object, or null when the source is not a JSON object.
      */
     public static function decode(string $source): ?array
     {
@@ -65,9 +67,10 @@ final class ComposerManifest
      * Used to anchor a finding near the offending key without embedding any
      * value in the finding payload.
      *
-     * @param string $source Raw manifest contents.
-     * @param string $needle Token to locate (for example a quoted package name).
-     * @return int 1-based line number, or 1 when the token is not found.
+     * @param string $source - Raw manifest contents.
+     * @param string $needle - Token to locate (for example a quoted package name).
+     *
+     * @return int - 1-based line number, or 1 when the token is not found.
      */
     public static function lineOf(string $source, string $needle): int
     {

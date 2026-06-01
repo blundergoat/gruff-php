@@ -138,8 +138,8 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Run a git command inside a temporary repository.
      *
-     * @param string       $root Repository root.
-     * @param list<string> $args Git arguments.
+     * @param string       $root - Repository root.
+     * @param list<string> $args - Git arguments.
      *
      * @return void
      */
@@ -163,14 +163,13 @@ final class PathIgnoreResolverTest extends TestCase
         self::assertTrue(mkdir($path));
         $this->tempDirs[] = $path;
 
-        // Hand back the freshly created repo root now registered for teardown.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Directory path.
+     * @param string $path - Directory path.
      *
      * @return void
      */

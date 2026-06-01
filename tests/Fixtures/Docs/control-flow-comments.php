@@ -9,8 +9,9 @@ final class ControlFlowCommentsFixture
     /**
      * Exercise loop and return control-flow comments.
      *
-     * @param list<int> $items The items to inspect.
-     * @return int The calculated total.
+     * @param list<int> $items - The items to inspect.
+     *
+     * @return int - The calculated total.
      */
     public function run(array $items): int
     {

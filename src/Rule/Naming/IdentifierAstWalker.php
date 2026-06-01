@@ -18,8 +18,8 @@ use PhpParser\Node\Stmt\Function_;
 final readonly class IdentifierAstWalker
 {
     /**
-     * @param list<Node>           $nodes     Roots to traverse.
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
+     * @param list<Node>           $nodes - Roots to traverse.
+     * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      *
      * @return list<Node> - every descendant satisfying the predicate, gathered across all roots; empty when none match
      */
@@ -31,14 +31,13 @@ final readonly class IdentifierAstWalker
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
 
-        // Hand back every descendant that satisfied the predicate, gathered across all roots.
         return $matches;
     }
 
     /**
-     * @param Node                 $node      Current node to test; recursion stops at function-like boundaries.
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @param list<Node>           $matches   Output list of matching descendant nodes.
+     * @param Node                 $node - Current node to test; recursion stops at function-like boundaries.
+     * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
+     * @param list<Node>           $matches - Output list of matching descendant nodes.
      *
      * @return void
      */
@@ -61,7 +60,7 @@ final readonly class IdentifierAstWalker
     /**
      * List direct child nodes that can be recursively traversed.
      *
-     * @param Node $node Parent node whose declared sub-node slots are flattened into traversable children.
+     * @param Node $node - Parent node whose declared sub-node slots are flattened into traversable children.
      *
      * @return list<Node> - the node's immediate child Nodes in sub-node declaration order; empty when it has no Node-valued slots
      */
@@ -73,15 +72,14 @@ final readonly class IdentifierAstWalker
             $this->collectChildNodes($node->{$name}, $children);
         }
 
-        // Hand back the flattened direct children pulled from every sub-node slot of this node.
         return $children;
     }
 
     /**
      * Append traversable child nodes to the current collection.
      *
-     * @param mixed      $subNode One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
-     * @param list<Node> $children
+     * @param mixed      $subNode - One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
+     * @param list<Node> $children - Accumulator mutated in place; discovered child nodes are appended in traversal order.
      *
      * @return void
      */

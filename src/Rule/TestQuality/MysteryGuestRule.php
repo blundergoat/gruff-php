@@ -55,7 +55,7 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Describe the mystery guest test rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -73,10 +73,10 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Find tests that reach external files or databases from inside the test body.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for hidden external test dependencies.
+     * @return list<Finding> - Findings for hidden external test dependencies.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -109,16 +109,15 @@ final readonly class MysteryGuestRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per hidden fixture access; empty when every read was test-owned setup.
         return $findings;
     }
 
     /**
      * Identify external file/database access in a call or constructor node.
      *
-     * @param Node $node Call or constructor node from a test body to classify.
+     * @param Node $node - Call or constructor node from a test body to classify.
      *
-     * @return string|null Guest dependency name, or null when none is detected.
+     * @return string|null - Guest dependency name, or null when none is detected.
      */
     private function mysteryGuest(Node $node): ?string
     {
@@ -145,10 +144,10 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Detect reads from paths the test created or handed to the SUT earlier in the same test.
      *
-     * @param TestQualityScope $scope Enclosing test scope whose earlier statements may have prepared the path.
-     * @param Node             $node  Read node under suspicion of reaching a hidden fixture.
+     * @param TestQualityScope $scope - Enclosing test scope whose earlier statements may have prepared the path.
+     * @param Node             $node - Read node under suspicion of reaching a hidden fixture.
      *
-     * @return bool True when the file access is test-owned rather than a hidden fixture.
+     * @return bool - True when the file access is test-owned rather than a hidden fixture.
      */
     private function usesPreparedPath(TestQualityScope $scope, Node $node): bool
     {
@@ -184,9 +183,9 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Return the path argument from a file-read call.
      *
-     * @param Node $node Guest node whose first argument may carry the read path.
+     * @param Node $node - Guest node whose first argument may carry the read path.
      *
-     * @return Expr|null Path expression, or null for non-path guests.
+     * @return Expr|null - Path expression, or null for non-path guests.
      */
     private function readPathExpression(Node $node): ?Expr
     {
@@ -210,10 +209,10 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Collect path-identifying keys prepared by a prior setup/SUT call.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall|Expr\New_ $node Earlier call that may have created or
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall|Expr\New_ $node - Earlier call that may have created or
      *                                                                      received the path the later read consumes.
      *
-     * @return list<string> Path keys.
+     * @return list<string> - Path keys.
      */
     private function preparedPathKeys(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall|Expr\New_ $node): array
     {
@@ -243,8 +242,9 @@ final readonly class MysteryGuestRule implements RuleInterface
     }
 
     /**
-     * @param list<Arg|Node\VariadicPlaceholder> $args Call arguments to inspect.
-     * @return list<string> Path keys found in arguments.
+     * @param list<Arg|Node\VariadicPlaceholder> $args - Call arguments to inspect.
+     *
+     * @return list<string> - Path keys found in arguments.
      */
     private function argumentPathKeys(array $args): array
     {
@@ -265,9 +265,9 @@ final readonly class MysteryGuestRule implements RuleInterface
     /**
      * Build stable keys for simple literal, variable, concatenated, and array path expressions.
      *
-     * @param Expr $expression Path expression to reduce to comparable keys; recursion handles concat and array forms.
+     * @param Expr $expression - Path expression to reduce to comparable keys; recursion handles concat and array forms.
      *
-     * @return list<string> Keys such as `var:outputPath` or `literal:/tmp/file.json`.
+     * @return list<string> - Keys such as `var:outputPath` or `literal:/tmp/file.json`.
      */
     private function pathKeys(Expr $expression): array
     {

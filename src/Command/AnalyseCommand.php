@@ -122,8 +122,8 @@ final class AnalyseCommand extends Command
     /**
      * Run source discovery, rule analysis, optional mutation ingestion, and reporting.
      *
-     * @param InputInterface  $input  Parsed CLI arguments and options for this analyse run.
-     * @param OutputInterface $output Destination for the rendered report; stderr is used for runtime payloads.
+     * @param InputInterface  $input - Parsed CLI arguments and options for this analyse run.
+     * @param OutputInterface $output - Destination for the rendered report; stderr is used for runtime payloads.
      *
      * @return int - Symfony command exit code: SUCCESS, FAILURE on a tripped gate, or INVALID on a run diagnostic.
      */
@@ -307,21 +307,21 @@ final class AnalyseCommand extends Command
     /**
      * Write the performance instrumentation payload as a single JSON line on stderr.
      *
-     * @param bool                                                                     $shouldEmit            Whether --print-runtime requested the
+     * @param bool                                                                     $shouldEmit - Whether --print-runtime requested the
      *                                                                                                        payload; a no-op when false.
-     * @param OutputInterface                                                          $output                Run output; the payload goes to its
+     * @param OutputInterface                                                          $output - Run output; the payload goes to its
      *                                                                                                        stderr stream, falling back to STDERR.
-     * @param int                                                                      $runtimeStart          hrtime(true) nanosecond marker captured
+     * @param int                                                                      $runtimeStart - hrtime(true) nanosecond marker captured
      *                                                                                                        at command start, used to derive wall
      *                                                                                                        time.
-     * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs      Timed analyse phase durations in
+     * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs - Timed analyse phase durations in
      *                                                                                                        nanoseconds.
-     * @param int                                                                      $filesParsed           Count of source files actually parsed
+     * @param int                                                                      $filesParsed - Count of source files actually parsed
      *                                                                                                        this run.
-     * @param int                                                                      $rulesExecuted         Count of rules enabled for this run.
-     * @param RuntimeTimingObserver|null                                               $runtimeTimingObserver Per-rule timings source; null unless
+     * @param int                                                                      $rulesExecuted - Count of rules enabled for this run.
+     * @param RuntimeTimingObserver|null                                               $runtimeTimingObserver - Per-rule timings source; null unless
      *                                                                                                        detailed mode ran.
-     * @param bool                                                                     $isDetailed            Whether to attach per-rule totals;
+     * @param bool                                                                     $isDetailed - Whether to attach per-rule totals;
      *                                                                                                        requires a non-null observer to take
      *                                                                                                        effect.
      *
@@ -372,8 +372,8 @@ final class AnalyseCommand extends Command
     /**
      * Render setup errors using either plain console text or the requested report format.
      *
-     * @param AnalyseCommandSetupResult $result Failed setup outcome with the error, exit code, and any partial report.
-     * @param OutputInterface           $output Destination the error text or formatted report is written to.
+     * @param AnalyseCommandSetupResult $result - Failed setup outcome with the error, exit code, and any partial report.
+     * @param OutputInterface           $output - Destination the error text or formatted report is written to.
      *
      * @return int - the setup result's own exit code, returned after emitting its error text or partial report.
      */
@@ -390,16 +390,15 @@ final class AnalyseCommand extends Command
             $this->renderReport($result->report, $result->format, $output);
         }
 
-        // Hand back the setup exit code after emitting whatever structured report the failure carried.
         return $result->exitCode;
     }
 
     /**
      * Resolve the Git diff for --diff-vs or --since against a single base ref.
      *
-     * @param string              $projectRoot Project root the Git diff is computed within.
-     * @param string|null         $diffMode    Git ref or diff selector to compare against; null means no diff was requested.
-     * @param list<RunDiagnostic> $diagnostics Run diagnostics; a diff-mode error is appended in place on failure.
+     * @param string              $projectRoot - Project root the Git diff is computed within.
+     * @param string|null         $diffMode - Git ref or diff selector to compare against; null means no diff was requested.
+     * @param list<RunDiagnostic> $diagnostics - Run diagnostics; a diff-mode error is appended in place on failure.
      *
      * @return DiffResult|null - changed lines for the ref, an inactive result when no ref was requested, or null when the Git lookup failed.
      */
@@ -427,9 +426,9 @@ final class AnalyseCommand extends Command
     /**
      * Build the changed-region diff result requested by --diff, --since, or --changed-ranges.
      *
-     * @param string                $projectRoot Project root the diff and requested paths resolve against.
-     * @param AnalyseCommandOptions $options     CLI options selecting the changed-region source (ranges, since, or diff).
-     * @param list<RunDiagnostic>   $diagnostics Run diagnostics; a diff-mode error is appended in place on failure.
+     * @param string                $projectRoot - Project root the diff and requested paths resolve against.
+     * @param AnalyseCommandOptions $options - CLI options selecting the changed-region source (ranges, since, or diff).
+     * @param list<RunDiagnostic>   $diagnostics - Run diagnostics; a diff-mode error is appended in place on failure.
      *
      * @return DiffResult|null - the active changed-region diff for the selected source, an inactive result, or null when the lookup failed.
      */
@@ -477,9 +476,9 @@ final class AnalyseCommand extends Command
     /**
      * Build the changed-region diff result from explicit --changed-ranges line ranges.
      *
-     * @param string                $projectRoot Project root the requested paths resolve against.
-     * @param AnalyseCommandOptions $options     Effective CLI options carrying paths and the changed ranges.
-     * @param list<RunDiagnostic>   $diagnostics Run diagnostics; diff-mode errors are appended in place.
+     * @param string                $projectRoot - Project root the requested paths resolve against.
+     * @param AnalyseCommandOptions $options - Effective CLI options carrying paths and the changed ranges.
+     * @param list<RunDiagnostic>   $diagnostics - Run diagnostics; diff-mode errors are appended in place.
      *
      * @return DiffResult|null - an active explicit-ranges diff over the requested files, or null when the ranges or paths are invalid.
      */
@@ -527,7 +526,7 @@ final class AnalyseCommand extends Command
     /**
      * Parse a --changed-ranges value like "3-3,8-10" into line ranges.
      *
-     * @param string $ranges Comma-separated 1-based line ranges.
+     * @param string $ranges - Comma-separated 1-based line ranges.
      *
      * @return list<ChangedLineRange> - the parsed 1-based line ranges, preserving the order they appeared in the input.
      * @throws DiffException When a range token is malformed or the value yields no ranges.
@@ -561,17 +560,16 @@ final class AnalyseCommand extends Command
             throw new DiffException('--changed-ranges requires at least one range like "3-3,8-10".');
         }
 
-        // Hand back the parsed ranges in input order; emptiness was already rejected above.
         return $parsed;
     }
 
     /**
      * Resolve which paths discovery should scan, narrowing to changed files when a diff-driven mode is active.
      *
-     * @param string                $projectRoot       Project root the requested and changed paths resolve against.
-     * @param AnalyseCommandOptions $options           Effective CLI options, including changed-only and requested-path flags.
-     * @param DiffResult|null       $reviewDiff        --diff-vs review diff; null when it failed or carries no changed files.
-     * @param DiffResult|null       $changedRegionDiff Changed-region diff from --diff/--since/--changed-ranges, when active.
+     * @param string                $projectRoot - Project root the requested and changed paths resolve against.
+     * @param AnalyseCommandOptions $options - Effective CLI options, including changed-only and requested-path flags.
+     * @param DiffResult|null       $reviewDiff - --diff-vs review diff; null when it failed or carries no changed files.
+     * @param DiffResult|null       $changedRegionDiff - Changed-region diff from --diff/--since/--changed-ranges, when active.
      *
      * @return list<string>|null - the paths discovery should scan; null means a changed-only review with no files to scan (distinct from scanning
      *                           everything).
@@ -624,10 +622,10 @@ final class AnalyseCommand extends Command
     /**
      * Filter source diagnostics for the current analysis scope.
      *
-     * @param list<RunDiagnostic>   $diagnostics Source-discovery diagnostics gathered before scope narrowing.
-     * @param string                $projectRoot Project root each diagnostic path is normalised against.
-     * @param AnalyseCommandOptions $options     Effective CLI options; only changed-only review runs trigger filtering.
-     * @param DiffResult|null       $reviewDiff  --diff-vs review diff supplying the changed-file allowlist, when present.
+     * @param list<RunDiagnostic>   $diagnostics - Source-discovery diagnostics gathered before scope narrowing.
+     * @param string                $projectRoot - Project root each diagnostic path is normalised against.
+     * @param AnalyseCommandOptions $options - Effective CLI options; only changed-only review runs trigger filtering.
+     * @param DiffResult|null       $reviewDiff - --diff-vs review diff supplying the changed-file allowlist, when present.
      *
      * @return list<RunDiagnostic> - diagnostics in scope: identical input outside a changed-only review, else with out-of-scope missing-path entries
      *                             dropped
@@ -676,10 +674,10 @@ final class AnalyseCommand extends Command
     /**
      * Decide the command exit code from run diagnostics and whether any fail threshold tripped.
      *
-     * @param list<RunDiagnostic>             $diagnostics    Run diagnostics; any present force INVALID ahead of findings.
-     * @param list<\GruffPhp\Finding\Finding> $findings       Post-baseline finding set the all-findings gate inspects.
-     * @param list<\GruffPhp\Finding\Finding> $newFindings    Change-introduced subset the new-findings gate inspects.
-     * @param FailThresholds                  $failThresholds Configured gate that decides which findings cause failure.
+     * @param list<RunDiagnostic>             $diagnostics - Run diagnostics; any present force INVALID ahead of findings.
+     * @param list<\GruffPhp\Finding\Finding> $findings - Post-baseline finding set the all-findings gate inspects.
+     * @param list<\GruffPhp\Finding\Finding> $newFindings - Change-introduced subset the new-findings gate inspects.
+     * @param FailThresholds                  $failThresholds - Configured gate that decides which findings cause failure.
      *
      * @return array{exitCode: int, trip: ThresholdTrip|null} - the resolved exit code plus the breached gate threshold (null unless one tripped).
      */
@@ -707,9 +705,9 @@ final class AnalyseCommand extends Command
      * findings); otherwise the post-baseline finding set is the baseline-new set.
      * The setup builder guarantees a reference point exists before this runs.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings Post-baseline findings for the run.
-     * @param BranchReviewResult|null         $review   Branch-review result when --diff-vs is active.
-     * @param BaselineReport|null             $baseline Baseline application result, when a baseline ran.
+     * @param list<\GruffPhp\Finding\Finding> $findings - Post-baseline findings for the run.
+     * @param BranchReviewResult|null         $review - Branch-review result when --diff-vs is active.
+     * @param BaselineReport|null             $baseline - Baseline application result, when a baseline ran.
      *
      * @return list<\GruffPhp\Finding\Finding> - the change-introduced findings the new-findings gate scores; empty when no reference point applies.
      */
@@ -732,12 +730,12 @@ final class AnalyseCommand extends Command
     /**
      * Render the report with the reporter selected by output format.
      *
-     * @param AnalysisReport  $report              Completed analysis result the chosen reporter serialises.
-     * @param OutputFormat    $format              Output format that selects which reporter renders the result.
-     * @param OutputInterface $output              Stream the rendered report is written to, raw and unformatted.
-     * @param string|null     $projectRoot         Project root for HTML file:line links; defaults to empty when not supplied.
-     * @param string          $reportEditorLink    HTML editor-link style (vscode, phpstorm, or none); ignored by other formats.
-     * @param bool            $isReportInteractive Whether HTML output renders the opt-in interactive finding filters.
+     * @param AnalysisReport  $report - Completed analysis result the chosen reporter serialises.
+     * @param OutputFormat    $format - Output format that selects which reporter renders the result.
+     * @param OutputInterface $output - Stream the rendered report is written to, raw and unformatted.
+     * @param string|null     $projectRoot - Project root for HTML file:line links; defaults to empty when not supplied.
+     * @param string          $reportEditorLink - HTML editor-link style (vscode, phpstorm, or none); ignored by other formats.
+     * @param bool            $isReportInteractive - Whether HTML output renders the opt-in interactive finding filters.
      *
      * @return void
      */
@@ -766,11 +764,11 @@ final class AnalyseCommand extends Command
     /**
      * Append a score-trend entry to the history file when one is configured.
      *
-     * @param string                $projectRoot  Project root the history file resolves against.
-     * @param AnalyseCommandOptions $options      Effective CLI options carrying the history-file path.
-     * @param ScoreReport           $score        Composite score recorded for this run.
-     * @param int                   $findingCount Number of findings recorded alongside the score.
-     * @param list<RunDiagnostic>   $diagnostics  Run diagnostics; a history error is appended in place.
+     * @param string                $projectRoot - Project root the history file resolves against.
+     * @param AnalyseCommandOptions $options - Effective CLI options carrying the history-file path.
+     * @param ScoreReport           $score - Composite score recorded for this run.
+     * @param int                   $findingCount - Number of findings recorded alongside the score.
+     * @param list<RunDiagnostic>   $diagnostics - Run diagnostics; a history error is appended in place.
      *
      * @return TrendReport|null - the appended trend entry, or null when no --history-file is set or recording failed (a diagnostic is added on
      *                          failure).

@@ -70,8 +70,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Find string literals that resemble hardcoded API keys.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> - one finding per non-dummy key-like literal outside comments; empty means clean (no prefix hit, or
      *                                         every match was a comment or dummy value), not an error

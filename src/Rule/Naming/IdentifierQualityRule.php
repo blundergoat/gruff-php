@@ -103,7 +103,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Describe the identifier quality rule.
      *
-     * @return RuleDefinition Rule metadata, defaults, and options.
+     * @return RuleDefinition - Rule metadata, defaults, and options.
      */
     public function definition(): RuleDefinition
     {
@@ -146,10 +146,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find placeholder, generic, and numbered identifiers across declarations and locals.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for low-quality identifiers.
+     * @return list<Finding> - Findings for low-quality identifiers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -170,11 +170,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Build shared finding inputs from rule settings.
      *
-     * @param AnalysisUnit   $analysisUnit Unit threaded into the context so every check reports against the same file.
-     * @param RuleContext    $ruleContext  Source of the per-run settings and project-wide accepted abbreviations.
-     * @param RuleDefinition $definition    This rule's definition, used to look up its configured option overrides.
+     * @param AnalysisUnit   $analysisUnit - Unit threaded into the context so every check reports against the same file.
+     * @param RuleContext    $ruleContext - Source of the per-run settings and project-wide accepted abbreviations.
+     * @param RuleDefinition $definition - This rule's definition, used to look up its configured option overrides.
      *
-     * @return IdentifierFindingContext Shared context for identifier finding checks.
+     * @return IdentifierFindingContext - Shared context for identifier finding checks.
      */
     private function findingContext(
         AnalysisUnit $analysisUnit,
@@ -197,10 +197,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Resolve the minimum local-variable reference count needed before reporting.
      *
-     * @param RuleContext    $ruleContext Carries the per-run option overrides for this threshold.
-     * @param RuleDefinition $definition  This rule's definition, used to key into its option set.
+     * @param RuleContext    $ruleContext - Carries the per-run option overrides for this threshold.
+     * @param RuleDefinition $definition - This rule's definition, used to key into its option set.
      *
-     * @return int Minimum number of local variable reads.
+     * @return int - Minimum number of local variable reads.
      */
     private function minScopeReferences(RuleContext $ruleContext, RuleDefinition $definition): int
     {
@@ -212,10 +212,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Resolve the foreach body-size threshold before generic loop variables report.
      *
-     * @param RuleContext    $ruleContext Carries the per-run option overrides for this threshold.
-     * @param RuleDefinition $definition  This rule's definition, used to key into its option set.
+     * @param RuleContext    $ruleContext - Carries the per-run option overrides for this threshold.
+     * @param RuleDefinition $definition - This rule's definition, used to key into its option set.
      *
-     * @return int Minimum statement count for generic foreach loop-variable findings.
+     * @return int - Minimum statement count for generic foreach loop-variable findings.
      */
     private function loopBodyThreshold(RuleContext $ruleContext, RuleDefinition $definition): int
     {
@@ -227,9 +227,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find low-quality class, interface, trait, and enum names.
      *
-     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-node checks.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-node checks.
      *
-     * @return list<Finding> Findings for class-like identifiers.
+     * @return list<Finding> - Findings for class-like identifiers.
      */
     private function classLikeFindings(IdentifierFindingContext $findingContext): array
     {
@@ -260,18 +260,17 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
-        // Hand back the class-like naming findings gathered for this unit.
         return $findings;
     }
 
     /**
      * Find low-quality function-like names, parameters, and local variables.
      *
-     * @param IdentifierFindingContext $findingContext     Resolved vocabulary and unit shared across the per-scope checks.
-     * @param int                      $minScopeReferences Reference floor below which a local name is too rarely used to judge.
-     * @param int                      $loopBodyThreshold  Foreach body-size above which a generic loop variable becomes reportable.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-scope checks.
+     * @param int                      $minScopeReferences - Reference floor below which a local name is too rarely used to judge.
+     * @param int                      $loopBodyThreshold - Foreach body-size above which a generic loop variable becomes reportable.
      *
-     * @return list<Finding> Findings for function-like identifier scopes.
+     * @return list<Finding> - Findings for function-like identifier scopes.
      */
     private function functionLikeFindings(
         IdentifierFindingContext $findingContext,
@@ -294,17 +293,16 @@ final readonly class IdentifierQualityRule implements RuleInterface
             );
         }
 
-        // Hand back the combined name, parameter, and local-variable findings for every function-like scope.
         return $findings;
     }
 
     /**
      * Find a low-quality method or function name.
      *
-     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-node checks.
-     * @param ClassMethod|Function_    $function       Named callable whose own declared name is judged here.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-node checks.
+     * @param ClassMethod|Function_    $function - Named callable whose own declared name is judged here.
      *
-     * @return list<Finding> Empty when the function-like name is exempt or acceptable.
+     * @return list<Finding> - Empty when the function-like name is exempt or acceptable.
      */
     private function functionNameFindings(IdentifierFindingContext $findingContext, ClassMethod|Function_ $function): array
     {
@@ -328,10 +326,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find low-quality parameter and promoted-property names in one function-like scope.
      *
-     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-parameter checks.
-     * @param FunctionLikeScope        $scope          Single function-like scope whose declared parameters are judged.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-parameter checks.
+     * @param FunctionLikeScope        $scope - Single function-like scope whose declared parameters are judged.
      *
-     * @return list<Finding> Findings for parameters and promoted properties.
+     * @return list<Finding> - Findings for parameters and promoted properties.
      */
     private function parameterFindings(IdentifierFindingContext $findingContext, FunctionLikeScope $scope): array
     {
@@ -363,7 +361,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
             $findings[] = $finding;
         }
 
-        // Hand back the parameter and promoted-property findings collected for this scope.
         return $findings;
     }
 
@@ -373,7 +370,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * `private static function stringValue(mixed $value): string` whose intent is "coerce anything
      * into the documented return type"; a generic parameter name (`$value`) is the right name there.
      *
-     * @param FunctionLikeScope $scope Scope whose underlying callable is matched against the coercion-helper shape.
+     * @param FunctionLikeScope $scope - Scope whose underlying callable is matched against the coercion-helper shape.
      *
      * @return bool - true when the callable shape makes a generic single parameter name carry useful intent
      */
@@ -411,12 +408,12 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Find low-quality local variable names in one function-like scope.
      *
-     * @param IdentifierFindingContext $findingContext     Resolved vocabulary and unit shared across the per-variable checks.
-     * @param FunctionLikeScope        $scope              Single scope whose locals (excluding loop/catch vars) are judged.
-     * @param int                      $minScopeReferences Reference floor below which a local is too rarely used to judge.
-     * @param int                      $loopBodyThreshold  Foreach body-size above which a generic loop variable becomes reportable.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-variable checks.
+     * @param FunctionLikeScope        $scope - Single scope whose locals (excluding loop/catch vars) are judged.
+     * @param int                      $minScopeReferences - Reference floor below which a local is too rarely used to judge.
+     * @param int                      $loopBodyThreshold - Foreach body-size above which a generic loop variable becomes reportable.
      *
-     * @return list<Finding> Findings for local variables.
+     * @return list<Finding> - Findings for local variables.
      */
     private function localVariableFindings(
         IdentifierFindingContext $findingContext,
@@ -459,16 +456,15 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
-        // Hand back the plain-local findings plus the long-body loop-variable findings for this scope.
         return $findings;
     }
 
     /**
      * Find low-quality declared property names.
      *
-     * @param IdentifierFindingContext $findingContext Resolved vocabulary and unit shared across the per-property checks.
+     * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-property checks.
      *
-     * @return list<Finding> Findings for property identifiers.
+     * @return list<Finding> - Findings for property identifiers.
      */
     private function propertyFindings(IdentifierFindingContext $findingContext): array
     {
@@ -491,18 +487,18 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
-        // Hand back the declared-property naming findings gathered for this unit.
         return $findings;
     }
 
     /**
-     * @param IdentifierFindingContext $identifierFindingContext Resolved vocabulary, definition, and unit used to classify and stamp the finding.
-     * @param Node                     $node                     Declaration node whose start line anchors the finding.
-     * @param string                   $kind                     Human-readable identifier kind (class, method, parameter, variable, property) for the message.
-     * @param string                   $name                     Raw identifier text being judged, with any leading `$` kept for variable-style names.
-     * @param string|null              $symbol                   Enclosing symbol label for grouping, or null when no symbol applies.
-     * @param list<string>|null        $ignoredNamesOverride     Optional ignored-name list for loop-variable checks.
-     * @return Finding|null Identifier finding, or null when the name is acceptable/ignored.
+     * @param IdentifierFindingContext $identifierFindingContext - Resolved vocabulary, definition, and unit used to classify and stamp the finding.
+     * @param Node                     $node - Declaration node whose start line anchors the finding.
+     * @param string                   $kind - Human-readable identifier kind (class, method, parameter, variable, property) for the message.
+     * @param string                   $name - Raw identifier text being judged, with any leading `$` kept for variable-style names.
+     * @param string|null              $symbol - Enclosing symbol label for grouping, or null when no symbol applies.
+     * @param list<string>|null        $ignoredNamesOverride - Optional ignored-name list for loop-variable checks.
+     *
+     * @return Finding|null - Identifier finding, or null when the name is acceptable/ignored.
      */
     private function finding(
         IdentifierFindingContext $identifierFindingContext,
@@ -573,11 +569,11 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param string       $name                  Identifier text to test against the exemption lists, matched case-insensitively.
-     * @param list<string> $ignoredNames          Names exempt from all checks; the loop path may override the configured set.
-     * @param list<string> $acceptedAbbreviations Project-accepted abbreviations that should never be flagged.
+     * @param string       $name - Identifier text to test against the exemption lists, matched case-insensitively.
+     * @param list<string> $ignoredNames - Names exempt from all checks; the loop path may override the configured set.
+     * @param list<string> $acceptedAbbreviations - Project-accepted abbreviations that should never be flagged.
      *
-     * @return bool True when the name should be skipped by this rule.
+     * @return bool - True when the name should be skipped by this rule.
      */
     private function isIgnored(string $name, array $ignoredNames, array $acceptedAbbreviations): bool
     {
@@ -598,10 +594,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $tokens        Identifier tokens to test.
-     * @param list<string> $genericTokens Configured tokens treated as generic when they stand alone.
+     * @param list<string> $tokens - Identifier tokens to test.
+     * @param list<string> $genericTokens - Configured tokens treated as generic when they stand alone.
      *
-     * @return bool True when every token is a configured generic token.
+     * @return bool - True when every token is a configured generic token.
      */
     private function allTokensMatch(array $tokens, array $genericTokens): bool
     {
@@ -617,13 +613,13 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param string       $name                  Raw identifier text, used to spot acronym-plus-number forms the tokens lose.
-     * @param list<string> $tokens                Identifier tokens whose trailing element must be the disambiguating number.
-     * @param list<string> $genericTokens         Configured generic tokens; a generic prefix makes the numbered name weak.
-     * @param list<string> $placeholderNames      Configured placeholder names; a placeholder prefix also makes it weak.
-     * @param list<string> $acceptedAbbreviations Project-accepted abbreviations that exempt the prefix from the check.
+     * @param string       $name - Raw identifier text, used to spot acronym-plus-number forms the tokens lose.
+     * @param list<string> $tokens - Identifier tokens whose trailing element must be the disambiguating number.
+     * @param list<string> $genericTokens - Configured generic tokens; a generic prefix makes the numbered name weak.
+     * @param list<string> $placeholderNames - Configured placeholder names; a placeholder prefix also makes it weak.
+     * @param list<string> $acceptedAbbreviations - Project-accepted abbreviations that exempt the prefix from the check.
      *
-     * @return bool True when the identifier is a weak numbered variant.
+     * @return bool - True when the identifier is a weak numbered variant.
      */
     private function isNumberedIdentifier(
         string $name,
@@ -656,9 +652,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_ $node Callable whose name decides whether the rule exempts it from name judging.
+     * @param ClassMethod|Function_ $node - Callable whose name decides whether the rule exempts it from name judging.
      *
-     * @return bool True when framework lifecycle or data-provider methods should be skipped.
+     * @return bool - True when framework lifecycle or data-provider methods should be skipped.
      */
     private function shouldSkipFunctionLike(ClassMethod|Function_ $node): bool
     {
@@ -681,9 +677,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @param FunctionLikeScope $scope Scope whose enclosing callable label is wanted for finding grouping.
+     * @param FunctionLikeScope $scope - Scope whose enclosing callable label is wanted for finding grouping.
      *
-     * @return string Named callable symbol or synthetic closure/arrow label.
+     * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
@@ -699,9 +695,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Return the declaration kind for a class-like node.
      *
-     * @param Class_|Interface_|Trait_|Enum_ $node Class-like node whose declaration keyword is wanted for the message.
+     * @param Class_|Interface_|Trait_|Enum_ $node - Class-like node whose declaration keyword is wanted for the message.
      *
-     * @return string One of class, interface, trait, or enum.
+     * @return string - One of class, interface, trait, or enum.
      */
     private function classLikeKind(Class_|Interface_|Trait_|Enum_ $node): string
     {
@@ -717,8 +713,9 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Normalize string lists for case-insensitive comparisons.
      *
-     * @param list<string> $values Raw configured names; case and duplicates are insignificant to the caller.
-     * @return list<string> The same names lowercased and de-duplicated, re-indexed from zero.
+     * @param list<string> $values - Raw configured names; case and duplicates are insignificant to the caller.
+     *
+     * @return list<string> - The same names lowercased and de-duplicated, re-indexed from zero.
      */
     private function lowercaseList(array $values): array
     {

@@ -16,12 +16,12 @@ use GruffPhp\Finding\Finding;
 final readonly class BranchReviewResult
 {
     /**
-     * @param string        $base          Base ref used for the review comparison.
-     * @param bool          $isChangedOnly Whether the review was restricted to changed files.
-     * @param list<Finding> $introduced    Findings introduced by the branch.
-     * @param list<Finding> $removed       Findings removed by the branch.
-     * @param list<Finding> $unchanged     Findings present in both base and branch.
-     * @param float|null    $deltaScore    Score delta versus the base snapshot, when available.
+     * @param string        $base - Base ref used for the review comparison.
+     * @param bool          $isChangedOnly - Whether the review was restricted to changed files.
+     * @param list<Finding> $introduced - Findings introduced by the branch.
+     * @param list<Finding> $removed - Findings removed by the branch.
+     * @param list<Finding> $unchanged - Findings present in both base and branch.
+     * @param float|null    $deltaScore - Score delta versus the base snapshot, when available.
      */
     public function __construct(
         public string $base,
@@ -34,7 +34,7 @@ final readonly class BranchReviewResult
     }
 
     /**
-     * @param callable(list<Finding>): list<Finding> $filter
+     * @param callable(list<Finding>): list<Finding> $filter - Callback applied independently to introduced, removed, and unchanged finding lists.
      *
      * @return self - new result carrying the same base ref, changed-only flag, and delta score, with each finding group (introduced, removed,
      *              unchanged) passed through $filter

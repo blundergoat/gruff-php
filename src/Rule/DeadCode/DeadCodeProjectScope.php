@@ -18,13 +18,13 @@ final readonly class DeadCodeProjectScope
     /**
      * Capture one analysis pass's project-wide dead-code scope.
      *
-     * @param list<string>        $internalNamespacePrefixes   Project-owned namespace prefixes.
-     * @param array<string, true> $entrypointSymbols           Exact symbols treated as externally invoked.
-     * @param list<string>        $entrypointPathPrefixes      Paths whose declarations are external entrypoints.
-     * @param list<string>        $additionalExcludedPaths     Paths excluded from declaration/reference indexing.
-     * @param list<string>        $externalNamespacePrefixes   Namespace prefixes treated as external contracts.
-     * @param list<string>        $frameworkAttributePrefixes  Lowercase attribute prefixes that mark entrypoints.
-     * @param bool                $shouldTreatTestsAsReferences Whether test references keep production symbols live.
+     * @param list<string>        $internalNamespacePrefixes - Project-owned namespace prefixes.
+     * @param array<string, true> $entrypointSymbols - Exact symbols treated as externally invoked.
+     * @param list<string>        $entrypointPathPrefixes - Paths whose declarations are external entrypoints.
+     * @param list<string>        $additionalExcludedPaths - Paths excluded from declaration/reference indexing.
+     * @param list<string>        $externalNamespacePrefixes - Namespace prefixes treated as external contracts.
+     * @param list<string>        $frameworkAttributePrefixes - Lowercase attribute prefixes that mark entrypoints.
+     * @param bool                $shouldTreatTestsAsReferences - Whether test references keep production symbols live.
      */
     private function __construct(
         private array $internalNamespacePrefixes,
@@ -40,8 +40,8 @@ final readonly class DeadCodeProjectScope
     /**
      * Build project-wide dead-code scope from rule options and composer metadata.
      *
-     * @param RuleContext    $ruleContext Project root and effective config.
-     * @param RuleDefinition $definition  Rule definition whose options drive scope.
+     * @param RuleContext    $ruleContext - Project root and effective config.
+     * @param RuleDefinition $definition - Rule definition whose options drive scope.
      *
      * @return self - configured scope for one analysis pass
      */
@@ -90,7 +90,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether a FQN is project-owned.
      *
-     * @param string $fqn Symbol FQN without a leading slash.
+     * @param string $fqn - Symbol FQN without a leading slash.
      *
      * @return bool - true only when the FQN matches an internal prefix and no external prefix
      */
@@ -114,7 +114,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether a whole unit is excluded from project-wide dead-code indexing.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit.
+     * @param AnalysisUnit $analysisUnit - Parsed unit.
      *
      * @return bool - true when the unit path matches an exclusion prefix
      */
@@ -132,7 +132,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether declarations in a path are configured entrypoints.
      *
-     * @param string $displayPath Project-relative path.
+     * @param string $displayPath - Project-relative path.
      *
      * @return bool - true when the path is under an entrypoint prefix
      */
@@ -150,7 +150,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether a symbol is configured as an entrypoint.
      *
-     * @param string $fqn Symbol FQN without a leading slash.
+     * @param string $fqn - Symbol FQN without a leading slash.
      *
      * @return bool - true when the exact symbol is configured as externally invoked
      */
@@ -162,7 +162,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether attributes mark a declaration as a framework entrypoint.
      *
-     * @param DeadCodeSymbolDeclaration $declaration Declaration to inspect.
+     * @param DeadCodeSymbolDeclaration $declaration - Declaration to inspect.
      *
      * @return bool - true when any attribute starts with a configured framework prefix
      */
@@ -183,7 +183,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Decide whether a path is a test file.
      *
-     * @param string $displayPath Project-relative path.
+     * @param string $displayPath - Project-relative path.
      *
      * @return bool - true for conventional test directories or test filenames
      */
@@ -197,8 +197,8 @@ final readonly class DeadCodeProjectScope
     /**
      * Derive internal namespace prefixes from explicit config or composer PSR-4 autoload.
      *
-     * @param RuleContext  $ruleContext Project root for composer.json.
-     * @param RuleSettings $settings    Rule settings carrying explicit prefixes.
+     * @param RuleContext  $ruleContext - Project root for composer.json.
+     * @param RuleSettings $settings - Rule settings carrying explicit prefixes.
      *
      * @return list<string> - normalized namespace prefixes; empty means no project-wide findings are allowed
      */
@@ -254,7 +254,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Normalize namespace prefixes.
      *
-     * @param list<string> $prefixes Configured or composer-derived prefixes.
+     * @param list<string> $prefixes - Configured or composer-derived prefixes.
      *
      * @return list<string> - non-empty prefixes without leading slash and with trailing slash
      */
@@ -276,7 +276,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Normalize path prefixes.
      *
-     * @param list<string> $prefixes Configured path prefixes.
+     * @param list<string> $prefixes - Configured path prefixes.
      *
      * @return list<string> - prefixes without leading slash or empty values
      */
@@ -296,7 +296,7 @@ final readonly class DeadCodeProjectScope
     /**
      * Normalize symbol names to a lookup set.
      *
-     * @param list<string> $symbols Configured exact entrypoint symbols.
+     * @param list<string> $symbols - Configured exact entrypoint symbols.
      *
      * @return array<string, true> - exact symbol lookup table
      */

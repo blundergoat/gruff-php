@@ -14,12 +14,12 @@ final readonly class BaselineEntry
     /**
      * Capture the stable fields used to match a finding against a baseline.
      *
-     * @param string      $fingerprint Stable finding fingerprint used for baseline matching.
-     * @param string      $ruleId      Rule identifier that produced the finding.
-     * @param string      $filePath    Display path recorded for the finding.
-     * @param int|null    $line        Source line recorded for the finding, when known.
-     * @param string|null $symbol      Symbol recorded for the finding, when available.
-     * @param string      $message     Finding message preserved for stale-entry reporting.
+     * @param string      $fingerprint - Stable finding fingerprint used for baseline matching.
+     * @param string      $ruleId - Rule identifier that produced the finding.
+     * @param string      $filePath - Display path recorded for the finding.
+     * @param int|null    $line - Source line recorded for the finding, when known.
+     * @param string|null $symbol - Symbol recorded for the finding, when available.
+     * @param string      $message - Finding message preserved for stale-entry reporting.
      */
     public function __construct(
         public string  $fingerprint,
@@ -34,7 +34,7 @@ final readonly class BaselineEntry
     /**
      * Create a baseline entry from a live analysis finding.
      *
-     * @param Finding $finding Live analysis finding to persist in the baseline.
+     * @param Finding $finding - Live analysis finding to persist in the baseline.
      *
      * @return self - baseline entry snapshotting the finding's fingerprint and identity, decoupled from later mutation
      */
@@ -52,8 +52,8 @@ final readonly class BaselineEntry
     }
 
     /**
-     * @param array<string, bool|float|int|string|null> $baselineRow Serialized baseline row decoded from JSON.
-     * @param int                                       $index       Zero-based baseline entry position for error messages.
+     * @param array<string, bool|float|int|string|null> $baselineRow - Serialized baseline row decoded from JSON.
+     * @param int                                       $index - Zero-based baseline entry position for error messages.
      *
      * @return self - baseline entry rebuilt from a validated on-disk row, ready to match against live findings
      * @throws BaselineException When required fields are missing or malformed.

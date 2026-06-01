@@ -10,12 +10,12 @@ namespace GruffPhp\Diff;
 final readonly class DiffResult
 {
     /**
-     * @param bool                                  $active       Whether diff filtering is active.
-     * @param string                                $mode         Diff mode used to produce the result.
-     * @param string|null                           $base         Base ref or description for the diff, when active.
-     * @param array<string, list<ChangedLineRange>> $changedLines Changed line ranges keyed by display path.
-     * @param list<string>                          $changedFiles Display paths marked as changed.
-     * @param string                                $message      Human-readable diff status message.
+     * @param bool                                  $active - Whether diff filtering is active.
+     * @param string                                $mode - Diff mode used to produce the result.
+     * @param string|null                           $base - Base ref or description for the diff, when active.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Changed line ranges keyed by display path.
+     * @param list<string>                          $changedFiles - Display paths marked as changed.
+     * @param string                                $message - Human-readable diff status message.
      */
     public function __construct(
         public bool    $active,
@@ -43,7 +43,7 @@ final readonly class DiffResult
     /**
      * Return changed line ranges for a display path.
      *
-     * @param string $filePath Display path to look up.
+     * @param string $filePath - Display path to look up.
      *
      * @return list<ChangedLineRange> - changed ranges for the path; empty list when the path has no entry
      *   (an expected miss, so callers treat the whole file as in-scope)

@@ -65,8 +65,8 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Flag tests that sleep or read the wall clock; both make tests flaky and slow.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - every sleep and wall-clock finding across all test scopes in this unit; empty when the unit has no tests or none offend
      */
@@ -89,8 +89,8 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build function findings for the test-quality rule.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto each finding.
-     * @param TestQualityScope $scope        Single test method scope whose calls are searched for sleeps/clock reads.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto each finding.
+     * @param TestQualityScope $scope - Single test method scope whose calls are searched for sleeps/clock reads.
      *
      * @return list<Finding> - one finding per sleep or wall-clock function call in this scope; empty when no call matches either set
      */
@@ -121,10 +121,10 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build a Finding for a sleep or wall-clock function call, or null when the call is neither.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto the finding.
-     * @param TestQualityScope $scope        Enclosing test scope, used for the symbol and message wording.
-     * @param Expr\FuncCall    $call         The call expression under inspection; its start line anchors the finding.
-     * @param string           $name         Lowercased called-function name already resolved from the call.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
+     * @param TestQualityScope $scope - Enclosing test scope, used for the symbol and message wording.
+     * @param Expr\FuncCall    $call - The call expression under inspection; its start line anchors the finding.
+     * @param string           $name - Lowercased called-function name already resolved from the call.
      *
      * @return Finding|null - the sleep- or wall-clock-variant finding for the call, or null when the call is neither family
      */
@@ -147,8 +147,8 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build date time findings for the test-quality rule.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto each finding.
-     * @param TestQualityScope $scope        Test scope whose descendant `new` expressions are checked for clock reads.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto each finding.
+     * @param TestQualityScope $scope - Test scope whose descendant `new` expressions are checked for clock reads.
      *
      * @return list<Finding> - one finding per current-time DateTime construction in this scope; empty when every construction uses a fixed timestamp
      */
@@ -169,7 +169,7 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Detect whether a `new DateTime(...)` / `new DateTimeImmutable(...)` reads the current time.
      *
-     * @param Expr\New_ $newExpression Object-construction node; only DateTime-family classes are considered.
+     * @param Expr\New_ $newExpression - Object-construction node; only DateTime-family classes are considered.
      *
      * @return bool - true when the class is a DateTime variant constructed with "now" or no argument; false for any non-DateTime class or a
      *              fixed-timestamp construction
@@ -191,7 +191,7 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Detect whether the DateTime constructor argument is empty or the literal string "now".
      *
-     * @param Expr\New_ $newExpression Construction node whose first argument is examined; non-literal args are treated
+     * @param Expr\New_ $newExpression - Construction node whose first argument is examined; non-literal args are treated
      *                                 as not-now so only provably current-time constructions are flagged.
      *
      * @return bool - true when no argument is passed or the first argument is the literal "now"; false when a fixed or non-literal argument is given
@@ -218,10 +218,10 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build the Finding for a sleep / usleep / time_nanosleep call inside a test.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto the finding.
-     * @param TestQualityScope $scope        Enclosing test scope; its symbol names the offending test in the message.
-     * @param Expr\FuncCall    $call         The sleep call; its start line locates the finding for the reviewer.
-     * @param string           $name         Lowercased sleep-function name recorded in the finding metadata.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
+     * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
+     * @param Expr\FuncCall    $call - The sleep call; its start line locates the finding for the reviewer.
+     * @param string           $name - Lowercased sleep-function name recorded in the finding metadata.
      *
      * @return Finding - warning finding tagged as the "sleep" variant, anchored at the call's start line, naming the offending test
      */
@@ -246,10 +246,10 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build the Finding for a time() / microtime() call inside a test.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto the finding.
-     * @param TestQualityScope $scope        Enclosing test scope; its symbol names the offending test in the message.
-     * @param Expr\FuncCall    $call         The wall-clock call; its start line locates the finding for the reviewer.
-     * @param string           $name         Lowercased clock-function name woven into the message and metadata.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
+     * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
+     * @param Expr\FuncCall    $call - The wall-clock call; its start line locates the finding for the reviewer.
+     * @param string           $name - Lowercased clock-function name woven into the message and metadata.
      *
      * @return Finding - warning finding tagged as the "wall-clock" variant, anchored at the call's start line, naming the offending test
      */
@@ -274,9 +274,9 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Build the Finding for a `new DateTime("now")` / `new DateTimeImmutable()` inside a test.
      *
-     * @param AnalysisUnit     $analysisUnit  Parsed unit supplying the display path stamped onto the finding.
-     * @param TestQualityScope $scope         Enclosing test scope; its symbol names the offending test in the message.
-     * @param Expr\New_        $newExpression The current-time construction; its start line and class name feed the finding.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit supplying the display path stamped onto the finding.
+     * @param TestQualityScope $scope - Enclosing test scope; its symbol names the offending test in the message.
+     * @param Expr\New_        $newExpression - The current-time construction; its start line and class name feed the finding.
      *                                        Caller must guarantee a named class, or this method throws LogicException.
      *
      * @return Finding - warning finding tagged as the "datetime" variant, anchored at the construction's start line, naming the offending test

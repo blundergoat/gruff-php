@@ -32,7 +32,7 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * Describe the unreachable code rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -50,9 +50,10 @@ final readonly class UnreachableCodeRule implements RuleInterface
     /**
      * Find statements that appear after a terminating statement in function-like bodies.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for unreachable statements.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - Findings for unreachable statements.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -76,9 +77,10 @@ final readonly class UnreachableCodeRule implements RuleInterface
      * would be redundant noise once the block is known dead); child blocks are still recursed so nested
      * unreachable code is not missed.
      *
-     * @param array<Node\Stmt> $stmts        Sibling statements of a single block, in source order.
-     * @param AnalysisUnit     $analysisUnit Unit supplying the display path stamped onto any finding.
-     * @param list<Finding>    &$findings    Accumulator the caller owns; appended to in place, never reset.
+     * @param array<Node\Stmt> $stmts - Sibling statements of a single block, in source order.
+     * @param AnalysisUnit     $analysisUnit - Unit supplying the display path stamped onto any finding.
+     * @param list<Finding>    &$findings - Accumulator the caller owns; appended to in place, never reset.
+     *
      * @return void
      */
     private function checkBlock(array $stmts, AnalysisUnit $analysisUnit, array &$findings): void
@@ -118,9 +120,10 @@ final readonly class UnreachableCodeRule implements RuleInterface
      * reachability is evaluated independently inside each one. Reachability does not cross block
      * boundaries: a return inside an `if` does not make the statement after the `if` unreachable.
      *
-     * @param Node\Stmt     $node         Statement whose child blocks (via StmtChildVisitor) get scanned.
-     * @param AnalysisUnit  $analysisUnit Unit forwarded unchanged so nested findings carry the same path.
-     * @param list<Finding> &$findings    Accumulator the caller owns; nested findings are appended in place.
+     * @param Node\Stmt     $node - Statement whose child blocks (via StmtChildVisitor) get scanned.
+     * @param AnalysisUnit  $analysisUnit - Unit forwarded unchanged so nested findings carry the same path.
+     * @param list<Finding> &$findings - Accumulator the caller owns; nested findings are appended in place.
+     *
      * @return void
      */
     private function walkChildren(Node\Stmt $node, AnalysisUnit $analysisUnit, array &$findings): void
@@ -137,8 +140,9 @@ final readonly class UnreachableCodeRule implements RuleInterface
      * terminates only sometimes (break/continue/goto, or a match/if where every arm returns) is not
      * treated as terminating, so the rule under-reports rather than risk a false positive.
      *
-     * @param Node $stmt Statement to classify; non-statement nodes simply fall through to false.
-     * @return bool True when no following sibling statement can run after this one.
+     * @param Node $stmt - Statement to classify; non-statement nodes simply fall through to false.
+     *
+     * @return bool - True when no following sibling statement can run after this one.
      */
     private function isTerminating(Node $stmt): bool
     {

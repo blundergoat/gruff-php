@@ -117,14 +117,13 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             }
         }
 
-        // Hand back every bare-@var finding gathered while walking the docblocks.
         return $findings;
     }
 
     /**
      * Distinguish declaration docblocks from local variable assertion docblocks.
      *
-     * @param Node $node AST node carrying the @var docblock; a declaration node means the tag documents that
+     * @param Node $node - AST node carrying the @var docblock; a declaration node means the tag documents that
      *                   declaration rather than a local assertion, so it is exempt from this rule.
      *
      * @return bool - true when the docblock documents a declaration (exempt); false for a local @var assertion to judge.

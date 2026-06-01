@@ -139,7 +139,7 @@ PATCH
     /**
      * Extract symbol strings from JSON finding rows.
      *
-     * @param list<array{symbol?: string|null}> $findings Finding rows decoded from the CLI JSON report.
+     * @param list<array{symbol?: string|null}> $findings - Finding rows decoded from the CLI JSON report.
      *
      * @return list<string> - symbol names of findings that carry one, in finding order; entries without a string symbol are omitted
      */
@@ -153,7 +153,6 @@ PATCH
             }
         }
 
-        // Hand back just the string symbol of each finding; entries without one are silently skipped.
         return $symbols;
     }
 
@@ -164,7 +163,6 @@ PATCH
      */
     private function changedRegionSource(): string
     {
-        // Hand back source with one edited and one untouched method, so diff-mode tests can target a changed region.
         return <<<'PHP'
 <?php
 final class Example

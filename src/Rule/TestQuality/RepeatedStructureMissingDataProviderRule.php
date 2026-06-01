@@ -38,7 +38,7 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Describe the repeated test structure rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -57,10 +57,10 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Find repeated test bodies that look like data-provider candidates.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for repeated test structures.
+     * @return list<Finding> - Findings for repeated test structures.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -131,16 +131,16 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             }
         }
 
-        // Hand back one finding per group of same-shaped tests that reached the minimum group size across all classes.
         return $findings;
     }
 
     /**
      * Check whether a project-configured path exemption applies.
      *
-     * @param string       $displayPath File path under analysis; matched after backslashes are normalised to slashes.
-     * @param list<string> $patterns    Glob patterns for accepted test shapes.
-     * @return bool True when the display path matches an ignored pattern.
+     * @param string       $displayPath - File path under analysis; matched after backslashes are normalised to slashes.
+     * @param list<string> $patterns - Glob patterns for accepted test shapes.
+     *
+     * @return bool - True when the display path matches an ignored pattern.
      */
     private function isPathIgnored(string $displayPath, array $patterns): bool
     {
@@ -160,8 +160,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Check whether a test method already declares a data provider.
      *
-     * @param Stmt\ClassMethod $classMethod Test method whose attributes and docblock are scanned for a provider.
-     * @return bool True when an attribute or docblock data provider is present.
+     * @param Stmt\ClassMethod $classMethod - Test method whose attributes and docblock are scanned for a provider.
+     *
+     * @return bool - True when an attribute or docblock data provider is present.
      */
     private function usesDataProvider(Stmt\ClassMethod $classMethod): bool
     {
@@ -181,10 +182,10 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Reduce a test body to a token string capturing only its call and control-flow shape, ignoring literal values.
      *
-     * @param list<Node> $stmts      Statements of one test method body; the unit being fingerprinted.
-     * @param NodeFinder $nodeFinder Finder shared across the class scan so one instance serves every method.
+     * @param list<Node> $stmts - Statements of one test method body; the unit being fingerprinted.
+     * @param NodeFinder $nodeFinder - Finder shared across the class scan so one instance serves every method.
      *
-     * @return string Structure fingerprint for comparison across tests.
+     * @return string - Structure fingerprint for comparison across tests.
      */
     private function fingerprint(array $stmts, NodeFinder $nodeFinder): string
     {
@@ -210,9 +211,9 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
     /**
      * Convert a structural AST node to a stable fingerprint token.
      *
-     * @param Node $node One structural node from a test body; call targets fold into the token, plain shapes do not.
+     * @param Node $node - One structural node from a test body; call targets fold into the token, plain shapes do not.
      *
-     * @return string Fingerprint token.
+     * @return string - Fingerprint token.
      */
     private function tokenFor(Node $node): string
     {

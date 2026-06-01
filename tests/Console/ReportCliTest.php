@@ -85,6 +85,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command outputs JSON report.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testReportCommandOutputsJsonReport(): void
@@ -139,6 +140,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command forwards repeated rule filters.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testReportCommandForwardsRepeatedRuleFilters(): void
@@ -206,6 +208,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command preserves dash-prefixed path arguments when delegating to analyse.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testReportCommandPreservesDashPrefixedPaths(): void
@@ -275,6 +278,7 @@ final class ReportCliTest extends CliTestCase
      * Verify report command forwards baseline flag.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testReportCommandForwardsBaselineFlag(): void

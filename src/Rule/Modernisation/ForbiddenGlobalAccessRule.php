@@ -34,7 +34,7 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Describe the forbidden global access rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -52,10 +52,10 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     /**
      * Find direct superglobal access outside controller boundaries.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for forbidden global reads.
+     * @return list<Finding> - Findings for forbidden global reads.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -94,16 +94,15 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per distinct forbidden superglobal read found outside a controller.
         return $findings;
     }
 
     /**
      * Check whether a file path is treated as a controller boundary.
      *
-     * @param string $displayPath File path as shown in findings; matched by convention to spot controller code.
+     * @param string $displayPath - File path as shown in findings; matched by convention to spot controller code.
      *
-     * @return bool True when direct request/session access is allowed.
+     * @return bool - True when direct request/session access is allowed.
      */
     private function isControllerPath(string $displayPath): bool
     {

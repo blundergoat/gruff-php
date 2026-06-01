@@ -31,7 +31,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Describe the unsafe XML loading rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +49,10 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Find XML loaders that receive request-controlled data without LIBXML_NONET.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unsafe XML loading.
+     * @return list<Finding> - Findings for unsafe XML loading.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -85,10 +85,10 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Build XML-loading findings for DOMDocument/XMLReader-style method and static calls.
      *
-     * @param AnalysisUnit                    $analysisUnit Parsed unit supplying the display path for any finding.
-     * @param Expr\MethodCall|Expr\StaticCall $call         Loader call to inspect (`load`, `loadXML`, `open`, `xml`).
+     * @param AnalysisUnit                    $analysisUnit - Parsed unit supplying the display path for any finding.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Loader call to inspect (`load`, `loadXML`, `open`, `xml`).
      *
-     * @return list<Finding> One finding when the loader takes request-controlled data without LIBXML_NONET, else empty.
+     * @return list<Finding> - One finding when the loader takes request-controlled data without LIBXML_NONET, else empty.
      */
     private function xmlMethodFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
@@ -118,10 +118,10 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Check whether any positional options argument at or after the given index passes LIBXML_NONET.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args Call args; string-keyed named args are skipped.
-     * @param int $startIndex First positional index the options flags can appear at; varies by loader signature.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call args; string-keyed named args are skipped.
+     * @param int $startIndex - First positional index the options flags can appear at; varies by loader signature.
      *
-     * @return bool True when an argument from the given index contains LIBXML_NONET.
+     * @return bool - True when an argument from the given index contains LIBXML_NONET.
      */
     private function hasLibxmlNonetArgument(array $args, int $startIndex): bool
     {
@@ -143,9 +143,9 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Test whether an argument expression mentions the LIBXML_NONET constant anywhere in its subtree.
      *
-     * @param Node $node Argument value node to search (a bare constant, a bitmask expression, etc.).
+     * @param Node $node - Argument value node to search (a bare constant, a bitmask expression, etc.).
      *
-     * @return bool True when the node contains the LIBXML_NONET constant.
+     * @return bool - True when the node contains the LIBXML_NONET constant.
      */
     private function containsLibxmlNonet(Node $node): bool
     {
@@ -161,11 +161,11 @@ final class UnsafeXmlLoadingRule implements RuleInterface
     /**
      * Build the unsafe XML loading finding for one flagged loader call.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path recorded on the finding.
-     * @param Node $node Loader call node; its start line locates the finding in source.
-     * @param string $sink Loader name (e.g. `loadXML`) put in the message and metadata so triage knows the call.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
+     * @param Node $node - Loader call node; its start line locates the finding in source.
+     * @param string $sink - Loader name (e.g. `loadXML`) put in the message and metadata so triage knows the call.
      *
-     * @return Finding Security finding.
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {

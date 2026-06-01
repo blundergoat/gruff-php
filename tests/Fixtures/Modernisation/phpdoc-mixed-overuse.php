@@ -326,7 +326,7 @@ final class PhpDocMixedOveruseFixture
     /**
      * The description can mention mixed without making the return type mixed.
      *
-     * @return bool True when an array/list bag has mixed payload leaves.
+     * @return bool - True when an array/list bag has mixed payload leaves.
      */
     public function isMixedOnlyInReturnDescription(): bool
     {

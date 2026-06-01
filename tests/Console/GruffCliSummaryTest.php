@@ -132,8 +132,8 @@ final class GruffCliSummaryTest extends TestCase
     /**
      * Verify summary rejects invalid option combinations.
      *
-     * @param list<string> $arguments CLI arguments appended after the base command.
-     * @param string       $message   Expected usage error excerpt.
+     * @param list<string> $arguments - CLI arguments appended after the base command.
+     * @param string       $message - Expected usage error excerpt.
      *
      * @return void
      */

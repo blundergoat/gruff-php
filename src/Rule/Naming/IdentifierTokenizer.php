@@ -10,7 +10,7 @@ namespace GruffPhp\Rule\Naming;
 final readonly class IdentifierTokenizer
 {
     /**
-     * @param string $identifier Identifier text to split into words.
+     * @param string $identifier - Identifier text to split into words.
      *
      * @return list<string> - lowercased word tokens in source order; empty when the identifier holds only separators
      */
@@ -41,7 +41,6 @@ final readonly class IdentifierTokenizer
             }
         }
 
-        // Hand back the lowercased words in source order, ready for downstream naming comparisons.
         return $tokens;
     }
 }

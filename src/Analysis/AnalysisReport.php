@@ -36,30 +36,30 @@ final readonly class AnalysisReport
     public const SCHEMA_VERSION = 'gruff.analysis.v2';
 
     /**
-     * @param string                      $toolVersion              Gruff version used to produce the report.
-     * @param list<string>                $requestedPaths           Paths requested for analysis.
-     * @param string                      $format                   Output format requested for report serialization.
-     * @param string                      $failOn                   Severity gate used to determine the process exit code.
-     * @param int                         $filesDiscovered          Number of source files discovered before parsing.
-     * @param int                         $filesParsed              Number of source files parsed successfully.
-     * @param list<string>                $ignoredPaths             Requested paths ignored by discovery.
-     * @param list<string>                $missingPaths             Requested paths that did not resolve to files.
-     * @param list<RunDiagnostic>         $diagnostics              Non-finding diagnostics emitted during the run.
-     * @param list<Finding>               $findings                 Findings included in the report.
-     * @param int                         $exitCode                 Process exit code represented by the report.
-     * @param string|null                 $configPath               Config file path used for the run, when available.
-     * @param MutationAnalysisResult|null $mutation                 Mutation analysis result attached to the report.
-     * @param ScoreReport|null            $score                    Score summary attached to the report.
-     * @param DiffResult|null             $diff                     Diff context attached to the report.
-     * @param TrendReport|null            $trend                    Trend history attached to the report.
-     * @param BaselineReport|null         $baseline                 Baseline application result attached to the report.
-     * @param BranchReviewResult|null     $review                   Branch review result attached to the report.
-     * @param FindingDisplayFilter|null   $filters                  Display filters applied to the report output.
-     * @param int|null                    $suppressedCount          Findings excluded by changed-region filtering.
-     * @param list<IgnoredPath>           $ignoredPathDetails       Ignored paths enriched with source and matching pattern.
-     * @param bool                        $shouldListAbsentBaseline Whether reporters should list resolved (absent) baseline entries.
-     * @param ThresholdTrip|null          $failureReason            Gate threshold that tripped, when the run failed a count threshold.
-     * @param int|null                    $newFindingsCount         Size of the new-findings set, when a new-findings gate is active.
+     * @param string                      $toolVersion - Gruff version used to produce the report.
+     * @param list<string>                $requestedPaths - Paths requested for analysis.
+     * @param string                      $format - Output format requested for report serialization.
+     * @param string                      $failOn - Severity gate used to determine the process exit code.
+     * @param int                         $filesDiscovered - Number of source files discovered before parsing.
+     * @param int                         $filesParsed - Number of source files parsed successfully.
+     * @param list<string>                $ignoredPaths - Requested paths ignored by discovery.
+     * @param list<string>                $missingPaths - Requested paths that did not resolve to files.
+     * @param list<RunDiagnostic>         $diagnostics - Non-finding diagnostics emitted during the run.
+     * @param list<Finding>               $findings - Findings included in the report.
+     * @param int                         $exitCode - Process exit code represented by the report.
+     * @param string|null                 $configPath - Config file path used for the run, when available.
+     * @param MutationAnalysisResult|null $mutation - Mutation analysis result attached to the report.
+     * @param ScoreReport|null            $score - Score summary attached to the report.
+     * @param DiffResult|null             $diff - Diff context attached to the report.
+     * @param TrendReport|null            $trend - Trend history attached to the report.
+     * @param BaselineReport|null         $baseline - Baseline application result attached to the report.
+     * @param BranchReviewResult|null     $review - Branch review result attached to the report.
+     * @param FindingDisplayFilter|null   $filters - Display filters applied to the report output.
+     * @param int|null                    $suppressedCount - Findings excluded by changed-region filtering.
+     * @param list<IgnoredPath>           $ignoredPathDetails - Ignored paths enriched with source and matching pattern.
+     * @param bool                        $shouldListAbsentBaseline - Whether reporters should list resolved (absent) baseline entries.
+     * @param ThresholdTrip|null          $failureReason - Gate threshold that tripped, when the run failed a count threshold.
+     * @param int|null                    $newFindingsCount - Size of the new-findings set, when a new-findings gate is active.
      */
     public function __construct(
         public string                  $toolVersion,
@@ -256,7 +256,7 @@ final readonly class AnalysisReport
     /**
      * Check whether any finding in the report matches the requested severity.
      *
-     * @param Severity $severity Severity level to look for in the finding list.
+     * @param Severity $severity - Severity level to look for in the finding list.
      *
      * @return bool - true on the first finding at the requested severity (the gate only needs one); false means nothing in the report reached that
      *              level

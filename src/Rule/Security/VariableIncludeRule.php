@@ -30,7 +30,7 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Describe the variable include security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Find include and require expressions using dynamic paths.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for variable include paths.
+     * @return list<Finding> - Findings for variable include paths.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,9 +82,9 @@ final class VariableIncludeRule implements RuleInterface
     /**
      * Treat literal paths and paths derived only from magic constants as fixed bootstrap includes.
      *
-     * @param Expr $expression Include/require path expression, recursed into for concatenation and dirname() wrappers.
+     * @param Expr $expression - Include/require path expression, recursed into for concatenation and dirname() wrappers.
      *
-     * @return bool True when the include path cannot vary from request or runtime data.
+     * @return bool - True when the include path cannot vary from request or runtime data.
      */
     private function isFixedIncludeExpression(Expr $expression): bool
     {

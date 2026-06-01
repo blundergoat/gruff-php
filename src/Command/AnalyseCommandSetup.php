@@ -18,14 +18,14 @@ final readonly class AnalyseCommandSetup
     /**
      * Capture resolved dependencies and options needed to execute analyse.
      *
-     * @param string                $projectRoot   Absolute project root used for path resolution.
-     * @param AnalyseCommandOptions $options       Validated analyse command options.
-     * @param OutputFormat          $format        Reporter format selected for output.
-     * @param FailThreshold         $failThreshold  Legacy severity threshold retained for display/back-compat.
-     * @param FailThresholds        $failThresholds Resolved count-gate thresholds that decide the exit code.
-     * @param AnalysisConfig        $config         Effective analysis configuration.
-     * @param string|null           $configPath     Config path used to build the setup, when any.
-     * @param RuleRegistry          $registry       Rule registry used for the analysis run.
+     * @param string                $projectRoot - Absolute project root used for path resolution.
+     * @param AnalyseCommandOptions $options - Validated analyse command options.
+     * @param OutputFormat          $format - Reporter format selected for output.
+     * @param FailThreshold         $failThreshold - Legacy severity threshold retained for display/back-compat.
+     * @param FailThresholds        $failThresholds - Resolved count-gate thresholds that decide the exit code.
+     * @param AnalysisConfig        $config - Effective analysis configuration.
+     * @param string|null           $configPath - Config path used to build the setup, when any.
+     * @param RuleRegistry          $registry - Rule registry used for the analysis run.
      */
     public function __construct(
         public string $projectRoot,

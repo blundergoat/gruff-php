@@ -49,8 +49,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Find files that lack a file-level docblock or a documented sole class-like declaration.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - at most one finding when the file lacks file-level docs; empty when the file is documented or has nothing to anchor to
      */
@@ -85,7 +85,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * List top-level statements that count toward file documentation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose namespaced statements are flattened.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose namespaced statements are flattened.
      *
      * @return list<Node\Stmt> - statements hoisted out of any namespace wrapper, in source order; empty when the file declares none
      */
@@ -109,7 +109,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     }
 
     /**
-     * @param list<Node\Stmt> $statements
+     * @param list<Node\Stmt> $statements - Effective top-level statements after namespace wrappers are flattened.
      *
      * @return bool - true only when the file declares exactly one class-like and it carries its own docblock; false otherwise
      */
@@ -132,7 +132,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Check whether the first effective statement carries a docblock comment.
      *
-     * @param Node\Stmt $statement First top-level statement whose attached comments are scanned.
+     * @param Node\Stmt $statement - First top-level statement whose attached comments are scanned.
      *
      * @return bool - true when a structured docblock is attached; false when only line or block comments are present
      */
@@ -152,8 +152,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Build finding for the documentation rule.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path reported in the finding.
-     * @param Node\Stmt    $first        First top-level statement, used to record the offending statement kind.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path reported in the finding.
+     * @param Node\Stmt    $first - First top-level statement, used to record the offending statement kind.
      *
      * @return list<Finding> - single advisory finding anchored at line 1 flagging the absent file-level documentation
      */
@@ -184,7 +184,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Return a compact statement kind for finding metadata.
      *
-     * @param Node\Stmt $node Statement whose class name is reduced to a short kind label.
+     * @param Node\Stmt $node - Statement whose class name is reduced to a short kind label.
      *
      * @return string - short parser node name, lower-cased with the trailing underscore stripped (e.g. "class", "function"), for finding metadata
      */

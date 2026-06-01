@@ -46,7 +46,6 @@ final class SensitiveDataLoggingRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Sensitive data logging',
@@ -60,8 +59,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Find log sinks that include request or secret-like values.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per flagged log sink across function, method, and static
      *   calls; empty when nothing leaks request or secret data
@@ -89,15 +88,14 @@ final class SensitiveDataLoggingRule implements RuleInterface
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
 
-        // Hand back every sensitive-logging finding gathered across function, method, and static log sinks.
         return $findings;
     }
 
     /**
      * Build logger call findings for the security rule.
      *
-     * @param AnalysisUnit                    $analysisUnit Unit being scanned; supplies the display path for findings.
-     * @param Expr\MethodCall|Expr\StaticCall $call         Possible logger call whose name and arguments are checked.
+     * @param AnalysisUnit                    $analysisUnit - Unit being scanned; supplies the display path for findings.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Possible logger call whose name and arguments are checked.
      *
      * @return list<Finding> - zero or one finding; empty when the call is not a tracked logger method or carries no sensitive argument
      */
@@ -119,7 +117,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Logger-call arguments to scan for request-tainted or secret-bearing values.
      *
      * @return bool - true on the first argument carrying request-tainted or secret-bearing data;
      *   false when every argument is static or non-sensitive
@@ -148,7 +146,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Detect logger arguments that contain only static message/context values.
      *
-     * @param Expr $expr Argument expression to classify; recursed into for arrays and concatenations.
+     * @param Expr $expr - Argument expression to classify; recursed into for arrays and concatenations.
      *
      * @return bool - true when the argument resolves to only compile-time constant message/context
      *   values; false when any part can hold runtime data
@@ -196,9 +194,9 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Build the sensitive data logging finding.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path recorded on the finding.
-     * @param Node         $node         Log call flagged as leaking; its start line locates the finding.
-     * @param string       $sink         Name of the log function or method, surfaced in the message and metadata.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node - Log call flagged as leaking; its start line locates the finding.
+     * @param string       $sink - Name of the log function or method, surfaced in the message and metadata.
      *
      * @return Finding - medium-confidence security warning located at the call's start line, naming
      *   the sink in its message and metadata

@@ -12,11 +12,11 @@ use GruffPhp\Finding\Finding;
 final readonly class BranchReviewComparator
 {
     /**
-     * @param list<Finding> $current       Current branch findings to compare.
-     * @param list<Finding> $base          Base branch findings to compare against.
-     * @param string        $baseRef       Base ref used to produce the comparison.
-     * @param bool          $isChangedOnly Whether unchanged changed-file scope applies.
-     * @param float|null    $deltaScore    Optional score delta between base and current runs.
+     * @param list<Finding> $current - Current branch findings to compare.
+     * @param list<Finding> $base - Base branch findings to compare against.
+     * @param string        $baseRef - Base ref used to produce the comparison.
+     * @param bool          $isChangedOnly - Whether unchanged changed-file scope applies.
+     * @param float|null    $deltaScore - Optional score delta between base and current runs.
      *
      * @return BranchReviewResult - findings partitioned into introduced, removed, and unchanged sets plus the
      *   score delta, ready for the caller to render the branch review
@@ -57,15 +57,14 @@ final readonly class BranchReviewComparator
             }
         }
 
-        // Hand back the three partitioned finding sets plus the score delta the caller renders as the review.
         return new BranchReviewResult($baseRef, $isChangedOnly, $introduced, $removed, $unchanged, $deltaScore);
     }
 
     /**
      * Index findings by branch-review identity.
      *
-     * @param list<Finding>         $findings
-     * @param FindingReviewIdentity $identity Key strategy that buckets findings so matching ignores line drift.
+     * @param list<Finding>         $findings - Findings to bucket by review identity before comparison.
+     * @param FindingReviewIdentity $identity - Key strategy that buckets findings so matching ignores line drift.
      *
      * @return array<string, list<Finding>> - findings bucketed by review-identity key, keys sorted ascending so iteration order is deterministic;
      *                       empty when no findings

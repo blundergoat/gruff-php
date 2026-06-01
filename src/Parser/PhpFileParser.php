@@ -26,7 +26,7 @@ final readonly class PhpFileParser
     /**
      * Create a parser using the supplied nikic/php-parser instance or default.
      *
-     * @param Parser|null $parser Parser override used by tests, or null for the default parser.
+     * @param Parser|null $parser - Parser override used by tests, or null for the default parser.
      */
     public function __construct(?Parser $parser = null)
     {
@@ -36,8 +36,9 @@ final readonly class PhpFileParser
     /**
      * Parse a source file into statements, tokens, and diagnostics for rules.
      *
-     * @param SourceFile $file File descriptor to parse.
-     * @return AnalysisUnit Parsed source representation consumed by rules.
+     * @param SourceFile $file - File descriptor to parse.
+     *
+     * @return AnalysisUnit - Parsed source representation consumed by rules.
      */
     public function parse(SourceFile $file): AnalysisUnit
     {

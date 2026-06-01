@@ -45,7 +45,6 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public static function indexProvider(): array
     {
-        // Each row pins a fixture method to its hand-computed index; the oracle the formula output is checked against.
         return [
             'flat'                  => ['flat', 97.7576810884],
             'one if'                => ['oneIf', 80.4379624235],
@@ -67,8 +66,8 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Verify maintainability index values match expected formula output.
      *
-     * @param string $methodName    Fixture method name.
-     * @param float  $expectedIndex Expected maintainability index.
+     * @param string $methodName - Fixture method name.
+     * @param float  $expectedIndex - Expected maintainability index.
      *
      * @return void
      */
@@ -145,8 +144,8 @@ final class MaintainabilityIndexRuleTest extends TestCase
     /**
      * Return a named method from the cognitive fixture.
      *
-     * @param AnalysisUnit $analysisUnit Parsed fixture.
-     * @param string       $methodName   Fixture method name.
+     * @param AnalysisUnit $analysisUnit - Parsed fixture.
+     * @param string       $methodName - Fixture method name.
      *
      * @return ClassMethod - the fixture's AST node whose name matches $methodName; fails the test when no such method exists
      */
@@ -173,7 +172,6 @@ final class MaintainabilityIndexRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
-        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
     }
 }

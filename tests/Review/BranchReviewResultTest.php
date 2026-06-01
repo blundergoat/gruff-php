@@ -103,6 +103,7 @@ final class BranchReviewResultTest extends TestCase
      *
      * @param string $ruleId - rule id to stamp on the fixture; the only field that varies across
      *   cases, since perRuleDelta() buckets and sorts purely on this value.
+     *
      * @return Finding - finding whose every other field is held constant so delta grouping and
      *   tie-breaking depend on $ruleId alone.
      */

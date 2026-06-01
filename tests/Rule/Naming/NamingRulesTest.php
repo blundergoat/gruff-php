@@ -361,7 +361,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Build `symbol|identifier` rows for identifier-quality findings with a reported name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings Identifier-quality findings from a fixture.
+     * @param list<\GruffPhp\Finding\Finding> $findings - Identifier-quality findings from a fixture.
      *
      * @return list<string> - symbol and identifier pairs in finding order; findings without string names are omitted
      */
@@ -480,7 +480,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Run identifier-quality checks with custom rule options.
      *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Identifier-quality rule option overrides.
      *
      * @return list<\GruffPhp\Finding\Finding> - identifier-quality findings only, in discovery order; empty when the options suppress every report
      */
@@ -495,7 +495,6 @@ final class NamingRulesTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Keep only identifier-quality findings so option-tuning assertions are not diluted by other naming rules.
         return array_values(array_filter(
                                 $findings,
                                 static fn($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
@@ -505,7 +504,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
-     * @param string $fixture fixture basename under the naming fixtures dir, parsed then run through the full rule pack
+     * @param string $fixture - fixture basename under the naming fixtures dir, parsed then run through the full rule pack
      *
      * @return list<\GruffPhp\Finding\Finding> - every finding the default rule pack raises against the fixture, in discovery order; empty when the
      *                                         fixture is clean
@@ -515,7 +514,6 @@ final class NamingRulesTest extends NamingRuleTestCase
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
 
-        // Hand back every finding the default registry raises against the fixture, in discovery order.
         return $registry->analyse([$unit], new RuleContext(
             __DIR__ . '/../../..',
             AnalysisConfig::fromRegistry($registry),
@@ -523,11 +521,11 @@ final class NamingRulesTest extends NamingRuleTestCase
     }
 
     /**
-     * @param list<\GruffPhp\Finding\Finding> $findings
-     * @param string                          $ruleId        rule the finding must come from; others are skipped
-     * @param string                          $metadataKey   finding metadata entry to match on, such as the reported identifier name
-     * @param string                          $metadataValue exact value that metadata entry must hold for a match
-     * @param string                          $symbolPrefix  prefix the reported symbol must start with, scoping the match to one declaration
+     * @param list<\GruffPhp\Finding\Finding> $findings - Findings to search for a matching rule, metadata value, and symbol prefix.
+     * @param string                          $ruleId - rule the finding must come from; others are skipped
+     * @param string                          $metadataKey - finding metadata entry to match on, such as the reported identifier name
+     * @param string                          $metadataValue - exact value that metadata entry must hold for a match
+     * @param string                          $symbolPrefix - prefix the reported symbol must start with, scoping the match to one declaration
      *
      * @return bool - true when some finding matches the rule, metadata, and symbol prefix; false when none does
      */
@@ -556,7 +554,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Group naming findings by reported variable name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings
+     * @param list<\GruffPhp\Finding\Finding> $findings - Naming findings to group by reported variable name.
      *
      * @return array<string, list<string>> - reported symbols bucketed by variable name; a name maps to repeated symbols when reported more than
      *                       once, and absent keys mean that variable was never flagged
@@ -578,7 +576,6 @@ final class NamingRulesTest extends NamingRuleTestCase
             $reported[$name][] = $finding->symbol;
         }
 
-        // Hand back the reported symbols bucketed by variable name for duplicate-report assertions.
         return $reported;
     }
 }

@@ -16,6 +16,7 @@ final class AnalyseCliMutationTest extends CliTestCase
      * Verify analyse command ingests infection report in JSON.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandIngestsInfectionReportInJson(): void
@@ -128,6 +129,7 @@ final class AnalyseCliMutationTest extends CliTestCase
      * Verify analyse command reports mutation budget and msi regression.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testAnalyseCommandReportsMutationBudgetAndMsiRegression(): void

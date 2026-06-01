@@ -26,9 +26,9 @@ final readonly class FailThresholds
     private const SEVERITY_ORDER = ['error', 'warning', 'advisory'];
 
     /**
-     * @param int|null             $total            Maximum total findings allowed, or null for no total cap.
-     * @param array<string, int>   $severityCounts   Maximum findings allowed per severity value, keyed by severity value.
-     * @param FailThresholds|null  $newFindingsGate  Optional sub-gate applied to the new-findings set only.
+     * @param int|null             $total - Maximum total findings allowed, or null for no total cap.
+     * @param array<string, int>   $severityCounts - Maximum findings allowed per severity value, keyed by severity value.
+     * @param FailThresholds|null  $newFindingsGate - Optional sub-gate applied to the new-findings set only.
      * @throws InvalidArgumentException When any cap is negative.
      */
     public function __construct(
@@ -50,8 +50,9 @@ final readonly class FailThresholds
     /**
      * Build thresholds equivalent to the legacy --fail-on severity gate.
      *
-     * @param FailThreshold $threshold Legacy severity threshold to desugar.
-     * @return self Thresholds reproducing the binary gate exactly.
+     * @param FailThreshold $threshold - Legacy severity threshold to desugar.
+     *
+     * @return self - Thresholds reproducing the binary gate exactly.
      */
     public static function fromFailOn(FailThreshold $threshold): self
     {
@@ -73,9 +74,10 @@ final readonly class FailThresholds
     /**
      * Build thresholds from a parsed failureConditions config block.
      *
-     * @param array<array-key, mixed> $failureConditions Decoded failureConditions block.
+     * @param array<array-key, mixed> $failureConditions - Decoded failureConditions block.
      * @throws ConfigException When keys, severities, or values are invalid.
-     * @return self Thresholds described by the config block.
+     *
+     * @return self - Thresholds described by the config block.
      */
     public static function fromConfig(array $failureConditions): self
     {
@@ -86,11 +88,12 @@ final readonly class FailThresholds
     /**
      * Recursively parse a failureConditions block, optionally allowing a newFindings sub-gate.
      *
-     * @param array<array-key, mixed> $conditions        Decoded conditions block.
-     * @param string                  $keyPath           Config key path used for error messages.
-     * @param bool                    $allowsNewFindings Whether a nested newFindings sub-gate is permitted at this level.
+     * @param array<array-key, mixed> $conditions - Decoded conditions block.
+     * @param string                  $keyPath - Config key path used for error messages.
+     * @param bool                    $allowsNewFindings - Whether a nested newFindings sub-gate is permitted at this level.
      * @throws ConfigException When keys, severities, or values are invalid.
-     * @return self Thresholds described by the block.
+     *
+     * @return self - Thresholds described by the block.
      */
     private static function parseConditions(array $conditions, string $keyPath, bool $allowsNewFindings): self
     {
@@ -107,10 +110,11 @@ final readonly class FailThresholds
     /**
      * Reject any key the conditions block does not support at this nesting level.
      *
-     * @param array<array-key, mixed> $conditions        Decoded conditions block.
-     * @param string                  $keyPath           Config key path used for error messages.
-     * @param bool                    $allowsNewFindings Whether the newFindings key is permitted at this level.
+     * @param array<array-key, mixed> $conditions - Decoded conditions block.
+     * @param string                  $keyPath - Config key path used for error messages.
+     * @param bool                    $allowsNewFindings - Whether the newFindings key is permitted at this level.
      * @throws ConfigException When an unsupported key is present.
+     *
      * @return void
      */
     private static function assertKnownKeys(array $conditions, string $keyPath, bool $allowsNewFindings): void
@@ -126,10 +130,11 @@ final readonly class FailThresholds
     /**
      * Parse the optional total-finding cap.
      *
-     * @param array<array-key, mixed> $conditions Decoded conditions block.
-     * @param string                  $keyPath    Config key path used for error messages.
+     * @param array<array-key, mixed> $conditions - Decoded conditions block.
+     * @param string                  $keyPath - Config key path used for error messages.
      * @throws ConfigException When the total value is not a non-negative integer.
-     * @return int|null Total cap, or null when the block omits it.
+     *
+     * @return int|null - Total cap, or null when the block omits it.
      */
     private static function parseTotal(array $conditions, string $keyPath): ?int
     {
@@ -150,10 +155,11 @@ final readonly class FailThresholds
     /**
      * Parse the optional per-severity caps keyed by severity value.
      *
-     * @param array<array-key, mixed> $conditions Decoded conditions block.
-     * @param string                  $keyPath    Config key path used for error messages.
+     * @param array<array-key, mixed> $conditions - Decoded conditions block.
+     * @param string                  $keyPath - Config key path used for error messages.
      * @throws ConfigException When a severity name or its cap value is invalid.
-     * @return array<string, int> Caps keyed by severity value.
+     *
+     * @return array<string, int> - Caps keyed by severity value.
      */
     private static function parseSeverityThresholds(array $conditions, string $keyPath): array
     {
@@ -186,11 +192,12 @@ final readonly class FailThresholds
     /**
      * Parse the optional nested newFindings sub-gate.
      *
-     * @param array<array-key, mixed> $conditions        Decoded conditions block.
-     * @param string                  $keyPath           Config key path used for error messages.
-     * @param bool                    $allowsNewFindings Whether a nested newFindings sub-gate is permitted at this level.
+     * @param array<array-key, mixed> $conditions - Decoded conditions block.
+     * @param string                  $keyPath - Config key path used for error messages.
+     * @param bool                    $allowsNewFindings - Whether a nested newFindings sub-gate is permitted at this level.
      * @throws ConfigException When the newFindings block is present but not an object.
-     * @return self|null Sub-gate, or null when no nested newFindings block applies.
+     *
+     * @return self|null - Sub-gate, or null when no nested newFindings block applies.
      */
     private static function parseNewFindingsGate(array $conditions, string $keyPath, bool $allowsNewFindings): ?self
     {
@@ -214,8 +221,9 @@ final readonly class FailThresholds
      * Severity caps are checked most-severe first, then the total cap; any breach
      * fails the run (OR semantics).
      *
-     * @param list<Finding> $findings Post-baseline findings to evaluate against the gate.
-     * @return ThresholdTrip|null The breached threshold, or null when no threshold trips.
+     * @param list<Finding> $findings - Post-baseline findings to evaluate against the gate.
+     *
+     * @return ThresholdTrip|null - The breached threshold, or null when no threshold trips.
      */
     public function tripsOn(array $findings): ?ThresholdTrip
     {
@@ -250,8 +258,9 @@ final readonly class FailThresholds
     /**
      * Return a copy of this gate with its new-findings sub-gate replaced.
      *
-     * @param FailThresholds|null $newFindingsGate New-findings sub-gate, or null to clear it.
-     * @return self Gate carrying the updated new-findings sub-gate.
+     * @param FailThresholds|null $newFindingsGate - New-findings sub-gate, or null to clear it.
+     *
+     * @return self - Gate carrying the updated new-findings sub-gate.
      */
     public function withNewFindingsGate(?FailThresholds $newFindingsGate): self
     {
@@ -265,9 +274,10 @@ final readonly class FailThresholds
      * The new-findings trip is preferred when both fire because it is the more
      * actionable signal for a developer.
      *
-     * @param list<Finding> $allFindings Post-baseline findings the total gate evaluates.
-     * @param list<Finding> $newFindings New-findings set the sub-gate evaluates.
-     * @return ThresholdTrip|null The breached threshold, or null when no threshold trips.
+     * @param list<Finding> $allFindings - Post-baseline findings the total gate evaluates.
+     * @param list<Finding> $newFindings - New-findings set the sub-gate evaluates.
+     *
+     * @return ThresholdTrip|null - The breached threshold, or null when no threshold trips.
      */
     public function tripsOnScope(array $allFindings, array $newFindings): ?ThresholdTrip
     {

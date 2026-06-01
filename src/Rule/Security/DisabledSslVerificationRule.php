@@ -30,7 +30,7 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Describe the disabled SSL verification rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Find cURL calls that disable peer or hostname verification.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for disabled SSL verification.
+     * @return list<Finding> - Findings for disabled SSL verification.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -75,8 +75,9 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Detect disabled verification in a `curl_setopt` call.
      *
-     * @param Expr\FuncCall $call Parsed `curl_setopt($handle, $option, $value)` call whose option/value pair is read.
-     * @return bool True when SSL verification is disabled.
+     * @param Expr\FuncCall $call - Parsed `curl_setopt($handle, $option, $value)` call whose option/value pair is read.
+     *
+     * @return bool - True when SSL verification is disabled.
      */
     private function isDisabledCurlSetopt(Expr\FuncCall $call): bool
     {
@@ -106,8 +107,9 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Detect disabled verification in a `curl_setopt_array` option map.
      *
-     * @param Expr\FuncCall $call Parsed `curl_setopt_array($handle, $options)` call; its options array is scanned.
-     * @return bool True when the option array disables SSL verification.
+     * @param Expr\FuncCall $call - Parsed `curl_setopt_array($handle, $options)` call; its options array is scanned.
+     *
+     * @return bool - True when the option array disables SSL verification.
      */
     private function isDisabledCurlSetoptArray(Expr\FuncCall $call): bool
     {
@@ -144,9 +146,10 @@ final class DisabledSslVerificationRule implements RuleInterface
     /**
      * Build the SSL verification finding for a cURL call.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path recorded on the finding.
-     * @param Node         $node         cURL call node whose start line localises the finding for the reviewer.
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
+     * @param Node         $node - cURL call node whose start line localises the finding for the reviewer.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {

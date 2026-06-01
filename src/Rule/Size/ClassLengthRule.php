@@ -37,7 +37,7 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Describe the class-length rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose physical line length exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized classes, traits, or enums.
+     * @return list<Finding> - Findings for oversized classes, traits, or enums.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -121,9 +121,9 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Build a display symbol for a class-like node.
      *
-     * @param Node $node Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
+     * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
-     * @return string Class-like display symbol.
+     * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -149,9 +149,9 @@ final readonly class ClassLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole floats are shown without a trailing decimal.
+     * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
-     * @return string Human-readable threshold value.
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

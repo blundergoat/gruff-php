@@ -64,9 +64,9 @@ final class DashboardScanRunner
     /**
      * Capture collaborators used to execute dashboard scans and render results.
      *
-     * @param string                $gruffBinary  Absolute gruff-php binary path used for scan requests.
-     * @param DashboardStateFactory $stateFactory Factory used to resolve dashboard state.
-     * @param DashboardPageRenderer $renderer     Renderer used for scan output and errors.
+     * @param string                $gruffBinary - Absolute gruff-php binary path used for scan requests.
+     * @param DashboardStateFactory $stateFactory - Factory used to resolve dashboard state.
+     * @param DashboardPageRenderer $renderer - Renderer used for scan output and errors.
      */
     public function __construct(
         private readonly string $gruffBinary,
@@ -78,9 +78,10 @@ final class DashboardScanRunner
     /**
      * Run a dashboard scan request and return HTML for the iframe.
      *
-     * @param DashboardRequestContext $dashboardRequestContext Dashboard request context.
-     * @param array<string, string>   $query                   Request query values from the dashboard form.
-     * @return string Dashboard HTML for either scan results or an error panel.
+     * @param DashboardRequestContext $dashboardRequestContext - Dashboard request context.
+     * @param array<string, string>   $query - Request query values from the dashboard form.
+     *
+     * @return string - Dashboard HTML for either scan results or an error panel.
      */
     public function scanHtml(DashboardRequestContext $dashboardRequestContext, array $query): string
     {
@@ -161,11 +162,12 @@ final class DashboardScanRunner
     /**
      * Build an invalidation fingerprint for the requested scan inputs.
      *
-     * @param         string                                                                                                                                                                                              $scanRoot Resolved project root the paths are taken relative to.
-     * @param         list<string>                                                                                                                                                                                        $paths Requested scan paths.
-     * @param         array<string, string>                                                                                                                                                                               $state Dashboard query state.
+     * @param         string                                                                                                                                                                                              $scanRoot - Resolved project root the paths are taken relative to.
+     * @param         list<string>                                                                                                                                                                                        $paths - Requested scan paths.
+     * @param         array<string, string>                                                                                                                                                                               $state - Dashboard query state.
      * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
-     * @return string Fingerprint covering source paths plus config and baseline inputs.
+     *
+     * @return string - Fingerprint covering source paths plus config and baseline inputs.
      */
     private function cacheFingerprint(string $scanRoot, array $paths, array $state): string
     {
@@ -192,9 +194,10 @@ final class DashboardScanRunner
     /**
      * Add a file, directory, or missing-path marker to a cache fingerprint.
      *
-     * @param list<string> $parts    Fingerprint parts collected so far; appended to by reference.
-     * @param string       $scanRoot Project root that $path is resolved against.
-     * @param string       $path     Project-relative or absolute path to fingerprint; may not exist on disk.
+     * @param list<string> $parts - Fingerprint parts collected so far; appended to by reference.
+     * @param string       $scanRoot - Project root that $path is resolved against.
+     * @param string       $path - Project-relative or absolute path to fingerprint; may not exist on disk.
+     *
      * @return void
      */
     private function appendPathFingerprint(array &$parts, string $scanRoot, string $path): void
@@ -224,9 +227,10 @@ final class DashboardScanRunner
     /**
      * Add recursive file metadata for a directory to a cache fingerprint.
      *
-     * @param list<string> $parts     Fingerprint parts collected so far; appended to by reference.
-     * @param string       $scanRoot  Project root used to decide which nested directories are ignored.
-     * @param string       $directory Absolute directory whose files are walked into the fingerprint.
+     * @param list<string> $parts - Fingerprint parts collected so far; appended to by reference.
+     * @param string       $scanRoot - Project root used to decide which nested directories are ignored.
+     * @param string       $directory - Absolute directory whose files are walked into the fingerprint.
+     *
      * @return void
      */
     private function appendDirectoryFingerprint(array &$parts, string $scanRoot, string $directory): void
@@ -259,9 +263,10 @@ final class DashboardScanRunner
     /**
      * Check whether a directory is outside the dashboard cache invalidation surface.
      *
-     * @param  string $scanRoot  Project root used to derive the directory's relative path for root matching.
-     * @param  string $directory Absolute directory being considered for the recursive walk.
-     * @return bool True when the directory should not invalidate cached scans.
+     * @param  string $scanRoot - Project root used to derive the directory's relative path for root matching.
+     * @param  string $directory - Absolute directory being considered for the recursive walk.
+     *
+     * @return bool - True when the directory should not invalidate cached scans.
      */
     private function isIgnoredDirectory(string $scanRoot, string $directory): bool
     {
@@ -281,8 +286,9 @@ final class DashboardScanRunner
     /**
      * Return file metadata used for dashboard cache invalidation.
      *
-     * @param  string $path Absolute path to an existing file whose metadata identifies the cached version.
-     * @return string File path, modification time, size, and content hash.
+     * @param  string $path - Absolute path to an existing file whose metadata identifies the cached version.
+     *
+     * @return string - File path, modification time, size, and content hash.
      */
     private function fileFingerprint(string $path): string
     {
@@ -295,7 +301,8 @@ final class DashboardScanRunner
     /**
      * Keep the in-process dashboard result cache bounded.
      *
-     * @param  string $cacheKey Key about to be (re)written; dropped first so a refresh moves it to newest.
+     * @param  string $cacheKey - Key about to be (re)written; dropped first so a refresh moves it to newest.
+     *
      * @return void
      */
     private function evictCacheEntryIfNeeded(string $cacheKey): void

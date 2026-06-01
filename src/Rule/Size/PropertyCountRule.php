@@ -35,7 +35,7 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Describe the property-count rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -54,10 +54,10 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Find class-like scopes whose declared property count exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for classes, traits, or enums with too many properties.
+     * @return list<Finding> - Findings for classes, traits, or enums with too many properties.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -106,14 +106,13 @@ final readonly class PropertyCountRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per class-like scope that breached the threshold; empty when all fit.
         return $findings;
     }
 
     /**
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose properties and promoted constructor params are counted.
      *
-     * @return int Declared and promoted property count.
+     * @return int - Declared and promoted property count.
      */
     private function countProperties(Node $classLike): int
     {
@@ -140,8 +139,9 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Build a display symbol for a class-like node.
      *
-     * @param Node $node Class, trait, or enum declaration to render as a finding symbol.
-     * @return string Class-like display symbol.
+     * @param Node $node - Class, trait, or enum declaration to render as a finding symbol.
+     *
+     * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -167,8 +167,9 @@ final readonly class PropertyCountRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

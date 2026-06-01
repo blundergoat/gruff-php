@@ -27,10 +27,11 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build the validated analysis setup from console input.
      *
-     * @param InputInterface           $input              Symfony console input for the analyse command.
-     * @param OutputInterface          $output             Symfony console output for optional init prompting.
-     * @param SymfonyApplication|null  $symfonyApplication Console application used to dispatch the init command.
-     * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
+     * @param InputInterface           $input - Symfony console input for the analyse command.
+     * @param OutputInterface          $output - Symfony console output for optional init prompting.
+     * @param SymfonyApplication|null  $symfonyApplication - Console application used to dispatch the init command.
+     *
+     * @return AnalyseCommandSetupResult - Ready setup or formatted usage/config error.
      */
     public function build(
         InputInterface $input,
@@ -54,11 +55,12 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build setup, prompting for an init config only after option validation passes.
      *
-     * @param InputInterface          $input              Symfony console input for the analyse command.
-     * @param OutputInterface         $output             Console output used for the optional init prompt.
-     * @param SymfonyApplication|null $symfonyApplication Console application used to dispatch the init command.
-     * @param string                  $projectRoot        Current project root.
-     * @return AnalyseCommandSetupResult Ready setup or formatted usage/config error.
+     * @param InputInterface          $input - Symfony console input for the analyse command.
+     * @param OutputInterface         $output - Console output used for the optional init prompt.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
+     * @param string                  $projectRoot - Current project root.
+     *
+     * @return AnalyseCommandSetupResult - Ready setup or formatted usage/config error.
      */
     private function buildSetup(
         InputInterface $input,
@@ -183,8 +185,9 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the requested output format.
      *
-     * @param mixed $optionValue Raw --format console option; a non-string (option absent) defaults to text.
-     * @return OutputFormat|string Parsed format, or a formatted usage error string.
+     * @param mixed $optionValue - Raw --format console option; a non-string (option absent) defaults to text.
+     *
+     * @return OutputFormat|string - Parsed format, or a formatted usage error string.
      */
     private function format(mixed $optionValue): OutputFormat|string
     {
@@ -201,10 +204,11 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Apply ADR-015 precedence to the parsed --fail-on value.
      *
-     * @param InputInterface $input             Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config            Loaded analysis config supplying per-command overrides.
-     * @param FailThreshold  $explicitOrDefault Already-parsed CLI value; binary default when --fail-on omitted.
-     * @return FailThreshold Resolved threshold honouring CLI > config > binary precedence.
+     * @param InputInterface $input - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config - Loaded analysis config supplying per-command overrides.
+     * @param FailThreshold  $explicitOrDefault - Already-parsed CLI value; binary default when --fail-on omitted.
+     *
+     * @return FailThreshold - Resolved threshold honouring CLI > config > binary precedence.
      */
     private function resolveFailThresholdWithConfig(
         InputInterface $input,
@@ -228,10 +232,11 @@ final readonly class AnalyseCommandSetupBuilder
      * threshold (config minimumSeverity or the binary default) is desugared so the
      * gate stays byte-identical to today.
      *
-     * @param InputInterface $input         Console input used for explicit-flag detection.
-     * @param AnalysisConfig $config        Loaded config supplying the optional failureConditions block.
-     * @param FailThreshold  $failThreshold Already-resolved singular threshold for the run.
-     * @return FailThresholds Count-gate thresholds that decide the exit code.
+     * @param InputInterface $input - Console input used for explicit-flag detection.
+     * @param AnalysisConfig $config - Loaded config supplying the optional failureConditions block.
+     * @param FailThreshold  $failThreshold - Already-resolved singular threshold for the run.
+     *
+     * @return FailThresholds - Count-gate thresholds that decide the exit code.
      */
     private function resolveFailThresholds(
         InputInterface $input,
@@ -262,9 +267,10 @@ final readonly class AnalyseCommandSetupBuilder
      * Return the "no reference point" error when a new-findings gate is configured
      * without a baseline or --diff-vs to define "new" against, else null.
      *
-     * @param AnalyseCommandOptions $options        Validated options carrying baseline and diff-vs selections.
-     * @param FailThresholds        $failThresholds Resolved gate, whose new-findings sub-gate may be set.
-     * @return string|null Remediation message, or null when a reference point exists.
+     * @param AnalyseCommandOptions $options - Validated options carrying baseline and diff-vs selections.
+     * @param FailThresholds        $failThresholds - Resolved gate, whose new-findings sub-gate may be set.
+     *
+     * @return string|null - Remediation message, or null when a reference point exists.
      */
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
@@ -286,8 +292,9 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the requested failure threshold.
      *
-     * @param mixed $optionValue Raw --fail-on console option; a non-string (option absent) defaults to advisory.
-     * @return FailThreshold|string Parsed threshold, or the unsupported raw value.
+     * @param mixed $optionValue - Raw --fail-on console option; a non-string (option absent) defaults to advisory.
+     *
+     * @return FailThreshold|string - Parsed threshold, or the unsupported raw value.
      */
     private function failThreshold(mixed $optionValue): FailThreshold|string
     {
@@ -300,8 +307,9 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the optional mutation finding budget.
      *
-     * @param mixed $optionValue Raw --mutation-budget console option; null means the flag was not supplied.
-     * @return int|false|null Non-negative budget, false for invalid input, or null when omitted.
+     * @param mixed $optionValue - Raw --mutation-budget console option; null means the flag was not supplied.
+     *
+     * @return int|false|null - Non-negative budget, false for invalid input, or null when omitted.
      */
     private function mutationBudget(mixed $optionValue): int|false|null
     {
@@ -317,12 +325,13 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Load analysis configuration or convert configuration failures to a report.
      *
-     * @param AnalyseCommandOptions $options       Validated options; its noConfig/configPath select the load path.
-     * @param RuleRegistry          $registry      Default rule set used to seed config when loading is disabled.
-     * @param OutputFormat          $format        Output format stamped onto the error report when loading fails.
-     * @param FailThreshold         $failThreshold Threshold echoed into the error report so its failOn stays accurate.
-     * @param ConfigLoader          $configLoader  Loader that reads and validates the on-disk config file.
-     * @return AnalysisConfig|AnalysisReport Loaded config or a formatted config error report.
+     * @param AnalyseCommandOptions $options - Validated options; its noConfig/configPath select the load path.
+     * @param RuleRegistry          $registry - Default rule set used to seed config when loading is disabled.
+     * @param OutputFormat          $format - Output format stamped onto the error report when loading fails.
+     * @param FailThreshold         $failThreshold - Threshold echoed into the error report so its failOn stays accurate.
+     * @param ConfigLoader          $configLoader - Loader that reads and validates the on-disk config file.
+     *
+     * @return AnalysisConfig|AnalysisReport - Loaded config or a formatted config error report.
      */
     private function config(
         AnalyseCommandOptions $options,
@@ -351,9 +360,10 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Resolve the config path that should be reported for this run.
      *
-     * @param AnalyseCommandOptions $options      Validated options; noConfig and an explicit configPath drive the result.
-     * @param ConfigLoader          $configLoader Loader used to auto-discover the path when none was given explicitly.
-     * @return string|null Resolved path, explicit path, or null when config loading is disabled.
+     * @param AnalyseCommandOptions $options - Validated options; noConfig and an explicit configPath drive the result.
+     * @param ConfigLoader          $configLoader - Loader used to auto-discover the path when none was given explicitly.
+     *
+     * @return string|null - Resolved path, explicit path, or null when config loading is disabled.
      */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
@@ -369,12 +379,13 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Build a zero-finding report for CLI usage and configuration errors.
      *
-     * @param AnalyseCommandOptions $options Validated options supplying the requested paths and config path for context.
-     * @param OutputFormat          $format  Format the caller will render this error report in.
-     * @param string                $failOn  Fail-on value to record on the report so its threshold field stays accurate.
-     * @param string                $message Human-readable remediation text shown to the user as the diagnostic.
-     * @param string                $type    Diagnostic category, either 'usage-error' (default) or 'config-error'.
-     * @return AnalysisReport Report carrying the diagnostic and invalid exit code.
+     * @param AnalyseCommandOptions $options - Validated options supplying the requested paths and config path for context.
+     * @param OutputFormat          $format - Format the caller will render this error report in.
+     * @param string                $failOn - Fail-on value to record on the report so its threshold field stays accurate.
+     * @param string                $message - Human-readable remediation text shown to the user as the diagnostic.
+     * @param string                $type - Diagnostic category, either 'usage-error' (default) or 'config-error'.
+     *
+     * @return AnalysisReport - Report carrying the diagnostic and invalid exit code.
      */
     private function usageReport(
         AnalyseCommandOptions $options,

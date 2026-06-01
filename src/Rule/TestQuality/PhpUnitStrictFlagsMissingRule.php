@@ -48,7 +48,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Create the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -76,8 +76,8 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Report a project once when PHPUnit strict-mode attributes are missing.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext  Rule context carrying project root.
+     * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext - Rule context carrying project root.
      *
      * @return list<Finding> - one finding naming the absent strict flags, emitted once per project root; empty when fully configured or not a
      *                       PHPUnit project
@@ -136,7 +136,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * List PHPUnit strictness flags missing from configuration.
      *
-     * @param PhpUnitConfig $config Discovered config whose <phpunit> root attributes are checked for each flag.
+     * @param PhpUnitConfig $config - Discovered config whose <phpunit> root attributes are checked for each flag.
      *
      * @return list<string> - missing strict flag names in STRICT_FLAGS order; empty when strictness is fully configured
      */

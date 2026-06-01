@@ -65,7 +65,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Describe the cyclomatic complexity rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -84,9 +84,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Find functions and methods whose cyclomatic complexity exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying thresholds.
-     * @return list<Finding> Findings for complex function-like declarations.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying thresholds.
+     *
+     * @return list<Finding> - Findings for complex function-like declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -139,14 +140,13 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per function-like that breached its threshold; empty when all stay under.
         return $findings;
     }
 
     /**
-     * @param ClassMethod|Function_ $node
+     * @param ClassMethod|Function_ $node - Function-like node whose control-flow constructs are counted.
      *
-     * @return int Cyclomatic complexity number.
+     * @return int - Cyclomatic complexity number.
      */
     public static function computeCyclomaticComplexity(Node $node): int
     {
@@ -188,8 +188,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node contributes one cyclomatic complexity point.
      *
-     * @param Node $child Body descendant being classified as a decision point or not.
-     * @return bool True when the node is counted as a decision point.
+     * @param Node $child - Body descendant being classified as a decision point or not.
+     *
+     * @return bool - True when the node is counted as a decision point.
      */
     private static function isDecisionNode(Node $child): bool
     {
@@ -202,10 +203,10 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node is an instance of any configured class.
      *
-     * @param Node                      $node    Node whose runtime class is tested against the candidates.
-     * @param list<class-string<Node>> $classes Candidate node classes.
+     * @param Node                      $node - Node whose runtime class is tested against the candidates.
+     * @param list<class-string<Node>> $classes - Candidate node classes.
      *
-     * @return bool True when the node matches one candidate class.
+     * @return bool - True when the node matches one candidate class.
      */
     private static function isInstanceOfAny(Node $node, array $classes): bool
     {
@@ -223,8 +224,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Build a display symbol for a function-like node.
      *
-     * @param ClassMethod|Function_ $node Function-like node to describe.
-     * @return string Function or method display symbol.
+     * @param ClassMethod|Function_ $node - Function-like node to describe.
+     *
+     * @return string - Function or method display symbol.
      */
     public static function resolveSymbol(ClassMethod|Function_ $node): string
     {
@@ -258,8 +260,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      * A free {@see Function_} always carries a body, so this only ever filters
      * bodyless methods.
      *
-     * @param ClassMethod|Function_ $node Function-like node under inspection.
-     * @return bool True when the node has a statement body the rule can measure.
+     * @param ClassMethod|Function_ $node - Function-like node under inspection.
+     *
+     * @return bool - True when the node has a statement body the rule can measure.
      */
     public static function hasExecutableBody(ClassMethod|Function_ $node): bool
     {
@@ -270,8 +273,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Configured threshold to render; whole floats are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Configured threshold to render; whole floats are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {

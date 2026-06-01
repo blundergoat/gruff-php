@@ -315,9 +315,9 @@ final class SecurityRulesTest extends TestCase
     /**
      * Assert the expected security finding count for a rule.
      *
-     * @param string        $ruleId        rule id whose findings are counted; all other rules' findings are filtered out first
-     * @param int           $expectedCount exact findings expected for that rule, including zero to assert it never fires
-     * @param list<Finding> $findings
+     * @param string        $ruleId - rule id whose findings are counted; all other rules' findings are filtered out first
+     * @param int           $expectedCount - exact findings expected for that rule, including zero to assert it never fires
+     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
      *
      * @return void
      */
@@ -333,8 +333,8 @@ final class SecurityRulesTest extends TestCase
     /**
      * Run one security rule against a fixture and return its findings.
      *
-     * @param AnalysisUnit $analysisUnit already-parsed fixture to run the full default registry over
-     * @param string       $ruleId       rule id to retain; findings from every other rule are discarded
+     * @param AnalysisUnit $analysisUnit - already-parsed fixture to run the full default registry over
+     * @param string       $ruleId - rule id to retain; findings from every other rule are discarded
      *
      * @return list<Finding> - only the findings whose ruleId matches $ruleId, re-indexed from zero; empty when that rule never fired
      */
@@ -354,7 +354,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Analyse security fixtures and return findings for assertions.
      *
-     * @param string $fixture fixture basename under the security fixtures directory to parse and run every rule over
+     * @param string $fixture - fixture basename under the security fixtures directory to parse and run every rule over
      *
      * @return list<Finding> - every finding the default registry raised against the fixture, in discovery order; empty when the fixture is clean
      */
@@ -363,7 +363,6 @@ final class SecurityRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
-        // Hand back every finding the default registry raises against the fixture, in discovery order.
         return $registry->analyse(
             [$this->parseFixture($fixture)],
             new RuleContext(__DIR__ . '/../../..', $config),
@@ -373,7 +372,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return AnalysisUnit - the parsed fixture, tagged PHP or text by extension so non-PHP fixtures still feed the text-based rules
      */
@@ -382,7 +381,6 @@ final class SecurityRulesTest extends TestCase
         $path = __DIR__ . '/../../Fixtures/Security/' . $filename;
         $type = str_ends_with($filename, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
 
-        // Hand back the parsed unit, tagged PHP or text so non-PHP fixtures still feed the text-based rules.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename, $type));
     }
 
@@ -648,8 +646,8 @@ PHP,
     /**
      * Parse inline source into an analysis unit.
      *
-     * @param string $source      Source directory.
-     * @param string $displayPath Fixture display path.
+     * @param string $source - Source directory.
+     * @param string $displayPath - Fixture display path.
      *
      * @return AnalysisUnit - unit carrying the parsed statements and tokens under $displayPath, with parent attributes connected for rule traversal
      */
@@ -668,7 +666,6 @@ PHP,
         /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
         $traversed = $nodeTraverser->traverse($statements);
 
-        // Hand back a unit carrying the parsed statements and tokens under a stable display path for the rules.
         return new AnalysisUnit(
             new SourceFile(__FILE__, $displayPath),
             $source,

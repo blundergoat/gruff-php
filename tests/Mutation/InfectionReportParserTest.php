@@ -252,8 +252,8 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Verify malformed report shapes surface specific diagnostics.
      *
-     * @param InvalidReportShape $report  Report payload.
-     * @param string             $message Expected exception message fragment.
+     * @param InvalidReportShape $report - Report payload.
+     * @param string             $message - Expected exception message fragment.
      *
      * @return void
      */
@@ -289,7 +289,6 @@ final class InfectionReportParserTest extends TestCase
             'mutationCodeCoverage' => 0.0,
         ];
 
-        // Each case pairs a deliberately malformed report with the substring its rejection message must contain.
         return [
             'missing stats'          => [
                 ['escaped' => []],
@@ -438,18 +437,17 @@ final class InfectionReportParserTest extends TestCase
             self::fail(sprintf('Unable to create temp directory: %s', $path));
         }
 
-        // Hand back the freshly created temp directory; the caller owns removing it after the test.
         return $path;
     }
 
     /**
      * Build one infection mutant payload for parser tests.
      *
-     * @param string   $filePath      Source path the mutant claims to touch, mirrored into mutator.originalFilePath.
-     * @param string   $mutatorName   Infection mutator label, e.g. "Plus"; drives how the parser classifies the mutant.
-     * @param int|null $line          One-based source line; null omits originalStartLine to hit the optional branch.
-     * @param string   $diff          Unified diff body the report would carry; blank when a test does not assert on it.
-     * @param string   $processOutput Captured runner stdout for the mutant; blank when irrelevant to the case.
+     * @param string   $filePath - Source path the mutant claims to touch, mirrored into mutator.originalFilePath.
+     * @param string   $mutatorName - Infection mutator label, e.g. "Plus"; drives how the parser classifies the mutant.
+     * @param int|null $line - One-based source line; null omits originalStartLine to hit the optional branch.
+     * @param string   $diff - Unified diff body the report would carry; blank when a test does not assert on it.
+     * @param string   $processOutput - Captured runner stdout for the mutant; blank when irrelevant to the case.
      *
      * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string} -
      *                        one mutant entry in the exact shape Infection writes into its status lists; originalStartLine is omitted when line is
@@ -466,7 +464,6 @@ final class InfectionReportParserTest extends TestCase
             $mutator['originalStartLine'] = $line;
         }
 
-        // Hand back the assembled mutant entry in the exact shape Infection writes into its escaped/killed lists.
         return [
             'mutator'       => $mutator,
             'diff'          => $diff,
@@ -477,8 +474,8 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Write an Infection report fixture to a temporary file.
      *
-     * @param string             $path Destination file the JSON-encoded fixture is written to; caller cleans it up.
-     * @param InvalidReportShape $report
+     * @param string             $path - Destination file the JSON-encoded fixture is written to; caller cleans it up.
+     * @param InvalidReportShape $report - JSON-serialisable report payload to write.
      *
      * @return void
      */
@@ -490,7 +487,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

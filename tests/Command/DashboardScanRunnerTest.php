@@ -199,7 +199,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build a runner fixture.
      *
-     * @param string $binary Fake gruff-php binary path.
+     * @param string $binary - Fake gruff-php binary path.
      *
      * @return DashboardScanRunner - runner wired to the fake binary so scans run hermetically without the real CLI
      */
@@ -212,7 +212,7 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build a request context for a project.
      *
-     * @param string $project Project root.
+     * @param string $project - Project root.
      *
      * @return DashboardRequestContext - loopback request context rooted at the project with a short scan timeout
      */
@@ -254,14 +254,13 @@ final class DashboardScanRunnerTest extends TestCase
         file_put_contents($project . '/src/Example.php', "<?php\nfinal class Example {}\n");
         $this->tempDirs[] = $project;
 
-        // Hand back the seeded project dir; teardown removes it via the recorded temp list.
         return $project;
     }
 
     /**
      * Create a fake gruff-php executable.
      *
-     * @param string $mode Fake executable mode.
+     * @param string $mode - Fake executable mode.
      *
      * @return string - filesystem path to the executable stub whose output matches the requested mode (counter/empty/slow)
      */
@@ -291,7 +290,7 @@ PHP,
     /**
      * Recursively remove a temporary directory.
      *
-     * @param string $directory Directory to remove.
+     * @param string $directory - Directory to remove.
      *
      * @return void
      */

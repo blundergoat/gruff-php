@@ -25,9 +25,10 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Verify rejects malformed or disallowed host headers.
      *
-     * @param string $request          Raw request bytes to send.
-     * @param string $statusLine       Expected HTTP status line.
-     * @param bool   $shouldCloseWrite Whether to close the client write side after sending.
+     * @param string $request - Raw request bytes to send.
+     * @param string $statusLine - Expected HTTP status line.
+     * @param bool   $shouldCloseWrite - Whether to close the client write side after sending.
+     *
      * @return void
      */
     #[DataProvider('rejectedHostRequestProvider')]
@@ -45,7 +46,6 @@ final class DashboardRequestHandlerTest extends TestCase
      */
     public static function rejectedHostRequestProvider(): array
     {
-        // Each row pairs a raw request with the status line its bad/absent Host must trigger.
         return [
             'missing host' => ["GET / HTTP/1.1\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
             'mismatched host' => ["GET /scan HTTP/1.1\r\nHost: evil.example\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
@@ -112,8 +112,9 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Return the dashboard response for a raw HTTP request.
      *
-     * @param string $request          Raw HTTP request.
-     * @param bool   $shouldCloseWrite When true, half-close the write side to exercise truncated-request handling.
+     * @param string $request - Raw HTTP request.
+     * @param bool   $shouldCloseWrite - When true, half-close the write side to exercise truncated-request handling.
+     *
      * @return string - the exact bytes the handler wrote back to the socket, including status line and body
      */
     private function responseFor(string $request, bool $shouldCloseWrite = false): string

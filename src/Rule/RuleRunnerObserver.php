@@ -15,8 +15,9 @@ interface RuleRunnerObserver
     /**
      * Record that a single rule invocation against one unit completed.
      *
-     * @param string $ruleId     Rule identifier as declared in the rule's RuleDefinition.
-     * @param int    $durationNs Wall-clock nanoseconds the rule spent in analyse().
+     * @param string $ruleId - Rule identifier as declared in the rule's RuleDefinition.
+     * @param int    $durationNs - Wall-clock nanoseconds the rule spent in analyse().
+     *
      * @return void
      */
     public function onRuleExecuted(string $ruleId, int $durationNs): void;

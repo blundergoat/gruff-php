@@ -58,7 +58,7 @@ final class NodeIndex
      * AST immediately after analysis so the index does not pin already-
      * unreachable nodes until the unit itself is garbage collected.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to remove from the cache.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to remove from the cache.
      *
      * @return void
      */
@@ -76,8 +76,8 @@ final class NodeIndex
      * relies on a shared per-unit cache so repeat queries do no extra work.
      *
      * @template T of Node
-     * @param AnalysisUnit    $analysisUnit Parsed unit whose AST is indexed.
-     * @param class-string<T> $class
+     * @param AnalysisUnit    $analysisUnit - Parsed unit whose AST is indexed.
+     * @param class-string<T> $class - Exact node class to retrieve from the per-unit index.
      *
      * @return list<T> - matching nodes in document preorder; empty when the unit holds none of that class
      */
@@ -94,8 +94,8 @@ final class NodeIndex
     /**
      * Return nodes that match any of the supplied classes in preorder.
      *
-     * @param AnalysisUnit             $analysisUnit Parsed unit whose AST is indexed.
-     * @param list<class-string<Node>> $classes
+     * @param AnalysisUnit             $analysisUnit - Parsed unit whose AST is indexed.
+     * @param list<class-string<Node>> $classes - Node classes to union from the per-unit index.
      *
      * @return list<Node> - union of matching nodes in preorder, deduplicated so a node matching several classes appears once; empty when none match
      */
@@ -125,7 +125,7 @@ final class NodeIndex
     /**
      * Return every descendant below a function or method body in preorder.
      *
-     * @param Node $node Function-like node whose statements should be walked.
+     * @param Node $node - Function-like node whose statements should be walked.
      *
      * @return list<Node> - body descendants in preorder; empty when the node has no body or is not function-like
      */
@@ -147,8 +147,8 @@ final class NodeIndex
      * with a class-disjunction predicate on a function body.
      *
      * @template T of Node
-     * @param Node                  $node    Function-like node whose body should be scanned.
-     * @param list<class-string<T>> $classes Concrete node classes to keep.
+     * @param Node                  $node - Function-like node whose body should be scanned.
+     * @param list<class-string<T>> $classes - Concrete node classes to keep.
      *
      * @return list<T> - body descendants matching any supplied class, in preorder, each kept once; empty when no classes or no body
      */
@@ -176,7 +176,7 @@ final class NodeIndex
     /**
      * Count distinct non-Nop statement start lines below a function-like body.
      *
-     * @param Node $node Function-like node whose logical lines should be counted.
+     * @param Node $node - Function-like node whose logical lines should be counted.
      *
      * @return int - count of distinct start lines carrying a real statement; Nop placeholders are excluded and statements sharing one physical line
      *             count once
@@ -213,7 +213,7 @@ final class NodeIndex
     /**
      * Index parsed nodes by concrete PhpParser class.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose full AST is walked once; the result is memoised against it.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose full AST is walked once; the result is memoised against it.
      *
      * @return array<class-string<Node>, list<Node>> - map from each concrete, ancestor, and interface class-string to its preorder nodes
      */
@@ -232,8 +232,7 @@ final class NodeIndex
             private array $nodesByClass = [];
 
             /**
-             * @param array<class-string<Node>, list<class-string<Node>>> $hierarchyCache
-             *                                                                            Shared, process-wide cache of class hierarchy keys.
+             * @param array<class-string<Node>, list<class-string<Node>>> $hierarchyCache - Shared, process-wide cache of class hierarchy keys.
              */
             public function __construct(private array &$hierarchyCache)
             {
@@ -243,7 +242,7 @@ final class NodeIndex
              * Add a node to the index under every ancestor class and
              * implemented interface so abstract base lookups still work.
              *
-             * @param Node $node Node currently being traversed.
+             * @param Node $node - Node currently being traversed.
              *
              * @return null - the PhpParser visitor signal to leave the node in place and keep descending into its children
              */
@@ -288,7 +287,6 @@ final class NodeIndex
              */
             public function nodesByClass(): array
             {
-                // Hand back the index the walk accumulated, keyed by concrete, ancestor, and interface class-strings.
                 return $this->nodesByClass;
             }
         };
@@ -308,7 +306,7 @@ final class NodeIndex
     /**
      * Index nodes that appear inside function-like bodies.
      *
-     * @param Node $node Function-like node confirmed to carry a body; its statements are walked once and memoised.
+     * @param Node $node - Function-like node confirmed to carry a body; its statements are walked once and memoised.
      *
      * @return list<Node> - body descendants in preorder; empty when the body holds no statements
      */
@@ -328,7 +326,7 @@ final class NodeIndex
             /**
              * Add a body descendant to the source-order list.
              *
-             * @param Node $node Node currently being traversed.
+             * @param Node $node - Node currently being traversed.
              *
              * @return null - the PhpParser visitor signal to leave the node unchanged and keep descending into the body
              */
@@ -347,7 +345,6 @@ final class NodeIndex
              */
             public function nodes(): array
             {
-                // Hand back the body descendants in the source order the preorder walk visited them.
                 return $this->nodes;
             }
         };

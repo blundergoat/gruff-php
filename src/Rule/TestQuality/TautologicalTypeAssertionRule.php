@@ -31,7 +31,7 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Describe the tautological type assertion rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +49,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Find `assertInstanceOf` calls where the value type is already proven locally.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for redundant type assertions.
+     * @return list<Finding> - Findings for redundant type assertions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -106,9 +106,9 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Map local variables to the class names assigned to them.
      *
-     * @param TestQualityScope $scope Single test method whose direct `$var = new X()` assignments are scanned.
+     * @param TestQualityScope $scope - Single test method whose direct `$var = new X()` assignments are scanned.
      *
-     * @return array<string, string> Variable name to constructed class name; only locals built via `new` appear.
+     * @return array<string, string> - Variable name to constructed class name; only locals built via `new` appear.
      */
     private function collectLocalAssignmentTypes(TestQualityScope $scope): array
     {
@@ -130,10 +130,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     }
 
     /**
-     * @param Expr                  $expr       Value expression from the assertion's second argument to resolve.
-     * @param array<string, string> $localTypes Map of variable name to class built by collectLocalAssignmentTypes().
+     * @param Expr                  $expr - Value expression from the assertion's second argument to resolve.
+     * @param array<string, string> $localTypes - Map of variable name to class built by collectLocalAssignmentTypes().
      *
-     * @return string|null Proven class name, or null when it cannot be inferred.
+     * @return string|null - Proven class name, or null when it cannot be inferred.
      */
     private function provenClass(Expr $expr, array $localTypes): ?string
     {
@@ -155,9 +155,9 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Extract the class name from a direct `new ClassName` expression.
      *
-     * @param Expr $expr Candidate expression; only a `new` with a static class name yields a result.
+     * @param Expr $expr - Candidate expression; only a `new` with a static class name yields a result.
      *
-     * @return string|null Constructed class name, or null for dynamic/unsupported expressions.
+     * @return string|null - Constructed class name, or null for dynamic/unsupported expressions.
      */
     private function newClassName(Expr $expr): ?string
     {
@@ -173,10 +173,10 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Extract a `ClassName::class` argument from an assertion call.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call whose argument list is read.
-     * @param int $index Zero-based argument position the caller expects to hold a `X::class` constant.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose argument list is read.
+     * @param int $index - Zero-based argument position the caller expects to hold a `X::class` constant.
      *
-     * @return string|null Class name string, or null when the argument is not a class constant.
+     * @return string|null - Class name string, or null when the argument is not a class constant.
      */
     private function classNameArg(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?string
     {
@@ -199,9 +199,9 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     /**
      * Describe the asserted value for the finding message.
      *
-     * @param Expr $expr Asserted value expression rendered for human-readable finding text.
+     * @param Expr $expr - Asserted value expression rendered for human-readable finding text.
      *
-     * @return string Variable name or a generic value label.
+     * @return string - Variable name or a generic value label.
      */
     private function describeValue(Expr $expr): string
     {

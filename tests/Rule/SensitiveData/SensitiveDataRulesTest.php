@@ -343,9 +343,9 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Assert the expected sensitive-data finding count for a rule.
      *
-     * @param string        $ruleId        Rule whose findings are isolated before counting.
-     * @param int           $expectedCount Findings the rule must report for this fixture.
-     * @param list<Finding> $findings      Full analysis output to filter by rule id.
+     * @param string        $ruleId - Rule whose findings are isolated before counting.
+     * @param int           $expectedCount - Findings the rule must report for this fixture.
+     * @param list<Finding> $findings - Full analysis output to filter by rule id.
      *
      * @return void
      */
@@ -361,21 +361,20 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
-     * @param string $path Project-relative fixture path to parse and scan.
+     * @param string $path - Project-relative fixture path to parse and scan.
      *
      * @return list<Finding> - every rule finding for the fixture, in registry order; empty when nothing flagged
      */
     private function analysePath(string $path): array
     {
-        // Single-fixture convenience wrapper around the multi-unit analyser.
         return $this->analyseUnits([$this->unitForPath($path)]);
     }
 
     /**
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
-     * @param list<AnalysisUnit> $units  Pre-parsed units to run the default rule set over.
-     * @param ?AnalysisConfig    $config Override config; null applies the registry defaults.
+     * @param list<AnalysisUnit> $units - Pre-parsed units to run the default rule set over.
+     * @param ?AnalysisConfig    $config - Override config; null applies the registry defaults.
      *
      * @return list<Finding> - aggregated findings the default rule set produced across the units; empty when none fired
      */
@@ -383,7 +382,6 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
 
-        // Hand back the findings the default rule set produced for these units.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -393,7 +391,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisUnit - the parsed unit, typed PHP for .php paths and plain text otherwise
      */
@@ -419,7 +417,6 @@ final class SensitiveDataRulesTest extends TestCase
             'tests/Fixtures/SensitiveData/config-secrets.json',
         ];
 
-        // Same fixtures run twice so the leak check can compare text and JSON renderings.
         return [
             $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--no-config']),
             $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--no-config']),
@@ -427,7 +424,7 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
-     * @param list<string> $arguments
+     * @param list<string> $arguments - CLI arguments appended after the gruff binary path.
      *
      * @return string - the gruff CLI's stdout; stderr is dropped and a non-zero exit already fails the test before returning
      */
@@ -438,7 +435,6 @@ final class SensitiveDataRulesTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
-        // Returns stdout only; the assertSame on the exit code already failed the test if the run errored.
         return $process->getOutput();
     }
 

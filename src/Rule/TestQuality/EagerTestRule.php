@@ -74,7 +74,7 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Describe the eager test rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -93,10 +93,10 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Find tests that assert many times across multiple apparent SUT calls.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for eager tests.
+     * @return list<Finding> - Findings for eager tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -127,15 +127,15 @@ final readonly class EagerTestRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per eager test scope; empty when nothing crossed both thresholds.
         return $findings;
     }
 
     /**
      * Collect distinct method calls made on likely system-under-test receivers.
      *
-     * @param  TestQualityScope $scope Single test method whose body is searched for SUT exercise calls.
-     * @return array<string, string>   Distinct method names keyed by name, taken from the busiest receiver only.
+     * @param  TestQualityScope $scope - Single test method whose body is searched for SUT exercise calls.
+     *
+     * @return array<string, string> - Distinct method names keyed by name, taken from the busiest receiver only.
      */
     private function distinctSutCalls(TestQualityScope $scope): array
     {
@@ -172,9 +172,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate SUT call whose ancestors are
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate SUT call whose ancestors are
      *                                                            walked for an enclosing assertion.
-     * @return bool True when the call is only part of an assertion expression.
+     *
+     * @return bool - True when the call is only part of an assertion expression.
      */
     private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -196,9 +197,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call whose ancestors are
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call whose ancestors are
      *                                                            walked for an enclosing finally block.
-     * @return bool True when the call belongs to teardown rather than exercise.
+     *
+     * @return bool - True when the call belongs to teardown rather than exercise.
      */
     private function isNestedInFinallyBlock(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -218,11 +220,12 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call under inspection; only
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Candidate call under inspection; only
      *                                                            method calls can be observations.
-     * @param  string $name Called method name resolved by the caller; compared against the lower-case
+     * @param  string $name - Called method name resolved by the caller; compared against the lower-case
      *                      observation conventions.
-     * @return bool True when the call reads or shapes test output rather than exercising the SUT.
+     *
+     * @return bool - True when the call reads or shapes test output rather than exercising the SUT.
      */
     private function isObservationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
@@ -255,8 +258,9 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\MethodCall $call Method call whose receiver is checked for being the bare `$this` test case.
-     * @return bool True when the call is a direct test-case helper call.
+     * @param  Expr\MethodCall $call - Method call whose receiver is checked for being the bare `$this` test case.
+     *
+     * @return bool - True when the call is a direct test-case helper call.
      */
     private function isDirectThisCall(Expr\MethodCall $call): bool
     {
@@ -266,9 +270,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call to key by receiver; free functions
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call to key by receiver; free functions
      *                                                            and self/parent/static yield null.
-     * @return string|null Stable receiver identity for SUT call grouping.
+     *
+     * @return string|null - Stable receiver identity for SUT call grouping.
      */
     private function receiverKey(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
@@ -298,8 +303,9 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr $receiver Receiver expression to key; method-call chains are unwound to their root before keying.
-     * @return string|null Receiver identity for method-call grouping.
+     * @param  Expr $receiver - Receiver expression to key; method-call chains are unwound to their root before keying.
+     *
+     * @return string|null - Receiver identity for method-call grouping.
      */
     private function receiverExpressionKey(Expr $receiver): ?string
     {
@@ -327,9 +333,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\PropertyFetch $receiver Property access (such as `$this->sut`) keyed as owner plus
+     * @param  Expr\PropertyFetch $receiver - Property access (such as `$this->sut`) keyed as owner plus
      *                                      property name; dynamic names yield null.
-     * @return string|null Receiver identity for property-held SUTs.
+     *
+     * @return string|null - Receiver identity for property-held SUTs.
      */
     private function propertyReceiverKey(Expr\PropertyFetch $receiver): ?string
     {
@@ -351,8 +358,9 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Choose the receiver with the widest distinct call surface.
      *
-     * @param  array<string, array<string, string>> $callsByReceiver Distinct call-name sets keyed by receiver identity.
-     * @return array<string, string> The single widest call set; empty when no receiver was recorded.
+     * @param  array<string, array<string, string>> $callsByReceiver - Distinct call-name sets keyed by receiver identity.
+     *
+     * @return array<string, string> - The single widest call set; empty when no receiver was recorded.
      */
     private function largestReceiverCallSet(array $callsByReceiver): array
     {
@@ -369,8 +377,9 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr $receiver Receiver expression unwound through method-call chains to its root variable.
-     * @return string|null Receiver variable name, or null for dynamic/non-variable receivers.
+     * @param  Expr $receiver - Receiver expression unwound through method-call chains to its root variable.
+     *
+     * @return string|null - Receiver variable name, or null for dynamic/non-variable receivers.
      */
     private function receiverName(Expr $receiver): ?string
     {
@@ -388,8 +397,9 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  string $name Method name to classify against the get/has/is prefixes and the bare `count` reader.
-     * @return bool True when the method name follows a result-observation convention.
+     * @param  string $name - Method name to classify against the get/has/is prefixes and the bare `count` reader.
+     *
+     * @return bool - True when the method name follows a result-observation convention.
      */
     private function isObservationMethodName(string $name): bool
     {
@@ -407,8 +417,9 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Collect variables that receive assertion result values.
      *
-     * @param  TestQualityScope $scope Test method whose assignments are scanned for call-result variables.
-     * @return array<string, true> Set of local variable names (keyed by name) that hold a call result.
+     * @param  TestQualityScope $scope - Test method whose assignments are scanned for call-result variables.
+     *
+     * @return array<string, true> - Set of local variable names (keyed by name) that hold a call result.
      */
     private function collectResultVariables(TestQualityScope $scope): array
     {
@@ -431,8 +442,9 @@ final readonly class EagerTestRule implements RuleInterface
     /**
      * Detect call-chain expressions whose assigned variables represent result values.
      *
-     * @param  Expr $expr Right-hand side of an assignment; a call expression marks its target as a result variable.
-     * @return bool True when the expression is a call result.
+     * @param  Expr $expr - Right-hand side of an assignment; a call expression marks its target as a result variable.
+     *
+     * @return bool - True when the expression is a call result.
      */
     private function isCallChainExpression(Expr $expr): bool
     {
@@ -446,12 +458,12 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr                $receiver        Receiver expression unwound to its root variable before
+     * @param  Expr                $receiver - Receiver expression unwound to its root variable before
      *                                              the membership test.
-     * @param  array<string, true> $resultVariables Result-variable name set from collectResultVariables(),
+     * @param  array<string, true> $resultVariables - Result-variable name set from collectResultVariables(),
      *                                              keyed by variable name.
      *
-     * @return bool True when the receiver roots at a known result variable.
+     * @return bool - True when the receiver roots at a known result variable.
      */
     private function isResultVariableReceiver(Expr $receiver, array $resultVariables): bool
     {

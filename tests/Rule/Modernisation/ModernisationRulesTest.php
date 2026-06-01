@@ -134,8 +134,8 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Verify modernisation rules keep their documented false-positive fixtures quiet.
      *
-     * @param string $fixture Fixture file under tests/Fixtures/Modernisation.
-     * @param string $ruleId  Rule expected to report no findings for the fixture.
+     * @param string $fixture - Fixture file under tests/Fixtures/Modernisation.
+     * @param string $ruleId - Rule expected to report no findings for the fixture.
      *
      * @return void
      */
@@ -196,9 +196,9 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Assert the expected modernisation finding count for a rule.
      *
-     * @param string        $ruleId        Rule id whose findings are counted.
-     * @param int           $expectedCount Number of findings the fixture should trip for that rule.
-     * @param list<Finding> $findings      Full finding set to filter down to the rule.
+     * @param string        $ruleId - Rule id whose findings are counted.
+     * @param int           $expectedCount - Number of findings the fixture should trip for that rule.
+     * @param list<Finding> $findings - Full finding set to filter down to the rule.
      *
      * @return void
      */
@@ -214,8 +214,8 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @param string              $path   Project-relative fixture path to scan.
-     * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
+     * @param string              $path - Project-relative fixture path to scan.
+     * @param AnalysisConfig|null $config - Override config; null falls back to the default registry config.
      *
      * @return list<Finding> - every finding the registry raised for the single fixture; empty when it is clean
      */
@@ -228,8 +228,8 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths  Project-relative fixture paths to scan together.
-     * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
+     * @param list<string>        $paths - Project-relative fixture paths to scan together.
+     * @param AnalysisConfig|null $config - Override config; null falls back to the default registry config.
      *
      * @return list<Finding> - findings aggregated across all supplied fixtures; empty when none trip
      */
@@ -248,7 +248,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisUnit - the parsed fixture ready for rule analysis, carrying the project-relative display path
      */
@@ -263,7 +263,7 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Build analysis configuration for modernisation assertions.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisConfig - config loaded from the fixture's own YAML, applying its rule overrides
      */

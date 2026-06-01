@@ -70,14 +70,13 @@ final class BaselineStoreTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the freshly created dir for the test to populate and later tear down.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

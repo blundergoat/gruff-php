@@ -31,11 +31,10 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Describe the named argument opportunity rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back this rule's fixed identity and defaults for the registry and reports.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Named argument opportunity',
@@ -50,10 +49,10 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find calls with many positional arguments that would read better named.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for named argument opportunities.
+     * @return list<Finding> - Findings for named argument opportunities.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -96,17 +95,17 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
             );
         }
 
-        // Hand back every named-argument opportunity gathered across the unit's calls.
         return $findings;
     }
 
     /**
      * Decide whether a call carries enough positional arguments to recommend named arguments.
      *
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args Raw call arguments; spreads and named
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Raw call arguments; spreads and named
      *   arguments are present but do not count toward the positional total.
-     * @param int $minPositionalArguments Inclusive lower bound below which the call is left alone.
-     * @return string|null Explanation when the call should use named arguments.
+     * @param int $minPositionalArguments - Inclusive lower bound below which the call is left alone.
+     *
+     * @return string|null - Explanation when the call should use named arguments.
      */
     private function reason(array $args, int $minPositionalArguments): ?string
     {
@@ -128,8 +127,9 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Find method names declared with variadic parameters in the same file.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose own method declarations are scanned for variadic params.
-     * @return array<string, true> Lowercase variadic method names.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose own method declarations are scanned for variadic params.
+     *
+     * @return array<string, true> - Lowercase variadic method names.
      */
     private function variadicMethodNames(AnalysisUnit $analysisUnit): array
     {
@@ -151,9 +151,10 @@ final readonly class NamedArgumentOpportunityRule implements RuleInterface
     /**
      * Detect calls to same-file variadic methods, where named arguments would be misleading.
      *
-     * @param Expr\MethodCall|Expr\StaticCall $call Call whose method name is matched against the variadic set.
-     * @param array<string, true> $variadicMethodNames Lowercase method names declared with variadic params.
-     * @return bool True when the call target is variadic.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Call whose method name is matched against the variadic set.
+     * @param array<string, true> $variadicMethodNames - Lowercase method names declared with variadic params.
+     *
+     * @return bool - True when the call target is variadic.
      */
     private function isVariadicMethodCall(Expr\MethodCall|Expr\StaticCall $call, array $variadicMethodNames): bool
     {

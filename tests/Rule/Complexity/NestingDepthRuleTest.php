@@ -45,7 +45,6 @@ final class NestingDepthRuleTest extends TestCase
      */
     public static function methodDepthProvider(): array
     {
-        // Each row pairs a fixture method with its expected nesting depth; the oracle the counter is checked against.
         return [
             'flat method'             => ['flat', 0],
             'one level'               => ['oneLevel', 1],
@@ -61,8 +60,8 @@ final class NestingDepthRuleTest extends TestCase
     /**
      * Verify nesting depth matches expected.
      *
-     * @param string $methodName    Fixture method name.
-     * @param int    $expectedDepth Expected nesting depth.
+     * @param string $methodName - Fixture method name.
+     * @param int    $expectedDepth - Expected nesting depth.
      *
      * @return void
      */
@@ -145,14 +144,13 @@ final class NestingDepthRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
-        // Run the single rule under the test-supplied thresholds so each case controls its own finding boundary.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rule reports findings against
      */
@@ -160,7 +158,6 @@ final class NestingDepthRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
 
-        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/' . $filename));
     }
 }

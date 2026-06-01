@@ -19,9 +19,10 @@ final class ModernisationNodeHelper
     /**
      * Determine whether the configured target PHP version supports a syntax feature.
      *
-     * @param RuleContext $ruleContext Rule context carrying effective config.
-     * @param float       $version     PHP version required by the syntax feature.
-     * @return bool True when the project target is at least the requested version.
+     * @param RuleContext $ruleContext - Rule context carrying effective config.
+     * @param float       $version - PHP version required by the syntax feature.
+     *
+     * @return bool - True when the project target is at least the requested version.
      */
     public static function supportsPhp(RuleContext $ruleContext, float $version): bool
     {
@@ -32,8 +33,9 @@ final class ModernisationNodeHelper
     /**
      * Normalize simple PHP type nodes to lower-case names.
      *
-     * @param null|Identifier|Name|Node\ComplexType $type Type node to normalize.
-     * @return string|null Type name, or null for complex/absent types.
+     * @param null|Identifier|Name|Node\ComplexType $type - Type node to normalize.
+     *
+     * @return string|null - Type name, or null for complex/absent types.
      */
     public static function typeName(null|Identifier|Name|Node\ComplexType $type): ?string
     {
@@ -49,9 +51,10 @@ final class ModernisationNodeHelper
     /**
      * Check whether an expression fetches a property from `$this`.
      *
-     * @param Expr        $expr         Expression to inspect.
-     * @param string|null $propertyName Optional property name to match.
-     * @return bool True when the expression matches the requested `$this` property.
+     * @param Expr        $expr - Expression to inspect.
+     * @param string|null $propertyName - Optional property name to match.
+     *
+     * @return bool - True when the expression matches the requested `$this` property.
      */
     public static function isThisPropertyFetch(Expr $expr, ?string $propertyName = null): bool
     {
@@ -72,8 +75,9 @@ final class ModernisationNodeHelper
     /**
      * Resolve the property name from a static property-fetch expression.
      *
-     * @param Expr $expr Expression to inspect.
-     * @return string|null Property name, or null for dynamic property access.
+     * @param Expr $expr - Expression to inspect.
+     *
+     * @return string|null - Property name, or null for dynamic property access.
      */
     public static function propertyFetchName(Expr $expr): ?string
     {
@@ -89,8 +93,9 @@ final class ModernisationNodeHelper
     /**
      * Resolve a class statement's declared name.
      *
-     * @param Stmt\Class_ $class Class statement to inspect.
-     * @return string|null Class name, or null for anonymous classes.
+     * @param Stmt\Class_ $class - Class statement to inspect.
+     *
+     * @return string|null - Class name, or null for anonymous classes.
      */
     public static function className(Stmt\Class_ $class): ?string
     {
@@ -101,8 +106,9 @@ final class ModernisationNodeHelper
     /**
      * Identify value-style classes by conventional suffixes.
      *
-     * @param Stmt\Class_ $class Class statement to classify.
-     * @return bool True when the class name looks like a DTO/value object.
+     * @param Stmt\Class_ $class - Class statement to classify.
+     *
+     * @return bool - True when the class name looks like a DTO/value object.
      */
     public static function isDtoClass(Stmt\Class_ $class): bool
     {
@@ -126,8 +132,9 @@ final class ModernisationNodeHelper
     /**
      * Read the parent node connected by PhpParser's parent visitor.
      *
-     * @param Node $node Node whose parent attribute should be read.
-     * @return Node|null Parent node, or null when the attribute is absent.
+     * @param Node $node - Node whose parent attribute should be read.
+     *
+     * @return Node|null - Parent node, or null when the attribute is absent.
      */
     public static function parent(Node $node): ?Node
     {

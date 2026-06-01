@@ -45,7 +45,6 @@ final class HalsteadVolumeRuleTest extends TestCase
      */
     public static function metricsProvider(): array
     {
-        // Each row pins a fixture method to its expected Halstead metrics; the oracle the formula is checked against.
         return [
             'flat'                  => ['flat', 2.0, 0.5, 1.0, 2, 2],
             'one if'                => ['oneIf', 18.5754247591, 3.0, 55.7262742773, 5, 8],
@@ -67,12 +66,12 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Verify Halstead metrics match expected counts and formula output.
      *
-     * @param string $methodName         Fixture method name.
-     * @param float  $expectedVolume     Expected Halstead volume.
-     * @param float  $expectedDifficulty Expected Halstead difficulty.
-     * @param float  $expectedEffort     Expected Halstead effort.
-     * @param int    $expectedVocabulary Expected vocabulary count.
-     * @param int    $expectedLength     Expected token length.
+     * @param string $methodName - Fixture method name.
+     * @param float  $expectedVolume - Expected Halstead volume.
+     * @param float  $expectedDifficulty - Expected Halstead difficulty.
+     * @param float  $expectedEffort - Expected Halstead effort.
+     * @param int    $expectedVocabulary - Expected vocabulary count.
+     * @param int    $expectedLength - Expected token length.
      *
      * @return void
      */
@@ -154,7 +153,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     /**
      * Analyse the cognitive fixture with custom Halstead thresholds.
      *
-     * @param array<string, int|float> $thresholds Rule thresholds.
+     * @param array<string, int|float> $thresholds - Rule thresholds.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture under the given thresholds; empty when nothing breached
      */
@@ -167,14 +166,13 @@ final class HalsteadVolumeRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
-        // Run the single rule under the test-supplied thresholds so each case controls its own finding boundary.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
     /**
      * Return a named method from the cognitive fixture.
      *
-     * @param string $methodName Fixture method name.
+     * @param string $methodName - Fixture method name.
      *
      * @return ClassMethod - the matching method node from the cognitive fixture; fails the test when no method has that name
      */
@@ -201,7 +199,6 @@ final class HalsteadVolumeRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
-        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
     }
 }

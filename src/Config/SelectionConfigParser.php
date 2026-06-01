@@ -21,15 +21,15 @@ final readonly class SelectionConfigParser
     /**
      * Use the supplied string-list parser when decoding rule selection config.
      *
-     * @param StringListConfigParser $stringListConfigParser Parser used for scalar/list selection values.
+     * @param StringListConfigParser $stringListConfigParser - Parser used for scalar/list selection values.
      */
     public function __construct(private StringListConfigParser $stringListConfigParser = new StringListConfigParser())
     {
     }
 
     /**
-     * @param ConfigValue  $decodedValue Raw selection config value.
-     * @param RuleRegistry $registry     Registry used to validate selected rule ids.
+     * @param ConfigValue  $decodedValue - Raw selection config value.
+     * @param RuleRegistry $registry - Registry used to validate selected rule ids.
      *
      * @return RuleSelection - the include/exclude filters (tiers, pillars, rule ids) deciding which rules apply
      * @throws ConfigException When the selection config has unknown keys or invalid values.
@@ -39,7 +39,6 @@ final readonly class SelectionConfigParser
         $selection = $this->requireObject($decodedValue);
         $this->assertKnownKeys($selection);
 
-        // Hand back one RuleSelection carrying every validated include and exclude filter for the run.
         return new RuleSelection(
             tiers:          $this->tiers($selection),
             pillars:        $this->pillars($selection, 'pillars'),
@@ -52,7 +51,7 @@ final readonly class SelectionConfigParser
     /**
      * Reject unknown selection keys before parsing include/exclude lists.
      *
-     * @param ConfigObject $selection
+     * @param ConfigObject $selection - Decoded selection block whose keys are validated before per-list parsing.
      *
      * @return void
      */
@@ -68,7 +67,7 @@ final readonly class SelectionConfigParser
     /**
      * Read included tier names from the selection config.
      *
-     * @param ConfigObject $selection
+     * @param ConfigObject $selection - Decoded selection block; an absent `tiers` key means no tier filter.
      *
      * @return list<string> - included tier names, each a valid RuleTier; empty when no tier filter is configured
      */
@@ -94,8 +93,8 @@ final readonly class SelectionConfigParser
     /**
      * Read included pillar names from the selection config.
      *
-     * @param ConfigObject $selection
-     * @param string       $key Which selection sub-list to read, 'pillars' (include) or 'excludePillars'.
+     * @param ConfigObject $selection - Decoded selection block; the named key decides include versus exclude semantics.
+     * @param string       $key - Which selection sub-list to read, 'pillars' (include) or 'excludePillars'.
      *
      * @return list<string> - configured pillar names for this include/exclude side, each a valid Pillar; empty when the key is absent
      */
@@ -121,9 +120,9 @@ final readonly class SelectionConfigParser
     /**
      * Read included rule identifiers from the selection config.
      *
-     * @param ConfigObject $selection
-     * @param string       $key      Which selection sub-list to read, 'rules' (include) or 'excludeRules'.
-     * @param RuleRegistry $registry Source of truth for valid rule ids; unknown ids are rejected.
+     * @param ConfigObject $selection - Decoded selection block; the named key decides include versus exclude semantics.
+     * @param string       $key - Which selection sub-list to read, 'rules' (include) or 'excludeRules'.
+     * @param RuleRegistry $registry - Source of truth for valid rule ids; unknown ids are rejected.
      *
      * @return list<string> - configured rule ids for this include/exclude side, each recognised by the registry; empty when the key is absent
      */
@@ -149,7 +148,7 @@ final readonly class SelectionConfigParser
     /**
      * Validate that the selection config is an object-like array.
      *
-     * @param ConfigValue $decodedValue
+     * @param ConfigValue $decodedValue - Raw decoded `selection` value before object-shape validation.
      *
      * @return ConfigObject - the selection normalised to a string-keyed object the per-key readers expect
      */
@@ -176,7 +175,7 @@ final readonly class SelectionConfigParser
     /**
      * Normalise one decoded selection value into the supported value set.
      *
-     * @param mixed $decodedValue One raw YAML/JSON-decoded value, scalar or nested array, to validate.
+     * @param mixed $decodedValue - One raw YAML/JSON-decoded value, scalar or nested array, to validate.
      *
      * @return ConfigValue - the validated value: a depth-limited nested array, or a single accepted scalar leaf
      */
@@ -194,7 +193,7 @@ final readonly class SelectionConfigParser
     /**
      * Validate scalar selection config values after YAML decoding.
      *
-     * @param mixed $decodedValue One decoded leaf value; anything not YAML/JSON-compatible is rejected.
+     * @param mixed $decodedValue - One decoded leaf value; anything not YAML/JSON-compatible is rejected.
      *
      * @return ConfigScalar - the accepted leaf returned verbatim; null is preserved as a legitimate config value
      */
@@ -211,7 +210,7 @@ final readonly class SelectionConfigParser
     /**
      * Keep decoded configuration values within the supported nested scalar shape.
      *
-     * @param array<array-key, mixed> $decodedSelectionValues
+     * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the first supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>> - the
      *                          validated first-level subtree, keys preserved, deeper arrays recursed
@@ -231,7 +230,7 @@ final readonly class SelectionConfigParser
     /**
      * Keep second-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedSelectionValues
+     * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the second supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the validated second-level subtree,
      *                          keys preserved, deeper arrays recursed
@@ -251,7 +250,7 @@ final readonly class SelectionConfigParser
     /**
      * Keep third-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedSelectionValues
+     * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the third supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the validated third-level subtree, keys preserved, deeper arrays
      *                          recursed
@@ -271,7 +270,7 @@ final readonly class SelectionConfigParser
     /**
      * Keep fourth-level configuration values as scalar config values.
      *
-     * @param array<array-key, mixed> $decodedSelectionValues
+     * @param array<array-key, mixed> $decodedSelectionValues - Decoded selection subtree at the final supported nesting level.
      *
      * @return array<array-key, ConfigScalar> - the deepest subtree, scalar leaves only, keys preserved; any further nesting is rejected
      */

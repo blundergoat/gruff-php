@@ -66,11 +66,10 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Describe the one-line method rule.
      *
-     * @return RuleDefinition Rule metadata, defaults, and options.
+     * @return RuleDefinition - Rule metadata, defaults, and options.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back the rule's metadata, defaults, and option/false-positive contract for the registry.
         return new RuleDefinition(
             id:              self::ID,
             name:            'One-line method',
@@ -107,10 +106,10 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Find trivial methods that only wrap a single call expression.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for one-line wrapper methods.
+     * @return list<Finding> - Findings for one-line wrapper methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -182,20 +181,19 @@ final readonly class OneLineMethodRule implements RuleInterface
             );
         }
 
-        // Hand back every one-line-wrapper finding gathered while walking this unit's methods.
         return $findings;
     }
 
     /**
      * Decide whether a method shape is exempt from one-line wrapper checks.
      *
-     * @param ClassMethod        $classMethod      Candidate whose own param count, single-statement body, and factory membership decide exemption (caller count is supplied separately).
-     * @param int                $minParameters    Methods declaring fewer parameters are skipped as zero/low-arg accessors.
-     * @param int                $minInFileCallers Skip threshold: reached this many in-file self-callers exempts the wrapper (0 disables).
-     * @param int                $selfCallerCount  Count of in-class `$this->name()` / `self::name()` / `static::name()` / `parent::name()` calls.
-     * @param array<int, true>   $factoryMethodIds Alternative named-factory method object ids.
+     * @param ClassMethod        $classMethod - Candidate whose own param count, single-statement body, and factory membership decide exemption (caller count is supplied separately).
+     * @param int                $minParameters - Methods declaring fewer parameters are skipped as zero/low-arg accessors.
+     * @param int                $minInFileCallers - Skip threshold: reached this many in-file self-callers exempts the wrapper (0 disables).
+     * @param int                $selfCallerCount - Count of in-class `$this->name()` / `self::name()` / `static::name()` / `parent::name()` calls.
+     * @param array<int, true>   $factoryMethodIds - Alternative named-factory method object ids.
      *
-     * @return bool True when the method should not be reported.
+     * @return bool - True when the method should not be reported.
      */
     private function shouldSkip(
         ClassMethod $classMethod,
@@ -238,9 +236,9 @@ final readonly class OneLineMethodRule implements RuleInterface
      * enclosed by a class/trait/enum (e.g. interface methods, which the rule
      * already skips via `isAbstract()`).
      *
-     * @param ClassMethod $classMethod Method whose owning class-like declaration we resolve.
+     * @param ClassMethod $classMethod - Method whose owning class-like declaration we resolve.
      *
-     * @return int|null Object id of the enclosing class-like, or null when unresolved.
+     * @return int|null - Object id of the enclosing class-like, or null when unresolved.
      */
     private function enclosingClassId(ClassMethod $classMethod): ?int
     {
@@ -260,10 +258,10 @@ final readonly class OneLineMethodRule implements RuleInterface
     /**
      * Detect whether an expression contains any call or object creation.
      *
-     * @param Expr       $expression Single-statement body expression being classified as real work or not.
-     * @param NodeFinder $nodeFinder Shared finder reused across methods to avoid per-call allocation.
+     * @param Expr       $expression - Single-statement body expression being classified as real work or not.
+     * @param NodeFinder $nodeFinder - Shared finder reused across methods to avoid per-call allocation.
      *
-     * @return bool True when the expression contains callable work.
+     * @return bool - True when the expression contains callable work.
      */
     private function containsCall(Expr $expression, NodeFinder $nodeFinder): bool
     {
@@ -286,10 +284,10 @@ final readonly class OneLineMethodRule implements RuleInterface
      * with no callers would otherwise see `B::save()` silently exempted under
      * the `minInFileCallers: 2` default.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose class-like declarations are tallied.
-     * @param NodeFinder   $nodeFinder   Shared finder reused across methods to avoid per-call allocation.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose class-like declarations are tallied.
+     * @param NodeFinder   $nodeFinder - Shared finder reused across methods to avoid per-call allocation.
      *
-     * @return array<int, array<string, int>> Counts keyed by class object id, then lowercase method name.
+     * @return array<int, array<string, int>> - Counts keyed by class object id, then lowercase method name.
      */
     private function selfCallCountsByClass(AnalysisUnit $analysisUnit, NodeFinder $nodeFinder): array
     {
@@ -331,16 +329,15 @@ final readonly class OneLineMethodRule implements RuleInterface
             }
         }
 
-        // Hand back the per-class, per-method self-call tallies that drive the in-file caller exemption.
         return $counts;
     }
 
     /**
      * Find public static self-factory methods when a class exposes multiple named alternatives.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose classes are scanned for named-factory pairs.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose classes are scanned for named-factory pairs.
      *
-     * @return array<int, true> Method object ids that are exempt.
+     * @return array<int, true> - Method object ids that are exempt.
      */
     private function namedAlternativeFactoryMethodIds(AnalysisUnit $analysisUnit): array
     {
@@ -364,17 +361,16 @@ final readonly class OneLineMethodRule implements RuleInterface
             }
         }
 
-        // Hand back only ids from classes exposing two or more named factories; lone factories stay reportable.
         return $factoryIds;
     }
 
     /**
      * Detect public static methods that return a new instance of their own class.
      *
-     * @param ClassMethod $classMethod Candidate method being tested as a named constructor.
-     * @param Class_      $class       Declaring class, used to match `new ClassName()` against its own name.
+     * @param ClassMethod $classMethod - Candidate method being tested as a named constructor.
+     * @param Class_      $class - Declaring class, used to match `new ClassName()` against its own name.
      *
-     * @return bool True when the method is a named constructor/factory candidate.
+     * @return bool - True when the method is a named constructor/factory candidate.
      */
     private function isNamedAlternativeFactory(ClassMethod $classMethod, Class_ $class): bool
     {

@@ -237,7 +237,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Build abbreviation findings for the naming rule.
      *
-     * @param list<string> $acceptedAbbreviations
+     * @param list<string> $acceptedAbbreviations - Accepted abbreviation values to apply before analysing the fixture.
      *
      * @return list<\GruffPhp\Finding\Finding> - surviving abbreviation-allowlist findings after the supplied accepted abbreviations are applied;
      *                                         empty when every short name is accepted
@@ -254,7 +254,6 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Just the abbreviation findings that survived the supplied allowlist.
         return array_values(array_filter(
                                 $findings,
                                 static fn($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
@@ -264,7 +263,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Build hungarian findings for the naming rule.
      *
-     * @param list<string> $typePrefixes
+     * @param list<string> $typePrefixes - Hungarian prefixes treated as type markers for this assertion.
      *
      * @return list<\GruffPhp\Finding\Finding> - Hungarian-notation findings produced under the supplied type prefixes; empty when no prefixed
      *                                         variable matches
@@ -280,7 +279,6 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Just the hungarian-notation findings produced under the supplied type prefixes.
         return array_values(array_filter(
                                 $findings,
                                 static fn($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
@@ -290,7 +288,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Build boolean prefix property findings for the naming rule.
      *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Boolean-prefix rule option overrides.
      *
      * @return list<\GruffPhp\Finding\Finding> - boolean-prefix findings for the fixture's properties and parameters under the supplied options;
      *                                         empty when every bool name is exempt
@@ -306,7 +304,6 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Just the boolean-prefix findings produced under the supplied options.
         return array_values(array_filter(
                                 $findings,
                                 static fn($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
@@ -316,7 +313,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Build negative boolean findings for the naming rule.
      *
-     * @param list<string> $cliMirrorAllowlist
+     * @param list<string> $cliMirrorAllowlist - Negated boolean names exempted as CLI mirror flags.
      *
      * @return list<\GruffPhp\Finding\Finding> - negative-boolean findings with BooleanPrefixRule disabled so each negated name is counted once;
      *                                         empty when the allowlist exempts them all
@@ -349,7 +346,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
     /**
      * Group naming findings by reported identifier name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings
+     * @param list<\GruffPhp\Finding\Finding> $findings - Naming findings to group by reported identifier name.
      *
      * @return array<string, list<string>> - identifier name mapped to the rule ids that flagged it, for asserting which names overlap across rules
      */

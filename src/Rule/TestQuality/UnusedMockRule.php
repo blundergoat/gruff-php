@@ -50,8 +50,8 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Find mock variables that are assigned but never read.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per mock created but never read across all test scopes in the unit; empty
      *                         when every mock is used
@@ -74,15 +74,14 @@ final readonly class UnusedMockRule implements RuleInterface
             );
         }
 
-        // Hand back the unused-mock findings gathered across every test scope in the unit.
         return $findings;
     }
 
     /**
      * Collect mock variables created in the test scope.
      *
-     * @param TestQualityScope $scope                  Test method scope whose assignments are scanned for mock creation.
-     * @param array<int, true> $assignedVarObjectIds   Receives, by reference, the object id of every assigned variable
+     * @param TestQualityScope $scope - Test method scope whose assignments are scanned for mock creation.
+     * @param array<int, true> $assignedVarObjectIds - Receives, by reference, the object id of every assigned variable
      *                                                 node so reads can later exclude the assignment target itself.
      *
      * @return array<string, array{line: int, name: string}> - mock creations keyed by variable name, each holding the
@@ -121,8 +120,8 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Collect reads of variables created as mocks.
      *
-     * @param TestQualityScope $scope                  Test method scope to scan for variable reads.
-     * @param array<int, true> $assignedVarObjectIds   Object ids of assignment-target variable nodes to skip, so the
+     * @param TestQualityScope $scope - Test method scope to scan for variable reads.
+     * @param array<int, true> $assignedVarObjectIds - Object ids of assignment-target variable nodes to skip, so the
      *                                                 left-hand side of `$mock = ...` is not mistaken for a read.
      *
      * @return array<string, true> - set keyed by every variable name read somewhere other than its own assignment
@@ -151,11 +150,11 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Build findings for unread mocks in the test-quality rule.
      *
-     * @param AnalysisUnit                                  $analysisUnit    Unit supplying the display path for findings.
-     * @param TestQualityScope                              $scope           Test scope whose symbol names the offending test.
-     * @param array<string, array{line: int, name: string}> $mockAssignments Mock creations keyed by variable name,
+     * @param AnalysisUnit                                  $analysisUnit - Unit supplying the display path for findings.
+     * @param TestQualityScope                              $scope - Test scope whose symbol names the offending test.
+     * @param array<string, array{line: int, name: string}> $mockAssignments - Mock creations keyed by variable name,
      *                                                                       each carrying the assignment line to report.
-     * @param array<string, true>                           $reads           Variable names observed as reads; a mock present here is considered used
+     * @param array<string, true>                           $reads - Variable names observed as reads; a mock present here is considered used
      *                                                                       and is therefore not reported.
      *
      * @return list<Finding> - one advisory finding per mock created but never read back; empty when every mock is used
@@ -195,7 +194,7 @@ final readonly class UnusedMockRule implements RuleInterface
     /**
      * Detect whether an expression contains a recognised mock creation call.
      *
-     * @param Expr $expr Right-hand side of an assignment to test for a nested mock-creation call.
+     * @param Expr $expr - Right-hand side of an assignment to test for a nested mock-creation call.
      *
      * @return bool - true as soon as any descendant call is a recognised mock factory, so creators wrapped in other
      *                calls still count; false when no such call is present

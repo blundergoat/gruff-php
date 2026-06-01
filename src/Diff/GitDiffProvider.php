@@ -14,8 +14,8 @@ final readonly class GitDiffProvider
     /**
      * Read changed files and line ranges from git diff output.
      *
-     * @param string $projectRoot Git working tree root.
-     * @param string $mode        Diff mode or base ref.
+     * @param string $projectRoot - Git working tree root.
+     * @param string $mode - Diff mode or base ref.
      *
      * @return DiffResult - changed-line ranges per file plus diff metadata; base ref is null for local modes
      * @throws DiffException When git diff cannot run or the base ref is unsafe.
@@ -54,9 +54,9 @@ final readonly class GitDiffProvider
     /**
      * Include untracked, unignored files in the working-tree diff scope.
      *
-     * @param string                                $projectRoot  Git working tree root.
-     * @param list<string>                          $changedFiles Changed files collected so far.
-     * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     * @param string                                $projectRoot - Git working tree root.
+     * @param list<string>                          $changedFiles - Changed files collected so far.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
      * @return void
      * @throws DiffException When Git cannot list untracked files.
@@ -87,7 +87,7 @@ final readonly class GitDiffProvider
     /**
      * Ensure diff mode only runs inside a git working tree.
      *
-     * @param string $projectRoot Directory the git probe runs in; must be the working tree to inspect.
+     * @param string $projectRoot - Directory the git probe runs in; must be the working tree to inspect.
      *
      * @return void
      */
@@ -104,7 +104,7 @@ final readonly class GitDiffProvider
     /**
      * Build the git diff command used to calculate changed lines.
      *
-     * @param string $mode One of staged|unstaged|working-tree, or a base ref name validated as the diff target.
+     * @param string $mode - One of staged|unstaged|working-tree, or a base ref name validated as the diff target.
      *
      * @return list<string> - git command argv where element 0 is "git"; the trailing "--" ends option parsing before paths
      */
@@ -122,7 +122,7 @@ final readonly class GitDiffProvider
     /**
      * Reject unsafe refs before passing them to git.
      *
-     * @param string $ref Caller-supplied base ref; rejected unless it is a safe git ref with no leading dash.
+     * @param string $ref - Caller-supplied base ref; rejected unless it is a safe git ref with no leading dash.
      *
      * @return string - the same ref unchanged once it has cleared the safe-character guard, safe to pass to git
      */
@@ -133,16 +133,15 @@ final readonly class GitDiffProvider
             throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
         }
 
-        // Hand back the same ref once it has cleared the safe-character guard.
         return $ref;
     }
 
     /**
      * Add a changed file once and prepare its range bucket.
      *
-     * @param string|null                           $filePath     Project-relative changed path.
-     * @param list<string>                          $changedFiles Changed files collected so far.
-     * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     * @param string|null                           $filePath - Project-relative changed path.
+     * @param list<string>                          $changedFiles - Changed files collected so far.
+     * @param array<string, list<ChangedLineRange>> $changedLines - Changed ranges keyed by file.
      *
      * @return void
      */

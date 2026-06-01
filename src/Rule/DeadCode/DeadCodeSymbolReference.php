@@ -12,9 +12,9 @@ final readonly class DeadCodeSymbolReference
     /**
      * Capture one project-wide reference to a declaration candidate.
      *
-     * @param string      $fqn          Fully qualified referenced symbol without a leading slash.
-     * @param string|null $originSymbol Enclosing declaration FQN, when known; used to ignore purely self-recursive references.
-     * @param bool        $isTestFile   Whether the reference comes from a test path.
+     * @param string      $fqn - Fully qualified referenced symbol without a leading slash.
+     * @param string|null $originSymbol - Enclosing declaration FQN, when known; used to ignore purely self-recursive references.
+     * @param bool        $isTestFile - Whether the reference comes from a test path.
      */
     public function __construct(
         public string $fqn,

@@ -18,9 +18,9 @@ final readonly class IdentifierQualityScopeLocals
     /**
      * Select local variables whose reference count is high enough for identifier quality judging.
      *
-     * @param FunctionLikeScope   $scope              Scope whose declared locals are the candidate set.
-     * @param int                 $minScopeReferences Read-count floor; locals used fewer times are too transient.
-     * @param array<string, true> $excludedNames      Names already exempted by surrounding rule logic.
+     * @param FunctionLikeScope   $scope - Scope whose declared locals are the candidate set.
+     * @param int                 $minScopeReferences - Read-count floor; locals used fewer times are too transient.
+     * @param array<string, true> $excludedNames - Names already exempted by surrounding rule logic.
      *
      * @return array<string, Variable> - local variables keyed by name after exclusions and read-count filtering
      */
@@ -39,14 +39,13 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back only the locals that survived exclusion and met the read-count floor.
         return $variables;
     }
 
     /**
      * List variables introduced by loop constructs.
      *
-     * @param FunctionLikeScope $scope Scope to scan for loop-induction and foreach key/value variables.
+     * @param FunctionLikeScope $scope - Scope to scan for loop-induction and foreach key/value variables.
      *
      * @return array<string, true> - loop-introduced variables keyed by name
      */
@@ -68,14 +67,13 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back the loop-introduced names so the local-variable pass can exclude them from generic judging.
         return $variables;
     }
 
     /**
      * List variables introduced by catch clauses.
      *
-     * @param FunctionLikeScope $scope Scope to scan for catch-clause exception variables.
+     * @param FunctionLikeScope $scope - Scope to scan for catch-clause exception variables.
      *
      * @return array<string, true> - catch-introduced variables keyed by name
      */
@@ -93,16 +91,15 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back the catch-introduced exception names so they are excluded from generic judging.
         return $variables;
     }
 
     /**
      * Select generic loop variables whose foreach body is long enough to demand better names.
      *
-     * @param FunctionLikeScope $scope             Scope to scan for long-bodied foreach loops.
-     * @param list<string>      $genericTokens     Lowercase loop variable names treated as generic.
-     * @param int               $loopBodyThreshold Statement count where a foreach body demands a meaningful name.
+     * @param FunctionLikeScope $scope - Scope to scan for long-bodied foreach loops.
+     * @param list<string>      $genericTokens - Lowercase loop variable names treated as generic.
+     * @param int               $loopBodyThreshold - Statement count where a foreach body demands a meaningful name.
      *
      * @return array<string, Variable> - reportable loop variables keyed by name
      */
@@ -134,14 +131,13 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back the first occurrence of each generic-named variable in a long foreach body.
         return $variables;
     }
 
     /**
      * Check whether a foreach loop uses the canonical `$key => $value` map-iteration idiom.
      *
-     * @param Foreach_ $foreach Loop to test against the key/value idiom.
+     * @param Foreach_ $foreach - Loop to test against the key/value idiom.
      *
      * @return bool - true for the conventional key/value map iteration idiom
      */
@@ -157,7 +153,7 @@ final readonly class IdentifierQualityScopeLocals
     /**
      * Count local variable references inside one function-like scope.
      *
-     * @param FunctionLikeScope $scope Scope whose variable occurrences are tallied.
+     * @param FunctionLikeScope $scope - Scope whose variable occurrences are tallied.
      *
      * @return array<string, int> - local variable read counts keyed by variable name
      */
@@ -171,15 +167,14 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back the per-name occurrence tally that gates the minScopeReferences floor.
         return $counts;
     }
 
     /**
      * Add variable names found under the supplied AST nodes into an output set.
      *
-     * @param array<Node>         $nodes     AST nodes to scan for variable references.
-     * @param array<string, true> $variables Output set keyed by variable name.
+     * @param array<Node>         $nodes - AST nodes to scan for variable references.
+     * @param array<string, true> $variables - Output set keyed by variable name.
      *
      * @return void
      */
@@ -198,8 +193,8 @@ final readonly class IdentifierQualityScopeLocals
     /**
      * Filter pre-walked body descendants to nodes inside the current function-like scope.
      *
-     * @param FunctionLikeScope    $scope     Scope whose pre-walked body descendants are filtered.
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
+     * @param FunctionLikeScope    $scope - Scope whose pre-walked body descendants are filtered.
+     * @param callable(Node): bool $predicate - Predicate that selects matching descendants.
      *
      * @return list<Node> - descendant nodes in source order
      */
@@ -213,7 +208,6 @@ final readonly class IdentifierQualityScopeLocals
             }
         }
 
-        // Hand back every body descendant the predicate accepted, in source order.
         return $matches;
     }
 }

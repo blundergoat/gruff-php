@@ -105,7 +105,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Hand back this rule's identity and defaults, including the self-explanatory literal allowlist.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Magic number assertion',
@@ -120,8 +119,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     /**
      * Find assertions that compare against unexplained numeric literals.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per unexplained literal surviving allowlist and contextual checks; [] if none
      */
@@ -153,14 +152,13 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per unexplained literal that survived the allowlist and contextual checks.
         return $findings;
     }
 
     /**
      * Load configured assertion literals, falling back to the default self-explanatory values.
      *
-     * @param RuleContext $ruleContext Source of the per-rule `allowedLiterals` option for this run.
+     * @param RuleContext $ruleContext - Source of the per-rule `allowedLiterals` option for this run.
      *
      * @return list<int> - allowlisted literals treated as self-explanatory; defaults when no valid override is set
      */
@@ -179,12 +177,11 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             }
         }
 
-        // Hand back only the integer entries; non-int config values are silently dropped as unusable.
         return $allowedLiterals;
     }
 
     /**
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call whose numeric literal is judged.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose numeric literal is judged.
      *
      * @return bool - true when the call is a cardinality assertion or its compared value labels the number's meaning
      */
@@ -208,8 +205,8 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion or Pest expectation call to read from.
-     * @param string                                        $name Lowercased call name that selects the extraction path.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion or Pest expectation call to read from.
+     * @param string                                        $name - Lowercased call name that selects the extraction path.
      *
      * @return Expr|null - the actual value compared against the literal; null when no such expression is present
      */
@@ -225,7 +222,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * @param Expr $expr Expression compared against the numeric literal; wrappers are unwrapped recursively.
+     * @param Expr $expr - Expression compared against the numeric literal; wrappers are unwrapped recursively.
      *
      * @return bool - true when the expression (count call, named getter, or contextual property/key) labels the number
      */
@@ -265,7 +262,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * @param Node $node Property-name node to inspect; only a literal identifier carries a comparable name.
+     * @param Node $node - Property-name node to inspect; only a literal identifier carries a comparable name.
      *
      * @return bool - true when the property is a static identifier with a contextual name; false for dynamic names
      */
@@ -281,7 +278,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * @param Expr|null $expr Array-dimension node; only a literal string key carries a comparable name.
+     * @param Expr|null $expr - Array-dimension node; only a literal string key carries a comparable name.
      *
      * @return bool - true when the key is a literal string with a contextual normalized value; false for computed keys
      */
@@ -297,7 +294,7 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     }
 
     /**
-     * @param string $name Raw identifier or array key whose case and separators are insignificant for matching.
+     * @param string $name - Raw identifier or array key whose case and separators are insignificant for matching.
      *
      * @return string - the name lowercased with non-alphanumeric characters stripped, for case-insensitive lookup
      */

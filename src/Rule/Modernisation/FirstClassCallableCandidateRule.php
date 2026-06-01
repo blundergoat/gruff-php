@@ -32,7 +32,7 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Describe the first-class callable candidate rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +50,10 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Find array-callable expressions that may use first-class callable syntax.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for PHP 8.1 callable syntax candidates.
+     * @return list<Finding> - Findings for PHP 8.1 callable syntax candidates.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -85,16 +85,15 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per array callable that could adopt first-class callable syntax.
         return $findings;
     }
 
     /**
      * Check whether an array expression has the two-part callable shape.
      *
-     * @param Expr\Array_ $array Array literal under inspection; only the unkeyed [target, 'method'] pair matches.
+     * @param Expr\Array_ $array - Array literal under inspection; only the unkeyed [target, 'method'] pair matches.
      *
-     * @return bool True when the array looks like a callable pair.
+     * @return bool - True when the array looks like a callable pair.
      */
     private function isCallableArray(Expr\Array_ $array): bool
     {
@@ -130,9 +129,9 @@ final readonly class FirstClassCallableCandidateRule implements RuleInterface
     /**
      * Check whether the array callable appears in a callable-friendly context.
      *
-     * @param Expr\Array_ $array Array literal whose enclosing node decides if a callable would actually be invoked.
+     * @param Expr\Array_ $array - Array literal whose enclosing node decides if a callable would actually be invoked.
      *
-     * @return bool True when the parent context can accept a callable.
+     * @return bool - True when the parent context can accept a callable.
      */
     private function isCallableContext(Expr\Array_ $array): bool
     {

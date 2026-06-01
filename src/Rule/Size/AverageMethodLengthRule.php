@@ -37,7 +37,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Describe the average-method-length rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Find class-like scopes whose average method length exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for large average method bodies.
+     * @return list<Finding> - Findings for large average method bodies.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -133,9 +133,9 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Build a display symbol for a class-like node.
      *
-     * @param Node $node Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
+     * @param Node $node - Class-like node (Class_, Trait_, or Enum_) whose declared name labels the finding.
      *
-     * @return string Class-like display symbol.
+     * @return string - Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -161,9 +161,9 @@ final readonly class AverageMethodLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole floats are shown without a trailing decimal.
+     * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
-     * @return string Human-readable threshold value.
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

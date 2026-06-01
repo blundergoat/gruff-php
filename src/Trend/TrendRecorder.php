@@ -19,13 +19,14 @@ final readonly class TrendRecorder
     /**
      * Append a score snapshot to the bounded history file.
      *
-     * @param string      $projectRoot  Project root used to resolve the history path.
-     * @param string      $path         History file path to write.
-     * @param ScoreReport $score        Score report to snapshot.
-     * @param int         $findingCount Total finding count for the snapshot.
+     * @param string      $projectRoot - Project root used to resolve the history path.
+     * @param string      $path - History file path to write.
+     * @param ScoreReport $score - Score report to snapshot.
+     * @param int         $findingCount - Total finding count for the snapshot.
      * @throws RuntimeException When the history file cannot be read, validated, or written.
      * @throws \JsonException When history JSON cannot be decoded or encoded.
-     * @return TrendReport Report describing the current score and prior delta.
+     *
+     * @return TrendReport - Report describing the current score and prior delta.
      */
     public function record(string $projectRoot, string $path, ScoreReport $score, int $findingCount): TrendReport
     {
@@ -67,8 +68,9 @@ final readonly class TrendRecorder
     /**
      * Read and validate the bounded history file into typed snapshot rows.
      *
-     * @param string $path Resolved history file path; an absent or empty file is treated as no history.
-     * @return list<TrendEntry> Snapshot rows in file order; empty when the file is absent or blank.
+     * @param string $path - Resolved history file path; an absent or empty file is treated as no history.
+     *
+     * @return list<TrendEntry> - Snapshot rows in file order; empty when the file is absent or blank.
      */
     private function readEntries(string $path): array
     {
@@ -93,8 +95,9 @@ final readonly class TrendRecorder
     /**
      * Read raw history file bytes, distinguishing "no history" from an unreadable file.
      *
-     * @param string      $path Resolved history file path to read.
-     * @return string|null Raw file contents, or null when the file is missing or whitespace-only.
+     * @param string      $path - Resolved history file path to read.
+     *
+     * @return string|null - Raw file contents, or null when the file is missing or whitespace-only.
      */
     private function readHistoryFile(string $path): ?string
     {
@@ -120,9 +123,10 @@ final readonly class TrendRecorder
     /**
      * Validate one decoded history row and preserve its scalar values.
      *
-     * @param mixed  $trendEntry Decoded JSON row; must be a string-keyed map, else the file is rejected.
-     * @param string $path       History file path, used only to make validation errors point at the file.
-     * @return TrendEntry The row with every value confirmed scalar, ready to fold back into history.
+     * @param mixed  $trendEntry - Decoded JSON row; must be a string-keyed map, else the file is rejected.
+     * @param string $path - History file path, used only to make validation errors point at the file.
+     *
+     * @return TrendEntry - The row with every value confirmed scalar, ready to fold back into history.
      */
     private function normaliseEntry(mixed $trendEntry, string $path): array
     {
@@ -139,16 +143,16 @@ final readonly class TrendRecorder
             $normalisedEntry[$key] = $this->normaliseEntryValue($trendValue, $path);
         }
 
-        // Hand back the rebuilt row so an invalid value anywhere aborts before it re-enters history.
         return $normalisedEntry;
     }
 
     /**
      * Assert a single history value is scalar, rejecting nested arrays/objects.
      *
-     * @param mixed  $trendValue Decoded value to vet; non-scalar shapes are not valid trend data.
-     * @param string $path       History file path, surfaced in the error when a value is rejected.
-     * @return bool|float|int|string|null The same value once confirmed scalar.
+     * @param mixed  $trendValue - Decoded value to vet; non-scalar shapes are not valid trend data.
+     * @param string $path - History file path, surfaced in the error when a value is rejected.
+     *
+     * @return bool|float|int|string|null - The same value once confirmed scalar.
      */
     private function normaliseEntryValue(mixed $trendValue, string $path): bool|float|int|string|null
     {
@@ -161,9 +165,9 @@ final readonly class TrendRecorder
     }
 
     /**
-     * @param TrendEntry|null $trendEntry
+     * @param TrendEntry|null $trendEntry - Trend-history row to read, or null when the history has no previous entry.
      *
-     * @return float|null Score value from the entry, or null when absent.
+     * @return float|null - Score value from the entry, or null when absent.
      */
     private function scoreFromEntry(?array $trendEntry): ?float
     {

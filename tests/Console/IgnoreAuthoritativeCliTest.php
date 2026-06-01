@@ -190,13 +190,12 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Build a gruff-php subprocess rooted at the temporary fixture project.
      *
-     * @param list<string> $args CLI arguments passed after the binary.
+     * @param list<string> $args - CLI arguments passed after the binary.
      *
      * @return Process - configured but not yet started, so the caller decides when and how it runs
      */
     private function runGruff(array $args): Process
     {
-        // Hand back an unstarted process so the caller controls when and how it runs.
         return new Process(
             array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args),
             $this->project,
@@ -206,7 +205,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Decode a check-ignore JSON array response into a list of result rows.
      *
-     * @param Process $process Completed check-ignore process whose stdout holds the JSON array.
+     * @param Process $process - Completed check-ignore process whose stdout holds the JSON array.
      *
      * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> - one row per input path in argument order;
      *                          source/pattern are null when the path is not ignored
@@ -218,14 +217,13 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertIsArray($decoded);
 
         /** @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded The check-ignore JSON output is always a list of path-decision rows. */
-        // Hand back the decoded path-decision rows for the test's per-row assertions.
         return $decoded;
     }
 
     /**
      * Run a git command inside the fixture project.
      *
-     * @param list<string> $args Git arguments.
+     * @param list<string> $args - Git arguments.
      *
      * @return void
      */
@@ -240,8 +238,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
      *
      * @return void
      */

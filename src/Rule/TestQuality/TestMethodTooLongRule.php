@@ -47,8 +47,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Find test methods whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one Advisory finding per test scope exceeding its threshold; empty when every scope is within budget
      */
@@ -96,16 +96,15 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per test scope that exceeded its (possibly path-overridden) line budget.
         return $findings;
     }
 
     /**
      * Count the meaningful body lines of a test method, skipping blanks, comments, and lone brackets.
      *
-     * @param list<string> $sourceLines All source lines of the unit, indexed from zero (line N is index N-1).
-     * @param int          $startLine   First source line of the test scope, inclusive (1-based).
-     * @param int          $endLine     Last source line of the test scope, inclusive (1-based).
+     * @param list<string> $sourceLines - All source lines of the unit, indexed from zero (line N is index N-1).
+     * @param int          $startLine - First source line of the test scope, inclusive (1-based).
+     * @param int          $endLine - Last source line of the test scope, inclusive (1-based).
      *
      * @return int - meaningful line tally compared against the threshold; blanks, comments, and lone brackets are excluded
      */
@@ -147,11 +146,11 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Resolve a path-specific threshold override when configured.
      *
-     * @param string                                                        $displayPath      File path matched against each override glob;
+     * @param string                                                        $displayPath - File path matched against each override glob;
      *                                                                                        backslashes normalised to slashes first.
-     * @param int                                                           $defaultThreshold Threshold applied when no override pattern matches this
+     * @param int                                                           $defaultThreshold - Threshold applied when no override pattern matches this
      *                                                                                        path.
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides    Override map; else default.
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides - Override map; else default.
      *
      * @return int - effective max-meaningful-lines budget: the first matching override (floored at 1) or the default when none match
      */
@@ -185,7 +184,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Parse a compact `glob=threshold` override entry from config.
      *
-     * @param string $pathOverride Single override in `glob=threshold` form, e.g. `tests/Integration/*=60`.
+     * @param string $pathOverride - Single override in `glob=threshold` form, e.g. `tests/Integration/*=60`.
      *
      * @return array{0: string, 1: int|float|string} - glob pattern and its parsed numeric threshold; both empty strings when the entry is not a
      *                  valid `glob=number`

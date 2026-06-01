@@ -32,7 +32,7 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Describe the stale @param tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +50,10 @@ final readonly class StaleParamTagRule implements RuleInterface
     /**
      * Find @param tags that no longer match function parameters.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for stale @param tags.
+     * @return list<Finding> - Findings for stale @param tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -108,7 +108,6 @@ final readonly class StaleParamTagRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per documented @param whose name matches no current parameter on its callable.
         return $findings;
     }
 }

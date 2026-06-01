@@ -138,8 +138,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Find tests whose name implies a SUT call that is absent from the body.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per test whose name implies an uncalled SUT; empty when all match or skip
      */
@@ -181,8 +181,8 @@ final readonly class SutNotCalledRule implements RuleInterface
     }
 
     /**
-     * @param TestQualityScope $scope      Test body whose calls are scanned for a SUT invocation.
-     * @param list<string>     $candidates Normalised SUT names any non-assertion call must match.
+     * @param TestQualityScope $scope - Test body whose calls are scanned for a SUT invocation.
+     * @param list<string>     $candidates - Normalised SUT names any non-assertion call must match.
      *
      * @return bool - true when a non-assertion call resolves to a candidate name (SUT exercised); false keeps it open
      */
@@ -209,7 +209,7 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Detect subprocess-based tests that may invoke the SUT outside the AST call graph.
      *
-     * @param TestQualityScope $scope Test body searched for Process construction or subprocess functions.
+     * @param TestQualityScope $scope - Test body searched for Process construction or subprocess functions.
      *
      * @return bool - true when a Process object or shell/exec call may run the SUT off the AST graph (treat as covered)
      */
@@ -254,7 +254,7 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * List variable names that likely represent the system under test.
      *
-     * @param string $testName PHPUnit method name; only camelCase `test`-prefixed names yield candidates.
+     * @param string $testName - PHPUnit method name; only camelCase `test`-prefixed names yield candidates.
      *
      * @return list<string> - normalised SUT method-name candidates to match against calls; empty when the name yields no inferable SUT
      */
@@ -303,7 +303,7 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Split an identifier into lowercase tokens for test-name heuristics.
      *
-     * @param string $identifierName CamelCase fragment after the `test` prefix to break into word tokens.
+     * @param string $identifierName - CamelCase fragment after the `test` prefix to break into word tokens.
      *
      * @return list<string> - word and digit tokens in source order with original casing preserved; empty when nothing tokenised
      */
@@ -321,7 +321,7 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Find the first token that marks the expected outcome in a test name.
      *
-     * @param list<string> $tokens
+     * @param list<string> $tokens - Method-name tokens in source order, already normalised for marker comparison.
      *
      * @return int|null - index of the first outcome-marker token splitting method phrase from outcome; null when none is present
      */
@@ -341,7 +341,7 @@ final readonly class SutNotCalledRule implements RuleInterface
     /**
      * Extract the leading verb token from a test method name.
      *
-     * @param string $token Leading name token; matched case-insensitively against known method verbs and aliases.
+     * @param string $token - Leading name token; matched case-insensitively against known method verbs and aliases.
      *
      * @return string|null - canonical lowercase method verb the token resolves to; null when the token is not a recognised verb
      */

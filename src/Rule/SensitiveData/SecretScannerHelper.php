@@ -37,7 +37,7 @@ final class SecretScannerHelper
     /**
      * Build the list of comment byte ranges for an analysis unit so pattern rules can skip in-comment matches.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose tokens describe comment spans.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose tokens describe comment spans.
      *
      * @return list<array{0:int,1:int}> - ordered [startOffset, endOffsetExclusive] half-open spans callers test offsets against
      */
@@ -67,8 +67,8 @@ final class SecretScannerHelper
     /**
      * Check whether a source-text byte offset falls inside one of the given comment ranges.
      *
-     * @param int                      $offset Zero-based byte offset of a pattern match.
-     * @param list<array{0:int,1:int}> $ranges Comment ranges produced by commentRanges().
+     * @param int                      $offset - Zero-based byte offset of a pattern match.
+     * @param list<array{0:int,1:int}> $ranges - Comment ranges produced by commentRanges().
      *
      * @return bool - true when the offset falls inside a comment span, signalling the caller to skip the match
      */
@@ -88,8 +88,8 @@ final class SecretScannerHelper
     /**
      * Compute the 1-based line number for a byte offset within a source string.
      *
-     * @param string $source Source text being scanned.
-     * @param int    $offset Zero-based byte offset inside the source text.
+     * @param string $source - Source text being scanned.
+     * @param int    $offset - Zero-based byte offset inside the source text.
      *
      * @return int - 1-based line number containing the offset, as findings and editors expect
      */
@@ -102,7 +102,7 @@ final class SecretScannerHelper
     /**
      * Build a redacted preview of a sensitive value (first 4 + last 4 chars for values longer than 8 chars).
      *
-     * @param string $secretValue Sensitive value to redact for reporting.
+     * @param string $secretValue - Sensitive value to redact for reporting.
      *
      * @return string - redacted preview (length marker, or first/last 4 chars) safe to embed in findings and reports
      */
@@ -121,8 +121,8 @@ final class SecretScannerHelper
     /**
      * Build a `KEY=<redacted:N chars>` string for env-style secret findings.
      *
-     * @param string $key         Environment-style key name.
-     * @param string $secretValue Sensitive value associated with the key.
+     * @param string $key - Environment-style key name.
+     * @param string $secretValue - Sensitive value associated with the key.
      *
      * @return string - `KEY=<redacted:N chars>` with the key kept visible and only the value's byte length disclosed
      */
@@ -135,7 +135,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the value looks like a placeholder rather than a real secret (changeme / dummy / example / etc.).
      *
-     * @param string $secretValue Candidate sensitive value.
+     * @param string $secretValue - Candidate sensitive value.
      *
      * @return bool - true when the value is empty, low-cardinality, or a placeholder, so the caller suppresses it
      */
@@ -161,7 +161,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
-     * @param string $displayPath Project-relative path being scanned.
+     * @param string $displayPath - Project-relative path being scanned.
      *
      * @return bool - true when the basename is `.env` or a `.env.*` variant; callers relax dummy-value filtering
      */
@@ -176,7 +176,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
      *
-     * @param string $displayPath Project-relative path being scanned.
+     * @param string $displayPath - Project-relative path being scanned.
      *
      * @return bool - true when any path segment is a test or fixtures directory; callers downgrade secrets found there
      */
@@ -194,7 +194,7 @@ final class SecretScannerHelper
     /**
      * Detect whether the line contains an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
      *
-     * @param string $line Source line being scanned.
+     * @param string $line - Source line being scanned.
      *
      * @return bool - true when the line contains a secret-context fragment that raises detector confidence
      */
@@ -216,7 +216,7 @@ final class SecretScannerHelper
     /**
      * Compute the Shannon entropy of a string in bits-per-character.
      *
-     * @param string $secretValue Candidate secret value.
+     * @param string $secretValue - Candidate secret value.
      *
      * @return float - bits-per-character Shannon entropy; callers compare it against a threshold to flag secret-shaped literals
      */
@@ -244,14 +244,14 @@ final class SecretScannerHelper
     /**
      * Build a sensitive-data Finding with redacted preview / detector metadata.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit that owns the finding.
-     * @param string       $ruleId       Sensitive-data rule identifier.
-     * @param string       $message      Human-readable finding message.
-     * @param int          $line         Source line for the detected secret.
-     * @param Confidence   $confidence   Confidence level assigned by the detector.
-     * @param string       $detector     Detector name written to finding metadata.
-     * @param string       $preview      Redacted preview written to finding metadata.
-     * @param string       $remediation  Suggested remediation text for the finding.
+     * @param AnalysisUnit $analysisUnit - Parsed unit that owns the finding.
+     * @param string       $ruleId - Sensitive-data rule identifier.
+     * @param string       $message - Human-readable finding message.
+     * @param int          $line - Source line for the detected secret.
+     * @param Confidence   $confidence - Confidence level assigned by the detector.
+     * @param string       $detector - Detector name written to finding metadata.
+     * @param string       $preview - Redacted preview written to finding metadata.
+     * @param string       $remediation - Suggested remediation text for the finding.
      *
      * @return Finding - a SensitiveData/Warning finding carrying the detector name and redacted preview in metadata
      */

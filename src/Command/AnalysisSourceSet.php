@@ -20,10 +20,10 @@ final readonly class AnalysisSourceSet
     private ?int $explicitParsedFileCount;
 
     /**
-     * @param SourceDiscoveryResult $discovery       Discovery result for the requested paths.
-     * @param list<AnalysisUnit>    $analysisUnits   Parsed analysis units, possibly released.
-     * @param list<RunDiagnostic>   $diagnostics     Diagnostics emitted while loading sources.
-     * @param int|null              $parsedFileCount Optional pre-computed parsed-file count for streaming flows.
+     * @param SourceDiscoveryResult $discovery - Discovery result for the requested paths.
+     * @param list<AnalysisUnit>    $analysisUnits - Parsed analysis units, possibly released.
+     * @param list<RunDiagnostic>   $diagnostics - Diagnostics emitted while loading sources.
+     * @param int|null              $parsedFileCount - Optional pre-computed parsed-file count for streaming flows.
      */
     public function __construct(
         public SourceDiscoveryResult $discovery,
@@ -37,7 +37,7 @@ final readonly class AnalysisSourceSet
     /**
      * Count successfully parsed analysis units in the loaded source set.
      *
-     * @return int Number of units without parse diagnostics.
+     * @return int - Number of units without parse diagnostics.
      */
     public function parsedFileCount(): int
     {

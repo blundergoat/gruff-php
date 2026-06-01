@@ -18,8 +18,8 @@ final class DashboardStateFactory
     /**
      * Build the default dashboard query values from console input.
      *
-     * @param InputInterface $input       Console input used to seed dashboard controls.
-     * @param string         $projectRoot Active project root for the dashboard.
+     * @param InputInterface $input - Console input used to seed dashboard controls.
+     * @param string         $projectRoot - Active project root for the dashboard.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
      *                        noConfig: string, includeIgnored: string, reportInteractive: string} - initial form control values for an unsubmitted
@@ -52,7 +52,7 @@ final class DashboardStateFactory
     /**
      * Quote a dashboard path token when the parser needs help preserving it.
      *
-     * @param string $path Console path argument.
+     * @param string $path - Console path argument.
      *
      * @return string - the path re-encoded so DashboardScanCommandBuilder::parsePaths() round-trips it intact, quoted and escaped only when it
      *                contains characters the tokenizer would split on
@@ -71,8 +71,8 @@ final class DashboardStateFactory
     /**
      * Resolves the startup project option against the shell directory.
      *
-     * @param InputInterface $input      Console input containing the optional project override.
-     * @param string         $launchRoot Shell working directory that launched the dashboard.
+     * @param InputInterface $input - Console input containing the optional project override.
+     * @param string         $launchRoot - Shell working directory that launched the dashboard.
      *
      * @return string|null - canonical project root chosen from --project-root/--project/launchRoot; null when the resolved path is not an existing
      *                     directory
@@ -90,9 +90,9 @@ final class DashboardStateFactory
     /**
      * Merge dashboard request query values with console-input defaults.
      *
-     * @param InputInterface        $input       Console input used to seed dashboard defaults.
-     * @param string                $projectRoot Active project root for the dashboard.
-     * @param array<string, string> $query       Request query values from the dashboard form.
+     * @param InputInterface        $input - Console input used to seed dashboard defaults.
+     * @param string                $projectRoot - Active project root for the dashboard.
+     * @param array<string, string> $query - Request query values from the dashboard form.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
      *                        noConfig: string, includeIgnored: string, reportInteractive: string} - merged form state where submitted query values
@@ -122,10 +122,10 @@ final class DashboardStateFactory
     /**
      * Resolve a submitted dashboard checkbox value.
      *
-     * @param string                $key             Checkbox state key (such as noBaseline) to resolve.
-     * @param array<string, string> $query           Raw request query; an unchecked HTML checkbox is absent, not "0".
-     * @param array<string, string> $defaults        Initial state used only before the first submission.
-     * @param bool                  $isSubmittedForm True once any query value was posted, so a missing box means off.
+     * @param string                $key - Checkbox state key (such as noBaseline) to resolve.
+     * @param array<string, string> $query - Raw request query; an unchecked HTML checkbox is absent, not "0".
+     * @param array<string, string> $defaults - Initial state used only before the first submission.
+     * @param bool                  $isSubmittedForm - True once any query value was posted, so a missing box means off.
      *
      * @return string - "1" when the box resolves to checked, else "0"; an absent key on a submitted form reads as off, falling back to the default
      *                only before the first submission
@@ -149,8 +149,8 @@ final class DashboardStateFactory
     /**
      * Returns an existing absolute project directory, or null when invalid.
      *
-     * @param string $project  Project path from the request or command input.
-     * @param string $baseRoot Base directory used for relative project paths.
+     * @param string $project - Project path from the request or command input.
+     * @param string $baseRoot - Base directory used for relative project paths.
      *
      * @return string|null - realpath-canonicalised absolute directory when it exists, or null signalling an invalid or missing project root
      */
@@ -170,8 +170,8 @@ final class DashboardStateFactory
      * M12 will extend this through the form rendering and round-trip; M11 only
      * fixes the initial-state default-source chain.
      *
-     * @param InputInterface $input       Console input for the dashboard command.
-     * @param string         $projectRoot Active project root resolved from --project/--project-root.
+     * @param InputInterface $input - Console input for the dashboard command.
+     * @param string         $projectRoot - Active project root resolved from --project/--project-root.
      *
      * @return string - fail-on threshold seeded by ADR-015 precedence (explicit flag, then config, then "none"), never null so the form always has
      *                an initial value
@@ -198,8 +198,8 @@ final class DashboardStateFactory
      * shell's `getcwd()`, so launching the dashboard from outside the target
      * project still reads the right `.gruff-php.yaml`.
      *
-     * @param InputInterface $input       Console input for the dashboard command.
-     * @param string         $projectRoot Resolved project root to load config from.
+     * @param InputInterface $input - Console input for the dashboard command.
+     * @param string         $projectRoot - Resolved project root to load config from.
      *
      * @return string|null - configured minimumSeverity.dashboard value, or null when --no-config is set, the key is unset, or config loading failed
      */
@@ -225,8 +225,8 @@ final class DashboardStateFactory
     /**
      * Reads a non-empty string option from console input.
      *
-     * @param InputInterface $input Console input to read.
-     * @param string         $name  Option name without leading dashes.
+     * @param InputInterface $input - Console input to read.
+     * @param string         $name - Option name without leading dashes.
      *
      * @return string|null - the option's non-empty string value, or null collapsing both "undefined on this command" and "" so callers can ?? a
      *                     single fallback

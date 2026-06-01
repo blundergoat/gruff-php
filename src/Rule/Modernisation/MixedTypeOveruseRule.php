@@ -49,8 +49,8 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     /**
      * Find parameters and returns that overuse explicit mixed types.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per public function-like that declares mixed on a parameter or
      *   return; empty when nothing offends or the target predates PHP 8.0 (mixed did not exist before then)
@@ -96,14 +96,13 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per public function-like that leans on mixed at a parameter or return.
         return $findings;
     }
 
     /**
      * List source locations where broad mixed types appear.
      *
-     * @param Stmt\ClassMethod|Stmt\Function_ $functionLike Function-like whose parameter and return types are scanned
+     * @param Stmt\ClassMethod|Stmt\Function_ $functionLike - Function-like whose parameter and return types are scanned
      *                                                      for mixed; the labels feed the finding message verbatim.
      *
      * @return list<string> - human-readable labels for each mixed site ($param names and 'return type'), in source order; empty when none use mixed
@@ -125,7 +124,6 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             $locations[] = 'return type';
         }
 
-        // Hand back the human-readable spots ($param names and 'return type') so the message can list them.
         return $locations;
     }
 }

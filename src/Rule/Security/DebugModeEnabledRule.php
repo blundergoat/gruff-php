@@ -40,7 +40,7 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Describe the debug-mode rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -65,10 +65,10 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Find ini_set calls that turn error display on.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Debug-mode findings.
+     * @return list<Finding> - Debug-mode findings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -112,8 +112,9 @@ final class DebugModeEnabledRule implements RuleInterface
     /**
      * Decide whether a literal argument turns the directive on.
      *
-     * @param Expr $directiveValue Second argument to ini_set.
-     * @return bool True when the value is a truthy on-literal.
+     * @param Expr $directiveValue - Second argument to ini_set.
+     *
+     * @return bool - True when the value is a truthy on-literal.
      */
     private function isTruthy(Expr $directiveValue): bool
     {

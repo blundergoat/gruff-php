@@ -21,7 +21,7 @@ use JsonException;
 final readonly class AnalysisFingerprint
 {
     /**
-     * @param string $runDigest Digest of every analysis input shared across files in a run.
+     * @param string $runDigest - Digest of every analysis input shared across files in a run.
      */
     private function __construct(private string $runDigest)
     {
@@ -30,11 +30,12 @@ final readonly class AnalysisFingerprint
     /**
      * Build the run fingerprint from the resolved config, enabled rules, and tool version.
      *
-     * @param RuleRegistry   $registry    Registry whose enabled-rule set is part of the key.
-     * @param AnalysisConfig $config      Resolved configuration whose settings affect findings.
-     * @param string         $toolVersion gruff version string folded into the key.
+     * @param RuleRegistry   $registry - Registry whose enabled-rule set is part of the key.
+     * @param AnalysisConfig $config - Resolved configuration whose settings affect findings.
+     * @param string         $toolVersion - gruff version string folded into the key.
      * @throws JsonException When the run payload cannot be encoded.
-     * @return self Fingerprint for the run.
+     *
+     * @return self - Fingerprint for the run.
      */
     public static function forRun(RuleRegistry $registry, AnalysisConfig $config, string $toolVersion): self
     {
@@ -76,9 +77,10 @@ final readonly class AnalysisFingerprint
      * The display path is part of the key because it is part of every finding's
      * identity, so two byte-identical files at different paths never share an entry.
      *
-     * @param string $displayPath Project-relative display path.
-     * @param string $contents    Raw file bytes.
-     * @return string Hex cache key.
+     * @param string $displayPath - Project-relative display path.
+     * @param string $contents - Raw file bytes.
+     *
+     * @return string - Hex cache key.
      */
     public function forFile(string $displayPath, string $contents): string
     {

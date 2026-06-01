@@ -336,7 +336,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $displayPath Fixture display path.
+     * @param string $displayPath - Fixture display path.
      *
      * @return AnalysisUnit - the parsed fixture ready for rule analysis
      */
@@ -351,7 +351,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Build a fixture rule with the requested identifier.
      *
-     * @param string $id Rule identifier.
+     * @param string $id - Rule identifier.
      *
      * @return RuleInterface - an anonymous rule emitting one finding under the given id
      */
@@ -362,7 +362,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Build the anonymous fixture rule.
              *
-             * @param string $id Rule identifier.
+             * @param string $id - Rule identifier.
              */
             public function __construct(private string $id)
             {
@@ -389,8 +389,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit Analysis unit.
-             * @param RuleContext  $ruleContext  Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Analysis unit.
+             * @param RuleContext  $ruleContext - Rule context for the fixture.
              *
              * @return list<\GruffPhp\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
              */
@@ -443,8 +443,8 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return findings produced by the fixture rule.
              *
-             * @param AnalysisUnit $analysisUnit Analysis unit.
-             * @param RuleContext  $ruleContext  Rule context for the fixture.
+             * @param AnalysisUnit $analysisUnit - Analysis unit.
+             * @param RuleContext  $ruleContext - Rule context for the fixture.
              *
              * @return list<\GruffPhp\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
              */

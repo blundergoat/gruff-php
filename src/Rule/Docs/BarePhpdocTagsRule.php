@@ -31,7 +31,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Describe the bare PHPDoc tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +50,10 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     /**
      * Find docblocks that only list parameter or return tags.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for bare PHPDoc blocks.
+     * @return list<Finding> - Findings for bare PHPDoc blocks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -129,16 +129,15 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per docblock that carried only bare param/return tags with no descriptive prose.
         return $findings;
     }
 
     /**
      * Check whether one PHPDoc tag has a type but no description.
      *
-     * @param string $line Single trimmed docblock line, already stripped of comment markers, to classify.
+     * @param string $line - Single trimmed docblock line, already stripped of comment markers, to classify.
      *
-     * @return bool True when the tag is a bare parameter or return tag.
+     * @return bool - True when the tag is a bare parameter or return tag.
      */
     private function isBareParamOrReturnTag(string $line): bool
     {

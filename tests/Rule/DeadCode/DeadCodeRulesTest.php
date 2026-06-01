@@ -266,14 +266,13 @@ final class DeadCodeRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        // Keep only the requested rule so one fixture can be asserted against each dead-code rule independently.
         return array_values(array_filter($findings, static fn($finding) => $finding->ruleId === $ruleId));
     }
 
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rules report findings against
      */
@@ -281,7 +280,6 @@ final class DeadCodeRulesTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;
 
-        // Parsed unit carries the display path the rules report findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/DeadCode/' . $filename));
     }
 }

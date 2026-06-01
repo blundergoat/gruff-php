@@ -10,9 +10,9 @@ namespace GruffPhp\Source;
 final readonly class IgnoredPath
 {
     /**
-     * @param string      $path    Project-relative display path that was ignored.
-     * @param string      $source  Reason category: config, default, generated, or gitignore.
-     * @param string|null $pattern Matching glob, directory token, filename, or git rule.
+     * @param string      $path - Project-relative display path that was ignored.
+     * @param string      $source - Reason category: config, default, generated, or gitignore.
+     * @param string|null $pattern - Matching glob, directory token, filename, or git rule.
      */
     public function __construct(
         public string  $path,
@@ -24,8 +24,8 @@ final readonly class IgnoredPath
     /**
      * Build an ignored-path detail from a path and the engine decision that excluded it.
      *
-     * @param string         $path     Display path that was ignored.
-     * @param IgnoreDecision $decision Engine decision carrying the source and pattern.
+     * @param string         $path - Display path that was ignored.
+     * @param IgnoreDecision $decision - Engine decision carrying the source and pattern.
      *
      * @return self - immutable detail pairing the display path with the resolved source and matching pattern
      */

@@ -12,10 +12,10 @@ final readonly class SourceDiscoveryResult
     /**
      * Store discovered files plus missing and ignored path diagnostics.
      *
-     * @param list<SourceFile>  $files
-     * @param list<string>      $missingPaths
-     * @param list<string>      $ignoredPaths       Project-relative ignored paths (compatibility surface).
-     * @param list<IgnoredPath> $ignoredPathDetails Ignored paths enriched with source and matching pattern.
+     * @param list<SourceFile>  $files - Discovered source files in deterministic analysis order.
+     * @param list<string>      $missingPaths - Requested paths that could not be resolved.
+     * @param list<string>      $ignoredPaths - Project-relative ignored paths (compatibility surface).
+     * @param list<IgnoredPath> $ignoredPathDetails - Ignored paths enriched with source and matching pattern.
      */
     public function __construct(
         public array $files,
@@ -28,7 +28,7 @@ final readonly class SourceDiscoveryResult
     /**
      * Report whether any requested source path could not be resolved.
      *
-     * @return bool True when discovery recorded missing input paths.
+     * @return bool - True when discovery recorded missing input paths.
      */
     public function hasInputErrors(): bool
     {

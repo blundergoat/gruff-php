@@ -22,7 +22,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve a class-like declaration FQN.
      *
-     * @param Class_|Interface_|Trait_|Enum_ $node Class-like declaration.
+     * @param Class_|Interface_|Trait_|Enum_ $node - Class-like declaration.
      *
      * @return string|null - declaration FQN, or null for anonymous classes
      */
@@ -43,7 +43,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve a function declaration FQN.
      *
-     * @param Function_ $function Function declaration.
+     * @param Function_ $function - Function declaration.
      *
      * @return string - fully qualified function name without a leading slash
      */
@@ -57,7 +57,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve a standalone constant declaration FQN.
      *
-     * @param Node\Const_ $constant Constant declaration.
+     * @param Node\Const_ $constant - Constant declaration.
      *
      * @return string - fully qualified constant name without a leading slash
      */
@@ -71,8 +71,8 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve a class-name reference.
      *
-     * @param Name $name       Name node to resolve.
-     * @param Node $originNode Node where the reference appears.
+     * @param Name $name - Name node to resolve.
+     * @param Node $originNode - Node where the reference appears.
      *
      * @return string|null - resolved FQN, or null when the name is contextual/dynamic
      */
@@ -98,8 +98,8 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve a function or constant name, including namespace fallback.
      *
-     * @param Name $name       Function/constant name.
-     * @param Node $originNode Node where the reference appears.
+     * @param Name $name - Function/constant name.
+     * @param Node $originNode - Node where the reference appears.
      *
      * @return list<string> - candidate FQNs; unqualified names include current-namespace and global fallback forms
      */
@@ -130,7 +130,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve the enclosing function-like declaration FQN.
      *
-     * @param Node $node Node whose parents are searched.
+     * @param Node $node - Node whose parents are searched.
      *
      * @return string|null - enclosing function-like FQN, or null outside function scope
      */
@@ -156,7 +156,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve the namespace prefix for a node.
      *
-     * @param Node $node Node whose parents are searched.
+     * @param Node $node - Node whose parents are searched.
      *
      * @return string - namespace prefix with trailing slash, or empty string in the global namespace
      */
@@ -177,7 +177,7 @@ final readonly class DeadCodeNameResolver
     /**
      * Resolve the enclosing class-like declaration FQN.
      *
-     * @param Node $node Node whose parents are searched.
+     * @param Node $node - Node whose parents are searched.
      *
      * @return string|null - enclosing class-like FQN, or null outside class-like scope
      */

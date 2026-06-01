@@ -194,8 +194,8 @@ final class ProjectDeadCodeRulesTest extends TestCase
     /**
      * Analyse the fixture and return symbols for one rule.
      *
-     * @param string              $ruleId Rule identifier to filter.
-     * @param AnalysisConfig|null $config Optional config override.
+     * @param string              $ruleId - Rule identifier to filter.
+     * @param AnalysisConfig|null $config - Optional config override.
      *
      * @return list<string> - symbols emitted by that rule in report order
      */
@@ -207,10 +207,10 @@ final class ProjectDeadCodeRulesTest extends TestCase
     /**
      * Analyse units and return symbols for one rule.
      *
-     * @param string              $ruleId      Rule identifier to filter.
-     * @param list<AnalysisUnit>  $units       Parsed units to analyse together.
-     * @param string              $projectRoot Project root used by rule context.
-     * @param AnalysisConfig|null $config      Optional config override.
+     * @param string              $ruleId - Rule identifier to filter.
+     * @param list<AnalysisUnit>  $units - Parsed units to analyse together.
+     * @param string              $projectRoot - Project root used by rule context.
+     * @param AnalysisConfig|null $config - Optional config override.
      *
      * @return list<string> - symbols emitted by that rule in report order
      */
@@ -235,9 +235,8 @@ final class ProjectDeadCodeRulesTest extends TestCase
     /**
      * Build a config override for a rule's options.
      *
-     * @param string                                                                 $ruleId  Rule identifier.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
-     *        Option overrides to merge over defaults.
+     * @param string                                                                 $ruleId - Rule identifier.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Option overrides to merge over defaults.
      *
      * @return AnalysisConfig - config with the requested rule options changed
      */
@@ -275,8 +274,8 @@ final class ProjectDeadCodeRulesTest extends TestCase
     /**
      * Parse one project-relative PHP file.
      *
-     * @param string $projectRoot Project root containing the file.
-     * @param string $displayPath Project-relative display path.
+     * @param string $projectRoot - Project root containing the file.
+     * @param string $displayPath - Project-relative display path.
      *
      * @return AnalysisUnit - parsed unit with display path relative to $projectRoot
      */
@@ -301,7 +300,7 @@ final class ProjectDeadCodeRulesTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Directory path.
+     * @param string $path - Directory path.
      *
      * @return void
      */

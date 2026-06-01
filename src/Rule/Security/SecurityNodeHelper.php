@@ -32,7 +32,7 @@ final class SecurityNodeHelper
     /**
      * Resolve a non-namespaced function call to its lower-case name.
      *
-     * @param FuncCall $call Function call node to inspect.
+     * @param FuncCall $call - Function call node to inspect.
      *
      * @return string|null - lower-cased global function name, or null for dynamic or namespaced calls that cannot match
      */
@@ -54,8 +54,8 @@ final class SecurityNodeHelper
     }
 
     /**
-     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args  Call argument nodes to inspect.
-     * @param int                                                  $index Zero-based argument index.
+     * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args - Call argument nodes to inspect.
+     * @param int                                                  $index - Zero-based argument index.
      *
      * @return Expr|null - unwrapped argument value at the index, or null when the slot is absent or a variadic spread
      */
@@ -74,7 +74,7 @@ final class SecurityNodeHelper
     /**
      * Resolve a constant fetch to its normalized constant name.
      *
-     * @param Node $node Node to inspect.
+     * @param Node $node - Node to inspect.
      *
      * @return string|null - upper-cased constant name, or null for namespaced or non-constant-fetch expressions
      */
@@ -98,7 +98,7 @@ final class SecurityNodeHelper
     /**
      * Determine whether a node statically represents a false-like value.
      *
-     * @param Node $node Node to inspect.
+     * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is the literal `false` or integer 0 (the disabled-flag values rules look for)
      */
@@ -124,7 +124,7 @@ final class SecurityNodeHelper
      * Also follows simple same-scope local assignments before the inspected
      * expression so sinks catch `$next = $_GET["next"]; header($next);`.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree reads request input directly or via a same-scope laundered local; false if clean
      */
@@ -142,7 +142,7 @@ final class SecurityNodeHelper
     /**
      * Detect direct reads from request superglobals within a node tree.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree directly reads a request superglobal; false ignores laundered locals
      */
@@ -162,7 +162,7 @@ final class SecurityNodeHelper
     /**
      * Detect local variables that were assigned request data earlier in the same scope.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the node reads a local filled from request input by an earlier same-scope assignment
      */
@@ -206,9 +206,9 @@ final class SecurityNodeHelper
     }
 
     /**
-     * @param list<Node\Stmt> $statements
-     * @param FunctionLike    $scope        Scope that owns the sink expression.
-     * @param int             $sinkPosition Byte offset of the sink expression.
+     * @param list<Node\Stmt> $statements - Statements in the owning function-like scope, walked up to the sink position.
+     * @param FunctionLike    $scope - Scope that owns the sink expression.
+     * @param int             $sinkPosition - Byte offset of the sink expression.
      *
      * @return array<string, true> - set of local variable names tainted at the sink, keyed by name; empty when none
      */
@@ -256,8 +256,8 @@ final class SecurityNodeHelper
     /**
      * Check whether a node references a known tainted variable.
      *
-     * @param Node                $node Node tree to inspect.
-     * @param array<string, true> $taintedVariables
+     * @param Node                $node - Node tree to inspect.
+     * @param array<string, true> $taintedVariables - Tainted local-variable names known at the current sink or assignment.
      *
      * @return bool - true when the tree reads any name in $taintedVariables, propagating taint to this expression
      */
@@ -277,7 +277,7 @@ final class SecurityNodeHelper
     /**
      * Return non-superglobal variable names referenced by a node tree.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return list<string> - deduplicated local variable names touched by the tree, superglobals excluded; empty when none
      */
@@ -304,7 +304,7 @@ final class SecurityNodeHelper
     /**
      * Find the function, method, or closure scope containing a node.
      *
-     * @param Node $node Node whose containing function-like scope is needed.
+     * @param Node $node - Node whose containing function-like scope is needed.
      *
      * @return FunctionLike|null - nearest enclosing function/method/closure, or null when the node lives at file scope
      */
@@ -328,7 +328,7 @@ final class SecurityNodeHelper
     /**
      * Detect string construction patterns that can hide unsafe concatenation.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when the tree builds a string via `.` concatenation or interpolation, which can splice in untrusted data
      */
@@ -347,7 +347,7 @@ final class SecurityNodeHelper
     /**
      * Identify literal string nodes for security-rule exemptions.
      *
-     * @param Node $node Node to inspect.
+     * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is a literal string scalar, so rules can exempt statically-trusted constant args
      */
@@ -360,7 +360,7 @@ final class SecurityNodeHelper
     /**
      * Build the display name used when reporting a function call.
      *
-     * @param FuncCall $call Function call node to describe.
+     * @param FuncCall $call - Function call node to describe.
      *
      * @return string - the resolved function name, or the label "dynamic function call" so findings never show an empty name
      */
@@ -375,7 +375,7 @@ final class SecurityNodeHelper
     /**
      * Resolve a method name to its lower-case string when statically known.
      *
-     * @param Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
+     * @param Expr\MethodCall|Expr\StaticCall $call - Call node to inspect.
      *
      * @return string|null - lower-cased method name, or null when the name is computed (e.g. $obj->$method())
      */
@@ -393,7 +393,7 @@ final class SecurityNodeHelper
     /**
      * Resolve a class node to a lower-case class name when statically known.
      *
-     * @param Node $class Class node from a new/static call.
+     * @param Node $class - Class node from a new/static call.
      *
      * @return string|null - lower-cased class name, FQCN-resolved when available, or null for dynamic/anonymous classes
      */
@@ -417,8 +417,8 @@ final class SecurityNodeHelper
     /**
      * Match a class node against exact FQCNs or short class names.
      *
-     * @param Node         $class      Class node from a new/static call.
-     * @param list<string> $classNames FQCNs or short class names to match.
+     * @param Node         $class - Class node from a new/static call.
+     * @param list<string> $classNames - FQCNs or short class names to match.
      *
      * @return bool - true when the resolved class equals a target FQCN or shares a short target's final namespace segment
      */
@@ -450,7 +450,7 @@ final class SecurityNodeHelper
     /**
      * Detect whether a node tree contains an HTTP(S) literal.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when a literal string in the tree starts with http:// or https://, used to gate URL-only sinks
      */
@@ -473,7 +473,7 @@ final class SecurityNodeHelper
     /**
      * Detect whether an expression references likely sensitive data.
      *
-     * @param Node $node Node tree to inspect.
+     * @param Node $node - Node tree to inspect.
      *
      * @return bool - true when a variable name, property, array key, string literal, or env read in the tree names a secret
      */
@@ -516,7 +516,7 @@ final class SecurityNodeHelper
     /**
      * Detect env-reader calls that request a sensitive key.
      *
-     * @param FuncCall $call Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
+     * @param FuncCall $call - Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
      *
      * @return bool - true when an env reader requests a secret-like key, or reads the whole environment via no argument
      */
@@ -541,7 +541,7 @@ final class SecurityNodeHelper
     /**
      * Detect secret-like words in identifiers or string keys.
      *
-     * @param string $contextText Identifier or string-key text to scan; the value itself, never a read secret.
+     * @param string $contextText - Identifier or string-key text to scan; the value itself, never a read secret.
      *
      * @return bool - true when the text matches the secret-name pattern (api key, token, password, secret, etc.)
      */

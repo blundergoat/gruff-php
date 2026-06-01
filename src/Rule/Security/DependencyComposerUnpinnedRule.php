@@ -34,7 +34,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Describe the unpinned Composer constraint rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -52,10 +52,10 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Find `require`/`require-dev` constraints that are unbounded or wildcarded.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unpinned constraints.
+     * @return list<Finding> - Findings for unpinned constraints.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -106,8 +106,9 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     /**
      * Decide whether a version constraint is unpinned (wildcard, branch, or unbounded).
      *
-     * @param string $constraint Raw Composer version constraint.
-     * @return bool True when the constraint allows unbounded or non-reproducible upgrades.
+     * @param string $constraint - Raw Composer version constraint.
+     *
+     * @return bool - True when the constraint allows unbounded or non-reproducible upgrades.
      */
     private function isUnpinned(string $constraint): bool
     {

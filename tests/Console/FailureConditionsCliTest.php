@@ -52,6 +52,7 @@ final class FailureConditionsCliTest extends CliTestCase
      * Verify a severity cap above the finding count passes with no failure reason.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testCountGatePassesWhenUnderCap(): void
@@ -69,6 +70,7 @@ final class FailureConditionsCliTest extends CliTestCase
      * Verify exceeding a severity cap reports a structured failure reason in JSON output.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testCountGateReportsStructuredFailureReason(): void
@@ -109,6 +111,7 @@ final class FailureConditionsCliTest extends CliTestCase
      * Verify the total cap fails the run regardless of severity distribution.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testTotalCapFails(): void
@@ -155,12 +158,12 @@ final class FailureConditionsCliTest extends CliTestCase
     /**
      * Build a gruff-php subprocess rooted at the temporary fixture project.
      *
-     * @param list<string> $args CLI arguments passed after the binary.
-     * @return Process Configured but unstarted process.
+     * @param list<string> $args - CLI arguments passed after the binary.
+     *
+     * @return Process - Configured but unstarted process.
      */
     private function runGruff(array $args): Process
     {
-        // Hand back an unstarted process so the caller can set timeouts before running it.
         return new Process(
             array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args),
             $this->project,
@@ -170,8 +173,9 @@ final class FailureConditionsCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
+     *
      * @return void
      */
     private function writeProjectFile(string $path, string $contents): void

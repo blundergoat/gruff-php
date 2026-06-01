@@ -30,7 +30,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Describe the process command construction rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final class ProcessCommandConstructionRule implements RuleInterface
     /**
      * Find process commands that include request-controlled expressions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for request-controlled process commands.
+     * @return list<Finding> - Findings for request-controlled process commands.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -88,19 +88,18 @@ final class ProcessCommandConstructionRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per shell-exec, Symfony Process, or fromShellCommandLine sink fed request data.
         return $findings;
     }
 
     /**
      * Build the process command finding.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path reported to the reviewer.
-     * @param Node         $node         Tainted sink node whose start line anchors the finding for the reviewer.
-     * @param string       $sink         Sink discriminator (shell-exec, symfony-process, process-shell-commandline)
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path reported to the reviewer.
+     * @param Node         $node - Tainted sink node whose start line anchors the finding for the reviewer.
+     * @param string       $sink - Sink discriminator (shell-exec, symfony-process, process-shell-commandline)
      *                                   echoed into the message and metadata so a reviewer sees which construct fired.
      *
-     * @return Finding Security finding.
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {

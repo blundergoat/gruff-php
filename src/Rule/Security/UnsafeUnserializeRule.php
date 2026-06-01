@@ -30,7 +30,7 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Describe the unsafe unserialize security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Find unserialize calls that can deserialize untrusted data.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unsafe unserialize calls.
+     * @return list<Finding> - Findings for unsafe unserialize calls.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -91,9 +91,9 @@ final class UnsafeUnserializeRule implements RuleInterface
     /**
      * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
      *
-     * @param Expr\FuncCall $call unserialize() call whose second argument is checked for an options array.
+     * @param Expr\FuncCall $call - unserialize() call whose second argument is checked for an options array.
      *
-     * @return bool True when object deserialization has been disabled by options.
+     * @return bool - True when object deserialization has been disabled by options.
      */
     private function hasAllowedClassesFalse(Expr\FuncCall $call): bool
     {

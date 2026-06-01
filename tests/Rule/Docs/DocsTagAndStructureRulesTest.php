@@ -417,7 +417,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     /**
      * Key constant PHPDoc findings by the reported constant name.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings Findings from a missing-constant-phpdoc fixture.
+     * @param list<\GruffPhp\Finding\Finding> $findings - Findings from a missing-constant-phpdoc fixture.
      *
      * @return array<string, \GruffPhp\Finding\Finding> - findings keyed by constant name; findings without a string name are omitted
      */

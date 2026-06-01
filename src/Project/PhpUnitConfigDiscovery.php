@@ -22,8 +22,9 @@ final class PhpUnitConfigDiscovery
     /**
      * Find and parse the first supported PHPUnit config file under a project root.
      *
-     * @param string $projectRoot Project root where PHPUnit config files are searched.
-     * @return PhpUnitConfig|null Parsed config when discovery succeeds.
+     * @param string $projectRoot - Project root where PHPUnit config files are searched.
+     *
+     * @return PhpUnitConfig|null - Parsed config when discovery succeeds.
      */
     public function discover(string $projectRoot): ?PhpUnitConfig
     {

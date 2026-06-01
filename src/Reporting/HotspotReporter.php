@@ -15,8 +15,9 @@ final readonly class HotspotReporter
     /**
      * Render top file offenders as a hotspot JSON payload.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string Pretty-printed hotspot JSON document.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - Pretty-printed hotspot JSON document.
      */
     public function render(AnalysisReport $report): string
     {

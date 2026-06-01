@@ -16,7 +16,7 @@ final readonly class MarkdownReporter
     /**
      * Render an analysis report as Markdown.
      *
-     * @param AnalysisReport $report Analysis report to render.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - the complete Markdown document (summary, branch review, pillars, findings) with a single trailing newline
      */
@@ -36,8 +36,8 @@ final readonly class MarkdownReporter
     /**
      * Append report-level summary lines.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -125,8 +125,8 @@ final readonly class MarkdownReporter
      * Surfaced before the per-pillar score so the rule-level shift is visible alongside
      * the composite (which can mask churn). See M06 / ADR-016.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -176,8 +176,8 @@ final readonly class MarkdownReporter
     /**
      * Append mutation summary lines.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -211,8 +211,8 @@ final readonly class MarkdownReporter
     /**
      * Append the branch-review section.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -239,8 +239,8 @@ final readonly class MarkdownReporter
      * data is sourced from the existing {@see PillarScore} entries without
      * recomputing severity counts or scores.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -284,7 +284,7 @@ final readonly class MarkdownReporter
      * {@see PillarScore} data so per-severity counts and scores are never
      * recomputed by the markdown reporter.
      *
-     * @param AnalysisReport $report Analysis report providing the optional score.
+     * @param AnalysisReport $report - Analysis report providing the optional score.
      *
      * @return list<PillarScore> - applicable pillars only, ordered findings DESC then pillar name ASC; empty when no score was computed
      */
@@ -309,15 +309,14 @@ final readonly class MarkdownReporter
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
 
-        // Hand back the applicable pillars in the canonical table order built above.
         return $rows;
     }
 
     /**
      * Append current findings.
      *
-     * @param list<string>   $lines  Markdown lines being built.
-     * @param AnalysisReport $report Analysis report to render.
+     * @param list<string>   $lines - Markdown lines being built.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return void
      */
@@ -337,7 +336,7 @@ final readonly class MarkdownReporter
     /**
      * Render one finding as a Markdown list item.
      *
-     * @param Finding $finding Finding to format; a null line omits the line suffix and a null symbol omits its token.
+     * @param Finding $finding - Finding to format; a null line omits the line suffix and a null symbol omits its token.
      *
      * @return string - one Markdown list item packing severity, rule id, location, optional symbol, and message
      */
@@ -360,10 +359,10 @@ final readonly class MarkdownReporter
     /**
      * Append finding groups details to report output.
      *
-     * @param list<string>  $lines      Markdown lines being built; mutated in place with the rendered group.
-     * @param string        $title      Section heading text, emitted only when $hasHeading is true.
-     * @param list<Finding> $findings   Findings to group by severity then file path; an empty list renders "None.".
-     * @param bool          $hasHeading Whether to print the section heading; false for the inline current-findings.
+     * @param list<string>  $lines - Markdown lines being built; mutated in place with the rendered group.
+     * @param string        $title - Section heading text, emitted only when $hasHeading is true.
+     * @param list<Finding> $findings - Findings to group by severity then file path; an empty list renders "None.".
+     * @param bool          $hasHeading - Whether to print the section heading; false for the inline current-findings.
      *
      * @return void
      */
@@ -414,7 +413,7 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * @param array<string, int> $counts
+     * @param array<string, int> $counts - Mutation status counts keyed by status label; empty means no mutants ran.
      *
      * @return string - comma-joined `status=count` pairs in the map's order; the literal "none" when no mutants ran
      */
@@ -435,7 +434,7 @@ final readonly class MarkdownReporter
     }
 
     /**
-     * @param array<string, int> $counts
+     * @param array<string, int> $counts - Mutation status counts keyed by status label; only context-only statuses are emitted.
      *
      * @return string|null - comma-joined `status=count` pairs for context-only statuses; null tells the caller to omit the line when none occurred
      */

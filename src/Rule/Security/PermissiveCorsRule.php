@@ -37,7 +37,7 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Describe the permissive-CORS rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Find a wildcard CORS origin paired with credentialed CORS in one file.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Permissive-CORS findings.
+     * @return list<Finding> - Permissive-CORS findings.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -121,8 +121,9 @@ final class PermissiveCorsRule implements RuleInterface
     /**
      * Build a stable grouping key for the enclosing function-like scope.
      *
-     * @param Node $node Header call node.
-     * @return string Scope key (function-like object id, or "file" at top level).
+     * @param Node $node - Header call node.
+     *
+     * @return string - Scope key (function-like object id, or "file" at top level).
      */
     private function scopeKey(Node $node): string
     {

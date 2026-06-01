@@ -12,8 +12,8 @@ final readonly class ChangedLineRange
     /**
      * Create an inclusive changed-line range.
      *
-     * @param int $startLine First changed line in the range.
-     * @param int $endLine   Last changed line in the range.
+     * @param int $startLine - First changed line in the range.
+     * @param int $endLine - Last changed line in the range.
      */
     public function __construct(
         public int $startLine,
@@ -24,8 +24,8 @@ final readonly class ChangedLineRange
     /**
      * Check whether this range overlaps another inclusive line span.
      *
-     * @param int $startLine First line in the compared range.
-     * @param int $endLine   Last line in the compared range.
+     * @param int $startLine - First line in the compared range.
+     * @param int $endLine - Last line in the compared range.
      *
      * @return bool - true when the spans share at least one line, including when they meet at a single endpoint
      */

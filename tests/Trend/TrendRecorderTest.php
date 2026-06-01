@@ -141,8 +141,8 @@ final class TrendRecorderTest extends TestCase
     /**
      * Verify record rejects invalid history JSON shapes.
      *
-     * @param InvalidHistoryPayload $historyPayload Invalid history payload.
-     * @param string                $message        Expected exception message.
+     * @param InvalidHistoryPayload $historyPayload - Invalid history payload.
+     * @param string                $message - Expected exception message.
      *
      * @return void
      */
@@ -193,13 +193,12 @@ final class TrendRecorderTest extends TestCase
     /**
      * Build a score report fixture for trend assertions.
      *
-     * @param float $score
+     * @param float $score - Composite score value to place in the trend fixture.
      *
      * @return ScoreReport - a minimal full-project report graded from the given score, with empty pillars and offenders
      */
     private function score(float $score): ScoreReport
     {
-        // Hand back a minimal full-project ScoreReport fixture graded from the given score.
         return new ScoreReport(
             composite:              Grade::fromScore($score),
             pillars:                [],
@@ -221,14 +220,13 @@ final class TrendRecorderTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the unique temp directory just created for the caller to populate.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

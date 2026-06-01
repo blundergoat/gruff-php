@@ -29,31 +29,31 @@ final readonly class AnalyseCommandOptions
     private const PROFILE_SECURITY = 'security';
 
     /**
-     * @param list<string>               $paths                Paths requested for analysis.
-     * @param bool                       $shouldIncludeIgnored Whether ignored files should be included.
-     * @param string|null                $configPath           Explicit config path supplied by the CLI.
-     * @param bool                       $noConfig             Whether config loading is disabled.
-     * @param bool                       $noCache              Whether the on-disk result cache is disabled for the run.
-     * @param string                     $profile              Rule execution profile requested for the run.
-     * @param MutationAnalysisOptions    $mutation             Parsed mutation-analysis options.
-     * @param string|null                $diffMode             Requested diff mode, when diff analysis is enabled.
-     * @param string|null                $since                Git base ref used for changed-region analysis.
-     * @param string|null                $changedRanges        Explicit changed ranges used for changed-region analysis.
-     * @param string                     $changedScope         Changed-region scope: symbol or hunk.
-     * @param string|null                $diffVs               Comparison ref used for diff and changed-only analysis.
-     * @param bool                       $isChangedOnly        Whether analysis should be restricted to changed files.
-     * @param string|null                $historyFile          Trend history file path, when configured.
-     * @param bool                       $noBaseline           Whether baseline loading and application are disabled.
-     * @param BaselineApplicationOptions $baseline             Parsed baseline application options.
-     * @param string                     $reportEditorLink     Editor-link style requested for reports.
-     * @param bool                       $isReportInteractive  Whether interactive report behavior is enabled.
-     * @param string|null                $pathsRelativeTo      Base path used to normalize reported paths.
-     * @param string|null                $minSeverity          Minimum severity filter requested for output.
-     * @param list<string>               $includePillars       Pillars explicitly included in report output.
-     * @param list<string>               $excludePillars       Pillars explicitly excluded from report output.
-     * @param list<string>               $includeRules         Rule IDs explicitly included in report output.
-     * @param list<string>               $excludeRules         Rule IDs explicitly excluded from report output.
-     * @param string|null                $optionError          First usage error discovered while parsing options.
+     * @param list<string>               $paths - Paths requested for analysis.
+     * @param bool                       $shouldIncludeIgnored - Whether ignored files should be included.
+     * @param string|null                $configPath - Explicit config path supplied by the CLI.
+     * @param bool                       $noConfig - Whether config loading is disabled.
+     * @param bool                       $noCache - Whether the on-disk result cache is disabled for the run.
+     * @param string                     $profile - Rule execution profile requested for the run.
+     * @param MutationAnalysisOptions    $mutation - Parsed mutation-analysis options.
+     * @param string|null                $diffMode - Requested diff mode, when diff analysis is enabled.
+     * @param string|null                $since - Git base ref used for changed-region analysis.
+     * @param string|null                $changedRanges - Explicit changed ranges used for changed-region analysis.
+     * @param string                     $changedScope - Changed-region scope: symbol or hunk.
+     * @param string|null                $diffVs - Comparison ref used for diff and changed-only analysis.
+     * @param bool                       $isChangedOnly - Whether analysis should be restricted to changed files.
+     * @param string|null                $historyFile - Trend history file path, when configured.
+     * @param bool                       $noBaseline - Whether baseline loading and application are disabled.
+     * @param BaselineApplicationOptions $baseline - Parsed baseline application options.
+     * @param string                     $reportEditorLink - Editor-link style requested for reports.
+     * @param bool                       $isReportInteractive - Whether interactive report behavior is enabled.
+     * @param string|null                $pathsRelativeTo - Base path used to normalize reported paths.
+     * @param string|null                $minSeverity - Minimum severity filter requested for output.
+     * @param list<string>               $includePillars - Pillars explicitly included in report output.
+     * @param list<string>               $excludePillars - Pillars explicitly excluded from report output.
+     * @param list<string>               $includeRules - Rule IDs explicitly included in report output.
+     * @param list<string>               $excludeRules - Rule IDs explicitly excluded from report output.
+     * @param string|null                $optionError - First usage error discovered while parsing options.
      */
     public function __construct(
         public array                      $paths,
@@ -91,7 +91,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Build an options object from the Symfony Console InputInterface, recording any usage errors found.
      *
-     * @param InputInterface $input Console input to normalize into analyse options.
+     * @param InputInterface $input - Console input to normalize into analyse options.
      *
      * @return self - fully populated options bag whose optionError carries the first usage error, if any.
      */
@@ -130,7 +130,6 @@ final readonly class AnalyseCommandOptions
                                   ));
         }
 
-        // Hand back the fully normalised options bag; any usage error found above rides along in optionError.
         return new self(
             paths:                $paths,
             shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
@@ -179,7 +178,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy with the mutation budget set (used after parsing the `--mutation-budget` value).
      *
-     * @param int|null $mutationBudget Mutation score budget, or null when unset.
+     * @param int|null $mutationBudget - Mutation score budget, or null when unset.
      *
      * @return self - a new options bag identical to this one but with the mutation budget swapped in.
      */
@@ -226,7 +225,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Return a copy that auto-applies the project's default baseline when one exists and no other baseline flag is set.
      *
-     * @param string $projectRoot Project root used to look for the default baseline file.
+     * @param string $projectRoot - Project root used to look for the default baseline file.
      *
      * @return self - a copy with the implicit default baseline applied, or this same instance unchanged when it cannot apply.
      */
@@ -374,7 +373,7 @@ final readonly class AnalyseCommandOptions
     /**
      * Parse the `--report-interactive` option; returns true/false or a usage-error message string.
      *
-     * @param InputInterface $input Console input whose `--report-interactive` flag and value are inspected.
+     * @param InputInterface $input - Console input whose `--report-interactive` flag and value are inspected.
      *
      * @return bool|string - the resolved interactive flag when well-formed, or a usage-error message string when the value is unrecognised.
      */
@@ -413,8 +412,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a string option and return it only when non-empty; otherwise null.
      *
-     * @param InputInterface $input Console input the option is read from.
-     * @param string         $name  Option name without the leading dashes.
+     * @param InputInterface $input - Console input the option is read from.
+     * @param string         $name - Option name without the leading dashes.
      *
      * @return string|null - the option value when a non-empty string, or null so callers can apply a null-coalescing default for absent or empty
      *                     input.
@@ -430,8 +429,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a repeatable string option without comma expansion.
      *
-     * @param InputInterface $input Console input the repeated option is read from.
-     * @param string         $name  Option name without the leading dashes; named in the error on a blank entry.
+     * @param InputInterface $input - Console input the repeated option is read from.
+     * @param string         $name - Option name without the leading dashes; named in the error on a blank entry.
      *
      * @return list<string>|string - the verbatim occurrence values (no comma splitting), or a usage-error message string when any occurrence is
      *                             blank.
@@ -463,8 +462,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Read a repeatable CLI option as a list of strings.
      *
-     * @param InputInterface $input Console input the repeated option is read from.
-     * @param string         $name  Option name without the leading dashes; each occurrence is comma-split and trimmed.
+     * @param InputInterface $input - Console input the repeated option is read from.
+     * @param string         $name - Option name without the leading dashes; each occurrence is comma-split and trimmed.
      *
      * @return list<string> - the comma-expanded, trimmed values from every occurrence, de-duplicated and re-keyed into a clean list.
      */
@@ -499,8 +498,8 @@ final readonly class AnalyseCommandOptions
     /**
      * Parse the `--diff` option: null when absent, "working-tree" when bare, or the explicit value.
      *
-     * @param InputInterface $input Console input whose `--diff` flag and value are inspected.
-     * @param list<string>   $paths Parsed positional and --file paths; a bare "-" entry selects stdin diff mode.
+     * @param InputInterface $input - Console input whose `--diff` flag and value are inspected.
+     * @param list<string>   $paths - Parsed positional and --file paths; a bare "-" entry selects stdin diff mode.
      *
      * @return string|null - "-" for stdin, "working-tree" for a bare --diff, the explicit ref otherwise, or null when --diff was not supplied.
      */

@@ -24,7 +24,7 @@ final readonly class StmtChildVisitor
     /**
      * Whether a node is a control-flow statement that owns child blocks.
      *
-     * @param Node $node Node to inspect.
+     * @param Node $node - Node to inspect.
      *
      * @return bool - true when the node is an If/For/Foreach/While/Do/Switch/TryCatch that childBlocks() walks; false otherwise
      */
@@ -45,7 +45,7 @@ final readonly class StmtChildVisitor
      *
      * Yields nothing for non-control-flow nodes.
      *
-     * @param Node $node Node to inspect.
+     * @param Node $node - Node to inspect.
      *
      * @return iterable<StmtChildBlock> - one block per child statement list in source order; empty for non-control-flow nodes
      */

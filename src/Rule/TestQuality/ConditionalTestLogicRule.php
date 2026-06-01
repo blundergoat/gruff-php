@@ -29,7 +29,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Describe the conditional test logic rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Find test cases that hide behavior behind conditionals.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for conditional logic inside tests.
+     * @return list<Finding> - Findings for conditional logic inside tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,9 +89,10 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
     /**
      * Check whether a project-configured path exemption applies.
      *
-     * @param string       $displayPath Repository-relative path of the analysed file, used as the fnmatch subject.
-     * @param list<string> $patterns    Glob patterns the caller configured to exempt known matrix-style test paths.
-     * @return bool True when the display path matches an ignored pattern.
+     * @param string       $displayPath - Repository-relative path of the analysed file, used as the fnmatch subject.
+     * @param list<string> $patterns - Glob patterns the caller configured to exempt known matrix-style test paths.
+     *
+     * @return bool - True when the display path matches an ignored pattern.
      */
     private function isPathIgnored(string $displayPath, array $patterns): bool
     {

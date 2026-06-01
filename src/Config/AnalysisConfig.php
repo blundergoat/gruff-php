@@ -32,14 +32,14 @@ final readonly class AnalysisConfig
     ];
 
     /**
-     * @param array<string, RuleSettings>  $rules                 Effective settings keyed by rule id.
-     * @param float                        $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection                $ruleSelection         Include/exclude rule selection for the run.
-     * @param list<string>                 $ignoredPathPatterns   Path patterns skipped during discovery.
-     * @param list<string>                 $acceptedAbbreviations Abbreviations accepted by naming rules.
-     * @param list<string>                 $allowedSecretPreviews Secret previews explicitly allowed by config.
-     * @param array<string, FailThreshold> $minimumSeverity       Per-command exit-code thresholds, keyed by command name.
-     * @param FailThresholds|null          $failureConditions     Severity-bucketed count gate from failureConditions config, when set.
+     * @param array<string, RuleSettings>  $rules - Effective settings keyed by rule id.
+     * @param float                        $minimumPhpVersion - Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection                $ruleSelection - Include/exclude rule selection for the run.
+     * @param list<string>                 $ignoredPathPatterns - Path patterns skipped during discovery.
+     * @param list<string>                 $acceptedAbbreviations - Abbreviations accepted by naming rules.
+     * @param list<string>                 $allowedSecretPreviews - Secret previews explicitly allowed by config.
+     * @param array<string, FailThreshold> $minimumSeverity - Per-command exit-code thresholds, keyed by command name.
+     * @param FailThresholds|null          $failureConditions - Severity-bucketed count gate from failureConditions config, when set.
      *
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
@@ -61,9 +61,9 @@ final readonly class AnalysisConfig
     /**
      * Build default settings for every rule in the registry.
      *
-     * @param RuleRegistry $registry Rule registry supplying default rule definitions.
+     * @param RuleRegistry $registry - Rule registry supplying default rule definitions.
      *
-     * @return self Config initialised with registry defaults.
+     * @return self - Config initialised with registry defaults.
      */
     public static function fromRegistry(RuleRegistry $registry): self
     {
@@ -86,7 +86,7 @@ final readonly class AnalysisConfig
     /**
      * Return the configured settings for a known rule id.
      *
-     * @param string $ruleId Rule identifier to read.
+     * @param string $ruleId - Rule identifier to read.
      *
      * @return RuleSettings - effective settings for the rule; never null since an unknown id throws instead
      * @throws InvalidArgumentException When the rule id is unknown.
@@ -101,10 +101,10 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with one rule's settings replaced.
      *
-     * @param string       $ruleId   Rule identifier to replace.
-     * @param RuleSettings $settings New settings for the rule.
+     * @param string       $ruleId - Rule identifier to replace.
+     * @param RuleSettings $settings - New settings for the rule.
      *
-     * @return self Config carrying the updated rule settings.
+     * @return self - Config carrying the updated rule settings.
      * @throws InvalidArgumentException When the rule id is unknown.
      */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
@@ -143,9 +143,9 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different minimum PHP version.
      *
-     * @param float $minimumPhpVersion New minimum PHP version floor.
+     * @param float $minimumPhpVersion - New minimum PHP version floor.
      *
-     * @return self Config carrying the updated PHP version floor.
+     * @return self - Config carrying the updated PHP version floor.
      */
     public function withMinimumPhpVersion(float $minimumPhpVersion): self
     {
@@ -187,9 +187,9 @@ final readonly class AnalysisConfig
     /**
      * Return a copy with a different rule selection.
      *
-     * @param RuleSelection $ruleSelection Rule include/exclude selection to apply.
+     * @param RuleSelection $ruleSelection - Rule include/exclude selection to apply.
      *
-     * @return self Config carrying the updated rule selection.
+     * @return self - Config carrying the updated rule selection.
      */
     public function withRuleSelection(RuleSelection $ruleSelection): self
     {
@@ -218,9 +218,9 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $ignoredPathPatterns Path patterns skipped during discovery.
+     * @param list<string> $ignoredPathPatterns - Path patterns skipped during discovery.
      *
-     * @return self Config carrying the updated ignored path patterns.
+     * @return self - Config carrying the updated ignored path patterns.
      */
     public function withIgnoredPathPatterns(array $ignoredPathPatterns): self
     {
@@ -252,9 +252,9 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $acceptedAbbreviations Abbreviations accepted by naming rules.
+     * @param list<string> $acceptedAbbreviations - Abbreviations accepted by naming rules.
      *
-     * @return self Config carrying the updated accepted abbreviation list.
+     * @return self - Config carrying the updated accepted abbreviation list.
      */
     public function withAcceptedAbbreviations(array $acceptedAbbreviations): self
     {
@@ -284,9 +284,9 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param list<string> $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * @param list<string> $allowedSecretPreviews - Secret previews explicitly allowed by config.
      *
-     * @return self Config carrying the updated allowed secret preview list.
+     * @return self - Config carrying the updated allowed secret preview list.
      */
     public function withAllowedSecretPreviews(array $allowedSecretPreviews): self
     {
@@ -306,9 +306,9 @@ final readonly class AnalysisConfig
     /**
      * Return the per-command exit-code threshold for the named gating command.
      *
-     * @param string $command Gating command name (analyse, report, dashboard).
+     * @param string $command - Gating command name (analyse, report, dashboard).
      *
-     * @return FailThreshold|null Configured threshold for the command, or null when unset.
+     * @return FailThreshold|null - Configured threshold for the command, or null when unset.
      */
     public function failThresholdFor(string $command): ?FailThreshold
     {
@@ -317,9 +317,9 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param array<string, FailThreshold> $minimumSeverity Per-command exit-code thresholds keyed by command name.
+     * @param array<string, FailThreshold> $minimumSeverity - Per-command exit-code thresholds keyed by command name.
      *
-     * @return self Config carrying the updated minimumSeverity map.
+     * @return self - Config carrying the updated minimumSeverity map.
      */
     public function withMinimumSeverity(array $minimumSeverity): self
     {
@@ -339,7 +339,7 @@ final readonly class AnalysisConfig
     /**
      * Return the severity-bucketed count gate from failureConditions config, when set.
      *
-     * @return FailThresholds|null Configured failure-condition thresholds, or null when unset.
+     * @return FailThresholds|null - Configured failure-condition thresholds, or null when unset.
      */
     public function failureConditions(): ?FailThresholds
     {
@@ -348,9 +348,9 @@ final readonly class AnalysisConfig
     }
 
     /**
-     * @param FailThresholds|null $failureConditions Severity-bucketed count gate to apply, or null to clear it.
+     * @param FailThresholds|null $failureConditions - Severity-bucketed count gate to apply, or null to clear it.
      *
-     * @return self Config carrying the updated failure conditions.
+     * @return self - Config carrying the updated failure conditions.
      */
     public function withFailureConditions(?FailThresholds $failureConditions): self
     {

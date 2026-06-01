@@ -19,9 +19,9 @@ final readonly class HtmlReporter
     /**
      * Build the HTML reporter with the project root and editor-link preferences.
      *
-     * @param string $projectRoot Project root used to build editor links.
-     * @param string $editorLink  Editor-link mode used in finding rows.
-     * @param bool   $interactive Whether interactive filtering controls should be included.
+     * @param string $projectRoot - Project root used to build editor links.
+     * @param string $editorLink - Editor-link mode used in finding rows.
+     * @param bool   $interactive - Whether interactive filtering controls should be included.
      */
     public function __construct(
         private string $projectRoot = '',
@@ -33,7 +33,7 @@ final readonly class HtmlReporter
     /**
      * Render the full inspection report as a single HTML document.
      *
-     * @param AnalysisReport $report Analysis report to render.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - a complete standalone HTML document (doctype through closing html), inlining the styles and the filter script in interactive
      *                mode
@@ -77,7 +77,7 @@ final readonly class HtmlReporter
     /**
      * Render the report masthead (brand, paths, scope, format).
      *
-     * @param AnalysisReport $report Report whose requested paths, diff scope, format, and tool version label the header.
+     * @param AnalysisReport $report - Report whose requested paths, diff scope, format, and tool version label the header.
      *
      * @return string - the masthead header fragment carrying the brand, the resolved paths/scope/format meta panel, and the tool version
      */
@@ -103,7 +103,7 @@ final readonly class HtmlReporter
     /**
      * Render the diagnostics section listing run messages, or empty when there are none.
      *
-     * @param AnalysisReport $report Report whose run diagnostics drive the section; an empty list omits it entirely.
+     * @param AnalysisReport $report - Report whose run diagnostics drive the section; an empty list omits it entirely.
      *
      * @return string - the diagnostics section wrapping one row per run message, or an empty string when there are no diagnostics
      */
@@ -125,12 +125,12 @@ final readonly class HtmlReporter
     }
 
     /**
-     * @param string                                                     $grade        Composite letter grade already resolved by the caller;
+     * @param string                                                     $grade - Composite letter grade already resolved by the caller;
      *                                                                                 rendered into the grade stamp.
-     * @param string                                                     $numericScore Pre-formatted "NN.NN / 100" score string, or "n/a" when no
+     * @param string                                                     $numericScore - Pre-formatted "NN.NN / 100" score string, or "n/a" when no
      *                                                                                 score was computed.
-     * @param array{advisory: int, warning: int, error: int, total: int} $counts
-     * @param AnalysisReport                                             $report       Report supplying the per-pillar context for the verdict
+     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity tallies for the visible findings in this report.
+     * @param AnalysisReport                                             $report - Report supplying the per-pillar context for the verdict
      *                                                                                 summary sentence.
      *
      * @return string - the verdict section pairing the grade stamp with the summary headline, severity tallies, and score-driver context
@@ -164,7 +164,7 @@ final readonly class HtmlReporter
      * grade, score (2dp), findings, and per-severity counts, sorted by
      * findings DESC then pillar ASC.
      *
-     * @param AnalysisReport $report Report whose applicable pillar scores populate the table (mutation excluded).
+     * @param AnalysisReport $report - Report whose applicable pillar scores populate the table (mutation excluded).
      *
      * @return string - the pillars section table, one row per applicable pillar, or a "No pillars." placeholder row when none apply
      */
@@ -197,7 +197,7 @@ final readonly class HtmlReporter
     /**
      * Render the top-offenders table sorted by score.
      *
-     * @param AnalysisReport $report Report whose score supplies the ranked offender files; no score yields an empty table.
+     * @param AnalysisReport $report - Report whose score supplies the ranked offender files; no score yields an empty table.
      *
      * @return string - the top-offenders section table, one row per ranked file, or a "No offenders found." placeholder when there are none
      */
@@ -222,7 +222,7 @@ final readonly class HtmlReporter
     /**
      * Render the cyclomatic-complexity distribution histogram.
      *
-     * @param AnalysisReport $report Report whose complexity distribution buckets become histogram bars; empty renders a flat chart.
+     * @param AnalysisReport $report - Report whose complexity distribution buckets become histogram bars; empty renders a flat chart.
      *
      * @return string - the distribution chart section: the summary sentence, one histogram bar per CC bucket, and the bucket-label axis
      */
@@ -250,7 +250,7 @@ final readonly class HtmlReporter
     /**
      * Render the flagged-findings section with optional interactive filters.
      *
-     * @param AnalysisReport $report Report whose findings become rows; the filter form is added only in interactive mode.
+     * @param AnalysisReport $report - Report whose findings become rows; the filter form is added only in interactive mode.
      *
      * @return string - the flagged-findings section: the optional filter form, one card per finding, or a "No findings." placeholder when empty
      */
@@ -279,7 +279,7 @@ final readonly class HtmlReporter
     /**
      * Render the report footer with tool version and schema id.
      *
-     * @param AnalysisReport $report Report supplying the tool version shown in the footer (schema id is a class constant).
+     * @param AnalysisReport $report - Report supplying the tool version shown in the footer (schema id is a class constant).
      *
      * @return string - the footer band carrying the tool version, the tagline, and the schema id
      */
@@ -296,7 +296,7 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the canonical pillars table.
      *
-     * @param PillarScore $pillar Pillar score for this row; a null grade renders "n/a" and a neutral grade pill.
+     * @param PillarScore $pillar - Pillar score for this row; a null grade renders "n/a" and a neutral grade pill.
      *
      * @return string - one table row pairing the pillar name and grade pill with its score, finding total, and per-severity counts
      */
@@ -324,7 +324,7 @@ final readonly class HtmlReporter
      * data without recomputing severity counts or scores. The mutation pillar
      * is excluded so the HTML keeps mutation details in findings.
      *
-     * @param AnalysisReport $report Report whose pillar scores are filtered and sorted; a null score yields no rows.
+     * @param AnalysisReport $report - Report whose pillar scores are filtered and sorted; a null score yields no rows.
      *
      * @return list<PillarScore> - applicable, mutation-excluded pillars in table display order (findings DESC, then pillar ASC); empty when no score
      */
@@ -353,7 +353,6 @@ final readonly class HtmlReporter
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
 
-        // Hand back the applicable, mutation-excluded pillars in the table's display order.
         return $rows;
     }
 
@@ -361,8 +360,8 @@ final readonly class HtmlReporter
      * Return the CSS tier class for a per-severity count cell. Zero-valued
      * cells stay neutral so a clean pillar reads as visually quiet.
      *
-     * @param int    $count Number of findings at this severity; zero suppresses the colour class.
-     * @param string $tier  CSS class applied when the count is positive (for example "note", "warn", "fail").
+     * @param int    $count - Number of findings at this severity; zero suppresses the colour class.
+     * @param string $tier - CSS class applied when the count is positive (for example "note", "warn", "fail").
      *
      * @return string - the tier class when the count is positive, or an empty string for a zero count so the cell stays neutral
      */
@@ -375,7 +374,7 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the top-offenders table.
      *
-     * @param FileScore $file Per-file score for this row; complexity and LOC metrics may be null and render "n/a".
+     * @param FileScore $file - Per-file score for this row; complexity and LOC metrics may be null and render "n/a".
      *
      * @return string - one table row pairing the file path and grade pill with its cyclomatic, cognitive, LOC, and finding metrics
      */
@@ -395,7 +394,7 @@ final readonly class HtmlReporter
     /**
      * Render a single flagged-finding row with severity, rule, and location.
      *
-     * @param Finding $finding Finding to render; its fields also become data-* filter attributes in interactive mode.
+     * @param Finding $finding - Finding to render; its fields also become data-* filter attributes in interactive mode.
      *
      * @return string - one finding card: the severity badge, rule id, message, location, and pillar, plus filter data-* attributes in interactive
      *                mode
@@ -431,8 +430,8 @@ final readonly class HtmlReporter
     /**
      * Render a label-value pair for the masthead meta panel.
      *
-     * @param string $label       Short uppercase key shown on the left (for example "paths", "scope", "format").
-     * @param string $displayText Already-resolved value text shown on the right; escaped here, not by the caller.
+     * @param string $label - Short uppercase key shown on the left (for example "paths", "scope", "format").
+     * @param string $displayText - Already-resolved value text shown on the right; escaped here, not by the caller.
      *
      * @return string - one meta-panel row: the label and its value, both HTML-escaped here
      */
@@ -449,9 +448,9 @@ final readonly class HtmlReporter
     /**
      * Render a single statistic block inside the verdict stats grid.
      *
-     * @param string $number Pre-stringified count shown large (the caller casts the integer total/severity tally).
-     * @param string $label  Lowercase caption under the number (for example "findings", "errors").
-     * @param string $class  Severity colour class for the number ("fail", "warn", "note"), or empty for the neutral total.
+     * @param string $number - Pre-stringified count shown large (the caller casts the integer total/severity tally).
+     * @param string $label - Lowercase caption under the number (for example "findings", "errors").
+     * @param string $class - Severity colour class for the number ("fail", "warn", "note"), or empty for the neutral total.
      *
      * @return string - one stat tile: the large count, its caption, and the optional severity colour class on the number
      */
@@ -469,7 +468,7 @@ final readonly class HtmlReporter
     /**
      * Render concise score-context notes for the HTML report.
      *
-     * @param AnalysisReport $report Report whose score, diff, baseline, filters, and mutation inputs become driver notes.
+     * @param AnalysisReport $report - Report whose score, diff, baseline, filters, and mutation inputs become driver notes.
      *
      * @return string - the "score drivers" list of explanation, diff, baseline-movement, filter, and mutation notes, or an empty string when no
      *                score exists
@@ -530,7 +529,7 @@ final readonly class HtmlReporter
     /**
      * Stringify an optional integer; null renders as "n/a".
      *
-     * @param int|null $integer Metric value, or null when the offender row has no measurement for that column.
+     * @param int|null $integer - Metric value, or null when the offender row has no measurement for that column.
      *
      * @return string - the integer as a decimal string, or "n/a" when the value is null so empty cells read explicitly
      */
@@ -541,9 +540,9 @@ final readonly class HtmlReporter
     }
 
     /**
-     * @param AnalysisReport                                             $report Report whose findings are scanned to count the distinct pillars
+     * @param AnalysisReport                                             $report - Report whose findings are scanned to count the distinct pillars
      *                                                                           carrying warnings/errors.
-     * @param array{advisory: int, warning: int, error: int, total: int} $counts
+     * @param array{advisory: int, warning: int, error: int, total: int} $counts - Severity tallies used to decide whether the summary is clean or thresholded.
      *
      * @return string - a one-line summary: the reassuring no-findings sentence, or the warning/error count and the number of pillars they span
      */
@@ -576,7 +575,7 @@ final readonly class HtmlReporter
     }
 
     /**
-     * @param array<string, int> $distribution
+     * @param array<string, int> $distribution - Complexity bucket counts keyed by range label; absent buckets are treated as zero.
      *
      * @return string - a one-line summary of how many methods exceed CC 10, with the per-bucket split across 11-15, 16-20, and 21+
      */
@@ -602,8 +601,8 @@ final readonly class HtmlReporter
     /**
      * Render a clickable file-and-line span; emits an editor-link anchor when configured.
      *
-     * @param string   $filePath Report-relative or absolute path shown to the reader and carried in data-path.
-     * @param int|null $line     Line number appended after a colon, or null to show the path alone (used for file-level rows).
+     * @param string   $filePath - Report-relative or absolute path shown to the reader and carried in data-path.
+     * @param int|null $line - Line number appended after a colon, or null to show the path alone (used for file-level rows).
      *
      * @return string - the path (with optional line) as a clickable editor-link anchor when one is configured, otherwise an inert focusable span
      *                that still copies via data-path
@@ -631,8 +630,8 @@ final readonly class HtmlReporter
     /**
      * Build the editor-link URL for the configured editor, or null when disabled.
      *
-     * @param string   $filePath Path to open; resolved to absolute before being encoded into the editor URL.
-     * @param int|null $line     Target line for the editor to jump to, or null to open the file without a line anchor.
+     * @param string   $filePath - Path to open; resolved to absolute before being encoded into the editor URL.
+     * @param int|null $line - Target line for the editor to jump to, or null to open the file without a line anchor.
      *
      * @return string|null - the vscode:// or phpstorm:// URL opening the file at the line, or null when editor links are off or the configured
      *                     editor is unsupported
@@ -657,8 +656,8 @@ final readonly class HtmlReporter
     /**
      * Build a VS Code file protocol URL for Unix, Windows drive, and UNC paths.
      *
-     * @param string   $absolutePath Absolute filesystem path; separators are normalised and each segment URL-encoded.
-     * @param int|null $line         Line to open at, appended as ":line", or null to open the file without a line anchor.
+     * @param string   $absolutePath - Absolute filesystem path; separators are normalised and each segment URL-encoded.
+     * @param int|null $line - Line to open at, appended as ":line", or null to open the file without a line anchor.
      *
      * @return string - a vscode://file URL with each path segment URL-encoded (Windows drive colon preserved) and the optional ":line" anchor
      *                appended
@@ -688,7 +687,7 @@ final readonly class HtmlReporter
     /**
      * Resolve the absolute path of a report-relative file path, using the configured project root.
      *
-     * @param string $filePath Path from a finding; already-absolute paths pass through, relative ones join the project root.
+     * @param string $filePath - Path from a finding; already-absolute paths pass through, relative ones join the project root.
      *
      * @return string - the path unchanged when already absolute, otherwise the relative path joined onto the project root (falling back to cwd)
      */
@@ -712,7 +711,7 @@ final readonly class HtmlReporter
     /**
      * Render the interactive filter form for findings (severity, pillar, path, text, group-by).
      *
-     * @param AnalysisReport $report Report whose findings supply the distinct pillar options and the total finding count.
+     * @param AnalysisReport $report - Report whose findings supply the distinct pillar options and the total finding count.
      *
      * @return string - the filter form: the severity and pillar multi-selects, path and search inputs, group-by radios, and the live finding count
      */
@@ -756,7 +755,7 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the diagnostics list.
      *
-     * @param RunDiagnostic $diagnostic Diagnostic whose type, message, and optional location populate the row.
+     * @param RunDiagnostic $diagnostic - Diagnostic whose type, message, and optional location populate the row.
      *
      * @return string - one diagnostic line: the type label, the message, and (when present) the file/line it points at
      */
@@ -774,7 +773,7 @@ final readonly class HtmlReporter
     /**
      * Render the file-and-line span for a diagnostic, or empty when no location is set.
      *
-     * @param RunDiagnostic $diagnostic Diagnostic whose filePath or path locates it; a line is appended only with a filePath.
+     * @param RunDiagnostic $diagnostic - Diagnostic whose filePath or path locates it; a line is appended only with a filePath.
      *
      * @return string - the location span (filePath or path, with a line appended only alongside a filePath), or an empty string when no location is
      *                attached
@@ -799,7 +798,7 @@ final readonly class HtmlReporter
     /**
      * Escape a value for safe insertion into HTML attribute or text content.
      *
-     * @param string $text Untrusted text (path, message, label) to neutralise before it reaches the document.
+     * @param string $text - Untrusted text (path, message, label) to neutralise before it reaches the document.
      *
      * @return string - the text with HTML special characters and quotes escaped (and invalid bytes substituted) so it is safe in both attribute and
      *                text contexts

@@ -15,8 +15,8 @@ final readonly class DashboardServer
     /**
      * Create a dashboard server using the shared state factory and gruff-php binary path.
      *
-     * @param DashboardStateFactory $stateFactory Factory used to build dashboard state.
-     * @param string                $gruffBinary  Absolute gruff-php binary path used for scan requests.
+     * @param DashboardStateFactory $stateFactory - Factory used to build dashboard state.
+     * @param string                $gruffBinary - Absolute gruff-php binary path used for scan requests.
      */
     public function __construct(
         private DashboardStateFactory $stateFactory,
@@ -27,10 +27,10 @@ final readonly class DashboardServer
     /**
      * Bind the dashboard socket and process HTTP clients until the socket closes.
      *
-     * @param OutputInterface         $output                  Console output for the dashboard URL and errors.
-     * @param string                  $host                    Hostname or address to bind.
-     * @param int                     $port                    Port to bind.
-     * @param DashboardRequestContext $dashboardRequestContext Request context shared with handlers.
+     * @param OutputInterface         $output - Console output for the dashboard URL and errors.
+     * @param string                  $host - Hostname or address to bind.
+     * @param int                     $port - Port to bind.
+     * @param DashboardRequestContext $dashboardRequestContext - Request context shared with handlers.
      *
      * @return int - Command::SUCCESS on clean shutdown (socket closed), Command::FAILURE when the bind never succeeded
      */
@@ -75,9 +75,9 @@ final readonly class DashboardServer
     /**
      * Build the initial dashboard URL shown in console output.
      *
-     * @param string                  $host                    Bound host the browser should connect back to.
-     * @param int                     $port                    Bound TCP port to embed in the URL.
-     * @param DashboardRequestContext $dashboardRequestContext Request context whose input/projectRoot seed the default query string.
+     * @param string                  $host - Bound host the browser should connect back to.
+     * @param int                     $port - Bound TCP port to embed in the URL.
+     * @param DashboardRequestContext $dashboardRequestContext - Request context whose input/projectRoot seed the default query string.
      *
      * @return string - http URL the operator opens, pre-seeded with the launch options as the default query string
      */
@@ -95,7 +95,7 @@ final readonly class DashboardServer
     /**
      * Format a host for use in a browser URL.
      *
-     * @param string $host Bound host or address; an unbracketed IPv6 literal here gets wrapped.
+     * @param string $host - Bound host or address; an unbracketed IPv6 literal here gets wrapped.
      *
      * @return string - the host unchanged, except a bare IPv6 literal is wrapped in brackets for safe URL embedding
      */
@@ -113,7 +113,7 @@ final readonly class DashboardServer
     /**
      * Build the per-request dashboard handler.
      *
-     * @param DashboardRequestContext $dashboardRequestContext Request context threaded into the handler and its scan runner.
+     * @param DashboardRequestContext $dashboardRequestContext - Request context threaded into the handler and its scan runner.
      *
      * @return DashboardRequestHandler - handler pre-wired with its renderer, scan runner, and responder per connection
      */
@@ -129,12 +129,12 @@ final readonly class DashboardServer
     /**
      * Open the listening socket with PHP warnings suppressed so the caller handles bind failures.
      *
-     * @param string          $host         Host or address to bind; IPv6 literals are bracketed before use.
-     * @param int             $port         TCP port to bind.
-     * @param int|null        $errorCode    Receives the socket errno on failure; caller passes an unset variable to be filled.
-     * @param string|null     $errorMessage Receives the human-readable bind error on failure; pairs with $errorCode.
-     * @param-out int|null    $errorCode
-     * @param-out string|null $errorMessage
+     * @param string          $host - Host or address to bind; IPv6 literals are bracketed before use.
+     * @param int             $port - TCP port to bind.
+     * @param int|null        $errorCode - Receives the socket errno on failure; caller passes an unset variable to be filled.
+     * @param string|null     $errorMessage - Receives the human-readable bind error on failure; pairs with $errorCode.
+     * @param-out int|null    $errorCode - Socket errno on bind failure, null otherwise.
+     * @param-out string|null $errorMessage - Human-readable socket error on bind failure, null otherwise.
      *
      * @return resource|false - listening stream on success, or false when the bind fails (details in the out params)
      */
@@ -153,7 +153,7 @@ final readonly class DashboardServer
     /**
      * Accept one dashboard HTTP client connection.
      *
-     * @param resource $server
+     * @param resource $server - Listening stream created by createServer().
      *
      * @return resource|false - accepted client stream, or false on the 1s accept timeout or error so the loop retries
      */

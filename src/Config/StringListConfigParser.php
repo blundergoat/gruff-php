@@ -16,10 +16,10 @@ use GruffPhp\Support\PathHelper;
 final readonly class StringListConfigParser
 {
     /**
-     * @param ConfigValue $configValue     Raw config value to normalize.
-     * @param string      $path            Config path used in validation messages.
-     * @param bool        $hasPathPatterns Whether values are interpreted as path patterns.
-     * @param bool        $allowsGlobs     Whether glob-like wildcard patterns are accepted.
+     * @param ConfigValue $configValue - Raw config value to normalize.
+     * @param string      $path - Config path used in validation messages.
+     * @param bool        $hasPathPatterns - Whether values are interpreted as path patterns.
+     * @param bool        $allowsGlobs - Whether glob-like wildcard patterns are accepted.
      *
      * @return list<string> - deduplicated, reindexed strings in first-seen order; empty when the input list is empty
      * @throws ConfigException When the config value is not a valid string list.
@@ -44,11 +44,11 @@ final readonly class StringListConfigParser
     /**
      * Normalize one configured string and validate optional path-pattern rules.
      *
-     * @param mixed      $rawConfigValue  One list element; must be a non-empty string or the call throws.
-     * @param string     $path            Parent config key, prefixed onto error messages for locatability.
-     * @param int|string $index           Element's position in the list, appended to the key to pinpoint a bad entry.
-     * @param bool       $hasPathPatterns When true, the value must also pass project-relative path-pattern checks.
-     * @param bool       $allowsGlobs     When true, `*` wildcards are allowed; only read under $hasPathPatterns.
+     * @param mixed      $rawConfigValue - One list element; must be a non-empty string or the call throws.
+     * @param string     $path - Parent config key, prefixed onto error messages for locatability.
+     * @param int|string $index - Element's position in the list, appended to the key to pinpoint a bad entry.
+     * @param bool       $hasPathPatterns - When true, the value must also pass project-relative path-pattern checks.
+     * @param bool       $allowsGlobs - When true, `*` wildcards are allowed; only read under $hasPathPatterns.
      *
      * @return string - canonical form: input trimmed and every backslash folded to `/` for path comparison
      */
@@ -77,10 +77,10 @@ final readonly class StringListConfigParser
     /**
      * Reject path patterns that can escape the project or use disallowed globs.
      *
-     * @param string     $normalized  Already-normalized pattern to vet; must stay inside the project tree.
-     * @param string     $path        Parent config key, prefixed onto the rejection message for locatability.
-     * @param int|string $index       List position, appended to the key to pinpoint the offending entry.
-     * @param bool       $allowsGlobs When false, any `*` in the pattern is rejected as unsupported glob syntax.
+     * @param string     $normalized - Already-normalized pattern to vet; must stay inside the project tree.
+     * @param string     $path - Parent config key, prefixed onto the rejection message for locatability.
+     * @param int|string $index - List position, appended to the key to pinpoint the offending entry.
+     * @param bool       $allowsGlobs - When false, any `*` in the pattern is rejected as unsupported glob syntax.
      *
      * @return void
      */

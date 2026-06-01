@@ -64,8 +64,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Find private methods that are not referenced inside their class-like scope.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per private method unreferenced in its class-like; empty when none are dead
      */
@@ -98,14 +98,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             );
         }
 
-        // Hand back every unused-private-method finding gathered across the class-likes in this unit.
         return $findings;
     }
 
     /**
      * Collect private methods declared on a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private methods are collected.
      *
      * @return array<string, Stmt\ClassMethod> - candidate private declarations keyed by method name; empty when the class-like declares none
      */
@@ -124,15 +123,14 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
-        // Hand back the non-magic private declarations keyed by name, the candidates that must be referenced.
         return $privateMethods;
     }
 
     /**
      * Collect private method calls made inside a class-like node.
      *
-     * @param NodeFinder          $nodeFinder Reused tree walker that enumerates every node under the class-like body.
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param NodeFinder          $nodeFinder - Reused tree walker that enumerates every node under the class-like body.
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose body is searched for private method calls.
      *
      * @return array<string, true> - set of method names referenced anywhere in scope; a name's absence means it is unused
      */
@@ -149,14 +147,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
-        // Hand back the set of method names referenced anywhere in scope; absence here means unused.
         return $calledNames;
     }
 
     /**
      * Extract a private method name from `$this` or self/static calls.
      *
-     * @param Node $node Arbitrary node from the class-like body; only `$this`/self/static method calls yield a name.
+     * @param Node $node - Arbitrary node from the class-like body; only `$this`/self/static method calls yield a name.
      *
      * @return string|null - method name from a `$this->`/self/static call, or null when no such call shape matches
      */
@@ -187,7 +184,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract a method name from callable-array syntax.
      *
-     * @param Node $node Arbitrary node from the class-like body; only a `[$this, 'method']` array yields a name.
+     * @param Node $node - Arbitrary node from the class-like body; only a `[$this, 'method']` array yields a name.
      *
      * @return string|null - method name from a `[$this, 'method']` callable array, or null when the node is not that shape
      */
@@ -212,12 +209,12 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Build findings for unused methods in the dead-code rule.
      *
-     * @param AnalysisUnit                    $analysisUnit    Supplies the display path stamped on each finding; the
+     * @param AnalysisUnit                    $analysisUnit - Supplies the display path stamped on each finding; the
      *                                                         line span comes from each method node, not this unit.
-     * @param RuleDefinition                  $definition      Supplies the rule id, severity, pillar, and tier copied into every finding.
-     * @param Class_|Trait_|Enum_             $classLike
-     * @param array<string, Stmt\ClassMethod> $privateMethods
-     * @param array<string, true>             $calledNames
+     * @param RuleDefinition                  $definition - Supplies the rule id, severity, pillar, and tier copied into every finding.
+     * @param Class_|Trait_|Enum_             $classLike - Owner whose name prefixes each reported private method symbol.
+     * @param array<string, Stmt\ClassMethod> $privateMethods - Candidate private methods keyed by name.
+     * @param array<string, true>             $calledNames - Private method names observed in calls within the class-like scope.
      *
      * @return list<Finding> - one finding per private method whose name never appears in $calledNames; empty when all are used
      */
@@ -252,14 +249,13 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per private method whose name was never seen among the called names.
         return $findings;
     }
 
     /**
      * Check whether an expression is a `$this` callable-array reference.
      *
-     * @param Expr $expr Candidate array-item value to test for the `[$this, 'method']` callable pair.
+     * @param Expr $expr - Candidate array-item value to test for the `[$this, 'method']` callable pair.
      *
      * @return bool - true only for a two-element `[$this, 'method']` array literal; false for any other expression
      */
@@ -281,7 +277,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract the method name from a supported callable-array expression.
      *
-     * @param Expr $expr Callable-array value already vetted by isCallableReference for the `[$this, 'method']` shape.
+     * @param Expr $expr - Callable-array value already vetted by isCallableReference for the `[$this, 'method']` shape.
      *
      * @return string|null - the string in the array's second slot, or null when that slot is not a string literal
      */
@@ -301,7 +297,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Resolve a display name for a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $node
+     * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - declared class/trait/enum name, or an `@anonymous`/`unknown@line` placeholder when unnamed
      */

@@ -117,9 +117,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Assert how many findings one rule emitted.
      *
-     * @param string        $ruleId        Rule whose findings are isolated before counting.
-     * @param int           $expectedCount Findings the rule must report for this fixture.
-     * @param list<Finding> $findings      Full analysis output to filter by rule id.
+     * @param string        $ruleId - Rule whose findings are isolated before counting.
+     * @param int           $expectedCount - Findings the rule must report for this fixture.
+     * @param list<Finding> $findings - Full analysis output to filter by rule id.
      *
      * @return void
      */
@@ -135,8 +135,8 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string          $path   Project-relative fixture path to parse and scan.
-     * @param ?AnalysisConfig $config Override config; null applies the registry defaults.
+     * @param string          $path - Project-relative fixture path to parse and scan.
+     * @param ?AnalysisConfig $config - Override config; null applies the registry defaults.
      *
      * @return list<Finding> - every finding the full default rule set emitted for the fixture, unfiltered; empty when clean
      */
@@ -155,7 +155,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisUnit - the parsed fixture, repo-relative display path preserved, ready to feed the rule registry
      */

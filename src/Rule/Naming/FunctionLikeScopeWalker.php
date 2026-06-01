@@ -18,8 +18,9 @@ final class FunctionLikeScopeWalker
     /**
      * Build function-like scopes from top-level statements.
      *
-     * @param list<Node> $statements Top-level AST nodes for one parsed unit; the first node keys the scope cache.
-     * @return list<FunctionLikeScope> One scope per function-like, including nested ones, in discovery order.
+     * @param list<Node> $statements - Top-level AST nodes for one parsed unit; the first node keys the scope cache.
+     *
+     * @return list<FunctionLikeScope> - One scope per function-like, including nested ones, in discovery order.
      */
     public function scopes(array $statements): array
     {
@@ -38,14 +39,14 @@ final class FunctionLikeScopeWalker
             $this->discoverScopes($statement, $scopes);
         }
         $cache[$statements[0]] = ['count' => count($statements), 'scopes' => $scopes];
-        // Hand back every function-like scope discovered across the unit's statement tree.
         return $scopes;
     }
     /**
      * Recursively collect function-like scopes, descending only into scope bodies.
      *
-     * @param Node                    $node   Current AST node being visited in the depth-first walk.
-     * @param list<FunctionLikeScope> $scopes Accumulator appended to in place as scopes are discovered.
+     * @param Node                    $node - Current AST node being visited in the depth-first walk.
+     * @param list<FunctionLikeScope> $scopes - Accumulator appended to in place as scopes are discovered.
+     *
      * @return void
      */
     private function discoverScopes(Node $node, array &$scopes): void
@@ -65,9 +66,9 @@ final class FunctionLikeScopeWalker
     /**
      * Build one isolated scope description for a function-like node.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Function-like node whose own scope is described.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Function-like node whose own scope is described.
      *
-     * @return FunctionLikeScope Scope with parameters and local variables separated.
+     * @return FunctionLikeScope - Scope with parameters and local variables separated.
      */
     private function scopeFor(ClassMethod|Function_|Closure|ArrowFunction $node): FunctionLikeScope
     {
@@ -86,9 +87,9 @@ final class FunctionLikeScopeWalker
     /**
      * Return parameter names keyed for fast exclusion checks.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Node whose declared parameters are collected.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose declared parameters are collected.
      *
-     * @return array<string, true> Parameter names declared by the node.
+     * @return array<string, true> - Parameter names declared by the node.
      */
     private function parameterNames(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
@@ -102,10 +103,11 @@ final class FunctionLikeScopeWalker
         return $names;
     }
     /**
-     * @param list<Node>                                  $bodyDescendants Descendant nodes in this scope body.
-     * @param array<string, true>                         $parameterNames  Names to skip; parameters are not locals.
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node            Owning node; its `use` captures are skipped.
-     * @return array<string, Variable> First occurrence of each genuinely local variable, keyed by name.
+     * @param list<Node>                                  $bodyDescendants - Descendant nodes in this scope body.
+     * @param array<string, true>                         $parameterNames - Names to skip; parameters are not locals.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Owning node; its `use` captures are skipped.
+     *
+     * @return array<string, Variable> - First occurrence of each genuinely local variable, keyed by name.
      */
     private function localVariables(array $bodyDescendants, array $parameterNames, ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
@@ -130,8 +132,9 @@ final class FunctionLikeScopeWalker
     /**
      * List all descendant nodes inside a function-like body.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Node whose body subtree is flattened.
-     * @return list<Node> Every body descendant, excluding any nested function-like and its contents.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose body subtree is flattened.
+     *
+     * @return list<Node> - Every body descendant, excluding any nested function-like and its contents.
      */
     private function bodyDescendants(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
@@ -148,8 +151,9 @@ final class FunctionLikeScopeWalker
     /**
      * Append descendant nodes from a function-like body.
      *
-     * @param Node       $node        Current node in the body walk.
-     * @param list<Node> $descendants Accumulator appended to in place with the in-scope nodes.
+     * @param Node       $node - Current node in the body walk.
+     * @param list<Node> $descendants - Accumulator appended to in place with the in-scope nodes.
+     *
      * @return void
      */
     private function collectBodyDescendants(Node $node, array &$descendants): void
@@ -168,8 +172,9 @@ final class FunctionLikeScopeWalker
     /**
      * Return immediate body nodes for any supported function-like node.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Node whose direct body nodes are returned.
-     * @return list<Node> Body nodes to scan.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose direct body nodes are returned.
+     *
+     * @return list<Node> - Body nodes to scan.
      */
     private function bodyNodes(ClassMethod|Function_|Closure|ArrowFunction $node): array
     {
@@ -183,8 +188,9 @@ final class FunctionLikeScopeWalker
     /**
      * Name the function-like node shape for synthetic symbols.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Node whose kind label is derived.
-     * @return string One of method, function, closure, or arrow.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Node whose kind label is derived.
+     *
+     * @return string - One of method, function, closure, or arrow.
      */
     private function kind(ClassMethod|Function_|Closure|ArrowFunction $node): string
     {
@@ -199,8 +205,9 @@ final class FunctionLikeScopeWalker
     /**
      * Return direct child nodes for recursive body traversal.
      *
-     * @param Node $node Parent node whose sub-node slots are scanned for child nodes.
-     * @return list<Node> Child AST nodes.
+     * @param Node $node - Parent node whose sub-node slots are scanned for child nodes.
+     *
+     * @return list<Node> - Child AST nodes.
      */
     private function childNodes(Node $node): array
     {
@@ -214,8 +221,9 @@ final class FunctionLikeScopeWalker
     /**
      * Append traversable child nodes to the current collection.
      *
-     * @param mixed      $subNode  A single sub-node slot value: a Node, an array of them, or a scalar to ignore.
-     * @param list<Node> $children Accumulator appended to in place with any Node found in the slot.
+     * @param mixed      $subNode - A single sub-node slot value: a Node, an array of them, or a scalar to ignore.
+     * @param list<Node> $children - Accumulator appended to in place with any Node found in the slot.
+     *
      * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$children): void

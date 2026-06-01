@@ -386,7 +386,6 @@ PATCH;
      */
     public static function unsafeDiffModeProvider(): array
     {
-        // Each row feeds one ref argument the provider must reject as unsafe.
         return [
             'no-renames option'  => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
@@ -398,7 +397,7 @@ PATCH;
     /**
      * Verify Git diff provider rejects unsafe base refs.
      *
-     * @param string $mode Unsafe diff mode argument.
+     * @param string $mode - Unsafe diff mode argument.
      *
      * @return void
      */
@@ -423,14 +422,13 @@ PATCH;
     /**
      * Build a finding fixture for assertions.
      *
-     * @param string $filePath Finding file path.
-     * @param int    $line     Finding line number.
+     * @param string $filePath - Finding file path.
+     * @param int    $line - Finding line number.
      *
      * @return Finding - an advisory missing-public-phpdoc finding fixed at the given path and line for filter assertions
      */
     private function finding(string $filePath, int $line): Finding
     {
-        // Hand back a fixed finding so changed-region filtering can be asserted by file and line.
         return new Finding(
             ruleId:     'docs.missing-public-phpdoc',
             message:    'Example finding.',
@@ -446,8 +444,8 @@ PATCH;
     /**
      * Build an analysis unit fixture for changed-region filtering assertions.
      *
-     * @param string $displayPath Reporting path the parsed unit should carry in findings.
-     * @param string $source      PHP source the fixture unit is parsed from.
+     * @param string $displayPath - Reporting path the parsed unit should carry in findings.
+     * @param string $source - PHP source the fixture unit is parsed from.
      *
      * @return AnalysisUnit - the unit parsed from the source, reported under the supplied display path
      */
@@ -458,7 +456,6 @@ PATCH;
         file_put_contents($path, $source);
 
         try {
-            // Hand back the unit parsed from a throwaway file, reported under the caller's display path.
             return (new PhpFileParser())->parse(new SourceFile($path, $displayPath));
         } finally {
             unlink($path);
@@ -470,7 +467,6 @@ PATCH;
      */
     private function symbolScopeSource(): string
     {
-        // Hand back source with one edited and one untouched method so scope filtering can be tested.
         return <<<'PHP'
 <?php
 final class Example
@@ -514,15 +510,14 @@ PHP;
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the freshly created temp directory for the diff fixture repository.
         return $path;
     }
 
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
      *
      * @return void
      */
@@ -537,7 +532,7 @@ PHP;
     /**
      * Initialise a repository with two committed PHP files.
      *
-     * @param string $tempDir Fixture repository root.
+     * @param string $tempDir - Fixture repository root.
      *
      * @return void
      */
@@ -555,7 +550,7 @@ PHP;
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

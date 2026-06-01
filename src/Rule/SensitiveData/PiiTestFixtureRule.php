@@ -61,8 +61,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Find realistic PII-like values inside test fixture files.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> - one finding per realistic PII match left after allow-list and attribution filtering; empty for
      *                                         non-test paths or clean fixtures
@@ -115,7 +115,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Allow clearly synthetic example values.
      *
-     * @param string $candidateFixture Matched fixture text, lower-cased here before substring checks.
+     * @param string $candidateFixture - Matched fixture text, lower-cased here before substring checks.
      *
      * @return bool - true to suppress the match as a known-synthetic example (reserved domain or 555-010x phone block); false lets it be flagged
      */
@@ -135,8 +135,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Ignore email addresses that appear in attribution or copyright lines.
      *
-     * @param string $source Full unit source, used to recover the physical line around the match.
-     * @param int    $offset Byte offset of the email match within the source.
+     * @param string $source - Full unit source, used to recover the physical line around the match.
+     * @param int    $offset - Byte offset of the email match within the source.
      *
      * @return bool - true when the email sits on an author/copyright line (maintainer metadata, not fixture PII) and should be skipped
      */

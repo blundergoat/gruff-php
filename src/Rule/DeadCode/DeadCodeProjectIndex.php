@@ -83,8 +83,8 @@ final class DeadCodeProjectIndex
     /**
      * Reset and configure this project index for one analysis pass.
      *
-     * @param RuleContext    $ruleContext Project root and effective config.
-     * @param RuleDefinition $definition  Rule definition whose options drive ownership and escape hatches.
+     * @param RuleContext    $ruleContext - Project root and effective config.
+     * @param RuleDefinition $definition - Rule definition whose options drive ownership and escape hatches.
      *
      * @return void
      */
@@ -102,7 +102,7 @@ final class DeadCodeProjectIndex
     /**
      * Extract declaration/reference summaries from one parsed unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to index.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to index.
      *
      * @return void
      */
@@ -170,7 +170,7 @@ final class DeadCodeProjectIndex
     /**
      * Collect project-owned declarations from a parsed unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      *
      * @return void
      */
@@ -237,7 +237,7 @@ final class DeadCodeProjectIndex
     /**
      * Collect supported references from a parsed unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      *
      * @return void
      */
@@ -255,8 +255,8 @@ final class DeadCodeProjectIndex
     /**
      * Record expression-level class references from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param bool         $isTestFile   Whether the containing unit is a test file.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -286,8 +286,8 @@ final class DeadCodeProjectIndex
     /**
      * Record declaration-structure class references from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param bool         $isTestFile   Whether the containing unit is a test file.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -332,8 +332,8 @@ final class DeadCodeProjectIndex
     /**
      * Record type declaration references from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param bool         $isTestFile   Whether the containing unit is a test file.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -349,8 +349,8 @@ final class DeadCodeProjectIndex
     /**
      * Record direct and first-class function-call references from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param bool         $isTestFile   Whether the containing unit is a test file.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -367,8 +367,8 @@ final class DeadCodeProjectIndex
     /**
      * Record direct standalone constant references from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param bool         $isTestFile   Whether the containing unit is a test file.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -389,8 +389,8 @@ final class DeadCodeProjectIndex
     /**
      * Record class references found in a type node.
      *
-     * @param Node     $node       Param, method/function, or property node.
-     * @param bool     $isTestFile Whether the containing unit is a test file.
+     * @param Node     $node - Param, method/function, or property node.
+     * @param bool     $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -417,9 +417,9 @@ final class DeadCodeProjectIndex
     /**
      * Record references from one type expression.
      *
-     * @param Identifier|Name|ComplexType|null $type       Type node to inspect.
-     * @param Node                             $originNode Node carrying the type.
-     * @param bool                             $isTestFile Whether the containing unit is a test file.
+     * @param Identifier|Name|ComplexType|null $type - Type node to inspect.
+     * @param Node                             $originNode - Node carrying the type.
+     * @param bool                             $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -448,9 +448,9 @@ final class DeadCodeProjectIndex
     /**
      * Record a class reference from a node that may be a name or dynamic expression.
      *
-     * @param Node|null $classNode  Candidate class node.
-     * @param Node      $originNode Node where the reference appears.
-     * @param bool      $isTestFile Whether the containing unit is a test file.
+     * @param Node|null $classNode - Candidate class node.
+     * @param Node      $originNode - Node where the reference appears.
+     * @param bool      $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -464,9 +464,9 @@ final class DeadCodeProjectIndex
     /**
      * Record a class reference from a name node.
      *
-     * @param Name $name       Class name node.
-     * @param Node $originNode Node where the reference appears.
-     * @param bool $isTestFile Whether the containing unit is a test file.
+     * @param Name $name - Class name node.
+     * @param Node $originNode - Node where the reference appears.
+     * @param bool $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -487,9 +487,9 @@ final class DeadCodeProjectIndex
     /**
      * Record function references.
      *
-     * @param list<string> $fqns       Candidate resolved names.
-     * @param Node         $originNode Node where the reference appears.
-     * @param bool         $isTestFile Whether the containing unit is a test file.
+     * @param list<string> $fqns - Candidate resolved names.
+     * @param Node         $originNode - Node where the reference appears.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -511,8 +511,8 @@ final class DeadCodeProjectIndex
     /**
      * Record constant references.
      *
-     * @param list<string> $fqns       Candidate resolved names.
-     * @param bool         $isTestFile Whether the containing unit is a test file.
+     * @param list<string> $fqns - Candidate resolved names.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
@@ -534,8 +534,8 @@ final class DeadCodeProjectIndex
     /**
      * Filter declarations down to symbols with no live references.
      *
-     * @param array<string, DeadCodeSymbolDeclaration>          $declarations Declarations keyed by FQN.
-     * @param array<string, list<DeadCodeSymbolReference>>      $references   References keyed by FQN.
+     * @param array<string, DeadCodeSymbolDeclaration>          $declarations - Declarations keyed by FQN.
+     * @param array<string, list<DeadCodeSymbolReference>>      $references - References keyed by FQN.
      *
      * @return list<DeadCodeSymbolDeclaration> - declarations that survived every entrypoint/framework/reference filter
      */
@@ -565,8 +565,8 @@ final class DeadCodeProjectIndex
     /**
      * Decide whether a declaration has a supported reference that keeps it live.
      *
-     * @param DeadCodeSymbolDeclaration  $declaration Declaration being checked.
-     * @param list<DeadCodeSymbolReference> $references Candidate references to the declaration.
+     * @param DeadCodeSymbolDeclaration  $declaration - Declaration being checked.
+     * @param list<DeadCodeSymbolReference> $references - Candidate references to the declaration.
      *
      * @return bool - true when at least one non-self reference is live for this configuration
      */
@@ -590,7 +590,7 @@ final class DeadCodeProjectIndex
     /**
      * Resolve attribute names.
      *
-     * @param array<array-key, Node\AttributeGroup> $attributeGroups Attribute groups on a declaration.
+     * @param array<array-key, Node\AttributeGroup> $attributeGroups - Attribute groups on a declaration.
      *
      * @return list<string> - attribute names without leading slash
      */
@@ -625,7 +625,7 @@ final class DeadCodeProjectIndex
     /**
      * Classify a class-like node for metadata and messages.
      *
-     * @param Class_|Interface_|Trait_|Enum_ $node Class-like declaration.
+     * @param Class_|Interface_|Trait_|Enum_ $node - Class-like declaration.
      *
      * @return string - one of class, interface, trait, or enum
      */

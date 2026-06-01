@@ -104,8 +104,8 @@ abstract class AbstractUnusedInternalSymbolRule implements ProjectRuleInterface,
     /**
      * Analyse all project units for unused internal symbols.
      *
-     * @param list<AnalysisUnit> $units       Parsed project units.
-     * @param RuleContext        $ruleContext Rule context carrying config.
+     * @param list<AnalysisUnit> $units - Parsed project units.
+     * @param RuleContext        $ruleContext - Rule context carrying config.
      *
      * @return list<Finding> - project-wide dead-code findings; empty when no candidate symbol is provably unreferenced
      */
@@ -122,7 +122,7 @@ abstract class AbstractUnusedInternalSymbolRule implements ProjectRuleInterface,
     /**
      * Reset the symbol index for a streaming project pass.
      *
-     * @param RuleContext $ruleContext Rule context carrying config.
+     * @param RuleContext $ruleContext - Rule context carrying config.
      *
      * @return void
      */
@@ -135,8 +135,8 @@ abstract class AbstractUnusedInternalSymbolRule implements ProjectRuleInterface,
     /**
      * Accumulate declaration/reference summaries from one unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to index.
-     * @param RuleContext  $ruleContext  Rule context; accepted for the accumulator interface.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to index.
+     * @param RuleContext  $ruleContext - Rule context; accepted for the accumulator interface.
      *
      * @return void
      */
@@ -152,7 +152,7 @@ abstract class AbstractUnusedInternalSymbolRule implements ProjectRuleInterface,
     /**
      * Emit findings from the accumulated symbol index and clear it.
      *
-     * @param RuleContext $ruleContext Rule context carrying config.
+     * @param RuleContext $ruleContext - Rule context carrying config.
      *
      * @return list<Finding> - one finding per unused declaration for this rule's symbol kind; empty when all candidates are referenced
      */
@@ -235,7 +235,7 @@ abstract class AbstractUnusedInternalSymbolRule implements ProjectRuleInterface,
     /**
      * Build a finding message for one unused declaration.
      *
-     * @param DeadCodeSymbolDeclaration $declaration Unused declaration.
+     * @param DeadCodeSymbolDeclaration $declaration - Unused declaration.
      *
      * @return string - human-facing finding message
      */

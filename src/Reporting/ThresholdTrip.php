@@ -25,10 +25,10 @@ final readonly class ThresholdTrip
     public const SCOPE_NEW = 'new';
 
     /**
-     * @param string $thresholdKind Threshold that tripped: "total" or a severity value (advisory, warning, error).
-     * @param int    $count         Actual finding count observed for the threshold.
-     * @param int    $cap           Configured maximum that was exceeded.
-     * @param string $scope         Finding set the threshold applied to: "total" or "new".
+     * @param string $thresholdKind - Threshold that tripped: "total" or a severity value (advisory, warning, error).
+     * @param int    $count - Actual finding count observed for the threshold.
+     * @param int    $cap - Configured maximum that was exceeded.
+     * @param string $scope - Finding set the threshold applied to: "total" or "new".
      */
     public function __construct(
         public string $thresholdKind,
@@ -41,7 +41,7 @@ final readonly class ThresholdTrip
     /**
      * Return a copy of this trip re-scoped to the given finding set.
      *
-     * @param string $scope Scope to apply: "total" or "new".
+     * @param string $scope - Scope to apply: "total" or "new".
      *
      * @return self - new trip with the same kind/count/cap but the supplied scope; the original is left unchanged
      */

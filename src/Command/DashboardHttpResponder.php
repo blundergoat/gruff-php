@@ -12,9 +12,10 @@ use RuntimeException;
 final class DashboardHttpResponder
 {
     /**
-     * @param resource              $client        Socket client receiving the dashboard response.
-     * @param DashboardHttpResponse $response      HTTP response to write to the client.
-     * @param bool                  $isHeadRequest Whether the body should be omitted for a HEAD request.
+     * @param resource              $client - Socket client receiving the dashboard response.
+     * @param DashboardHttpResponse $response - HTTP response to write to the client.
+     * @param bool                  $isHeadRequest - Whether the body should be omitted for a HEAD request.
+     *
      * @return void
      */
     public function write($client, DashboardHttpResponse $response, bool $isHeadRequest): void
@@ -37,8 +38,9 @@ final class DashboardHttpResponder
     }
 
     /**
-     * @param resource $client  Socket client receiving the payload.
-     * @param string   $payload Raw bytes to send in full; the loop retries short writes until every byte is sent.
+     * @param resource $client - Socket client receiving the payload.
+     * @param string   $payload - Raw bytes to send in full; the loop retries short writes until every byte is sent.
+     *
      * @return void
      */
     private function writeAll($client, string $payload): void

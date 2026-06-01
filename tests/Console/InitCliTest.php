@@ -383,7 +383,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Write an existing config with local path-ignore policy.
      *
-     * @param string $configPath Destination the pre-existing config is written to before init runs.
+     * @param string $configPath - Destination the pre-existing config is written to before init runs.
      *
      * @return void
      */
@@ -404,7 +404,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Decode generated YAML config for assertions.
      *
-     * @param string $configPath Path of the config init generated, read back for assertions.
+     * @param string $configPath - Path of the config init generated, read back for assertions.
      *
      * @return array<string, mixed> - parsed config narrowed to string keys; values stay mixed for structural assertions
      */
@@ -417,14 +417,13 @@ final class InitCliTest extends CliTestCase
 
         $decoded = Yaml::parse($contents);
 
-        // Hand back the parsed config narrowed to string keys for structural assertions.
         return $this->stringKeyedArray($decoded);
     }
 
     /**
      * Assert the top-level generated config sections exist.
      *
-     * @param array<string, mixed> $decoded Parsed config payload.
+     * @param array<string, mixed> $decoded - Parsed config payload.
      *
      * @return void
      */
@@ -442,8 +441,8 @@ final class InitCliTest extends CliTestCase
     /**
      * Assert configured path ignores match the expected list.
      *
-     * @param list<string>         $expectedPaths Expected ignored paths.
-     * @param array<string, mixed> $decoded       Parsed config payload.
+     * @param list<string>         $expectedPaths - Expected ignored paths.
+     * @param array<string, mixed> $decoded - Parsed config payload.
      *
      * @return void
      */
@@ -456,7 +455,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Assert one representative registry default is emitted.
      *
-     * @param array<string, mixed> $decoded Parsed config payload.
+     * @param array<string, mixed> $decoded - Parsed config payload.
      *
      * @return void
      */
@@ -473,7 +472,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Assert a decoded YAML value is an array keyed by strings.
      *
-     * @param mixed $decodedValue Raw YAML decode result asserted to be a string-keyed array.
+     * @param mixed $decodedValue - Raw YAML decode result asserted to be a string-keyed array.
      *
      * @return array<string, mixed> - the same entries re-typed as a string-keyed array once every key is verified to be a string
      */
@@ -487,14 +486,13 @@ final class InitCliTest extends CliTestCase
             $result[$key] = $entry;
         }
 
-        // Hand back the value re-typed as a string-keyed array once every key is verified.
         return $result;
     }
 
     /**
      * Read generated config file contents for assertions.
      *
-     * @param string $configPath Generated config file path.
+     * @param string $configPath - Generated config file path.
      *
      * @return string - raw file text, asserted non-null first so callers can match against it directly
      */
@@ -503,7 +501,6 @@ final class InitCliTest extends CliTestCase
         $contents = file_get_contents($configPath);
         self::assertIsString($contents);
 
-        // Hand back the generated config text for the caller's content assertions.
         return $contents;
     }
 }

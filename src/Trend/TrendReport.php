@@ -12,11 +12,11 @@ namespace GruffPhp\Trend;
 final readonly class TrendReport
 {
     /**
-     * @param string           $path          Trend history file path.
-     * @param float            $currentScore  Current composite score.
-     * @param float|null       $previousScore Previous composite score, when available.
-     * @param float|null       $delta         Score delta from the previous snapshot.
-     * @param list<TrendEntry> $entries       Historical trend entries.
+     * @param string           $path - Trend history file path.
+     * @param float            $currentScore - Current composite score.
+     * @param float|null       $previousScore - Previous composite score, when available.
+     * @param float|null       $delta - Score delta from the previous snapshot.
+     * @param list<TrendEntry> $entries - Historical trend entries.
      */
     public function __construct(
         public string $path,

@@ -42,7 +42,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Describe the generic method name rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -60,10 +60,10 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Find functions and methods whose names are too generic to communicate intent.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for generic callable names.
+     * @return list<Finding> - Findings for generic callable names.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -100,16 +100,15 @@ final readonly class GenericMethodNameRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per callable whose name is in the generic list and is not a framework override.
         return $findings;
     }
 
     /**
      * Allow known framework-required generic method names.
      *
-     * @param ClassMethod $classMethod Method whose name and signature decide whether a framework forces it.
+     * @param ClassMethod $classMethod - Method whose name and signature decide whether a framework forces it.
      *
-     * @return bool True when the method matches a supported framework override.
+     * @return bool - True when the method matches a supported framework override.
      */
     private function matchesFrameworkOverride(ClassMethod $classMethod): bool
     {
@@ -127,9 +126,9 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Detect Symfony Console command `execute()` overrides.
      *
-     * @param ClassMethod $classMethod Candidate `execute` method to match against the Symfony command signature.
+     * @param ClassMethod $classMethod - Candidate `execute` method to match against the Symfony command signature.
      *
-     * @return bool True when parameters match the Symfony command signature.
+     * @return bool - True when parameters match the Symfony command signature.
      */
     private function matchesSymfonyConsoleExecute(ClassMethod $classMethod): bool
     {
@@ -149,10 +148,10 @@ final readonly class GenericMethodNameRule implements RuleInterface
     /**
      * Compare a parameter type node against an unqualified class/interface name.
      *
-     * @param Node|null $type      Declared parameter type node, or null when the parameter is untyped.
-     * @param string    $shortName Unqualified class or interface name to match, ignoring any namespace prefix.
+     * @param Node|null $type - Declared parameter type node, or null when the parameter is untyped.
+     * @param string    $shortName - Unqualified class or interface name to match, ignoring any namespace prefix.
      *
-     * @return bool True when the type short name matches.
+     * @return bool - True when the type short name matches.
      */
     private function hasParameterTypeShortName(?Node $type, string $shortName): bool
     {

@@ -36,7 +36,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Describe the private reflection test rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -54,10 +54,10 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Find tests that use reflection or binding to reach private implementation details.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for private-reflection test access.
+     * @return list<Finding> - Findings for private-reflection test access.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -103,8 +103,9 @@ final readonly class PrivateReflectionRule implements RuleInterface
     /**
      * Detect reflection or closure binding nodes that expose private members.
      *
-     * @param Node $node Candidate AST node (a new-expression, static call, or method call) to classify.
-     * @return bool True when the node performs private reflection access.
+     * @param Node $node - Candidate AST node (a new-expression, static call, or method call) to classify.
+     *
+     * @return bool - True when the node performs private reflection access.
      */
     private function isPrivateReflectionNode(Node $node): bool
     {

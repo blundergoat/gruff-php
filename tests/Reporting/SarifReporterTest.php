@@ -158,8 +158,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify severity values map to SARIF result levels.
      *
-     * @param Severity $severity Finding severity to render.
-     * @param string   $level    Expected SARIF level.
+     * @param Severity $severity - Finding severity to render.
+     * @param string   $level - Expected SARIF level.
      *
      * @return void
      * @throws JsonException
@@ -297,14 +297,13 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param list<Finding>    $findings Findings to attach to the report.
-     * @param ScoreReport|null $score    Precomputed score, or null to let assertions exercise an unscored report.
+     * @param list<Finding>    $findings - Findings to attach to the report.
+     * @param ScoreReport|null $score - Precomputed score, or null to let assertions exercise an unscored report.
      *
      * @return AnalysisReport - a sarif-format report carrying only the given findings and optional score, so a test renders a known input
      */
     private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
     {
-        // Hand back a sarif-format report fixture carrying just the given findings and optional score.
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],
@@ -325,10 +324,10 @@ final class SarifReporterTest extends TestCase
     /**
      * Build a focused finding for SARIF renderer tests.
      *
-     * @param string   $ruleId   Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
-     * @param string   $filePath Artifact path the SARIF location should reference, relative to the scanned root.
-     * @param int|null $line     One-based location line; null exercises rendering when a finding has no line.
-     * @param Severity $severity Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
+     * @param string   $ruleId - Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
+     * @param string   $filePath - Artifact path the SARIF location should reference, relative to the scanned root.
+     * @param int|null $line - One-based location line; null exercises rendering when a finding has no line.
+     * @param Severity $severity - Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
      *
      * @return Finding - a single finding built from the given fields, ready to render through the SARIF reporter and assert against
      */
@@ -338,7 +337,6 @@ final class SarifReporterTest extends TestCase
         ?int     $line = 1,
         Severity $severity = Severity::Warning,
     ): Finding {
-        // Hand back the finding fixture so a test can render it through the SARIF reporter and inspect the result.
         return new Finding(
             ruleId:     $ruleId,
             message:    'Finding message.',
@@ -352,20 +350,19 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $payload SARIF payload.
+     * @param JsonArray $payload - SARIF payload.
      *
      * @return JsonArray - the single run object at runs[0], holding the tool driver, results, and run properties
      */
     private function sarifRun(array $payload): array
     {
-        // Hand back the first (and only) run object; SARIF wraps results under runs[0] of a single-tool document.
         return $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
     }
 
     /**
      * Extract the physical location object from a SARIF result fixture.
      *
-     * @param mixed $result One decoded SARIF result object; mixed because it arrives straight from json_decode.
+     * @param mixed $result - One decoded SARIF result object; mixed because it arrives straight from json_decode.
      *
      * @return JsonArray - the physicalLocation object under the result's first location, holding the artifact URI and optional region
      */
@@ -380,7 +377,7 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param string $json Rendered SARIF document to decode; expected to be a single top-level JSON object.
+     * @param string $json - Rendered SARIF document to decode; expected to be a single top-level JSON object.
      *
      * @return JsonArray - the decoded document as a string-keyed array so callers can index named top-level fields
      * @throws JsonException
@@ -389,13 +386,12 @@ final class SarifReporterTest extends TestCase
     {
         $decodedJson = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        // Hand back the decoded document narrowed to a string-keyed array so callers can index named fields.
         return $this->stringKeyedArray($decodedJson);
     }
 
     /**
-     * @param JsonArray $payload Source array.
-     * @param string    $key     Key whose value must itself be an array; the test fails if it is absent or scalar.
+     * @param JsonArray $payload - Source array.
+     * @param string    $key - Key whose value must itself be an array; the test fails if it is absent or scalar.
      *
      * @return list<JsonValue> - the child array re-indexed as a 0-based list so positional access ignores the original keys
      */
@@ -404,15 +400,14 @@ final class SarifReporterTest extends TestCase
         $payloadValue = $payload[$key] ?? null;
         self::assertIsArray($payloadValue);
 
-        // Hand back the child re-indexed as a list so positional [0] access does not depend on original keys.
         return array_values($payloadValue);
     }
 
     /**
      * Normalize a decoded JSON value or keyed child to an array payload.
      *
-     * @param mixed       $payload Decoded JSON node; mixed because it comes from json_decode, and non-arrays fail.
-     * @param string|null $key     When set, descend into that child first; null treats $payload itself as the target.
+     * @param mixed       $payload - Decoded JSON node; mixed because it comes from json_decode, and non-arrays fail.
+     * @param string|null $key - When set, descend into that child first; null treats $payload itself as the target.
      *
      * @return JsonArray - the resolved node narrowed to a JSON object, after the test has failed on any non-array or scalar leaf
      */
@@ -428,9 +423,10 @@ final class SarifReporterTest extends TestCase
     /**
      * Assert that decoded SARIF contains an object at the requested key.
      *
-     * @param mixed              $payload Value under test; passes only when it is an array whose leaves are all JSON scalars.
+     * @param mixed              $payload - Value under test; passes only when it is an array whose leaves are all JSON scalars.
      *
      * @phpstan-assert JsonArray $payload
+     *
      * @return void
      */
     private function assertJsonArray(mixed $payload): void
@@ -456,8 +452,8 @@ final class SarifReporterTest extends TestCase
     }
 
     /**
-     * @param JsonArray $payload Source array.
-     * @param string    $key     Key whose value must be a string; the test fails if it is missing or non-string.
+     * @param JsonArray $payload - Source array.
+     * @param string    $key - Key whose value must be a string; the test fails if it is missing or non-string.
      *
      * @return string - the string value at $key, after the assertion has failed the test on a missing or non-string field
      */

@@ -37,7 +37,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Describe the missing property PHPDoc rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     /**
      * Find declared and promoted properties that lack local documentation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for undocumented properties.
+     * @return list<Finding> - Findings for undocumented properties.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,7 +89,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      * @param ClassLike $classLike - class-like node from the parsed unit; the caller must still
      *   guard `$classLike->name` separately, since anonymous classes are supported but unnamed.
      *
-     * @return bool True when the node should be inspected.
+     * @return bool - True when the node should be inspected.
      */
     private function isSupportedClassLike(ClassLike $classLike): bool
     {
@@ -112,7 +112,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      *   severity and pillar stay consistent without re-deriving them per property.
      * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on findings.
      *
-     * @return list<Finding> Findings for undocumented declared properties.
+     * @return list<Finding> - Findings for undocumented declared properties.
      */
     private function declaredPropertyFindings(
         ClassLike $classLike,
@@ -155,7 +155,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      *   tier, and confidence.
      * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on the finding.
      *
-     * @return Finding Finding for an undocumented declared property.
+     * @return Finding - Finding for an undocumented declared property.
      */
     private function declaredPropertyFinding(
         string $propertyName,
@@ -197,7 +197,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      * @param RuleDefinition $definition   - rule metadata copied into each emitted finding.
      * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on findings.
      *
-     * @return list<Finding> Findings for undocumented promoted properties.
+     * @return list<Finding> - Findings for undocumented promoted properties.
      */
     private function promotedPropertyFindings(
         ClassLike $classLike,
@@ -240,7 +240,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      * @param Param $param - a single constructor parameter node; treated as promoted only when it carries
      *   visibility flags (`public`/`protected`/`private`), which is what turns a param into a property.
      *
-     * @return string|null Property name, or null when the parameter is not promoted.
+     * @return string|null - Property name, or null when the parameter is not promoted.
      */
     private function promotedPropertyName(Param $param): ?string
     {
@@ -266,7 +266,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      *   tier, and confidence.
      * @param AnalysisUnit   $analysisUnit - parsed unit supplying the display path recorded on the finding.
      *
-     * @return Finding Finding for an undocumented promoted property.
+     * @return Finding - Finding for an undocumented promoted property.
      */
     private function promotedPropertyFinding(
         string $propertyName,
@@ -304,7 +304,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      * @param ClassLike $classLike - node whose direct methods are scanned; inherited constructors are not
      *   resolved, since promotion only annotates the constructor physically declared in this class body.
      *
-     * @return ClassMethod|null Constructor, or null when absent.
+     * @return ClassMethod|null - Constructor, or null when absent.
      */
     private function findConstructor(ClassLike $classLike): ?ClassMethod
     {
@@ -326,7 +326,7 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
      * @param ClassMethod $constructor - the constructor whose docblock `@param` tags are read; only its
      *   own docblock counts, so a param documented on a parent constructor is not considered covered here.
      *
-     * @return list<string> Names (without `$`) of parameters the constructor docblock already documents;
+     * @return list<string> - Names (without `$`) of parameters the constructor docblock already documents;
      *   empty when the constructor has no docblock, which the caller reads as "nothing documented yet".
      */
     private function documentedConstructorParams(ClassMethod $constructor): array

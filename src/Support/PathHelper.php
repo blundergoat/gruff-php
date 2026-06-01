@@ -12,8 +12,9 @@ final class PathHelper
     /**
      * Normalize directory separators while preserving the path's absolute form.
      *
-     * @param string $path Path supplied by a user, Git, or a report payload.
-     * @return string Path using forward slash separators.
+     * @param string $path - Path supplied by a user, Git, or a report payload.
+     *
+     * @return string - Path using forward slash separators.
      */
     public static function normalizeSeparators(string $path): string
     {
@@ -30,8 +31,9 @@ final class PathHelper
     /**
      * Detect Unix, UNC, and Windows drive-letter absolute paths.
      *
-     * @param string $path Path to classify.
-     * @return bool True when the path is absolute on a supported platform.
+     * @param string $path - Path to classify.
+     *
+     * @return bool - True when the path is absolute on a supported platform.
      */
     public static function isAbsolute(string $path): bool
     {
@@ -52,9 +54,10 @@ final class PathHelper
     /**
      * Resolve a possibly-relative path against a root directory.
      *
-     * @param string $root Root used for relative paths.
-     * @param string $path Path to resolve.
-     * @return string Absolute path when $path is relative; original absolute path otherwise.
+     * @param string $root - Root used for relative paths.
+     * @param string $path - Path to resolve.
+     *
+     * @return string - Absolute path when $path is relative; original absolute path otherwise.
      */
     public static function resolveAgainst(string $root, string $path): string
     {
@@ -78,8 +81,9 @@ final class PathHelper
     /**
      * Canonicalize a path when possible and normalize separators either way.
      *
-     * @param string $path Path to canonicalize.
-     * @return string Real path when it exists; normalized input otherwise.
+     * @param string $path - Path to canonicalize.
+     *
+     * @return string - Real path when it exists; normalized input otherwise.
      */
     public static function canonical(string $path): string
     {
@@ -97,9 +101,10 @@ final class PathHelper
     /**
      * Convert a path to project-relative form when it is inside the given root.
      *
-     * @param string $path Path to relativize.
-     * @param string $root Root directory to compare against.
-     * @return string|null "." for the root, a relative path inside root, or null outside root.
+     * @param string $path - Path to relativize.
+     * @param string $root - Root directory to compare against.
+     *
+     * @return string|null - "." for the root, a relative path inside root, or null outside root.
      */
     public static function relativeToRoot(string $path, string $root): ?string
     {
@@ -123,8 +128,9 @@ final class PathHelper
     /**
      * Normalize a display path by trimming a leading current-directory prefix.
      *
-     * @param string $path Path to normalize for matching.
-     * @return string Normalized path without leading "./" segments.
+     * @param string $path - Path to normalize for matching.
+     *
+     * @return string - Normalized path without leading "./" segments.
      */
     public static function normalizeRelative(string $path): string
     {
@@ -141,8 +147,9 @@ final class PathHelper
     /**
      * Collapse "." and ".." path segments without requiring the path to exist.
      *
-     * @param string $path Normalized path using forward slash separators.
-     * @return string Path with dot segments removed.
+     * @param string $path - Normalized path using forward slash separators.
+     *
+     * @return string - Path with dot segments removed.
      */
     private static function collapseDotSegments(string $path): string
     {
@@ -171,8 +178,9 @@ final class PathHelper
      * Callers must pass a path that has already been through normalizeSeparators(); the patterns here
      * assume forward slashes and would miss Windows roots written with backslashes.
      *
-     * @param string $path Forward-slash-normalized path whose root, if any, should be peeled off.
-     * @return array{prefix: string, remaining: string} Root prefix and remaining path.
+     * @param string $path - Forward-slash-normalized path whose root, if any, should be peeled off.
+     *
+     * @return array{prefix: string, remaining: string} - Root prefix and remaining path.
      */
     private static function splitRoot(string $path): array
     {
@@ -206,9 +214,10 @@ final class PathHelper
      * Building the array key-by-key (rather than `['prefix' => ..., 'remaining' => ...]`) keeps the
      * literal from resembling a `[Class, method]` callable, which static analysers otherwise flag here.
      *
-     * @param string $prefix    Root segment to preserve verbatim (e.g. "/", "//", "C:/"), empty for relative paths.
-     * @param string $remaining Path after the root, still slash-separated, for the caller to collapse into segments.
-     * @return array{prefix: string, remaining: string} Root split parts.
+     * @param string $prefix - Root segment to preserve verbatim (e.g. "/", "//", "C:/"), empty for relative paths.
+     * @param string $remaining - Path after the root, still slash-separated, for the caller to collapse into segments.
+     *
+     * @return array{prefix: string, remaining: string} - Root split parts.
      */
     private static function rootParts(string $prefix, string $remaining): array
     {
@@ -216,17 +225,17 @@ final class PathHelper
         $parts['prefix']    = $prefix;
         $parts['remaining'] = $remaining;
 
-        // Hand back the two halves as a named shape so callers read $parts['prefix'] / ['remaining'] explicitly.
         return $parts;
     }
 
     /**
      * Collapse relative path segments after the root has been separated.
      *
-     * @param string $path       Rootless path remainder (root already peeled by splitRoot) to reduce to clean segments.
-     * @param bool   $isAbsolute True when the path had a root: leading ".." is then dropped (cannot ascend past the
+     * @param string $path - Rootless path remainder (root already peeled by splitRoot) to reduce to clean segments.
+     * @param bool   $isAbsolute - True when the path had a root: leading ".." is then dropped (cannot ascend past the
      *                           root); false keeps leading ".." so a relative path can still climb above its base.
-     * @return list<string> Normalized path segments.
+     *
+     * @return list<string> - Normalized path segments.
      */
     private static function collapsedSegments(string $path, bool $isAbsolute): array
     {

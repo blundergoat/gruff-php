@@ -39,8 +39,8 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Verify allowed public method shapes are not flagged.
      *
-     * @param string             $fixture    Fixture filename.
-     * @param array<string, int> $thresholds Rule thresholds.
+     * @param string             $fixture - Fixture filename.
+     * @param array<string, int> $thresholds - Rule thresholds.
      *
      * @return void
      */
@@ -71,8 +71,8 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
-     * @param array<string, int> $thresholds Warning/error public-method-count limits for this case.
+     * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int> $thresholds - Warning/error public-method-count limits for this case.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings from this rule only; empty when the fixture stays within limits
      */
@@ -105,7 +105,7 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with a repo-relative display path for finding reports
      */

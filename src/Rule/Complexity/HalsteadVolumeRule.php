@@ -56,8 +56,8 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Detect functions and methods whose Halstead volume exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per function-like node over threshold, empty when every node stayed under
      */
@@ -120,7 +120,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Compute Halstead volume inputs for one function-like node.
      *
-     * @param ClassMethod|Function_ $node
+     * @param ClassMethod|Function_ $node - Function-like node whose body supplies the operator and operand counts.
      *
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the full Halstead set for the node; a trivial
      *                       body yields all-zero figures that trip no threshold
@@ -169,7 +169,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Return Halstead metrics only when enough operands and operators exist.
      *
-     * @param mixed $rawMetrics Value previously stored in the WeakMap cache; trusted to be a metrics array but
+     * @param mixed $rawMetrics - Value previously stored in the WeakMap cache; trusted to be a metrics array but
      *                          re-validated because the cache is untyped and a malformed entry must be recomputed.
      *
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int}|null - the validated metrics, or null when the
@@ -206,7 +206,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Classify a node as a Halstead operator when it contributes executable structure.
      *
-     * @param Node $node Any AST node visited while walking the body; only control-flow and operator nodes count.
+     * @param Node $node - Any AST node visited while walking the body; only control-flow and operator nodes count.
      *
      * @return string|null - operator class name keying each distinct operator kind, or null when the node is not an operator
      */
@@ -232,7 +232,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Classify a node as a Halstead operand when it contributes a value reference.
      *
-     * @param Node $node Any AST node visited while walking the body; only variables, scalars, and params count.
+     * @param Node $node - Any AST node visited while walking the body; only variables, scalars, and params count.
      *
      * @return string|null - operand key collapsing repeats of the same value, or null when the node is not an operand
      */
@@ -250,7 +250,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Build the operand key for a function or method parameter.
      *
-     * @param Node\Param $parameter Declared parameter; only a plain `$name` variable yields a key, so destructured
+     * @param Node\Param $parameter - Declared parameter; only a plain `$name` variable yields a key, so destructured
      *                              or expression-named params are skipped.
      *
      * @return string|null - the `$name` operand key, or null for destructured or dynamic-named params with no name
@@ -269,11 +269,11 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Calculate Halstead metrics from operator and operand counts.
      *
-     * @param int $uniqueOperators Distinct operator kinds (n1); drives vocabulary and the difficulty numerator.
-     * @param int $uniqueOperands  Distinct operand names (n2); a zero short-circuits to the empty-metrics result
+     * @param int $uniqueOperators - Distinct operator kinds (n1); drives vocabulary and the difficulty numerator.
+     * @param int $uniqueOperands - Distinct operand names (n2); a zero short-circuits to the empty-metrics result
      *                             to avoid dividing by it in the difficulty term.
-     * @param int $totalOperators  Every operator occurrence (N1), counting repeats; feeds program length.
-     * @param int $totalOperands   Every operand occurrence (N2), counting repeats; a zero also yields empty metrics.
+     * @param int $totalOperators - Every operator occurrence (N1), counting repeats; feeds program length.
+     * @param int $totalOperands - Every operand occurrence (N2), counting repeats; a zero also yields empty metrics.
      *
      * @return array{volume: float, difficulty: float, effort: float, vocabulary: int, length: int} - the computed metrics; all-zero when vocabulary
      *                       or operand counts are zero so log() and the difficulty division stay defined
@@ -304,7 +304,7 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     /**
      * Render a configured numeric threshold for finding messages.
      *
-     * @param int|float $number Configured volume threshold; an integral float is shown without its ".0" tail.
+     * @param int|float $number - Configured volume threshold; an integral float is shown without its ".0" tail.
      *
      * @return string - the threshold for the message, with an integral float's ".0" dropped and real fractions kept
      */

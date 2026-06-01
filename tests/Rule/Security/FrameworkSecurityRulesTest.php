@@ -76,8 +76,8 @@ final class FrameworkSecurityRulesTest extends TestCase
     /**
      * Analyse a fixture and return findings for one rule.
      *
-     * @param string $displayPath Fixture display path.
-     * @param string $ruleId      Rule identifier to filter for.
+     * @param string $displayPath - Fixture display path.
+     * @param string $ruleId - Rule identifier to filter for.
      *
      * @return list<Finding> - findings emitted by the named rule for the fixture; empty when the rule did not fire
      */
@@ -91,7 +91,6 @@ final class FrameworkSecurityRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
-        // The filtered list isolates the framework-misconfiguration rule under test.
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 }

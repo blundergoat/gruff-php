@@ -70,7 +70,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Verify configured interface exemption cases are not flagged.
      *
-     * @param string $symbol Interface symbol expected to be absent from findings.
+     * @param string $symbol - Interface symbol expected to be absent from findings.
      *
      * @return void
      */

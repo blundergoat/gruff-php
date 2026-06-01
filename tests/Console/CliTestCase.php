@@ -34,14 +34,13 @@ abstract class CliTestCase extends TestCase
         // Provide a README so docs.missing-readme does not add an extra baseline entry.
         file_put_contents($project . '/README.md', "Baseline workflow fixture.\n");
 
-        // Hand back the isolated project root the baseline CLI test will scan.
         return $project;
     }
 
     /**
      * Decode a finished CLI process's stdout as the JSON report object.
      *
-     * @param Process $process Completed CLI process whose stdout holds the JSON report.
+     * @param Process $process - Completed CLI process whose stdout holds the JSON report.
      *
      * @return array<string, mixed> - the decoded report keyed by its string field names; empty array when stdout held an empty JSON object
      * @throws JsonException
@@ -59,7 +58,6 @@ abstract class CliTestCase extends TestCase
             $report[$key] = $value;
         }
 
-        // Hand back the report keyed by its string field names for assertion.
         return $report;
     }
 
@@ -74,14 +72,13 @@ abstract class CliTestCase extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the freshly created temp directory for filesystem assertions.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */
@@ -115,8 +112,8 @@ abstract class CliTestCase extends TestCase
     /**
      * Copy the package tree into an isolated test project.
      *
-     * @param string $source      Source directory.
-     * @param string $destination Destination directory.
+     * @param string $source - Source directory.
+     * @param string $destination - Destination directory.
      *
      * @return void
      */
@@ -208,15 +205,14 @@ abstract class CliTestCase extends TestCase
             throw new RuntimeException('Unable to read allocated test port.');
         }
 
-        // Hand back the OS-assigned ephemeral port the dashboard test should bind.
         return (int)$matches[1];
     }
 
     /**
      * Wait for the dashboard HTTP server to accept connections.
      *
-     * @param int     $port    Local TCP port.
-     * @param Process $process Dashboard server process.
+     * @param int     $port - Local TCP port.
+     * @param Process $process - Dashboard server process.
      *
      * @return void
      */
@@ -248,8 +244,8 @@ abstract class CliTestCase extends TestCase
     /**
      * Fetch a raw response from the local dashboard server.
      *
-     * @param int    $port Local TCP port.
-     * @param string $path Filesystem path.
+     * @param int    $port - Local TCP port.
+     * @param string $path - Filesystem path.
      *
      * @return string - the raw HTTP response text including the status line, headers, and body for the caller to inspect
      * @throws RuntimeException When the helper cannot complete the fixture operation.
@@ -287,7 +283,6 @@ abstract class CliTestCase extends TestCase
             throw new RuntimeException('Unable to read HTTP response.');
         }
 
-        // Hand back the raw status-line-plus-body text for the caller to inspect.
         return $response;
     }
 }

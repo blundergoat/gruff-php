@@ -53,7 +53,7 @@ final readonly class SourceDiscovery
     /**
      * Build the source-discovery scanner for the given project root.
      *
-     * @param string $projectRoot Project root used to resolve requested paths.
+     * @param string $projectRoot - Project root used to resolve requested paths.
      */
     public function __construct(private string $projectRoot)
     {
@@ -61,9 +61,9 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<string> $paths                    Requested paths to discover.
-     * @param bool         $shouldIncludeIgnored     Whether built-in ignored paths should still be included.
-     * @param list<string> $configuredIgnorePatterns Additional ignore patterns from config.
+     * @param list<string> $paths - Requested paths to discover.
+     * @param bool         $shouldIncludeIgnored - Whether built-in ignored paths should still be included.
+     * @param list<string> $configuredIgnorePatterns - Additional ignore patterns from config.
      *
      * @return SourceDiscoveryResult - discovered source files plus the missing inputs and ignored-path records the caller reports back
      */
@@ -105,12 +105,12 @@ final readonly class SourceDiscovery
     /**
      * Resolve one requested path into discovered files, missing inputs, or ignore records.
      *
-     * @param string                    $path                     Requested path to resolve against the project root.
-     * @param bool                      $shouldIncludeIgnored     Whether built-in ignored paths should still be included.
-     * @param list<string>              $configuredIgnorePatterns Additional ignore patterns from config.
-     * @param array<string, SourceFile> $files                    Discovered files keyed by canonical path; appended in place.
-     * @param list<string>              $missingPaths             Requested paths that do not exist; appended in place.
-     * @param list<IgnoredPath>         $ignoredDetails           Ignored-path records; appended in place.
+     * @param string                    $path - Requested path to resolve against the project root.
+     * @param bool                      $shouldIncludeIgnored - Whether built-in ignored paths should still be included.
+     * @param list<string>              $configuredIgnorePatterns - Additional ignore patterns from config.
+     * @param array<string, SourceFile> $files - Discovered files keyed by canonical path; appended in place.
+     * @param list<string>              $missingPaths - Requested paths that do not exist; appended in place.
+     * @param list<IgnoredPath>         $ignoredDetails - Ignored-path records; appended in place.
      *
      * @return void
      */
@@ -169,10 +169,10 @@ final readonly class SourceDiscovery
     /**
      * Yield source files below a directory while applying ignore patterns.
      *
-     * @param string            $directory                Existing directory whose tree is recursively scanned.
-     * @param bool              $shouldIncludeIgnored     When true, default/generated ignores are bypassed so those files surface too.
-     * @param list<string>      $configuredIgnorePatterns Additional ignore patterns from config.
-     * @param list<IgnoredPath> $ignoredDetails           Ignore records discovered while walking; appended in place.
+     * @param string            $directory - Existing directory whose tree is recursively scanned.
+     * @param bool              $shouldIncludeIgnored - When true, default/generated ignores are bypassed so those files surface too.
+     * @param list<string>      $configuredIgnorePatterns - Additional ignore patterns from config.
+     * @param list<IgnoredPath> $ignoredDetails - Ignore records discovered while walking; appended in place.
      *
      * @return iterable<SplFileInfo> - lazily yielded regular files under the directory that classify as source; ignored nodes and their subtrees are
      *                               pruned
@@ -224,7 +224,7 @@ final readonly class SourceDiscovery
     /**
      * Resolve a user-supplied path against the project root, returning an absolute filesystem path.
      *
-     * @param string $path Relative or absolute path as typed by the user.
+     * @param string $path - Relative or absolute path as typed by the user.
      *
      * @return string - absolute filesystem path; relative inputs are anchored to the project root, absolute inputs returned unchanged
      */
@@ -237,7 +237,7 @@ final readonly class SourceDiscovery
     /**
      * Canonicalise a path via realpath(), falling back to the original string when the file does not exist.
      *
-     * @param string $path Absolute path to canonicalise; need not exist on disk.
+     * @param string $path - Absolute path to canonicalise; need not exist on disk.
      *
      * @return string - symlink-resolved canonical path when the file exists, otherwise the input string verbatim
      */
@@ -250,7 +250,7 @@ final readonly class SourceDiscovery
     /**
      * Format a path for user-facing output relative to the project root; the root itself renders as ".".
      *
-     * @param string $path Absolute path to render for display.
+     * @param string $path - Absolute path to render for display.
      *
      * @return string - project-root-relative path for inputs inside the root (the root itself as "."), or the canonical absolute path when outside it
      */
@@ -263,7 +263,7 @@ final readonly class SourceDiscovery
     /**
      * Classify the file as PHP, text-config, or unsupported (null) based on extension and env-like naming.
      *
-     * @param string $path Path whose extension and basename decide the source type.
+     * @param string $path - Path whose extension and basename decide the source type.
      *
      * @return string|null - SourceFile::TYPE_PHP for .php, TYPE_TEXT for recognised config/dotfiles, or null when the file is unsupported and
      *                     excluded from discovery
@@ -293,7 +293,7 @@ final readonly class SourceDiscovery
     /**
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
-     * @param string $path Path whose basename is tested against env-file naming.
+     * @param string $path - Path whose basename is tested against env-file naming.
      *
      * @return bool - true when the basename is `.env` or a `.env.*` variant that the text scanners treat as secret-bearing, false otherwise
      */
@@ -308,8 +308,8 @@ final readonly class SourceDiscovery
     /**
      * Discover files through Git's tracked plus unignored-untracked view of the worktree.
      *
-     * @param list<string> $requestedPaths
-     * @param list<string> $configuredIgnorePatterns
+     * @param list<string> $requestedPaths - User-requested paths, or empty to discover the whole project.
+     * @param list<string> $configuredIgnorePatterns - Project config ignore patterns applied after Git visibility.
      *
      * @return SourceDiscoveryResult|null - the Git-derived discovery result, or null when Git discovery is unavailable so the caller falls back to
      *                                    the filesystem walk
@@ -358,8 +358,8 @@ final readonly class SourceDiscovery
     /**
      * Build git discovery request for the source discovery.
      *
-     * @param list<string> $requestedPaths
-     * @param list<string> $configuredIgnorePatterns
+     * @param list<string> $requestedPaths - User-requested paths, or empty to build a root-wide Git pathspec.
+     * @param list<string> $configuredIgnorePatterns - Project config ignore patterns used to preclassify requested paths.
      *
      * @return array|null - pre-resolved Git query inputs (pathspecs to list plus missing/ignored
      *                      records found so far), or null when any request reaches outside the
@@ -418,8 +418,8 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<string>      $missingPaths
-     * @param list<IgnoredPath> $ignoredDetails
+     * @param list<string>      $missingPaths - Requested paths that were already known to be absent.
+     * @param list<IgnoredPath> $ignoredDetails - Ignored requested paths collected before Git listing.
      *
      * @return SourceDiscoveryResult - a file-less result that still reports the missing and ignored inputs, so the user sees why nothing was analysed
      */
@@ -433,8 +433,8 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths
-     * @param list<string>                                                      $visiblePaths
+     * @param list<array{absolutePath: string, pathspec: string, isFile: bool}> $requestedExistingPaths - Existing requested paths expressed as Git pathspecs.
+     * @param list<string>                                                      $visiblePaths - Root-relative paths returned by `git ls-files`.
      *
      * @return list<IgnoredPath> - one record per explicitly-requested existing path that Git's view or generated-file protection withheld,
      *                           explaining each omission
@@ -468,8 +468,8 @@ final readonly class SourceDiscovery
     /**
      * Build source file objects from paths reported by git.
      *
-     * @param list<string> $visiblePaths
-     * @param list<string> $configuredIgnorePatterns
+     * @param list<string> $visiblePaths - Root-relative paths returned by `git ls-files`.
+     * @param list<string> $configuredIgnorePatterns - Project config ignore patterns applied before creating SourceFile objects.
      *
      * @return array{files: array<string, SourceFile>, ignoredDetails: list<IgnoredPath>} - the Git-visible set split into accepted source files
      *                      keyed by canonical path and the records for entries held back by config/default/generated ignores
@@ -493,10 +493,10 @@ final readonly class SourceDiscovery
     /**
      * Append git visible source file details to report output.
      *
-     * @param string                    $displayPath              Root-relative path emitted by `git ls-files` to classify.
-     * @param list<string>              $configuredIgnorePatterns Additional ignore patterns from config.
-     * @param array<string, SourceFile> $files                    Accepted files keyed by canonical path; appended in place.
-     * @param list<IgnoredPath>         $ignoredDetails           Ignore records for paths held back; appended in place.
+     * @param string                    $displayPath - Root-relative path emitted by `git ls-files` to classify.
+     * @param list<string>              $configuredIgnorePatterns - Additional ignore patterns from config.
+     * @param array<string, SourceFile> $files - Accepted files keyed by canonical path; appended in place.
+     * @param list<IgnoredPath>         $ignoredDetails - Ignore records for paths held back; appended in place.
      *
      * @return void
      */
@@ -567,7 +567,7 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param list<string> $pathspecs
+     * @param list<string> $pathspecs - Git pathspecs to pass after `--`; empty input is handled by the caller.
      *
      * @return list<string>|null - deduplicated, sorted root-relative paths Git treats as tracked or unignored-untracked, or null when `git ls-files`
      *                           fails so the caller retries via the filesystem walk
@@ -600,7 +600,7 @@ final readonly class SourceDiscovery
     /**
      * Convert an existing project path into a Git pathspec relative to the project root.
      *
-     * @param string $absolutePath Existing absolute path to express relative to the project root.
+     * @param string $absolutePath - Existing absolute path to express relative to the project root.
      *
      * @return string|null - the path expressed relative to the worktree ("." for the root itself), or null when it sits outside the project root and
      *                     Git discovery must be dropped
@@ -625,9 +625,9 @@ final readonly class SourceDiscovery
     }
 
     /**
-     * @param string       $pathspec     Requested pathspec to look for among the visible paths.
-     * @param list<string> $visiblePaths Root-relative paths Git reported as visible.
-     * @param bool         $isFile       True when the request was a file, so only an exact match counts; directories also match by prefix.
+     * @param string       $pathspec - Requested pathspec to look for among the visible paths.
+     * @param list<string> $visiblePaths - Root-relative paths Git reported as visible.
+     * @param bool         $isFile - True when the request was a file, so only an exact match counts; directories also match by prefix.
      *
      * @return bool - true when the pathspec matched a visible path (an exact match for a file request, the directory or anything beneath it
      *              otherwise), false when the input was withheld
@@ -660,8 +660,8 @@ final readonly class SourceDiscovery
     /**
      * Return a compact ignored path for configured glob patterns.
      *
-     * @param string       $path     Absolute path of the ignored file to present compactly.
-     * @param list<string> $patterns Configured ignore globs whose `/**` directory form collapses the report.
+     * @param string       $path - Absolute path of the ignored file to present compactly.
+     * @param list<string> $patterns - Configured ignore globs whose `/**` directory form collapses the report.
      *
      * @return string - the directory base when a `dir/**` glob covers the file (collapsing the report to one entry), otherwise the file's own
      *                root-relative display path
@@ -690,7 +690,7 @@ final readonly class SourceDiscovery
     /**
      * Reduce ignored details to one entry per path, sorted for stable reporting.
      *
-     * @param list<IgnoredPath> $ignoredDetails
+     * @param list<IgnoredPath> $ignoredDetails - Ignored-path records that may contain duplicate paths from different discovery stages.
      *
      * @return list<IgnoredPath> - one record per path in stable path order, so repeated runs and snapshots stay deterministic
      */
@@ -711,13 +711,12 @@ final readonly class SourceDiscovery
     /**
      * Project the ignored-path display strings from the enriched details.
      *
-     * @param list<IgnoredPath> $ignoredDetails
+     * @param list<IgnoredPath> $ignoredDetails - Enriched ignored-path records whose path strings feed the legacy plain list.
      *
      * @return list<string> - just the path strings extracted from the detail records, for the legacy plain-list field alongside the richer records
      */
     private function pathsFromDetails(array $ignoredDetails): array
     {
-        // Just the path strings, for the legacy plain-list field alongside the richer detail records.
         return array_map(static fn(IgnoredPath $ignoredPath): string => $ignoredPath->path, $ignoredDetails);
     }
 }

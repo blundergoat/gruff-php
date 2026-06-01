@@ -125,8 +125,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Analyse all project units for interfaces with exactly one concrete implementor.
      *
-     * @param list<AnalysisUnit> $units       Parsed project units to analyse together.
-     * @param RuleContext        $ruleContext Rule context carrying config and settings.
+     * @param list<AnalysisUnit> $units - Parsed project units to analyse together.
+     * @param RuleContext        $ruleContext - Rule context carrying config and settings.
      *
      * @return list<Finding> - one per interface left single-implementor and externally unused; empty when none qualify
      */
@@ -144,7 +144,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Reset accumulated state at the start of a streaming project pass.
      *
-     * @param RuleContext $ruleContext Rule context carrying config and settings.
+     * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
      * @return void
      */
@@ -166,8 +166,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
      * Stores the per-unit summary on `$this->accumulated`; the AST may be
      * released by the orchestrator as soon as this call returns.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to index.
-     * @param RuleContext  $ruleContext  Rule context carrying config and settings.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to index.
+     * @param RuleContext  $ruleContext - Rule context carrying config and settings.
      *
      * @return void
      */
@@ -184,7 +184,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Produce single-implementor findings from the accumulated state and reset.
      *
-     * @param RuleContext $ruleContext Rule context carrying config and settings.
+     * @param RuleContext $ruleContext - Rule context carrying config and settings.
      *
      * @return list<Finding> - one finding per surviving single-implementor interface; empty when none qualify
      */
@@ -213,14 +213,13 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         ];
         $this->accumulationExcludedPaths = null;
 
-        // Hand back the single-implementor findings built from this project pass.
         return $findings;
     }
 
     /**
      * Apply path exclusions that previously gated filterEligibleUnits.
      *
-     * @param AnalysisUnit $analysisUnit Unit whose display path is matched against vendor and configured exclusions.
+     * @param AnalysisUnit $analysisUnit - Unit whose display path is matched against vendor and configured exclusions.
      *
      * @return bool - true when the unit is vendor or a configured-out path and contributes no facts; false to index it
      */
@@ -247,13 +246,13 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Index one unit's interfaces, implementations, and type references into the project-level facts.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to scan; its AST may be released once this returns.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to scan; its AST may be released once this returns.
      * @param array{
      *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
-     * }                   $projectTypes Accumulator mutated in place with the facts found in this unit.
+     * }                   $projectTypes - Accumulator mutated in place with the facts found in this unit.
      *
      * @return void
      */
@@ -317,7 +316,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Walk parent links to find the enclosing named class for a node.
      *
-     * @param Node $node Node whose `parent` attribute chain is walked outward; relies on the parent visitor
+     * @param Node $node - Node whose `parent` attribute chain is walked outward; relies on the parent visitor
      *                   having run during parsing.
      *
      * @return Class_|null - nearest named class ancestor; null when none exists (e.g. only anonymous-class scopes above)
@@ -340,14 +339,14 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Record one interface declaration plus the parent contracts it extends into the project facts.
      *
-     * @param Interface_   $interface    Interface declaration node to register as a project contract.
-     * @param AnalysisUnit $analysisUnit Owning unit, used for the display path and start line stored on the entry.
+     * @param Interface_   $interface - Interface declaration node to register as a project contract.
+     * @param AnalysisUnit $analysisUnit - Owning unit, used for the display path and start line stored on the entry.
      * @param array{
      *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
-     * }                   $projectTypes Accumulator gaining the interface entry and any parents marked as extended.
+     * }                   $projectTypes - Accumulator gaining the interface entry and any parents marked as extended.
      *
      * @return void
      */
@@ -381,14 +380,14 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Record each interface a concrete class implements so implementor counts can be tallied later.
      *
-     * @param Class_       $class        Class declaration node whose `implements` list supplies the edges.
-     * @param AnalysisUnit $analysisUnit Owning unit, used for the display path and start line stored per edge.
+     * @param Class_       $class - Class declaration node whose `implements` list supplies the edges.
+     * @param AnalysisUnit $analysisUnit - Owning unit, used for the display path and start line stored per edge.
      * @param array{
      *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
-     * }                   $projectTypes Accumulator gaining one implementation edge per implemented interface.
+     * }                   $projectTypes - Accumulator gaining one implementation edge per implemented interface.
      *
      * @return void
      */
@@ -417,12 +416,12 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Build findings from the collected project-level rule facts.
      *
-     * @param array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}> $interfaces
-     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $implementations
-     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $typeReferences
-     * @param array<string, true>                                                                                                $extendedInterfaces
-     * @param list<string>                                                                                                       $externalPrefixes
-     * @param list<string>                                                                                                       $frameworkAttributePrefixes
+     * @param array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}> $interfaces - Interface facts keyed by FQN.
+     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $implementations - Implementation edges keyed by interface FQN.
+     * @param array<string, list<array{classFqn: string, displayPath: string, line: int}>>                                       $typeReferences - Type-reference edges keyed by referenced interface FQN.
+     * @param array<string, true>                                                                                                $extendedInterfaces - Interfaces that are parents of another interface.
+     * @param list<string>                                                                                                       $externalPrefixes - Lower-cased namespace prefixes treated as external contracts.
+     * @param list<string>                                                                                                       $frameworkAttributePrefixes - Lower-cased attribute prefixes treated as framework hooks.
      *
      * @return list<Finding> - one finding per interface left single-implementor and externally unused after every exemption filter; empty when none
      *                       remain
@@ -505,7 +504,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Resolve the fully qualified declaration name for a class or interface.
      *
-     * @param Class_|Interface_ $node Declaration whose namespaced name is preferred, falling back to the bare name.
+     * @param Class_|Interface_ $node - Declaration whose namespaced name is preferred, falling back to the bare name.
      *
      * @return string|null - resolved FQN preferred over the short name; null only for anonymous declarations with no name
      */
@@ -525,7 +524,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Resolve name list for the design rule.
      *
-     * @param array<Name>|null $names Name nodes (e.g. an extends/implements list), or null when the clause is absent.
+     * @param array<Name>|null $names - Name nodes (e.g. an extends/implements list), or null when the clause is absent.
      *
      * @return list<string> - fully qualified name strings in source order; empty when the clause was null or had no names
      */
@@ -548,7 +547,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Resolve a name node to its fully qualified form when name resolution has run.
      *
-     * @param Name $name Name node to resolve; its `resolvedName` attribute is used when the resolver populated it.
+     * @param Name $name - Name node to resolve; its `resolvedName` attribute is used when the resolver populated it.
      *
      * @return string - resolved FQN when the resolver ran, else the name as written; always without a leading slash so keys match across units
      */
@@ -567,7 +566,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Resolve attributes for the design rule.
      *
-     * @param list<AttributeGroup> $attrGroups
+     * @param list<AttributeGroup> $attrGroups - Attribute groups declared on the interface being indexed.
      *
      * @return list<string> - flattened fully qualified attribute names across every group; empty when no attributes are present
      */
@@ -587,20 +586,20 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Record that one class type-hints a name, so an interface used only by its lone implementor stays flaggable.
      *
-     * @param Class_                           $class        Referencing class; its FQN is the attributed source of the
+     * @param Class_                           $class - Referencing class; its FQN is the attributed source of the
      *                                                       reference.
-     * @param Identifier|Name|ComplexType|null $type         Declared type to mine for names; scalars and null add nothing.
-     * @param int                              $line         1-based source line where the type appears; recorded on
+     * @param Identifier|Name|ComplexType|null $type - Declared type to mine for names; scalars and null add nothing.
+     * @param int                              $line - 1-based source line where the type appears; recorded on
      *                                                       the stored reference entry but not consumed — findings count usages by class FQN and
      *                                                       report the interface's own declaration line, so this is retained for entry
      *                                                       completeness/diagnostics, not as a reported location.
-     * @param AnalysisUnit                     $analysisUnit Owning unit, used for the display path stored per reference.
+     * @param AnalysisUnit                     $analysisUnit - Owning unit, used for the display path stored per reference.
      * @param array{
      *     interfaces: array<string, array{fqn: string, displayPath: string, line: int, extends: list<string>, attributes: list<string>}>,
      *     implementations: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     typeReferences: array<string, list<array{classFqn: string, displayPath: string, line: int}>>,
      *     extendedInterfaces: array<string, true>
-     * }                                       $projectTypes Accumulator gaining one type-reference edge per name found in the type.
+     * }                                       $projectTypes - Accumulator gaining one type-reference edge per name found in the type.
      *
      * @return void
      */
@@ -629,7 +628,7 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Extract referenced names from a type declaration.
      *
-     * @param Identifier|Name|ComplexType|null $type Declared type to walk; nullable and union/intersection types
+     * @param Identifier|Name|ComplexType|null $type - Declared type to walk; nullable and union/intersection types
      *                                               recurse into their members.
      *
      * @return list<Name> - class-like name nodes referenced by the type, flattened across union/intersection members; empty for null, scalar, or
@@ -676,8 +675,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Decide whether an interface inherits from an external contract we should not flag.
      *
-     * @param list<string> $extends          Fully qualified parent interface names of the interface under test.
-     * @param list<string> $externalPrefixes Lower-cased namespace prefixes that mark third-party contracts.
+     * @param list<string> $extends - Fully qualified parent interface names of the interface under test.
+     * @param list<string> $externalPrefixes - Lower-cased namespace prefixes that mark third-party contracts.
      *
      * @return bool - true when a parent interface matches an external prefix, marking the interface an extension point to keep
      */
@@ -700,8 +699,8 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     /**
      * Decide whether an interface carries a framework attribute that marks it as an extension point.
      *
-     * @param list<string> $attributes                 Fully qualified attribute names declared on the interface.
-     * @param list<string> $frameworkAttributePrefixes Lower-cased attribute prefixes that mark framework hooks.
+     * @param list<string> $attributes - Fully qualified attribute names declared on the interface.
+     * @param list<string> $frameworkAttributePrefixes - Lower-cased attribute prefixes that mark framework hooks.
      *
      * @return bool - true when an attribute matches a framework prefix, meaning the framework wires the interface so it is exempt
      */

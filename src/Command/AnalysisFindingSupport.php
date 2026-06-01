@@ -17,9 +17,10 @@ final readonly class AnalysisFindingSupport
     /**
      * Drop sensitive-data findings whose preview is on the config allowlist.
      *
-     * @param list<Finding> $findings Findings produced for the run.
-     * @param AnalysisConfig $config  Effective config supplying the secret-preview allowlist.
-     * @return list<Finding> Findings with allowlisted secret previews removed.
+     * @param list<Finding> $findings - Findings produced for the run.
+     * @param AnalysisConfig $config - Effective config supplying the secret-preview allowlist.
+     *
+     * @return list<Finding> - Findings with allowlisted secret previews removed.
      */
     public function filterAllowedSecretPreviews(array $findings, AnalysisConfig $config): array
     {
@@ -29,7 +30,6 @@ final readonly class AnalysisFindingSupport
             return $findings;
         }
 
-        // Hand back the findings minus any sensitive-data hit whose preview the operator has explicitly allowlisted.
         return array_values(array_filter(
             $findings,
             static function (Finding $finding) use ($allowedPreviews): bool {
@@ -46,9 +46,10 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep only findings whose file is in the changed-files set.
      *
-     * @param list<Finding> $findings     Findings to filter.
-     * @param list<string>  $changedFiles Project-relative paths considered changed.
-     * @return list<Finding> Findings located in a changed file.
+     * @param list<Finding> $findings - Findings to filter.
+     * @param list<string>  $changedFiles - Project-relative paths considered changed.
+     *
+     * @return list<Finding> - Findings located in a changed file.
      */
     public function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
     {
@@ -59,7 +60,6 @@ final readonly class AnalysisFindingSupport
 
         $changed = array_fill_keys($changedFiles, true);
 
-        // Hand back only the findings whose file is in the changed set, keyed by path for O(1) membership.
         return array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => isset($changed[$finding->filePath]),
@@ -69,9 +69,10 @@ final readonly class AnalysisFindingSupport
     /**
      * Rewrite absolute finding paths to be relative to the requested base directory.
      *
-     * @param list<Finding> $findings       Findings whose paths may need normalising.
-     * @param string|null   $pathsRelativeTo Base directory for relative paths, or null to leave paths untouched.
-     * @return list<Finding> Findings with absolute paths rebased under the directory when it resolves.
+     * @param list<Finding> $findings - Findings whose paths may need normalising.
+     * @param string|null   $pathsRelativeTo - Base directory for relative paths, or null to leave paths untouched.
+     *
+     * @return list<Finding> - Findings with absolute paths rebased under the directory when it resolves.
      */
     public function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
     {
@@ -115,16 +116,16 @@ final readonly class AnalysisFindingSupport
             );
         }
 
-        // Hand back every finding with absolute paths under the root rebased to relative; others kept verbatim.
         return $normalized;
     }
 
     /**
      * Normalise user-supplied path arguments to project-relative paths sorted for stable matching.
      *
-     * @param string       $projectRoot Project root requested paths resolve against.
-     * @param list<string> $paths       User-supplied path arguments.
-     * @return list<string> Project-relative paths sorted for stable matching.
+     * @param string       $projectRoot - Project root requested paths resolve against.
+     * @param list<string> $paths - User-supplied path arguments.
+     *
+     * @return list<string> - Project-relative paths sorted for stable matching.
      */
     public function normaliseRequestedPaths(string $projectRoot, array $paths): array
     {
@@ -159,16 +160,16 @@ final readonly class AnalysisFindingSupport
         $paths = array_values($normalised);
         sort($paths, SORT_STRING);
 
-        // Hand back the de-duplicated, project-relative paths in a stable sort so set matching is deterministic.
         return $paths;
     }
 
     /**
      * Report whether a changed file is inside the requested path set.
      *
-     * @param string       $changedFile    Project-relative changed file path.
-     * @param list<string> $requestedPaths Normalised requested paths to match against.
-     * @return bool True when the changed file is inside the requested path set.
+     * @param string       $changedFile - Project-relative changed file path.
+     * @param list<string> $requestedPaths - Normalised requested paths to match against.
+     *
+     * @return bool - True when the changed file is inside the requested path set.
      */
     public function matchesRequestedPath(string $changedFile, array $requestedPaths): bool
     {
@@ -194,9 +195,10 @@ final readonly class AnalysisFindingSupport
     /**
      * Keep the changed paths that exist on disk under the project root.
      *
-     * @param string       $projectRoot  Project root the changed paths resolve against.
-     * @param list<string> $changedFiles Project-relative paths from a diff.
-     * @return list<string> Existing paths that can be passed to source discovery.
+     * @param string       $projectRoot - Project root the changed paths resolve against.
+     * @param list<string> $changedFiles - Project-relative paths from a diff.
+     *
+     * @return list<string> - Existing paths that can be passed to source discovery.
      */
     public function existingChangedFiles(string $projectRoot, array $changedFiles): array
     {
@@ -210,16 +212,16 @@ final readonly class AnalysisFindingSupport
 
         sort($existing, SORT_STRING);
 
-        // Hand back the on-disk subset, sorted and de-duplicated, so source discovery sees stable distinct paths.
         return array_values(array_unique($existing));
     }
 
     /**
      * Keep requested paths that exist in the base snapshot.
      *
-     * @param string       $baseRoot Base-snapshot root the paths resolve against.
-     * @param list<string> $paths    Requested project-relative paths.
-     * @return list<string> Paths that exist in the base snapshot.
+     * @param string       $baseRoot - Base-snapshot root the paths resolve against.
+     * @param list<string> $paths - Requested project-relative paths.
+     *
+     * @return list<string> - Paths that exist in the base snapshot.
      */
     public function existingSnapshotPaths(string $baseRoot, array $paths): array
     {
@@ -233,7 +235,6 @@ final readonly class AnalysisFindingSupport
             }
         }
 
-        // Hand back only the requested paths present in the snapshot; an empty result signals none survived there.
         return $existing === [] ? [] : $existing;
     }
 }

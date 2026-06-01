@@ -91,7 +91,7 @@ final class ReflectedXssRuleTest extends TestCase
     /**
      * Analyse a fixture and return only reflected-XSS findings.
      *
-     * @param string $displayPath Fixture display path.
+     * @param string $displayPath - Fixture display path.
      *
      * @return list<Finding> - reflected-XSS findings for the fixture in registry order; empty when the rule fires none
      */

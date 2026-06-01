@@ -15,9 +15,9 @@ use Symfony\Component\Process\Process;
 final readonly class GitArchiveSnapshot
 {
     /**
-     * @param string       $projectRoot Git working tree root.
-     * @param string       $ref         Git ref to archive.
-     * @param list<string> $paths       Optional path filters to include in the archive.
+     * @param string       $projectRoot - Git working tree root.
+     * @param string       $ref - Git ref to archive.
+     * @param list<string> $paths - Optional path filters to include in the archive.
      *
      * @return string - path to the extracted snapshot tree; empty directory when path filters match nothing at the ref
      * @throws RuntimeException When the temporary snapshot directory cannot be created.
@@ -86,7 +86,7 @@ final readonly class GitArchiveSnapshot
     /**
      * Recursively remove a snapshot directory.
      *
-     * @param string $path Snapshot directory path to remove.
+     * @param string $path - Snapshot directory path to remove.
      *
      * @return void
      */
@@ -123,9 +123,9 @@ final readonly class GitArchiveSnapshot
     /**
      * List requested paths that exist at a git ref.
      *
-     * @param string       $projectRoot Working tree the git ls-tree runs in.
-     * @param string       $ref         Git ref whose tree is queried for the requested paths.
-     * @param list<string> $paths       Path filters to test; normalised to root-relative before the query.
+     * @param string       $projectRoot - Working tree the git ls-tree runs in.
+     * @param string       $ref - Git ref whose tree is queried for the requested paths.
+     * @param list<string> $paths - Path filters to test; normalised to root-relative before the query.
      *
      * @return list<string> - root-relative paths present at the ref, sorted and de-duplicated; empty when none match
      */
@@ -163,8 +163,8 @@ final readonly class GitArchiveSnapshot
     /**
      * Normalise archive paths for the branch-review workflow.
      *
-     * @param string       $projectRoot Root that absolute inputs are made relative to; paths outside it are dropped.
-     * @param list<string> $paths       Caller path filters, absolute or relative, possibly with `./` prefixes.
+     * @param string       $projectRoot - Root that absolute inputs are made relative to; paths outside it are dropped.
+     * @param list<string> $paths - Caller path filters, absolute or relative, possibly with `./` prefixes.
      *
      * @return list<string> - root-relative path filters, sorted and de-duplicated; empty when every input was out-of-tree
      */
@@ -208,7 +208,7 @@ final readonly class GitArchiveSnapshot
     /**
      * Validate a Git ref before passing it to archive commands.
      *
-     * @param string $ref Untrusted caller-supplied ref name to allowlist before it reaches the command line.
+     * @param string $ref - Untrusted caller-supplied ref name to allowlist before it reaches the command line.
      *
      * @return string - the same ref, returned unchanged once it passes the allowlist so callers can splice it unquoted
      */

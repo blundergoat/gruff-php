@@ -64,8 +64,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Find short variable names outside accepted local conventions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
      *
      * @return list<Finding> - one finding per offending name across every scope; empty when the unit has no short names
      */
@@ -82,17 +82,16 @@ final readonly class ShortVariableRule implements RuleInterface
             );
         }
 
-        // Hand back the short-name findings gathered across every function-like scope in the unit.
         return $findings;
     }
 
     /**
      * Find short parameters in one function-like scope.
      *
-     * @param RuleDefinition    $definition   Rule identity and defaults stamped onto each emitted finding.
-     * @param AnalysisUnit      $analysisUnit Parsed unit supplying the display path and source for locations.
-     * @param RuleContext       $ruleContext  Carries the accepted-abbreviation allowlist that suppresses matches.
-     * @param FunctionLikeScope $scope        The single function/closure whose parameter list is inspected here.
+     * @param RuleDefinition    $definition - Rule identity and defaults stamped onto each emitted finding.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and source for locations.
+     * @param RuleContext       $ruleContext - Carries the accepted-abbreviation allowlist that suppresses matches.
+     * @param FunctionLikeScope $scope - The single function/closure whose parameter list is inspected here.
      *
      * @return list<Finding> - one finding per single-character parameter; empty when every name is long enough or allowed
      */
@@ -132,10 +131,10 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Find short local variables in one function-like scope.
      *
-     * @param RuleDefinition    $definition   Rule identity and defaults stamped onto each emitted finding.
-     * @param AnalysisUnit      $analysisUnit Parsed unit supplying the display path and source for locations.
-     * @param RuleContext       $ruleContext  Carries the accepted-abbreviation allowlist that suppresses matches.
-     * @param FunctionLikeScope $scope        Scope whose local variables, loop vars, and catch vars are read.
+     * @param RuleDefinition    $definition - Rule identity and defaults stamped onto each emitted finding.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and source for locations.
+     * @param RuleContext       $ruleContext - Carries the accepted-abbreviation allowlist that suppresses matches.
+     * @param FunctionLikeScope $scope - Scope whose local variables, loop vars, and catch vars are read.
      *
      * @return list<Finding> - one finding per short local; allowlisted loop counters and caught-exception names are skipped
      */
@@ -182,13 +181,13 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Build a short-variable finding when the name violates the rule.
      *
-     * @param RuleDefinition $definition   Rule identity and defaults stamped onto the finding when one is built.
-     * @param AnalysisUnit   $analysisUnit Parsed unit supplying the display path and source for the location.
-     * @param RuleContext    $ruleContext  Carries the accepted-abbreviation allowlist that suppresses the finding.
-     * @param Node           $node         Declaration node (param or variable) whose start line anchors the finding.
-     * @param string         $kind         Human label for the message, one of parameter, property, or variable.
-     * @param string         $name         The identifier without its leading dollar; the value being judged short.
-     * @param string         $symbol       Enclosing callable label shown in the message so the reader can locate it.
+     * @param RuleDefinition $definition - Rule identity and defaults stamped onto the finding when one is built.
+     * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path and source for the location.
+     * @param RuleContext    $ruleContext - Carries the accepted-abbreviation allowlist that suppresses the finding.
+     * @param Node           $node - Declaration node (param or variable) whose start line anchors the finding.
+     * @param string         $kind - Human label for the message, one of parameter, property, or variable.
+     * @param string         $name - The identifier without its leading dollar; the value being judged short.
+     * @param string         $symbol - Enclosing callable label shown in the message so the reader can locate it.
      *
      * @return Finding|null - the finding for a reportable single-character name; null means the name is exempt, not an error
      */
@@ -232,9 +231,9 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Return a best-effort 1-indexed column for a variable or parameter name.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose raw source is scanned for the name's offset.
-     * @param Node         $node         Node whose start line selects which source line to search.
-     * @param string       $name         Identifier without its dollar; matched as `$name` to find the column.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose raw source is scanned for the name's offset.
+     * @param Node         $node - Node whose start line selects which source line to search.
+     * @param string       $name - Identifier without its dollar; matched as `$name` to find the column.
      *
      * @return int|null - 1-indexed source column of the name; null when it cannot be located on the node's line
      */
@@ -262,7 +261,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Collect variable names introduced by foreach loops.
      *
-     * @param FunctionLikeScope $scope Scope whose body is searched for `for` loops; nested callables are excluded.
+     * @param FunctionLikeScope $scope - Scope whose body is searched for `for` loops; nested callables are excluded.
      *
      * @return array<string, true> - presence set of loop-init variable names; the `true` is a marker, callers test keys only
      */
@@ -285,7 +284,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Collect variable names introduced by catch clauses.
      *
-     * @param FunctionLikeScope $scope Scope whose body is searched for `catch` clauses; nested callables excluded.
+     * @param FunctionLikeScope $scope - Scope whose body is searched for `catch` clauses; nested callables excluded.
      *
      * @return array<string, true> - presence set of caught-exception names; the `true` is a marker, callers test keys only
      */
@@ -306,8 +305,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Collect variable references keyed by variable name.
      *
-     * @param array<Node>        $nodes
-     * @param array<string,true> $variables
+     * @param array<Node>        $nodes - AST nodes whose descendants are scanned for variable references.
+     * @param array<string,true> $variables - Accumulator mutated in place; each discovered variable name is added as a key.
      *
      * @return void
      */
@@ -325,8 +324,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * List descendant nodes in the current function-like scope.
      *
-     * @param FunctionLikeScope    $scope     Scope whose precomputed body descendants are tested, one level deep.
-     * @param callable(Node): bool $predicate Returns true to keep a node; called once per descendant.
+     * @param FunctionLikeScope    $scope - Scope whose precomputed body descendants are tested, one level deep.
+     * @param callable(Node): bool $predicate - Returns true to keep a node; called once per descendant.
      *
      * @return list<Node> - matching descendants in source order; empty when no node in the scope satisfies the predicate
      */
@@ -347,8 +346,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Filter descendant nodes with a predicate.
      *
-     * @param list<Node>           $nodes     Roots to walk; each is traversed recursively until a nested callable.
-     * @param callable(Node): bool $predicate Returns true to keep a node; applied at every visited descendant.
+     * @param list<Node>           $nodes - Roots to walk; each is traversed recursively until a nested callable.
+     * @param callable(Node): bool $predicate - Returns true to keep a node; applied at every visited descendant.
      *
      * @return list<Node> - matching nodes flattened across all roots in recursive-walk order; empty when none match
      */
@@ -367,9 +366,9 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Append descendant nodes that satisfy a predicate.
      *
-     * @param Node                 $node      Subtree root to inspect and recurse into for the current call.
-     * @param callable(Node): bool $predicate Returns true to keep a node; tested before descending.
-     * @param list<Node>           $matches   Accumulator appended to in place, so recursion shares one result list.
+     * @param Node                 $node - Subtree root to inspect and recurse into for the current call.
+     * @param callable(Node): bool $predicate - Returns true to keep a node; tested before descending.
+     * @param list<Node>           $matches - Accumulator appended to in place, so recursion shares one result list.
      *
      * @return void
      */
@@ -392,7 +391,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * List direct child nodes that can be recursively traversed.
      *
-     * @param Node $node Parent whose declared sub-node slots are flattened into child AST nodes.
+     * @param Node $node - Parent whose declared sub-node slots are flattened into child AST nodes.
      *
      * @return list<Node> - direct child AST nodes; scalar and null sub-node slots are dropped, so empty means no Node children
      */
@@ -411,8 +410,8 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Append traversable child nodes to the current collection.
      *
-     * @param mixed      $subNode  A raw sub-node slot: a Node, an array of them, or a scalar/null to ignore.
-     * @param list<Node> $children Accumulator appended to in place so the recursion builds one flat child list.
+     * @param mixed      $subNode - A raw sub-node slot: a Node, an array of them, or a scalar/null to ignore.
+     * @param list<Node> $children - Accumulator appended to in place so the recursion builds one flat child list.
      *
      * @return void
      */
@@ -438,7 +437,7 @@ final readonly class ShortVariableRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @param FunctionLikeScope $scope Scope being labelled; its node decides named vs synthetic resolution.
+     * @param FunctionLikeScope $scope - Scope being labelled; its node decides named vs synthetic resolution.
      *
      * @return string - the callable's real name for functions/methods, or a synthesised `kind@line` label for anonymous ones
      */

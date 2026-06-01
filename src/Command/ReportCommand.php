@@ -105,10 +105,10 @@ final class ReportCommand extends Command
     /**
      * Run analysis through the analyse command and emit or write the report.
      *
-     * @param InputInterface  $input  Console input carrying report paths, format, and forwarded analyse options.
-     * @param OutputInterface $output Destination for the rendered report, status lines, and forwarded child stderr.
+     * @param InputInterface  $input - Console input carrying report paths, format, and forwarded analyse options.
+     * @param OutputInterface $output - Destination for the rendered report, status lines, and forwarded child stderr.
      *
-     * @return int Symfony command exit code.
+     * @return int - Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -184,7 +184,7 @@ final class ReportCommand extends Command
     /**
      * Build the analyse command argv used by report generation.
      *
-     * @param InputInterface $input Report-command input whose options and paths are translated into analyse flags.
+     * @param InputInterface $input - Report-command input whose options and paths are translated into analyse flags.
      *
      * @return list<string> - full analyse subprocess argv, starting with the PHP binary and `analyse`, with forwarded flags and trailing paths
      */
@@ -204,15 +204,14 @@ final class ReportCommand extends Command
         $this->appendDiffOption($command, $input);
         $this->appendPaths($command, $input);
 
-        // Hand back the fully assembled analyse argv for the report subprocess to run.
         return $command;
     }
 
     /**
      * Append user paths after an option separator so dash-prefixed paths stay positional.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Supplies the variadic paths argument appended after the `--` separator.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Supplies the variadic paths argument appended after the `--` separator.
      *
      * @return void
      */
@@ -233,8 +232,8 @@ final class ReportCommand extends Command
     /**
      * Forward all configured string-valued options to the analyse command.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of the STRING_OPTIONS values; empty or unset options are skipped.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of the STRING_OPTIONS values; empty or unset options are skipped.
      *
      * @return void
      */
@@ -255,8 +254,8 @@ final class ReportCommand extends Command
     /**
      * Forward the report editor-link option unless it uses the default disabled value.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of report-editor-link; the default "none" is treated as unset and dropped.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of report-editor-link; the default "none" is treated as unset and dropped.
      *
      * @return void
      */
@@ -272,8 +271,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional baseline flag with its optional path.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of --baseline; the flag is forwarded only when the user passed it.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of --baseline; the flag is forwarded only when the user passed it.
      *
      * @return void
      */
@@ -292,8 +291,8 @@ final class ReportCommand extends Command
     /**
      * Forward true boolean flags to the analyse command.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of the BOOLEAN_OPTIONS flags; only flags resolving to true are forwarded.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of the BOOLEAN_OPTIONS flags; only flags resolving to true are forwarded.
      *
      * @return void
      */
@@ -309,8 +308,8 @@ final class ReportCommand extends Command
     /**
      * Forward repeated filter options to the analyse command.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of the REPEATED_OPTIONS arrays; each non-empty value yields one flag pair.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of the REPEATED_OPTIONS arrays; each non-empty value yields one flag pair.
      *
      * @return void
      */
@@ -335,8 +334,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional interactive report flag.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of --report-interactive; a string value is passed as `=value`, else bare.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of --report-interactive; a string value is passed as `=value`, else bare.
      *
      * @return void
      */
@@ -356,8 +355,8 @@ final class ReportCommand extends Command
     /**
      * Forward the optional diff flag with its optional mode value.
      *
-     * @param list<string>   $command Analyse command arguments built so far.
-     * @param InputInterface $input   Source of --diff; forwarded only when present, with its mode value when non-empty.
+     * @param list<string>   $command - Analyse command arguments built so far.
+     * @param InputInterface $input - Source of --diff; forwarded only when present, with its mode value when non-empty.
      *
      * @return void
      */
@@ -381,9 +380,9 @@ final class ReportCommand extends Command
      * --fail-on, so the subprocess uses it directly rather than re-applying
      * analyse's own precedence chain (which has a different binary default).
      *
-     * @param InputInterface $input Console input for the report command.
+     * @param InputInterface $input - Console input for the report command.
      *
-     * @return string Resolved threshold suitable for `--fail-on`.
+     * @return string - Resolved threshold suitable for `--fail-on`.
      */
     private function resolveFailOn(InputInterface $input): string
     {
@@ -413,9 +412,9 @@ final class ReportCommand extends Command
      * same config and will surface any failures through its usual diagnostic
      * path. Returning null lets the caller fall back to the binary default.
      *
-     * @param InputInterface $input Console input for the report command.
+     * @param InputInterface $input - Console input for the report command.
      *
-     * @return string|null Resolved threshold string, or null when unavailable.
+     * @return string|null - Resolved threshold string, or null when unavailable.
      */
     private function loadConfigFailThreshold(InputInterface $input): ?string
     {
@@ -445,10 +444,10 @@ final class ReportCommand extends Command
     /**
      * Read a non-empty string option from console input.
      *
-     * @param InputInterface $input Console input to read the option from.
-     * @param string         $name  Option name to read, without the leading dashes.
+     * @param InputInterface $input - Console input to read the option from.
+     * @param string         $name - Option name to read, without the leading dashes.
      *
-     * @return string|null Option value, or null when omitted/empty.
+     * @return string|null - Option value, or null when omitted/empty.
      */
     private function optionalStringOption(InputInterface $input, string $name): ?string
     {
@@ -461,7 +460,7 @@ final class ReportCommand extends Command
     /**
      * Return the package-local gruff-php executable path.
      *
-     * @return string Absolute gruff-php binary path.
+     * @return string - Absolute gruff-php binary path.
      */
     private function gruffBinary(): string
     {
@@ -472,8 +471,8 @@ final class ReportCommand extends Command
     /**
      * Forward child process stderr to the most appropriate output stream.
      *
-     * @param OutputInterface $output Target stream; the dedicated error channel is used when one is available.
-     * @param string          $stderr Captured analyse stderr; an empty string is a no-op, otherwise a newline is ensured.
+     * @param OutputInterface $output - Target stream; the dedicated error channel is used when one is available.
+     * @param string          $stderr - Captured analyse stderr; an empty string is a no-op, otherwise a newline is ensured.
      *
      * @return void
      */

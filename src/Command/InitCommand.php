@@ -106,10 +106,10 @@ final class InitCommand extends Command
     /**
      * Generate the default config file at the project root.
      *
-     * @param InputInterface  $input  Console input; only the --project-root and --force options are read.
-     * @param OutputInterface $output Console output; carries the wrote-path notice, next-steps guidance, and any error.
+     * @param InputInterface  $input - Console input; only the --project-root and --force options are read.
+     * @param OutputInterface $output - Console output; carries the wrote-path notice, next-steps guidance, and any error.
      *
-     * @return int Symfony command exit code.
+     * @return int - Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -170,10 +170,10 @@ final class InitCommand extends Command
     /**
      * Resolve the directory the new config file will be written to.
      *
-     * @param InputInterface  $input  Console input; an explicit --project-root wins, else the current working directory is used.
-     * @param OutputInterface $output Console output used to report a missing directory or an undeterminable working directory.
+     * @param InputInterface  $input - Console input; an explicit --project-root wins, else the current working directory is used.
+     * @param OutputInterface $output - Console output used to report a missing directory or an undeterminable working directory.
      *
-     * @return string|null Directory to use, or null after emitting an error.
+     * @return string|null - Directory to use, or null after emitting an error.
      */
     private function projectRoot(InputInterface $input, OutputInterface $output): ?string
     {
@@ -205,12 +205,12 @@ final class InitCommand extends Command
     /**
      * Refuse to overwrite a preferred or legacy config file without --force.
      *
-     * @param string          $projectRoot Directory checked for a sibling legacy .gruff.yaml that --force would shadow.
-     * @param string          $targetPath  Full path of the .gruff-php.yaml about to be written; refused when it already exists.
-     * @param bool            $shouldForce True bypasses both guards; the caller derives it from the --force option.
-     * @param OutputInterface $output      Console output used to explain why init refused.
+     * @param string          $projectRoot - Directory checked for a sibling legacy .gruff.yaml that --force would shadow.
+     * @param string          $targetPath - Full path of the .gruff-php.yaml about to be written; refused when it already exists.
+     * @param bool            $shouldForce - True bypasses both guards; the caller derives it from the --force option.
+     * @param OutputInterface $output - Console output used to explain why init refused.
      *
-     * @return int|null Exit code when init must refuse, or null when writing may proceed.
+     * @return int|null - Exit code when init must refuse, or null when writing may proceed.
      */
     private function guardExistingConfig(string $projectRoot, string $targetPath, bool $shouldForce, OutputInterface $output): ?int
     {
@@ -251,15 +251,14 @@ final class InitCommand extends Command
      * renderRulesSection so each rule can carry a leading description comment
      * that Yaml::dump can't emit.
      *
-     * @param AnalysisConfig        $analysisConfig  Config seeded from the registry defaults.
-     * @param list<string>          $ignoredPaths    Paths to omit from generated project scans.
-     * @param array<string, string> $minimumSeverity Per-command exit-code thresholds emitted under `minimumSeverity:`.
+     * @param AnalysisConfig        $analysisConfig - Config seeded from the registry defaults.
+     * @param list<string>          $ignoredPaths - Paths to omit from generated project scans.
+     * @param array<string, string> $minimumSeverity - Per-command exit-code thresholds emitted under `minimumSeverity:`.
      *
      * @return array<string, mixed> - scaffold document keyed in the exact order init emits above the rules block, ready for Yaml::dump
      */
     private static function buildScaffoldDocument(AnalysisConfig $analysisConfig, array $ignoredPaths, array $minimumSeverity): array
     {
-        // Hand back the scaffold document in the key order init emits above the rules block.
         return [
             'schemaVersion'     => ConfigLoader::SCHEMA_VERSION,
             'minimumPhpVersion' => $analysisConfig->minimumPhpVersion(),
@@ -287,9 +286,9 @@ final class InitCommand extends Command
      * display name when no description is set). Output is appended to the
      * scaffold YAML; the existing 4-space indent contract is preserved.
      *
-     * @param RuleRegistry $ruleRegistry Source of the rules to render and the descriptions that become their comments.
+     * @param RuleRegistry $ruleRegistry - Source of the rules to render and the descriptions that become their comments.
      *
-     * @return string Rendered `rules:` block including trailing newline.
+     * @return string - Rendered `rules:` block including trailing newline.
      */
     private static function renderRulesSection(RuleRegistry $ruleRegistry): string
     {
@@ -305,7 +304,6 @@ final class InitCommand extends Command
             }
         }
 
-        // Hand back the fully rendered rules block (header line plus every commented rule entry).
         return $output;
     }
 
@@ -315,9 +313,9 @@ final class InitCommand extends Command
      * gating-command + threshold-value contract the loader applies so an invalid
      * block surfaces a useful error before init blindly preserves it.
      *
-     * @param string $targetPath Path of the config file being regenerated, read for a hand-edited block to carry forward.
+     * @param string $targetPath - Path of the config file being regenerated, read for a hand-edited block to carry forward.
      *
-     * @return array<string, string>|null Existing block (command => threshold), or null when none can be preserved.
+     * @return array<string, string>|null - Existing block (command => threshold), or null when none can be preserved.
      * @throws ConfigException When a preserved entry is not a valid gating command or threshold value.
      */
     private static function existingMinimumSeverity(string $targetPath): ?array
@@ -333,7 +331,6 @@ final class InitCommand extends Command
             $preserved[self::validateGatingCommand($command)] = self::validateGatingThreshold((string)$command, $threshold);
         }
 
-        // Hand back the existing entries, now re-validated, so --force keeps the user's gating thresholds.
         return $preserved;
     }
 
@@ -343,9 +340,9 @@ final class InitCommand extends Command
      * so the two-stage call avoids returning a nullable mixed-array shape from
      * a single helper (which trips `modernisation.phpdoc-mixed-overuse`).
      *
-     * @param string $targetPath Path of the existing config file to probe; a missing or unparseable file counts as absent.
+     * @param string $targetPath - Path of the existing config file to probe; a missing or unparseable file counts as absent.
      *
-     * @return bool True when the YAML loads and contains a top-level `minimumSeverity:` key.
+     * @return bool - True when the YAML loads and contains a top-level `minimumSeverity:` key.
      */
     private static function hasMinimumSeverityBlock(string $targetPath): bool
     {
@@ -368,9 +365,9 @@ final class InitCommand extends Command
     /**
      * Read and shape-validate the `minimumSeverity:` block from the existing config.
      *
-     * @param string $targetPath Path of the config file to read; the caller has already confirmed the block is present.
+     * @param string $targetPath - Path of the config file to read; the caller has already confirmed the block is present.
      *
-     * @return array<array-key, mixed> Decoded YAML map; per-entry validation happens in the caller.
+     * @return array<array-key, mixed> - Decoded YAML map; per-entry validation happens in the caller.
      * @throws ConfigException When the key is not a map shape.
      */
     private static function readMinimumSeverityBlock(string $targetPath): array
@@ -386,16 +383,15 @@ final class InitCommand extends Command
             throw new ConfigException('Config key "minimumSeverity" must be a map of command name to threshold.');
         }
 
-        // Hand back the raw map; the caller validates each command/threshold pair before trusting it.
         return $existing;
     }
 
     /**
      * Confirm the user-supplied key names a real gating command.
      *
-     * @param mixed $command Raw YAML map key; must be a string naming one of ConfigLoader::GATING_COMMANDS.
+     * @param mixed $command - Raw YAML map key; must be a string naming one of ConfigLoader::GATING_COMMANDS.
      *
-     * @return string Validated gating-command name.
+     * @return string - Validated gating-command name.
      * @throws ConfigException When the key is not a string or names a non-gating command.
      */
     private static function validateGatingCommand(mixed $command): string
@@ -419,10 +415,10 @@ final class InitCommand extends Command
     /**
      * Confirm the user-supplied threshold names a canonical `FailThreshold` value.
      *
-     * @param string $command   Owning command name, used only to point the rejection message at the offending key.
-     * @param mixed  $threshold Raw YAML value; must be a string accepted by FailThreshold::fromInput.
+     * @param string $command - Owning command name, used only to point the rejection message at the offending key.
+     * @param mixed  $threshold - Raw YAML value; must be a string accepted by FailThreshold::fromInput.
      *
-     * @return string Validated threshold string (one of advisory|warning|error|none).
+     * @return string - Validated threshold string (one of advisory|warning|error|none).
      * @throws ConfigException When the value is not a string or not in the canonical four.
      */
     private static function validateGatingThreshold(string $command, mixed $threshold): string
@@ -446,7 +442,7 @@ final class InitCommand extends Command
      * overwrite a deliberate downgrade; the scaffold always writes the canonical
      * value, so a mismatch is treated as a user intent worth confirming.
      *
-     * @param string $targetPath Path of the config file to inspect; a missing, unparseable, or unset schemaVersion is allowed.
+     * @param string $targetPath - Path of the config file to inspect; a missing, unparseable, or unset schemaVersion is allowed.
      *
      * @return void
      * @throws ConfigException When the existing schemaVersion is set but does not match the canonical value.
@@ -488,9 +484,9 @@ final class InitCommand extends Command
     /**
      * Read an existing config's path ignores so --force does not wipe local policy.
      *
-     * @param string $targetPath Path of the config file to read; any non-list or blank-entry ignore block is rejected wholesale.
+     * @param string $targetPath - Path of the config file to read; any non-list or blank-entry ignore block is rejected wholesale.
      *
-     * @return list<string>|null Existing ignore paths, or null when none can be preserved.
+     * @return list<string>|null - Existing ignore paths, or null when none can be preserved.
      */
     private static function existingIgnoredPaths(string $targetPath): ?array
     {
@@ -533,14 +529,13 @@ final class InitCommand extends Command
             $ignoredPaths[] = trim($path);
         }
 
-        // Hand back the trimmed, fully validated ignore list so --force preserves the user's path policy.
         return $ignoredPaths;
     }
 
     /**
      * Serialise one rule's registry defaults into the config shape.
      *
-     * @param RuleDefinition $ruleDefinition Rule definition to serialise.
+     * @param RuleDefinition $ruleDefinition - Rule definition to serialise.
      *
      * @return array<string, mixed> - config entry carrying only the keys this rule defines defaults for; always has `enabled`, with
      *                       `threshold`/`severity`/`thresholds`/`options` present only when the rule sets them
@@ -562,7 +557,6 @@ final class InitCommand extends Command
             $ruleEntry['options'] = $ruleDefinition->defaultOptions;
         }
 
-        // Hand back the entry carrying only the keys this rule actually defines defaults for.
         return $ruleEntry;
     }
 }

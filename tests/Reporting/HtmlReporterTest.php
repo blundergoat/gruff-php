@@ -468,7 +468,6 @@ final class HtmlReporterTest extends TestCase
      */
     private function sampleReport(): AnalysisReport
     {
-        // Hand back a report spanning one finding per pillar so renderer assertions exercise every section.
         return $this->report([
                                  new Finding(
                                      ruleId:     'docs.missing-public-phpdoc',
@@ -505,9 +504,9 @@ final class HtmlReporterTest extends TestCase
     }
 
     /**
-     * @param list<Finding>       $findings
-     * @param list<RunDiagnostic> $diagnostics
-     * @param ScoreReport|null    $score
+     * @param list<Finding>       $findings - Findings to render in the HTML fixture report.
+     * @param list<RunDiagnostic> $diagnostics - Diagnostics to render alongside the findings.
+     * @param ScoreReport|null    $score - Precomputed score to use, or null to derive one from the findings.
      *
      * @return AnalysisReport - html-format report wired with the given findings, diagnostics, and resolved score, ready to render
      */
@@ -515,7 +514,6 @@ final class HtmlReporterTest extends TestCase
     {
         $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
-        // Hand back an html-format report fixture wired with the given findings, diagnostics, and resolved score.
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],
@@ -536,7 +534,7 @@ final class HtmlReporterTest extends TestCase
     /**
      * Load an expected fixture snapshot.
      *
-     * @param string $name Fixture name.
+     * @param string $name - Fixture name.
      *
      * @return string - raw committed snapshot text for the named fixture, used as the expected HTML in snapshot assertions
      */
@@ -545,7 +543,6 @@ final class HtmlReporterTest extends TestCase
         $contents = file_get_contents(__DIR__ . '/../Fixtures/Reporting/InteractiveReport/' . $name);
         self::assertIsString($contents);
 
-        // Hand back the snapshot text so a test can diff rendered HTML against the committed expectation.
         return $contents;
     }
 }

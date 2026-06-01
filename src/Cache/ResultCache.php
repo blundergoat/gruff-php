@@ -28,7 +28,7 @@ final readonly class ResultCache
     private const MAX_ENTRIES = 4096;
 
     /**
-     * @param string $cacheDir Project-local directory holding cache entries.
+     * @param string $cacheDir - Project-local directory holding cache entries.
      */
     public function __construct(private string $cacheDir)
     {
@@ -37,8 +37,9 @@ final readonly class ResultCache
     /**
      * Build the cache rooted at the project's gitignored cache directory.
      *
-     * @param string $projectRoot Project root the cache lives under.
-     * @return self Cache for the project.
+     * @param string $projectRoot - Project root the cache lives under.
+     *
+     * @return self - Cache for the project.
      */
     public static function forProject(string $projectRoot): self
     {
@@ -49,8 +50,9 @@ final readonly class ResultCache
     /**
      * Return the cached findings for a key, or null on any miss or doubt.
      *
-     * @param string $key Cache key for a file's per-unit findings.
-     * @return list<Finding>|null Reconstructed findings, or null when not cached.
+     * @param string $key - Cache key for a file's per-unit findings.
+     *
+     * @return list<Finding>|null - Reconstructed findings, or null when not cached.
      */
     public function get(string $key): ?array
     {
@@ -96,8 +98,9 @@ final readonly class ResultCache
     /**
      * Store a file's per-unit findings under its key. Best-effort; failures are silent.
      *
-     * @param string        $key      Cache key for a file's per-unit findings.
-     * @param list<Finding> $findings Findings produced for the file.
+     * @param string        $key - Cache key for a file's per-unit findings.
+     * @param list<Finding> $findings - Findings produced for the file.
+     *
      * @return void
      */
     public function put(string $key, array $findings): void
@@ -128,8 +131,9 @@ final readonly class ResultCache
     /**
      * Resolve the on-disk path for a cache key.
      *
-     * @param string $key Cache key.
-     * @return string Absolute entry path.
+     * @param string $key - Cache key.
+     *
+     * @return string - Absolute entry path.
      */
     private function pathFor(string $key): string
     {

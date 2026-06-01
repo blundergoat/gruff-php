@@ -26,7 +26,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Describe the private key sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -44,10 +44,10 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     /**
      * Find string literals that appear to contain private key material.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for private key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for private key-like literals.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

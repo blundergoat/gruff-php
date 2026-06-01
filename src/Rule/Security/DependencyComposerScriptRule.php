@@ -50,7 +50,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Describe the risky Composer script rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -68,10 +68,10 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Find `scripts` entries that run shell or remote commands.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for risky scripts.
+     * @return list<Finding> - Findings for risky scripts.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -115,8 +115,9 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     /**
      * Decide whether any command for an event is a shell/remote invocation.
      *
-     * @param mixed $commands Script value: a command string or a list of commands.
-     * @return bool True when at least one command matches a risky shell fragment.
+     * @param mixed $commands - Script value: a command string or a list of commands.
+     *
+     * @return bool - True when at least one command matches a risky shell fragment.
      */
     private function hasRiskyCommand(mixed $commands): bool
     {

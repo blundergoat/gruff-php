@@ -42,7 +42,7 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Describe the parameter-count rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -62,10 +62,10 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Find functions, methods, and closures with too many parameters.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for callables above configured thresholds.
+     * @return list<Finding> - Findings for callables above configured thresholds.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -166,7 +166,6 @@ final readonly class ParameterCountRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per callable that breached its applicable threshold; empty when all fit.
         return $findings;
     }
 
@@ -176,11 +175,12 @@ final readonly class ParameterCountRule implements RuleInterface
      * Constructor-specific configuration is opt-in: zero means the constructor
      * inherits the main rule threshold.
      *
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Callable judged; only its constructor-ness matters.
-     * @param int $paramCount Declared parameter count, compared against the chosen threshold.
-     * @param int $constructorMax Constructor-specific cap; zero disables it and defers to the main threshold.
-     * @param RuleSettings $settings Effective settings supplying the main high-value threshold ladder.
-     * @return ThresholdMatch|null Matched threshold, or null when allowed.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Callable judged; only its constructor-ness matters.
+     * @param int $paramCount - Declared parameter count, compared against the chosen threshold.
+     * @param int $constructorMax - Constructor-specific cap; zero disables it and defers to the main threshold.
+     * @param RuleSettings $settings - Effective settings supplying the main high-value threshold ladder.
+     *
+     * @return ThresholdMatch|null - Matched threshold, or null when allowed.
      */
     private function thresholdMatch(
         ClassMethod|Function_|Closure|ArrowFunction $node,
@@ -208,9 +208,10 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Use the configured rule severity for constructor-specific threshold hits.
      *
-     * @param RuleSettings $settings       Effective settings whose explicit severity, when set, wins outright.
-     * @param int          $constructorMax Configured cap; probed one above to read the ladder's severity for that band.
-     * @return Severity Severity selected from the effective rule settings.
+     * @param RuleSettings $settings - Effective settings whose explicit severity, when set, wins outright.
+     * @param int          $constructorMax - Configured cap; probed one above to read the ladder's severity for that band.
+     *
+     * @return Severity - Severity selected from the effective rule settings.
      */
     private function constructorThresholdSeverity(RuleSettings $settings, int $constructorMax): Severity
     {
@@ -228,8 +229,9 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Exclude final readonly value-object constructors that use property promotion.
      *
-     * @param ClassMethod $node Method node tested for the final-readonly, fully-promoted constructor shape.
-     * @return bool True when the constructor shape is an accepted value object.
+     * @param ClassMethod $node - Method node tested for the final-readonly, fully-promoted constructor shape.
+     *
+     * @return bool - True when the constructor shape is an accepted value object.
      */
     private function isPromotedValueObjectConstructor(ClassMethod $node): bool
     {
@@ -256,8 +258,9 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod $node Method node whose name decides whether it is the constructor.
-     * @return bool True when the node is a PHP constructor.
+     * @param ClassMethod $node - Method node whose name decides whether it is the constructor.
+     *
+     * @return bool - True when the node is a PHP constructor.
      */
     private function isConstructor(ClassMethod $node): bool
     {
@@ -266,10 +269,11 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
-     * @param ClassMethod|Function_|Closure|ArrowFunction $node Callable being judged; only a constructor can qualify.
-     * @param int $paramCount Declared parameter count, compared against the constructor cap.
-     * @param int $constructorMax Configured constructor cap; must be above zero for the opt-in path to apply.
-     * @return bool True when the constructor-specific option caused the finding.
+     * @param ClassMethod|Function_|Closure|ArrowFunction $node - Callable being judged; only a constructor can qualify.
+     * @param int $paramCount - Declared parameter count, compared against the constructor cap.
+     * @param int $constructorMax - Configured constructor cap; must be above zero for the opt-in path to apply.
+     *
+     * @return bool - True when the constructor-specific option caused the finding.
      */
     private function usesConstructorThreshold(
         ClassMethod|Function_|Closure|ArrowFunction $node,
@@ -284,10 +288,11 @@ final readonly class ParameterCountRule implements RuleInterface
     }
 
     /**
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
-     * @param string $name Option key to read out of the bag.
-     * @param int $default Fallback used when the key is absent or not an integer.
-     * @return int Non-negative integer option value.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Effective rule options keyed by option name.
+     * @param string $name - Option key to read out of the bag.
+     * @param int $default - Fallback used when the key is absent or not an integer.
+     *
+     * @return int - Non-negative integer option value.
      */
     private function integerOption(array $options, string $name, int $default): int
     {
@@ -300,8 +305,9 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Build a display symbol for a callable node.
      *
-     * @param Node $node Callable node (method, function, or closure) to render as a finding symbol.
-     * @return string Callable display symbol.
+     * @param Node $node - Callable node (method, function, or closure) to render as a finding symbol.
+     *
+     * @return string - Callable display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -331,8 +337,9 @@ final readonly class ParameterCountRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

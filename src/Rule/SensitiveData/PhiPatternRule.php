@@ -62,8 +62,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Find health identifier patterns when nearby text gives PHI context.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<\GruffPhp\Finding\Finding> - one finding per non-comment, non-placeholder pattern hit that had PHI context on its line; empty
      *                                         when none qualify
@@ -122,8 +122,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Check whether a matched identifier line contains health-data context.
      *
-     * @param string $line     Source line that produced the candidate match.
-     * @param string $detector Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
+     * @param string $line - Source line that produced the candidate match.
+     * @param string $detector - Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
      *
      * @return bool - true when the line names this detector or any health-domain keyword, so a raw pattern hit may become a finding
      */
@@ -146,9 +146,9 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Suppress PHI-looking identifiers that are obvious examples or placeholders.
      *
-     * @param string $line            Source line carrying the match, lower-cased here for keyword checks.
-     * @param string $candidateSecret Matched identifier text; punctuation is stripped before comparison.
-     * @param string $displayPath     Unit path; example/placeholder wording only suppresses under docs/.
+     * @param string $line - Source line carrying the match, lower-cased here for keyword checks.
+     * @param string $candidateSecret - Matched identifier text; punctuation is stripped before comparison.
+     * @param string $displayPath - Unit path; example/placeholder wording only suppresses under docs/.
      *
      * @return bool - true to suppress the match as sample data: the known fund-membership placeholder, or an example/placeholder/sample line under
      *              docs/
@@ -178,8 +178,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Return source text for a 1-based line number.
      *
-     * @param string $source     Full unit source to slice by newline.
-     * @param int    $lineNumber 1-based line to read; out-of-range numbers yield an empty string.
+     * @param string $source - Full unit source to slice by newline.
+     * @param int    $lineNumber - 1-based line to read; out-of-range numbers yield an empty string.
      *
      * @return string - the requested line's text, or an empty string when the line number is past the end of the source
      */

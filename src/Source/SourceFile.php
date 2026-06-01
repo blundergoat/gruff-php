@@ -22,9 +22,9 @@ final readonly class SourceFile
     /**
      * Capture a discovered source file and the type gruff should apply to it.
      *
-     * @param string $absolutePath Absolute filesystem path.
-     * @param string $displayPath  Project-relative display path.
-     * @param string $type         Source type used to choose parsing or text scanning.
+     * @param string $absolutePath - Absolute filesystem path.
+     * @param string $displayPath - Project-relative display path.
+     * @param string $type - Source type used to choose parsing or text scanning.
      */
     public function __construct(
         public string $absolutePath,
@@ -36,7 +36,7 @@ final readonly class SourceFile
     /**
      * Report whether the source file should be parsed as PHP.
      *
-     * @return bool True when the file type is PHP.
+     * @return bool - True when the file type is PHP.
      */
     public function isPhp(): bool
     {

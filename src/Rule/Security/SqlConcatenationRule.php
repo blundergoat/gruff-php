@@ -36,11 +36,10 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Describe the SQL concatenation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'SQL string concatenation',
@@ -54,10 +53,10 @@ final class SqlConcatenationRule implements RuleInterface
     /**
      * Find query method calls whose first argument uses concatenation or interpolation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for heuristic SQL concatenation.
+     * @return list<Finding> - Findings for heuristic SQL concatenation.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -76,17 +75,16 @@ final class SqlConcatenationRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per query call whose first argument was assembled by concatenation or interpolation.
         return $findings;
     }
 
     /**
      * Build the SQL concatenation finding for a call node.
      *
-     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path recorded on the finding.
-     * @param Node         $node         Query call flagged as concatenating SQL; its start line locates the finding.
+     * @param AnalysisUnit $analysisUnit - Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node - Query call flagged as concatenating SQL; its start line locates the finding.
      *
-     * @return Finding Security finding.
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {

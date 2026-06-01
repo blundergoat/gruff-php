@@ -77,7 +77,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse and analyse a repeated-structure fixture.
      *
-     * @param string $fixture Fixture filename.
+     * @param string $fixture - Fixture filename.
      *
      * @return list<Finding> - rule findings for the fixture, ordered as the rule emits them, empty when none match
      */
@@ -95,7 +95,7 @@ final class RepeatedStructureMissingDataProviderRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return AnalysisUnit - the parsed fixture with its display path kept repo-relative for finding output
      */

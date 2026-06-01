@@ -46,9 +46,10 @@ final class CheckIgnoreCommand extends Command
     /**
      * Resolve each path's ignore decision and render it as text or JSON.
      *
-     * @param InputInterface  $input  Parsed invocation supplying the paths argument and format/config options.
-     * @param OutputInterface $output Console stream that receives the rendered report and any error lines.
-     * @return int 0 when any path is ignored, 1 when none are, 2 on error.
+     * @param InputInterface  $input - Parsed invocation supplying the paths argument and format/config options.
+     * @param OutputInterface $output - Console stream that receives the rendered report and any error lines.
+     *
+     * @return int - 0 when any path is ignored, 1 when none are, 2 on error.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
@@ -119,11 +120,12 @@ final class CheckIgnoreCommand extends Command
     /**
      * Resolve the configured ignore patterns, mirroring analyse config resolution.
      *
-     * @param string          $projectRoot Absolute project root that anchors config discovery and relative patterns.
-     * @param string|null     $configPath  Explicit config file to load, or null to auto-discover the default file.
-     * @param bool            $noConfig    When true, skip file discovery entirely and use only built-in defaults.
-     * @param OutputInterface $output      Stream that receives the config error message before this returns null.
-     * @return list<string>|null Configured patterns, or null when config loading failed.
+     * @param string          $projectRoot - Absolute project root that anchors config discovery and relative patterns.
+     * @param string|null     $configPath - Explicit config file to load, or null to auto-discover the default file.
+     * @param bool            $noConfig - When true, skip file discovery entirely and use only built-in defaults.
+     * @param OutputInterface $output - Stream that receives the config error message before this returns null.
+     *
+     * @return list<string>|null - Configured patterns, or null when config loading failed.
      */
     private function ignorePatterns(string $projectRoot, ?string $configPath, bool $noConfig, OutputInterface $output): ?array
     {
@@ -154,11 +156,12 @@ final class CheckIgnoreCommand extends Command
      * Decide whether a single path is ignored, consulting Git only when the
      * configured and built-in rules do not already exclude it.
      *
-     * @param PathIgnoreResolver $resolver    Engine that evaluates config/built-in patterns and the Git fallback.
-     * @param string             $projectRoot Absolute root the path is made relative to before matching.
-     * @param list<string>       $patterns    Configured paths.ignore glob patterns.
-     * @param string             $path        Caller-supplied path (absolute or relative) to classify.
-     * @return IgnoreDecision Ignore decision for the path.
+     * @param PathIgnoreResolver $resolver - Engine that evaluates config/built-in patterns and the Git fallback.
+     * @param string             $projectRoot - Absolute root the path is made relative to before matching.
+     * @param list<string>       $patterns - Configured paths.ignore glob patterns.
+     * @param string             $path - Caller-supplied path (absolute or relative) to classify.
+     *
+     * @return IgnoreDecision - Ignore decision for the path.
      */
     private function decideForPath(PathIgnoreResolver $resolver, string $projectRoot, array $patterns, string $path): IgnoreDecision
     {
@@ -186,11 +189,11 @@ final class CheckIgnoreCommand extends Command
     /**
      * Render the per-path results as text (ignored paths only) or JSON (all paths).
      *
-     * @param list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $results
-     *   One entry per requested path, in request order, each carrying its ignore decision.
-     * @param string $format    Already-validated output format, either `json` or `text`.
-     * @param bool   $isVerbose When true, text output appends the matching source and pattern per path.
-     * @return string|null Rendered output, or null when there is nothing to print.
+     * @param list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $results - One entry per requested path, in request order, each carrying its ignore decision.
+     * @param string $format - Already-validated output format, either `json` or `text`.
+     * @param bool   $isVerbose - When true, text output appends the matching source and pattern per path.
+     *
+     * @return string|null - Rendered output, or null when there is nothing to print.
      */
     private function render(array $results, string $format, bool $isVerbose): ?string
     {

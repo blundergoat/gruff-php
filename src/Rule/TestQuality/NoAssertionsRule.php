@@ -28,7 +28,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     /**
      * Describe the no-assertions rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +46,10 @@ final readonly class NoAssertionsRule implements RuleInterface
     /**
      * Find tests that do not contain an observable assertion or expectation.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for assertion-free tests.
+     * @return list<Finding> - Findings for assertion-free tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -75,16 +75,15 @@ final readonly class NoAssertionsRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per assertion-free test scope; empty when every test proved something.
         return $findings;
     }
 
     /**
      * Detect assertions, mock verifications, or explicit PHPUnit expectation markers.
      *
-     * @param TestQualityScope $scope Test scope whose body is searched for any observable expectation.
+     * @param TestQualityScope $scope - Test scope whose body is searched for any observable expectation.
      *
-     * @return bool True when the test has an observable expectation.
+     * @return bool - True when the test has an observable expectation.
      */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
@@ -118,9 +117,9 @@ final readonly class NoAssertionsRule implements RuleInterface
     /**
      * Detect legacy `@expectedException` annotations.
      *
-     * @param ClassMethod $classMethod Test method whose docblock is checked for the legacy annotation.
+     * @param ClassMethod $classMethod - Test method whose docblock is checked for the legacy annotation.
      *
-     * @return bool True when the method docblock declares an expected exception.
+     * @return bool - True when the method docblock declares an expected exception.
      */
     private function hasExpectedExceptionAnnotation(ClassMethod $classMethod): bool
     {

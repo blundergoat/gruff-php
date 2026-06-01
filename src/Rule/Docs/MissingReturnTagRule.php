@@ -31,7 +31,7 @@ final readonly class MissingReturnTagRule implements RuleInterface
     /**
      * Describe the missing @return tag rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +50,10 @@ final readonly class MissingReturnTagRule implements RuleInterface
     /**
      * Find documented function-like declarations that lack an @return tag.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for missing return tags.
+     * @return list<Finding> - Findings for missing return tags.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

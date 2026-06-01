@@ -289,18 +289,18 @@ final class MissingConfigPromptTest extends TestCase
      * The fake's own BufferedOutput parent captures any main-stream writes so the
      * caller can assert that the routing under test never leaks payloads onto stdout.
      *
-     * @param BufferedOutput $bufferedOutput Buffer that should receive the error-stream chatter.
-     * @return BufferedOutput&ConsoleOutputInterface Test double exposing the supplied buffer as the error stream.
+     * @param BufferedOutput $bufferedOutput - Buffer that should receive the error-stream chatter.
+     *
+     * @return BufferedOutput&ConsoleOutputInterface - Test double exposing the supplied buffer as the error stream.
      */
     private function fakeConsoleOutput(BufferedOutput $bufferedOutput): BufferedOutput&ConsoleOutputInterface
     {
-        // Hand back an anonymous console double whose error stream is the supplied buffer, main stream its own.
         return new class ($bufferedOutput) extends BufferedOutput implements ConsoleOutputInterface
         {
             /**
              * Capture the buffer returned to callers asking for the error stream.
              *
-             * @param BufferedOutput $bufferedOutput Buffer exposed as the error stream.
+             * @param BufferedOutput $bufferedOutput - Buffer exposed as the error stream.
              */
             public function __construct(private readonly BufferedOutput $bufferedOutput)
             {
@@ -310,7 +310,7 @@ final class MissingConfigPromptTest extends TestCase
             /**
              * Return the BufferedOutput used by tests to capture STDERR-bound chatter.
              *
-             * @return OutputInterface Error stream backed by the captured buffer.
+             * @return OutputInterface - Error stream backed by the captured buffer.
              */
             public function getErrorOutput(): OutputInterface
             {
@@ -321,7 +321,8 @@ final class MissingConfigPromptTest extends TestCase
             /**
              * Ignore attempts to swap the error stream; the fake exposes a single fixed buffer.
              *
-             * @param OutputInterface $output Replacement stream the fake silently discards.
+             * @param OutputInterface $output - Replacement stream the fake silently discards.
+             *
              * @return void
              */
             public function setErrorOutput(OutputInterface $output): void
@@ -333,7 +334,8 @@ final class MissingConfigPromptTest extends TestCase
              * Reject section creation; the fake never participates in sectioned rendering.
              *
              * @throws LogicException Always; the test scenario never exercises sectioned output.
-             * @return ConsoleSectionOutput Never returns — the call always throws.
+             *
+             * @return ConsoleSectionOutput - Never returns — the call always throws.
              */
             public function section(): ConsoleSectionOutput
             {
@@ -347,7 +349,8 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Run the closure with a fresh temporary project as the working directory.
      *
-     * @param callable(string): void $callable Closure that receives the project root.
+     * @param callable(string): void $callable - Closure that receives the project root.
+     *
      * @return void
      */
     private function withTemporaryProject(callable $callable): void
@@ -368,8 +371,9 @@ final class MissingConfigPromptTest extends TestCase
     /**
      * Build a StringInput marked interactive with the given stream contents.
      *
-     * @param string $streamContents Input data the QuestionHelper should read.
-     * @return StringInput Configured interactive input.
+     * @param string $streamContents - Input data the QuestionHelper should read.
+     *
+     * @return StringInput - Configured interactive input.
      */
     private function interactiveInput(string $streamContents): StringInput
     {
@@ -385,28 +389,27 @@ final class MissingConfigPromptTest extends TestCase
         $stringInput->setStream($stream);
         $stringInput->setInteractive(true);
 
-        // Hand back an interactive input whose stream feeds the prepared answers to the QuestionHelper.
         return $stringInput;
     }
 
     /**
      * Create a unique temporary directory for an isolated project root.
      *
-     * @return string Absolute path to the new directory.
+     * @return string - Absolute path to the new directory.
      */
     private function createTempDirectory(): string
     {
         $path = sys_get_temp_dir() . '/gruff-prompt-' . bin2hex(random_bytes(6));
         self::assertTrue(mkdir($path));
 
-        // Hand back the new directory path for the caller to populate and later tear down.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Absolute path to remove.
+     * @param string $path - Absolute path to remove.
+     *
      * @return void
      */
     private function removeTempDirectory(string $path): void

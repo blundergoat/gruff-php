@@ -20,7 +20,7 @@ final readonly class SarifReporter
     /**
      * Render findings as a SARIF 2.1.0 JSON document.
      *
-     * @param AnalysisReport $report Analysis report to render.
+     * @param AnalysisReport $report - Analysis report to render.
      *
      * @return string - the SARIF 2.1.0 JSON document with trailing newline; on encode failure a minimal JSON
      *                  error object instead, so the caller always gets parseable output rather than an exception
@@ -88,7 +88,7 @@ final readonly class SarifReporter
     /**
      * Render one registry definition as a SARIF driver rule.
      *
-     * @param RuleDefinition $definition Native rule definition.
+     * @param RuleDefinition $definition - Native rule definition.
      *
      * @return array{
      *     id: string,
@@ -146,8 +146,8 @@ final readonly class SarifReporter
     /**
      * Build one SARIF result payload for a finding.
      *
-     * @param Finding $finding   Finding to serialize into a single SARIF result entry.
-     * @param int     $ruleIndex Zero-based offset of this finding's rule in the driver `rules` array, so the
+     * @param Finding $finding - Finding to serialize into a single SARIF result entry.
+     * @param int     $ruleIndex - Zero-based offset of this finding's rule in the driver `rules` array, so the
      *                           result can reference its rule by index rather than repeating the descriptor.
      *
      * @return array<string, mixed> - one SARIF `result` entry for the run's `results` list, with `region` keys present only when the finding carries
@@ -219,7 +219,7 @@ final readonly class SarifReporter
     /**
      * Map gruff-php severities onto SARIF result levels.
      *
-     * @param Severity $severity Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
+     * @param Severity $severity - Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
      *
      * @return string - one of SARIF's `error`/`warning`/`note` level names; advisory collapses to `note`
      */

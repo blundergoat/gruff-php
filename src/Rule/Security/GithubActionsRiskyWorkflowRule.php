@@ -41,7 +41,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Describe the risky GitHub Actions workflow rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -59,10 +59,10 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Find risky patterns in GitHub Actions workflow YAML.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for risky workflow patterns.
+     * @return list<Finding> - Findings for risky workflow patterns.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -86,13 +86,13 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
             }
         }
 
-        // Hand back every risky-pattern finding collected across the workflow's lines.
         return $findings;
     }
 
     /**
-     * @param string $displayPath Repository-relative path of the unit, in either slash style.
-     * @return bool True when the display path is a GitHub Actions workflow YAML file.
+     * @param string $displayPath - Repository-relative path of the unit, in either slash style.
+     *
+     * @return bool - True when the display path is a GitHub Actions workflow YAML file.
      */
     private function isWorkflowFile(string $displayPath): bool
     {
@@ -103,11 +103,12 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string   $line                 One raw YAML line, leading indentation intact for block-scalar tracking.
-     * @param bool     $hasPullRequestEvent  True when a pull_request event is present, gating secret leaks.
-     * @param int|null $runBlockIndent       Current block scalar run indentation, updated in place.
-     * @param int|null $reportedRunBlockLine First reported run-block interpolation line, updated in place.
-     * @return list<string> Finding sinks detected on the line.
+     * @param string   $line - One raw YAML line, leading indentation intact for block-scalar tracking.
+     * @param bool     $hasPullRequestEvent - True when a pull_request event is present, gating secret leaks.
+     * @param int|null $runBlockIndent - Current block scalar run indentation, updated in place.
+     * @param int|null $reportedRunBlockLine - First reported run-block interpolation line, updated in place.
+     *
+     * @return list<string> - Finding sinks detected on the line.
      */
     private function lineFindingSinks(
         string $line,
@@ -136,9 +137,10 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line                One raw YAML line to scan for single-line risky patterns.
-     * @param bool   $hasPullRequestEvent True when a pull_request event is present, enabling the secrets-in-PR sink.
-     * @return list<string> Finding sinks that do not need multiline run-block state.
+     * @param string $line - One raw YAML line to scan for single-line risky patterns.
+     * @param bool   $hasPullRequestEvent - True when a pull_request event is present, enabling the secrets-in-PR sink.
+     *
+     * @return list<string> - Finding sinks that do not need multiline run-block state.
      */
     private function directLineSinks(string $line, bool $hasPullRequestEvent): array
     {
@@ -169,9 +171,10 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Reset run-block state once a non-empty line dedents back to the parent level.
      *
-     * @param string   $line                 Current YAML line; its indentation decides whether the run block closed.
-     * @param int|null $runBlockIndent       Active run-block indentation, cleared in place once the block ends.
-     * @param int|null $reportedRunBlockLine Already-reported interpolation marker, cleared in place with the indent.
+     * @param string   $line - Current YAML line; its indentation decides whether the run block closed.
+     * @param int|null $runBlockIndent - Active run-block indentation, cleared in place once the block ends.
+     * @param int|null $reportedRunBlockLine - Already-reported interpolation marker, cleared in place with the indent.
+     *
      * @return void
      */
     private function closeRunBlockWhenDedented(string $line, ?int &$runBlockIndent, ?int &$reportedRunBlockLine): void
@@ -186,8 +189,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $source Full workflow YAML source to scan for a pull_request trigger in either syntax.
-     * @return bool True when the workflow listens to pull_request or pull_request_target.
+     * @param string $source - Full workflow YAML source to scan for a pull_request trigger in either syntax.
+     *
+     * @return bool - True when the workflow listens to pull_request or pull_request_target.
      */
     private function hasPullRequestEvent(string $source): bool
     {
@@ -201,8 +205,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line to test for a pull_request_target mapping key.
-     * @return bool True when the line declares a pull_request_target trigger.
+     * @param string $line - One YAML line to test for a pull_request_target mapping key.
+     *
+     * @return bool - True when the line declares a pull_request_target trigger.
      */
     private function isPullRequestTargetTrigger(string $line): bool
     {
@@ -214,8 +219,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line to test for the start of a block-scalar run step.
-     * @return bool True when the line starts a YAML block-scalar run step.
+     * @param string $line - One YAML line to test for the start of a block-scalar run step.
+     *
+     * @return bool - True when the line starts a YAML block-scalar run step.
      */
     private function isRunBlockStart(string $line): bool
     {
@@ -227,8 +233,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line to test for an inline run step that interpolates event data.
-     * @return bool True when an inline run step interpolates github.event data.
+     * @param string $line - One YAML line to test for an inline run step that interpolates event data.
+     *
+     * @return bool - True when an inline run step interpolates github.event data.
      */
     private function hasInlineGithubEventRun(string $line): bool
     {
@@ -240,8 +247,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One line of a run block to test for any github.event interpolation.
-     * @return bool True when any text contains github.event interpolation.
+     * @param string $line - One line of a run block to test for any github.event interpolation.
+     *
+     * @return bool - True when any text contains github.event interpolation.
      */
     private function hasGithubEventInterpolation(string $line): bool
     {
@@ -253,8 +261,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line whose leading-space count defines its indentation level.
-     * @return int Number of leading spaces.
+     * @param string $line - One YAML line whose leading-space count defines its indentation level.
+     *
+     * @return int - Number of leading spaces.
      */
     private function indent(string $line): int
     {
@@ -265,8 +274,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line that may declare a uses: step referencing an action.
-     * @return string|null Finding sink for a risky uses: reference.
+     * @param string $line - One YAML line that may declare a uses: step referencing an action.
+     *
+     * @return string|null - Finding sink for a risky uses: reference.
      */
     private function riskyUsesFinding(string $line): ?string
     {
@@ -300,8 +310,9 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     }
 
     /**
-     * @param string $line One YAML line that may grant token permissions at workflow or job scope.
-     * @return string|null Finding sink for broad write permissions.
+     * @param string $line - One YAML line that may grant token permissions at workflow or job scope.
+     *
+     * @return string|null - Finding sink for broad write permissions.
      */
     private function riskyPermissionFinding(string $line): ?string
     {
@@ -325,10 +336,11 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
     /**
      * Build the workflow finding.
      *
-     * @param AnalysisUnit $analysisUnit Unit under analysis, supplying the display path attached to the finding.
-     * @param int          $line         1-based line where the risky pattern was matched.
-     * @param string       $sink         Sink identifier naming the matched pattern; carried into message and metadata.
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Unit under analysis, supplying the display path attached to the finding.
+     * @param int          $line - 1-based line where the risky pattern was matched.
+     * @param string       $sink - Sink identifier naming the matched pattern; carried into message and metadata.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, int $line, string $sink): Finding
     {

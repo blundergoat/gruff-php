@@ -35,13 +35,14 @@ final readonly class MissingConfigPrompt
      * address a non-CWD root (notably `dashboard --project ...`) write the new
      * config in the right directory.
      *
-     * @param InputInterface          $input              Console input for the calling command.
-     * @param OutputInterface         $output             Console output for the calling command.
-     * @param SymfonyApplication|null $symfonyApplication Console application used to dispatch the init command.
-     * @param string                  $projectRoot        Project root used to look for an existing config.
-     * @param string|null             $explicitConfigPath Explicit --config path, when supplied.
-     * @param bool                    $shouldSkipConfig   Whether the caller passed --no-config.
-     * @return int|null Exit code when init was run and failed; null when the caller may continue.
+     * @param InputInterface          $input - Console input for the calling command.
+     * @param OutputInterface         $output - Console output for the calling command.
+     * @param SymfonyApplication|null $symfonyApplication - Console application used to dispatch the init command.
+     * @param string                  $projectRoot - Project root used to look for an existing config.
+     * @param string|null             $explicitConfigPath - Explicit --config path, when supplied.
+     * @param bool                    $shouldSkipConfig - Whether the caller passed --no-config.
+     *
+     * @return int|null - Exit code when init was run and failed; null when the caller may continue.
      */
     public static function maybeOffer(
         InputInterface $input,
@@ -106,8 +107,9 @@ final readonly class MissingConfigPrompt
      * error stream so JSON, SARIF, and HTML payloads written to STDOUT stay
      * uncorrupted.
      *
-     * @param OutputInterface $output Console output supplied by the caller.
-     * @return OutputInterface Error stream when available; otherwise the supplied output.
+     * @param OutputInterface $output - Console output supplied by the caller.
+     *
+     * @return OutputInterface - Error stream when available; otherwise the supplied output.
      */
     private static function promptOutput(OutputInterface $output): OutputInterface
     {

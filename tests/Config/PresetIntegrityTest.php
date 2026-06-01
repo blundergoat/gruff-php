@@ -20,7 +20,7 @@ final class PresetIntegrityTest extends TestCase
     /**
      * Verify every bundled preset loads into a usable config.
      *
-     * @param string $preset Bundled preset name.
+     * @param string $preset - Bundled preset name.
      *
      * @return void
      */
@@ -38,7 +38,7 @@ final class PresetIntegrityTest extends TestCase
     /**
      * Verify every rule id referenced by a preset exists in the registry.
      *
-     * @param string $preset Bundled preset name.
+     * @param string $preset - Bundled preset name.
      *
      * @return void
      */
@@ -69,14 +69,13 @@ final class PresetIntegrityTest extends TestCase
             $cases[$preset] = [$preset];
         }
 
-        // Hand back one case per bundled preset so the integrity test runs against every shipped profile.
         return $cases;
     }
 
     /**
      * Resolve the on-disk path for a bundled preset.
      *
-     * @param string $preset Preset name.
+     * @param string $preset - Preset name.
      *
      * @return string - absolute filesystem path to the preset's YAML profile under the package root
      */

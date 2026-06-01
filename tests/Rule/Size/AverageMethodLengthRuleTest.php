@@ -97,8 +97,8 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
-     * @param array<string, int> $thresholds Rule option overrides applied before the fixture runs.
+     * @param string             $fixture - Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int> $thresholds - Rule option overrides applied before the fixture runs.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings this rule emitted for the fixture; empty when the average is under threshold
      */
@@ -119,7 +119,7 @@ final class AverageMethodLengthRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with its display path set to the repo-relative location
      */

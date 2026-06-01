@@ -12,13 +12,13 @@ final readonly class DeadCodeSymbolDeclaration
     /**
      * Capture one declaration that can be checked for project-wide references.
      *
-     * @param string       $fqn         Fully qualified symbol name without a leading slash.
-     * @param string       $displayPath Project-relative path where the declaration appears.
-     * @param int          $line        Declaration start line.
-     * @param string       $kind        Symbol kind: class, interface, trait, enum, function, or constant.
-     * @param list<string> $attributes  Fully qualified attribute names applied to the declaration.
-     * @param bool         $isAbstract  Whether the declaration is an abstract class or interface-like contract.
-     * @param bool         $isTestFile  Whether the declaration lives in a test path.
+     * @param string       $fqn - Fully qualified symbol name without a leading slash.
+     * @param string       $displayPath - Project-relative path where the declaration appears.
+     * @param int          $line - Declaration start line.
+     * @param string       $kind - Symbol kind: class, interface, trait, enum, function, or constant.
+     * @param list<string> $attributes - Fully qualified attribute names applied to the declaration.
+     * @param bool         $isAbstract - Whether the declaration is an abstract class or interface-like contract.
+     * @param bool         $isTestFile - Whether the declaration lives in a test path.
      */
     public function __construct(
         public string $fqn,

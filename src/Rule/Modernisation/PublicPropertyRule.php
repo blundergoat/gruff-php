@@ -29,11 +29,10 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Describe the public property modernisation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back this rule's fixed identity and defaults for the registry and reports.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Public mutable property',
@@ -47,10 +46,10 @@ final readonly class PublicPropertyRule implements RuleInterface
     /**
      * Find mutable public properties that expose object state directly.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for public property declarations.
+     * @return list<Finding> - Findings for public property declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -86,7 +85,6 @@ final readonly class PublicPropertyRule implements RuleInterface
             }
         }
 
-        // Hand back every public mutable property finding gathered across the unit's non-DTO classes.
         return $findings;
     }
 }

@@ -26,7 +26,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Describe the database URL password sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +46,10 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
     /**
      * Find database connection URLs that embed passwords.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for credential-bearing database URLs.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for credential-bearing database URLs.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -97,7 +97,6 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             );
         }
 
-        // Hand back one finding per credential-bearing URL that survived the comment and dummy-value filters.
         return $findings;
     }
 }

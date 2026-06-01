@@ -14,8 +14,9 @@ final readonly class FindingReviewIdentity
     /**
      * Build the comparison key used to match findings across branch reviews.
      *
-     * @param Finding $finding Finding to identify for branch review comparison.
-     * @return string Null-delimited finding identity key.
+     * @param Finding $finding - Finding to identify for branch review comparison.
+     *
+     * @return string - Null-delimited finding identity key.
      */
     public function key(Finding $finding): string
     {

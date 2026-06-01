@@ -62,8 +62,8 @@ final readonly class ConfigLoader
     /**
      * Create a loader for a project root with an optional package config fallback.
      *
-     * @param string      $projectRoot        Project root used for primary config discovery.
-     * @param string|null $fallbackConfigRoot Root used for fallback config discovery.
+     * @param string      $projectRoot - Project root used for primary config discovery.
+     * @param string|null $fallbackConfigRoot - Root used for fallback config discovery.
      */
     public function __construct(
         private string  $projectRoot,
@@ -74,7 +74,7 @@ final readonly class ConfigLoader
     /**
      * Return the installed package root for fallback config discovery.
      *
-     * @return string Absolute package root path.
+     * @return string - Absolute package root path.
      */
     public static function packageRoot(): string
     {
@@ -89,9 +89,9 @@ final readonly class ConfigLoader
      * without loading the file. Covers both the preferred and legacy filenames
      * so callers do not drift from {@see resolveConfigPath()}.
      *
-     * @param string $projectRoot Project root used for config discovery.
+     * @param string $projectRoot - Project root used for config discovery.
      *
-     * @return bool True when a preferred or legacy config file exists at the root.
+     * @return bool - True when a preferred or legacy config file exists at the root.
      */
     public static function hasProjectConfig(string $projectRoot): bool
     {
@@ -111,10 +111,10 @@ final readonly class ConfigLoader
     /**
      * Load analysis config from an explicit, project, or fallback YAML file.
      *
-     * @param string|null  $configPath Explicit config path supplied by the CLI.
-     * @param RuleRegistry $registry   Rule registry used to seed default config.
+     * @param string|null  $configPath - Explicit config path supplied by the CLI.
+     * @param RuleRegistry $registry - Rule registry used to seed default config.
      *
-     * @return AnalysisConfig Loaded config merged onto registry defaults.
+     * @return AnalysisConfig - Loaded config merged onto registry defaults.
      */
     public function load(?string $configPath, RuleRegistry $registry): AnalysisConfig
     {
@@ -133,9 +133,9 @@ final readonly class ConfigLoader
     /**
      * Resolve the config file path that should be used for this run.
      *
-     * @param string|null $configPath Explicit config path supplied by the CLI.
+     * @param string|null $configPath - Explicit config path supplied by the CLI.
      *
-     * @return string|null Absolute config path, or null when none is available.
+     * @return string|null - Absolute config path, or null when none is available.
      * @throws ConfigException When an explicit config path does not exist.
      */
     public function resolveConfigPath(?string $configPath): ?string
@@ -178,7 +178,7 @@ final readonly class ConfigLoader
     /**
      * Return preferred then legacy default config paths for a root.
      *
-     * @param string $root Directory to look in; a trailing slash is tolerated and stripped.
+     * @param string $root - Directory to look in; a trailing slash is tolerated and stripped.
      *
      * @return list<string> - preferred-name path first then legacy-name path, both candidates whether or not they exist on disk
      */
@@ -196,11 +196,11 @@ final readonly class ConfigLoader
     /**
      * Apply a parsed config file to the registry-derived defaults.
      *
-     * @param AnalysisConfig $config   Starting config (registry defaults) that each chain entry layers onto.
-     * @param RuleRegistry   $registry Registry consulted when resolving rule-selection and per-rule settings.
-     * @param string         $path     Root config file whose extends chain is resolved and applied in order.
+     * @param AnalysisConfig $config - Starting config (registry defaults) that each chain entry layers onto.
+     * @param RuleRegistry   $registry - Registry consulted when resolving rule-selection and per-rule settings.
+     * @param string         $path - Root config file whose extends chain is resolved and applied in order.
      *
-     * @return AnalysisConfig Config after file values have been applied.
+     * @return AnalysisConfig - Config after file values have been applied.
      */
     private function applyConfigFile(AnalysisConfig $config, RuleRegistry $registry, string $path): AnalysisConfig
     {
@@ -217,7 +217,6 @@ final readonly class ConfigLoader
             $config = (new RuleConfigApplier())->apply($config, $registry, $rootConfig);
         }
 
-        // Hand back the config after every chain entry, ancestor through child, has been layered on.
         return $config;
     }
 
@@ -229,11 +228,11 @@ final readonly class ConfigLoader
      * parent's for the same section — see ADR-021). A cycle or a chain deeper than
      * the cap throws.
      *
-     * @param string       $path     Config file to resolve.
-     * @param list<string> $ancestry Canonical paths already in the chain (cycle guard).
-     * @param int          $depth    Current resolution depth (1 at the root file).
+     * @param string       $path - Config file to resolve.
+     * @param list<string> $ancestry - Canonical paths already in the chain (cycle guard).
+     * @param int          $depth - Current resolution depth (1 at the root file).
      *
-     * @return list<ConfigObject> Configs to apply in order, ancestor first.
+     * @return list<ConfigObject> - Configs to apply in order, ancestor first.
      * @throws ConfigException When the chain cycles, exceeds the depth cap, or a target is invalid.
      */
     private function resolveExtendsChain(string $path, array $ancestry, int $depth): array
@@ -268,10 +267,10 @@ final readonly class ConfigLoader
     /**
      * Resolve an `extends:` reference (bundled preset name or path) to a config file path.
      *
-     * @param string $reference   Preset name (`gruff.*`) or a relative/absolute path.
-     * @param string $loadingFile Config file declaring the `extends:` (paths resolve from its directory).
+     * @param string $reference - Preset name (`gruff.*`) or a relative/absolute path.
+     * @param string $loadingFile - Config file declaring the `extends:` (paths resolve from its directory).
      *
-     * @return string Absolute path to the referenced config file.
+     * @return string - Absolute path to the referenced config file.
      * @throws ConfigException When the preset name is unknown or the path target is missing.
      */
     private function resolveExtendsReference(string $reference, string $loadingFile): string
@@ -305,7 +304,7 @@ final readonly class ConfigLoader
     /**
      * Read the YAML configuration root from disk.
      *
-     * @param string $path Absolute config file path to read and decode; its extension selects the parser.
+     * @param string $path - Absolute config file path to read and decode; its extension selects the parser.
      *
      * @return ConfigObject - the decoded top-level mapping; a list or scalar document throws rather than returning
      */
@@ -326,7 +325,7 @@ final readonly class ConfigLoader
     /**
      * Reject unsupported top-level config keys.
      *
-     * @param ConfigObject $rootConfig
+     * @param ConfigObject $rootConfig - Decoded root config map whose keys are checked against the supported schema.
      *
      * @return void
      */
@@ -346,7 +345,7 @@ final readonly class ConfigLoader
      * hard-error path is the intentional UX per the pre-public-adoption
      * schema window.
      *
-     * @param ConfigObject $rootConfig
+     * @param ConfigObject $rootConfig - Decoded root config map that must carry the required schema version.
      *
      * @return void
      */
@@ -379,10 +378,10 @@ final readonly class ConfigLoader
      * non-canonical threshold value with a clear error. See ADR-015 for the
      * rejection rationale.
      *
-     * @param AnalysisConfig $config Config to extend; returned unchanged when no minimumSeverity block is present.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; returned unchanged when no minimumSeverity block is present.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of the block preserves inherited thresholds.
      *
-     * @return AnalysisConfig Config with the per-command minimumSeverity map applied.
+     * @return AnalysisConfig - Config with the per-command minimumSeverity map applied.
      */
     private function applyMinimumSeverityConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -438,10 +437,10 @@ final readonly class ConfigLoader
     /**
      * Apply the configured minimum PHP version when present.
      *
-     * @param AnalysisConfig $config Config to extend; returned unchanged when no minimumPhpVersion is set.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; returned unchanged when no minimumPhpVersion is set.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of the key leaves the default PHP floor in place.
      *
-     * @return AnalysisConfig Config with the PHP version floor applied.
+     * @return AnalysisConfig - Config with the PHP version floor applied.
      */
     private function applyMinimumPhpVersion(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -466,10 +465,10 @@ final readonly class ConfigLoader
     /**
      * Apply configured path ignores when present.
      *
-     * @param AnalysisConfig $config Config to extend; returned unchanged when no paths block is present.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; returned unchanged when no paths block is present.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of the paths block leaves ignore patterns unchanged.
      *
-     * @return AnalysisConfig Config with ignored path patterns applied.
+     * @return AnalysisConfig - Config with ignored path patterns applied.
      */
     private function applyPathConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -485,10 +484,10 @@ final readonly class ConfigLoader
     /**
      * Apply the optional failureConditions count gate when present.
      *
-     * @param AnalysisConfig $config Config to extend; returned unchanged when no failureConditions block is set.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; returned unchanged when no failureConditions block is set.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of the block preserves inherited failure gates.
      *
-     * @return AnalysisConfig Config with the failure-condition thresholds applied.
+     * @return AnalysisConfig - Config with the failure-condition thresholds applied.
      * @throws ConfigException When the failureConditions block is malformed.
      */
     private function applyFailureConditionsConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
@@ -513,10 +512,10 @@ final readonly class ConfigLoader
      * `allowlists.secretPreviews` only must NOT lose
      * `DEFAULT_ACCEPTED_ABBREVIATIONS` (`id`, `url`, etc.) as a side effect.
      *
-     * @param AnalysisConfig $config Config to extend; each allowlist sub-key the user omitted is left as-is.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; each allowlist sub-key the user omitted is left as-is.
+     * @param ConfigObject   $rootConfig - Decoded root config map; omitted allowlist sub-keys keep registry-seeded defaults.
      *
-     * @return AnalysisConfig Config with allowlist values applied.
+     * @return AnalysisConfig - Config with allowlist values applied.
      */
     private function applyAllowlistConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
@@ -542,11 +541,11 @@ final readonly class ConfigLoader
     /**
      * Apply configured rule selection when present.
      *
-     * @param AnalysisConfig $config   Config to extend; returned unchanged when no selection block is present.
-     * @param RuleRegistry   $registry Registry of known rule ids the parser validates include/exclude entries against.
-     * @param ConfigObject   $rootConfig
+     * @param AnalysisConfig $config - Config to extend; returned unchanged when no selection block is present.
+     * @param RuleRegistry   $registry - Registry of known rule ids the parser validates include/exclude entries against.
+     * @param ConfigObject   $rootConfig - Decoded root config map; absence of selection leaves the active rule set unchanged.
      *
-     * @return AnalysisConfig Config with include/exclude selection applied.
+     * @return AnalysisConfig - Config with include/exclude selection applied.
      */
     private function applySelectionConfig(
         AnalysisConfig $config,
@@ -565,7 +564,7 @@ final readonly class ConfigLoader
     /**
      * Parse paths.ignore into the ignore patterns used during discovery.
      *
-     * @param mixed $decodedValue Decoded value of the `paths` key; must be a mapping or the parse throws.
+     * @param mixed $decodedValue - Decoded value of the `paths` key; must be a mapping or the parse throws.
      *
      * @return list<string> - validated relative path globs from paths.ignore; empty when the block has no ignore key
      */
@@ -595,7 +594,7 @@ final readonly class ConfigLoader
      * registry-seeded defaults intact rather than overriding them with an
      * empty list.
      *
-     * @param mixed $decodedValue Decoded value of the `allowlists` key; must be a mapping or the parse throws.
+     * @param mixed $decodedValue - Decoded value of the `allowlists` key; must be a mapping or the parse throws.
      *
      * @return array{acceptedAbbreviations: list<string>|null, secretPreviews: list<string>|null} - parsed lists per
      *   sub-key, with null for any sub-key the user omitted so the caller keeps the registry-seeded defaults
@@ -638,8 +637,8 @@ final readonly class ConfigLoader
     /**
      * Decode supported YAML config text into a root object.
      *
-     * @param string $contents Raw file contents to parse as YAML.
-     * @param string $path     Source path; only its extension is read here, to gate the .yaml/.yml requirement.
+     * @param string $contents - Raw file contents to parse as YAML.
+     * @param string $path - Source path; only its extension is read here, to gate the .yaml/.yml requirement.
      *
      * @return ConfigObject - the parsed YAML mapping; an empty document yields an empty array, a non-mapping throws
      */
@@ -667,8 +666,8 @@ final readonly class ConfigLoader
     /**
      * Validate that a decoded config value is an object-like array.
      *
-     * @param mixed  $decodedValue Decoded value to check; an empty array passes, a list or scalar does not.
-     * @param string $message      Error text thrown when the value is not an object or has a non-string key.
+     * @param mixed  $decodedValue - Decoded value to check; an empty array passes, a list or scalar does not.
+     * @param string $message - Error text thrown when the value is not an object or has a non-string key.
      *
      * @return ConfigObject - the value as a string-keyed map with each entry normalised; an empty array passes through
      */
@@ -695,7 +694,7 @@ final readonly class ConfigLoader
     /**
      * Normalise one decoded config value into the supported value set.
      *
-     * @param mixed $decodedValue One decoded YAML node (array or scalar) to constrain to the supported shape.
+     * @param mixed $decodedValue - One decoded YAML node (array or scalar) to constrain to the supported shape.
      *
      * @return ConfigValue - the node narrowed to the supported shape: a recursively normalised array, or a validated scalar
      */
@@ -713,7 +712,7 @@ final readonly class ConfigLoader
     /**
      * Validate scalar config values after YAML decoding.
      *
-     * @param mixed $decodedValue Decoded leaf value expected to be a YAML/JSON scalar (bool, number, string, object, null).
+     * @param mixed $decodedValue - Decoded leaf value expected to be a YAML/JSON scalar (bool, number, string, object, null).
      *
      * @return ConfigScalar - the same leaf passed through unchanged once confirmed to be a permitted scalar type
      */
@@ -730,7 +729,7 @@ final readonly class ConfigLoader
     /**
      * Keep decoded configuration values within the supported nested scalar shape.
      *
-     * @param array<array-key, mixed> $decodedConfigValues
+     * @param array<array-key, mixed> $decodedConfigValues - Decoded config subtree at the first supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>> - the same
      *                          keys with each value normalised, nested arrays recursed to depth 2
@@ -750,7 +749,7 @@ final readonly class ConfigLoader
     /**
      * Keep second-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedConfigValues
+     * @param array<array-key, mixed> $decodedConfigValues - Decoded config subtree at the second supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the same keys with each value
      *                          normalised, nested arrays recursed to depth 3
@@ -770,7 +769,7 @@ final readonly class ConfigLoader
     /**
      * Keep third-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedConfigValues
+     * @param array<array-key, mixed> $decodedConfigValues - Decoded config subtree at the third supported nesting level.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the same keys with each value normalised, nested arrays recursed to
      *                          depth 4
@@ -790,7 +789,7 @@ final readonly class ConfigLoader
     /**
      * Keep fourth-level configuration values as scalar config values.
      *
-     * @param array<array-key, mixed> $decodedConfigValues
+     * @param array<array-key, mixed> $decodedConfigValues - Decoded config subtree at the final supported nesting level.
      *
      * @return array<array-key, ConfigScalar> - the same keys with every value as a validated scalar; a nested array here throws
      */

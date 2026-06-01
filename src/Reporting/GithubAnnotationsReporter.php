@@ -15,8 +15,9 @@ final readonly class GithubAnnotationsReporter
     /**
      * Render findings as GitHub Actions workflow commands.
      *
-     * @param AnalysisReport $report Analysis report to render.
-     * @return string GitHub annotation output.
+     * @param AnalysisReport $report - Analysis report to render.
+     *
+     * @return string - GitHub annotation output.
      */
     public function render(AnalysisReport $report): string
     {
@@ -33,8 +34,9 @@ final readonly class GithubAnnotationsReporter
     /**
      * Render one finding as a GitHub annotation command.
      *
-     * @param Finding $finding Finding to encode; severity selects the command level and a null line is omitted.
-     * @return string GitHub annotation line.
+     * @param Finding $finding - Finding to encode; severity selects the command level and a null line is omitted.
+     *
+     * @return string - GitHub annotation line.
      */
     private function annotation(Finding $finding): string
     {
@@ -63,8 +65,9 @@ final readonly class GithubAnnotationsReporter
     /**
      * Escape annotation property text according to GitHub command rules.
      *
-     * @param string $text Raw property value; property context also reserves `:` and `,` as delimiters.
-     * @return string Escaped property value.
+     * @param string $text - Raw property value; property context also reserves `:` and `,` as delimiters.
+     *
+     * @return string - Escaped property value.
      */
     private function escapeProperty(string $text): string
     {
@@ -79,8 +82,9 @@ final readonly class GithubAnnotationsReporter
     /**
      * Escape annotation message text according to GitHub command rules.
      *
-     * @param string $text Raw message body; only `%` and newlines are reserved in the data segment.
-     * @return string Escaped data value.
+     * @param string $text - Raw message body; only `%` and newlines are reserved in the data segment.
+     *
+     * @return string - Escaped data value.
      */
     private function escapeData(string $text): string
     {

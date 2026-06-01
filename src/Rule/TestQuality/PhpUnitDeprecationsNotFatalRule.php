@@ -36,7 +36,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Create the rule with injectable PHPUnit config discovery for tests.
      *
-     * @param PhpUnitConfigDiscovery|null $discovery Discovery service override for tests.
+     * @param PhpUnitConfigDiscovery|null $discovery - Discovery service override for tests.
      */
     public function __construct(?PhpUnitConfigDiscovery $discovery = null)
     {
@@ -46,7 +46,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Describe the PHPUnit deprecations-not-fatal rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -64,9 +64,10 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     /**
      * Report a project once when PHPUnit deprecations do not fail the run.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
-     * @param RuleContext  $ruleContext  Rule context carrying project root.
-     * @return list<Finding> Findings for non-fatal PHPUnit deprecations.
+     * @param AnalysisUnit $analysisUnit - Parsed unit used to decide whether the project has PHPUnit tests.
+     * @param RuleContext  $ruleContext - Rule context carrying project root.
+     *
+     * @return list<Finding> - Findings for non-fatal PHPUnit deprecations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

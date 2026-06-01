@@ -49,7 +49,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Describe the path traversal file access rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -67,10 +67,10 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Find filesystem sinks that receive request-controlled paths.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for request-controlled filesystem paths.
+     * @return list<Finding> - Findings for request-controlled filesystem paths.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -111,10 +111,11 @@ final class PathTraversalFileAccessRule implements RuleInterface
     /**
      * Build the path traversal finding.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path recorded on the finding.
-     * @param Node         $node         Call or `new` node whose start line localises the finding for the reviewer.
-     * @param string       $sink         Sink label (function name, or `filesystem-object`) recorded on the finding.
-     * @return Finding Security finding.
+     * @param AnalysisUnit $analysisUnit - Parsed unit supplying the display path recorded on the finding.
+     * @param Node         $node - Call or `new` node whose start line localises the finding for the reviewer.
+     * @param string       $sink - Sink label (function name, or `filesystem-object`) recorded on the finding.
+     *
+     * @return Finding - Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {

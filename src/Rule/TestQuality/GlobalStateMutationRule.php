@@ -59,10 +59,10 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Find tests that mutate global state without detected cleanup hooks.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unscoped global state mutation.
+     * @return list<Finding> - Findings for unscoped global state mutation.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,16 +82,15 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
-        // Hand back every unscoped-mutation finding gathered across the unit's test scopes.
         return $findings;
     }
 
     /**
-     * @param TestQualityScope           $scope         Scope to test; Pest scopes are exempt from cleanup checks.
-     * @param array<int, bool>           $cleanupCache  Memo by enclosing class object id; true means a hook was found.
-     * @param array<string, Stmt\Class_> $classesByName Declared classes by name, used to resolve parent cleanup hooks.
+     * @param TestQualityScope           $scope - Scope to test; Pest scopes are exempt from cleanup checks.
+     * @param array<int, bool>           $cleanupCache - Memo by enclosing class object id; true means a hook was found.
+     * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to resolve parent cleanup hooks.
      *
-     * @return bool True when the scope should be scanned for cleanup-sensitive mutations.
+     * @return bool - True when the scope should be scanned for cleanup-sensitive mutations.
      */
     private function shouldCheckScopeCleanup(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
@@ -118,8 +117,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Build superglobal findings for the test-quality rule.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
-     * @param TestQualityScope $scope        Cleanup-free test scope scanned for direct superglobal writes.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
+     * @param TestQualityScope $scope - Cleanup-free test scope scanned for direct superglobal writes.
      *
      * @return list<Finding> - one finding per unscoped superglobal write in the scope; empty when none are written
      */
@@ -149,8 +148,8 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Build state function findings for the test-quality rule.
      *
-     * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
-     * @param TestQualityScope $scope        Cleanup-free test scope; its calls are matched against the state list.
+     * @param AnalysisUnit     $analysisUnit - Parsed unit; supplies the display path recorded on each finding.
+     * @param TestQualityScope $scope - Cleanup-free test scope; its calls are matched against the state list.
      *
      * @return list<Finding> - one finding per unscoped state-mutating call in the scope; empty when none are called
      */
@@ -184,9 +183,9 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Extract the written superglobal name from an assignment target.
      *
-     * @param Expr $target Left-hand side of an assignment; nested array-dim writes are unwrapped to the base variable.
+     * @param Expr $target - Left-hand side of an assignment; nested array-dim writes are unwrapped to the base variable.
      *
-     * @return string|null Superglobal name, or null when the assignment is not to a tracked superglobal.
+     * @return string|null - Superglobal name, or null when the assignment is not to a tracked superglobal.
      */
     private function superglobalWriteName(Expr $target): ?string
     {
@@ -210,11 +209,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * @param Stmt\Class_                $class         Class whose own methods and ancestors are searched for a hook.
-     * @param array<string, Stmt\Class_> $classesByName Declared classes by name, used to follow `extends` to a parent.
-     * @param array<int, true>           $visited       Object ids already walked; guards against cycles in the graph.
+     * @param Stmt\Class_                $class - Class whose own methods and ancestors are searched for a hook.
+     * @param array<string, Stmt\Class_> $classesByName - Declared classes by name, used to follow `extends` to a parent.
+     * @param array<int, true>           $visited - Object ids already walked; guards against cycles in the graph.
      *
-     * @return bool True when the class or an ancestor declares a cleanup hook.
+     * @return bool - True when the class or an ancestor declares a cleanup hook.
      */
     private function hasCleanupInClass(Stmt\Class_ $class, array $classesByName, array $visited = []): bool
     {
@@ -268,7 +267,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Index declared classes by fully qualified and short names.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose declared classes seed the lookup table.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose declared classes seed the lookup table.
      *
      * @return array<string, Stmt\Class_> - declared classes keyed by both short and namespaced name; empty when the unit declares none
      */
@@ -297,7 +296,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Return the final segment of a fully qualified class name.
      *
-     * @param string $name Fully qualified or already-short class name; an empty-segment result falls back to the input.
+     * @param string $name - Fully qualified or already-short class name; an empty-segment result falls back to the input.
      *
      * @return string - the trailing namespace segment, used to match `extends` targets against short class names
      */
@@ -310,11 +309,11 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     }
 
     /**
-     * @param AnalysisUnit          $analysisUnit Parsed unit; supplies the display path recorded on the finding.
-     * @param TestQualityScope      $scope        Offending test scope; its symbol identifies the test in the finding.
-     * @param int                   $line         1-based source line of the mutation, reported to the user.
-     * @param string                $message      Human-readable text naming the mutated state and the missing cleanup.
-     * @param array<string, scalar> $metadata     Structured detail (`variant`, `name`) used to group or filter.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit; supplies the display path recorded on the finding.
+     * @param TestQualityScope      $scope - Offending test scope; its symbol identifies the test in the finding.
+     * @param int                   $line - 1-based source line of the mutation, reported to the user.
+     * @param string                $message - Human-readable text naming the mutated state and the missing cleanup.
+     * @param array<string, scalar> $metadata - Structured detail (`variant`, `name`) used to group or filter.
      *
      * @return Finding - the mutation report stamped with this rule's fixed pillar, tier, severity, and remediation text
      */

@@ -30,7 +30,7 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Describe the unused import rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,9 +48,10 @@ final readonly class UnusedImportRule implements RuleInterface
     /**
      * Find imported names that are not referenced after import declarations are removed.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding> Findings for unused import statements.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
+     *
+     * @return list<Finding> - Findings for unused import statements.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -102,9 +103,10 @@ final readonly class UnusedImportRule implements RuleInterface
      * import against its own `use` statement. Lines are replaced with empty strings rather than removed
      * so every other line keeps its original 1-based number for any later position lookup.
      *
-     * @param string     $source Full source text of the unit, used only as the haystack to blank and scan.
-     * @param list<Use_> $uses   Import statements whose line spans must be erased before the alias search.
-     * @return string Source text with each import statement's lines replaced by empty strings.
+     * @param string     $source - Full source text of the unit, used only as the haystack to blank and scan.
+     * @param list<Use_> $uses - Import statements whose line spans must be erased before the alias search.
+     *
+     * @return string - Source text with each import statement's lines replaced by empty strings.
      */
     private function removeUseStatements(string $source, array $uses): string
     {

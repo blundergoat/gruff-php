@@ -133,7 +133,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Build function-like scopes for a test fixture.
      *
-     * @param string $source Inline PHP source defining the functions and closures to walk.
+     * @param string $source - Inline PHP source defining the functions and closures to walk.
      *
      * @return list<FunctionLikeScope> - the fixture's scopes in depth-first declaration order, the positions tests index by
      */
@@ -149,7 +149,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Parse inline PHP source through the production parser.
      *
-     * @param string $source Inline PHP written to a throwaway temp file before parsing.
+     * @param string $source - Inline PHP written to a throwaway temp file before parsing.
      *
      * @return AnalysisUnit - parsed statements plus diagnostics, asserted diagnostic-free so callers walk valid input
      */
@@ -169,7 +169,6 @@ final class FunctionLikeScopeWalkerTest extends TestCase
 
         self::assertSame([], $unit->diagnostics);
 
-        // Hand back the unit only once it parsed cleanly, so scope tests start from valid input.
         return $unit;
     }
 }

@@ -12,11 +12,11 @@ final readonly class RunDiagnostic
     /**
      * Capture a non-finding diagnostic emitted during a gruff-php run.
      *
-     * @param string      $type     Diagnostic category used by report serializers.
-     * @param string      $message  Human-readable diagnostic detail.
-     * @param string|null $filePath Source file related to the diagnostic, when available.
-     * @param int|null    $line     Source line related to the diagnostic, when available.
-     * @param string|null $path     Input path related to the diagnostic, when no parsed file exists.
+     * @param string      $type - Diagnostic category used by report serializers.
+     * @param string      $message - Human-readable diagnostic detail.
+     * @param string|null $filePath - Source file related to the diagnostic, when available.
+     * @param int|null    $line - Source line related to the diagnostic, when available.
+     * @param string|null $path - Input path related to the diagnostic, when no parsed file exists.
      */
     public function __construct(
         public string  $type,

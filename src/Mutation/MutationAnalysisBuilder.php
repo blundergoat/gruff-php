@@ -13,10 +13,11 @@ use GruffPhp\Support\PathHelper;
 final readonly class MutationAnalysisBuilder
 {
     /**
-     * @param string                  $projectRoot Project root used to resolve mutation report paths.
-     * @param MutationAnalysisOptions $options     Mutation-analysis options selected for the run.
-     * @param list<RunDiagnostic>     $diagnostics Diagnostics collected while loading mutation data.
-     * @return MutationAnalysisResult|null Mutation report result when one can be built.
+     * @param string                  $projectRoot - Project root used to resolve mutation report paths.
+     * @param MutationAnalysisOptions $options - Mutation-analysis options selected for the run.
+     * @param list<RunDiagnostic>     $diagnostics - Diagnostics collected while loading mutation data.
+     *
+     * @return MutationAnalysisResult|null - Mutation report result when one can be built.
      */
     public function build(
         string $projectRoot,
@@ -58,10 +59,11 @@ final readonly class MutationAnalysisBuilder
     }
 
     /**
-     * @param string                  $projectRoot Anchor for resolving the report path Infection writes to.
-     * @param MutationAnalysisOptions $options     Run options; gates whether Infection is invoked or trusted as-is.
-     * @param list<RunDiagnostic>     $diagnostics Run-by-reference sink; a failure diagnostic is appended on error.
-     * @return bool True when Infection output is available for parsing.
+     * @param string                  $projectRoot - Anchor for resolving the report path Infection writes to.
+     * @param MutationAnalysisOptions $options - Run options; gates whether Infection is invoked or trusted as-is.
+     * @param list<RunDiagnostic>     $diagnostics - Run-by-reference sink; a failure diagnostic is appended on error.
+     *
+     * @return bool - True when Infection output is available for parsing.
      */
     private function canRunInfection(
         string $projectRoot,
@@ -113,8 +115,9 @@ final readonly class MutationAnalysisBuilder
     /**
      * Append diagnostics for invalid or skipped mutation options.
      *
-     * @param MutationAnalysisOptions $options     Options whose flags set without --infection-report count as misuse.
-     * @param list<RunDiagnostic>     $diagnostics Run-by-reference sink; one usage-error is appended per stray flag.
+     * @param MutationAnalysisOptions $options - Options whose flags set without --infection-report count as misuse.
+     * @param list<RunDiagnostic>     $diagnostics - Run-by-reference sink; one usage-error is appended per stray flag.
+     *
      * @return void
      */
     private function addOptionDiagnostics(MutationAnalysisOptions $options, array &$diagnostics): void
@@ -160,8 +163,9 @@ final readonly class MutationAnalysisBuilder
     /**
      * Capture the report state before an Infection run.
      *
-     * @param string $reportPath Absolute path to the JSON report whose mtime, size, and hash are sampled.
-     * @return array{mtime: int, size: int, hash: string}|null Existing report signature, or null when absent.
+     * @param string $reportPath - Absolute path to the JSON report whose mtime, size, and hash are sampled.
+     *
+     * @return array{mtime: int, size: int, hash: string}|null - Existing report signature, or null when absent.
      */
     private function reportSignature(string $reportPath): ?array
     {
@@ -193,9 +197,10 @@ final readonly class MutationAnalysisBuilder
      * A pre-existing report whose mtime, size, and hash have not changed is treated as stale to avoid
      * surfacing outdated mutation results when Infection exits before rewriting it.
      *
-     * @param string $reportPath Path to the report on disk, re-sampled after the run.
-     * @param array{mtime: int, size: int, hash: string}|null $preRunSignature Report state before running Infection.
-     * @return bool True when the report file was created or changed by this run.
+     * @param string $reportPath - Path to the report on disk, re-sampled after the run.
+     * @param array{mtime: int, size: int, hash: string}|null $preRunSignature - Report state before running Infection.
+     *
+     * @return bool - True when the report file was created or changed by this run.
      */
     private function isReportFresh(string $reportPath, ?array $preRunSignature): bool
     {

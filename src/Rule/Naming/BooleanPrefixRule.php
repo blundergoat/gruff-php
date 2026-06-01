@@ -75,7 +75,7 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Describe the boolean method prefix rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -98,10 +98,10 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Find bool-returning functions and methods without a boolean-style prefix.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for poorly named boolean callables.
+     * @return list<Finding> - Findings for poorly named boolean callables.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -171,13 +171,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Find bool-returning functions and methods without a boolean-style prefix.
      *
-     * @param RuleDefinition        $definition    Rule metadata stamped onto any finding produced here.
-     * @param AnalysisUnit          $analysisUnit  Parsed unit supplying the display path and line numbers.
-     * @param ClassMethod|Function_ $node          Callable whose return type and name are checked.
-     * @param string                $symbol        Human-readable symbol used as the finding subject.
-     * @param list<string>          $prefixes      Configured predicate prefixes.
-     * @param list<string>          $acceptedNames Lowercased exact names accepted as-is.
-     * @return list<Finding> Findings for bool-returning callables.
+     * @param RuleDefinition        $definition - Rule metadata stamped onto any finding produced here.
+     * @param AnalysisUnit          $analysisUnit - Parsed unit supplying the display path and line numbers.
+     * @param ClassMethod|Function_ $node - Callable whose return type and name are checked.
+     * @param string                $symbol - Human-readable symbol used as the finding subject.
+     * @param list<string>          $prefixes - Configured predicate prefixes.
+     * @param list<string>          $acceptedNames - Lowercased exact names accepted as-is.
+     *
+     * @return list<Finding> - Findings for bool-returning callables.
      */
     private function functionLikeFindings(
         RuleDefinition $definition,
@@ -219,14 +220,15 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Find typed bool parameters without a boolean-style prefix or state adjective.
      *
-     * @param RuleDefinition    $definition      Rule metadata stamped onto any finding produced here.
-     * @param AnalysisUnit      $analysisUnit    Parsed unit supplying the display path and line numbers.
-     * @param FunctionLikeScope $scope           Scope whose declared parameters are inspected.
-     * @param string            $symbol          Owning callable symbol attributed to each parameter finding.
-     * @param list<string>      $prefixes        Configured predicate prefixes.
-     * @param list<string>      $stateAdjectives Configured state-adjective names.
-     * @param list<string>      $acceptedNames   Lowercased exact names accepted as-is.
-     * @return list<Finding> Findings for bool parameters.
+     * @param RuleDefinition    $definition - Rule metadata stamped onto any finding produced here.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit supplying the display path and line numbers.
+     * @param FunctionLikeScope $scope - Scope whose declared parameters are inspected.
+     * @param string            $symbol - Owning callable symbol attributed to each parameter finding.
+     * @param list<string>      $prefixes - Configured predicate prefixes.
+     * @param list<string>      $stateAdjectives - Configured state-adjective names.
+     * @param list<string>      $acceptedNames - Lowercased exact names accepted as-is.
+     *
+     * @return list<Finding> - Findings for bool parameters.
      */
     private function parameterFindings(
         RuleDefinition $definition,
@@ -266,13 +268,14 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Build a finding for a typed boolean property or parameter.
      *
-     * @param RuleDefinition $definition   Rule metadata stamped onto the finding.
-     * @param AnalysisUnit   $analysisUnit Parsed unit supplying the display path and start line.
-     * @param Node           $node         Property or parameter node the finding points at.
-     * @param string         $kind         Identifier kind label, either "property" or "parameter".
-     * @param string         $name         Identifier name without the leading dollar sign.
-     * @param string|null    $symbol       Owning callable symbol, or null for a bare property.
-     * @return Finding Finding for a boolean identifier without clear predicate naming.
+     * @param RuleDefinition $definition - Rule metadata stamped onto the finding.
+     * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path and start line.
+     * @param Node           $node - Property or parameter node the finding points at.
+     * @param string         $kind - Identifier kind label, either "property" or "parameter".
+     * @param string         $name - Identifier name without the leading dollar sign.
+     * @param string|null    $symbol - Owning callable symbol, or null for a bare property.
+     *
+     * @return Finding - Finding for a boolean identifier without clear predicate naming.
      */
     private function identifierFinding(
         RuleDefinition $definition,
@@ -304,8 +307,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Check whether a declaration type is bool or nullable bool.
      *
-     * @param Node|null $type Declared type node to classify, or null when the declaration is untyped.
-     * @return bool True when the type resolves to bool, including ?bool and bool|null.
+     * @param Node|null $type - Declared type node to classify, or null when the declaration is untyped.
+     *
+     * @return bool - True when the type resolves to bool, including ?bool and bool|null.
      */
     private function isBoolType(?Node $type): bool
     {
@@ -341,11 +345,12 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Check whether a typed boolean identifier is already clear.
      *
-     * @param string       $name            Identifier name to test, matched case-insensitively.
-     * @param list<string> $prefixes        Configured predicate prefixes.
-     * @param list<string> $stateAdjectives Configured state-adjective names.
-     * @param list<string> $acceptedNames   Lowercased exact names accepted as-is.
-     * @return bool True when the identifier is allowed.
+     * @param string       $name - Identifier name to test, matched case-insensitively.
+     * @param list<string> $prefixes - Configured predicate prefixes.
+     * @param list<string> $stateAdjectives - Configured state-adjective names.
+     * @param list<string> $acceptedNames - Lowercased exact names accepted as-is.
+     *
+     * @return bool - True when the identifier is allowed.
      */
     private function hasBooleanStyleName(string $name, array $prefixes, array $stateAdjectives, array $acceptedNames): bool
     {
@@ -363,9 +368,10 @@ final readonly class BooleanPrefixRule implements RuleInterface
      * comparison is whole-name and case-insensitive, never a prefix match. The
      * caller supplies the names already lowercased.
      *
-     * @param string       $name          Identifier name to match, compared whole and case-insensitively.
-     * @param list<string> $acceptedNames Lowercased exact names accepted as-is.
-     * @return bool True when the name matches an accepted boolean name.
+     * @param string       $name - Identifier name to match, compared whole and case-insensitively.
+     * @param list<string> $acceptedNames - Lowercased exact names accepted as-is.
+     *
+     * @return bool - True when the name matches an accepted boolean name.
      */
     private function isAcceptedBooleanName(string $name, array $acceptedNames): bool
     {
@@ -376,9 +382,10 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Check whether the callable name starts with a configured predicate prefix.
      *
-     * @param string       $name     Callable name to test; a prefix only counts when a word boundary follows it.
-     * @param list<string> $prefixes Configured predicate prefixes.
-     * @return bool True when the name has an allowed prefix followed by a word boundary.
+     * @param string       $name - Callable name to test; a prefix only counts when a word boundary follows it.
+     * @param list<string> $prefixes - Configured predicate prefixes.
+     *
+     * @return bool - True when the name has an allowed prefix followed by a word boundary.
      */
     private function hasAllowedPrefix(string $name, array $prefixes): bool
     {
@@ -406,8 +413,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Check whether a boolean name starts with a negative flag prefix.
      *
-     * @param string $name Identifier name to test; the negative prefix must be followed by a word boundary.
-     * @return bool True when the name starts with a configured negative prefix.
+     * @param string $name - Identifier name to test; the negative prefix must be followed by a word boundary.
+     *
+     * @return bool - True when the name starts with a configured negative prefix.
      */
     private function hasNegativeFlagName(string $name): bool
     {
@@ -430,8 +438,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @param FunctionLikeScope $scope Scope whose node yields the symbol name.
-     * @return string Named callable symbol or synthetic closure/arrow label.
+     * @param FunctionLikeScope $scope - Scope whose node yields the symbol name.
+     *
+     * @return string - Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {

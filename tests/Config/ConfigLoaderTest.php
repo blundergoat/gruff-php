@@ -378,8 +378,8 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     /**
      * Verify inline invalid config shapes are rejected with explicit messages.
      *
-     * @param string $configJson      Inline JSON config.
-     * @param string $expectedMessage Expected exception message.
+     * @param string $configJson - Inline JSON config.
+     * @param string $expectedMessage - Expected exception message.
      *
      * @return void
      */
@@ -402,7 +402,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      */
     public static function invalidInlineConfigProvider(): array
     {
-        // Each case pairs a malformed inline config payload with the validation message the loader must raise.
         return [
             'severity threshold without severity'                      => [
                 '{"rules":{"size.file-length":{"threshold":70}}}',

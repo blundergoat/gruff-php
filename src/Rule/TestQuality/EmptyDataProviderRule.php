@@ -34,7 +34,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Describe the empty data provider rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -52,10 +52,10 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Find tests linked to data providers that cannot yield any rows.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for empty data providers.
+     * @return list<Finding> - Findings for empty data providers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -72,8 +72,8 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Build empty-provider findings for one test class.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit that owns the test class.
-     * @param Stmt\Class_  $class        Test class declaration being inspected.
+     * @param AnalysisUnit $analysisUnit - Parsed unit that owns the test class.
+     * @param Stmt\Class_  $class - Test class declaration being inspected.
      *
      * @return list<Finding> - findings for test/provider pairs whose provider is provably empty
      */
@@ -101,7 +101,7 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Key class methods by lower-cased method name for case-insensitive provider lookup.
      *
-     * @param Stmt\Class_ $class Class declaration whose methods are indexed.
+     * @param Stmt\Class_ $class - Class declaration whose methods are indexed.
      *
      * @return array<string, Stmt\ClassMethod> - class methods keyed by lower-cased name
      */
@@ -119,10 +119,10 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * Build empty-provider findings for one test method.
      *
-     * @param AnalysisUnit                    $analysisUnit  Parsed unit that owns the test class.
-     * @param string                          $className     Test class name used in messages and symbols.
-     * @param Stmt\ClassMethod                $testMethod    Test method whose provider bindings are checked.
-     * @param array<string, Stmt\ClassMethod> $methodsByName Class methods keyed by lower-cased method name.
+     * @param AnalysisUnit                    $analysisUnit - Parsed unit that owns the test class.
+     * @param string                          $className - Test class name used in messages and symbols.
+     * @param Stmt\ClassMethod                $testMethod - Test method whose provider bindings are checked.
+     * @param array<string, Stmt\ClassMethod> $methodsByName - Class methods keyed by lower-cased method name.
      *
      * @return list<Finding> - findings for provider names that resolve to empty provider methods
      */
@@ -166,9 +166,10 @@ final readonly class EmptyDataProviderRule implements RuleInterface
     /**
      * List data provider method names referenced by test attributes.
      *
-     * @param Stmt\ClassMethod $classMethod Test method whose provider bindings are read - both the #[DataProvider]
+     * @param Stmt\ClassMethod $classMethod - Test method whose provider bindings are read - both the #[DataProvider]
      *                                      attribute and the legacy @dataProvider docblock annotation are scanned.
-     * @return list<string> Provider method names the test depends on, de-duplicated; empty when it names no provider.
+     *
+     * @return list<string> - Provider method names the test depends on, de-duplicated; empty when it names no provider.
      */
     private function dataProviderNames(Stmt\ClassMethod $classMethod): array
     {
@@ -204,8 +205,9 @@ final readonly class EmptyDataProviderRule implements RuleInterface
      * Conservative: only returns true when the AST proves emptiness; anything dynamic is treated as possibly non-empty
      * so the Error-severity finding cannot fire on a false positive.
      *
-     * @param Stmt\ClassMethod $classMethod Provider method to inspect by AST shape, without executing it.
-     * @return bool True when the provider is empty by simple AST inspection.
+     * @param Stmt\ClassMethod $classMethod - Provider method to inspect by AST shape, without executing it.
+     *
+     * @return bool - True when the provider is empty by simple AST inspection.
      */
     private function isProvablyEmpty(Stmt\ClassMethod $classMethod): bool
     {

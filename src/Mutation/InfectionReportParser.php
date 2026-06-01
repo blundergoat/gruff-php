@@ -20,7 +20,7 @@ final readonly class InfectionReportParser
     /**
      * Create a parser that resolves report paths relative to the project root.
      *
-     * @param string $projectRoot Project root used to resolve report paths.
+     * @param string $projectRoot - Project root used to resolve report paths.
      */
     public function __construct(private string $projectRoot)
     {
@@ -29,7 +29,7 @@ final readonly class InfectionReportParser
     /**
      * Parse an Infection JSON report from disk.
      *
-     * @param string $path Infection report path to read.
+     * @param string $path - Infection report path to read.
      *
      * @return InfectionReport - fully validated report; only returned once every stats key and section row passed validation, so callers never see a
      *                         partial parse
@@ -73,7 +73,7 @@ final readonly class InfectionReportParser
     /**
      * Resolve and validate a report path.
      *
-     * @param string $path Caller-supplied report path, absolute or relative to the project root.
+     * @param string $path - Caller-supplied report path, absolute or relative to the project root.
      *
      * @return string - canonical absolute path, or the unresolved candidate when realpath fails (e.g. broken symlink); the file is guaranteed to
      *                exist at return time
@@ -95,8 +95,8 @@ final readonly class InfectionReportParser
     /**
      * Parse stats for the mutation report parser.
      *
-     * @param JsonObject $decoded
-     * @param string     $path Original report path, used only to label validation failures.
+     * @param JsonObject $decoded - Decoded Infection report root object.
+     * @param string     $path - Original report path, used only to label validation failures.
      *
      * @return array<string, int|float> - report stats keyed by Infection metric name; guaranteed to include the four required MSI keys
      */
@@ -122,17 +122,16 @@ final readonly class InfectionReportParser
             }
         }
 
-        // Hand back the numeric stats only once all four required MSI keys are confirmed present.
         return $stats;
     }
 
     /**
      * Parse one mutant row from an Infection status section.
      *
-     * @param mixed  $mutantRecord Raw decoded row; must be a JSON object or validation rejects it.
-     * @param string $status       Normalised mutant status already mapped from the section name.
-     * @param string $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
-     * @param string $path         Original report path, used only to label validation failures.
+     * @param mixed  $mutantRecord - Raw decoded row; must be a JSON object or validation rejects it.
+     * @param string $status - Normalised mutant status already mapped from the section name.
+     * @param string $location - Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string $path - Original report path, used only to label validation failures.
      *
      * @return InfectionMutant - one validated mutant carrying the normalised status, display file path, and start line; empty diff/processOutput
      *                         strings are collapsed to null
@@ -158,9 +157,9 @@ final readonly class InfectionReportParser
     /**
      * Extract and validate the mutator object from one mutant row.
      *
-     * @param JsonObject $mutantRecord Already-validated mutant object to pull the "mutator" entry from.
-     * @param string     $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
-     * @param string     $path         Original report path, used only to label validation failures.
+     * @param JsonObject $mutantRecord - Already-validated mutant object to pull the "mutator" entry from.
+     * @param string     $location - Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path - Original report path, used only to label validation failures.
      *
      * @return JsonObject - the validated mutator sub-object for this mutant row
      */
@@ -175,8 +174,8 @@ final readonly class InfectionReportParser
     /**
      * Validate that a decoded Infection value is an object-like array.
      *
-     * @param mixed  $decodedValue Decoded value expected to be a string-keyed array, not a list or scalar.
-     * @param string $message      Exception message thrown verbatim when the value is not an object.
+     * @param mixed  $decodedValue - Decoded value expected to be a string-keyed array, not a list or scalar.
+     * @param string $message - Exception message thrown verbatim when the value is not an object.
      *
      * @return JsonObject - a freshly built string-keyed map containing only the shape-validated entries
      */
@@ -202,7 +201,7 @@ final readonly class InfectionReportParser
     /**
      * Normalise one decoded Infection JSON value.
      *
-     * @param mixed $decodedValue One decoded value, routed to array narrowing or scalar validation by type.
+     * @param mixed $decodedValue - One decoded value, routed to array narrowing or scalar validation by type.
      *
      * @return JsonValue - the value narrowed to the supported nested-array or leaf-scalar shape
      */
@@ -220,7 +219,7 @@ final readonly class InfectionReportParser
     /**
      * Validate scalar Infection JSON values after decoding.
      *
-     * @param mixed $decodedValue Value that must already be a bool, int, float, string, or null; else throws.
+     * @param mixed $decodedValue - Value that must already be a bool, int, float, string, or null; else throws.
      *
      * @return JsonScalar - the value unchanged once proven to be a permitted bool, int, float, string, or null
      */
@@ -237,7 +236,7 @@ final readonly class InfectionReportParser
     /**
      * Keep decoded mutation-report values within the supported nested JSON shape.
      *
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $values - Decoded JSON array at the first supported nesting level.
      *
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>> - the array
      *                          narrowed to the supported four-deep nesting shape
@@ -257,7 +256,7 @@ final readonly class InfectionReportParser
     /**
      * Keep second-level mutation-report values within the supported JSON shape.
      *
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $values - Decoded JSON array at the second supported nesting level.
      *
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>> - the second-level array narrowed to permit at
      *                          most three further nesting layers
@@ -277,7 +276,7 @@ final readonly class InfectionReportParser
     /**
      * Keep third-level mutation-report values within the supported JSON shape.
      *
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $values - Decoded JSON array at the third supported nesting level.
      *
      * @return array<array-key, JsonScalar|array<array-key, JsonScalar>> - the third-level array narrowed to permit at most one further nested array
      */
@@ -296,7 +295,7 @@ final readonly class InfectionReportParser
     /**
      * Keep fourth-level mutation-report values as scalar JSON values.
      *
-     * @param array<array-key, mixed> $values
+     * @param array<array-key, mixed> $values - Decoded JSON array at the final supported nesting level.
      *
      * @return array<array-key, JsonScalar> - the deepest supported level, where every entry is a flat scalar
      */
@@ -317,10 +316,10 @@ final readonly class InfectionReportParser
     }
 
     /**
-     * @param JsonObject $mutator  Validated mutator object whose string field is being extracted.
-     * @param string     $field    Mutator key to read, e.g. "mutatorName" or "originalFilePath".
-     * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
-     * @param string     $path     Original report path, used only to label validation failures.
+     * @param JsonObject $mutator - Validated mutator object whose string field is being extracted.
+     * @param string     $field - Mutator key to read, e.g. "mutatorName" or "originalFilePath".
+     * @param string     $location - Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path - Original report path, used only to label validation failures.
      *
      * @return string - the requested field's value, guaranteed non-empty; a missing or empty field throws rather than returning a blank string
      */
@@ -336,9 +335,9 @@ final readonly class InfectionReportParser
     }
 
     /**
-     * @param JsonObject $mutator  Validated mutator object that may carry an "originalStartLine" entry.
-     * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
-     * @param string     $path     Original report path, used only to label validation failures.
+     * @param JsonObject $mutator - Validated mutator object that may carry an "originalStartLine" entry.
+     * @param string     $location - Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path - Original report path, used only to label validation failures.
      *
      * @return int|null - the originalStartLine when present; null means the report simply omitted it (an expected miss, not a parse failure), while
      *                  a non-integer value throws
@@ -377,7 +376,7 @@ final readonly class InfectionReportParser
     /**
      * Convert an absolute report path to a project-relative display path when possible.
      *
-     * @param string $path Absolute or canonical filesystem path to render for display.
+     * @param string $path - Absolute or canonical filesystem path to render for display.
      *
      * @return string - project-relative path for readable output, falling back to the canonical absolute path when the file sits outside the project
      *                root

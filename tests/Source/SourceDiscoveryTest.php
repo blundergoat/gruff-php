@@ -330,7 +330,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Resolve a source-discovery fixture root.
      *
-     * @param string $name Fixture name.
+     * @param string $name - Fixture name.
      *
      * @return string - canonical absolute path to the fixture root with symlinks resolved
      */
@@ -340,7 +340,6 @@ final class SourceDiscoveryTest extends TestCase
 
         self::assertIsString($root);
 
-        // Hand back the canonical absolute fixture root, symlinks already resolved by realpath.
         return $root;
     }
 
@@ -356,7 +355,6 @@ final class SourceDiscoveryTest extends TestCase
         self::assertTrue(mkdir($path));
         $this->tempDirs[] = $path;
 
-        // Hand back the new project root now registered for teardown.
         return $path;
     }
 
@@ -378,8 +376,8 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Run a git command inside a temporary fixture project.
      *
-     * @param string       $root Fixture root.
-     * @param list<string> $args Git arguments.
+     * @param string       $root - Fixture root.
+     * @param list<string> $args - Git arguments.
      *
      * @return void
      */
@@ -394,9 +392,9 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $root     Fixture root.
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $root - Fixture root.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
      *
      * @return void
      */
@@ -415,7 +413,7 @@ final class SourceDiscoveryTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Directory path.
+     * @param string $path - Directory path.
      *
      * @return void
      */

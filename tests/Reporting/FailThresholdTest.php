@@ -17,8 +17,8 @@ final class FailThresholdTest extends TestCase
     /**
      * Each canonical CLI value parses into the matching enum case.
      *
-     * @param string        $rawInput Raw CLI value supplied to FailThreshold::fromInput.
-     * @param FailThreshold $expected Enum case the parser must return for the canonical value.
+     * @param string        $rawInput - Raw CLI value supplied to FailThreshold::fromInput.
+     * @param FailThreshold $expected - Enum case the parser must return for the canonical value.
      *
      * @return void
      */
@@ -31,7 +31,7 @@ final class FailThresholdTest extends TestCase
     /**
      * Banned aliases, case variants, and the empty string return null.
      *
-     * @param string $rawInput Raw CLI value the parser must reject as unsupported.
+     * @param string $rawInput - Raw CLI value the parser must reject as unsupported.
      *
      * @return void
      */
@@ -44,9 +44,9 @@ final class FailThresholdTest extends TestCase
     /**
      * isTriggeredBy returns the documented value for every threshold/severity pair.
      *
-     * @param FailThreshold $threshold     Threshold under test.
-     * @param Severity      $severity      Finding severity compared against the threshold.
-     * @param bool          $shouldTrigger Expected isTriggeredBy result for this pair.
+     * @param FailThreshold $threshold - Threshold under test.
+     * @param Severity      $severity - Finding severity compared against the threshold.
+     * @param bool          $shouldTrigger - Expected isTriggeredBy result for this pair.
      *
      * @return void
      */

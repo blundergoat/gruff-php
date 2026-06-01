@@ -29,7 +29,7 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Describe the empty class rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Find concrete classes that declare no members and are not exception markers.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for empty classes.
+     * @return list<Finding> - Findings for empty classes.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -96,8 +96,9 @@ final readonly class EmptyClassRule implements RuleInterface
     /**
      * Allow empty classes that exist as exception marker types.
      *
-     * @param Class_ $class Class declaration to test; only a parent type can make an empty body legitimate.
-     * @return bool True when the class extends an exception/throwable type.
+     * @param Class_ $class - Class declaration to test; only a parent type can make an empty body legitimate.
+     *
+     * @return bool - True when the class extends an exception/throwable type.
      */
     private function isEmptyExceptionMarker(Class_ $class): bool
     {

@@ -69,7 +69,7 @@ final readonly class PathIgnoreResolver
     ];
 
     /**
-     * @param string $projectRoot Project root used to evaluate Git ignore rules.
+     * @param string $projectRoot - Project root used to evaluate Git ignore rules.
      */
     public function __construct(private string $projectRoot)
     {
@@ -82,11 +82,12 @@ final readonly class PathIgnoreResolver
      * files are otherwise included; default and generated exclusions are skipped
      * when ignored files are requested.
      *
-     * @param string       $displayPath        Project-relative display path used for glob and directory matching.
-     * @param string       $absolutePath       Absolute path used for filename matching.
-     * @param list<string> $configuredPatterns Configured paths.ignore glob patterns.
-     * @param bool         $shouldIncludeIgnored Whether default/generated ignores are bypassed for this run.
-     * @return IgnoreDecision Decision describing whether and why the path is ignored.
+     * @param string       $displayPath - Project-relative display path used for glob and directory matching.
+     * @param string       $absolutePath - Absolute path used for filename matching.
+     * @param list<string> $configuredPatterns - Configured paths.ignore glob patterns.
+     * @param bool         $shouldIncludeIgnored - Whether default/generated ignores are bypassed for this run.
+     *
+     * @return IgnoreDecision - Decision describing whether and why the path is ignored.
      */
     public function decide(
         string $displayPath,
@@ -124,9 +125,10 @@ final readonly class PathIgnoreResolver
     /**
      * Return the configured ignore glob that matches the path, or null when none match.
      *
-     * @param string       $displayPath Project-relative display path being tested.
-     * @param list<string> $patterns    Configured paths.ignore glob patterns.
-     * @return string|null Matching pattern, or null when the path is not configured-ignored.
+     * @param string       $displayPath - Project-relative display path being tested.
+     * @param list<string> $patterns - Configured paths.ignore glob patterns.
+     *
+     * @return string|null - Matching pattern, or null when the path is not configured-ignored.
      */
     public function matchedConfiguredPattern(string $displayPath, array $patterns): ?string
     {
@@ -146,8 +148,9 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in ignored directory token that matches the path, or null when none match.
      *
-     * @param string $displayPath Project-relative display path being tested.
-     * @return string|null Matching directory token, or null when the path is not default-ignored.
+     * @param string $displayPath - Project-relative display path being tested.
+     *
+     * @return string|null - Matching directory token, or null when the path is not default-ignored.
      */
     public function matchedDefaultDirectory(string $displayPath): ?string
     {
@@ -173,8 +176,9 @@ final readonly class PathIgnoreResolver
     /**
      * Return the built-in generated/lock filename that matches the path, or null when none match.
      *
-     * @param string $absolutePath Absolute filesystem path being tested.
-     * @return string|null Matching filename, or null when the path is not a known generated artifact.
+     * @param string $absolutePath - Absolute filesystem path being tested.
+     *
+     * @return string|null - Matching filename, or null when the path is not a known generated artifact.
      */
     public function matchedGeneratedFilename(string $absolutePath): ?string
     {
@@ -187,8 +191,9 @@ final readonly class PathIgnoreResolver
     /**
      * Return the Git ignore rule that excludes the pathspec, or null when Git does not ignore it.
      *
-     * @param string $pathspec Project-relative pathspec to test against Git ignore rules.
-     * @return string|null Matching git rule (or the pathspec when no rule text is reported), or null when not ignored.
+     * @param string $pathspec - Project-relative pathspec to test against Git ignore rules.
+     *
+     * @return string|null - Matching git rule (or the pathspec when no rule text is reported), or null when not ignored.
      */
     public function gitIgnoreRule(string $pathspec): ?string
     {
@@ -218,9 +223,10 @@ final readonly class PathIgnoreResolver
     /**
      * Detect whether the display path matches a glob-style pattern (`*`, `**`, `?` supported).
      *
-     * @param string $displayPath Project-relative path to test; backslashes and edge slashes are normalized here.
-     * @param string $pattern     Glob with `*` (within a segment), `**` (across segments), and `?` placeholders.
-     * @return bool True when the normalized path matches the pattern.
+     * @param string $displayPath - Project-relative path to test; backslashes and edge slashes are normalized here.
+     * @param string $pattern - Glob with `*` (within a segment), `**` (across segments), and `?` placeholders.
+     *
+     * @return bool - True when the normalized path matches the pattern.
      */
     private function matchesPathPattern(string $displayPath, string $pattern): bool
     {

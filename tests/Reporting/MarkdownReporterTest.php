@@ -237,8 +237,8 @@ final class MarkdownReporterTest extends TestCase
      * the supplied {@see ScoreReport} or derives one from the supplied
      * findings via {@see ScoreCalculator}.
      *
-     * @param list<Finding>    $findings
-     * @param ScoreReport|null $score
+     * @param list<Finding>    $findings - Findings to render in the markdown fixture report.
+     * @param ScoreReport|null $score - Precomputed score to use, or null to derive one from the findings.
      *
      * @return AnalysisReport - a markdown-format fixture wired with the given findings and resolved score, ready to render
      */
@@ -246,7 +246,6 @@ final class MarkdownReporterTest extends TestCase
     {
         $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
 
-        // Hand back a markdown-format report fixture wired with the given findings and resolved score.
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],

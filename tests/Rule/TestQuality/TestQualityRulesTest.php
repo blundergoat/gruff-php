@@ -531,9 +531,9 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
-     * @param string        $ruleId        Rule identifier whose findings are counted.
-     * @param int           $expectedCount Exact number of findings the rule must emit.
-     * @param list<Finding> $findings
+     * @param string        $ruleId - Rule identifier whose findings are counted.
+     * @param int           $expectedCount - Exact number of findings the rule must emit.
+     * @param list<Finding> $findings - Findings to filter down to the requested rule id.
      *
      * @return void
      */
@@ -549,8 +549,8 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param string              $path   Single fixture path to analyse.
-     * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
+     * @param string              $path - Single fixture path to analyse.
+     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
      * @return list<Finding> - every finding emitted across all rules for the single fixture; empty when nothing fired
      */
@@ -567,7 +567,6 @@ final class TestQualityRulesTest extends TestCase
      */
     private function eagerMutationFindings(): array
     {
-        // Keep only eager-test findings from the mutation fixture, dropping any other rule that also fires on it.
         return array_values(array_filter(
                                 $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php'),
                                 static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
@@ -577,8 +576,8 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string>        $paths  Fixture paths to parse and analyse together.
-     * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
+     * @param list<string>        $paths - Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
      * @return list<Finding> - every finding the default registry emits across the combined fixtures; empty when nothing fired
      */
@@ -597,7 +596,7 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Parse the requested path into an analysis unit.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return AnalysisUnit - the parsed fixture, carrying the project-root-relative path as its display name
      */
@@ -605,7 +604,6 @@ final class TestQualityRulesTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
-        // Hand back the fixture parsed from the project-root-relative path, with that path kept as its display name.
         return (new PhpFileParser())->parse($sourceFile);
     }
 }

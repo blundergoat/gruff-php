@@ -14,11 +14,11 @@ use GruffPhp\Finding\Severity;
 final readonly class FindingDisplayFilter
 {
     /**
-     * @param Severity|null $minSeverity    Minimum severity that should be displayed.
-     * @param list<Pillar>  $includePillars Pillars explicitly included in output.
-     * @param list<Pillar>  $excludePillars Pillars explicitly excluded from output.
-     * @param list<string>  $includeRules   Rule ids explicitly included in output.
-     * @param list<string>  $excludeRules   Rule ids explicitly excluded from output.
+     * @param Severity|null $minSeverity - Minimum severity that should be displayed.
+     * @param list<Pillar>  $includePillars - Pillars explicitly included in output.
+     * @param list<Pillar>  $excludePillars - Pillars explicitly excluded from output.
+     * @param list<string>  $includeRules - Rule ids explicitly included in output.
+     * @param list<string>  $excludeRules - Rule ids explicitly excluded from output.
      */
     public function __construct(
         public ?Severity $minSeverity = null,
@@ -32,7 +32,7 @@ final readonly class FindingDisplayFilter
     /**
      * Keep only findings visible under the selected display filter.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Candidate findings before severity, pillar, and rule filters are applied.
      *
      * @return list<Finding> - findings that pass every active filter, re-keyed to a 0-indexed list; empty when all are filtered out
      */
@@ -84,7 +84,7 @@ final readonly class FindingDisplayFilter
     /**
      * Determine whether one finding passes all configured filters.
      *
-     * @param Finding $finding Finding under test against severity floor and pillar/rule include-exclude sets.
+     * @param Finding $finding - Finding under test against severity floor and pillar/rule include-exclude sets.
      *
      * @return bool - true when the finding clears the severity floor and every pillar/rule include-exclude gate; false drops it from output
      */
@@ -117,7 +117,7 @@ final readonly class FindingDisplayFilter
     /**
      * Convert severity to a comparable rank.
      *
-     * @param Severity $severity Severity whose ordering position is needed for the minimum-severity comparison.
+     * @param Severity $severity - Severity whose ordering position is needed for the minimum-severity comparison.
      *
      * @return int - ordering rank where a larger value is more severe, so the minimum-severity floor can be compared with a numeric >=
      */

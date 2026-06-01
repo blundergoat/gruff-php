@@ -24,14 +24,15 @@ interface ProjectRuleAccumulator
     /**
      * Describe the rule for the registry and reports.
      *
-     * @return RuleDefinition Rule metadata.
+     * @return RuleDefinition - Rule metadata.
      */
     public function definition(): RuleDefinition;
 
     /**
      * Reset any accumulated state at the start of a project pass.
      *
-     * @param RuleContext $ruleContext Rule context carrying config and settings.
+     * @param RuleContext $ruleContext - Rule context carrying config and settings.
+     *
      * @return void
      */
     public function startProject(RuleContext $ruleContext): void;
@@ -39,8 +40,9 @@ interface ProjectRuleAccumulator
     /**
      * Extract project-level data from one analysis unit.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to accumulate.
-     * @param RuleContext  $ruleContext  Rule context carrying config and settings.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
+     * @param RuleContext  $ruleContext - Rule context carrying config and settings.
+     *
      * @return void Implementations should store what they need on `$this` or
      *              an internal collector; the unit may be released by the
      *              orchestrator immediately after this call returns.
@@ -50,8 +52,9 @@ interface ProjectRuleAccumulator
     /**
      * Produce project-level findings from the accumulated state and clear it.
      *
-     * @param RuleContext $ruleContext Rule context carrying config and settings.
-     * @return list<Finding> Findings emitted from the accumulated summary.
+     * @param RuleContext $ruleContext - Rule context carrying config and settings.
+     *
+     * @return list<Finding> - Findings emitted from the accumulated summary.
      */
     public function finishProject(RuleContext $ruleContext): array;
 }

@@ -77,8 +77,8 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Find request-derived output that is not HTML-escaped.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per output sink reached by unescaped request data; empty when the unit is clean
      */
@@ -122,8 +122,8 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Decide whether an output expression carries unescaped request data.
      *
-     * @param Expr         $output       Expression rendered to output.
-     * @param AnalysisUnit $analysisUnit Parsed unit (top-level scope fallback).
+     * @param Expr         $output - Expression rendered to output.
+     * @param AnalysisUnit $analysisUnit - Parsed unit (top-level scope fallback).
      *
      * @return bool - true when a request source reaches the sink unescaped, whether directly or via a tainted local alias
      */
@@ -158,9 +158,9 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Compute local variables holding unescaped request data before the sink.
      *
-     * @param list<Stmt>        $statements   Statements of the owning scope.
-     * @param FunctionLike|null $scope        Owning function-like scope, or null for top level.
-     * @param int               $sinkPosition Byte offset of the output expression.
+     * @param list<Stmt>        $statements - Statements of the owning scope.
+     * @param FunctionLike|null $scope - Owning function-like scope, or null for top level.
+     * @param int               $sinkPosition - Byte offset of the output expression.
      *
      * @return array<string, true> - variable names still tainted immediately before the sink, keyed for set-membership lookup
      */
@@ -208,8 +208,8 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Decide whether an assignment right-hand side carries unescaped request data.
      *
-     * @param Expr                $expr    Right-hand side expression.
-     * @param array<string, true> $tainted Already-tainted local variable names.
+     * @param Expr                $expr - Right-hand side expression.
+     * @param array<string, true> $tainted - Already-tainted local variable names.
      *
      * @return bool - true when the right-hand side reads a request superglobal or a still-tainted alias without an escaper
      */
@@ -236,8 +236,8 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Determine whether a leaf is wrapped by an escaper/encoder/cast up to a root.
      *
-     * @param Node $leaf Request-source leaf node.
-     * @param Node $root Output expression boundary (inclusive).
+     * @param Node $leaf - Request-source leaf node.
+     * @param Node $root - Output expression boundary (inclusive).
      *
      * @return bool - true when an escaper/encoder call or numeric cast encloses the leaf on the path up to the root
      */
@@ -265,7 +265,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Detect an escaper/encoder function call.
      *
-     * @param Node $node Candidate node.
+     * @param Node $node - Candidate node.
      *
      * @return bool - true when the node is a global call to one of the recognised escaper/encoder functions
      */
@@ -285,7 +285,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Detect a numeric/boolean cast that neutralises markup.
      *
-     * @param Node $node Candidate node.
+     * @param Node $node - Candidate node.
      *
      * @return bool - true for an int, float, or bool cast, which strips markup before it can reach an HTML sink
      */
@@ -300,7 +300,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * List request-superglobal variable nodes within an expression.
      *
-     * @param Node $node Expression to inspect.
+     * @param Node $node - Expression to inspect.
      *
      * @return list<Expr\Variable> - request-superglobal variable leaves found beneath the node; empty when none are request sources
      */
@@ -320,7 +320,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * List variable nodes within an expression.
      *
-     * @param Node $node Expression to inspect.
+     * @param Node $node - Expression to inspect.
      *
      * @return list<Expr\Variable> - every variable leaf in the expression subtree, in finder order; empty when the node has no variables
      */
@@ -340,7 +340,7 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Find the function, method, or closure scope containing a node.
      *
-     * @param Node $node Node whose containing function-like scope is needed.
+     * @param Node $node - Node whose containing function-like scope is needed.
      *
      * @return FunctionLike|null - closest enclosing function/method/closure that bounds aliasing, or null at file top level
      */
@@ -364,9 +364,9 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Build a reflected-XSS finding for an output sink.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit being analysed.
-     * @param int          $line         Sink line number.
-     * @param string       $sink         Output sink name (echo/print/printf/vprintf).
+     * @param AnalysisUnit $analysisUnit - Parsed unit being analysed.
+     * @param int          $line - Sink line number.
+     * @param string       $sink - Output sink name (echo/print/printf/vprintf).
      *
      * @return Finding - warning-level finding naming only the sink, with remediation; never includes the tainted value
      */

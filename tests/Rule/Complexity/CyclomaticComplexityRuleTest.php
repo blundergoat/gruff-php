@@ -46,7 +46,6 @@ final class CyclomaticComplexityRuleTest extends TestCase
      */
     public static function methodCcnProvider(): array
     {
-        // Each row pairs a fixture method with its expected ccn; the oracle the counter is checked against.
         return [
             'flat method'         => ['flat', 1],
             'if/elseif'           => ['ifElseIf', 3],
@@ -61,8 +60,8 @@ final class CyclomaticComplexityRuleTest extends TestCase
     /**
      * Verify cyclomatic count matches expected.
      *
-     * @param string $methodName  Fixture method name.
-     * @param int    $expectedCcn Expected cyclomatic complexity.
+     * @param string $methodName - Fixture method name.
+     * @param int    $expectedCcn - Expected cyclomatic complexity.
      *
      * @return void
      */
@@ -198,14 +197,13 @@ final class CyclomaticComplexityRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
-        // Run the single rule under the test-supplied thresholds so each case controls its own finding boundary.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying the repo-relative display path the rule reports findings against
      */
@@ -213,7 +211,6 @@ final class CyclomaticComplexityRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
 
-        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/' . $filename));
     }
 }

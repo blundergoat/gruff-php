@@ -34,7 +34,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Describe the missing class PHPDoc rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -52,10 +52,10 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
     /**
      * Find class-like declarations that do not have a PHPDoc block.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for undocumented class-like declarations.
+     * @return list<Finding> - Findings for undocumented class-like declarations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -96,16 +96,15 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per undocumented class-like declaration; empty when all are documented.
         return $findings;
     }
 
     /**
      * Return the declaration kind for a class-like node.
      *
-     * @param Node $node Class-like node already confirmed to be a class, interface, trait, or enum.
+     * @param Node $node - Class-like node already confirmed to be a class, interface, trait, or enum.
      *
-     * @return string One of class, interface, trait, or enum.
+     * @return string - One of class, interface, trait, or enum.
      */
     private function classKind(Node $node): string
     {

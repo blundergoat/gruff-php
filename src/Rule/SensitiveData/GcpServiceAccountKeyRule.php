@@ -30,7 +30,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     /**
      * Describe the GCP service-account-key rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +49,10 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     /**
      * Find service-account key JSON that embeds a private key.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for GCP service-account keys.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for GCP service-account keys.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -107,8 +107,9 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     /**
      * Decide whether the source carries a private-key body.
      *
-     * @param string $source Raw source text.
-     * @return bool True when a PEM private-key block or a JSON private_key field is present.
+     * @param string $source - Raw source text.
+     *
+     * @return bool - True when a PEM private-key block or a JSON private_key field is present.
      */
     private function hasPrivateKeyBody(string $source): bool
     {
@@ -129,9 +130,10 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
      * without the substring false-matches that a generic dummy check hits on
      * base64.
      *
-     * @param string|null $privateKeyValue Extracted JSON private_key value, if any.
-     * @param string      $source          Raw source text (PEM fallback).
-     * @return bool True when the key body is too short to be real key material.
+     * @param string|null $privateKeyValue - Extracted JSON private_key value, if any.
+     * @param string      $source - Raw source text (PEM fallback).
+     *
+     * @return bool - True when the key body is too short to be real key material.
      */
     private function looksLikePlaceholderKey(?string $privateKeyValue, string $source): bool
     {
@@ -151,8 +153,9 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     /**
      * Extract the first PEM private-key block from source text.
      *
-     * @param string $source Raw source text.
-     * @return string|null The PEM block, or null when none is present.
+     * @param string $source - Raw source text.
+     *
+     * @return string|null - The PEM block, or null when none is present.
      */
     private function pemBlock(string $source): ?string
     {
@@ -169,8 +172,9 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
     /**
      * Extract the JSON private_key field value when present.
      *
-     * @param string $source Raw source text.
-     * @return string|null The (still-escaped) private_key value, or null when absent.
+     * @param string $source - Raw source text.
+     *
+     * @return string|null - The (still-escaped) private_key value, or null when absent.
      */
     private function privateKeyValue(string $source): ?string
     {

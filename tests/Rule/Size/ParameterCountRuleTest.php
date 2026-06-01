@@ -111,8 +111,8 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Verify exempt callables are not reported under the standard threshold.
      *
-     * @param string $fixture Fixture filename to parse.
-     * @param string $symbol  Symbol whose absence from findings is asserted.
+     * @param string $fixture - Fixture filename to parse.
+     * @param string $symbol - Symbol whose absence from findings is asserted.
      *
      * @return void
      */
@@ -305,11 +305,11 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param string                                                                       $fixture    Fixture filename under tests/Fixtures/Size to
+     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
      *                                                                                                 scan.
-     * @param array<string, int>                                                           $thresholds Warning/error parameter-count limits for this
+     * @param array<string, int>                                                           $thresholds - Warning/error parameter-count limits for this
      *                                                                                     case.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options    Extra rule options merged over the rule
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Extra rule options merged over the rule
      *                                                             defaults.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings the rule emitted for the fixture, empty when nothing tripped the threshold
@@ -332,9 +332,9 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param string                                                                       $fixture Fixture filename under tests/Fixtures/Size to
+     * @param string                                                                       $fixture - Fixture filename under tests/Fixtures/Size to
      *                                                                                              scan.
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options Option overrides layered onto the shipped
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options - Option overrides layered onto the shipped
      *                                                             defaults, thresholds untouched.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings produced under the default thresholds, empty when none fired
@@ -361,7 +361,7 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
+     * @param string $filename - Fixture filename.
      *
      * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse
      */

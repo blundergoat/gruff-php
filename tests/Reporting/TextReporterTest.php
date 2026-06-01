@@ -52,7 +52,7 @@ final class TextReporterTest extends TestCase
     /**
      * Build a synthetic AnalysisReport with the requested number of findings.
      *
-     * @param int $findingCount Number of synthetic findings to embed.
+     * @param int $findingCount - Number of synthetic findings to embed.
      *
      * @return AnalysisReport - report carrying exactly $findingCount advisory findings over one discovered/parsed file, exit code 0
      */

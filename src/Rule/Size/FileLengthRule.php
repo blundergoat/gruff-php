@@ -31,7 +31,7 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Describe the file length rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -50,10 +50,10 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Find files whose line count exceeds configured thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized files.
+     * @return list<Finding> - Findings for oversized files.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -98,8 +98,9 @@ final readonly class FileLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

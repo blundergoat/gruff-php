@@ -22,9 +22,9 @@ abstract class ConfigLoaderTestCase extends TestCase
      * wrong-schemaVersion error path include a non-canonical value
      * explicitly and the auto-injection sees `schemaVersion` and skips.
      *
-     * @param string $contents                  Config file contents.
-     * @param string $suffix                    File suffix.
-     * @param bool   $shouldInjectSchemaVersion When false, write contents verbatim (used by schemaVersion-rejection tests).
+     * @param string $contents - Config file contents.
+     * @param string $suffix - File suffix.
+     * @param bool   $shouldInjectSchemaVersion - When false, write contents verbatim (used by schemaVersion-rejection tests).
      *
      * @return string - absolute on-disk path of the freshly written temp config file, ready to feed a ConfigLoader
      */
@@ -45,14 +45,13 @@ abstract class ConfigLoaderTestCase extends TestCase
 
         self::assertNotFalse(file_put_contents($path, $contents));
 
-        // Hand back the on-disk path so the test can point a ConfigLoader at this fixture.
         return $path;
     }
 
     /**
      * Prepend the canonical schemaVersion when the test contents omit it.
      *
-     * @param string $contents Raw config contents supplied by the test.
+     * @param string $contents - Raw config contents supplied by the test.
      *
      * @return string - the config body guaranteed to carry a schemaVersion; returned unchanged when one was already present
      */

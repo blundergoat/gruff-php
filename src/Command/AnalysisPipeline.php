@@ -40,23 +40,8 @@ final class AnalysisPipeline
     private readonly Closure $projectContextUnitsResolver;
 
     /**
-     * @param RuleRegistry                                                                                                             $registry Rule
-     *                                                                                                                                           registry
-     *                                                                                                                                           used
-     *                                                                                                                                           to
-     *                                                                                                                                           execute
-     *                                                                                                                                           enabled
-     *                                                                                                                                           rules.
-     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
-     *                                                                                                                                           Resolves
-     *                                                                                                                                           full
-     *                                                                                                                                           project
-     *                                                                                                                                           context
-     *                                                                                                                                           units
-     *                                                                                                                                           for
-     *                                                                                                                                           legacy
-     *                                                                                                                                           review
-     *                                                                                                                                           analysis.
+     * @param RuleRegistry                                                                                                             $registry - Registry used to execute enabled rules.
+     * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure - Resolves full project context units for legacy review analysis.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
@@ -68,14 +53,14 @@ final class AnalysisPipeline
     /**
      * Run the right pipeline for this CLI invocation.
      *
-     * @param string                  $projectRoot        Project root used for discovery and parsing.
-     * @param AnalyseCommandOptions   $options            Effective CLI analysis options.
-     * @param AnalysisConfig          $config             Effective rule and path configuration.
-     * @param RuleContext             $ruleContext        Rule execution context.
-     * @param DiffResult|null         $reviewDiff         Review diff metadata when branch review is active.
-     * @param list<string>|null       $analysisPaths      Paths to analyse, or null when setup failed.
-     * @param int                     $discoverStart      Monotonic start timestamp for discovery timing.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing observer.
+     * @param string                  $projectRoot - Project root used for discovery and parsing.
+     * @param AnalyseCommandOptions   $options - Effective CLI analysis options.
+     * @param AnalysisConfig          $config - Effective rule and path configuration.
+     * @param RuleContext             $ruleContext - Rule execution context.
+     * @param DiffResult|null         $reviewDiff - Review diff metadata when branch review is active.
+     * @param list<string>|null       $analysisPaths - Paths to analyse, or null when setup failed.
+     * @param int                     $discoverStart - Monotonic start timestamp for discovery timing.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing observer.
      *
      * @return array{
      *     sources: AnalysisSourceSet,
@@ -136,9 +121,9 @@ final class AnalysisPipeline
     /**
      * Decide whether streaming parse → analyse → release is safe for this run.
      *
-     * @param AnalyseCommandOptions $options     CLI options; changed-region and diff modes force the legacy path.
-     * @param DiffResult|null       $reviewDiff  Review diff metadata; an active review keeps the base snapshot.
-     * @param RuleContext           $ruleContext Context whose enabled rules must all tolerate per-unit release.
+     * @param AnalyseCommandOptions $options - CLI options; changed-region and diff modes force the legacy path.
+     * @param DiffResult|null       $reviewDiff - Review diff metadata; an active review keeps the base snapshot.
+     * @param RuleContext           $ruleContext - Context whose enabled rules must all tolerate per-unit release.
      *
      * @return bool - true when every unit can be released immediately after analysis (streaming is safe), false when a review/diff or changed-region
      *              mode forces the legacy load-all path
@@ -159,13 +144,13 @@ final class AnalysisPipeline
      * Streaming pipeline: each unit's AST is freed as soon as its per-unit
      * and accumulator passes complete, keeping peak memory near one file.
      *
-     * @param string                  $projectRoot        Root for discovery, parsing, and the per-project result cache.
-     * @param AnalyseCommandOptions   $options            CLI options; gate the cache and whether ignored files load.
-     * @param AnalysisConfig          $config             Ignore patterns plus the inputs to the cache fingerprint.
-     * @param RuleContext             $ruleContext        Context the per-unit and accumulator rule passes run against.
-     * @param list<string>            $analysisPaths      Project-relative paths to discover under; never null here.
-     * @param int                     $discoverStart      Monotonic hrtime start for the discover-and-parse span.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing sink, or null to skip timing.
+     * @param string                  $projectRoot - Root for discovery, parsing, and the per-project result cache.
+     * @param AnalyseCommandOptions   $options - CLI options; gate the cache and whether ignored files load.
+     * @param AnalysisConfig          $config - Ignore patterns plus the inputs to the cache fingerprint.
+     * @param RuleContext             $ruleContext - Context the per-unit and accumulator rule passes run against.
+     * @param list<string>            $analysisPaths - Project-relative paths to discover under; never null here.
+     * @param int                     $discoverStart - Monotonic hrtime start for the discover-and-parse span.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing sink, or null to skip timing.
      *
      * @return array{
      *     sources: AnalysisSourceSet,
@@ -265,14 +250,14 @@ final class AnalysisPipeline
      * Legacy load-all-then-analyse pipeline. Still used for diff/review flows
      * that need both the current changed-only set and a base snapshot.
      *
-     * @param string                  $projectRoot        Root for discovery and parsing of the changed-only set.
-     * @param AnalyseCommandOptions   $options            CLI options forwarded to discovery and the context resolver.
-     * @param AnalysisConfig          $config             Effective config supplying ignore patterns and rule selection.
-     * @param RuleContext             $ruleContext        Context the whole-project analysis pass runs against.
-     * @param DiffResult|null         $reviewDiff         Review diff metadata that drives which base units load.
-     * @param list<string>            $analysisPaths      Project-relative paths to load and parse; never null here.
-     * @param int                     $discoverStart      Monotonic hrtime start for the discover-and-parse span.
-     * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing sink, or null to skip timing.
+     * @param string                  $projectRoot - Root for discovery and parsing of the changed-only set.
+     * @param AnalyseCommandOptions   $options - CLI options forwarded to discovery and the context resolver.
+     * @param AnalysisConfig          $config - Effective config supplying ignore patterns and rule selection.
+     * @param RuleContext             $ruleContext - Context the whole-project analysis pass runs against.
+     * @param DiffResult|null         $reviewDiff - Review diff metadata that drives which base units load.
+     * @param list<string>            $analysisPaths - Project-relative paths to load and parse; never null here.
+     * @param int                     $discoverStart - Monotonic hrtime start for the discover-and-parse span.
+     * @param RuleRunnerObserver|null $ruleRunnerObserver - Optional per-rule timing sink, or null to skip timing.
      *
      * @return array{
      *     sources: AnalysisSourceSet,

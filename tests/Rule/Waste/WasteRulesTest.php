@@ -419,9 +419,9 @@ final class WasteRulesTest extends TestCase
     /**
      * Analyse waste-rule fixtures and return findings for assertions.
      *
-     * @param string              $fixture Fixture filename under the dead-code fixtures directory.
-     * @param string              $ruleId  Rule identifier to keep; all other findings are discarded.
-     * @param AnalysisConfig|null $config  Overriding config, or null to use the registry defaults.
+     * @param string              $fixture - Fixture filename under the dead-code fixtures directory.
+     * @param string              $ruleId - Rule identifier to keep; all other findings are discarded.
+     * @param AnalysisConfig|null $config - Overriding config, or null to use the registry defaults.
      *
      * @return list<\GruffPhp\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
      */
@@ -431,7 +431,6 @@ final class WasteRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config ?? AnalysisConfig::fromRegistry($registry)));
 
-        // Keep only the requested rule's findings so each assertion sees one rule in isolation.
         return array_values(array_filter($findings, static fn($finding) => $finding->ruleId === $ruleId));
     }
 

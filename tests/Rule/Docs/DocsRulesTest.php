@@ -155,7 +155,7 @@ final class DocsRulesTest extends DocsRuleTestCase
     /**
      * Build `symbol|parameter` rows for findings whose metadata identifies a parameter.
      *
-     * @param list<\GruffPhp\Finding\Finding> $findings Findings from a missing-param-tag fixture.
+     * @param list<\GruffPhp\Finding\Finding> $findings - Findings from a missing-param-tag fixture.
      *
      * @return list<string> - symbol and parameter pairs in finding order; entries without string parameter metadata are omitted
      */

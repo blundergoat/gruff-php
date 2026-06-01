@@ -30,7 +30,7 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Describe the enum candidate modernisation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class EnumCandidateRule implements RuleInterface
     /**
      * Find string or integer constant groups that could become enums.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for enum candidate classes.
+     * @return list<Finding> - Findings for enum candidate classes.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -90,13 +90,13 @@ final readonly class EnumCandidateRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per constant-only class identified as an enum candidate.
         return $findings;
     }
 
     /**
-     * @param list<Stmt\ClassConst> $constants
-     * @return bool True when every constant value is a string-or-integer scalar AND every constant in the group is of the same backed-enum scalar type.
+     * @param list<Stmt\ClassConst> $constants - Constant groups declared by the candidate class.
+     *
+     * @return bool - True when every constant value is a string-or-integer scalar AND every constant in the group is of the same backed-enum scalar type.
      */
     private function allConstantsShareOneBackedEnumType(array $constants): bool
     {

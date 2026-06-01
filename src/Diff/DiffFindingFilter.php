@@ -26,8 +26,8 @@ final readonly class DiffFindingFilter
     public const SCOPE_HUNK   = 'hunk';
 
     /**
-     * @param list<Finding> $findings Findings to filter against the diff scope.
-     * @param DiffResult    $diff     Diff result used to retain changed-file findings.
+     * @param list<Finding> $findings - Findings to filter against the diff scope.
+     * @param DiffResult    $diff - Diff result used to retain changed-file findings.
      *
      * @return list<Finding> - the kept findings in input order; empty when every finding was out of diff scope
      */
@@ -41,10 +41,10 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param list<Finding>      $findings      Findings to filter against the diff scope.
-     * @param DiffResult         $diff          Diff result used to retain changed-file findings.
-     * @param list<AnalysisUnit> $analysisUnits Parsed units used to recover enclosing declarations.
-     * @param string             $scope         SCOPE_SYMBOL widens a hit to its enclosing declaration; SCOPE_HUNK keeps only hunk hits.
+     * @param list<Finding>      $findings - Findings to filter against the diff scope.
+     * @param DiffResult         $diff - Diff result used to retain changed-file findings.
+     * @param list<AnalysisUnit> $analysisUnits - Parsed units used to recover enclosing declarations.
+     * @param string             $scope - SCOPE_SYMBOL widens a hit to its enclosing declaration; SCOPE_HUNK keeps only hunk hits.
      *
      * @return DiffFilterResult - kept findings in input order paired with the count dropped as out of diff scope
      */
@@ -77,9 +77,9 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param Finding                               $finding           Single finding whose location is tested for diff membership.
-     * @param DiffResult                            $diff              Source of changed files and changed-line ranges to test against.
-     * @param array<string, list<ChangedLineRange>> $declarationRanges Per-file declaration spans for symbol widening.
+     * @param Finding                               $finding - Single finding whose location is tested for diff membership.
+     * @param DiffResult                            $diff - Source of changed files and changed-line ranges to test against.
+     * @param array<string, list<ChangedLineRange>> $declarationRanges - Per-file declaration spans for symbol widening.
      *
      * @return bool - true when the finding belongs to a changed file, hunk, or enclosing changed declaration
      */
@@ -121,9 +121,9 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param list<ChangedLineRange> $ranges    Changed-line ranges to test for any overlap.
-     * @param int                    $startLine First line of the inclusive span being matched.
-     * @param int                    $endLine   Last line of the inclusive span being matched.
+     * @param list<ChangedLineRange> $ranges - Changed-line ranges to test for any overlap.
+     * @param int                    $startLine - First line of the inclusive span being matched.
+     * @param int                    $endLine - Last line of the inclusive span being matched.
      *
      * @return bool - true when any changed range overlaps the inclusive span
      */
@@ -141,9 +141,9 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param list<ChangedLineRange> $ranges    Candidate declaration spans to search for an enclosing one.
-     * @param int                    $startLine First line of the inclusive span that must be contained.
-     * @param int                    $endLine   Last line of the inclusive span that must be contained.
+     * @param list<ChangedLineRange> $ranges - Candidate declaration spans to search for an enclosing one.
+     * @param int                    $startLine - First line of the inclusive span that must be contained.
+     * @param int                    $endLine - Last line of the inclusive span that must be contained.
      *
      * @return ChangedLineRange|null - the tightest declaration span containing the input span, or null when none exists
      */
@@ -170,7 +170,7 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param list<AnalysisUnit> $analysisUnits
+     * @param list<AnalysisUnit> $analysisUnits - Parsed analysis units whose statement spans define declaration-level diff filtering.
      *
      * @return array<string, list<ChangedLineRange>> - declaration spans keyed by display path, each list pre-sorted smallest-span-first; files with
      *                       no statements are absent
@@ -209,8 +209,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param Node                   $node   Subtree root walked recursively for scope-defining declarations.
-     * @param list<ChangedLineRange> $ranges Accumulator appended to in place as scope spans are discovered.
+     * @param Node                   $node - Subtree root walked recursively for scope-defining declarations.
+     * @param list<ChangedLineRange> $ranges - Accumulator appended to in place as scope spans are discovered.
      *
      * @return void
      */
@@ -247,7 +247,7 @@ final readonly class DiffFindingFilter
     /**
      * Decide whether a parser node should widen hunk scope to an enclosing reviewable block.
      *
-     * @param Node $node Parser node being classified for diff-scope widening.
+     * @param Node $node - Parser node being classified for diff-scope widening.
      *
      * @return bool - true when the node has a meaningful source span for symbol or block-level diff review
      */

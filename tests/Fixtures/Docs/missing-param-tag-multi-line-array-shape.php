@@ -13,13 +13,14 @@ final class MultiLineArrayShapeFixture
     /**
      * Publish a tool-use envelope to the event sink.
      *
-     * @param string $topic Sink topic to dispatch to.
+     * @param string $topic - Sink topic to dispatch to.
      * @param array{
      *     id: string,
      *     name: string,
      *     arguments: array<string, mixed>,
      *     latencyMs: int,
      * } $payload Envelope describing the tool-use call.
+     *
      * @return void
      */
     public function publishToolUse(string $topic, array $payload): void
@@ -31,11 +32,12 @@ final class MultiLineArrayShapeFixture
      * Publish a turn envelope to the event sink. The @param block intentionally omits the closing
      * `$variable` so the rule must still flag the missing tag for the actual parameter.
      *
-     * @param string $topic Sink topic to dispatch to.
+     * @param string $topic - Sink topic to dispatch to.
      * @param array{
      *     id: string,
      *     name: string,
      * }
+     *
      * @return void
      */
     public function publishTurnWithMalformedDoc(string $topic, array $payload): void

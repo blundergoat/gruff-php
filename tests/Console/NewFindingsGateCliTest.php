@@ -45,6 +45,7 @@ final class NewFindingsGateCliTest extends CliTestCase
      * Verify --fail-on-new passes (exit 0, zero new) when every finding is baselined.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testPassesWhenNoNewFindings(): void
@@ -63,6 +64,7 @@ final class NewFindingsGateCliTest extends CliTestCase
      * Verify --fail-on-new fails with a "new" scope on a finding not in the baseline.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testFailsOnBaselineNewFinding(): void
@@ -83,6 +85,7 @@ final class NewFindingsGateCliTest extends CliTestCase
      * Verify --fail-on-new fails on a finding introduced versus a --diff-vs base ref.
      *
      * @throws JsonException
+     *
      * @return void
      */
     public function testFailsOnDiffVsIntroducedFinding(): void
@@ -116,7 +119,8 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Write the Calc fixture, optionally with a second undocumented method.
      *
-     * @param bool $shouldIncludeBeta Whether to include a second undocumented public method.
+     * @param bool $shouldIncludeBeta - Whether to include a second undocumented public method.
+     *
      * @return void
      */
     private function writeCalc(bool $shouldIncludeBeta): void
@@ -134,22 +138,23 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Run a gruff-php subprocess rooted at the fixture project and return it completed.
      *
-     * @param list<string> $args CLI arguments passed after the binary.
-     * @return Process Completed process.
+     * @param list<string> $args - CLI arguments passed after the binary.
+     *
+     * @return Process - Completed process.
      */
     private function runGruff(array $args): Process
     {
         $process = new Process(array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args), $this->project);
         $process->run();
 
-        // Hand back the already-run process so the caller can assert on its exit code and output.
         return $process;
     }
 
     /**
      * Run a git command inside the fixture project.
      *
-     * @param list<string> $args Git arguments.
+     * @param list<string> $args - Git arguments.
+     *
      * @return void
      */
     private function git(array $args): void
@@ -163,8 +168,9 @@ final class NewFindingsGateCliTest extends CliTestCase
     /**
      * Write a fixture file, creating parent directories as needed.
      *
-     * @param string $path     Project-relative file path.
-     * @param string $contents File contents.
+     * @param string $path - Project-relative file path.
+     * @param string $contents - File contents.
+     *
      * @return void
      */
     private function writeProjectFile(string $path, string $contents): void

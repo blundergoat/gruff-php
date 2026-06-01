@@ -28,15 +28,16 @@ final readonly class BranchReviewBuilder
     /**
      * Compare current findings against a base ref snapshot and report introduced/removed/unchanged findings.
      *
-     * @param string              $projectRoot     Project root the comparison runs from.
-     * @param AnalyseCommandOptions $options       Effective CLI analysis options.
-     * @param AnalysisConfig      $config          Effective rule and path configuration.
-     * @param RuleRegistry        $registry        Rule registry used to analyse the base snapshot.
-     * @param list<Finding>       $currentFindings Post-baseline findings for the current tree.
-     * @param float               $currentScore    Composite score of the current findings.
-     * @param DiffResult|null     $reviewDiff      Review diff metadata, or null when diff lookup failed.
-     * @param list<RunDiagnostic> $diagnostics     Run diagnostics; review-mode errors are appended in place.
-     * @return BranchReviewResult|null Review comparison, or null when disabled/unavailable.
+     * @param string              $projectRoot - Project root the comparison runs from.
+     * @param AnalyseCommandOptions $options - Effective CLI analysis options.
+     * @param AnalysisConfig      $config - Effective rule and path configuration.
+     * @param RuleRegistry        $registry - Rule registry used to analyse the base snapshot.
+     * @param list<Finding>       $currentFindings - Post-baseline findings for the current tree.
+     * @param float               $currentScore - Composite score of the current findings.
+     * @param DiffResult|null     $reviewDiff - Review diff metadata, or null when diff lookup failed.
+     * @param list<RunDiagnostic> $diagnostics - Run diagnostics; review-mode errors are appended in place.
+     *
+     * @return BranchReviewResult|null - Review comparison, or null when disabled/unavailable.
      */
     public function build(
         string $projectRoot,
@@ -140,13 +141,14 @@ final readonly class BranchReviewBuilder
     /**
      * Resolve the project files project-wide rules need for the current analyse run.
      *
-     * @param string                $projectRoot       Project root used for full-tree discovery.
-     * @param AnalyseCommandOptions $options           Effective CLI analysis options.
-     * @param AnalysisConfig        $config            Effective rule and path configuration.
-     * @param RuleRegistry          $registry          Rule registry consulted for enabled project rules.
-     * @param DiffResult|null       $reviewDiff        Review diff metadata when branch review is active.
-     * @param AnalysisSourceSet     $analysisSourceSet Already-loaded sources for the requested paths.
-     * @return list<AnalysisUnit> Project files needed by project-wide rules.
+     * @param string                $projectRoot - Project root used for full-tree discovery.
+     * @param AnalyseCommandOptions $options - Effective CLI analysis options.
+     * @param AnalysisConfig        $config - Effective rule and path configuration.
+     * @param RuleRegistry          $registry - Rule registry consulted for enabled project rules.
+     * @param DiffResult|null       $reviewDiff - Review diff metadata when branch review is active.
+     * @param AnalysisSourceSet     $analysisSourceSet - Already-loaded sources for the requested paths.
+     *
+     * @return list<AnalysisUnit> - Project files needed by project-wide rules.
      */
     public function projectContextUnits(
         string $projectRoot,
@@ -174,11 +176,12 @@ final readonly class BranchReviewBuilder
     /**
      * Decide which files the base-ref snapshot must contain for this run.
      *
-     * @param string                $projectRoot              Project root the requested paths resolve to.
-     * @param AnalyseCommandOptions $options                  Effective CLI options; sets changed-only scope.
-     * @param DiffResult            $reviewDiff               Review diff metadata; the changed-file set.
-     * @param bool                  $shouldLoadProjectContext True when project rules force a full snapshot.
-     * @return list<string> Paths that need to be copied from the base ref.
+     * @param string                $projectRoot - Project root the requested paths resolve to.
+     * @param AnalyseCommandOptions $options - Effective CLI options; sets changed-only scope.
+     * @param DiffResult            $reviewDiff - Review diff metadata; the changed-file set.
+     * @param bool                  $shouldLoadProjectContext - True when project rules force a full snapshot.
+     *
+     * @return list<string> - Paths that need to be copied from the base ref.
      */
     private function baseSnapshotPaths(
         string $projectRoot,
@@ -220,17 +223,17 @@ final readonly class BranchReviewBuilder
         ));
         sort($paths, SORT_STRING);
 
-        // Hand back the changed files under the requested filter, sorted so the snapshot is deterministic.
         return $paths;
     }
 
     /**
      * Decide which snapshot files to actually analyse, which can be narrower than the copied set.
      *
-     * @param string                $projectRoot Project root the requested paths resolve against.
-     * @param AnalyseCommandOptions $options     Effective CLI options; selects changed-only vs requested.
-     * @param DiffResult            $reviewDiff  Review diff metadata supplying the changed-file set.
-     * @return list<string> Paths that should be analysed from the base snapshot.
+     * @param string                $projectRoot - Project root the requested paths resolve against.
+     * @param AnalyseCommandOptions $options - Effective CLI options; selects changed-only vs requested.
+     * @param DiffResult            $reviewDiff - Review diff metadata supplying the changed-file set.
+     *
+     * @return list<string> - Paths that should be analysed from the base snapshot.
      */
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
@@ -251,10 +254,11 @@ final readonly class BranchReviewBuilder
     /**
      * Load the full base-ref tree so project-wide rules see the same context on both sides of the diff.
      *
-     * @param string                $baseRoot Snapshot root of the base ref checkout to walk.
-     * @param AnalyseCommandOptions $options  Effective CLI options; supplies the ignored-path inclusion flag.
-     * @param AnalysisConfig        $config   Effective rule and path configuration supplying ignore patterns.
-     * @return list<AnalysisUnit> Base-snapshot files needed for branch-review comparison.
+     * @param string                $baseRoot - Snapshot root of the base ref checkout to walk.
+     * @param AnalyseCommandOptions $options - Effective CLI options; supplies the ignored-path inclusion flag.
+     * @param AnalysisConfig        $config - Effective rule and path configuration supplying ignore patterns.
+     *
+     * @return list<AnalysisUnit> - Base-snapshot files needed for branch-review comparison.
      */
     private function baseProjectContextUnits(string $baseRoot, AnalyseCommandOptions $options, AnalysisConfig $config): array
     {
@@ -270,11 +274,12 @@ final readonly class BranchReviewBuilder
     /**
      * Report whether changed-only mode still has to load whole-tree context for project-level rules.
      *
-     * @param AnalyseCommandOptions $options    Effective CLI options; only changed-only runs can need this.
-     * @param RuleRegistry          $registry   Rule registry consulted for any enabled project-wide rule.
-     * @param AnalysisConfig        $config     Effective rule and path config for resolving enabled rules.
-     * @param DiffResult|null       $reviewDiff Review diff metadata; null or no changes means no context.
-     * @return bool True when changed-only mode still needs complete context for project-level rules.
+     * @param AnalyseCommandOptions $options - Effective CLI options; only changed-only runs can need this.
+     * @param RuleRegistry          $registry - Rule registry consulted for any enabled project-wide rule.
+     * @param AnalysisConfig        $config - Effective rule and path config for resolving enabled rules.
+     * @param DiffResult|null       $reviewDiff - Review diff metadata; null or no changes means no context.
+     *
+     * @return bool - True when changed-only mode still needs complete context for project-level rules.
      */
     private function shouldLoadChangedOnlyProjectContext(
         AnalyseCommandOptions $options,

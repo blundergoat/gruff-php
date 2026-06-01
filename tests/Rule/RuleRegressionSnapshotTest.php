@@ -54,7 +54,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         self::assertCount(169, $units);
         self::assertCount(2408, $findings);
         self::assertSame(
-            'd0d79f24dbd96063bb37' . '85d09816b0df40abed4f7c5a84d2dbb50bec1b2f058e',
+            '6e3ade987df6cbcf' . 'e39c9d85dbb5b7084fafb89ae1a1ac7234de417f5920f415',
             hash('sha256', $json),
         );
     }
@@ -99,9 +99,9 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param list<string>        $paths
-     * @param AnalysisConfig|null $config
-     * @param string              $projectRoot
+     * @param list<string>        $paths - Fixture paths to parse and analyse.
+     * @param AnalysisConfig|null $config - Optional config override, or null to use default-registry config.
+     * @param string              $projectRoot - Project root used to resolve fixture paths and rule context.
      *
      * @return array{0: list<AnalysisUnit>, 1: list<Finding>, 2: string} - parsed units, raw findings, and canonical JSON for the analysed paths, in
      *                  that order
@@ -174,7 +174,6 @@ final class RuleRegressionSnapshotTest extends TestCase
         )[1],
         );
 
-        // Hand back the extra findings the baseline scan cannot reach, merged into one calibration list.
         return $findings;
     }
 
@@ -237,7 +236,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     /**
      * List unique rule identifiers present in finding output.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Findings whose rule ids feed the supplemental coverage assertion.
      *
      * @return list<string> - the de-duplicated rule ids in stable ascending string order; empty when no findings
      */
@@ -249,14 +248,13 @@ final class RuleRegressionSnapshotTest extends TestCase
                                              )));
         sort($ruleIds, SORT_STRING);
 
-        // Hand back the de-duplicated rule ids in stable string order so the snapshot is deterministic.
         return $ruleIds;
     }
 
     /**
      * Normalize findings to stable arrays for regression snapshots.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Findings to convert into canonical snapshot payload rows.
      *
      * @return list<FindingArray> - rows sorted into a canonical order so reordered findings still hash identically
      */
@@ -269,14 +267,13 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         usort($payload, static fn(array $left, array $right): int => $left <=> $right);
 
-        // Hand back the rows sorted into a canonical order so reordered findings still hash identically.
         return $payload;
     }
 
     /**
      * Build a stable finding payload row for snapshot hashing.
      *
-     * @param Finding $finding single finding to flatten; its metadata is recursively key-sorted for stability
+     * @param Finding $finding - single finding to flatten; its metadata is recursively key-sorted for stability
      *
      * @return FindingArray - the flattened finding with top-level keys sorted so equal findings serialise byte-for-byte alike
      */
@@ -290,12 +287,11 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         ksort($findingPayload, SORT_STRING);
 
-        // Hand back the row with top-level keys sorted so two equal findings serialise byte-for-byte alike.
         return $findingPayload;
     }
 
     /**
-     * @param FindingMetadata $metadata Finding metadata payload.
+     * @param FindingMetadata $metadata - Finding metadata payload.
      *
      * @return FindingMetadata - the metadata with both nested maps and the top level key-sorted for a stable snapshot hash
      */
@@ -311,7 +307,6 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         ksort($metadata, SORT_STRING);
 
-        // Hand back the metadata with both nested maps and the top level key-sorted for a stable snapshot.
         return $metadata;
     }
 
@@ -326,14 +321,13 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the freshly created, uniquely named temp directory path for the caller to populate.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

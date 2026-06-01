@@ -331,20 +331,18 @@ final class TestQualityNodeHelperTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/TestQuality/test-quality-node-helper.php';
 
-        // Hand back the shared helper fixture parsed once, so each assertion inspects the same scopes and calls.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/TestQuality/test-quality-node-helper.php'));
     }
 
     /**
      * Create an empty analysis unit with a display path.
      *
-     * @param string $displayPath Project-relative display path.
+     * @param string $displayPath - Project-relative display path.
      *
      * @return AnalysisUnit - a body-less unit carrying only the display path, for exercising path handling without real source
      */
     private function unitWithDisplayPath(string $displayPath): AnalysisUnit
     {
-        // Hand back a body-less unit so a test can exercise display-path handling without parsing real source.
         return new AnalysisUnit(new SourceFile(__FILE__, $displayPath), '', [], [], []);
     }
 
@@ -361,14 +359,13 @@ final class TestQualityNodeHelperTest extends TestCase
             $scopes[$scope->name] = $scope;
         }
 
-        // Hand back the fixture scopes keyed by name so tests can look one up without scanning the list.
         return $scopes;
     }
 
     /**
      * Return the class method node owned by a scope.
      *
-     * @param TestQualityScope $scope Scope to inspect.
+     * @param TestQualityScope $scope - Scope to inspect.
      *
      * @return Stmt\ClassMethod - the scope's node narrowed to a class method; the test fails first if it is any other node
      */
@@ -383,8 +380,8 @@ final class TestQualityNodeHelperTest extends TestCase
     /**
      * Return the first call with the requested normalised name.
      *
-     * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls Calls to inspect.
-     * @param string                                              $name  Normalised call name.
+     * @param list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> $calls - Calls to inspect.
+     * @param string                                              $name - Normalised call name.
      *
      * @return Expr\FuncCall|Expr\MethodCall|Expr\StaticCall - the first call matching the name; the test fails if none matches
      */

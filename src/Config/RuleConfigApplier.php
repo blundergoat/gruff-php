@@ -18,9 +18,9 @@ use GruffPhp\Rule\RuleRegistry;
 final readonly class RuleConfigApplier
 {
     /**
-     * @param AnalysisConfig $config     Config to update.
-     * @param RuleRegistry   $registry   Rule registry used to validate rule ids.
-     * @param ConfigObject   $rootConfig Parsed root config object.
+     * @param AnalysisConfig $config - Config to update.
+     * @param RuleRegistry   $registry - Rule registry used to validate rule ids.
+     * @param ConfigObject   $rootConfig - Parsed root config object.
      *
      * @return AnalysisConfig - the input config with every rule's overrides folded in, or unchanged with no "rules" block
      * @throws ConfigException When rule config references unknown ids or invalid values.
@@ -52,10 +52,10 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param AnalysisConfig $config     Config being threaded through the loop; carries prior rules' overrides.
-     * @param RuleRegistry   $registry   Registry consulted for each rule's default thresholds, options, and rubric.
-     * @param string         $ruleId     Already-validated rule id this override block belongs to.
-     * @param ConfigObject   $ruleConfig One rule's parsed override keys (enabled, threshold, options, ...).
+     * @param AnalysisConfig $config - Config being threaded through the loop; carries prior rules' overrides.
+     * @param RuleRegistry   $registry - Registry consulted for each rule's default thresholds, options, and rubric.
+     * @param string         $ruleId - Already-validated rule id this override block belongs to.
+     * @param ConfigObject   $ruleConfig - One rule's parsed override keys (enabled, threshold, options, ...).
      *
      * @return AnalysisConfig - the threaded config with this one rule's settings rebuilt from its override keys
      */
@@ -99,8 +99,8 @@ final readonly class RuleConfigApplier
     /**
      * Reject unknown keys before applying a per-rule override.
      *
-     * @param string       $ruleId     Rule id named in the thrown error so the user can locate the bad key.
-     * @param ConfigObject $ruleConfig One rule's override block; only its top-level keys are checked here.
+     * @param string       $ruleId - Rule id named in the thrown error so the user can locate the bad key.
+     * @param ConfigObject $ruleConfig - One rule's override block; only its top-level keys are checked here.
      *
      * @return void
      */
@@ -114,9 +114,9 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param string       $ruleId              Rule id named in the type-error message when the value is non-boolean.
-     * @param ConfigObject $ruleConfig          One rule's override block; read for an optional excludeFromScore key.
-     * @param bool         $isExcludedByDefault Current flag used when the override omits excludeFromScore.
+     * @param string       $ruleId - Rule id named in the type-error message when the value is non-boolean.
+     * @param ConfigObject $ruleConfig - One rule's override block; read for an optional excludeFromScore key.
+     * @param bool         $isExcludedByDefault - Current flag used when the override omits excludeFromScore.
      *
      * @return bool - the override's boolean when present, otherwise the rule's existing excludeFromScore flag
      */
@@ -136,9 +136,9 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param string       $ruleId             Rule id named in the type-error message when the value is non-boolean.
-     * @param ConfigObject $ruleConfig         One rule's override block; read for an optional enabled key.
-     * @param bool         $isEnabledByDefault Current enabled state used when the override omits enabled.
+     * @param string       $ruleId - Rule id named in the type-error message when the value is non-boolean.
+     * @param ConfigObject $ruleConfig - One rule's override block; read for an optional enabled key.
+     * @param bool         $isEnabledByDefault - Current enabled state used when the override omits enabled.
      *
      * @return bool - the override's boolean when present, otherwise the rule's existing enabled state
      */
@@ -160,10 +160,10 @@ final readonly class RuleConfigApplier
     /**
      * Merge configured thresholds with rule defaults.
      *
-     * @param string                   $ruleId            Rule id used in error messages and to look up its allowed thresholds.
-     * @param ConfigObject             $ruleConfig        One rule's override block; read for an optional thresholds map.
-     * @param RuleRegistry             $registry          Registry queried for the rule's set of valid threshold names.
-     * @param array<string, int|float> $defaultThresholds Rule's built-in thresholds, used as the base each override merges onto.
+     * @param string                   $ruleId - Rule id used in error messages and to look up its allowed thresholds.
+     * @param ConfigObject             $ruleConfig - One rule's override block; read for an optional thresholds map.
+     * @param RuleRegistry             $registry - Registry queried for the rule's set of valid threshold names.
+     * @param array<string, int|float> $defaultThresholds - Rule's built-in thresholds, used as the base each override merges onto.
      *
      * @return array<string, int|float> - effective thresholds keyed by name: defaults with any configured overrides overlaid
      */
@@ -203,9 +203,9 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param string       $ruleId     Rule id used in error messages and to look up the rule's rubric and defaults.
-     * @param ConfigObject $ruleConfig One rule's override block; read for the single-value threshold/severity pair.
-     * @param RuleRegistry $registry   Registry queried for the rule's definition to validate the single-threshold form.
+     * @param string       $ruleId - Rule id used in error messages and to look up the rule's rubric and defaults.
+     * @param ConfigObject $ruleConfig - One rule's override block; read for the single-value threshold/severity pair.
+     * @param RuleRegistry $registry - Registry queried for the rule's definition to validate the single-threshold form.
      *
      * @return SeverityThreshold|null - the validated threshold/severity pair, or null when no "threshold" key is set
      */
@@ -249,10 +249,10 @@ final readonly class RuleConfigApplier
     }
 
     /**
-     * @param string                   $ruleId            Rule id used to build the error path when the value is rejected.
-     * @param string                   $thresholdName     Configured threshold key; must be one the rule declares.
-     * @param mixed                    $thresholdValue    Raw configured value, accepted only when numeric.
-     * @param array<string, int|float> $allowedThresholds Threshold names the rule permits; an unlisted name is rejected.
+     * @param string                   $ruleId - Rule id used to build the error path when the value is rejected.
+     * @param string                   $thresholdName - Configured threshold key; must be one the rule declares.
+     * @param mixed                    $thresholdValue - Raw configured value, accepted only when numeric.
+     * @param array<string, int|float> $allowedThresholds - Threshold names the rule permits; an unlisted name is rejected.
      *
      * @return int|float - the configured value, returned unchanged once its name is allowed and its type is numeric
      */
@@ -277,10 +277,10 @@ final readonly class RuleConfigApplier
     /**
      * Merge configured rule options with rule defaults.
      *
-     * @param string                         $ruleId         Rule id used in error messages and to look up its allowed options.
-     * @param ConfigObject                   $ruleConfig     One rule's override block; read for an optional options map.
-     * @param RuleRegistry                   $registry       Registry queried for the rule's allowed option names and default types.
-     * @param array<string, RuleOptionValue> $defaultOptions Rule's built-in options, used as the base each override merges onto.
+     * @param string                         $ruleId - Rule id used in error messages and to look up its allowed options.
+     * @param ConfigObject                   $ruleConfig - One rule's override block; read for an optional options map.
+     * @param RuleRegistry                   $registry - Registry queried for the rule's allowed option names and default types.
+     * @param array<string, RuleOptionValue> $defaultOptions - Rule's built-in options, used as the base each override merges onto.
      *
      * @return array<string, RuleOptionValue> - effective options keyed by name: defaults with any validated overrides overlaid
      */
@@ -317,10 +317,10 @@ final readonly class RuleConfigApplier
     /**
      * Validate and normalize a configured rule option against its default type.
      *
-     * @param string          $ruleId       Rule id used to build the error path when validation fails.
-     * @param string          $optionName   Option key used to build the error path when validation fails.
-     * @param mixed           $optionValue  Raw configured value, validated against the default's shape.
-     * @param RuleOptionValue $defaultValue Default option value used as the type contract.
+     * @param string          $ruleId - Rule id used to build the error path when validation fails.
+     * @param string          $optionName - Option key used to build the error path when validation fails.
+     * @param mixed           $optionValue - Raw configured value, validated against the default's shape.
+     * @param RuleOptionValue $defaultValue - Default option value used as the type contract.
      *
      * @return RuleOptionValue - the configured value validated against the default's runtime type and returned in that shape
      */
@@ -361,9 +361,9 @@ final readonly class RuleConfigApplier
     /**
      * Validate an integer option value.
      *
-     * @param string $ruleId      Rule id used to build the error path when the value is not an integer.
-     * @param string $optionName  Option key used to build the error path when the value is not an integer.
-     * @param mixed  $optionValue Raw configured value; accepted only when it is an int.
+     * @param string $ruleId - Rule id used to build the error path when the value is not an integer.
+     * @param string $optionName - Option key used to build the error path when the value is not an integer.
+     * @param mixed  $optionValue - Raw configured value; accepted only when it is an int.
      *
      * @return int - the user's int returned verbatim, never cast or coerced from another type
      */
@@ -380,9 +380,9 @@ final readonly class RuleConfigApplier
     /**
      * Validate a numeric option value.
      *
-     * @param string $ruleId      Rule id used to build the error path when the value is not numeric.
-     * @param string $optionName  Option key used to build the error path when the value is not numeric.
-     * @param mixed  $optionValue Raw configured value; accepted when it is an int or a float.
+     * @param string $ruleId - Rule id used to build the error path when the value is not numeric.
+     * @param string $optionName - Option key used to build the error path when the value is not numeric.
+     * @param mixed  $optionValue - Raw configured value; accepted when it is an int or a float.
      *
      * @return int|float - the value with its original numeric type preserved; an int stays int, a float stays float
      */
@@ -399,9 +399,9 @@ final readonly class RuleConfigApplier
     /**
      * Validate a boolean option value.
      *
-     * @param string $ruleId      Rule id used to build the error path when the value is not boolean.
-     * @param string $optionName  Option key used to build the error path when the value is not boolean.
-     * @param mixed  $optionValue Raw configured value; accepted only when it is a bool.
+     * @param string $ruleId - Rule id used to build the error path when the value is not boolean.
+     * @param string $optionName - Option key used to build the error path when the value is not boolean.
+     * @param mixed  $optionValue - Raw configured value; accepted only when it is a bool.
      *
      * @return bool - the configured value when it is a real bool; truthy strings or 0/1 are rejected, not coerced
      */
@@ -418,9 +418,9 @@ final readonly class RuleConfigApplier
     /**
      * Validate a string option value.
      *
-     * @param string $ruleId      Rule id used to build the error path when the value is not a string.
-     * @param string $optionName  Option key used to build the error path when the value is not a string.
-     * @param mixed  $optionValue Raw configured value; accepted only when it is a string.
+     * @param string $ruleId - Rule id used to build the error path when the value is not a string.
+     * @param string $optionName - Option key used to build the error path when the value is not a string.
+     * @param mixed  $optionValue - Raw configured value; accepted only when it is a string.
      *
      * @return string - the configured string untrimmed and uncast; whitespace and numeric-looking text survive
      */
@@ -437,10 +437,10 @@ final readonly class RuleConfigApplier
     /**
      * Validate a list option value and its item type when the default list is typed.
      *
-     * @param string                      $ruleId       Rule id used to build the error path when validation fails.
-     * @param string                      $optionName   Option key used to build the error path when validation fails.
-     * @param mixed                       $optionValue  Raw configured value; must be a list of scalars.
-     * @param list<int|float|bool|string> $defaultValue Default option list used as an item-type sample.
+     * @param string                      $ruleId - Rule id used to build the error path when validation fails.
+     * @param string                      $optionName - Option key used to build the error path when validation fails.
+     * @param mixed                       $optionValue - Raw configured value; must be a list of scalars.
+     * @param list<int|float|bool|string> $defaultValue - Default option list used as an item-type sample.
      *
      * @return list<int|float|bool|string> - the configured list once every item is a scalar matching the default's type
      */
@@ -481,11 +481,11 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured list item against the default list sample type.
      *
-     * @param string $ruleId     Rule id used to build the error path when an item's type is wrong.
-     * @param string $optionName Option key used to build the error path when an item's type is wrong.
-     * @param int    $index      Zero-based item position, surfaced in the error path to point at the bad entry.
-     * @param mixed  $optionItem Configured list item being type-checked.
-     * @param mixed  $sample     First default-list item; its type fixes what every configured item must match.
+     * @param string $ruleId - Rule id used to build the error path when an item's type is wrong.
+     * @param string $optionName - Option key used to build the error path when an item's type is wrong.
+     * @param int    $index - Zero-based item position, surfaced in the error path to point at the bad entry.
+     * @param mixed  $optionItem - Configured list item being type-checked.
+     * @param mixed  $sample - First default-list item; its type fixes what every configured item must match.
      *
      * @return void
      */
@@ -508,10 +508,10 @@ final readonly class RuleConfigApplier
     /**
      * Validate an associative option map with scalar values.
      *
-     * @param string                                  $ruleId       Rule id used to build the error path when validation fails.
-     * @param string                                  $optionName   Option key used to build the error path when validation fails.
-     * @param mixed                                   $optionValue  Raw configured value; must be a string-keyed map of scalars.
-     * @param array<array-key, int|float|bool|string> $defaultValue Default option map used as the type contract.
+     * @param string                                  $ruleId - Rule id used to build the error path when validation fails.
+     * @param string                                  $optionName - Option key used to build the error path when validation fails.
+     * @param mixed                                   $optionValue - Raw configured value; must be a string-keyed map of scalars.
+     * @param array<array-key, int|float|bool|string> $defaultValue - Default option map used as the type contract.
      *
      * @return array<string, int|float|bool|string> - the configured map once keys are strings and values match the default's type
      */
@@ -552,11 +552,11 @@ final readonly class RuleConfigApplier
     /**
      * Validate one configured map item against the default map sample type.
      *
-     * @param string $ruleId     Rule id used to build the error path when an item's type is wrong.
-     * @param string $optionName Option key used to build the error path when an item's type is wrong.
-     * @param string $key        Configured map key, surfaced in the error path to point at the bad entry.
-     * @param mixed  $optionItem Configured map value being type-checked.
-     * @param mixed  $sample     A default-map value; its type fixes what every configured value must match.
+     * @param string $ruleId - Rule id used to build the error path when an item's type is wrong.
+     * @param string $optionName - Option key used to build the error path when an item's type is wrong.
+     * @param string $key - Configured map key, surfaced in the error path to point at the bad entry.
+     * @param mixed  $optionItem - Configured map value being type-checked.
+     * @param mixed  $sample - A default-map value; its type fixes what every configured value must match.
      *
      * @return void
      */
@@ -587,8 +587,8 @@ final readonly class RuleConfigApplier
     /**
      * Validate that a decoded rule config value is an object-like array.
      *
-     * @param mixed  $decodedValue Decoded YAML/JSON value; must be a string-keyed (non-list) array.
-     * @param string $message      Caller-supplied error text thrown when the value is not object-like.
+     * @param mixed  $decodedValue - Decoded YAML/JSON value; must be a string-keyed (non-list) array.
+     * @param string $message - Caller-supplied error text thrown when the value is not object-like.
      *
      * @return ConfigObject - the value as a string-keyed map with each entry normalised into the supported config shape
      */
@@ -615,7 +615,7 @@ final readonly class RuleConfigApplier
     /**
      * Normalise one decoded rule config value into the supported value set.
      *
-     * @param mixed $decodedValue One decoded YAML/JSON value, either a nested array or a scalar.
+     * @param mixed $decodedValue - One decoded YAML/JSON value, either a nested array or a scalar.
      *
      * @return ConfigValue - the value normalised into the supported shape: a depth-bounded nested array or a validated scalar
      */
@@ -633,7 +633,7 @@ final readonly class RuleConfigApplier
     /**
      * Validate scalar rule config values after YAML decoding.
      *
-     * @param mixed $decodedValue One decoded leaf value to confirm is a supported scalar (or null/object).
+     * @param mixed $decodedValue - One decoded leaf value to confirm is a supported scalar (or null/object).
      *
      * @return ConfigScalar - the same value passed through unchanged once confirmed to be a supported scalar, null, or object
      */
@@ -650,7 +650,7 @@ final readonly class RuleConfigApplier
     /**
      * Keep decoded configuration values within the supported nested scalar shape.
      *
-     * @param array<array-key, mixed> $decodedRuleValues Top-level decoded array; nested arrays recurse one level deeper.
+     * @param array<array-key, mixed> $decodedRuleValues - Top-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>> - the
      *                          level-1 array with scalars validated and nested arrays normalised through the depth-2 pass
@@ -670,7 +670,7 @@ final readonly class RuleConfigApplier
     /**
      * Keep second-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedRuleValues Second-level decoded array; nested arrays recurse one level deeper.
+     * @param array<array-key, mixed> $decodedRuleValues - Second-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>> - the level-2 array with scalars
      *                          validated and nested arrays normalised through the depth-3 pass
@@ -690,7 +690,7 @@ final readonly class RuleConfigApplier
     /**
      * Keep third-level configuration values within the supported scalar shape.
      *
-     * @param array<array-key, mixed> $decodedRuleValues Third-level decoded array; nested arrays recurse one level deeper.
+     * @param array<array-key, mixed> $decodedRuleValues - Third-level decoded array; nested arrays recurse one level deeper.
      *
      * @return array<array-key, ConfigScalar|array<array-key, ConfigScalar>> - the level-3 array with scalars validated and nested arrays normalised
      *                          through the depth-4 pass
@@ -710,7 +710,7 @@ final readonly class RuleConfigApplier
     /**
      * Keep fourth-level configuration values as scalar config values.
      *
-     * @param array<array-key, mixed> $decodedRuleValues Fourth-level decoded array; a further nested array is rejected as too deep.
+     * @param array<array-key, mixed> $decodedRuleValues - Fourth-level decoded array; a further nested array is rejected as too deep.
      *
      * @return array<array-key, ConfigScalar> - the deepest allowed level with every item confirmed to be a supported scalar
      */

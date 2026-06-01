@@ -31,20 +31,20 @@ namespace GruffPhp\Finding;
 final readonly class Finding
 {
     /**
-     * @param string          $ruleId           Stable rule identifier that produced the finding.
-     * @param string          $message          Human-readable finding message.
-     * @param string          $filePath         Display path for the affected file.
-     * @param int|null        $line             Start line for the finding, when known.
-     * @param Severity        $severity         Severity used for reporting and exit gates.
-     * @param Pillar          $pillar           Primary quality pillar for the finding.
-     * @param RuleTier        $tier             Rule catalogue tier that owns the finding.
-     * @param Confidence      $confidence       Confidence level assigned by the rule.
-     * @param int|null        $endLine          End line for multi-line findings, when known.
-     * @param int|null        $column           Start column for the finding, when known.
-     * @param string|null     $symbol           Symbol associated with the finding, when available.
-     * @param string|null     $remediation      Suggested remediation text, when available.
-     * @param list<Pillar>    $secondaryPillars Additional quality pillars touched by the finding.
-     * @param FindingMetadata $metadata         Machine-readable rule metadata for reporters.
+     * @param string          $ruleId - Stable rule identifier that produced the finding.
+     * @param string          $message - Human-readable finding message.
+     * @param string          $filePath - Display path for the affected file.
+     * @param int|null        $line - Start line for the finding, when known.
+     * @param Severity        $severity - Severity used for reporting and exit gates.
+     * @param Pillar          $pillar - Primary quality pillar for the finding.
+     * @param RuleTier        $tier - Rule catalogue tier that owns the finding.
+     * @param Confidence      $confidence - Confidence level assigned by the rule.
+     * @param int|null        $endLine - End line for multi-line findings, when known.
+     * @param int|null        $column - Start column for the finding, when known.
+     * @param string|null     $symbol - Symbol associated with the finding, when available.
+     * @param string|null     $remediation - Suggested remediation text, when available.
+     * @param list<Pillar>    $secondaryPillars - Additional quality pillars touched by the finding.
+     * @param FindingMetadata $metadata - Machine-readable rule metadata for reporters.
      */
     public function __construct(
         public string     $ruleId,
@@ -102,7 +102,7 @@ final readonly class Finding
      * The derived `fingerprint` / `stableIdentity` fields are recomputed from the
      * restored inputs, never read from the payload, so a round-trip is lossless.
      *
-     * @param array<string, mixed> $serialized Serialized finding produced by toArray().
+     * @param array<string, mixed> $serialized - Serialized finding produced by toArray().
      *
      * @return self - finding rebuilt from the payload, with every field coerced through a narrowing helper so a malformed payload yields safe
      *              defaults rather than throwing
@@ -145,7 +145,7 @@ final readonly class Finding
     }
 
     /**
-     * @param mixed $value Raw value from a decoded payload.
+     * @param mixed $value - Raw value from a decoded payload.
      *
      * @return string - the value unchanged when it is a string, otherwise an empty string so an absent or wrong-typed field can't raise a type error
      */
@@ -158,7 +158,7 @@ final readonly class Finding
     /**
      * Narrow a decoded metadata value to the supported scalar/list shape.
      *
-     * @param mixed $value Raw decoded metadata value.
+     * @param mixed $value - Raw decoded metadata value.
      *
      * @return bool|float|int|string|null|array<array-key, bool|float|int|string|null> - scalars and null pass through; arrays become a flat list
      *                                                     with non-scalar entries replaced by null; any other type collapses to null
@@ -185,7 +185,7 @@ final readonly class Finding
     }
 
     /**
-     * @param mixed $value Raw value from a decoded payload.
+     * @param mixed $value - Raw value from a decoded payload.
      *
      * @return int|null - the integer unchanged, or null for any non-int (numeric strings included) so absent line/column data stays absent
      */
@@ -196,7 +196,7 @@ final readonly class Finding
     }
 
     /**
-     * @param mixed $value Raw value from a decoded payload.
+     * @param mixed $value - Raw value from a decoded payload.
      *
      * @return string|null - the value unchanged when it is a string, otherwise null so optional fields like symbol/remediation read as "not set"
      */

@@ -575,7 +575,7 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Read an associative array from decoded JSON output.
      *
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $payload - Decoded JSON object containing the nested key under test.
      * @param string               $key - key whose value must itself be a string-keyed array; missing key asserts.
      *
      * @return array<string, mixed> - the nested JSON object at that key, ready for further key reads
@@ -587,7 +587,7 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $payload - Decoded JSON object containing the integer key under test.
      * @param string               $key - key whose value must be an int; a non-int (or missing) value fails the test.
      *
      * @return int - the value at that key, asserted to be an int so callers can use it without re-checking
@@ -597,14 +597,13 @@ final class AgentWorkflowCliTest extends TestCase
         $payloadValue = $payload[$key] ?? null;
         self::assertIsInt($payloadValue);
 
-        // Returned only after assertIsInt narrows the value, so callers receive a guaranteed int.
         return $payloadValue;
     }
 
     /**
      * Read a list from decoded JSON output.
      *
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $payload - Decoded JSON object containing the list key under test.
      * @param string               $key - key whose value must be a list; missing key resolves to null and asserts.
      *
      * @return list<mixed> - the JSON array at that key, reindexed to 0-based order
@@ -616,7 +615,7 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $payload - Decoded JSON object containing the string key under test.
      * @param string               $key - key whose value must be a string; a non-string (or missing) value fails.
      *
      * @return string - the value at that key, asserted to be a string so callers can use it without re-checking
@@ -626,14 +625,13 @@ final class AgentWorkflowCliTest extends TestCase
         $payloadValue = $payload[$key] ?? null;
         self::assertIsString($payloadValue);
 
-        // Returned only after assertIsString narrows the value, so callers receive a guaranteed string.
         return $payloadValue;
     }
 
     /**
      * Extract diagnostic type names from decoded JSON output.
      *
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $payload - Decoded analysis payload whose diagnostics list is inspected.
      *
      * @return list<string> - diagnostic type names in diagnostics order; empty when the report has no diagnostics
      */
@@ -724,8 +722,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $cwd  Working directory.
-     * @param string $args Command arguments.
+     * @param string $cwd - Working directory.
+     * @param string $args - Command arguments.
      *
      * @return void
      */
@@ -748,14 +746,13 @@ final class AgentWorkflowCliTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Hand back the path only after mkdir succeeds, so callers never operate on a directory that was not created.
         return $path;
     }
 
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

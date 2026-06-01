@@ -28,7 +28,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Describe the commented-out code rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +46,10 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Find comment tokens that appear to contain disabled executable code.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for suspicious comment blocks.
+     * @return list<Finding> - Findings for suspicious comment blocks.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -92,8 +92,9 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Check whether a parser token is a regular comment.
      *
-     * @param Token $token Lexer token to classify; only line and inline block comments qualify, never docblocks.
-     * @return bool True for non-docblock comment tokens.
+     * @param Token $token - Lexer token to classify; only line and inline block comments qualify, never docblocks.
+     *
+     * @return bool - True for non-docblock comment tokens.
      */
     private function isCommentToken(Token $token): bool
     {
@@ -104,8 +105,9 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Remove PHP comment delimiters before code-shape checks.
      *
-     * @param string $text Raw comment token text, still carrying its leading slashes, hash, or block delimiters.
-     * @return string Trimmed comment body.
+     * @param string $text - Raw comment token text, still carrying its leading slashes, hash, or block delimiters.
+     *
+     * @return string - Trimmed comment body.
      */
     private function stripCommentMarkers(string $text): string
     {
@@ -120,8 +122,9 @@ final readonly class CommentedOutCodeRule implements RuleInterface
     /**
      * Detect whether comment content has enough PHP-like syntax signals.
      *
-     * @param string $content Delimiter-stripped comment body to scan for disabled-code signals.
-     * @return bool True when the content looks like disabled code.
+     * @param string $content - Delimiter-stripped comment body to scan for disabled-code signals.
+     *
+     * @return bool - True when the content looks like disabled code.
      */
     private function isCodeLike(string $content): bool
     {

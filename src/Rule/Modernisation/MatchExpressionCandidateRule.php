@@ -29,7 +29,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Describe the match-expression candidate rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     /**
      * Find switch statements whose direct-return branches may become match expressions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for PHP 8 match-expression candidates.
+     * @return list<Finding> - Findings for PHP 8 match-expression candidates.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -83,16 +83,15 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per switch whose direct-return branches could collapse into a match.
         return $findings;
     }
 
     /**
      * Check whether every switch case consists of exactly one return statement.
      *
-     * @param Stmt\Switch_ $switch Switch under inspection; only an all-direct-return body maps cleanly onto a match.
+     * @param Stmt\Switch_ $switch - Switch under inspection; only an all-direct-return body maps cleanly onto a match.
      *
-     * @return bool True when all cases return directly.
+     * @return bool - True when all cases return directly.
      */
     private function allCasesReturnDirectly(Stmt\Switch_ $switch): bool
     {

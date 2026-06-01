@@ -29,7 +29,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
     /**
      * Describe the extract or compact user input security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final class ExtractCompactUserInputRule implements RuleInterface
     /**
      * Find extract and compact calls that operate on user-controlled input.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for risky variable table operations.
+     * @return list<Finding> - Findings for risky variable table operations.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

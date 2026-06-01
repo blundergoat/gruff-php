@@ -65,13 +65,12 @@ final class AnalysisReportTest extends TestCase
     /**
      * Build an AnalysisReport from the supplied findings.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding> $findings - Findings to expose through the report under test.
      *
      * @return AnalysisReport - report whose findings are the supplied list, with all other fields inert fixtures
      */
     private function reportFor(array $findings): AnalysisReport
     {
-        // Minimal report wrapping the findings under test; other fields are inert fixtures.
         return new AnalysisReport(
             toolVersion:     '0.2.0',
             requestedPaths:  ['src'],
@@ -90,8 +89,8 @@ final class AnalysisReportTest extends TestCase
     /**
      * Build a finding fixture for aggregation tests.
      *
-     * @param string   $ruleId   Rule id that drives the grouping/ordering under assertion.
-     * @param Severity $severity Severity the fixture should carry for the case being exercised.
+     * @param string   $ruleId - Rule id that drives the grouping/ordering under assertion.
+     * @param Severity $severity - Severity the fixture should carry for the case being exercised.
      *
      * @return Finding - finding carrying the given ruleId and severity; all other fields are fixed fixture values
      */

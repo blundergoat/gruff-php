@@ -18,9 +18,10 @@ final class VarAnnotationDescriptionFixture
     /**
      * Exercise inline var assertion descriptions.
      *
-     * @param mixed $rawToken The token returned by the SDK.
-     * @param mixed $rawValue The value returned by the legacy API.
-     * @return string The combined value.
+     * @param mixed $rawToken - The token returned by the SDK.
+     * @param mixed $rawValue - The value returned by the legacy API.
+     *
+     * @return string - The combined value.
      */
     public function run(mixed $rawToken, mixed $rawValue): string
     {

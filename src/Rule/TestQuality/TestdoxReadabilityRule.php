@@ -48,8 +48,8 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Find test names that produce hard-to-read TestDox output.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one advisory finding per non-Pest test method whose name yields fewer words than the threshold; empty when every name
      *                       passes
@@ -92,14 +92,13 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per non-Pest test method whose name yields fewer words than the threshold.
         return $findings;
     }
 
     /**
      * Split testdox text into words for readability checks.
      *
-     * @param string $methodName Raw test method name; the `test` prefix is stripped and CamelCase split into words.
+     * @param string $methodName - Raw test method name; the `test` prefix is stripped and CamelCase split into words.
      *
      * @return list<string> - the test name's words in order, `test` prefix removed and CamelCase split; empty when the name reduces to nothing
      */
@@ -114,7 +113,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     }
 
     /**
-     * @param list<string> $words Words split from the test name, in order; empty when the name reduced to nothing.
+     * @param list<string> $words - Words split from the test name, in order; empty when the name reduced to nothing.
      *
      * @return string - the words lower-cased and space-joined to mirror PHPUnit's testdox output; empty string when no words remain
      */

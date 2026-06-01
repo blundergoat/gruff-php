@@ -199,8 +199,8 @@ final class DashboardStateFactoryTest extends TestCase
      * set explicitly), config (when no flag), or binary default (when
      * `--no-config` suppresses the config lookup).
      *
-     * @param array<string, mixed> $parameters     Input parameters passed to ArrayInput.
-     * @param string               $expectedFailOn Resolved threshold the state should carry.
+     * @param array<string, mixed> $parameters - Input parameters passed to ArrayInput.
+     * @param string               $expectedFailOn - Resolved threshold the state should carry.
      *
      * @return void
      */
@@ -224,7 +224,6 @@ final class DashboardStateFactoryTest extends TestCase
      */
     public static function provideDashboardPrecedenceCases(): array
     {
-        // Each case pairs the CLI parameters with the fail-on threshold precedence is expected to resolve to.
         return [
             'config wins over binary default when no CLI flag' => [[], 'error'],
             'CLI flag overrides config'                        => [['--fail-on' => 'warning'], 'warning'],
@@ -294,13 +293,12 @@ final class DashboardStateFactoryTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $parameters
+     * @param array<string, mixed> $parameters - CLI input parameters to merge over analyse-command defaults.
      *
      * @return ArrayInput - input whose definition mirrors the analyse command, so default resolution matches production
      */
     private function input(array $parameters = []): ArrayInput
     {
-        // Hand back an input whose option set mirrors the analyse command, so default resolution behaves as in production.
         return new ArrayInput($parameters, new InputDefinition([
                                                                    new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                                                                    new InputOption('project', null, InputOption::VALUE_REQUIRED),
@@ -317,7 +315,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Build a temporary project containing a .gruff-php.yaml with a dashboard threshold.
      *
-     * @param string $threshold Threshold value to set under `minimumSeverity.dashboard`.
+     * @param string $threshold - Threshold value to set under `minimumSeverity.dashboard`.
      *
      * @return string - absolute root of the temp project whose `.gruff-php.yaml` now carries the threshold
      */
@@ -329,7 +327,6 @@ final class DashboardStateFactoryTest extends TestCase
             "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    dashboard: " . $threshold . "\n",
         );
 
-        // Hand back the root so callers can chdir into the project whose config now carries the threshold.
         return $project;
     }
 
@@ -344,15 +341,14 @@ final class DashboardStateFactoryTest extends TestCase
         self::assertTrue(mkdir($project));
         $this->tempDirs[] = $project;
 
-        // Hand back the freshly created directory; it is already registered for teardown cleanup.
         return $project;
     }
 
     /**
      * Run the callable with the working directory pointed at the given project.
      *
-     * @param string          $project  Working directory the closure should run in.
-     * @param callable():void $callable Closure invoked under the swapped CWD.
+     * @param string          $project - Working directory the closure should run in.
+     * @param callable():void $callable - Closure invoked under the swapped CWD.
      *
      * @return void
      */
@@ -372,7 +368,7 @@ final class DashboardStateFactoryTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Absolute path to remove.
+     * @param string $path - Absolute path to remove.
      *
      * @return void
      */

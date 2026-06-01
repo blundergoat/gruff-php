@@ -30,7 +30,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Describe the multiple arrange-act-assert cycles rule.
      *
-     * @return RuleDefinition Rule metadata, defaults, and thresholds.
+     * @return RuleDefinition - Rule metadata, defaults, and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -51,10 +51,10 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Find tests that appear to repeat act/assert cycles in one method.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for repeated AAA cycles.
+     * @return list<Finding> - Findings for repeated AAA cycles.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -94,16 +94,15 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per test method whose cycle count reached the configured threshold.
         return $findings;
     }
 
     /**
      * Count apparent act-then-assert cycles across top-level test statements.
      *
-     * @param TestQualityScope $scope Test method whose top-level statements are scanned for act/assert runs.
+     * @param TestQualityScope $scope - Test method whose top-level statements are scanned for act/assert runs.
      *
-     * @return int Number of detected cycles.
+     * @return int - Number of detected cycles.
      */
     private function countActAssertCycles(TestQualityScope $scope): int
     {
@@ -156,9 +155,10 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Check whether a project-configured path exemption applies.
      *
-     * @param string       $displayPath Display path of the unit under test, matched after slash normalisation.
-     * @param list<string> $patterns    Glob patterns for accepted broad test shapes.
-     * @return bool True when the display path matches an ignored pattern.
+     * @param string       $displayPath - Display path of the unit under test, matched after slash normalisation.
+     * @param list<string> $patterns - Glob patterns for accepted broad test shapes.
+     *
+     * @return bool - True when the display path matches an ignored pattern.
      */
     private function isPathIgnored(string $displayPath, array $patterns): bool
     {
@@ -178,9 +178,9 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
     /**
      * Detect whether a call is used only to compute an assertion argument.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Inner call whose ancestor chain is walked.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Inner call whose ancestor chain is walked.
      *
-     * @return bool True when the call is nested inside an assertion call.
+     * @return bool - True when the call is nested inside an assertion call.
      */
     private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {

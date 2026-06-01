@@ -170,7 +170,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Build complete dashboard state with targeted overrides.
      *
-     * @param array<string, string> $overrides Values to override.
+     * @param array<string, string> $overrides - Values to override.
      *
      * @return array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
      *                        noConfig: string, includeIgnored: string, reportInteractive: string} - every form field defaulted, with the caller's
@@ -196,7 +196,7 @@ final class DashboardPageRendererTest extends TestCase
     /**
      * Extract the embedded dashboard metadata payload.
      *
-     * @param string $html HTML containing the metadata script.
+     * @param string $html - HTML containing the metadata script.
      *
      * @return array<string, int|string> - the JSON payload pulled from the meta script tag, decoded and asserted to contain only string keys mapping
      *                       to int or string values
@@ -221,7 +221,6 @@ final class DashboardPageRendererTest extends TestCase
             $metadata[$key] = $value;
         }
 
-        // Hand back the decoded payload once every key/value has been type-checked.
         return $metadata;
     }
 }

@@ -141,8 +141,8 @@ final class DependencyComposerRulesTest extends TestCase
     /**
      * Analyse a manifest fixture and return findings for one rule.
      *
-     * @param string $displayPath Fixture display path (basename decides manifest detection).
-     * @param string $ruleId      Rule identifier to filter for.
+     * @param string $displayPath - Fixture display path (basename decides manifest detection).
+     * @param string $ruleId - Rule identifier to filter for.
      *
      * @return list<Finding> - findings emitted only by the named rule, empty when that rule stayed silent
      */
@@ -156,7 +156,6 @@ final class DependencyComposerRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
-        // The filtered list isolates the dependency-composer rule under test.
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 }

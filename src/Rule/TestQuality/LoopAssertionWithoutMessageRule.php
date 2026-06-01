@@ -33,7 +33,7 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Describe the loop assertion message rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -51,10 +51,10 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Find assertions inside loops that lack a context-bearing message.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for loop assertions without messages.
+     * @return list<Finding> - Findings for loop assertions without messages.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -117,16 +117,15 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
             }
         }
 
-        // Hand back every in-loop assertion missing an iteration message; empty means all loops were safe.
         return $findings;
     }
 
     /**
      * Check whether an assertion call appears to include a message argument.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call whose argument list is sniffed.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Assertion call whose argument list is sniffed.
      *
-     * @return bool True when the final argument looks like message text.
+     * @return bool - True when the final argument looks like message text.
      */
     private function hasMessageArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -147,9 +146,9 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     }
 
     /**
-     * @param string $name Lower-cased assertion name to classify against the known PHPUnit arities.
+     * @param string $name - Lower-cased assertion name to classify against the known PHPUnit arities.
      *
-     * @return int|null Number of required non-message arguments, or null for unknown assertions.
+     * @return int|null - Number of required non-message arguments, or null for unknown assertions.
      */
     private function minimumArgumentCountBeforeMessage(string $name): ?int
     {
@@ -203,9 +202,9 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Keep a conservative fallback for custom assertion helpers with unknown arity.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Custom assertion whose trailing argument is sniffed.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Custom assertion whose trailing argument is sniffed.
      *
-     * @return bool True when the final argument looks like message text.
+     * @return bool - True when the final argument looks like message text.
      */
     private function hasLegacyStringMessageArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -227,9 +226,9 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
     /**
      * Detect string-like expressions commonly used for assertion messages.
      *
-     * @param Expr $expr Trailing-argument expression tested for whether it can yield a readable message.
+     * @param Expr $expr - Trailing-argument expression tested for whether it can yield a readable message.
      *
-     * @return bool True when the expression can produce message text.
+     * @return bool - True when the expression can produce message text.
      */
     private function isLikelyStringExpression(Expr $expr): bool
     {

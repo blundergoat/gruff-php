@@ -50,7 +50,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify the visitor identifies a control-flow statement type.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
      *
      * @return void
      */
@@ -65,7 +65,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify the visitor rejects a non-control-flow statement type.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
      *
      * @return void
      */
@@ -113,7 +113,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Verify each loop type yields exactly one loop-body block.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
      *
      * @return void
      */
@@ -206,7 +206,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Parse a single statement from source.
      *
-     * @param string $source PHP source fragment without the open tag.
+     * @param string $source - PHP source fragment without the open tag.
      *
      * @return Node - the first parsed statement node; helper asserts the parse is non-empty before returning it
      */
@@ -225,7 +225,7 @@ final class StmtChildVisitorTest extends TestCase
     /**
      * Materialise the visitor's iterable as a numeric list of blocks.
      *
-     * @param Node $node Statement to inspect.
+     * @param Node $node - Statement to inspect.
      *
      * @return list<StmtChildBlock> - child blocks drained from the generator in source order so tests can index and count them
      */

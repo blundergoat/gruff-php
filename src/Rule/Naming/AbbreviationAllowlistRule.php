@@ -62,8 +62,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Find undeclared lowercase abbreviations on properties, parameters, and locals.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context carrying accepted abbreviations.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context carrying accepted abbreviations.
      *
      * @return list<Finding> - one finding per undeclared abbreviation; empty when every short name is sanctioned
      */
@@ -106,20 +106,19 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             );
         }
 
-        // Hand back every undeclared abbreviation found across properties, parameters, and locals in this unit.
         return $findings;
     }
 
     /**
      * Build abbreviation findings for properties declared in one property statement.
      *
-     * @param RuleDefinition $definition   Rule metadata used to populate emitted findings.
-     * @param AnalysisUnit   $analysisUnit Parsed unit that owns the property declaration.
-     * @param Property       $property     Property statement whose individual props are inspected.
-     * @param list<string>   $ignored      Lowercased built-in names that are never reported.
-     * @param list<string>   $accepted     Lowercased project abbreviations that suppress findings.
-     * @param int            $minLength    Inclusive lower bound for abbreviation length.
-     * @param int            $maxLength    Inclusive upper bound for abbreviation length.
+     * @param RuleDefinition $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit   $analysisUnit - Parsed unit that owns the property declaration.
+     * @param Property       $property - Property statement whose individual props are inspected.
+     * @param list<string>   $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>   $accepted - Lowercased project abbreviations that suppress findings.
+     * @param int            $minLength - Inclusive lower bound for abbreviation length.
+     * @param int            $maxLength - Inclusive upper bound for abbreviation length.
      *
      * @return list<Finding> - property abbreviation findings in declaration order
      */
@@ -156,13 +155,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Build abbreviation findings for parameters and local variables inside one callable scope.
      *
-     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
-     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
-     * @param FunctionLikeScope $scope        Callable scope whose parameters and locals are inspected.
-     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
-     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
-     * @param int               $minLength    Inclusive lower bound for abbreviation length.
-     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope - Callable scope whose parameters and locals are inspected.
+     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength - Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength - Inclusive upper bound for abbreviation length.
      *
      * @return list<Finding> - parameter and local abbreviation findings in source order
      */
@@ -200,13 +199,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Build abbreviation findings for parameters inside one callable scope.
      *
-     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
-     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
-     * @param FunctionLikeScope $scope        Callable scope whose parameters are inspected.
-     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
-     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
-     * @param int               $minLength    Inclusive lower bound for abbreviation length.
-     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope - Callable scope whose parameters are inspected.
+     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength - Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength - Inclusive upper bound for abbreviation length.
      *
      * @return list<Finding> - parameter abbreviation findings in declaration order
      */
@@ -248,13 +247,13 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Build abbreviation findings for local variables inside one callable scope.
      *
-     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
-     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
-     * @param FunctionLikeScope $scope        Callable scope whose locals are inspected.
-     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
-     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
-     * @param int               $minLength    Inclusive lower bound for abbreviation length.
-     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     * @param RuleDefinition    $definition - Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit - Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope - Callable scope whose locals are inspected.
+     * @param list<string>      $ignored - Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted - Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength - Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength - Inclusive upper bound for abbreviation length.
      *
      * @return list<Finding> - local variable abbreviation findings in discovery order
      */
@@ -297,19 +296,19 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Build a finding for one identifier, or null when it passes every abbreviation gate.
      *
-     * @param RuleDefinition                                         $definition   Rule metadata supplying id, severity, and tier for any finding
+     * @param RuleDefinition                                         $definition - Rule metadata supplying id, severity, and tier for any finding
      *                                                                             raised.
-     * @param AnalysisUnit                                           $analysisUnit Parsed unit, used only for its display path on the emitted
+     * @param AnalysisUnit                                           $analysisUnit - Parsed unit, used only for its display path on the emitted
      *                                                                             finding.
-     * @param Node                                                   $node         Declaration node whose start line the finding points at.
-     * @param array{kind: string, name: string, symbol: string|null} $identifier   Kind label, raw name, and owning
+     * @param Node                                                   $node - Declaration node whose start line the finding points at.
+     * @param array{kind: string, name: string, symbol: string|null} $identifier - Kind label, raw name, and owning
      *                                                                             symbol; symbol is null for top-level locals.
-     * @param list<string>                                           $ignored      Lowercased built-in names that are never reported (e.g. this).
-     * @param list<string>                                           $accepted     Lowercased project vocabulary from acceptedAbbreviations that
+     * @param list<string>                                           $ignored - Lowercased built-in names that are never reported (e.g. this).
+     * @param list<string>                                           $accepted - Lowercased project vocabulary from acceptedAbbreviations that
      *                                                                             suppresses a finding.
-     * @param int                                                    $minLength    Inclusive lower bound; shorter names fall to ShortVariableRule
+     * @param int                                                    $minLength - Inclusive lower bound; shorter names fall to ShortVariableRule
      *                                                                             instead.
-     * @param int                                                    $maxLength    Inclusive upper bound; longer names are treated as real words, not
+     * @param int                                                    $maxLength - Inclusive upper bound; longer names are treated as real words, not
      *                                                                             abbreviations.
      *
      * @return Finding|null - a finding for an undeclared abbreviation; null when out of scope or sanctioned
@@ -364,10 +363,10 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Read a positive integer rule option, falling back when configuration is not numeric.
      *
-     * @param RuleContext    $ruleContext Source of resolved settings for this rule.
-     * @param RuleDefinition $definition  Rule whose settings bag the option is read from.
-     * @param string         $name        Option key to read, such as minLength or maxLength.
-     * @param int            $default     Value used when the option is absent or not an integer.
+     * @param RuleContext    $ruleContext - Source of resolved settings for this rule.
+     * @param RuleDefinition $definition - Rule whose settings bag the option is read from.
+     * @param string         $name - Option key to read, such as minLength or maxLength.
+     * @param int            $default - Value used when the option is absent or not an integer.
      *
      * @return int - the configured length clamped to at least 1, or the default when absent or non-integer
      */
@@ -382,7 +381,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Collect local names exempt from abbreviation checks.
      *
-     * @param FunctionLikeScope $scope Scope whose body is scanned for loop and catch variable declarations.
+     * @param FunctionLikeScope $scope - Scope whose body is scanned for loop and catch variable declarations.
      *
      * @return array<string, true> - set of loop and catch variable names exempt from findings, keyed for fast lookup
      */
@@ -403,8 +402,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Add loop and catch variables that are conventional enough to skip abbreviation findings.
      *
-     * @param Node                $node  Loop or catch node to inspect; other node kinds contribute nothing.
-     * @param array<string, true> $names Accumulator mutated in place; matched variable names are added as keys.
+     * @param Node                $node - Loop or catch node to inspect; other node kinds contribute nothing.
+     * @param array<string, true> $names - Accumulator mutated in place; matched variable names are added as keys.
      *
      * @return void
      */
@@ -431,8 +430,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Collect local variable names from a node list.
      *
-     * @param array<Node>         $nodes Loop init or foreach key/value nodes to walk for variable references.
-     * @param array<string, true> $names Accumulator mutated in place; each discovered variable name is added as a key.
+     * @param array<Node>         $nodes - Loop init or foreach key/value nodes to walk for variable references.
+     * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
      * @return void
      */
@@ -446,8 +445,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Record a local variable name when the node is a variable reference.
      *
-     * @param Node                $node  Node to test and then recurse into; only string-named variables are recorded.
-     * @param array<string, true> $names Accumulator mutated in place; each discovered variable name is added as a key.
+     * @param Node                $node - Node to test and then recurse into; only string-named variables are recorded.
+     * @param array<string, true> $names - Accumulator mutated in place; each discovered variable name is added as a key.
      *
      * @return void
      */
@@ -465,7 +464,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * List direct child nodes that can be recursively traversed.
      *
-     * @param Node $node Parent node whose sub-node slots are flattened into child nodes.
+     * @param Node $node - Parent node whose sub-node slots are flattened into child nodes.
      *
      * @return list<Node> - immediate child nodes only, sub-node arrays unwrapped; the caller drives deeper recursion
      */
@@ -484,8 +483,8 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Append traversable child nodes to the current collection.
      *
-     * @param mixed      $subNode  A sub-node slot value: a Node, an array of them, or a scalar that is skipped.
-     * @param list<Node> $children Accumulator mutated in place; discovered Node instances are appended.
+     * @param mixed      $subNode - A sub-node slot value: a Node, an array of them, or a scalar that is skipped.
+     * @param list<Node> $children - Accumulator mutated in place; discovered Node instances are appended.
      *
      * @return void
      */
@@ -510,7 +509,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
-     * @param FunctionLikeScope $scope Scope whose node determines whether a real name or a synthetic label is used.
+     * @param FunctionLikeScope $scope - Scope whose node determines whether a real name or a synthetic label is used.
      *
      * @return string - the qualified name for a method or function, or a kind@line label for a closure or arrow fn
      */
@@ -528,7 +527,7 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     /**
      * Normalize string lists for case-insensitive comparisons.
      *
-     * @param list<string> $values
+     * @param list<string> $values - Input strings to lowercase for case-insensitive allowlist comparison.
      *
      * @return list<string> - same entries lowercased, order preserved; empty input yields an empty list
      */

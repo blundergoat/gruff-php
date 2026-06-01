@@ -47,8 +47,9 @@ enum OutputFormat: string
     /**
      * Convert a CLI format string into the matching output format.
      *
-     * @param string $rawInput CLI format value to parse.
-     * @return self|null Matching format, or null for unsupported input.
+     * @param string $rawInput - CLI format value to parse.
+     *
+     * @return self|null - Matching format, or null for unsupported input.
      */
     public static function fromInput(string $rawInput): ?self
     {

@@ -16,7 +16,6 @@ final readonly class HtmlReportAssets
      */
     public static function interactiveScript(): string
     {
-        // Hand back the client-side filter script verbatim; it is inlined into the page only in interactive mode.
         return <<<'JS'
 const form=document.querySelector('[data-finding-filters]');
 const list=document.querySelector('[data-findings-list]');
@@ -57,8 +56,8 @@ JS;
     /**
      * Inline CSS for the report; appends diagnostic and interactive-filter rules when those sections are present.
      *
-     * @param bool $hasDiagnostics True when diagnostic-section rules should be included.
-     * @param bool $interactive    True when filter-form and grouped-finding rules should be included.
+     * @param bool $hasDiagnostics - True when diagnostic-section rules should be included.
+     * @param bool $interactive - True when filter-form and grouped-finding rules should be included.
      *
      * @return string - stylesheet body for the standalone HTML report, including optional diagnostic/filter sections
      */

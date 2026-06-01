@@ -26,7 +26,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Describe the high entropy string rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -49,10 +49,10 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Find long high-entropy string literals that may be secrets.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious high-entropy literals.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for suspicious high-entropy literals.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -106,17 +106,16 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             );
         }
 
-        // Hand back one finding per surviving high-entropy literal; an empty list means nothing cleared every filter.
         return $findings;
     }
 
     /**
      * Defer known secret formats to more specific detectors.
      *
-     * @param string $candidateSecret Literal under test; a known vendor prefix or token shape means a dedicated
+     * @param string $candidateSecret - Literal under test; a known vendor prefix or token shape means a dedicated
      *                                rule owns it.
      *
-     * @return bool True when another rule should handle the literal.
+     * @return bool - True when another rule should handle the literal.
      */
     private function shouldSkipKnownSecretPattern(string $candidateSecret): bool
     {
@@ -144,10 +143,10 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect path-like literals that should not be treated as secrets.
      *
-     * @param string $candidateSecret Literal under test; file paths and route URLs trip the length heuristic but
+     * @param string $candidateSecret - Literal under test; file paths and route URLs trip the length heuristic but
      *                                hold no secret.
      *
-     * @return bool True when the literal looks like a file path.
+     * @return bool - True when the literal looks like a file path.
      */
     private function isPathLikeLiteral(string $candidateSecret): bool
     {
@@ -168,9 +167,9 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect URL and route literals that are long because of slugs or numeric IDs, not secret material.
      *
-     * @param string $candidateSecret Literal under test; a long public URL or route path otherwise reads as entropy.
+     * @param string $candidateSecret - Literal under test; a long public URL or route path otherwise reads as entropy.
      *
-     * @return bool True when the literal is shaped like a public URL path.
+     * @return bool - True when the literal is shaped like a public URL path.
      */
     private function isUrlOrRoutePathLiteral(string $candidateSecret): bool
     {
@@ -218,7 +217,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect long gruff config-path strings such as `rules.<id>.excludeFromScore`.
      *
-     * @param string $candidateSecret Literal under test; dotted config keys can look high entropy but are public metadata.
+     * @param string $candidateSecret - Literal under test; dotted config keys can look high entropy but are public metadata.
      *
      * @return bool - true when the literal is a gruff configuration path rather than secret material
      */
@@ -241,11 +240,11 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Detect public clinical-code metadata whose long tokens are standard identifiers.
      *
-     * @param string $candidateSecret Long token under test; clinical code systems use IDs that mimic secret entropy.
-     * @param string $line            Source line of the literal; the surrounding field name is what marks it
+     * @param string $candidateSecret - Long token under test; clinical code systems use IDs that mimic secret entropy.
+     * @param string $line - Source line of the literal; the surrounding field name is what marks it
      *                                as metadata.
      *
-     * @return bool True when the candidate is medical terminology metadata.
+     * @return bool - True when the candidate is medical terminology metadata.
      */
     private function isMedicalStandardsMetadata(string $candidateSecret, string $line): bool
     {
@@ -277,10 +276,10 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     /**
      * Return source text for a 1-based line number.
      *
-     * @param string $source     Full file source the literal was matched in.
-     * @param int    $lineNumber 1-based line number of the literal, as reported by the offset-to-line helper.
+     * @param string $source - Full file source the literal was matched in.
+     * @param int    $lineNumber - 1-based line number of the literal, as reported by the offset-to-line helper.
      *
-     * @return string Line text, or an empty string when unavailable.
+     * @return string - Line text, or an empty string when unavailable.
      */
     private function lineText(string $source, int $lineNumber): string
     {

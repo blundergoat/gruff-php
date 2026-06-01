@@ -17,11 +17,12 @@ final readonly class InfectionRunner
     /**
      * Execute Infection and capture its process result.
      *
-     * @param string      $projectRoot          Project root where Infection should run.
-     * @param string      $binary               Infection binary path or command name.
-     * @param string|null $configPath           Infection config path, when supplied.
-     * @param string|null $testFrameworkOptions Extra test-framework options passed to Infection.
-     * @return InfectionRunResult Process result and optional diagnostic.
+     * @param string      $projectRoot - Project root where Infection should run.
+     * @param string      $binary - Infection binary path or command name.
+     * @param string|null $configPath - Infection config path, when supplied.
+     * @param string|null $testFrameworkOptions - Extra test-framework options passed to Infection.
+     *
+     * @return InfectionRunResult - Process result and optional diagnostic.
      */
     public function runInfection(
         string $projectRoot,
@@ -63,7 +64,6 @@ final readonly class InfectionRunner
         $process->setTimeout(null);
         $process->run();
 
-        // Hand back the finished process; a null exit code is normalised to 2 (treated as failure).
         return new InfectionRunResult(
             exitCode:    $process->getExitCode() ?? 2,
             output:      $process->getOutput(),
@@ -74,9 +74,10 @@ final readonly class InfectionRunner
     /**
      * Resolve an Infection executable from a path, vendor bin, or PATH lookup.
      *
-     * @param string $projectRoot Anchor for relative binary paths and the vendor/bin lookup.
-     * @param string $binary      Configured binary; a slash means an explicit path, otherwise a PATH/vendor name.
-     * @return string|null Executable path, or null when not found.
+     * @param string $projectRoot - Anchor for relative binary paths and the vendor/bin lookup.
+     * @param string $binary - Configured binary; a slash means an explicit path, otherwise a PATH/vendor name.
+     *
+     * @return string|null - Executable path, or null when not found.
      */
     private function resolveBinary(string $projectRoot, string $binary): ?string
     {
@@ -108,9 +109,10 @@ final readonly class InfectionRunner
     /**
      * Resolve a path relative to the project root when needed.
      *
-     * @param string $projectRoot Base directory an already-relative path is joined onto.
-     * @param string $path        Candidate path; returned unchanged when already absolute.
-     * @return string Absolute path.
+     * @param string $projectRoot - Base directory an already-relative path is joined onto.
+     * @param string $path - Candidate path; returned unchanged when already absolute.
+     *
+     * @return string - Absolute path.
      */
     private function absolutePath(string $projectRoot, string $path): string
     {

@@ -27,10 +27,10 @@ final readonly class DashboardRequestHandler
     /**
      * Create a request handler for one dashboard server context.
      *
-     * @param DashboardRequestContext $dashboardRequestContext Request context shared by dashboard routes.
-     * @param DashboardStateFactory   $stateFactory            Factory used to build dashboard state.
-     * @param DashboardScanRunner     $scanRunner              Runner used for scan requests.
-     * @param DashboardHttpResponder  $responder               Responder used to write HTTP responses.
+     * @param DashboardRequestContext $dashboardRequestContext - Request context shared by dashboard routes.
+     * @param DashboardStateFactory   $stateFactory - Factory used to build dashboard state.
+     * @param DashboardScanRunner     $scanRunner - Runner used for scan requests.
+     * @param DashboardHttpResponder  $responder - Responder used to write HTTP responses.
      */
     public function __construct(
         private DashboardRequestContext $dashboardRequestContext,
@@ -43,7 +43,7 @@ final readonly class DashboardRequestHandler
     /**
      * Read, route, and write one HTTP request from a socket client.
      *
-     * @param resource $client
+     * @param resource $client - Connected client stream to read from and write the response to.
      *
      * @return void
      */
@@ -75,7 +75,8 @@ final readonly class DashboardRequestHandler
     /**
      * Read one dashboard HTTP request from the client socket.
      *
-     * @param resource $client
+     * @param resource $client - Connected client stream positioned at the request line.
+     *
      * @return array{method: string, target: string, headers: array<string, string>}|DashboardHttpResponse|null - the parsed request (method, target, headers) when well-formed; a DashboardHttpResponse to send verbatim when a size limit or duplicate Host was hit; null when the connection dropped or the request line was malformed
      */
     private function request($client): array|DashboardHttpResponse|null
@@ -119,9 +120,9 @@ final readonly class DashboardRequestHandler
     }
 
     /**
-     * @param string                $method  HTTP verb; only GET and HEAD are served, anything else returns 405.
-     * @param string                $target  Raw request target (path plus query); parsed for the route and params.
-     * @param array<string, string> $headers Lower-cased request headers; the Host entry gates access before any route.
+     * @param string                $method - HTTP verb; only GET and HEAD are served, anything else returns 405.
+     * @param string                $target - Raw request target (path plus query); parsed for the route and params.
+     * @param array<string, string> $headers - Lower-cased request headers; the Host entry gates access before any route.
      *
      * @return DashboardHttpResponse - the routed reply: a 200 page/health/scan body for an allowed GET/HEAD, or the matching error (405 wrong verb, 421 disallowed host, 404 unknown path)
      */
@@ -153,7 +154,7 @@ final readonly class DashboardRequestHandler
     }
 
     /**
-     * @param array<string, string> $query
+     * @param array<string, string> $query - Sanitised query params used to seed dashboard state.
      *
      * @return string - the complete HTML document for the dashboard page, with state derived from the query params already rendered in
      */
@@ -168,7 +169,7 @@ final readonly class DashboardRequestHandler
     /**
      * Parse dashboard query parameters from the request target.
      *
-     * @param string $target Raw request target; only its query string is read, and non-scalar values are dropped.
+     * @param string $target - Raw request target; only its query string is read, and non-scalar values are dropped.
      *
      * @return array<string, string> - scalar query params keyed by name, each stringified; empty when the target has no query string
      */
@@ -192,14 +193,14 @@ final readonly class DashboardRequestHandler
             $clean[$key] = (string) $queryValue;
         }
 
-        // Hand back only the scalar params, each stringified, so downstream state never sees arrays.
         return $clean;
     }
 
     /**
      * Read dashboard HTTP headers until the request header block ends.
      *
-     * @param resource $client
+     * @param resource $client - Connected client stream positioned at the first header line.
+     *
      * @return array<string, string>|DashboardHttpResponse|null - lower-cased header name to value map on the blank-line terminator; a DashboardHttpResponse (431/400) when the line/byte budget overran or a duplicate Host appeared; null when the stream ended before the terminator
      */
     private function headers($client): array|DashboardHttpResponse|null
@@ -247,7 +248,7 @@ final readonly class DashboardRequestHandler
     /**
      * Validate the Host header against the dashboard bind host and port.
      *
-     * @param ?string $hostHeader Raw Host header, or null when absent; missing or empty is rejected as not allowed.
+     * @param ?string $hostHeader - Raw Host header, or null when absent; missing or empty is rejected as not allowed.
      *
      * @return bool - true when the Host header's name and port match this dashboard's bind target; false denies the request as a likely cross-origin or DNS-rebinding attempt
      */

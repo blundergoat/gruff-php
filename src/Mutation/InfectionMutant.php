@@ -12,12 +12,12 @@ final readonly class InfectionMutant
     /**
      * Capture a mutant entry parsed from Infection output.
      *
-     * @param string      $status        Infection status for the mutant.
-     * @param string      $filePath      Source file path reported by Infection.
-     * @param int|null    $line          Source line reported for the mutant, when available.
-     * @param string      $mutator       Mutator name that produced the mutant.
-     * @param string|null $diff          Mutant diff text, when Infection provided it.
-     * @param string|null $processOutput Per-mutant process output, when available.
+     * @param string      $status - Infection status for the mutant.
+     * @param string      $filePath - Source file path reported by Infection.
+     * @param int|null    $line - Source line reported for the mutant, when available.
+     * @param string      $mutator - Mutator name that produced the mutant.
+     * @param string|null $diff - Mutant diff text, when Infection provided it.
+     * @param string|null $processOutput - Per-mutant process output, when available.
      */
     public function __construct(
         public string  $status,

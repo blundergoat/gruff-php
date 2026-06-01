@@ -34,7 +34,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Describe the Composer VCS-repository rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -52,10 +52,10 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     /**
      * Find `repositories` entries that resolve dependencies from version control.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for VCS repositories.
+     * @return list<Finding> - Findings for VCS repositories.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

@@ -29,11 +29,10 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Describe the silent catch rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
-        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Silent catch block',
@@ -47,10 +46,10 @@ final class SilentCatchRule implements RuleInterface
     /**
      * Find catch blocks that only contain no-op statements.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for swallowed exceptions.
+     * @return list<Finding> - Findings for swallowed exceptions.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -74,16 +73,15 @@ final class SilentCatchRule implements RuleInterface
             );
         }
 
-        // Hand back every swallowed-exception finding gathered while walking the unit's catch blocks.
         return $findings;
     }
 
     /**
      * Check whether a catch block has no executable handling statements.
      *
-     * @param Stmt\Catch_ $catch Parsed catch block whose body statements are inspected for any real handling.
+     * @param Stmt\Catch_ $catch - Parsed catch block whose body statements are inspected for any real handling.
      *
-     * @return bool True when the catch body is silent.
+     * @return bool - True when the catch body is silent.
      */
     private function isSilent(Stmt\Catch_ $catch): bool
     {

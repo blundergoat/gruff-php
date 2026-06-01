@@ -54,8 +54,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Find private properties that are never read, never written, or unused entirely.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per private property that is unread, unwritten, or fully unused across every class-like in the unit; empty
      *                       when all are live
@@ -89,14 +89,13 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             );
         }
 
-        // Hand back the dead-property findings gathered across every class-like in the unit.
         return $findings;
     }
 
     /**
      * Collect private properties declared on a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private properties are collected.
      *
      * @return array<string, array{line: int, writtenByDeclaration: bool}> - private property names mapped to their declaration line and whether a
      *                       default or promotion already writes them; empty when the class-like has none
@@ -146,9 +145,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Track reads and writes for collected private properties.
      *
-     * @param NodeFinder                                                  $nodeFinder   Walks the body for accesses.
-     * @param Class_|Trait_|Enum_                                         $classLike    Owner of the accesses.
-     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps Names to track; rest ignored.
+     * @param NodeFinder                                                  $nodeFinder - Walks the body for accesses.
+     * @param Class_|Trait_|Enum_                                         $classLike - Owner of the accesses.
+     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps - Names to track; rest ignored.
      *
      * @return array{reads: array<string, true>, writes: array<string, true>} - two name-keyed sets flagging which tracked properties were read and
      *                      which were written; a name absent from both was never accessed
@@ -177,10 +176,10 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Record read/write usage for a private property access node.
      *
-     * @param Node                $node   Access node already matched to $name; its parent decides read vs write.
-     * @param string              $name   Property whose usage flag to set.
-     * @param array<string, true> $reads  Accumulator, keyed by name; receives true when this access reads.
-     * @param array<string, true> $writes Accumulator, keyed by name; receives true when this access assigns.
+     * @param Node                $node - Access node already matched to $name; its parent decides read vs write.
+     * @param string              $name - Property whose usage flag to set.
+     * @param array<string, true> $reads - Accumulator, keyed by name; receives true when this access reads.
+     * @param array<string, true> $writes - Accumulator, keyed by name; receives true when this access assigns.
      *
      * @return void
      */
@@ -209,11 +208,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Build findings for properties in the dead-code rule.
      *
-     * @param AnalysisUnit                                                   $analysisUnit Path stamped on findings.
-     * @param RuleDefinition                                                 $definition   Source of id and severity.
-     * @param Class_|Trait_|Enum_                                            $classLike    Owner; name prefixes ids.
-     * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps Defaulted means written.
-     * @param array{reads: array<string, true>, writes: array<string, true>} $usage        Reads/writes per name.
+     * @param AnalysisUnit                                                   $analysisUnit - Path stamped on findings.
+     * @param RuleDefinition                                                 $definition - Source of id and severity.
+     * @param Class_|Trait_|Enum_                                            $classLike - Owner; name prefixes ids.
+     * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps - Defaulted means written.
+     * @param array{reads: array<string, true>, writes: array<string, true>} $usage - Reads/writes per name.
      *
      * @return list<Finding> - one finding per property that failed the read-and-written test; empty when every private property is live
      */
@@ -258,9 +257,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Build the finding message for a private property usage state.
      *
-     * @param string $symbol    Fully qualified property symbol to name in the message.
-     * @param bool   $isRead    Whether any read of the property was seen.
-     * @param bool   $isWritten Whether the property is ever written: true if an assignment was seen OR the
+     * @param string $symbol - Fully qualified property symbol to name in the message.
+     * @param bool   $isRead - Whether any read of the property was seen.
+     * @param bool   $isWritten - Whether the property is ever written: true if an assignment was seen OR the
      *                          declaration carries a default, so true with zero observed writes means default-only.
      *
      * @return string - the finding message phrased for the property's usage state: never used, written-but-never-read, or
@@ -286,7 +285,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Resolve a display name for a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $node
+     * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - the declared class/trait/enum name, or a stable placeholder (class@anonymous, or unknown@line for a malformed tree) when no
      *                name node exists
@@ -305,8 +304,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Extract the private property name from `$this` or own-class static access.
      *
-     * @param Node        $node         Candidate access node; only $this-> and own-class static fetches qualify.
-     * @param string|null $ownClassName Enclosing class name, or null inside a trait/anonymous scope.
+     * @param Node        $node - Candidate access node; only $this-> and own-class static fetches qualify.
+     * @param string|null $ownClassName - Enclosing class name, or null inside a trait/anonymous scope.
      *
      * @return string|null - the accessed property name for $this-> or own-class static fetches; null means the node is not a self-referential
      *                     property access and carries no usage signal
@@ -337,8 +336,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Check whether a static access target refers to the current class-like scope.
      *
-     * @param Node        $class        Class reference from a static fetch; non-Name targets never match.
-     * @param string|null $ownClassName Enclosing class name to compare against, or null when there is none.
+     * @param Node        $class - Class reference from a static fetch; non-Name targets never match.
+     * @param string|null $ownClassName - Enclosing class name to compare against, or null when there is none.
      *
      * @return bool - true when the static target is self::/static:: or matches the enclosing class name; false for dynamic targets and for
      *              trait/anonymous scopes that have no name

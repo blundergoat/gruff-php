@@ -152,7 +152,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
      */
     public static function invalidRuleOptionTypeProvider(): array
     {
-        // Each case pairs a config payload carrying one mistyped option with the validation message it must trigger.
         return [
             'float option'                   => [
                 '{"rules":{"%s":{"options":{"ratio":"high"}}}}',
@@ -211,8 +210,8 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify rejects invalid rule option type variants.
      *
-     * @param string $configTemplate  Config JSON template.
-     * @param string $messageTemplate Expected exception message template.
+     * @param string $configTemplate - Config JSON template.
+     * @param string $messageTemplate - Expected exception message template.
      *
      * @return void
      */
@@ -231,8 +230,8 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     /**
      * Verify rejects invalid project-wide dead-code option variants.
      *
-     * @param string $configTemplate  Config JSON template.
-     * @param string $messageTemplate Expected exception message template.
+     * @param string $configTemplate - Config JSON template.
+     * @param string $messageTemplate - Expected exception message template.
      *
      * @return void
      */
@@ -263,7 +262,6 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Hand back a default-disabled definition so the loader's enabled-state path has a rule to toggle.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Fixture default-disabled rule',
@@ -278,14 +276,13 @@ final readonly class FixtureDefaultDisabledRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit Analysis unit.
-     * @param RuleContext  $ruleContext  Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit - Analysis unit.
+     * @param RuleContext  $ruleContext - Rule context for the fixture.
      *
      * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the loader's enabled-state path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // This fixture exists only to be registered and configured; it never reports, so return no findings.
         return [];
     }
 }
@@ -305,7 +302,6 @@ final readonly class FixtureOptionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Hand back a definition whose defaultOptions declare one of each option type for the validation tests to abuse.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Fixture options rule',
@@ -327,14 +323,13 @@ final readonly class FixtureOptionsRule implements RuleInterface
     /**
      * Return findings produced by the fixture rule.
      *
-     * @param AnalysisUnit $analysisUnit Analysis unit.
-     * @param RuleContext  $ruleContext  Rule context for the fixture.
+     * @param AnalysisUnit $analysisUnit - Analysis unit.
+     * @param RuleContext  $ruleContext - Rule context for the fixture.
      *
      * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture exercises only the option-validation path and never reports
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        // This fixture exists only to be registered and configured; it never reports, so return no findings.
         return [];
     }
 }

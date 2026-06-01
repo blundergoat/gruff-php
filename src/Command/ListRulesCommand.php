@@ -43,8 +43,8 @@ final class ListRulesCommand extends Command
     /**
      * Render rule metadata as either a table or JSON document, or a per-rule detail view.
      *
-     * @param InputInterface  $input  Parsed invocation; supplies the `format` option and optional `ruleId` argument.
-     * @param OutputInterface $output Destination the rendered catalogue, detail view, or error is written to.
+     * @param InputInterface  $input - Parsed invocation; supplies the `format` option and optional `ruleId` argument.
+     * @param OutputInterface $output - Destination the rendered catalogue, detail view, or error is written to.
      *
      * @return int - Symfony exit code: SUCCESS once output is written, INVALID for a bad format, FAILURE if JSON encoding fails
      */
@@ -119,11 +119,11 @@ final class ListRulesCommand extends Command
     /**
      * Render the per-rule detail view, or report a typo with near-match suggestions.
      *
-     * @param string          $ruleId   Rule id the caller asked to inspect; matched exactly against the registry.
-     * @param RuleRegistry    $registry Source of the canonical rule set the lookup and typo suggestions draw from.
-     * @param AnalysisConfig  $config   Effective config supplying whether the matched rule is enabled for this project.
-     * @param string          $format   Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
-     * @param OutputInterface $output   Destination the detail view or unknown-rule message is written to.
+     * @param string          $ruleId - Rule id the caller asked to inspect; matched exactly against the registry.
+     * @param RuleRegistry    $registry - Source of the canonical rule set the lookup and typo suggestions draw from.
+     * @param AnalysisConfig  $config - Effective config supplying whether the matched rule is enabled for this project.
+     * @param string          $format - Pre-validated output format (`text`, `table`, or `json`) selecting the renderer.
+     * @param OutputInterface $output - Destination the detail view or unknown-rule message is written to.
      *
      * @return int - Symfony exit code: SUCCESS once the detail view is written, FAILURE if JSON encoding fails; an unknown id defers to the
      *             not-found path's INVALID
@@ -169,9 +169,9 @@ final class ListRulesCommand extends Command
     /**
      * Print a friendly typo response with up to three near-match suggestions, exit INVALID.
      *
-     * @param string          $ruleId   Unrecognised rule id the caller typed; echoed back and used as the match anchor.
-     * @param RuleRegistry    $registry Source of known rule ids the Levenshtein suggestions are drawn from.
-     * @param OutputInterface $output   Destination the unknown-rule error and any suggestions are written to.
+     * @param string          $ruleId - Unrecognised rule id the caller typed; echoed back and used as the match anchor.
+     * @param RuleRegistry    $registry - Source of known rule ids the Levenshtein suggestions are drawn from.
+     * @param OutputInterface $output - Destination the unknown-rule error and any suggestions are written to.
      *
      * @return int - always Symfony INVALID, signalling a bad rule-id argument so callers can branch on misuse
      */
@@ -208,8 +208,8 @@ final class ListRulesCommand extends Command
     /**
      * Serialise the per-rule detail payload for JSON output.
      *
-     * @param RuleDefinition $definition Rule whose metadata, thresholds, options, and escape hatches are serialised.
-     * @param bool           $enabled    Effective project enabled state; emitted as the `defaultEnabled` field.
+     * @param RuleDefinition $definition - Rule whose metadata, thresholds, options, and escape hatches are serialised.
+     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
      *
      * @return array - JSON-ready detail document; empty option/threshold maps are stdClass so they
      *                   encode as `{}` rather than `[]`
@@ -257,8 +257,8 @@ final class ListRulesCommand extends Command
     /**
      * Render a per-rule detail view as multi-line text.
      *
-     * @param RuleDefinition $definition Rule whose name, pillar, options, hatches, and false-positive shapes render.
-     * @param bool           $enabled    Effective project enabled state; printed on the "Enabled by default" line.
+     * @param RuleDefinition $definition - Rule whose name, pillar, options, hatches, and false-positive shapes render.
+     * @param bool           $enabled - Effective project enabled state; printed on the "Enabled by default" line.
      *
      * @return string - the full multi-line detail block, newline-joined and terminated with a trailing newline so it writes cleanly raw
      */
@@ -323,7 +323,7 @@ final class ListRulesCommand extends Command
     /**
      * Derive the escape-hatch config paths a user can set for a rule.
      *
-     * @param RuleDefinition $definition Rule whose option keys, severity threshold, and id seed the config paths.
+     * @param RuleDefinition $definition - Rule whose option keys, severity threshold, and id seed the config paths.
      *
      * @return list<array{path: string, description: string}> - settable `.gruff-php.yaml` config paths with help text, per-option paths first then
      *                          the always-present enable/score/threshold hatches; empty only when the rule has no options and no threshold
@@ -363,7 +363,7 @@ final class ListRulesCommand extends Command
     /**
      * Format an option default value for inline display in the detail view.
      *
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $value
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $value - Raw default option value from a rule definition.
      *
      * @return string - single-line config-style rendering: booleans as true/false, strings quoted, lists bracketed, numbers bare
      */
@@ -394,8 +394,8 @@ final class ListRulesCommand extends Command
     /**
      * Build the machine-readable row emitted by list-rules.
      *
-     * @param RuleDefinition $definition Rule whose metadata, thresholds, and options populate the catalogue row.
-     * @param bool           $enabled    Effective project enabled state; emitted as the `defaultEnabled` field.
+     * @param RuleDefinition $definition - Rule whose metadata, thresholds, and options populate the catalogue row.
+     * @param bool           $enabled - Effective project enabled state; emitted as the `defaultEnabled` field.
      *
      * @return array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool,
      *                   thresholds: array<string, int|float|string>|\stdClass, options: array<string, int|float|bool|string|array<array-key,

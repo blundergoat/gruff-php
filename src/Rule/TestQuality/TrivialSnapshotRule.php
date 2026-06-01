@@ -27,7 +27,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Describe the trivial snapshot rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -46,10 +46,10 @@ final readonly class TrivialSnapshotRule implements RuleInterface
     /**
      * Find snapshot assertions that lack supporting behavioral assertions.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for trivial snapshot tests.
+     * @return list<Finding> - Findings for trivial snapshot tests.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,7 +89,6 @@ final readonly class TrivialSnapshotRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per snapshot assertion whose literal is short enough to assert directly instead.
         return $findings;
     }
 }

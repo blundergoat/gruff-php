@@ -15,10 +15,10 @@ use GruffPhp\Source\SourceDiscoveryResult;
 final readonly class AnalysisSourceLoader
 {
     /**
-     * @param string       $projectRoot          Root used for source discovery and parsing.
-     * @param list<string> $paths                Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  Configured path patterns to skip unless ignored files are included.
+     * @param string       $projectRoot - Root used for source discovery and parsing.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns - Configured path patterns to skip unless ignored files are included.
      *
      * @return AnalysisSourceSet - discovered files, their parsed units, and missing-path plus parse-error diagnostics
      */
@@ -56,10 +56,10 @@ final readonly class AnalysisSourceLoader
      * file at a time so each unit's AST can be released immediately after
      * analysis, keeping peak memory close to one unit's worth.
      *
-     * @param string       $projectRoot          Root used for source discovery.
-     * @param list<string> $paths                Project-relative paths requested by the CLI.
-     * @param bool         $shouldIncludeIgnored Whether files matching default ignore patterns are included.
-     * @param list<string> $ignoredPathPatterns  Configured path patterns to skip unless ignored files are included.
+     * @param string       $projectRoot - Root used for source discovery.
+     * @param list<string> $paths - Project-relative paths requested by the CLI.
+     * @param bool         $shouldIncludeIgnored - Whether files matching default ignore patterns are included.
+     * @param list<string> $ignoredPathPatterns - Configured path patterns to skip unless ignored files are included.
      *
      * @return array{discovery: SourceDiscoveryResult, diagnostics: list<RunDiagnostic>} - unparsed discovery result paired with missing-path
      *                          diagnostics; the caller parses each file itself
@@ -83,7 +83,7 @@ final readonly class AnalysisSourceLoader
      * Build the diagnostics list for paths that disappeared between argument
      * parsing and discovery.
      *
-     * @param SourceDiscoveryResult $sourceDiscoveryResult Discovery output; each missing path yields one diagnostic.
+     * @param SourceDiscoveryResult $sourceDiscoveryResult - Discovery output; each missing path yields one diagnostic.
      *
      * @return list<RunDiagnostic> - one missing-path diagnostic per vanished input path, in discovery order; empty when every path resolved
      */

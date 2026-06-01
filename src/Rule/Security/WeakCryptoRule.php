@@ -29,7 +29,7 @@ final class WeakCryptoRule implements RuleInterface
     /**
      * Describe the weak cryptography security rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -47,10 +47,10 @@ final class WeakCryptoRule implements RuleInterface
     /**
      * Find weak hashing and cryptography primitives in source code.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for weak cryptography usage.
+     * @return list<Finding> - Findings for weak cryptography usage.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

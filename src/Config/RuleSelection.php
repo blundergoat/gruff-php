@@ -14,11 +14,11 @@ final readonly class RuleSelection
     /**
      * Store rule-selection include and exclude lists.
      *
-     * @param list<string> $tiers
-     * @param list<string> $pillars
-     * @param list<string> $rules
-     * @param list<string> $excludePillars
-     * @param list<string> $excludeRules
+     * @param list<string> $tiers - Included tier names; empty means no tier filter.
+     * @param list<string> $pillars - Included pillar names; empty means no pillar include filter.
+     * @param list<string> $rules - Included rule ids; empty means no rule include filter.
+     * @param list<string> $excludePillars - Pillar names to remove after include filters are applied.
+     * @param list<string> $excludeRules - Rule ids to remove after include filters are applied.
      */
     public function __construct(
         public array $tiers = [],
@@ -32,7 +32,7 @@ final readonly class RuleSelection
     /**
      * Decide whether a rule definition passes the include and exclude filters.
      *
-     * @param RuleDefinition $definition Rule definition to test against selection filters.
+     * @param RuleDefinition $definition - Rule definition to test against selection filters.
      *
      * @return bool - true keeps the rule enabled; false drops it (no include matched, or an exclude filter vetoed it)
      */

@@ -29,7 +29,7 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Describe the long-test-versus-SUT rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Find long tests that appear to exercise only one SUT call.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for tests with disproportionate setup/assertion size.
+     * @return list<Finding> - Findings for tests with disproportionate setup/assertion size.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -91,9 +91,9 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Count apparent non-assertion SUT calls in a test scope.
      *
-     * @param TestQualityScope $scope Single test method whose call sites are filtered down to candidate SUT calls.
+     * @param TestQualityScope $scope - Single test method whose call sites are filtered down to candidate SUT calls.
      *
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Apparent SUT calls.
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - Apparent SUT calls.
      */
     private function sutCalls(TestQualityScope $scope): array
     {
@@ -118,9 +118,9 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Detect integration-test harness calls that naturally need more arrangement than the SUT call itself.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call The sole SUT call, examined to exempt harness drivers.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - The sole SUT call, examined to exempt harness drivers.
      *
-     * @return bool True when the single call is a command/process/application harness invocation.
+     * @return bool - True when the single call is a command/process/application harness invocation.
      */
     private function isIntegrationHarnessCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -147,10 +147,10 @@ final readonly class TestLongerThanSutRule implements RuleInterface
     /**
      * Detect harness-looking receiver variables and direct new expressions.
      *
-     * @param Expr         $receiver       Method-call receiver, matched as a named variable or an inline `new`.
-     * @param list<string> $variableTokens Lowercase variable-name fragments accepted as harnesses.
+     * @param Expr         $receiver - Method-call receiver, matched as a named variable or an inline `new`.
+     * @param list<string> $variableTokens - Lowercase variable-name fragments accepted as harnesses.
      *
-     * @return bool True when the receiver looks like a test harness.
+     * @return bool - True when the receiver looks like a test harness.
      */
     private function isHarnessReceiver(Expr $receiver, array $variableTokens): bool
     {

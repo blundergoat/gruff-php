@@ -26,7 +26,7 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Describe the hardcoded environment value rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -44,10 +44,10 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Find env-style assignments that look like committed secrets.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious env-style values.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for suspicious env-style values.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -98,17 +98,16 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
             );
         }
 
-        // Hand back one finding per assignment that cleared the comment, dummy-value, and evidence filters.
         return $findings;
     }
 
     /**
      * Check whether a key/value pair has enough evidence to be treated as secret-like.
      *
-     * @param string $key         Matched env-style key, e.g. DB_PASSWORD; suffix sets the value-evidence bar.
-     * @param string $secretValue Raw matched value, quotes and whitespace included; trimmed and entropy-scored here.
+     * @param string $key - Matched env-style key, e.g. DB_PASSWORD; suffix sets the value-evidence bar.
+     * @param string $secretValue - Raw matched value, quotes and whitespace included; trimmed and entropy-scored here.
      *
-     * @return bool True when the value shape is strong enough for the key.
+     * @return bool - True when the value shape is strong enough for the key.
      */
     private function hasSecretValueEvidence(string $key, string $secretValue): bool
     {
@@ -138,9 +137,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Detect key suffixes that need stronger value evidence.
      *
-     * @param string $key Upper-cased env-style key to test against the conservative suffix list.
+     * @param string $key - Upper-cased env-style key to test against the conservative suffix list.
      *
-     * @return bool True when the key suffix is commonly non-secret.
+     * @return bool - True when the key suffix is commonly non-secret.
      */
     private function isConservativeKeySuffix(string $key): bool
     {
@@ -158,9 +157,9 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Detect short identifier-like values that are usually not secrets.
      *
-     * @param string $secretValue Already-normalized value to classify as a plain label rather than a credential.
+     * @param string $secretValue - Already-normalized value to classify as a plain label rather than a credential.
      *
-     * @return bool True when the value looks like a common non-secret token.
+     * @return bool - True when the value looks like a common non-secret token.
      */
     private function isCommonNonSecretValue(string $secretValue): bool
     {
@@ -189,10 +188,10 @@ final readonly class HardcodedEnvValueRule implements SourceTextRuleInterface
     /**
      * Detect field names, cache keys, and labels that include secret words but are not secret values.
      *
-     * @param string $key         Upper-cased env-style key whose suffix steers which identifier shapes are allowed.
-     * @param string $secretValue Already-normalized value; tested for identifier shape rather than secret shape.
+     * @param string $key - Upper-cased env-style key whose suffix steers which identifier shapes are allowed.
+     * @param string $secretValue - Already-normalized value; tested for identifier shape rather than secret shape.
      *
-     * @return bool True when the key/value shape is identifier-like instead of credential-like.
+     * @return bool - True when the key/value shape is identifier-like instead of credential-like.
      */
     private function isIdentifierLikeNonSecretValue(string $key, string $secretValue): bool
     {

@@ -756,7 +756,7 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Load an expected CLI golden output fixture.
      *
-     * @param string $fileName Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
+     * @param string $fileName - Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      *
      * @return string - verbatim fixture text to assert the CLI's actual output against
      */
@@ -765,7 +765,6 @@ final class AnalyseCliTest extends CliTestCase
         $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
         self::assertIsString($contents);
 
-        // Hand back the fixture text verbatim to compare the CLI's actual output against.
         return $contents;
     }
 

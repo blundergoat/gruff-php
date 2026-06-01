@@ -91,7 +91,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Run the changed-only internal dead-code branch-review command.
      *
-     * @param string $repository Working repository path.
+     * @param string $repository - Working repository path.
      *
      * @return array<string, mixed> - decoded JSON analysis report
      * @throws JsonException
@@ -121,7 +121,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Initialize a Git repository with a source directory.
      *
-     * @param string $repository Working repository path.
+     * @param string $repository - Working repository path.
      *
      * @return void
      */
@@ -136,8 +136,8 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Read an object payload by key.
      *
-     * @param array<string, mixed> $payload Decoded JSON object.
-     * @param string               $key     Key whose value must be a JSON object.
+     * @param array<string, mixed> $payload - Decoded JSON object.
+     * @param string               $key - Key whose value must be a JSON object.
      *
      * @return array<string, mixed> - nested object payload
      */
@@ -149,8 +149,8 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Read an integer payload by key.
      *
-     * @param array<string, mixed> $payload Decoded JSON object.
-     * @param string               $key     Key whose value must be an integer.
+     * @param array<string, mixed> $payload - Decoded JSON object.
+     * @param string               $key - Key whose value must be an integer.
      *
      * @return int - integer value from the payload
      */
@@ -165,7 +165,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Extract diagnostic type names from decoded JSON output.
      *
-     * @param array<string, mixed> $payload Decoded JSON report.
+     * @param array<string, mixed> $payload - Decoded JSON report.
      *
      * @return list<string> - diagnostic type names in report order
      */
@@ -185,7 +185,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Build symbols from findings for the branch-review workflow.
      *
-     * @param mixed $findings Decoded findings value.
+     * @param mixed $findings - Decoded findings value.
      *
      * @return list<mixed> - symbol values in finding order
      */
@@ -203,7 +203,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Validate a decoded JSON value is a list.
      *
-     * @param mixed $payload Decoded JSON value.
+     * @param mixed $payload - Decoded JSON value.
      *
      * @return list<mixed> - reindexed list value
      */
@@ -217,7 +217,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Validate a decoded JSON value is a string-keyed object.
      *
-     * @param mixed $payload Decoded JSON value.
+     * @param mixed $payload - Decoded JSON value.
      *
      * @return array<string, mixed> - string-keyed object value
      */
@@ -252,8 +252,8 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Run a Git command in a fixture repository.
      *
-     * @param string $workingDirectory Working directory.
-     * @param string $arguments        Command arguments.
+     * @param string $workingDirectory - Working directory.
+     * @param string $arguments - Command arguments.
      *
      * @return void
      */
@@ -281,7 +281,7 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     /**
      * Remove a temporary directory tree.
      *
-     * @param string $path Filesystem path.
+     * @param string $path - Filesystem path.
      *
      * @return void
      */

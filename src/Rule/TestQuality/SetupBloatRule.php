@@ -29,7 +29,7 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Describe the setup bloat rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - Rule metadata and defaults.
      */
     public function definition(): RuleDefinition
     {
@@ -48,10 +48,10 @@ final readonly class SetupBloatRule implements RuleInterface
     /**
      * Find setup methods that exceed the configured size threshold.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized setup methods.
+     * @return list<Finding> - Findings for oversized setup methods.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -100,7 +100,6 @@ final readonly class SetupBloatRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per class whose setUp clears the threshold and outweighs its average test method.
         return $findings;
     }
 }

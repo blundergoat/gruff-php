@@ -52,8 +52,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * Find mock creations for classes that match configured domain-object patterns.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per mock whose target matched a configured domain-object pattern; empty when none configured or none
      *                       matched
@@ -108,14 +108,13 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             }
         }
 
-        // Hand back one finding per mock whose target class matched a configured domain-object pattern.
         return $findings;
     }
 
     /**
      * Map imported class aliases to fully qualified names.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit whose `use` and group-use statements supply the alias map.
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose `use` and group-use statements supply the alias map.
      *
      * @return array<string, string> - local import alias keyed to its fully qualified target; empty when the unit has no `use` statements
      */
@@ -145,8 +144,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     /**
      * Extract a `ClassName::class` argument from a mock creation call.
      *
-     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  Mock-creation call whose argument is read.
-     * @param int                                           $index Zero-based argument position holding the class.
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Mock-creation call whose argument is read.
+     * @param int                                           $index - Zero-based argument position holding the class.
      *
      * @return string|null - the mocked class name as written, or null when the argument is not a `Something::class` fetch
      */
@@ -169,8 +168,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * @param string                $className  Class reference as written at the mock site, aliased or qualified.
-     * @param array<string, string> $useAliases Import alias map used to expand a leading short segment.
+     * @param string                $className - Class reference as written at the mock site, aliased or qualified.
+     * @param array<string, string> $useAliases - Import alias map used to expand a leading short segment.
      *
      * @return string - the fully qualified class name with any import alias expanded and no leading backslash
      */
@@ -195,8 +194,8 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     }
 
     /**
-     * @param string       $className Fully qualified class name to test against the domain-object globs.
-     * @param list<string> $patterns  fnmatch globs marking namespaces the project treats as domain objects.
+     * @param string       $className - Fully qualified class name to test against the domain-object globs.
+     * @param list<string> $patterns - fnmatch globs marking namespaces the project treats as domain objects.
      *
      * @return string|null - the first glob the class matches, or null when no configured pattern matches
      */

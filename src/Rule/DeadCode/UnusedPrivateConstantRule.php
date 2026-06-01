@@ -53,8 +53,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Find private constants that are not referenced inside their class-like scope.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
      * @return list<Finding> - one finding per private constant unreferenced in its class-like; empty when none are dead
      */
@@ -92,14 +92,13 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
             );
         }
 
-        // Hand back every unused-private-constant finding gathered across the class-likes in this unit.
         return $findings;
     }
 
     /**
      * Collect private constants declared on a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $classLike
+     * @param Class_|Trait_|Enum_ $classLike - Class-like declaration whose private constants are collected.
      *
      * @return array<string, Node\Const_> - candidate private declarations keyed by constant name; empty when the class-like declares none
      */
@@ -117,15 +116,14 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
             }
         }
 
-        // Hand back private class constants keyed by name; enum cases are a different node and never included.
         return $privateConstants;
     }
 
     /**
      * Collect private-constant reads made inside a class-like node.
      *
-     * @param NodeFinder          $nodeFinder Walks the class-like body for constant fetches.
-     * @param Class_|Trait_|Enum_ $classLike  Owner whose private constants are being checked.
+     * @param NodeFinder          $nodeFinder - Walks the class-like body for constant fetches.
+     * @param Class_|Trait_|Enum_ $classLike - Owner whose private constants are being checked.
      *
      * @return array{referencedNames: array<string, true>, hasDynamicReference: bool} - literal names read in scope plus whether an unresolved
      *                                                                                 dynamic local fetch prevents high-confidence findings
@@ -159,7 +157,7 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Extract a literal class-constant name from a class-constant fetch.
      *
-     * @param Expr\ClassConstFetch $node Candidate fetch already known to target the current class-like.
+     * @param Expr\ClassConstFetch $node - Candidate fetch already known to target the current class-like.
      *
      * @return string|null - constant name when the fetch is literal and not ::class; null for dynamic names
      */
@@ -182,11 +180,11 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Build findings for unused private constants in the dead-code rule.
      *
-     * @param AnalysisUnit                $analysisUnit     Supplies the display path stamped on each finding.
-     * @param RuleDefinition              $definition       Supplies the rule id, severity, pillar, and tier copied into every finding.
-     * @param Class_|Trait_|Enum_         $classLike        Owner whose name prefixes each reported symbol.
-     * @param array<string, Node\Const_>  $privateConstants Private constants declared directly on the class-like.
-     * @param array<string, true>         $referencedNames  Literal private-constant names read in scope.
+     * @param AnalysisUnit                $analysisUnit - Supplies the display path stamped on each finding.
+     * @param RuleDefinition              $definition - Supplies the rule id, severity, pillar, and tier copied into every finding.
+     * @param Class_|Trait_|Enum_         $classLike - Owner whose name prefixes each reported symbol.
+     * @param array<string, Node\Const_>  $privateConstants - Private constants declared directly on the class-like.
+     * @param array<string, true>         $referencedNames - Literal private-constant names read in scope.
      *
      * @return list<Finding> - one finding per private constant whose name never appears in $referencedNames; empty when all are used
      */
@@ -221,14 +219,13 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per private constant whose name was never seen among the referenced names.
         return $findings;
     }
 
     /**
      * Resolve the declared short name for a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $node
+     * @param Class_|Trait_|Enum_ $node - Class-like declaration whose short name is used for self-reference checks.
      *
      * @return string|null - declared short name, or null for anonymous classes and malformed input
      */
@@ -240,7 +237,7 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Resolve a display name for a class-like node.
      *
-     * @param Class_|Trait_|Enum_ $node
+     * @param Class_|Trait_|Enum_ $node - Class-like declaration whose display symbol is needed for finding text.
      *
      * @return string - declared class/trait/enum name, or an `@anonymous`/`unknown@line` placeholder when unnamed
      */
@@ -258,8 +255,8 @@ final readonly class UnusedPrivateConstantRule implements RuleInterface
     /**
      * Check whether a class-constant fetch target refers to the current class-like scope.
      *
-     * @param Node        $class        Class reference from a constant fetch.
-     * @param string|null $ownClassName Enclosing class-like name to compare against, or null when there is none.
+     * @param Node        $class - Class reference from a constant fetch.
+     * @param string|null $ownClassName - Enclosing class-like name to compare against, or null when there is none.
      *
      * @return bool - true for self::/static::/$this:: or the enclosing class name; false for dynamic and foreign targets
      */

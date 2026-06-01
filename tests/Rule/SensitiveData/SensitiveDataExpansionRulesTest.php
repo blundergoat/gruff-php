@@ -154,8 +154,8 @@ final class SensitiveDataExpansionRulesTest extends TestCase
     /**
      * Analyse a fixture and return findings for one rule.
      *
-     * @param string $displayPath Fixture display path.
-     * @param string $ruleId      Rule identifier to filter for.
+     * @param string $displayPath - Fixture display path.
+     * @param string $ruleId - Rule identifier to filter for.
      *
      * @return list<Finding> - findings emitted by that one rule, in detection order; empty when the rule did not fire
      */
@@ -166,14 +166,13 @@ final class SensitiveDataExpansionRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
-        // The filtered list is the public contract these rule tests assert.
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 
     /**
      * Run the gruff CLI and return its stdout.
      *
-     * @param list<string> $arguments CLI arguments.
+     * @param list<string> $arguments - CLI arguments.
      *
      * @return string - the full rendered report captured from stdout; a non-zero exit aborts via assertion first,
      *   so the returned text is always the complete report to scan for leaked secrets
@@ -185,7 +184,6 @@ final class SensitiveDataExpansionRulesTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
-        // Renderers write report payloads to stdout.
         return $process->getOutput();
     }
 }

@@ -37,7 +37,7 @@ final readonly class MethodLengthRule implements RuleInterface
     /**
      * Describe the method-length rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -56,10 +56,10 @@ final readonly class MethodLengthRule implements RuleInterface
     /**
      * Find callables whose logical statement line count exceeds thresholds.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for long callables.
+     * @return list<Finding> - Findings for long callables.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -118,15 +118,15 @@ final readonly class MethodLengthRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per callable that breached its threshold; empty when every body fits.
         return $findings;
     }
 
     /**
      * Build a display symbol for a callable node.
      *
-     * @param Node $node Callable node (method, function, or closure) to render as a finding symbol.
-     * @return string Callable display symbol.
+     * @param Node $node - Callable node (method, function, or closure) to render as a finding symbol.
+     *
+     * @return string - Callable display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
@@ -156,8 +156,9 @@ final readonly class MethodLengthRule implements RuleInterface
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {

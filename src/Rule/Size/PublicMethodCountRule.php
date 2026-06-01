@@ -32,7 +32,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Describe the public method count rule.
      *
-     * @return RuleDefinition Rule metadata and thresholds.
+     * @return RuleDefinition - Rule metadata and thresholds.
      */
     public function definition(): RuleDefinition
     {
@@ -51,10 +51,10 @@ final readonly class PublicMethodCountRule implements RuleInterface
     /**
      * Find classes and enums with too many public methods.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
+     * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized public APIs.
+     * @return list<Finding> - Findings for oversized public APIs.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -111,15 +111,15 @@ final readonly class PublicMethodCountRule implements RuleInterface
             );
         }
 
-        // Hand back one finding per class or enum whose public API breached the threshold; empty when all fit.
         return $findings;
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
-     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
-     * @return string Human-readable threshold value.
+     * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
+     *
+     * @return string - Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {
