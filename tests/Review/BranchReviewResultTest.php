@@ -94,7 +94,7 @@ final class BranchReviewResultTest extends TestCase
             deltaScore:    null,
         );
 
-        $ruleIds = array_map(static fn (array $row): string => $row['ruleId'], $result->perRuleDelta());
+        $ruleIds = array_map(static fn(array $deltaRow): string => $deltaRow['ruleId'], $result->perRuleDelta());
         self::assertSame(['alpha.rule', 'beta.rule', 'zeta.rule'], $ruleIds);
     }
 

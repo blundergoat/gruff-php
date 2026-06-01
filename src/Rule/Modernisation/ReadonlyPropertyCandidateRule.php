@@ -61,53 +61,101 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             return [];
         }
 
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
-            if (!$class->isFinal() || $class->extends !== null || $class->getTraitUses() !== []) {
-                continue;
-            }
-
-            if ($class->isReadonly()) {
-                continue;
-            }
-
-            $constructorAssignments = $this->constructorAssignments($class);
-            $lateAssignments        = $this->lateAssignments($class);
-
-            foreach ($class->getProperties() as $property) {
-                if ($property->isStatic() || $property->isReadonly() || $property->type === null) {
-                    continue;
-                }
-
-                foreach ($property->props as $propertyProperty) {
-                    $name = $propertyProperty->name->toString();
-                    if ($propertyProperty->default !== null || !isset($constructorAssignments[$name]) || isset($lateAssignments[$name])) {
-                        continue;
-                    }
-
-                    $findings[] = new Finding(
-                        ruleId:      self::ID,
-                        message:     sprintf('Property $%s is only assigned in a final class constructor and may be a readonly candidate.', $name),
-                        filePath:    $analysisUnit->file->displayPath,
-                        line:        $propertyProperty->getStartLine(),
-                        severity:    Severity::Advisory,
-                        pillar:      Pillar::Modernisation,
-                        tier:        RuleTier::V01,
-                        confidence:  Confidence::Medium,
-                        remediation: 'Consider readonly only after confirming no reflection, hydration, or late assignment contract depends on mutability; gruff-php reports only.',
-                        metadata:    [
-                            'property' => $name,
-                            'requiresPhp' => 8.1,
-                        ],
-                    );
-                }
-            }
+            array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
 
         // Hand back every readonly-candidate finding gathered across the unit's eligible final classes.
         return $findings;
+    }
+
+    /**
+     * Build readonly-candidate findings for one eligible final class.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit used to anchor finding paths.
+     * @param Stmt\Class_  $class        Class declaration being inspected.
+     *
+     * @return list<Finding> - property findings for constructor-only assignments in this class
+     */
+    private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        if (!$this->isEligibleClass($class)) {
+            return [];
+        }
+
+        $constructorAssignments = $this->constructorAssignments($class);
+        $lateAssignments        = $this->lateAssignments($class);
+        $findings               = [];
+
+        foreach ($class->getProperties() as $property) {
+            if ($property->isStatic() || $property->isReadonly() || $property->type === null) {
+                continue;
+            }
+
+            foreach ($property->props as $propertyProperty) {
+                $finding = $this->propertyFinding($analysisUnit, $propertyProperty, $constructorAssignments, $lateAssignments);
+                if ($finding instanceof Finding) {
+                    $findings[] = $finding;
+                }
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Check whether a class shape can safely receive property-level readonly suggestions.
+     *
+     * @param Stmt\Class_ $class Class declaration being inspected.
+     *
+     * @return bool - true when the class is final, non-readonly, has no parent, and uses no traits
+     */
+    private function isEligibleClass(Stmt\Class_ $class): bool
+    {
+        return $class->isFinal()
+            && !$class->isReadonly()
+            && $class->extends === null
+            && $class->getTraitUses() === [];
+    }
+
+    /**
+     * Build a readonly-candidate finding for one declared property, or null when the property is not eligible.
+     *
+     * @param AnalysisUnit                    $analysisUnit            Parsed unit used to anchor finding paths.
+     * @param Stmt\PropertyProperty           $propertyProperty        Single property declaration inside a property statement.
+     * @param array<string, true>             $constructorAssignments  Properties written by the constructor.
+     * @param array<string, true>             $lateAssignments         Properties written after construction.
+     *
+     * @return Finding|null - readonly-candidate finding, or null when defaults/missing constructor assignment/late writes disqualify it
+     */
+    private function propertyFinding(
+        AnalysisUnit $analysisUnit,
+        Stmt\PropertyProperty $propertyProperty,
+        array $constructorAssignments,
+        array $lateAssignments,
+    ): ?Finding {
+        $name = $propertyProperty->name->toString();
+        if ($propertyProperty->default !== null || !isset($constructorAssignments[$name]) || isset($lateAssignments[$name])) {
+            return null;
+        }
+
+        return new Finding(
+            ruleId:      self::ID,
+            message:     sprintf('Property $%s is only assigned in a final class constructor and may be a readonly candidate.', $name),
+            filePath:    $analysisUnit->file->displayPath,
+            line:        $propertyProperty->getStartLine(),
+            severity:    Severity::Advisory,
+            pillar:      Pillar::Modernisation,
+            tier:        RuleTier::V01,
+            confidence:  Confidence::Medium,
+            remediation: 'Consider readonly only after confirming no reflection, hydration, or late assignment contract depends on mutability; gruff-php reports only.',
+            metadata:    [
+                'property' => $name,
+                'requiresPhp' => 8.1,
+            ],
+        );
     }
 
     /**
@@ -183,6 +231,8 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
      *   base property so element mutation still counts as mutating the property.
      * @param array<string, true> &$assignments Accumulator mutated in place; the resolved property name is added
      *   when the target is a `$this` property, and left untouched otherwise.
+     *
+     * @return void
      */
     private function recordPropertyMutation(Expr $expr, array &$assignments): void
     {

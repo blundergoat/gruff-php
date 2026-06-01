@@ -296,6 +296,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * Detect a leading non-doc `//` or `#` line comment attached to the statement.
      *
      * @param Node\Stmt $statement Const or case statement whose attached leading comments are examined.
+     *
+     * @return bool - true when the statement already has a leading line comment worth promoting to PHPDoc
      */
     private function hasLeadingLineComment(Node\Stmt $statement): bool
     {
@@ -314,6 +316,8 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * Distinguish `//` and `#` single-line comment shapes from block comments.
      *
      * @param Comment $comment Already-confirmed non-doc comment whose opening delimiter is classified.
+     *
+     * @return bool - true when the comment uses a single-line delimiter rather than a block delimiter
      */
     private function isLineComment(Comment $comment): bool
     {

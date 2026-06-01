@@ -110,9 +110,8 @@ final readonly class MissingParamTagRule implements RuleInterface
     }
 
     /**
-     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes
-     * (`@param array{key:string,...} $payload` spanning N physical lines) match the closing
-     * `$payload` even though it sits on a different line from the `@param` token.
+     * Extract parameter names documented by @param tags. Depth-aware so multi-line array shapes match the
+     * closing documented variable even when it sits on a different line from the `@param` token.
      *
      * @param string $docText Raw docblock text.
      * @return list<string> Parameter names found in the docblock.
@@ -155,13 +154,13 @@ final readonly class MissingParamTagRule implements RuleInterface
 
     /**
      * Walk forward from a `@param` token through balanced `{} <> [] ()` brackets and return the
-     * first `$varname` reached at depth zero. Stops at the next `@tag` (next docblock entry) or
+     * first parameter variable token reached at depth zero. Stops at the next `@tag` (next docblock entry) or
      * end of input.
      *
      * @param string $stripped Docblock text with `/**`, ` * `, and `*\/` framing removed.
      * @param int    $length   Pre-computed `strlen($stripped)` to avoid recomputation per call.
      * @param int    $position Cursor position (mutated to point past the matched variable).
-     * @return string|null Variable name when found, null when the `@param` tag has no closing `$varname`.
+     * @return string|null Variable name when found, null when the `@param` tag has no closing variable token.
      */
     private static function scanForParamVariable(string $stripped, int $length, int &$position): ?string
     {

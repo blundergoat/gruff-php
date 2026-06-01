@@ -74,7 +74,12 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 continue;
             }
 
-            if ($this->shouldSkipKnownSecretPattern($candidateSecret) || $this->isPathLikeLiteral($candidateSecret) || SecretScannerHelper::isLikelyDummyValue($candidateSecret)) {
+            if (
+                $this->shouldSkipKnownSecretPattern($candidateSecret)
+                || $this->isPathLikeLiteral($candidateSecret)
+                || $this->isGruffConfigPathLiteral($candidateSecret)
+                || SecretScannerHelper::isLikelyDummyValue($candidateSecret)
+            ) {
                 continue;
             }
 
@@ -208,6 +213,29 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         // Treat as a route only with a real path shape and word-like segments and no credential separators.
         return $hasPublicPathShape && $hasAlphabeticSegment && !$hasTokenSeparator;
+    }
+
+    /**
+     * Detect long gruff config-path strings such as `rules.<id>.excludeFromScore`.
+     *
+     * @param string $candidateSecret Literal under test; dotted config keys can look high entropy but are public metadata.
+     *
+     * @return bool - true when the literal is a gruff configuration path rather than secret material
+     */
+    private function isGruffConfigPathLiteral(string $candidateSecret): bool
+    {
+        if (
+            !str_starts_with($candidateSecret, 'rules.')
+            && !str_starts_with($candidateSecret, 'paths.')
+            && !str_starts_with($candidateSecret, 'allowlists.')
+            && !str_starts_with($candidateSecret, 'selection.')
+        ) {
+            // Without a known config root, the literal is not a gruff config path and stays eligible for scanning.
+            return false;
+        }
+
+        // Match known config roots followed by dotted path segments; values, URLs, and credentials do not use this shape.
+        return preg_match('/^(?:rules|paths|allowlists|selection)\.[A-Za-z0-9_.-]+$/', $candidateSecret) === 1;
     }
 
     /**

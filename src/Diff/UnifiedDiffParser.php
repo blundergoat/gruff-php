@@ -51,6 +51,7 @@ final readonly class UnifiedDiffParser
                 continue;
             }
 
+            // Match unified-diff hunk headers and capture the new-file start line plus optional length.
             if ($currentFile === null || !preg_match('/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/', $line, $matches)) {
                 continue;
             }

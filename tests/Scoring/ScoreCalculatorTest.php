@@ -338,13 +338,13 @@ final class ScoreCalculatorTest extends TestCase
      */
     private function pillarMap(array $pillars): array
     {
-        $map = [];
+        $pillarsByName = [];
         foreach ($pillars as $pillar) {
-            $map[$pillar->pillar] = $pillar;
+            $pillarsByName[$pillar->pillar] = $pillar;
         }
 
         // Pillar scores keyed by name so a test can assert one pillar without index juggling.
-        return $map;
+        return $pillarsByName;
     }
 
     /**

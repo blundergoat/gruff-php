@@ -18,12 +18,9 @@ use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Stmt\Catch_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
-use PhpParser\Node\Stmt\For_;
-use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Property;
@@ -377,6 +374,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
      * into the documented return type"; a generic parameter name (`$value`) is the right name there.
      *
      * @param FunctionLikeScope $scope Scope whose underlying callable is matched against the coercion-helper shape.
+     *
+     * @return bool - true when the callable shape makes a generic single parameter name carry useful intent
      */
     private function isGenericByPurposeHelper(FunctionLikeScope $scope): bool
     {
@@ -427,10 +426,10 @@ final readonly class IdentifierQualityRule implements RuleInterface
     ): array {
         $findings  = [];
         $symbol    = $this->symbol($scope);
-        $loopVars  = $this->loopVariables($scope);
-        $catchVars = $this->catchVariables($scope);
+        $loopVars  = IdentifierQualityScopeLocals::loopVariables($scope);
+        $catchVars = IdentifierQualityScopeLocals::catchVariables($scope);
 
-        foreach ($this->localVariableNames($scope, $minScopeReferences, $loopVars + $catchVars) as $name => $variable) {
+        foreach (IdentifierQualityScopeLocals::localVariableNames($scope, $minScopeReferences, $loopVars + $catchVars) as $name => $variable) {
             $finding = $this->finding(
                 identifierFindingContext: $findingContext,
                 node:                     $variable,
@@ -445,7 +444,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
         }
 
         $loopIgnoredNames = array_values(array_diff($findingContext->ignoredNames, $findingContext->genericTokens));
-        foreach ($this->reportableLoopVariableNames($scope, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
+        foreach (IdentifierQualityScopeLocals::reportableLoopVariableNames($scope, $findingContext->genericTokens, $loopBodyThreshold) as $name => $variable) {
             $finding = $this->finding(
                 identifierFindingContext: $findingContext,
                 node:                     $variable,
@@ -677,188 +676,6 @@ final readonly class IdentifierQualityRule implements RuleInterface
 
         // Data-provider methods follow the provide*/<*>Provider convention PHPUnit requires, so exempt them too.
         return str_starts_with($name, 'provide') || str_ends_with($name, 'Provider');
-    }
-
-    /**
-     * @param FunctionLikeScope   $scope              Scope whose declared locals are the candidate set.
-     * @param int                 $minScopeReferences Read-count floor; locals used fewer times are too transient to judge.
-     * @param array<string, true> $excludedNames      Names already exempted by surrounding rule logic.
-     * @return array<string, Variable> Local variables that should be checked for naming quality.
-     */
-    private function localVariableNames(FunctionLikeScope $scope, int $minScopeReferences, array $excludedNames): array
-    {
-        $counts    = $this->localVariableReferenceCounts($scope);
-        $variables = [];
-
-        foreach ($scope->localVariables as $name => $variable) {
-            if (isset($excludedNames[$name])) {
-                continue;
-            }
-
-            if (($counts[$name] ?? 0) >= $minScopeReferences) {
-                $variables[$name] = $variable;
-            }
-        }
-
-        // Hand back only the locals that survived exclusion and met the read-count floor.
-        return $variables;
-    }
-
-    /**
-     * @param FunctionLikeScope $scope Scope to scan for loop-induction and foreach key/value variables.
-     *
-     * @return array<string, true> Variables introduced by loop constructs.
-     */
-    private function loopVariables(FunctionLikeScope $scope): array
-    {
-        $variables = [];
-
-        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof For_ || $node instanceof Foreach_) as $loop) {
-            if ($loop instanceof For_) {
-                $this->collectVariablesByName($loop->init, $variables);
-            }
-
-            if ($loop instanceof Foreach_) {
-                foreach ([$loop->keyVar, $loop->valueVar] as $variable) {
-                    if ($variable instanceof Variable && is_string($variable->name)) {
-                        $variables[$variable->name] = true;
-                    }
-                }
-            }
-        }
-
-        // Hand back the loop-introduced names so the local-variable pass can exclude them from generic judging.
-        return $variables;
-    }
-
-    /**
-     * @param FunctionLikeScope $scope Scope to scan for catch-clause exception variables.
-     *
-     * @return array<string, true> Variables introduced by catch clauses.
-     */
-    private function catchVariables(FunctionLikeScope $scope): array
-    {
-        $variables = [];
-
-        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Catch_) as $catch) {
-            if (!$catch instanceof Catch_) {
-                continue;
-            }
-
-            if ($catch->var instanceof Variable && is_string($catch->var->name)) {
-                $variables[$catch->var->name] = true;
-            }
-        }
-
-        // Hand back the catch-introduced exception names so they are excluded from generic judging.
-        return $variables;
-    }
-
-    /**
-     * @param FunctionLikeScope $scope             Scope to scan for long-bodied foreach loops.
-     * @param list<string>      $genericTokens     Lowercase loop variable names treated as generic.
-     * @param int               $loopBodyThreshold Statement count at or above which a foreach body is "long" enough to demand a meaningful name.
-     * @return array<string, Variable> Loop variables that should be reported.
-     */
-    private function reportableLoopVariableNames(
-        FunctionLikeScope $scope,
-        array $genericTokens,
-        int $loopBodyThreshold,
-    ): array {
-        $variables = [];
-
-        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Foreach_) as $foreach) {
-            if (!$foreach instanceof Foreach_) {
-                continue;
-            }
-
-            if (count($foreach->stmts) < $loopBodyThreshold || $this->isCanonicalMapLoop($foreach)) {
-                continue;
-            }
-
-            foreach ([$foreach->keyVar, $foreach->valueVar] as $variable) {
-                if (!$variable instanceof Variable || !is_string($variable->name)) {
-                    continue;
-                }
-
-                $name = strtolower($variable->name);
-                if (in_array($name, $genericTokens, true)) {
-                    $variables[$variable->name] ??= $variable;
-                }
-            }
-        }
-
-        // Hand back the first occurrence of each generic-named variable in a long foreach body.
-        return $variables;
-    }
-
-    /**
-     * @param Foreach_ $foreach Loop to test against the canonical `$key => $value` map-iteration idiom.
-     *
-     * @return bool True for the conventional key/value map iteration idiom.
-     */
-    private function isCanonicalMapLoop(Foreach_ $foreach): bool
-    {
-        // True only for the exact `$key => $value` shape, the one idiom where those generic names read as intentional.
-        return $foreach->keyVar instanceof Variable
-            && $foreach->valueVar instanceof Variable
-            && $foreach->keyVar->name === 'key'
-            && $foreach->valueVar->name === 'value';
-    }
-
-    /**
-     * @param FunctionLikeScope $scope Scope whose variable occurrences are tallied.
-     *
-     * @return array<string, int> Local variable read counts keyed by variable name.
-     */
-    private function localVariableReferenceCounts(FunctionLikeScope $scope): array
-    {
-        $counts = [];
-
-        foreach ($this->nodesInScope($scope, static fn (Node $node): bool => $node instanceof Variable) as $variable) {
-            if ($variable instanceof Variable && is_string($variable->name)) {
-                $counts[$variable->name] = ($counts[$variable->name] ?? 0) + 1;
-            }
-        }
-
-        // Hand back the per-name occurrence tally that gates the minScopeReferences floor.
-        return $counts;
-    }
-
-    /**
-     * @param array<Node>        $nodes     AST nodes to scan for variable references.
-     * @param array<string,true> $variables Output set keyed by variable name.
-     * @return void
-     */
-    private function collectVariablesByName(array $nodes, array &$variables): void
-    {
-        $walker = new IdentifierAstWalker();
-        foreach ($nodes as $node) {
-            foreach ($walker->nodesMatching([$node], static fn (Node $candidate): bool => $candidate instanceof Variable) as $variable) {
-                if ($variable instanceof Variable && is_string($variable->name)) {
-                    $variables[$variable->name] = true;
-                }
-            }
-        }
-    }
-
-    /**
-     * @param FunctionLikeScope    $scope     Scope whose pre-walked body descendants are filtered (loop/catch vars stay in scope).
-     * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @return list<Node> Descendant nodes in the current function-like scope.
-     */
-    private function nodesInScope(FunctionLikeScope $scope, callable $predicate): array
-    {
-        $matches = [];
-
-        foreach ($scope->bodyDescendants as $node) {
-            if ($predicate($node)) {
-                $matches[] = $node;
-            }
-        }
-
-        // Hand back every body descendant the predicate accepted, in source order.
-        return $matches;
     }
 
     /**

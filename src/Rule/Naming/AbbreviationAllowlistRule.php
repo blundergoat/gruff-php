@@ -77,68 +77,220 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
         $findings   = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
-            foreach ($property->props as $prop) {
-                $finding = $this->finding(
+            array_push(
+                $findings,
+                ...$this->propertyFindings(
                     definition:   $definition,
                     analysisUnit: $analysisUnit,
-                    node:         $prop,
-                    identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                    property:     $property,
                     ignored:      $ignored,
                     accepted:     $accepted,
                     minLength:    $minLength,
                     maxLength:    $maxLength,
-                );
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+                ),
+            );
         }
 
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
-            $symbol = $this->symbol($scope);
-            foreach ($scope->node->params as $param) {
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
-
-                $finding = $this->finding(
+            array_push(
+                $findings,
+                ...$this->scopeFindings(
                     definition:   $definition,
                     analysisUnit: $analysisUnit,
-                    node:         $param,
-                    identifier:   ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
+                    scope:        $scope,
                     ignored:      $ignored,
                     accepted:     $accepted,
                     minLength:    $minLength,
                     maxLength:    $maxLength,
-                );
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
-
-            $exemptLocals = $this->exemptLocalNames($scope);
-            foreach ($scope->localVariables as $name => $variable) {
-                if (isset($exemptLocals[$name])) {
-                    continue;
-                }
-
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $variable,
-                    identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    ignored:      $ignored,
-                    accepted:     $accepted,
-                    minLength:    $minLength,
-                    maxLength:    $maxLength,
-                );
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+                ),
+            );
         }
 
         // Hand back every undeclared abbreviation found across properties, parameters, and locals in this unit.
+        return $findings;
+    }
+
+    /**
+     * Build abbreviation findings for properties declared in one property statement.
+     *
+     * @param RuleDefinition $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit   $analysisUnit Parsed unit that owns the property declaration.
+     * @param Property       $property     Property statement whose individual props are inspected.
+     * @param list<string>   $ignored      Lowercased built-in names that are never reported.
+     * @param list<string>   $accepted     Lowercased project abbreviations that suppress findings.
+     * @param int            $minLength    Inclusive lower bound for abbreviation length.
+     * @param int            $maxLength    Inclusive upper bound for abbreviation length.
+     *
+     * @return list<Finding> - property abbreviation findings in declaration order
+     */
+    private function propertyFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        Property $property,
+        array $ignored,
+        array $accepted,
+        int $minLength,
+        int $maxLength,
+    ): array {
+        $findings = [];
+
+        foreach ($property->props as $prop) {
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $prop,
+                identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                ignored:      $ignored,
+                accepted:     $accepted,
+                minLength:    $minLength,
+                maxLength:    $maxLength,
+            );
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build abbreviation findings for parameters and local variables inside one callable scope.
+     *
+     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope        Callable scope whose parameters and locals are inspected.
+     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength    Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     *
+     * @return list<Finding> - parameter and local abbreviation findings in source order
+     */
+    private function scopeFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $ignored,
+        array $accepted,
+        int $minLength,
+        int $maxLength,
+    ): array {
+        return [
+            ...$this->parameterFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                ignored:      $ignored,
+                accepted:     $accepted,
+                minLength:    $minLength,
+                maxLength:    $maxLength,
+            ),
+            ...$this->localVariableFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                ignored:      $ignored,
+                accepted:     $accepted,
+                minLength:    $minLength,
+                maxLength:    $maxLength,
+            ),
+        ];
+    }
+
+    /**
+     * Build abbreviation findings for parameters inside one callable scope.
+     *
+     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope        Callable scope whose parameters are inspected.
+     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength    Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     *
+     * @return list<Finding> - parameter abbreviation findings in declaration order
+     */
+    private function parameterFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $ignored,
+        array $accepted,
+        int $minLength,
+        int $maxLength,
+    ): array {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->node->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $param,
+                identifier:   ['kind' => 'parameter', 'name' => $param->var->name, 'symbol' => $symbol],
+                ignored:      $ignored,
+                accepted:     $accepted,
+                minLength:    $minLength,
+                maxLength:    $maxLength,
+            );
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build abbreviation findings for local variables inside one callable scope.
+     *
+     * @param RuleDefinition    $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit      $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope $scope        Callable scope whose locals are inspected.
+     * @param list<string>      $ignored      Lowercased built-in names that are never reported.
+     * @param list<string>      $accepted     Lowercased project abbreviations that suppress findings.
+     * @param int               $minLength    Inclusive lower bound for abbreviation length.
+     * @param int               $maxLength    Inclusive upper bound for abbreviation length.
+     *
+     * @return list<Finding> - local variable abbreviation findings in discovery order
+     */
+    private function localVariableFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $ignored,
+        array $accepted,
+        int $minLength,
+        int $maxLength,
+    ): array {
+        $findings     = [];
+        $symbol       = $this->symbol($scope);
+        $exemptLocals = $this->exemptLocalNames($scope);
+
+        foreach ($scope->localVariables as $name => $variable) {
+            if (isset($exemptLocals[$name])) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $variable,
+                identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                ignored:      $ignored,
+                accepted:     $accepted,
+                minLength:    $minLength,
+                maxLength:    $maxLength,
+            );
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
         return $findings;
     }
 

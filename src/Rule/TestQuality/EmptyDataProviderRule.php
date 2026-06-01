@@ -59,58 +59,107 @@ final readonly class EmptyDataProviderRule implements RuleInterface
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $nodeFinder = new NodeFinder();
-        $findings   = [];
+        $findings = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Stmt\Class_::class) as $class) {
-            $className = $class->name?->toString();
-            if ($className === null) {
-                continue;
-            }
-
-            $methodsByName = [];
-            foreach ($class->getMethods() as $classMethod) {
-                $methodsByName[strtolower($classMethod->name->toString())] = $classMethod;
-            }
-
-            foreach ($class->getMethods() as $testMethod) {
-                if (!TestQualityNodeHelper::isTestMethod($testMethod)) {
-                    continue;
-                }
-
-                foreach ($this->dataProviderNames($testMethod) as $providerName) {
-                    $providerMethod = $methodsByName[strtolower($providerName)] ?? null;
-                    if ($providerMethod === null) {
-                        continue;
-                    }
-
-                    if (!$this->isProvablyEmpty($providerMethod)) {
-                        continue;
-                    }
-
-                    $findings[] = new Finding(
-                        ruleId:  self::ID,
-                        message: sprintf(
-                            '%s::%s() uses data provider %s() that yields no rows.',
-                            $className,
-                            $testMethod->name->toString(),
-                            $providerName,
-                        ),
-                        filePath:    $analysisUnit->file->displayPath,
-                        line:        $testMethod->getStartLine(),
-                        severity:    Severity::Error,
-                        pillar:      Pillar::TestQuality,
-                        tier:        RuleTier::V01,
-                        confidence:  Confidence::High,
-                        symbol:      sprintf('%s::%s()', $className, $testMethod->name->toString()),
-                        remediation: 'Add at least one data row to the provider, or remove the unused #[DataProvider] / @dataProvider link.',
-                        metadata:    ['provider' => $providerName],
-                    );
-                }
-            }
+            array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
 
         // One finding per test/provider pair where the provider is statically guaranteed to be empty.
+        return $findings;
+    }
+
+    /**
+     * Build empty-provider findings for one test class.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit that owns the test class.
+     * @param Stmt\Class_  $class        Test class declaration being inspected.
+     *
+     * @return list<Finding> - findings for test/provider pairs whose provider is provably empty
+     */
+    private function classFindings(AnalysisUnit $analysisUnit, Stmt\Class_ $class): array
+    {
+        $className = $class->name?->toString();
+        if ($className === null) {
+            return [];
+        }
+
+        $methodsByName = $this->methodsByLowerName($class);
+        $findings      = [];
+
+        foreach ($class->getMethods() as $testMethod) {
+            if (!TestQualityNodeHelper::isTestMethod($testMethod)) {
+                continue;
+            }
+
+            array_push($findings, ...$this->testMethodFindings($analysisUnit, $className, $testMethod, $methodsByName));
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Key class methods by lower-cased method name for case-insensitive provider lookup.
+     *
+     * @param Stmt\Class_ $class Class declaration whose methods are indexed.
+     *
+     * @return array<string, Stmt\ClassMethod> - class methods keyed by lower-cased name
+     */
+    private function methodsByLowerName(Stmt\Class_ $class): array
+    {
+        $methodsByName = [];
+
+        foreach ($class->getMethods() as $classMethod) {
+            $methodsByName[strtolower($classMethod->name->toString())] = $classMethod;
+        }
+
+        return $methodsByName;
+    }
+
+    /**
+     * Build empty-provider findings for one test method.
+     *
+     * @param AnalysisUnit                    $analysisUnit  Parsed unit that owns the test class.
+     * @param string                          $className     Test class name used in messages and symbols.
+     * @param Stmt\ClassMethod                $testMethod    Test method whose provider bindings are checked.
+     * @param array<string, Stmt\ClassMethod> $methodsByName Class methods keyed by lower-cased method name.
+     *
+     * @return list<Finding> - findings for provider names that resolve to empty provider methods
+     */
+    private function testMethodFindings(
+        AnalysisUnit $analysisUnit,
+        string $className,
+        Stmt\ClassMethod $testMethod,
+        array $methodsByName,
+    ): array {
+        $findings = [];
+
+        foreach ($this->dataProviderNames($testMethod) as $providerName) {
+            $providerMethod = $methodsByName[strtolower($providerName)] ?? null;
+            if ($providerMethod === null || !$this->isProvablyEmpty($providerMethod)) {
+                continue;
+            }
+
+            $findings[] = new Finding(
+                ruleId:  self::ID,
+                message: sprintf(
+                    '%s::%s() uses data provider %s() that yields no rows.',
+                    $className,
+                    $testMethod->name->toString(),
+                    $providerName,
+                ),
+                filePath:    $analysisUnit->file->displayPath,
+                line:        $testMethod->getStartLine(),
+                severity:    Severity::Error,
+                pillar:      Pillar::TestQuality,
+                tier:        RuleTier::V01,
+                confidence:  Confidence::High,
+                symbol:      sprintf('%s::%s()', $className, $testMethod->name->toString()),
+                remediation: 'Add at least one data row to the provider, or remove the unused #[DataProvider] / @dataProvider link.',
+                metadata:    ['provider' => $providerName],
+            );
+        }
+
         return $findings;
     }
 

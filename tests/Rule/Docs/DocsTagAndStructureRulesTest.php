@@ -399,13 +399,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
     {
         $findings = $this->analyseRule('missing-constant-phpdoc-line-comment.php', MissingConstantPhpdocRule::ID);
 
-        $byConstant = [];
-        foreach ($findings as $finding) {
-            $constantName = $finding->metadata['constantName'] ?? null;
-            if (is_string($constantName)) {
-                $byConstant[$constantName] = $finding;
-            }
-        }
+        $byConstant = $this->constantFindingsByName($findings);
 
         self::assertArrayHasKey('CSV_BYTE_CAP', $byConstant);
         self::assertArrayHasKey('PLAIN_NO_COMMENT', $byConstant);
@@ -418,5 +412,26 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
         $plain = $byConstant['PLAIN_NO_COMMENT'];
         self::assertArrayNotHasKey('commentKind', $plain->metadata);
         self::assertStringContainsString('needs a brief intent description', $plain->message);
+    }
+
+    /**
+     * Key constant PHPDoc findings by the reported constant name.
+     *
+     * @param list<\GruffPhp\Finding\Finding> $findings Findings from a missing-constant-phpdoc fixture.
+     *
+     * @return array<string, \GruffPhp\Finding\Finding> - findings keyed by constant name; findings without a string name are omitted
+     */
+    private function constantFindingsByName(array $findings): array
+    {
+        $byConstant = [];
+
+        foreach ($findings as $finding) {
+            $constantName = $finding->metadata['constantName'] ?? null;
+            if (is_string($constantName)) {
+                $byConstant[$constantName] = $finding;
+            }
+        }
+
+        return $byConstant;
     }
 }

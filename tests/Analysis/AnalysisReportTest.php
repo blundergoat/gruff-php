@@ -58,7 +58,7 @@ final class AnalysisReportTest extends TestCase
                                        $this->finding('beta.rule', Severity::Advisory),
                                    ]);
 
-        $ruleIds = array_map(static fn(array $row): string => $row['ruleId'], $report->findingCountsByRule());
+        $ruleIds = array_map(static fn(array $ruleCount): string => $ruleCount['ruleId'], $report->findingCountsByRule());
         self::assertSame(['alpha.rule', 'beta.rule', 'zeta.rule'], $ruleIds);
     }
 

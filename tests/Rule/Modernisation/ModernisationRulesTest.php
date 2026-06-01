@@ -23,6 +23,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\Security\ErrorSuppressionRule;
 use GruffPhp\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -131,39 +132,42 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
-     * Verify enum candidate rule ignores classes that mix scalar constant types.
+     * Verify modernisation rules keep their documented false-positive fixtures quiet.
+     *
+     * @param string $fixture Fixture file under tests/Fixtures/Modernisation.
+     * @param string $ruleId  Rule expected to report no findings for the fixture.
      *
      * @return void
      */
-    public function testEnumCandidateRuleIgnoresMixedScalarConstants(): void
+    #[DataProvider('modernisationFalsePositiveProvider')]
+    public function testModernisationRulesIgnoreFalsePositiveFixtures(string $fixture, string $ruleId): void
     {
-        $findings = $this->analysePath('tests/Fixtures/Modernisation/enum-candidate-mixed-scalar.php');
+        $findings = $this->analysePath($fixture);
 
-        self::assertRuleCount(EnumCandidateRule::ID, 0, $findings);
+        self::assertRuleCount($ruleId, 0, $findings);
     }
 
     /**
-     * Verify first-class callable rule ignores non-`::class` ConstFetch targets.
+     * Provide false-positive fixtures for modernisation rules.
      *
-     * @return void
+     * @return list<array{fixture: string, ruleId: string}> - fixture/rule pairs that should produce zero findings
      */
-    public function testFirstClassCallableRuleIgnoresNonClassClassConst(): void
+    public static function modernisationFalsePositiveProvider(): array
     {
-        $findings = $this->analysePath('tests/Fixtures/Modernisation/first-class-callable-non-class-const.php');
-
-        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
-    }
-
-    /**
-     * Verify first-class callable rule ignores associative two-key array literals.
-     *
-     * @return void
-     */
-    public function testFirstClassCallableRuleIgnoresAssociativeArrayLiterals(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/Modernisation/first-class-callable-associative-array.php');
-
-        self::assertRuleCount(FirstClassCallableCandidateRule::ID, 0, $findings);
+        return [
+            [
+                'fixture' => 'tests/Fixtures/Modernisation/enum-candidate-mixed-scalar.php',
+                'ruleId'  => EnumCandidateRule::ID,
+            ],
+            [
+                'fixture' => 'tests/Fixtures/Modernisation/first-class-callable-non-class-const.php',
+                'ruleId'  => FirstClassCallableCandidateRule::ID,
+            ],
+            [
+                'fixture' => 'tests/Fixtures/Modernisation/first-class-callable-associative-array.php',
+                'ruleId'  => FirstClassCallableCandidateRule::ID,
+            ],
+        ];
     }
 
     /**

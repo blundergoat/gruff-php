@@ -197,6 +197,7 @@ final readonly class RedundantVariableRule implements RuleInterface
 
         foreach ([$returnStatement, $assignment] as $statement) {
             $docComment = $statement->getDocComment();
+            // Match a narrowing PHPDoc tag for the exact temporary variable, not another variable with the same prefix.
             if ($docComment !== null && preg_match($pattern, $docComment->getText()) === 1) {
                 // Found a `@var $name` narrowing on this statement, so the temp carries a real type contract.
                 return true;

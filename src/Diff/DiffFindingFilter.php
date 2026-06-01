@@ -15,7 +15,14 @@ use PhpParser\Node\Stmt;
  */
 final readonly class DiffFindingFilter
 {
+    /**
+     * Include findings anywhere inside the changed declaration or block that encloses the diff.
+     */
     public const SCOPE_SYMBOL = 'symbol';
+
+    /**
+     * Include only findings whose own line span overlaps a changed diff hunk.
+     */
     public const SCOPE_HUNK   = 'hunk';
 
     /**
@@ -28,7 +35,9 @@ final readonly class DiffFindingFilter
     {
         // Convenience façade: callers that only want the kept list, not the suppressed count, get the
         // default symbol scope without passing analysis units; the count is dropped on the floor here.
-        return $this->apply($findings, $diff)->findings;
+        $result = $this->apply($findings, $diff);
+
+        return $result->findings;
     }
 
     /**
@@ -71,6 +80,8 @@ final readonly class DiffFindingFilter
      * @param Finding                               $finding           Single finding whose location is tested for diff membership.
      * @param DiffResult                            $diff              Source of changed files and changed-line ranges to test against.
      * @param array<string, list<ChangedLineRange>> $declarationRanges Per-file declaration spans for symbol widening.
+     *
+     * @return bool - true when the finding belongs to a changed file, hunk, or enclosing changed declaration
      */
     private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges): bool
     {
@@ -93,7 +104,7 @@ final readonly class DiffFindingFilter
         }
 
         $endLine = $finding->endLine ?? $line;
-        if ($this->rangesTouch($changedRanges, $line, $endLine)) {
+        if ($this->hasRangeOverlap($changedRanges, $line, $endLine)) {
             // The finding's own span lands on edited lines, so it is a direct consequence of the diff.
             return true;
         }
@@ -106,15 +117,17 @@ final readonly class DiffFindingFilter
 
         // Last chance under symbol scope: the finding sits in a method/closure whose body was edited,
         // so editing any part of that symbol pulls the whole symbol's findings back into review.
-        return $this->rangesTouch($changedRanges, $enclosingRange->startLine, $enclosingRange->endLine);
+        return $this->hasRangeOverlap($changedRanges, $enclosingRange->startLine, $enclosingRange->endLine);
     }
 
     /**
      * @param list<ChangedLineRange> $ranges    Changed-line ranges to test for any overlap.
      * @param int                    $startLine First line of the inclusive span being matched.
      * @param int                    $endLine   Last line of the inclusive span being matched.
+     *
+     * @return bool - true when any changed range overlaps the inclusive span
      */
-    private function rangesTouch(array $ranges, int $startLine, int $endLine): bool
+    private function hasRangeOverlap(array $ranges, int $startLine, int $endLine): bool
     {
         foreach ($ranges as $range) {
             if ($range->touches($startLine, $endLine)) {
@@ -131,6 +144,8 @@ final readonly class DiffFindingFilter
      * @param list<ChangedLineRange> $ranges    Candidate declaration spans to search for an enclosing one.
      * @param int                    $startLine First line of the inclusive span that must be contained.
      * @param int                    $endLine   Last line of the inclusive span that must be contained.
+     *
+     * @return ChangedLineRange|null - the tightest declaration span containing the input span, or null when none exists
      */
     private function enclosingRange(array $ranges, int $startLine, int $endLine): ?ChangedLineRange
     {
@@ -229,6 +244,13 @@ final readonly class DiffFindingFilter
         }
     }
 
+    /**
+     * Decide whether a parser node should widen hunk scope to an enclosing reviewable block.
+     *
+     * @param Node $node Parser node being classified for diff-scope widening.
+     *
+     * @return bool - true when the node has a meaningful source span for symbol or block-level diff review
+     */
     private function isScopeNode(Node $node): bool
     {
         // Defines what counts as an enclosing "symbol" for diff scoping: control-flow blocks are listed

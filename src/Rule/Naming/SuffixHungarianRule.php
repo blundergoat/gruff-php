@@ -94,69 +94,196 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $findings            = [];
 
         foreach (NodeIndex::nodesOf($analysisUnit, Property::class) as $property) {
-            foreach ($property->props as $prop) {
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $prop,
-                    identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         $property->type,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+            array_push(
+                $findings,
+                ...$this->propertyFindings(
+                    definition:        $definition,
+                    analysisUnit:      $analysisUnit,
+                    property:          $property,
+                    suffixes:          $suffixes,
+                    tokenizer:         $identifierTokenizer,
+                ),
+            );
         }
 
         foreach ((new FunctionLikeScopeWalker())->scopes($analysisUnit->statements) as $scope) {
-            $symbol = $this->symbol($scope);
-
-            foreach ($scope->node->params as $param) {
-                if (!$param->var instanceof Variable || !is_string($param->var->name)) {
-                    continue;
-                }
-
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $param,
-                    identifier:   ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         $param->type,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
-
-            foreach ($scope->localVariables as $name => $variable) {
-                $suffixToken = $this->suffixToken($name, $suffixes, $identifierTokenizer);
-                if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
-                    continue;
-                }
-
-                $finding = $this->finding(
-                    definition:   $definition,
-                    analysisUnit: $analysisUnit,
-                    node:         $variable,
-                    identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
-                    suffixes:     $suffixes,
-                    tokenizer:    $identifierTokenizer,
-                    type:         null,
-                );
-
-                if ($finding instanceof Finding) {
-                    $findings[] = $finding;
-                }
-            }
+            array_push(
+                $findings,
+                ...$this->scopeFindings(
+                    definition:        $definition,
+                    analysisUnit:      $analysisUnit,
+                    scope:             $scope,
+                    suffixes:          $suffixes,
+                    tokenizer:         $identifierTokenizer,
+                ),
+            );
         }
 
         // Hand back every suffix-Hungarian finding gathered across properties, parameters, and locals.
+        return $findings;
+    }
+
+    /**
+     * Build suffix-Hungarian findings for properties declared in one property statement.
+     *
+     * @param RuleDefinition        $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the property declaration.
+     * @param Property              $property     Property statement whose individual props are inspected.
+     * @param array<string, string> $suffixes     Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer    Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - property suffix findings in declaration order
+     */
+    private function propertyFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        Property $property,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
+
+        foreach ($property->props as $prop) {
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $prop,
+                identifier:   ['kind' => 'property', 'name' => $prop->name->toString(), 'symbol' => '$' . $prop->name->toString()],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         $property->type,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build suffix-Hungarian findings for parameters and locals inside one callable scope.
+     *
+     * @param RuleDefinition        $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope        Callable scope whose identifiers are inspected.
+     * @param array<string, string> $suffixes     Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer    Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - parameter and local suffix findings in source order
+     */
+    private function scopeFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        return [
+            ...$this->parameterFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+            ),
+            ...$this->localVariableFindings(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                scope:        $scope,
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+            ),
+        ];
+    }
+
+    /**
+     * Build suffix-Hungarian findings for parameters inside one callable scope.
+     *
+     * @param RuleDefinition        $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope        Callable scope whose parameters are inspected.
+     * @param array<string, string> $suffixes     Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer    Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - parameter suffix findings in declaration order
+     */
+    private function parameterFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->node->params as $param) {
+            if (!$param->var instanceof Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $param,
+                identifier:   ['kind' => $param->flags === 0 ? 'parameter' : 'property', 'name' => $param->var->name, 'symbol' => $symbol],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         $param->type,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Build suffix-Hungarian findings for local variables inside one callable scope.
+     *
+     * @param RuleDefinition        $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit          $analysisUnit Parsed unit that owns the callable scope.
+     * @param FunctionLikeScope     $scope        Callable scope whose locals are inspected.
+     * @param array<string, string> $suffixes     Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer    Splits names into tokens so trailing type suffixes can be isolated.
+     *
+     * @return list<Finding> - local variable suffix findings in discovery order
+     */
+    private function localVariableFindings(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        FunctionLikeScope $scope,
+        array $suffixes,
+        IdentifierTokenizer $tokenizer,
+    ): array {
+        $findings = [];
+        $symbol   = $this->symbol($scope);
+
+        foreach ($scope->localVariables as $name => $variable) {
+            $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
+            if ($suffixToken === null || !$this->allowsLocalTypeSuffix($variable, $suffixes[$suffixToken])) {
+                continue;
+            }
+
+            $finding = $this->finding(
+                definition:   $definition,
+                analysisUnit: $analysisUnit,
+                node:         $variable,
+                identifier:   ['kind' => 'variable', 'name' => $name, 'symbol' => $symbol],
+                suffixes:     $suffixes,
+                tokenizer:    $tokenizer,
+                type:         null,
+            );
+
+            if ($finding instanceof Finding) {
+                $findings[] = $finding;
+            }
+        }
+
         return $findings;
     }
 

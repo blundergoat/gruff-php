@@ -190,6 +190,8 @@ rules:
                 - supports
                 - touches
                 - uses
+            acceptedBooleanNames:
+                - excludeFromScore
             stateAdjectiveAllowlist:
                 - active
                 - enabled

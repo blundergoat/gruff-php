@@ -349,7 +349,26 @@ final class NamingRulesTest extends NamingRuleTestCase
     public function testIdentifierQualitySkipsGenericByPurposeHelpers(): void
     {
         $findings = $this->analyseRule('identifier-quality-generic-helpers.php', IdentifierQualityRule::ID);
-        $symbols  = [];
+        $symbols  = $this->identifierNamesBySymbol($findings);
+
+        self::assertNotContains('GenericByPurposeHelperFixture::stringValue()|value', $symbols);
+        self::assertNotContains('GenericByPurposeHelperFixture::fingerprint()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::tag()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::transform()|value', $symbols);
+        self::assertContains('GenericByPurposeHelperFixture::describe()|value', $symbols);
+    }
+
+    /**
+     * Build `symbol|identifier` rows for identifier-quality findings with a reported name.
+     *
+     * @param list<\GruffPhp\Finding\Finding> $findings Identifier-quality findings from a fixture.
+     *
+     * @return list<string> - symbol and identifier pairs in finding order; findings without string names are omitted
+     */
+    private function identifierNamesBySymbol(array $findings): array
+    {
+        $symbols = [];
+
         foreach ($findings as $finding) {
             $name   = $finding->metadata['identifierName'] ?? null;
             $symbol = $finding->symbol ?? '';
@@ -358,11 +377,7 @@ final class NamingRulesTest extends NamingRuleTestCase
             }
         }
 
-        self::assertNotContains('GenericByPurposeHelperFixture::stringValue()|value', $symbols);
-        self::assertNotContains('GenericByPurposeHelperFixture::fingerprint()|value', $symbols);
-        self::assertContains('GenericByPurposeHelperFixture::tag()|value', $symbols);
-        self::assertContains('GenericByPurposeHelperFixture::transform()|value', $symbols);
-        self::assertContains('GenericByPurposeHelperFixture::describe()|value', $symbols);
+        return $symbols;
     }
 
     /**

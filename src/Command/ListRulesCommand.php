@@ -64,7 +64,13 @@ final class ListRulesCommand extends Command
 
         if (is_string($ruleId) && $ruleId !== '') {
             // A rule id was supplied, so the catalogue is bypassed in favour of the single-rule detail view.
-            return $this->renderRuleDetail($ruleId, $registry, $config, $format, $output);
+            return $this->renderRuleDetail(
+                ruleId:   $ruleId,
+                registry: $registry,
+                config:   $config,
+                format:   $format,
+                output:   $output,
+            );
         }
 
         /** @var list<array{id: string, name: string, pillar: string, tier: string, defaultSeverity: string, confidence: string, defaultEnabled: bool, thresholds: array<string, int|float>|\stdClass, options: array<string, int|float|bool|string|array<array-key, int|float|bool|string>>|\stdClass, description: string}> $rows Accumulator shape is built from rule definitions for table rendering. */
@@ -291,7 +297,7 @@ final class ListRulesCommand extends Command
         if ($hatches !== []) {
             $lines[]   = '';
             $lines[]   = 'Escape hatches:';
-            $pathWidth = max(array_map(static fn(array $row): int => strlen($row['path']), $hatches));
+            $pathWidth = max(array_map(static fn(array $escapeHatch): int => strlen($escapeHatch['path']), $hatches));
             foreach ($hatches as $hatch) {
                 $lines[] = sprintf(
                     '  %-' . $pathWidth . 's  %s',
@@ -371,7 +377,7 @@ final class ListRulesCommand extends Command
         if (is_array($value)) {
             // List options render as a bracketed, comma-joined line; string items stay quoted to read like the source.
             return $value === [] ? '[]' : sprintf('[%s]', implode(', ', array_map(
-                static fn($item): string => is_string($item) ? '"' . $item . '"' : (string)$item,
+                static fn($optionValue): string => is_string($optionValue) ? '"' . $optionValue . '"' : (string)$optionValue,
                 $value,
             )));
         }

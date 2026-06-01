@@ -77,15 +77,15 @@ final readonly class BranchReviewResult
         $rows = [];
 
         foreach ($buckets as $ruleId => $counts) {
-            $net = $counts['introduced'] - $counts['removed'];
-            if ($net === 0) {
+            $netDelta = $counts['introduced'] - $counts['removed'];
+            if ($netDelta === 0) {
                 continue;
             }
             $rows[] = [
                 'ruleId'     => $ruleId,
                 'introduced' => $counts['introduced'],
                 'removed'    => $counts['removed'],
-                'net'        => $net,
+                'net'        => $netDelta,
             ];
         }
 

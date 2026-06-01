@@ -136,8 +136,8 @@ final class DocsRulesTest extends DocsRuleTestCase
     }
 
     /**
-     * Verify missing param tag recognises multi-line `@param array{...} $payload ` shapes whose
-     * closing `$varname` sits on a different physical line than the `@param` token.
+     * Verify missing param tag recognises multi-line `@param array{...}` shapes whose closing documented
+     * variable sits on a different physical line than the `@param` token.
      *
      * @return void
      */
@@ -145,7 +145,24 @@ final class DocsRulesTest extends DocsRuleTestCase
     {
         $findings = $this->analyseRule('missing-param-tag-multi-line-array-shape.php', MissingParamTagRule::ID);
 
+        $reported = $this->reportedParametersBySymbol($findings);
+
+        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|topic', $reported);
+        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|payload', $reported);
+        self::assertContains('MultiLineArrayShapeFixture::publishTurnWithMalformedDoc()|payload', $reported);
+    }
+
+    /**
+     * Build `symbol|parameter` rows for findings whose metadata identifies a parameter.
+     *
+     * @param list<\GruffPhp\Finding\Finding> $findings Findings from a missing-param-tag fixture.
+     *
+     * @return list<string> - symbol and parameter pairs in finding order; entries without string parameter metadata are omitted
+     */
+    private function reportedParametersBySymbol(array $findings): array
+    {
         $reported = [];
+
         foreach ($findings as $finding) {
             $symbol    = $finding->symbol ?? '';
             $parameter = $finding->metadata['parameter'] ?? null;
@@ -154,9 +171,7 @@ final class DocsRulesTest extends DocsRuleTestCase
             }
         }
 
-        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|topic', $reported);
-        self::assertNotContains('MultiLineArrayShapeFixture::publishToolUse()|payload', $reported);
-        self::assertContains('MultiLineArrayShapeFixture::publishTurnWithMalformedDoc()|payload', $reported);
+        return $reported;
     }
 
     /**

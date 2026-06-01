@@ -203,6 +203,36 @@ final class SensitiveDataRulesTest extends TestCase
     }
 
     /**
+     * Verify gruff configuration path literals are not treated as high-entropy secrets.
+     *
+     * @return void
+     */
+    public function testHighEntropyGruffConfigPathsAreNotFlagged(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-config-path-entropy-');
+        self::assertIsString($path);
+        $path   .= '.php';
+        $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
+        $source = "<?php\n\n"
+                  . '$configPath = ' . var_export('rules.naming.identifier-quality.excludeFromScore', true) . ";\n"
+                  . '$secret = ' . var_export($secret, true) . ";\n";
+        self::assertNotFalse(file_put_contents($path, $source));
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-config-path-entropy.php'));
+            $findings = array_values(array_filter(
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+                                     ));
+
+            self::assertCount(1, $findings);
+            self::assertStringContainsString('M7qP', $findings[0]->message);
+        } finally {
+            self::assertTrue(unlink($path));
+        }
+    }
+
+    /**
      * Verify medical terminology metadata is not treated as embedded secret material.
      *
      * @return void

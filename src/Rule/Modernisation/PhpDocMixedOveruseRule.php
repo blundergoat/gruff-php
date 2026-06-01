@@ -126,58 +126,76 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             $symbol = $this->resolveSymbol($node);
 
             foreach ($this->extractTagBlocks($doc) as $block) {
-                $tagKind = $block['tag'];
-                if (!$this->isScannedTag($tagKind)) {
-                    continue;
-                }
-
-                $analysis = $this->classifyMixedInBody($block['body'], in_array($tagKind, self::TYPE_ALIAS_TAGS, true));
-                if (!$analysis['hasMixed']) {
-                    continue;
-                }
-
-                if ($this->isUnstructuredArrayBagType($block['body'])) {
-                    continue;
-                }
-
-                if ($this->isPreciseArrayShape($block['body'])) {
-                    continue;
-                }
-
-                $paramName = in_array($tagKind, self::PARAM_TAGS, true)
-                    ? $this->extractParamName($block['body'])
-                    : null;
-
-                if ($analysis['isStandalone'] && $this->hasSignatureBroadTypeCoverage($node, $tagKind, $paramName)) {
-                    continue;
-                }
-
-                $findings[] = new Finding(
-                    ruleId:      $definition->id,
-                    message:     sprintf(
-                                     '%s has @%s using mixed; prefer a narrower PHPDoc type.',
-                                     $symbol,
-                                     $tagKind,
-                                 ),
-                    filePath:    $analysisUnit->file->displayPath,
-                    line:        $block['line'],
-                    severity:    $definition->defaultSeverity,
-                    pillar:      $definition->pillar,
-                    tier:        $definition->tier,
-                    confidence:  $definition->confidence,
-                    symbol:      $symbol,
-                    remediation: 'Narrow the PHPDoc type to match what the function actually accepts. For JSON-boundary helpers use `array|bool|float|int|string|null`. For envelope shapes where the leaf is genuinely heterogeneous (e.g. FHIR resources, LLM tool-call args), name the envelope precisely with `array{...}` syntax — precise shapes are exempted by the rule. When only one input shape is meaningful, narrow to that concrete type (`?string`, `int|float|null`, a named class).',
-                    metadata:    [
-                                     'tagKind'   => $tagKind,
-                                     'paramName' => $paramName,
-                                     'snippet'   => trim($block['body']),
-                                 ],
+                $finding = $this->findingForTagBlock(
+                    definition:   $definition,
+                    analysisUnit: $analysisUnit,
+                    node:         $node,
+                    symbol:       $symbol,
+                    block:        $block,
                 );
+                if ($finding instanceof Finding) {
+                    $findings[] = $finding;
+                }
             }
         }
 
         // Hand back every mixed-overuse finding gathered across the unit's documented nodes.
         return $findings;
+    }
+
+    /**
+     * Build a mixed-overuse finding for one PHPDoc tag block, or null when an exemption applies.
+     *
+     * @param RuleDefinition                          $definition   Rule metadata used to populate emitted findings.
+     * @param AnalysisUnit                            $analysisUnit Parsed unit that owns the documented node.
+     * @param Node                                    $node         Documented declaration whose signature may mirror `mixed`.
+     * @param string                                  $symbol       Rendered symbol used in the finding message.
+     * @param array{tag: string, body: string, line: int} $block    Parsed PHPDoc tag block with source line.
+     *
+     * @return Finding|null - finding for a reportable `mixed` tag, or null when the tag is unscanned or exempt
+     */
+    private function findingForTagBlock(
+        RuleDefinition $definition,
+        AnalysisUnit $analysisUnit,
+        Node $node,
+        string $symbol,
+        array $block,
+    ): ?Finding {
+        $tagKind = $block['tag'];
+        if (!$this->isScannedTag($tagKind)) {
+            return null;
+        }
+
+        $analysis = $this->classifyMixedInBody($block['body'], in_array($tagKind, self::TYPE_ALIAS_TAGS, true));
+        if (!$analysis['hasMixed'] || $this->isUnstructuredArrayBagType($block['body']) || $this->isPreciseArrayShape($block['body'])) {
+            return null;
+        }
+
+        $paramName = in_array($tagKind, self::PARAM_TAGS, true)
+            ? $this->extractParamName($block['body'])
+            : null;
+
+        if ($analysis['isStandalone'] && $this->hasSignatureBroadTypeCoverage($node, $tagKind, $paramName)) {
+            return null;
+        }
+
+        return new Finding(
+            ruleId:      $definition->id,
+            message:     sprintf('%s has @%s using mixed; prefer a narrower PHPDoc type.', $symbol, $tagKind),
+            filePath:    $analysisUnit->file->displayPath,
+            line:        $block['line'],
+            severity:    $definition->defaultSeverity,
+            pillar:      $definition->pillar,
+            tier:        $definition->tier,
+            confidence:  $definition->confidence,
+            symbol:      $symbol,
+            remediation: 'Narrow the PHPDoc type to match what the function actually accepts. For JSON-boundary helpers use `array|bool|float|int|string|null`. For envelope shapes where the leaf is genuinely heterogeneous (e.g. FHIR resources, LLM tool-call args), name the envelope precisely with `array{...}` syntax — precise shapes are exempted by the rule. When only one input shape is meaningful, narrow to that concrete type (`?string`, `int|float|null`, a named class).',
+            metadata:    [
+                             'tagKind'   => $tagKind,
+                             'paramName' => $paramName,
+                             'snippet'   => trim($block['body']),
+                         ],
+        );
     }
 
     /**
@@ -369,6 +387,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         }
 
         $type = preg_replace('/\s+/', '', $type) ?? $type;
+        // Match a whole PHPDoc array shape so only its top-level field list is analysed for `mixed` leaves.
         if (!preg_match('/^array\{(.*)\}$/i', $type, $matches)) {
             // Not `array{...}` syntax, so the shape-precision exemption does not apply.
             return false;
@@ -441,6 +460,8 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      * Return the index of the first top-level colon in a shape pair, or null when none exists.
      *
      * @param string $pair A single `key: type` shape field, possibly nesting `<>{}()[]` in the type.
+     *
+     * @return int|null - zero-based colon offset for an associative shape field, or null for positional/malformed fields
      */
     private function topLevelColonIndex(string $pair): ?int
     {
@@ -529,9 +550,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     /**
      * Extract the parameter variable name from a @param body, or null when none is present.
      *
-     * @param string $body `@param` tag body whose first `$name` token identifies the documented parameter.
+     * @param string $body `@param` tag body whose first parameter variable token identifies the documented parameter.
      *
-     * @return string|null - the parameter name without its leading `$`, or null when the body carries no `$name` token
+     * @return string|null - the parameter name without its leading `$`, or null when the body carries no parameter variable token
      */
     private function extractParamName(string $body): ?string
     {
@@ -557,49 +578,77 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function hasSignatureBroadTypeCoverage(Node $node, string $tagKind, ?string $paramName): bool
     {
         if (in_array($tagKind, self::PARAM_TAGS, true)) {
-            if ($paramName === null) {
-                // Without a name there is no signature parameter to compare against.
-                return false;
-            }
-
-            if ($node instanceof ClassMethod || $node instanceof Function_) {
-                foreach ($node->params as $param) {
-                    if (!$param->var instanceof Node\Expr\Variable || !is_string($param->var->name)) {
-                        continue;
-                    }
-                    if ($param->var->name === $paramName) {
-                        // Matched the named parameter: coverage holds only if its hint is also `mixed`.
-                        return ModernisationNodeHelper::typeName($param->type) === 'mixed';
-                    }
-                }
-            }
-
-            // No parameter of that name exists on the node, so the docblock mirrors nothing.
-            return false;
+            return $this->hasParamSignatureMixedCoverage($node, $paramName);
         }
 
         if (in_array($tagKind, self::RETURN_TAGS, true)) {
-            if ($node instanceof ClassMethod || $node instanceof Function_) {
-                // Return coverage holds only when the native return hint is also `mixed`.
-                return ModernisationNodeHelper::typeName($node->returnType) === 'mixed';
-            }
-
-            // A return tag on a non-callable node mirrors no signature.
-            return false;
+            return $this->hasReturnSignatureMixedCoverage($node);
         }
 
         if (in_array($tagKind, self::VAR_TAGS, true)) {
-            if ($node instanceof Property) {
-                // Var coverage holds only when the property's native type is also `mixed`.
-                return ModernisationNodeHelper::typeName($node->type) === 'mixed';
-            }
-
-            // A var tag off a property declaration mirrors no signature.
-            return false;
+            return $this->hasVarSignatureMixedCoverage($node);
         }
 
         // Property/type-alias tags have no native declaration to mirror, so they never count as covered.
         return false;
+    }
+
+    /**
+     * Check whether a PHPDoc param tag mirrors a native `mixed` parameter type.
+     *
+     * @param Node        $node      Method or function node to inspect.
+     * @param string|null $paramName Parameter name extracted from the PHPDoc tag body.
+     *
+     * @return bool - true when the named signature parameter exists and is natively typed `mixed`
+     */
+    private function hasParamSignatureMixedCoverage(Node $node, ?string $paramName): bool
+    {
+        if ($paramName === null || !($node instanceof ClassMethod || $node instanceof Function_)) {
+            return false;
+        }
+
+        foreach ($node->params as $param) {
+            if (!$param->var instanceof Node\Expr\Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            if ($param->var->name === $paramName) {
+                // Matched the named parameter: coverage holds only if its hint is also `mixed`.
+                return ModernisationNodeHelper::typeName($param->type) === 'mixed';
+            }
+        }
+
+        // No parameter of that name exists on the node, so the docblock mirrors nothing.
+        return false;
+    }
+
+    /**
+     * Check whether a PHPDoc return tag mirrors a native `mixed` return type.
+     *
+     * @param Node $node Method or function node to inspect.
+     *
+     * @return bool - true when the callable natively returns `mixed`
+     */
+    private function hasReturnSignatureMixedCoverage(Node $node): bool
+    {
+        return ($node instanceof ClassMethod || $node instanceof Function_)
+            && ModernisationNodeHelper::typeName($node->returnType) === 'mixed';
+    }
+
+    /**
+     * Check whether a PHPDoc var tag mirrors a native `mixed` property type.
+     *
+     * @param Node $node Property node to inspect.
+     *
+     * @return bool - true when the property is natively typed `mixed`
+     */
+    private function hasVarSignatureMixedCoverage(Node $node): bool
+    {
+        if (!$node instanceof Property) {
+            return false;
+        }
+
+        return ModernisationNodeHelper::typeName($node->type) === 'mixed';
     }
 
     /**
