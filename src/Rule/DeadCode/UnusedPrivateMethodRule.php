@@ -177,7 +177,6 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             return $node->name->toString();
         }
 
-        // No literal in-scope call shape matched, so this node names no private method.
         return null;
     }
 
@@ -202,7 +201,6 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
-        // The array held no `$this` callable pair, so it references no private method.
         return null;
     }
 
@@ -290,7 +288,6 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
 
         $second = $expr->items[1]->value;
 
-        // The method name lives in the second slot as a string literal; absent that, there is no name.
         return $second instanceof Node\Scalar\String_ ? $second->value : null;
     }
 
@@ -304,11 +301,9 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     private function resolveClassName(Node $node): string
     {
         if ($node instanceof Class_) {
-            // Anonymous classes have no name node, so fall back to a stable placeholder for the symbol string.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
-        // Traits and enums are always named; the line-tagged fallback only guards against malformed input.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 }

@@ -124,7 +124,6 @@ final readonly class SutNotCalledRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Low-confidence test-quality error: name heuristic, so callers can downgrade or suppress it.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test name mentions SUT that is not called',
@@ -176,7 +175,6 @@ final readonly class SutNotCalledRule implements RuleInterface
             );
         }
 
-        // One finding per surviving test scope; empty when every name matched a call or was skipped.
         return $findings;
     }
 
@@ -296,7 +294,6 @@ final readonly class SutNotCalledRule implements RuleInterface
             $candidates[] = TestQualityNodeHelper::normalizedTestName($verb);
         }
 
-        // The full method phrase plus, for multi-word phrases, the bare verb as a fallback match.
         return array_values(array_unique($candidates));
     }
 
@@ -350,7 +347,6 @@ final readonly class SutNotCalledRule implements RuleInterface
         $verb = strtolower($token);
         $verb = self::VERB_ALIASES[$verb] ?? $verb;
 
-        // The canonical method verb when the token is recognised; null marks an unrecognised phrase.
         return in_array($verb, self::METHOD_VERBS, true) ? $verb : null;
     }
 }

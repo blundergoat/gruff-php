@@ -25,7 +25,6 @@ final class FunctionLikeScopeWalker
     public function scopes(array $statements): array
     {
         if ($statements === []) {
-            // No statements means no callables to walk; an empty unit can hold no scopes.
             return [];
         }
         $cache  = self::$cache ??= new WeakMap();
@@ -99,7 +98,6 @@ final class FunctionLikeScopeWalker
                 $names[$param->var->name] = true;
             }
         }
-        // Keyed by name so callers can exclude parameters from the body-local set with an isset() check.
         return $names;
     }
     /**
@@ -125,7 +123,6 @@ final class FunctionLikeScopeWalker
                 $variables[$child->name] ??= $child;
             }
         }
-        // Locals excluding parameters and captured `use` vars, each kept at its first sighting for stable reporting.
         return $variables;
     }
 
@@ -144,7 +141,6 @@ final class FunctionLikeScopeWalker
             $this->collectBodyDescendants($child, $descendants);
         }
 
-        // Flattened body subtree with nested callables pruned, so locals stay attributed to this scope only.
         return $descendants;
     }
 
@@ -215,7 +211,6 @@ final class FunctionLikeScopeWalker
         foreach ($node->getSubNodeNames() as $name) {
             $this->collectChildNodes($node->{$name}, $children);
         }
-        // Immediate child nodes flattened out of scalar and array sub-node slots, ready for further descent.
         return $children;
     }
     /**

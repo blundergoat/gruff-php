@@ -117,7 +117,6 @@ final class ReportCommand extends Command
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
-            // No working directory means no project to resolve paths against; abort the run.
             return Command::FAILURE;
         }
 
@@ -128,7 +127,6 @@ final class ReportCommand extends Command
             if (!is_dir(dirname($resolvedOutput))) {
                 $output->writeln(sprintf('<error>Report output directory does not exist: %s</error>', dirname($resolvedOutput)));
 
-                // Refuse to scan when the requested output directory is absent, so nothing is silently dropped.
                 return Command::INVALID;
             }
         }
@@ -142,7 +140,6 @@ final class ReportCommand extends Command
             shouldSkipConfig:   (bool)$input->getOption('no-config'),
         );
         if ($promptExitCode !== null) {
-            // The missing-config prompt resolved the run (declined or errored); honour its exit code.
             return $promptExitCode;
         }
 
@@ -155,7 +152,6 @@ final class ReportCommand extends Command
         if ($resolvedOutput === null) {
             $output->write($report, false, OutputInterface::OUTPUT_RAW);
 
-            // Streamed straight to stdout, so the analyse subprocess's own pass/fail code is the result.
             return $process->getExitCode() ?? Command::FAILURE;
         }
 
@@ -164,20 +160,17 @@ final class ReportCommand extends Command
         if ($exitCode === Command::INVALID || ($report === '' && $exitCode !== Command::SUCCESS)) {
             $output->writeln(sprintf('<error>Analyse exited with code %d; %s was not written.</error>', $exitCode, $outputPath));
 
-            // Analyse failed or produced nothing usable; propagate its code rather than write a partial file.
             return $exitCode;
         }
 
         if (file_put_contents($resolvedOutput, $report) === false) {
             $output->writeln(sprintf('<error>Unable to write report: %s</error>', $resolvedOutput));
 
-            // A failed write must fail the command even if analyse itself succeeded.
             return Command::FAILURE;
         }
 
         $output->writeln(sprintf('<info>Report written to %s</info>', $resolvedOutput));
 
-        // Report persisted; the command's success hinges on analyse's verdict, so surface its code.
         return $exitCode;
     }
 
@@ -221,7 +214,6 @@ final class ReportCommand extends Command
         $paths = $input->getArgument('paths');
 
         if ($paths === []) {
-            // No paths means no separator either; emitting a bare `--` would swallow later analyse args.
             return;
         }
 

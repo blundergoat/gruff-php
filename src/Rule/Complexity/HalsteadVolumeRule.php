@@ -113,7 +113,6 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             );
         }
 
-        // One finding per function-like node that breached a threshold; empty when every node stayed under it.
         return $findings;
     }
 
@@ -162,7 +161,6 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $metrics             = self::metricsForCounts(count($operators), count($operands), $totalOperators, $totalOperands);
         $metricsCache[$node] = $metrics;
 
-        // Freshly computed metrics, now cached against this node for the next caller.
         return $metrics;
     }
 
@@ -193,7 +191,6 @@ final readonly class HalsteadVolumeRule implements RuleInterface
             return null;
         }
 
-        // Every field passed its type check, so rebuild the shape the type signature promises.
         return [
             'volume'     => $volume,
             'difficulty' => $difficulty,
@@ -291,7 +288,6 @@ final readonly class HalsteadVolumeRule implements RuleInterface
         $volume     = $length * log($vocabulary, 2);
         $difficulty = ($uniqueOperators / 2) * ($totalOperands / $uniqueOperands);
 
-        // Full Halstead set; volume is the threshold-bearing figure, effort and difficulty enrich the finding.
         return [
             'volume'     => $volume,
             'difficulty' => $difficulty,
@@ -311,11 +307,9 @@ final readonly class HalsteadVolumeRule implements RuleInterface
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Genuine fraction: keep every digit so a precise threshold reads back exactly.
             return (string)$number;
         }
 
-        // Integral value: cast through int to drop the ".0" a float would otherwise print.
         return (string)(int)$number;
     }
 }

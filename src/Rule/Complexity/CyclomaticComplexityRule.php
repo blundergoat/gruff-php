@@ -181,7 +181,6 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $cyclomaticCache[$node] = $ccn;
 
-        // One baseline path plus every decision point reached; match arms add one per extra condition.
         return $ccn;
     }
 
@@ -217,7 +216,6 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             }
         }
 
-        // Node is none of the candidate classes.
         return false;
     }
 
@@ -238,13 +236,11 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
-            // Qualify as Class::method() when an owning class is known; fall back to bare method() otherwise.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
-        // A free function has no owning class, so its symbol is just the function name.
         return $node->name->toString() . '()';
     }
 
@@ -280,11 +276,9 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // A real fractional threshold keeps its decimals so the message stays faithful.
             return (string) $number;
         }
 
-        // Integers and whole-valued floats render without a trailing `.0` for a cleaner message.
         return (string) (int) $number;
     }
 }

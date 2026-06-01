@@ -43,7 +43,6 @@ final readonly class ResultCache
      */
     public static function forProject(string $projectRoot): self
     {
-        // Cache lives in a fixed gitignored directory directly under the project root.
         return new self(rtrim($projectRoot, '/') . '/' . self::DIRECTORY);
     }
 
@@ -91,7 +90,6 @@ final readonly class ResultCache
             $findings[] = Finding::fromArray($entry);
         }
 
-        // Fully reconstructed findings for the key; a byte-identical cold run would have produced this same list.
         return $findings;
     }
 
@@ -137,7 +135,6 @@ final readonly class ResultCache
      */
     private function pathFor(string $key): string
     {
-        // One JSON file per key inside the cache directory; the key is already a hex hash so it is filename-safe.
         return $this->cacheDir . '/' . $key . '.json';
     }
 

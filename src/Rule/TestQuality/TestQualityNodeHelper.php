@@ -40,7 +40,6 @@ final class TestQualityNodeHelper
 
         $basename = basename($analysisUnit->file->displayPath);
 
-        // Outside a tests dir, fall back to the PHPUnit *Test / *TestCase filename convention.
         return str_ends_with($basename, 'Test.php') || str_ends_with($basename, 'TestCase.php');
     }
 
@@ -192,7 +191,6 @@ final class TestQualityNodeHelper
      */
     public static function calls(TestQualityScope $scope): array
     {
-        // Every call the scope makes, of any of the three call shapes the rules care about.
         return NodeIndex::descendantsOfAny($scope->node, [Expr\FuncCall::class, Expr\MethodCall::class, Expr\StaticCall::class]);
     }
 
@@ -473,7 +471,6 @@ final class TestQualityNodeHelper
      */
     public static function firstArgValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?Expr
     {
-        // The first argument is the expected value for most assertions; delegate to the index-0 lookup.
         return self::argValue($call, 0);
     }
 
@@ -488,11 +485,9 @@ final class TestQualityNodeHelper
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
     {
         if (!isset($call->args[$index]) || !$call->args[$index] instanceof Arg) {
-            // No argument at that position, or a spread (VariadicPlaceholder), has no single value to hand back.
             return null;
         }
 
-        // Unwrap the Arg node to the expression the caller actually passed.
         return $call->args[$index]->value;
     }
 
@@ -505,7 +500,6 @@ final class TestQualityNodeHelper
      */
     public static function argString(Arg $arg): ?string
     {
-        // Only a bare string literal yields text; an interpolated or computed argument reads back as null.
         return $arg->value instanceof Scalar\String_ ? $arg->value->value : null;
     }
 
@@ -615,7 +609,6 @@ final class TestQualityNodeHelper
     {
         $name = preg_replace('/^test[_]?/i', '', $name) ?? $name;
 
-        // Strip separators and casing so testFooBar / test_foo_bar / fooBar collapse to one comparable key.
         return strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $name));
     }
 

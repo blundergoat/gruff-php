@@ -104,7 +104,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         // Fast bail: nothing to find when no `mixed` literal appears in the
         // file's source text.
         if (!str_contains($analysisUnit->source, 'mixed')) {
-            // No `mixed` token anywhere means no tag can match; skip the AST walk entirely.
             return [];
         }
 
@@ -205,7 +204,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
      */
     private function isScannedTag(string $tagName): bool
     {
-        // True when the tag belongs to any family that can carry a type worth narrowing.
         return in_array($tagName, self::PARAM_TAGS, true)
                || in_array($tagName, self::RETURN_TAGS, true)
                || in_array($tagName, self::VAR_TAGS, true)
@@ -254,7 +252,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             $blocks[] = $current;
         }
 
-        // One entry per docblock tag, in source order, each with its tag name, body, and line.
         return $blocks;
     }
 
@@ -273,7 +270,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
         $trimmed = ltrim($trimmed);
         $trimmed = preg_replace('/^\*+\s?/', '', $trimmed) ?? $trimmed;
 
-        // The line's bare textual content, with opening, closing, and per-line `*` framing removed.
         return $trimmed;
     }
 
@@ -295,13 +291,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
         // Find standalone `mixed` tokens without matching substrings inside class names.
         if ($type === null || preg_match('/(?<![\\\\\w])mixed(?!\w)/i', $type) !== 1) {
-            // No `mixed` token to narrow; report neither presence nor a standalone match.
             return ['hasMixed' => false, 'isStandalone' => false];
         }
 
         $standalone = strcasecmp($type, 'mixed') === 0;
 
-        // `mixed` is present; standalone is true only when the whole type is exactly `mixed`.
         return ['hasMixed' => true, 'isStandalone' => $standalone];
     }
 
@@ -316,13 +310,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         $type = $this->extractTypeExpression($body);
         if ($type === null) {
-            // An empty body carries no type, so it cannot be an unstructured bag.
             return false;
         }
 
         $type = $this->stripTopLevelNullUnion(strtolower(preg_replace('/\s+/', '', $type) ?? $type));
 
-        // Defer the bag decision to the shared predicate once the type is normalized and de-nulled.
         return $this->isArrayBagType($type);
     }
 
@@ -335,17 +327,14 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         // Capture the value side of array-key/string/int keyed generic array types.
         if (preg_match('/^array<(?:array-key|string|int),(.+)>$/', $type, $matches) === 1) {
-            // Keyed array: the bag verdict rests on whatever its value type resolves to.
             return $this->isArrayBagValueType($matches[1]);
         }
 
         // Capture the element type from list generics.
         if (preg_match('/^list<(.+)>$/', $type, $matches) === 1) {
-            // List generic: the bag verdict rests on its element type.
             return $this->isArrayBagValueType($matches[1]);
         }
 
-        // Anything that is not a keyed-array or list generic is not an unstructured bag.
         return false;
     }
 
@@ -357,11 +346,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function isArrayBagValueType(string $type): bool
     {
         if ($type === 'mixed') {
-            // A `mixed` leaf is the unstructured bottom this exemption is looking for.
             return true;
         }
 
-        // Otherwise the value is itself a generic; recurse so nested bags still qualify.
         return $this->isArrayBagType($type);
     }
 
@@ -380,20 +367,17 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         $type = $this->extractTypeExpression($body);
         if ($type === null) {
-            // No type at all cannot be a precise shape.
             return false;
         }
 
         $type = preg_replace('/\s+/', '', $type) ?? $type;
         // Match a whole PHPDoc array shape so only its top-level field list is analysed for `mixed` leaves.
         if (!preg_match('/^array\{(.*)\}$/i', $type, $matches)) {
-            // Not `array{...}` syntax, so the shape-precision exemption does not apply.
             return false;
         }
 
         $inner = $matches[1];
         if ($inner === '') {
-            // An empty `array{}` names no fields, so it is not a precise envelope.
             return false;
         }
 
@@ -405,12 +389,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
             $fieldType = trim(substr($pair, $colonIndex + 1));
             if ($fieldType !== '' && strcasecmp($fieldType, 'mixed') !== 0) {
-                // One concrete (non-mixed) sibling field is enough to call the envelope precise.
                 return true;
             }
         }
 
-        // Every field was mixed (or untyped), so the shape adds no precision over a bare bag.
         return false;
     }
 
@@ -450,7 +432,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             $segments[] = $segment;
         }
 
-        // One segment per top-level field, with bracket-nested commas kept intact inside each.
         return $segments;
     }
 
@@ -474,12 +455,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
                 $depth = max(0, $depth - 1);
             } elseif ($char === ':' && $depth === 0) {
-                // First colon outside any brackets separates the field key from its type.
                 return $i;
             }
         }
 
-        // No unbracketed colon: the pair is positional or malformed, not `key: type`.
         return null;
     }
 
@@ -520,7 +499,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
         $type = trim($type);
 
-        // The leading type token, or null when nothing but whitespace preceded the description.
         return $type === '' ? null : $type;
     }
 
@@ -537,11 +515,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
         // Remove the alias name and optional equals sign before parsing the aliased type.
         if (preg_match('/^\S+\s+(?:=\s*)?(?<type>.+)$/s', $body, $matches) !== 1) {
-            // A bare alias name with no following type yields nothing to classify.
             return null;
         }
 
-        // Parse the text after the alias name as an ordinary type expression.
         return $this->extractTypeExpression($matches['type']);
     }
 
@@ -556,11 +532,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         // Capture the first PHPDoc parameter variable name in the tag body.
         if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)/', $body, $matches) === 1) {
-            // The matched name without its leading `$`, as the signature comparison expects.
             return $matches[1];
         }
 
-        // A `@param` body with no `$name` token (e.g. type-only) has no name to extract.
         return null;
     }
 
@@ -587,7 +561,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             return $this->hasVarSignatureMixedCoverage($node);
         }
 
-        // Property/type-alias tags have no native declaration to mirror, so they never count as covered.
         return false;
     }
 
@@ -611,12 +584,10 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             }
 
             if ($param->var->name === $paramName) {
-                // Matched the named parameter: coverage holds only if its hint is also `mixed`.
                 return ModernisationNodeHelper::typeName($param->type) === 'mixed';
             }
         }
 
-        // No parameter of that name exists on the node, so the docblock mirrors nothing.
         return false;
     }
 
@@ -659,7 +630,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod || $node instanceof Function_) {
-            // Reuse the shared `Class::method` / `function()` formatting for callables.
             return CyclomaticComplexityRule::resolveSymbol($node);
         }
 
@@ -669,7 +639,6 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 $names[] = '$' . $prop->name->toString();
             }
 
-            // A grouped property declaration can name several variables; list them all.
             return implode(', ', $names);
         }
 
@@ -679,11 +648,9 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 $names[] = $const->name->toString();
             }
 
-            // A single `const` statement can declare several names; list them all.
             return implode(', ', $names);
         }
 
-        // Unreachable for the node kinds this rule indexes; a stable label for any other kind.
         return 'unknown';
     }
 
@@ -700,16 +667,13 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function stripTopLevelNullUnion(string $type): string
     {
         if (str_ends_with($type, '|null')) {
-            // Drop a trailing `|null` so the remaining type can be matched as a bare bag.
             return substr($type, 0, -strlen('|null'));
         }
 
         if (str_starts_with($type, 'null|')) {
-            // Drop a leading `null|` so the remaining type can be matched as a bare bag.
             return substr($type, strlen('null|'));
         }
 
-        // Not a top-level nullable union; hand the type back untouched.
         return $type;
     }
 }

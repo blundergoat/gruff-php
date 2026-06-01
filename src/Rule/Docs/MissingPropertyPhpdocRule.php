@@ -78,8 +78,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             );
         }
 
-        // Hand the caller one finding per undocumented declared or promoted property; empty when every
-        // property in the unit is documented, which the analysis pipeline treats as a clean pass.
         return $findings;
     }
 
@@ -138,8 +136,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             }
         }
 
-        // One finding per undocumented prop, including each name in a grouped `$a, $b;` declaration;
-        // empty when every property statement here already carries a docblock.
         return $findings;
     }
 
@@ -166,8 +162,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     ): Finding {
         $symbol = sprintf('%s::$%s', $className, $propertyName);
 
-        // Return a fully populated finding (never null): the caller has already decided this property is
-        // undocumented, so this method only formats the advisory, it does not re-test the condition.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Property %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the type).', $symbol),
@@ -229,8 +223,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             );
         }
 
-        // One finding per promoted-but-undocumented constructor parameter; empty when the constructor has
-        // no promotion or every promoted param already has a matching `@param`.
         return $findings;
     }
 
@@ -250,7 +242,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             return null;
         }
 
-        // The variable name is the promoted property name; PHP guarantees `$this->name === $param name`.
         return $param->var->name;
     }
 
@@ -277,8 +268,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
     ): Finding {
         $symbol = sprintf('%s::__construct($%s)', $className, $propertyName);
 
-        // Return a fully populated finding (never null): the caller has already confirmed this promoted
-        // param lacks a matching `@param`, so this method only formats the advisory.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Promoted property %s needs an @param tag on the constructor with a brief description (one plain-English clause; not a restatement of the type).', $symbol),
@@ -316,7 +305,6 @@ final readonly class MissingPropertyPhpdocRule implements RuleInterface
             }
         }
 
-        // No constructor in this class body; null tells the caller there are no promoted properties here.
         return null;
     }
 

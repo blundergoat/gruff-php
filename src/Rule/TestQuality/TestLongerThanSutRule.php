@@ -33,7 +33,6 @@ final readonly class TestLongerThanSutRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory/low-confidence: it cannot see real SUT size, so minTestLines=12 gates a heuristic hint only.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Test longer than apparent SUT',
@@ -84,7 +83,6 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             );
         }
 
-        // One advisory per oversized single-call test; empty when no test trips the line threshold.
         return $findings;
     }
 
@@ -111,7 +109,6 @@ final readonly class TestLongerThanSutRule implements RuleInterface
             }
         }
 
-        // Best-effort SUT calls with timing waits excluded; an over-count here only weakens the advisory.
         return $calls;
     }
 

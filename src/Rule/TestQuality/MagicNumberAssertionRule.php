@@ -273,7 +273,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             return false;
         }
 
-        // Match the normalized identifier against the names already understood to label a number.
         return in_array($this->normalizeName($node->toString()), self::CONTEXTUAL_NUMERIC_NAMES, true);
     }
 
@@ -289,7 +288,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
             return false;
         }
 
-        // Match the normalized string key against the names already understood to label a number.
         return in_array($this->normalizeName($expr->value), self::CONTEXTUAL_NUMERIC_NAMES, true);
     }
 
@@ -302,7 +300,6 @@ final readonly class MagicNumberAssertionRule implements RuleInterface
     {
         $normalized = preg_replace('/[^a-z0-9]+/i', '', $name);
 
-        // Lowercase the stripped form so the contextual-name lists match regardless of case or separators.
         return strtolower((string)$normalized);
     }
 }

@@ -186,7 +186,6 @@ final readonly class ConfigLoader
     {
         $root = rtrim($root, '/');
 
-        // Preferred name first so callers that take the first match prefer it over the legacy one.
         return [
             $root . '/' . self::DEFAULT_CONFIG_FILE,
             $root . '/' . self::LEGACY_DEFAULT_CONFIG_FILE,
@@ -430,7 +429,6 @@ final readonly class ConfigLoader
             $resolved[$command] = $threshold;
         }
 
-        // Every key and value validated; commit the per-command threshold map onto the config.
         return $config->withMinimumSeverity($resolved);
     }
 
@@ -458,7 +456,6 @@ final readonly class ConfigLoader
             throw new ConfigException('Config key "minimumPhpVersion" must be at least 7.4.');
         }
 
-        // 7.4 is the lowest version gruff reasons about, so anything at or above it is accepted as the floor.
         return $config->withMinimumPhpVersion((float)$version);
     }
 
@@ -534,7 +531,6 @@ final readonly class ConfigLoader
             $config = $config->withAllowedSecretPreviews($allowlists['secretPreviews']);
         }
 
-        // Only the sub-keys the user actually set were overridden; the rest keep their defaults.
         return $config;
     }
 
@@ -627,7 +623,6 @@ final readonly class ConfigLoader
             ? (new StringListConfigParser())->parse($this->configValue($allowlists['secretPreviews']), 'allowlists.secretPreviews', false, false)
             : null;
 
-        // Null for an omitted sub-key signals "keep defaults"; an empty list would instead wipe them.
         return [
             'acceptedAbbreviations' => $acceptedAbbreviations,
             'secretPreviews'        => $secretPreviews,
@@ -687,7 +682,6 @@ final readonly class ConfigLoader
             $normalizedConfig[$key] = $this->configValue($decodedItem);
         }
 
-        // Keys are confirmed strings and every value normalised, so this is a well-formed config object.
         return $normalizedConfig;
     }
 
@@ -719,7 +713,6 @@ final readonly class ConfigLoader
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
-            // Already one of the permitted scalar types, so pass it through untouched.
             return $decodedValue;
         }
 
@@ -742,7 +735,6 @@ final readonly class ConfigLoader
             $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Top-level array normalised; nested arrays were handed down to the depth-2 pass.
         return $normalizedConfigValues;
     }
 
@@ -762,7 +754,6 @@ final readonly class ConfigLoader
             $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Second-level array normalised; deeper arrays were handed down to the depth-3 pass.
         return $normalizedConfigValues;
     }
 
@@ -782,7 +773,6 @@ final readonly class ConfigLoader
             $normalizedConfigValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Third-level array normalised; the depth-4 pass holds the line on further nesting.
         return $normalizedConfigValues;
     }
 
@@ -805,7 +795,6 @@ final readonly class ConfigLoader
             $normalizedConfigValues[$key] = $this->configScalar($decodedItem);
         }
 
-        // Deepest supported level: a nested array at depth 4 is rejected, so every retained value is a scalar.
         return $normalizedConfigValues;
     }
 }

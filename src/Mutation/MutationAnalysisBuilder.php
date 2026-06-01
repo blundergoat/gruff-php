@@ -54,7 +54,6 @@ final readonly class MutationAnalysisBuilder
             return null;
         }
 
-        // Both reports parsed; bundle them with the budget so callers can compute deltas and budget checks.
         return new MutationAnalysisResult($report, $baselineReport, $options->mutationBudget);
     }
 
@@ -183,7 +182,6 @@ final readonly class MutationAnalysisBuilder
             return null;
         }
 
-        // Triple of mtime, size, and hash; comparing all three catches same-size rewrites a plain mtime check misses.
         return [
             'mtime' => $mtime,
             'size' => $size,

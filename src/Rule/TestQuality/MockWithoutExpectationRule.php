@@ -43,7 +43,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning severity: an unverified mock weakens the test but rarely breaks the build outright.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Mock without expectation',
@@ -108,7 +107,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             }
         }
 
-        // One finding per unverified mock in this scope; verified mocks contributed nothing.
         return $findings;
     }
 
@@ -149,7 +147,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             ];
         }
 
-        // Keyed by variable name, holding the first assignment line so the finding points at creation.
         return $mockAssignments;
     }
 
@@ -182,8 +179,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             $reads[$var->name][] = $var;
         }
 
-        // Genuine reads only, grouped by variable name: assignment-target nodes are excluded via the
-        // $assignedVarObjectIds check, so the caller can treat a non-empty group as the mock being consulted.
         return $reads;
     }
 
@@ -333,7 +328,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             }
         }
 
-        // Method names matched against the verification/stub allowlists by the caller; order is irrelevant.
         return $names;
     }
 
@@ -353,7 +347,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             $receiver = $receiver->var;
         }
 
-        // True only when the unwound base is exactly the named variable, not some other receiver.
         return $receiver instanceof Expr\Variable
                && is_string($receiver->name)
                && $receiver->name === $varName;
@@ -376,7 +369,6 @@ final readonly class MockWithoutExpectationRule implements RuleInterface
             }
         }
 
-        // No name matched any needle, so the two lists are disjoint.
         return false;
     }
 }

@@ -41,14 +41,12 @@ final readonly class AnalyseCommandSetupBuilder
         $projectRoot = getcwd();
 
         if ($projectRoot === false) {
-            // Without a working directory there is no project to resolve config/paths against; fail hard.
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
                 Command::FAILURE,
             );
         }
 
-        // Project root is known, so defer all option validation and config loading to the worker.
         return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
     }
 
@@ -70,7 +68,6 @@ final readonly class AnalyseCommandSetupBuilder
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
-            // These two flags are contradictory; report before a format is parsed, so the message stays plain text.
             return AnalyseCommandSetupResult::plainError(
                 '<error>--no-config cannot be combined with --config.</error>',
                 Command::INVALID,
@@ -79,13 +76,11 @@ final readonly class AnalyseCommandSetupBuilder
 
         $formatResult = $this->format($input->getOption('format'));
         if (!$formatResult instanceof OutputFormat) {
-            // An unparseable format means we cannot render a structured report, so the error stays plain text.
             return AnalyseCommandSetupResult::plainError($formatResult, Command::INVALID);
         }
 
         $failThreshold = $this->failThreshold($input->getOption('fail-on'));
         if (!$failThreshold instanceof FailThreshold) {
-            // Non-enum result is the rejected raw value; echo it back through a structured usage report.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     $options,
@@ -99,7 +94,6 @@ final readonly class AnalyseCommandSetupBuilder
 
         $mutationBudget = $this->mutationBudget($input->getOption('mutation-budget'));
         if ($mutationBudget === false) {
-            // false is the parser's "given but malformed" signal (null would mean omitted); reject it as a usage error.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     $options,
@@ -114,7 +108,6 @@ final readonly class AnalyseCommandSetupBuilder
         $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
         if ($usageError !== null) {
-            // Any remaining cross-option conflict surfaces here, after the budget is folded into the options.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
                 $formatResult,
@@ -130,7 +123,6 @@ final readonly class AnalyseCommandSetupBuilder
             shouldSkipConfig:   $options->noConfig,
         );
         if ($promptExitCode !== null) {
-            // A non-null code means the init prompt already handled this run (declined or dispatched); stop here.
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
 
@@ -145,14 +137,12 @@ final readonly class AnalyseCommandSetupBuilder
             configLoader:  $configLoader,
         );
         if ($configResult instanceof AnalysisReport) {
-            // A report rather than a config means loading raised a ConfigException already rendered as the error.
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
         $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
         if ($referenceError !== null) {
-            // A new-findings gate without a baseline or diff reference cannot decide what "new" means; refuse to run.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     options: $options,
@@ -273,17 +263,14 @@ final readonly class AnalyseCommandSetupBuilder
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
         if ($failThresholds->newFindingsGate === null) {
-            // No new-findings gate is in play, so there is nothing to anchor and no error to report.
             return null;
         }
 
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
         if ($baselineWillApply || $options->diffVs !== null) {
-            // A consuming baseline (not a generate run) or a --diff-vs ref supplies the reference; the gate is valid.
             return null;
         }
 
-        // Gate configured but no reference exists: return the remediation text naming the flags that fix it.
         return 'The new-findings gate needs a reference point. Configure --baseline or --diff-vs <ref> before enabling --fail-on-new or failureConditions.newFindings.';
     }
 
@@ -298,7 +285,6 @@ final readonly class AnalyseCommandSetupBuilder
     {
         $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
-        // Return the raw string on failure so the caller can name the rejected value in its error message.
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
@@ -312,7 +298,6 @@ final readonly class AnalyseCommandSetupBuilder
     private function mutationBudget(mixed $optionValue): int|false|null
     {
         if ($optionValue === null) {
-            // null propagates the "flag omitted" state, kept distinct from false so callers do not treat it as invalid.
             return null;
         }
 
@@ -339,12 +324,10 @@ final readonly class AnalyseCommandSetupBuilder
         ConfigLoader $configLoader,
     ): AnalysisConfig|AnalysisReport {
         try {
-            // --no-config builds config from the registry alone; otherwise read and validate the on-disk file.
             return $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
         } catch (ConfigException $exception) {
-            // Convert a load/validation failure into a structured error report rather than letting it propagate.
             return $this->usageReport(
                 options: $options,
                 format:  $format,
@@ -366,11 +349,9 @@ final readonly class AnalyseCommandSetupBuilder
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
         if ($options->noConfig) {
-            // --no-config means no file was consulted, so report no path rather than a misleading discovered one.
             return null;
         }
 
-        // Prefer the user's explicit --config; otherwise report whatever path discovery would have loaded.
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 

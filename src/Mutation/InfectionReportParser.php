@@ -66,7 +66,6 @@ final readonly class InfectionReportParser
             }
         }
 
-        // Assemble the report only after every section validated; partial reports are never returned.
         return new InfectionReport($this->displayPath($resolvedPath), $stats, $mutants);
     }
 
@@ -194,7 +193,6 @@ final readonly class InfectionReportParser
             $result[$key] = $this->jsonValue($item);
         }
 
-        // Return a freshly built map so only string-keyed, shape-validated entries reach the caller.
         return $result;
     }
 
@@ -249,7 +247,6 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth2($item) : $this->jsonScalar($item);
         }
 
-        // Top-level array narrowed to the supported four-deep JSON shape; deeper nesting is rejected later.
         return $result;
     }
 
@@ -269,7 +266,6 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth3($item) : $this->jsonScalar($item);
         }
 
-        // Second level narrowed; its return type permits one fewer nesting layer than the top-level shape.
         return $result;
     }
 
@@ -288,7 +284,6 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth4($item) : $this->jsonScalar($item);
         }
 
-        // Third level narrowed; the next recursion is the last that may still hold a nested array.
         return $result;
     }
 
@@ -311,7 +306,6 @@ final readonly class InfectionReportParser
             $result[$key] = $this->jsonScalar($item);
         }
 
-        // Deepest supported level: every entry is now a scalar, since any array here already threw.
         return $result;
     }
 
@@ -330,7 +324,6 @@ final readonly class InfectionReportParser
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.%s.', $path, $location, $field));
         }
 
-        // Reached only past the guard, so the value is a guaranteed non-empty string for the mutant record.
         return $fieldValue;
     }
 
@@ -360,7 +353,6 @@ final readonly class InfectionReportParser
      */
     private function statusSections(): array
     {
-        // Keys are Infection's JSON section names; values are the human-facing statuses gruff reports.
         return [
             'escaped'                => 'escaped',
             'timeouted'              => 'timed out',

@@ -41,7 +41,6 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // The rule's registry identity: an error-tier gate that fires once nesting passes a depth of 4.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Maximum nesting depth',
@@ -112,7 +111,6 @@ final readonly class NestingDepthRule implements RuleInterface
             );
         }
 
-        // Every function-like node whose deepest nesting crossed the configured threshold.
         return $findings;
     }
 
@@ -123,7 +121,6 @@ final readonly class NestingDepthRule implements RuleInterface
      */
     public static function computeMaximumNestingDepth(Node $node): int
     {
-        // Measure the whole body starting from depth zero.
         return self::walkStatements($node->stmts ?? [], 0);
     }
 
@@ -141,7 +138,6 @@ final readonly class NestingDepthRule implements RuleInterface
             $maximumDepth = max($maximumDepth, self::walkNode($stmt, $depth));
         }
 
-        // The deepest level reached by any statement in the list.
         return $maximumDepth;
     }
 
@@ -176,7 +172,6 @@ final readonly class NestingDepthRule implements RuleInterface
             $maximumDepth = max($maximumDepth, self::walkStatements($block->statements, $blockDepth));
         }
 
-        // The deepest level reached across every child block of this construct.
         return $maximumDepth;
     }
 
@@ -205,7 +200,6 @@ final readonly class NestingDepthRule implements RuleInterface
             }
         }
 
-        // The deepest level reached by any nested sub-expression.
         return $maximumDepth;
     }
 
@@ -219,11 +213,9 @@ final readonly class NestingDepthRule implements RuleInterface
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Keep a genuine fraction visible (e.g. "2.5") instead of truncating it to an int.
             return (string) $number;
         }
 
-        // Whole numbers, including whole-valued floats, render without a trailing ".0".
         return (string) (int) $number;
     }
 }

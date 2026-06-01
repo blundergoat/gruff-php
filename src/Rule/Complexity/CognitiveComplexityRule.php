@@ -42,7 +42,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // The rule's registry identity: an error-tier gate that fires once a method's cognitive score passes 20.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Cognitive complexity',
@@ -113,7 +112,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             );
         }
 
-        // Every function-like node whose cognitive score crossed the configured threshold.
         return $findings;
     }
 
@@ -126,7 +124,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     {
         $body = $node->stmts ?? [];
 
-        // Score the whole body starting from nesting depth zero.
         return self::walkStatements($body, 0);
     }
 
@@ -144,7 +141,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             $total += self::walkNode($stmt, $nesting);
         }
 
-        // Sum of every statement's contribution at this nesting level.
         return $total;
     }
 
@@ -313,7 +309,6 @@ final readonly class CognitiveComplexityRule implements RuleInterface
             }
         }
 
-        // Combined score of every child node reached by the structural descent.
         return $total;
     }
 

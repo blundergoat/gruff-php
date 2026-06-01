@@ -106,7 +106,6 @@ final readonly class DashboardServer
             return '[' . $host . ']';
         }
 
-        // Hostname or IPv4 address needs no bracketing; return it untouched.
         return $host;
     }
 
@@ -122,7 +121,6 @@ final readonly class DashboardServer
         $dashboardPageRenderer = new DashboardPageRenderer();
         $dashboardScanRunner   = new DashboardScanRunner($this->gruffBinary, $this->stateFactory, $dashboardPageRenderer);
 
-        // Handler wired with its own renderer, scan runner, and responder so each connection reuses one collaborator set.
         return new DashboardRequestHandler($dashboardRequestContext, $this->stateFactory, $dashboardScanRunner, new DashboardHttpResponder());
     }
 

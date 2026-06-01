@@ -196,7 +196,6 @@ final class RuleRegistry
      */
     public static function defaults(): self
     {
-        // The built-in catalogue is centralised here so config, docs, and tests share one source.
         return new self([
                             new CognitiveComplexityRule(),
                             new CyclomaticComplexityRule(),
@@ -340,7 +339,6 @@ final class RuleRegistry
      */
     public function all(): array
     {
-        // Callers consume rules as a list while the registry stores them by id.
         return array_values($this->rules);
     }
 
@@ -353,7 +351,6 @@ final class RuleRegistry
      */
     public function has(string $ruleId): bool
     {
-        // The constructor guarantees registered ids are unique array keys.
         return isset($this->rules[$ruleId]);
     }
 
@@ -367,7 +364,6 @@ final class RuleRegistry
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
-        // Unknown ids are caller/config mistakes, so surface them immediately.
         return $this->rules[$ruleId]
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
@@ -382,13 +378,11 @@ final class RuleRegistry
      */
     public function enabledRules(AnalysisConfig $config): array
     {
-        // The returned list is already filtered to rules that can run for this config.
         return array_values(array_filter(
                                 $this->rules,
                                 static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
                                     $definition = $rule->definition();
 
-                                    // Enabled rules must pass both per-rule toggles and selection filters.
                                     return $config->ruleSettings($definition->id)->enabled
                                            && $config->ruleSelection()->allows($definition);
                                 },
@@ -406,12 +400,10 @@ final class RuleRegistry
     {
         foreach ($this->enabledRules($config) as $rule) {
             if ($rule instanceof ProjectRuleInterface) {
-                // One project rule is enough to require whole-project context.
                 return true;
             }
         }
 
-        // Pure per-unit rule sets can be analysed without project-level context.
         return false;
     }
 
@@ -430,12 +422,10 @@ final class RuleRegistry
     {
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if ($rule instanceof ProjectRuleInterface && !$rule instanceof ProjectRuleAccumulator) {
-                // Legacy project rules need all units at once, so streaming is unavailable.
                 return false;
             }
         }
 
-        // Per-unit rules and accumulator project rules can run incrementally.
         return true;
     }
 
@@ -476,7 +466,6 @@ final class RuleRegistry
         $findings = $this->runPerUnitRules($analysisUnit, $ruleContext, $ruleRunnerObserver);
         $this->accumulateForUnit($analysisUnit, $ruleContext, $ruleRunnerObserver);
 
-        // Streaming callers receive only immediate file-scoped findings for this unit.
         return $findings;
     }
 
@@ -495,7 +484,6 @@ final class RuleRegistry
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         if ($analysisUnit->hasParseErrors()) {
-            // Parse diagnostics are already recorded; rules should not inspect invalid AST.
             return [];
         }
 
@@ -522,7 +510,6 @@ final class RuleRegistry
             array_push($findings, ...$ruleFindings);
         }
 
-        // Per-unit findings are not final-sorted until the caller finalizes the full run.
         return $findings;
     }
 
@@ -541,7 +528,6 @@ final class RuleRegistry
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
         if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
-            // Project accumulators consume only parse-clean PHP units.
             return;
         }
 
@@ -593,7 +579,6 @@ final class RuleRegistry
             array_push($findings, ...$projectFindings);
         }
 
-        // Project accumulator findings are collected after all units have been seen.
         return $findings;
     }
 
@@ -626,7 +611,6 @@ final class RuleRegistry
                                                                            ],
         );
 
-        // Final ordering is part of the stable report contract.
         return $findings;
     }
 
@@ -683,7 +667,6 @@ final class RuleRegistry
             ));
         }
 
-        // The finalized list includes per-unit, accumulator, and legacy project-rule findings.
         return $this->finalizeFindings($findings);
     }
 
@@ -704,7 +687,6 @@ final class RuleRegistry
             }
         }
 
-        // Legacy rules run after the per-unit phase with the complete context.
         return $rules;
     }
 
@@ -730,7 +712,6 @@ final class RuleRegistry
                                          ));
 
         if ($analyseableUnits === []) {
-            // Project rules reason only over parse-clean PHP units.
             return [];
         }
 
@@ -748,7 +729,6 @@ final class RuleRegistry
             array_push($findings, ...$projectFindings);
         }
 
-        // Legacy project findings join the per-unit findings before final sorting.
         return $findings;
     }
 
@@ -784,7 +764,6 @@ final class RuleRegistry
             $uniqueFindings[] = $finding;
         }
 
-        // First occurrence wins so deterministic rule order remains stable.
         return $uniqueFindings;
     }
 
@@ -820,7 +799,6 @@ final class RuleRegistry
 
         ksort($selectedIndexes, SORT_NUMERIC);
 
-        // Preserve original relative order for the selected findings.
         return array_values(array_intersect_key($findings, $selectedIndexes));
     }
 
@@ -834,17 +812,14 @@ final class RuleRegistry
     private function namingOverlapKey(Finding $finding): ?string
     {
         if (!isset(self::NAMING_RULE_PRIORITY[$finding->ruleId])) {
-            // Non-naming findings never participate in naming-overlap suppression.
             return null;
         }
 
         $identifierName = $this->findingIdentifierName($finding);
         if ($identifierName === null) {
-            // A naming finding without an identifier cannot be safely collapsed.
             return null;
         }
 
-        // File, location, symbol, and identifier define the overlap bucket.
         return implode("\0", [
             $finding->filePath,
             (string)($finding->line ?? ''),
@@ -866,12 +841,10 @@ final class RuleRegistry
         foreach (['identifierName', 'variable', 'parameter'] as $metadataKey) {
             $metadataValue = $finding->metadata[$metadataKey] ?? null;
             if (is_string($metadataValue)) {
-                // Explicit metadata is more precise than the optional finding symbol.
                 return $metadataValue;
             }
         }
 
-        // Symbol is the fallback for naming rules that report at declaration level.
         return $finding->symbol;
     }
 }

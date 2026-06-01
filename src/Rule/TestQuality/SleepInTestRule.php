@@ -51,7 +51,6 @@ final readonly class SleepInTestRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Static registry descriptor: warning severity, high confidence, never varies per run.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Sleep or wall-clock read in test',
@@ -82,7 +81,6 @@ final readonly class SleepInTestRule implements RuleInterface
             );
         }
 
-        // Every sleep and wall-clock finding across all test scopes in this unit; empty when the unit has no tests.
         return $findings;
     }
 
@@ -114,7 +112,6 @@ final readonly class SleepInTestRule implements RuleInterface
             }
         }
 
-        // One finding per sleep/clock call in this scope; calls that match neither set are skipped above.
         return $findings;
     }
 
@@ -162,7 +159,6 @@ final readonly class SleepInTestRule implements RuleInterface
             }
         }
 
-        // One finding per current-time DateTime construction in this scope; fixed-timestamp ones are left alone.
         return $findings;
     }
 
@@ -227,7 +223,6 @@ final readonly class SleepInTestRule implements RuleInterface
      */
     private function sleepFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
-        // Warning that this test blocks on a real sleep; metadata tags it as the "sleep" variant for downstream filtering.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s sleeps during the test run, which is a flakiness and latency smell.', $scope->symbol),
@@ -255,7 +250,6 @@ final readonly class SleepInTestRule implements RuleInterface
      */
     private function wallClockFunctionFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
-        // Warning that this test reads real time; metadata tags it as the "wall-clock" variant for downstream filtering.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s reads the wall clock via %s(), which couples the test to real time.', $scope->symbol, $name),
@@ -289,7 +283,6 @@ final readonly class SleepInTestRule implements RuleInterface
 
         $className = $newExpression->class;
 
-        // Warning that this test pins to the current instant; metadata tags it as the "datetime" variant for filtering.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('%s constructs %s with the current time, which couples the test to real time.', $scope->symbol, $className->toString()),

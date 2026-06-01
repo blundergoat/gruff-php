@@ -45,7 +45,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning severity and medium confidence: mutation without cleanup is likely, not certain, test rot.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Global state mutation in test',
@@ -141,7 +140,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
-        // One finding per superglobal write reached in this scope; empty when the scope writes none.
         return $findings;
     }
 
@@ -176,7 +174,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
-        // One finding per state-mutating call reached in this scope; empty when the scope calls none.
         return $findings;
     }
 
@@ -289,7 +286,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
         }
 
-        // Each class is keyed under both its short and namespaced names so `extends` lookups hit either form.
         return $classes;
     }
 
@@ -304,7 +300,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $parts = explode('\\', $name);
 
-        // The trailing segment is the unqualified name; an empty split falls back to the original input.
         return $parts[array_key_last($parts)] ?? $name;
     }
 
@@ -324,7 +319,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         string           $message,
         array            $metadata,
     ): Finding {
-        // Stamp every finding with this rule's fixed pillar, tier, severity, and remediation guidance.
         return new Finding(
             ruleId:      self::ID,
             message:     $message,

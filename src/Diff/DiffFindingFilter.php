@@ -71,8 +71,6 @@ final readonly class DiffFindingFilter
             $suppressedCount++;
         }
 
-        // Return the partition: kept findings plus the tally of those dropped, so the caller can report
-        // how many were hidden by diff scoping rather than guessing from the size difference.
         return new DiffFilterResult($kept, $suppressedCount);
     }
 
@@ -136,7 +134,6 @@ final readonly class DiffFindingFilter
             }
         }
 
-        // Checked every range with no overlap, so the span lies entirely outside the changed lines.
         return false;
     }
 
@@ -203,8 +200,6 @@ final readonly class DiffFindingFilter
             $rangesByFile[$analysisUnit->file->displayPath] = $ranges;
         }
 
-        // Keyed by display path and pre-sorted smallest-span-first so enclosingRange() can take the first
-        // containing match as the tightest one without re-sorting on every lookup.
         return $rangesByFile;
     }
 

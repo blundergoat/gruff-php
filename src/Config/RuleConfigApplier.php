@@ -28,7 +28,6 @@ final readonly class RuleConfigApplier
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig
     {
         if (!isset($rootConfig['rules'])) {
-            // No rules block means nothing to override; hand back the config untouched.
             return $config;
         }
 
@@ -47,7 +46,6 @@ final readonly class RuleConfigApplier
             );
         }
 
-        // Every rule's overrides have been folded into $config across the loop; return the merged result.
         return $config;
     }
 
@@ -84,7 +82,6 @@ final readonly class RuleConfigApplier
         $severityThreshold = $this->severityThreshold($ruleId, $ruleConfig, $registry)
                              ?? $settings->severityThreshold;
 
-        // Rebuild the rule's settings from each override key, falling back to existing values where unset.
         return $config->withRuleSettings($ruleId, new RuleSettings(
             enabled:           $this->isEnabled($ruleId, $ruleConfig, $settings->enabled),
             thresholds:        $severityThreshold instanceof SeverityThreshold
@@ -123,7 +120,6 @@ final readonly class RuleConfigApplier
     private function excludeFromScore(string $ruleId, array $ruleConfig, bool $isExcludedByDefault): bool
     {
         if (!array_key_exists('excludeFromScore', $ruleConfig)) {
-            // Key omitted: preserve whatever the rule already had.
             return $isExcludedByDefault;
         }
 
@@ -131,7 +127,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.excludeFromScore" must be boolean.', $ruleId));
         }
 
-        // Caller supplied a valid boolean; it wins over the default.
         return $ruleConfig['excludeFromScore'];
     }
 
@@ -145,7 +140,6 @@ final readonly class RuleConfigApplier
     private function isEnabled(string $ruleId, array $ruleConfig, bool $isEnabledByDefault): bool
     {
         if (!array_key_exists('enabled', $ruleConfig)) {
-            // Key omitted: keep the rule's existing enabled state.
             return $isEnabledByDefault;
         }
 
@@ -153,7 +147,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.enabled" must be boolean.', $ruleId));
         }
 
-        // Caller supplied a valid boolean; it overrides the default.
         return $ruleConfig['enabled'];
     }
 
@@ -178,7 +171,6 @@ final readonly class RuleConfigApplier
         }
 
         if (!array_key_exists('thresholds', $ruleConfig)) {
-            // No thresholds map supplied; the rule keeps its built-in defaults.
             return $defaultThresholds;
         }
 
@@ -198,7 +190,6 @@ final readonly class RuleConfigApplier
             );
         }
 
-        // Defaults with each validated override overlaid by name.
         return $thresholds;
     }
 
@@ -215,7 +206,6 @@ final readonly class RuleConfigApplier
         RuleRegistry $registry,
     ): ?SeverityThreshold {
         if (!array_key_exists('threshold', $ruleConfig)) {
-            // No single-value threshold configured; signal "no override" so the caller keeps existing settings.
             return null;
         }
 
@@ -244,7 +234,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Config key "rules.%s.severity" must be "advisory", "warning", or "error".', $ruleId));
         }
 
-        // Threshold and severity both validated; pair them into the single-rubric override.
         return new SeverityThreshold($thresholdValue, Severity::from($severityValue));
     }
 
@@ -270,7 +259,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Threshold "rules.%s.thresholds.%s" must be numeric.', $ruleId, $thresholdName));
         }
 
-        // Name is allowed and value is numeric; safe to merge into the threshold map.
         return $thresholdValue;
     }
 
@@ -291,7 +279,6 @@ final readonly class RuleConfigApplier
         array        $defaultOptions,
     ): array {
         if (!array_key_exists('options', $ruleConfig)) {
-            // No options map supplied; the rule keeps its built-in option defaults.
             return $defaultOptions;
         }
 
@@ -310,7 +297,6 @@ final readonly class RuleConfigApplier
             $options[$optionName] = $this->optionValue($ruleId, $optionName, $optionValue, $allowedOptions[$optionName]);
         }
 
-        // Defaults with each validated, type-checked override applied by name.
         return $options;
     }
 
@@ -373,7 +359,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
         }
 
-        // Returned verbatim, not cast: the rule receives the exact int the user configured.
         return $optionValue;
     }
 
@@ -392,7 +377,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
         }
 
-        // An int stays an int and a float stays a float: no widening to float, so the rule sees the user's type.
         return $optionValue;
     }
 
@@ -411,7 +395,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
         }
 
-        // No truthiness coercion: only a real bool reaches here, so "0"/"false"/1 are rejected, not mapped.
         return $optionValue;
     }
 
@@ -430,7 +413,6 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
         }
 
-        // Returned untrimmed and uncast: surrounding whitespace and numeric-looking text survive to the rule.
         return $optionValue;
     }
 
@@ -474,7 +456,6 @@ final readonly class RuleConfigApplier
             $result[] = $optionItem;
         }
 
-        // Every item passed the scalar and sample-type checks; return the validated list.
         return $result;
     }
 
@@ -545,7 +526,6 @@ final readonly class RuleConfigApplier
             $result[$key] = $configuredValue;
         }
 
-        // Every key was a string and every value passed the sample-type check; return the validated map.
         return $result;
     }
 
@@ -608,7 +588,6 @@ final readonly class RuleConfigApplier
             $normalizedRuleConfig[$key] = $this->configValue($decodedItem);
         }
 
-        // Confirmed string-keyed; each value normalised into the supported config shape.
         return $normalizedRuleConfig;
     }
 
@@ -622,11 +601,9 @@ final readonly class RuleConfigApplier
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
         if (is_array($decodedValue)) {
-            // Nested array: descend so each level is bounded to the supported nesting depth.
             return $this->configArray($decodedValue);
         }
 
-        // Leaf value: validate it is a supported scalar.
         return $this->configScalar($decodedValue);
     }
 
@@ -640,7 +617,6 @@ final readonly class RuleConfigApplier
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
-            // Value is a supported scalar (or null/object); pass it through unchanged.
             return $decodedValue;
         }
 
@@ -663,7 +639,6 @@ final readonly class RuleConfigApplier
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Level-1 values normalised; nested arrays handed to the depth-2 pass.
         return $normalizedRuleValues;
     }
 
@@ -683,7 +658,6 @@ final readonly class RuleConfigApplier
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Level-2 values normalised; nested arrays handed to the depth-3 pass.
         return $normalizedRuleValues;
     }
 
@@ -703,7 +677,6 @@ final readonly class RuleConfigApplier
             $normalizedRuleValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
-        // Level-3 values normalised; nested arrays handed to the depth-4 pass (the last allowed level).
         return $normalizedRuleValues;
     }
 
@@ -726,7 +699,6 @@ final readonly class RuleConfigApplier
             $normalizedRuleValues[$key] = $this->configScalar($decodedItem);
         }
 
-        // Deepest allowed level: every item must already be a scalar.
         return $normalizedRuleValues;
     }
 }

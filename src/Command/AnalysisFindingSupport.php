@@ -26,7 +26,6 @@ final readonly class AnalysisFindingSupport
     {
         $allowedPreviews = $config->allowedSecretPreviews();
         if ($allowedPreviews === []) {
-            // Nothing allowlisted, so no secret-preview suppression applies and findings pass through unchanged.
             return $findings;
         }
 
@@ -77,13 +76,11 @@ final readonly class AnalysisFindingSupport
     public function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
     {
         if ($pathsRelativeTo === null) {
-            // No base requested, so the contract is to leave finding paths exactly as the rules emitted them.
             return $findings;
         }
 
         $realRoot = realpath($pathsRelativeTo);
         if ($realRoot === false) {
-            // The base directory does not resolve on disk, so rebasing is impossible; leave paths untouched.
             return $findings;
         }
 
@@ -188,7 +185,6 @@ final readonly class AnalysisFindingSupport
             }
         }
 
-        // No requested path contained this file, so it falls outside the analysis scope.
         return false;
     }
 

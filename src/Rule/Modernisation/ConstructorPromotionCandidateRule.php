@@ -36,7 +36,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory, medium-confidence metadata: the rewrite is a judgement call, so it never gates a build alone.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Constructor property promotion candidate',
@@ -90,7 +89,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             }
         }
 
-        // Only the classes whose shape passed the promotion pre-check reach the caller.
         return $classes;
     }
 
@@ -158,7 +156,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             }
         }
 
-        // Only direct top-level assignments qualify; nested or conditional ones are out of promotion scope.
         return $assignments;
     }
 
@@ -200,7 +197,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             return null;
         }
 
-        // Every equivalence check passed, so report this property as a promotion candidate.
         return $property;
     }
 
@@ -221,7 +217,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             }
         }
 
-        // No method named __construct, so the class has no explicit constructor.
         return null;
     }
 
@@ -245,7 +240,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             }
         }
 
-        // Static and public properties were skipped, so this set holds only promotable instance properties.
         return $properties;
     }
 
@@ -295,7 +289,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
             }
         }
 
-        // No plain same-named parameter exists, so the assignment is not a clean promotion target.
         return false;
     }
 
@@ -311,7 +304,6 @@ final readonly class ConstructorPromotionCandidateRule implements RuleInterface
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $property): Finding
     {
-        // Emit a fixed-shape advisory; the property name drives both the human message and the machine metadata.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Property $%s is assigned directly from the same constructor parameter; PHP 8 property promotion may reduce boilerplate.', $property),

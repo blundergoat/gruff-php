@@ -38,7 +38,6 @@ final readonly class UnusedParameterRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Static metadata is the same on every call; the registry reads it to list and configure the rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused parameter',
@@ -96,7 +95,6 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
-        // Only callables with both a body and parameters survive; the rest can hold no unused parameter.
         return $nodes;
     }
 
@@ -186,7 +184,6 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
-        // No attribute group carried `Override`, so nothing here ties the method to a parent signature.
         return false;
     }
 
@@ -238,7 +235,6 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
-        // Return one finding per declared parameter absent from the set of names read in the body.
         return $findings;
     }
 
@@ -263,7 +259,6 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
-        // Map only plain parameters by name; promoted-property params are skipped since they outlive the body.
         return $paramNames;
     }
 
@@ -291,7 +286,6 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
-        // Return the set of variable names read in the body, keyed for O(1) membership tests by the caller.
         return $usedNames;
     }
 
@@ -331,7 +325,6 @@ final readonly class UnusedParameterRule implements RuleInterface
     ): Finding {
         $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
-        // Point the finding at the parameter's own position so the author can jump straight to the offending token.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Parameter $%s in %s is never used.', $name, $symbol),

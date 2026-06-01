@@ -105,7 +105,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
      */
     public function definition(): RuleDefinition
     {
-        // Advisory-by-default metadata plus the prefix/attribute/path allowlists callers can override.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Single-implementor interface',
@@ -137,7 +136,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             $this->accumulate($unit, $ruleContext);
         }
 
-        // finishProject() both emits the findings and clears the accumulator, so the pass leaves no residual state.
         return $this->finishProject($ruleContext);
     }
 
@@ -174,7 +172,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
     {
         if ($this->isExcludedUnit($analysisUnit)) {
-            // Vendor and configured-out units contribute no facts, so leave the accumulator untouched.
             return;
         }
 
@@ -228,18 +225,15 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         $display = $analysisUnit->file->displayPath;
 
         if (str_starts_with($display, 'vendor/')) {
-            // Third-party interfaces are out of scope; we only judge the project's own contracts.
             return true;
         }
 
         foreach ($this->accumulationExcludedPaths ?? [] as $excluded) {
             if (str_starts_with($display, $excluded)) {
-                // Caller opted this path prefix out via additionalExcludedPaths.
                 return true;
             }
         }
 
-        // No exclusion matched, so the unit's types feed the project-level analysis.
         return false;
     }
 
@@ -326,13 +320,11 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         $current = $node->getAttribute('parent');
         while ($current instanceof Node) {
             if ($current instanceof Class_ && $current->name !== null) {
-                // First named class ancestor owns the node; anonymous classes are skipped over.
                 return $current;
             }
             $current = $current->getAttribute('parent');
         }
 
-        // Reached the top of the tree without a named class, so the node has no class scope.
         return null;
     }
 
@@ -353,13 +345,11 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     private function recordInterface(Interface_ $interface, AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
         if ($interface->name === null) {
-            // Anonymous interfaces have no FQN to key on, so there is nothing to register.
             return;
         }
 
         $fqn = $this->declarationFqn($interface);
         if ($fqn === null) {
-            // Without a resolvable name we cannot match implementors later; drop it rather than store a bad key.
             return;
         }
 
@@ -394,13 +384,11 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     private function recordClass(Class_ $class, AnalysisUnit $analysisUnit, array &$projectTypes): void
     {
         if ($class->name === null) {
-            // Anonymous classes cannot be the single named implementor we report, so skip them.
             return;
         }
 
         $classFqn = $this->declarationFqn($class);
         if ($classFqn === null) {
-            // No resolvable class name means we cannot attribute the implementation; ignore it.
             return;
         }
 
@@ -496,7 +484,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             );
         }
 
-        // One finding per interface that stayed single-implementor and externally unused after every filter.
         return $findings;
     }
 
@@ -513,11 +500,9 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
         $resolved = $node->namespacedName ?? null;
 
         if ($resolved instanceof Name) {
-            // Name resolution ran, so prefer the fully qualified form for cross-unit matching.
             return $resolved->toString();
         }
 
-        // Fall back to the short name (or null) when no namespaced name was attached.
         return $node->name?->toString();
     }
 
@@ -531,7 +516,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     private function resolveNameList(?array $names): array
     {
         if ($names === null) {
-            // Absent clause resolves to no names rather than forcing callers to null-check.
             return [];
         }
 
@@ -540,7 +524,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             $resolved[] = $this->resolveName($name);
         }
 
-        // Fully qualified form of every name in the clause, in source order.
         return $resolved;
     }
 
@@ -555,11 +538,9 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     {
         $resolved = $name->getAttribute('resolvedName');
         if ($resolved instanceof Name) {
-            // Resolver attached the fully qualified name; strip the leading slash so keys match across units.
             return ltrim($resolved->toString(), '\\');
         }
 
-        // No resolution available, so use the name as written, still normalised without a leading slash.
         return ltrim($name->toString(), '\\');
     }
 
@@ -579,7 +560,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             }
         }
 
-        // Flattened, fully qualified attribute names across every group, used to spot framework extension points.
         return $attributes;
     }
 
@@ -612,7 +592,6 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     ): void {
         $classFqn = $this->declarationFqn($class);
         if ($classFqn === null) {
-            // Cannot attribute the reference to a named class, so it cannot count as external usage; skip it.
             return;
         }
 
@@ -637,22 +616,18 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
     private function namesFromType(Identifier|Name|ComplexType|null $type): array
     {
         if ($type === null) {
-            // Untyped declaration references no class name.
             return [];
         }
 
         if ($type instanceof Identifier) {
-            // Built-in scalar/pseudo types (int, string, void) are never project interfaces.
             return [];
         }
 
         if ($type instanceof Name) {
-            // A bare class-like type is the one name this branch contributes.
             return [$type];
         }
 
         if ($type instanceof NullableType) {
-            // `?Foo` carries the same single name as `Foo`, so recurse past the nullable wrapper.
             return $this->namesFromType($type->type);
         }
 
@@ -664,11 +639,9 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
                 }
             }
 
-            // Every class name across the union/intersection members, flattened.
             return $names;
         }
 
-        // Unhandled composite type shapes contribute no names rather than risk a bad match.
         return [];
     }
 
@@ -686,13 +659,11 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             $parentLower = strtolower($parent);
             foreach ($externalPrefixes as $prefix) {
                 if (str_starts_with($parentLower, $prefix) || $parentLower === rtrim($prefix, '\\')) {
-                    // Parent belongs to an external namespace, so the interface is an extension point we must keep.
                     return true;
                 }
             }
         }
 
-        // No parent matched an external prefix, so nothing here exempts the interface.
         return false;
     }
 
@@ -710,13 +681,11 @@ final class SingleImplementorInterfaceRule implements ProjectRuleInterface, Proj
             $attributeLower = strtolower($attribute);
             foreach ($frameworkAttributePrefixes as $prefix) {
                 if (str_starts_with($attributeLower, $prefix) || str_contains($attributeLower, $prefix)) {
-                    // A framework attribute means the interface is wired by the framework, so leave it alone.
                     return true;
                 }
             }
         }
 
-        // No framework attribute present, so attributes give no reason to exempt the interface.
         return false;
     }
 

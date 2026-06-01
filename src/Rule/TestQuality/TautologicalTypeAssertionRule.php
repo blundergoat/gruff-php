@@ -35,7 +35,6 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High-confidence error: an assertInstanceOf the local code already proves is a defect, not a style nit.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Tautological type assertion',
@@ -99,7 +98,6 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
             }
         }
 
-        // One finding per redundant assertInstanceOf; empty when every type assertion adds real coverage.
         return $findings;
     }
 
@@ -206,11 +204,9 @@ final readonly class TautologicalTypeAssertionRule implements RuleInterface
     private function describeValue(Expr $expr): string
     {
         if ($expr instanceof Expr\Variable && is_string($expr->name)) {
-            // Use the source variable name so the finding message points at the exact symbol.
             return $expr->name;
         }
 
-        // Fallback label for unnamed expressions; keeps the message readable without leaking AST detail.
         return 'value';
     }
 }

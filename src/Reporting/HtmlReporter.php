@@ -49,7 +49,6 @@ final readonly class HtmlReporter
             ? '<script type="module">' . HtmlReportAssets::interactiveScript() . '</script>' . PHP_EOL
             : '';
 
-        // Assemble the whole document in section order; this concatenation is the single source of page layout.
         return '<!DOCTYPE html>' . PHP_EOL
                . '<html lang="en-NZ">' . PHP_EOL
                . '<head>' . PHP_EOL
@@ -88,7 +87,6 @@ final readonly class HtmlReporter
             ? sprintf('%s · %d changed files', $report->diff->mode, count($report->diff->changedFiles))
             : 'full project';
 
-        // Emit the masthead with the resolved paths and scope label folded into the meta panel.
         return '<header class="masthead">'
                . '<div class="brand"><div class="wordmark">gruff</div><div class="tagline">php code quality · inspection report</div></div>'
                . '<div class="meta">'
@@ -110,7 +108,6 @@ final readonly class HtmlReporter
     private function diagnostics(AnalysisReport $report): string
     {
         if ($report->diagnostics === []) {
-            // No run messages means no section, so callers concatenate nothing here.
             return '';
         }
 
@@ -120,7 +117,6 @@ final readonly class HtmlReporter
             $html .= $this->diagnosticRow($diagnostic);
         }
 
-        // Close the list and section wrappers opened above around the per-diagnostic rows.
         return $html . '</div></section>';
     }
 
@@ -139,7 +135,6 @@ final readonly class HtmlReporter
     {
         $summary = $this->verdictSummary($report, $counts);
 
-        // Build the grade stamp plus the headline, severity tallies, and score-driver context as one block.
         return '<section class="verdict">'
                . '<div class="grade-stamp">'
                . sprintf('<div class="grade-letter">%s</div>', $this->escape($grade))
@@ -190,7 +185,6 @@ final readonly class HtmlReporter
             $html .= $this->pillarRow($pillar);
         }
 
-        // Close the table body and section around the rows (or the "No pillars." placeholder) emitted above.
         return $html . '</tbody></table></section>';
     }
 
@@ -215,7 +209,6 @@ final readonly class HtmlReporter
             $html .= $this->offenderRow($item);
         }
 
-        // Close the offender table body and section around the rows (or "No offenders found." placeholder).
         return $html . '</tbody></table></section>';
     }
 
@@ -240,7 +233,6 @@ final readonly class HtmlReporter
             $axis   .= sprintf('<span>%s</span>', $this->escape($label));
         }
 
-        // Emit the chart section wrapping the summary sentence, the bars, and their bucket-label axis.
         return '<section class="chart-section"><h2 class="section-head">distribution <span class="aside">cyclomatic complexity</span></h2>'
                . sprintf('<p class="chart-summary">%s</p>', $this->escape($this->cyclomaticSummary($distribution)))
                . '<div class="chart-card"><div class="title">cyclomatic complexity · flagged methods</div>'
@@ -272,7 +264,6 @@ final readonly class HtmlReporter
             $html .= $this->findingRow($finding);
         }
 
-        // Close the findings list and section around the rows (or the "No findings." placeholder).
         return $html . '</div></section>';
     }
 
@@ -285,7 +276,6 @@ final readonly class HtmlReporter
      */
     private function footer(AnalysisReport $report): string
     {
-        // Emit the footer band carrying the tool version, tagline, and schema id.
         return '<footer class="footer">'
                . sprintf('<div class="left">gruff-php · v%s</div>', $this->escape($report->toolVersion))
                . '<div class="center">strong opinions, opinionated defaults</div>'
@@ -306,7 +296,6 @@ final readonly class HtmlReporter
         $gradeClass = $pillar->grade === null ? 'n' : strtolower($grade[0] ?? 'n');
         $score      = $pillar->grade === null ? 'n/a' : sprintf('%.2f', $pillar->grade->score);
 
-        // One table row pairing the pillar name and grade with its finding and per-severity counts.
         return '<tr>'
                . sprintf('<td class="pillar-name">%s</td>', $this->escape($pillar->pillar))
                . sprintf('<td class="num"><span class="grade-pill %s">%s</span></td>', $this->escape($gradeClass), $this->escape($grade))
@@ -331,7 +320,6 @@ final readonly class HtmlReporter
     private function pillarSummaryRows(AnalysisReport $report): array
     {
         if ($report->score === null) {
-            // No score means no pillars to tabulate, so the caller renders the empty-table placeholder.
             return [];
         }
 
@@ -349,7 +337,6 @@ final readonly class HtmlReporter
         }
 
         usort($rows, static function (PillarScore $left, PillarScore $right): int {
-            // Most findings first; ties broken by pillar name so the table order is stable across runs.
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
 
@@ -367,7 +354,6 @@ final readonly class HtmlReporter
      */
     private function severityCellClass(int $count, string $tier): string
     {
-        // A zero count stays neutral, so a clean pillar's cells render quiet rather than coloured.
         return $count > 0 ? $tier : '';
     }
 
@@ -380,7 +366,6 @@ final readonly class HtmlReporter
      */
     private function offenderRow(FileScore $file): string
     {
-        // One table row pairing the file path and grade with its complexity, LOC, and finding metrics.
         return '<tr>'
                . sprintf('<td class="file-path">%s</td>', $this->locationMarkup($file->filePath, null))
                . sprintf('<td class="num">%s</td>', $this->escape($this->optionalInt($file->maxCyclomatic)))
@@ -415,7 +400,6 @@ final readonly class HtmlReporter
             $this->escape($finding->ruleId . ' ' . $finding->message),
         ) : '';
 
-        // One finding card: the severity badge, rule, message, location, and pillar, plus filter data in interactive mode.
         return '<div class="finding"' . $attributes . '>'
                . sprintf('<div class="severity %s">%s</div>', $severityClass, $this->escape($finding->severity->value))
                . '<div class="finding-body">'
@@ -437,7 +421,6 @@ final readonly class HtmlReporter
      */
     private function metaRow(string $label, string $displayText): string
     {
-        // One label/value pair; both sides are HTML-escaped here so callers pass raw text.
         return sprintf(
             '<div><span class="label">%s</span><span class="val">%s</span></div>',
             $this->escape($label),
@@ -456,7 +439,6 @@ final readonly class HtmlReporter
      */
     private function stat(string $number, string $label, string $class): string
     {
-        // One stat tile: the count, its caption, and an optional severity colour class on the number.
         return sprintf(
             '<div class="stat"><div class="num %s">%s</div><div class="lbl">%s</div></div>',
             $this->escape($class),
@@ -476,7 +458,6 @@ final readonly class HtmlReporter
     private function scoreContext(AnalysisReport $report): string
     {
         if ($report->score === null) {
-            // Without a score there are no drivers to explain, so the section is omitted.
             return '';
         }
 
@@ -522,7 +503,6 @@ final readonly class HtmlReporter
             $list .= sprintf('<li>%s</li>', $this->escape($item));
         }
 
-        // Wrap the accumulated driver notes as a titled "score drivers" list.
         return '<div class="score-context"><div class="score-context-title">score drivers</div><ul>' . $list . '</ul></div>';
     }
 
@@ -535,7 +515,6 @@ final readonly class HtmlReporter
      */
     private function optionalInt(?int $integer): string
     {
-        // A missing metric reads as "n/a" so empty cells are explicit rather than blank.
         return $integer === null ? 'n/a' : (string)$integer;
     }
 
@@ -551,7 +530,6 @@ final readonly class HtmlReporter
         $thresholdFindings = $counts['warning'] + $counts['error'];
 
         if ($thresholdFindings === 0) {
-            // A clean threshold tally yields the reassuring sentence with no pillar breakdown.
             return 'No warning or error findings flagged.';
         }
 
@@ -564,7 +542,6 @@ final readonly class HtmlReporter
             $pillars[$finding->pillar->value] = true;
         }
 
-        // State the threshold-finding count and how many pillars they span, pluralising both nouns.
         return sprintf(
             '%d %s at warning or error severity across %d %s.',
             $thresholdFindings,
@@ -586,7 +563,6 @@ final readonly class HtmlReporter
         $severe   = $distribution['21+'] ?? 0;
         $exceeds  = $moderate + $high + $severe;
 
-        // Report how many methods exceed CC 10 and the per-bucket split, pluralising the verb and noun.
         return sprintf(
             '%d %s %s CC 10 (%d in 11-15, %d in 16-20, %d at 21+).',
             $exceeds,
@@ -614,7 +590,6 @@ final readonly class HtmlReporter
         $href              = $this->editorHref($filePath, $line);
 
         if ($href !== null) {
-            // An editor link is configured, so the location is a clickable anchor into the editor.
             return sprintf(
                 '<a class="loc-link" href="%s"%s>%s</a>',
                 $this->escape($href),
@@ -623,7 +598,6 @@ final readonly class HtmlReporter
             );
         }
 
-        // No editor link: render a focusable but inert span so the path still copies via data-path.
         return sprintf('<span class="loc-link" tabindex="0"%s>%s</span>', $locationAttribute, $this->escape($text));
     }
 
@@ -639,13 +613,11 @@ final readonly class HtmlReporter
     private function editorHref(string $filePath, ?int $line): ?string
     {
         if ($this->editorLink === 'none') {
-            // Editor linking is disabled, so the location stays a plain span rather than an anchor.
             return null;
         }
 
         $absolutePath = $this->absolutePath($filePath);
 
-        // Dispatch on the configured editor; an unrecognised value yields no link rather than a broken one.
         return match ($this->editorLink) {
             'vscode' => $this->vscodeHref($absolutePath, $line),
             'phpstorm' => 'phpstorm://open?file=' . rawurlencode($absolutePath) . ($line === null ? '' : '&line=' . $line),
@@ -680,7 +652,6 @@ final readonly class HtmlReporter
             $encodedPath = '/' . $encodedPath;
         }
 
-        // Assemble the vscode://file URL from the leading-slash-normalised path plus the optional line anchor.
         return 'vscode://file' . $encodedPath . ($line === null ? '' : ':' . $line);
     }
 
@@ -694,7 +665,6 @@ final readonly class HtmlReporter
     private function absolutePath(string $filePath): string
     {
         if (PathHelper::isAbsolute($filePath)) {
-            // Already absolute, so return it unchanged rather than prefixing the project root again.
             return $filePath;
         }
 
@@ -704,7 +674,6 @@ final readonly class HtmlReporter
             $projectRoot = is_string($cwd) ? $cwd : '';
         }
 
-        // Join the relative path onto the project root (falling back to cwd) with exactly one separator.
         return rtrim($projectRoot, '/') . '/' . ltrim($filePath, '/');
     }
 
@@ -730,7 +699,6 @@ final readonly class HtmlReporter
             $pillarOptions .= sprintf('<option value="%s">%s</option>', $this->escape($pillar), $this->escape($pillar));
         }
 
-        // Build the filter form: severity and pillar selects, path/search inputs, group-by radios, and the live count.
         return '<form class="finding-filters" data-finding-filters aria-label="Filter flagged findings">'
                . '<div class="filter-grid">'
                . '<label>Severity<select name="severity" multiple size="3">'
@@ -761,7 +729,6 @@ final readonly class HtmlReporter
      */
     private function diagnosticRow(RunDiagnostic $diagnostic): string
     {
-        // One diagnostic line: its type label, message, and (when present) the file/line it points at.
         return sprintf(
             '<div class="diagnostic"><span class="diagnostic-type">%s</span><span class="diagnostic-message">%s</span>%s</div>',
             $this->escape($diagnostic->type),
@@ -783,7 +750,6 @@ final readonly class HtmlReporter
         $location = $diagnostic->filePath ?? $diagnostic->path;
 
         if ($location === null) {
-            // No file or path is attached, so there is nothing to locate and the span is omitted.
             return '';
         }
 
@@ -791,7 +757,6 @@ final readonly class HtmlReporter
             $location .= ':' . $diagnostic->line;
         }
 
-        // Wrap the resolved location (path, optionally with line) as the diagnostic's location span.
         return sprintf('<span class="diagnostic-location">%s</span>', $this->escape($location));
     }
 
@@ -805,7 +770,6 @@ final readonly class HtmlReporter
      */
     private function escape(string $text): string
     {
-        // Escape quotes too so the value is safe in both attribute and text contexts; invalid bytes are substituted.
         return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }

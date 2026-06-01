@@ -36,7 +36,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Low confidence and advisory: only fires once a project opts in by listing its own domain namespaces.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Mocking a domain object',
@@ -137,7 +136,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             }
         }
 
-        // Local alias keyed to its fully qualified target, so short class references can be resolved later.
         return $useAliases;
     }
 
@@ -163,7 +161,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             return null;
         }
 
-        // The left-hand side of the `::class` fetch is the mocked class name.
         return $classConstFetch->class->toString();
     }
 
@@ -176,7 +173,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     private function resolveClassName(string $className, array $useAliases): string
     {
         if (str_starts_with($className, '\\')) {
-            // Already fully qualified; just drop the leading separator to match the alias-map form.
             return ltrim($className, '\\');
         }
 
@@ -189,7 +185,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             return $useAliases[$first] . $rest;
         }
 
-        // No matching import, so the reference is already same-namespace or global and stands as written.
         return $className;
     }
 
@@ -208,7 +203,6 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             }
         }
 
-        // No configured pattern matched, so this class is not a domain object for the rule's purposes.
         return null;
     }
 }

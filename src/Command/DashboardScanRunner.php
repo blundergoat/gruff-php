@@ -155,7 +155,6 @@ final class DashboardScanRunner
             ];
         }
 
-        // Fresh scan succeeded: render its HTML with the command, exit code, and duration stamped in.
         return $renderer->injectDashboardMetadata(html: $html, projectRoot: $scanRoot, command: $command, exitCode: $exitCode, durationMs: $durationMs);
     }
 
@@ -187,7 +186,6 @@ final class DashboardScanRunner
 
         sort($parts, SORT_STRING);
 
-        // Sort first so the digest is order-independent: the same file set always hashes to the same fingerprint.
         return hash('sha256', implode("\n", $parts));
     }
 
@@ -294,7 +292,6 @@ final class DashboardScanRunner
     {
         $hash = hash_file('sha256', $path);
 
-        // Combine path, mtime, size, and content hash so any edit to the file changes its fingerprint.
         return sprintf('file:%s:%d:%d:%s', $path, filemtime($path) ?: 0, filesize($path) ?: 0, is_string($hash) ? $hash : '');
     }
 

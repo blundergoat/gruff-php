@@ -26,7 +26,6 @@ final class ModernisationNodeHelper
      */
     public static function supportsPhp(RuleContext $ruleContext, float $version): bool
     {
-        // True only when the project's configured floor already reaches the feature's required version.
         return $ruleContext->config->minimumPhpVersion() >= $version;
     }
 
@@ -68,7 +67,6 @@ final class ModernisationNodeHelper
             return false;
         }
 
-        // With no name requested, any `$this` property matches; otherwise the fetched name must equal it.
         return $propertyName === null || $expr->name->toString() === $propertyName;
     }
 
@@ -86,7 +84,6 @@ final class ModernisationNodeHelper
             return null;
         }
 
-        // Return the bare property identifier so callers can key assignment maps on it.
         return $expr->name->toString();
     }
 
@@ -99,7 +96,6 @@ final class ModernisationNodeHelper
      */
     public static function className(Stmt\Class_ $class): ?string
     {
-        // Anonymous classes have no name node, so the null-safe call yields null for them.
         return $class->name?->toString();
     }
 
@@ -125,7 +121,6 @@ final class ModernisationNodeHelper
             }
         }
 
-        // No conventional suffix matched, so the class is not treated as a value object.
         return false;
     }
 

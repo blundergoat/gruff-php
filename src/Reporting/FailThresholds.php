@@ -99,7 +99,6 @@ final readonly class FailThresholds
     {
         self::assertKnownKeys($conditions, $keyPath, $allowsNewFindings);
 
-        // Assemble the gate from its three independently-parsed parts after the keys are validated.
         return new self(
             self::parseTotal($conditions, $keyPath),
             self::parseSeverityThresholds($conditions, $keyPath),
@@ -148,7 +147,6 @@ final readonly class FailThresholds
             throw new ConfigException(sprintf('Config key "%s.total" must be a non-negative integer.', $keyPath));
         }
 
-        // Validated non-negative cap on the total finding count.
         return $totalValue;
     }
 
@@ -185,7 +183,6 @@ final readonly class FailThresholds
             $severityCounts[$severityKey] = $cap;
         }
 
-        // Validated caps keyed by canonical severity value, ready for the constructor's non-negativity recheck.
         return $severityCounts;
     }
 
@@ -211,7 +208,6 @@ final readonly class FailThresholds
             throw new ConfigException(sprintf('Config key "%s.newFindings" must be an object.', $keyPath));
         }
 
-        // Recurse with allowsNewFindings=false so a newFindings block cannot itself nest another one.
         return self::parseConditions($newFindings, $keyPath . '.newFindings', false);
     }
 
@@ -251,7 +247,6 @@ final readonly class FailThresholds
             return new ThresholdTrip(ThresholdTrip::KIND_TOTAL, $totalCount, $this->total);
         }
 
-        // No cap exceeded: the run passes the gate.
         return null;
     }
 
@@ -288,7 +283,6 @@ final readonly class FailThresholds
             }
         }
 
-        // No new-findings sub-gate or it passed; fall through to the overall gate across every finding.
         return $this->tripsOn($allFindings);
     }
 }

@@ -63,11 +63,9 @@ final class SecurityNodeHelper
     {
         $arg = $args[$index] ?? null;
         if (!$arg instanceof Node\Arg) {
-            // Missing slot or a variadic spread placeholder: no concrete argument expression to hand back.
             return null;
         }
 
-        // Unwrap to the bare value expression so callers inspect the argument, not its Arg wrapper.
         return $arg->value;
     }
 
@@ -353,7 +351,6 @@ final class SecurityNodeHelper
      */
     public static function isStringLiteral(Node $node): bool
     {
-        // A bare string literal is statically trusted, so rules use this to exempt constant arguments.
         return $node instanceof Scalar\String_;
     }
 
@@ -368,7 +365,6 @@ final class SecurityNodeHelper
     {
         $name = self::globalFunctionName($call);
 
-        // Fall back to a human label when the callee is dynamic, so finding messages never show an empty name.
         return $name ?? 'dynamic function call';
     }
 
@@ -382,11 +378,9 @@ final class SecurityNodeHelper
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
         if (!$call->name instanceof Identifier) {
-            // A computed method name ($obj->$method()) cannot be matched statically, so report none.
             return null;
         }
 
-        // Lower-case because method names are case-insensitive in PHP; callers compare against lower-case literals.
         return strtolower($call->name->toString());
     }
 
@@ -433,17 +427,14 @@ final class SecurityNodeHelper
         foreach ($classNames as $className) {
             $normalized = strtolower(ltrim($className, '\\'));
             if ($resolvedName === $normalized) {
-                // Exact FQCN match against a configured fully-qualified target.
                 return true;
             }
 
             if (!str_contains($normalized, '\\') && str_ends_with($resolvedName, '\\' . $normalized)) {
-                // Short-name target: match any namespace whose final segment equals it (the `\Foo` suffix).
                 return true;
             }
         }
 
-        // None of the supplied names matched the resolved class.
         return false;
     }
 
@@ -547,7 +538,6 @@ final class SecurityNodeHelper
      */
     private static function hasSensitiveContext(string $contextText): bool
     {
-        // Match secret-like identifier and string-key fragments without reading values into findings.
         return preg_match('/(?:api[_-]?key|auth(?:orization)?|cookie|pass(?:word|wd)?|private[_-]?key|secret|token)/i', $contextText) === 1;
     }
 }

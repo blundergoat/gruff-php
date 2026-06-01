@@ -54,7 +54,6 @@ final class ListRulesCommand extends Command
         if (!is_string($format) || !in_array($format, ['text', 'table', 'json'], true)) {
             $output->writeln('<error>USAGE-ERROR Unsupported rule-list format. Use text, table, or json.</error>');
 
-            // Caller passed an unknown format; signal misuse so a CI gate can distinguish it from a rule failure.
             return Command::INVALID;
         }
 
@@ -63,7 +62,6 @@ final class ListRulesCommand extends Command
         $ruleId   = $input->getArgument('ruleId');
 
         if (is_string($ruleId) && $ruleId !== '') {
-            // A rule id was supplied, so the catalogue is bypassed in favour of the single-rule detail view.
             return $this->renderRuleDetail(
                 ruleId:   $ruleId,
                 registry: $registry,
@@ -88,11 +86,9 @@ final class ListRulesCommand extends Command
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode rule metadata: %s</error>', $exception->getMessage()));
 
-                // Encoding failed, so nothing usable was emitted; report failure rather than a partial document.
                 return Command::FAILURE;
             }
 
-            // The full JSON catalogue was written, so the run succeeded.
             return Command::SUCCESS;
         }
 
@@ -112,7 +108,6 @@ final class ListRulesCommand extends Command
                              ));
         }
 
-        // The Markdown table was written to completion, so the run succeeded.
         return Command::SUCCESS;
     }
 
@@ -140,7 +135,6 @@ final class ListRulesCommand extends Command
         }
 
         if ($match === null) {
-            // No rule matched the id, so delegate to the typo path which owns its own exit code.
             return $this->renderRuleNotFound($ruleId, $registry, $output);
         }
 
@@ -152,17 +146,14 @@ final class ListRulesCommand extends Command
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode rule detail: %s</error>', $exception->getMessage()));
 
-                // Encoding failed, so no usable detail document was emitted; report failure.
                 return Command::FAILURE;
             }
 
-            // The JSON detail payload was written, so the run succeeded.
             return Command::SUCCESS;
         }
 
         $output->write($this->renderDetailText($match, $enabled), false, OutputInterface::OUTPUT_RAW);
 
-        // The text detail view was written, so the run succeeded.
         return Command::SUCCESS;
     }
 
@@ -201,7 +192,6 @@ final class ListRulesCommand extends Command
             $output->writeln(sprintf('Did you mean: %s ?', implode(', ', $suggestions)));
         }
 
-        // The requested rule id does not exist; signal misuse so callers can branch on a bad-argument exit.
         return Command::INVALID;
     }
 

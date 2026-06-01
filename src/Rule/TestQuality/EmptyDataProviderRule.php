@@ -38,7 +38,6 @@ final readonly class EmptyDataProviderRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error: a provider yielding no rows silently skips its test, so the suite passes while asserting nothing.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Empty data provider',
@@ -65,7 +64,6 @@ final readonly class EmptyDataProviderRule implements RuleInterface
             array_push($findings, ...$this->classFindings($analysisUnit, $class));
         }
 
-        // One finding per test/provider pair where the provider is statically guaranteed to be empty.
         return $findings;
     }
 

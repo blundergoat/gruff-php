@@ -36,8 +36,6 @@ final readonly class StringListConfigParser
             $strings[] = $this->normalizedString($rawConfigValue, $path, $index, hasPathPatterns: $hasPathPatterns, allowsGlobs: $allowsGlobs);
         }
 
-        // Dedupe so a repeated pattern is not validated or matched twice; array_values reindexes the
-        // gaps array_unique leaves behind so the result satisfies the list<string> contract callers rely on.
         return array_values(array_unique($strings));
     }
 
@@ -69,8 +67,6 @@ final readonly class StringListConfigParser
             $this->assertPathPattern($normalized, $path, $index, $allowsGlobs);
         }
 
-        // Hand back the canonical form (trimmed, backslashes folded to `/`) so every downstream path
-        // comparison sees one separator convention regardless of how the value was written in config.
         return $normalized;
     }
 

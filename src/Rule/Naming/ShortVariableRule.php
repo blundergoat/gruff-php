@@ -50,7 +50,6 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory tier: a short name is a smell, never a build-breaker on its own.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Short variable name',
@@ -124,7 +123,6 @@ final readonly class ShortVariableRule implements RuleInterface
             }
         }
 
-        // One finding per offending parameter; empty when every parameter name is long enough or allowed.
         return $findings;
     }
 
@@ -173,8 +171,6 @@ final readonly class ShortVariableRule implements RuleInterface
             }
         }
 
-        // Reportable short locals only: allowlisted loop counters and caught-exception names never reach this list,
-        // so an empty result means every local in the scope is either long enough or an exempted convention.
         return $findings;
     }
 
@@ -210,8 +206,6 @@ final readonly class ShortVariableRule implements RuleInterface
             return null;
         }
 
-        // The name is a single-character identifier the project has not opted out of, so surface it as a Naming
-        // finding telling the reviewer the variable's intent is unclear and pointing them at where to rename it.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s in %s is a single character.', ucfirst($kind), $name, $symbol),
@@ -254,7 +248,6 @@ final readonly class ShortVariableRule implements RuleInterface
 
         $position = strpos($line, '$' . $name);
 
-        // Convert the 0-indexed match to a 1-indexed column; null when the token is not on this line.
         return $position === false ? null : $position + 1;
     }
 
@@ -277,7 +270,6 @@ final readonly class ShortVariableRule implements RuleInterface
             $this->collectVariablesByName($loop->init, $vars);
         }
 
-        // Set membership is all callers need; the `true` values just mark presence of each loop variable.
         return $vars;
     }
 
@@ -298,7 +290,6 @@ final readonly class ShortVariableRule implements RuleInterface
             }
         }
 
-        // Presence set keyed by name; callers only test membership, never the stored value.
         return $vars;
     }
 
@@ -339,7 +330,6 @@ final readonly class ShortVariableRule implements RuleInterface
             }
         }
 
-        // Descendants are scanned in document order, so matches come back in source order.
         return $matches;
     }
 
@@ -359,7 +349,6 @@ final readonly class ShortVariableRule implements RuleInterface
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
 
-        // Flattened matches from every root, in the order the recursive walk encountered them.
         return $matches;
     }
 
@@ -403,7 +392,6 @@ final readonly class ShortVariableRule implements RuleInterface
             $this->collectChildNodes($node->{$name}, $children);
         }
 
-        // Only real Node children survive; scalars and nulls in sub-node slots are dropped by the collector.
         return $children;
     }
 
@@ -444,11 +432,9 @@ final readonly class ShortVariableRule implements RuleInterface
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            // Named functions and methods carry a real identifier; reuse the shared resolver for it.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
-        // Closures and arrow functions are anonymous, so synthesise a kind@line label callers can locate.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

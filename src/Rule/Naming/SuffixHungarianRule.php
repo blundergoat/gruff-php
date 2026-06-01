@@ -66,7 +66,6 @@ final readonly class SuffixHungarianRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory by default: a suffix is a style smell, not a defect, so it should never gate a build.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Suffix Hungarian notation',
@@ -312,17 +311,14 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $symbol      = $identifier['symbol'];
         $suffixToken = $this->suffixToken($name, $suffixes, $tokenizer);
         if ($suffixToken === null) {
-            // No configured suffix at the tail, so there is nothing to report on this identifier.
             return null;
         }
 
         $suffix = $suffixes[$suffixToken];
         if ($this->doesTypeContradictSuffix($type, $suffixToken)) {
-            // The declared type disagrees with the suffix, so the name is not restating its own type.
             return null;
         }
 
-        // The suffix duplicates the type with no contradicting evidence; emit the rename finding.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s encodes the type suffix "%s".', ucfirst($kind), $name, $suffix),
@@ -350,7 +346,6 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $docType = $this->localVarDocType($variable);
 
-        // Absent annotation is treated as permissive; only a present, mismatching `@var` clears the suffix.
         return $docType === null || $this->matchesDocTypeSuffix($docType, strtolower($suffix));
     }
 
@@ -365,13 +360,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
     {
         $tokens = $tokenizer->tokenize($name);
         if (count($tokens) < 2 || $this->isConversionIdiom($tokens)) {
-            // Single-token names and `as`/`to` conversions carry no type suffix worth flagging.
             return null;
         }
 
         $suffixToken = $tokens[array_key_last($tokens)];
 
-        // Match only when the final token is one of the configured suffixes; otherwise no suffix applies.
         return isset($suffixes[$suffixToken]) ? $suffixToken : null;
     }
 
@@ -390,19 +383,16 @@ final readonly class SuffixHungarianRule implements RuleInterface
             $docComment = $parent->getDocComment();
             // Read an adjacent @var type assertion before using it to infer suffix intent.
             if ($docComment !== null && preg_match('/@var\s+([^\s]+)/', $docComment->getText(), $matches) === 1) {
-                // Nearest enclosing `@var` wins; its raw type text is what the suffix check compares against.
                 return $matches[1];
             }
 
             if ($parent instanceof Expression || $parent instanceof ClassMethod || $parent instanceof Function_) {
-                // Stop at the statement or function boundary so the search stays within the variable's own scope.
                 return null;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
-        // Reached the top of the chain with no annotation, so the variable has no local doc type.
         return null;
     }
 
@@ -415,13 +405,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function doesTypeContradictSuffix(?Node $type, string $suffix): bool
     {
         if ($type === null) {
-            // No declared type means nothing can contradict the suffix; the suffix stands as evidence.
             return false;
         }
 
         $typeName = $this->singleTypeName($type);
 
-        // Contradiction needs a resolvable single type whose name does not match the suffix.
         return $typeName !== null && !$this->matchesTypeNameSuffix($typeName, $suffix);
     }
 
@@ -442,11 +430,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
         ));
 
         if (count($arms) !== 1) {
-            // Multi-arm unions are ambiguous about the suffix, so they neither confirm nor allow it here.
             return false;
         }
 
-        // A single non-null arm is decisive: the suffix holds only if that one type matches it.
         return $this->matchesTypeNameSuffix($arms[0], $suffix);
     }
 
@@ -467,7 +453,6 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $parts      = explode('\\', $normalised);
         $shortName  = $parts[array_key_last($parts)] ?? $normalised;
 
-        // Each suffix admits the native type names that genuinely denote it; anything else is no match.
         return match ($suffix) {
             'string' => $shortName === 'string',
             'array', 'list', 'map', 'set', 'hash' => in_array($shortName, ['array', 'iterable', 'list', 'non-empty-list'], true),
@@ -489,12 +474,10 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function singleTypeName(Node $type): ?string
     {
         if ($type instanceof NullableType) {
-            // `?T` is one non-null arm; unwrap the nullable and resolve the inner type.
             return $this->singleTypeName($type->type);
         }
 
         if ($type instanceof Identifier || $type instanceof Name) {
-            // A plain hint already names exactly one type, so return it verbatim.
             return $type->toString();
         }
 
@@ -504,11 +487,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 static fn (Node $node): bool => !($node instanceof Identifier && $node->toLowerString() === 'null'),
             ));
 
-            // Resolvable only when the union collapses to a single non-null arm; mixed unions stay ambiguous.
             return count($nonNull) === 1 ? $this->singleTypeName($nonNull[0]) : null;
         }
 
-        // Intersection and other unsupported shapes cannot be reduced to one name.
         return null;
     }
 
@@ -530,7 +511,6 @@ final readonly class SuffixHungarianRule implements RuleInterface
             }
         }
 
-        // Lower-case keys let suffix lookups ignore the casing authors used in config.
         return $normalised;
     }
 
@@ -542,13 +522,11 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function isConversionIdiom(array $tokens): bool
     {
         if (count($tokens) < 3) {
-            // An idiom needs a verb plus subject plus suffix; fewer tokens cannot form `...AsString`.
             return false;
         }
 
         $previousToken = $tokens[array_key_last($tokens) - 1];
 
-        // `as`/`to` immediately before the suffix marks a deliberate cast like `$nameAsString`, so exempt it.
         return in_array($previousToken, ['as', 'to'], true);
     }
 
@@ -562,11 +540,9 @@ final readonly class SuffixHungarianRule implements RuleInterface
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            // Named methods and functions carry a real qualified symbol, so reuse the shared resolver.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
-        // Anonymous closures and arrows have no name, so label them by kind and start line for traceability.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

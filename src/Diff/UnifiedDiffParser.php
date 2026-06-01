@@ -68,7 +68,6 @@ final readonly class UnifiedDiffParser
         sort($changedFiles, SORT_STRING);
         ksort($changedLines, SORT_STRING);
 
-        // Files and per-file ranges are pre-sorted so downstream diff filtering is deterministic.
         return [
             'files' => $changedFiles,
             'lines' => $changedLines,
@@ -116,7 +115,6 @@ final readonly class UnifiedDiffParser
             return substr($rawPath, 2);
         }
 
-        // No `b/` prefix (e.g. already-normalised input): use the path unchanged.
         return $rawPath;
     }
 
@@ -141,7 +139,6 @@ final readonly class UnifiedDiffParser
             return substr($rawPath, 2);
         }
 
-        // No `a/` prefix (e.g. already-normalised input): use the path unchanged.
         return $rawPath;
     }
 
@@ -168,7 +165,6 @@ final readonly class UnifiedDiffParser
             return stripcslashes(substr($rawPath, 1, -1));
         }
 
-        // Unquoted ASCII path needs no decoding once any trailing metadata is gone.
         return $rawPath;
     }
 }

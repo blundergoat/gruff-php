@@ -46,7 +46,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Defaults target 2-3 character names; single chars belong to ShortVariableRule, 4+ are usually real words.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Abbreviation allowlist',
@@ -344,7 +343,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             return null;
         }
 
-        // Everything above passed, so this is a genuinely undeclared abbreviation worth flagging.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s "$%s" is a short lowercase name not declared in acceptedAbbreviations.', ucfirst($kind), $name),
@@ -395,7 +393,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             }
         }
 
-        // Loop and catch variables are idiomatically short, so return them as a name-keyed set to skip later.
         return $names;
     }
 
@@ -476,7 +473,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
             $this->collectChildNodes($node->{$name}, $children);
         }
 
-        // Flat list of immediate child nodes; the caller recurses, so this stays one level deep by design.
         return $children;
     }
 
@@ -516,11 +512,9 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            // Named callables get their qualified name so findings point at a symbol a reader can locate.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
-        // Closures and arrow functions have no name, so anchor the finding to kind plus start line instead.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 
@@ -533,7 +527,6 @@ final readonly class AbbreviationAllowlistRule implements RuleInterface
      */
     private function lowercaseList(array $values): array
     {
-        // Lowercase every entry up front so allowlist membership checks can compare case-insensitively.
         return array_map(static fn (string $optionValue): string => strtolower($optionValue), $values);
     }
 }

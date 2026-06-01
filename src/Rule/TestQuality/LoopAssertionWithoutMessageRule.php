@@ -37,7 +37,6 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Hand the registry this rule's identity, pillar, and advisory defaults.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Assertion in loop without message',
@@ -141,7 +140,6 @@ final readonly class LoopAssertionWithoutMessageRule implements RuleInterface
             return $this->hasLegacyStringMessageArgument($call);
         }
 
-        // A message is present only when an argument sits past the assertion's required positional operands.
         return count($call->args) > $minimumArgumentCount;
     }
 

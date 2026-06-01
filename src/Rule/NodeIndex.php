@@ -87,7 +87,6 @@ final class NodeIndex
         /** @var list<T> $nodes Cached entries are keyed by the exact requested class-string. */
         $nodes = $byClass[$class] ?? [];
 
-        // Empty list (not null) when the unit holds no node of that class, so callers can foreach unconditionally.
         return $nodes;
     }
 
@@ -118,7 +117,6 @@ final class NodeIndex
             }
         }
 
-        // Reindex to a 0-based list; the object-id keys only existed to drop nodes matching more than one class.
         return array_values($combined);
     }
 
@@ -169,7 +167,6 @@ final class NodeIndex
             }
         }
 
-        // Each match appears once in body preorder; the inner break stops a node counting per class it satisfies.
         return $matches;
     }
 
@@ -206,7 +203,6 @@ final class NodeIndex
 
         self::$logicalLineCountCache[$node] = $count;
 
-        // Distinct start lines, so multiple statements sharing one physical line count once toward body size.
         return $count;
     }
 

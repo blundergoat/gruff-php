@@ -167,7 +167,6 @@ final readonly class EagerTestRule implements RuleInterface
             $callsByReceiver[$receiver][$name] = $name;
         }
 
-        // Count only the busiest receiver, so helpers spread across many objects do not read as one eager SUT.
         return $this->largestReceiverCallSet($callsByReceiver);
     }
 
@@ -185,14 +184,12 @@ final readonly class EagerTestRule implements RuleInterface
             if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isAssertionCall($parent)
             ) {
-                // An assertion ancestor means this call is the asserted value, not a separate SUT exercise.
                 return true;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
-        // Reached the root with no assertion ancestor, so the call stands on its own.
         return false;
     }
 
@@ -208,14 +205,12 @@ final readonly class EagerTestRule implements RuleInterface
 
         while ($parent instanceof Node) {
             if ($parent instanceof Node\Stmt\Finally_) {
-                // A finally ancestor means this call is teardown, so it must not count as SUT exercise.
                 return true;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
-        // No finally ancestor, so the call is part of the test body proper.
         return false;
     }
 
@@ -230,28 +225,23 @@ final readonly class EagerTestRule implements RuleInterface
     private function isObservationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
         if (!$call instanceof Expr\MethodCall) {
-            // Only instance-method calls read a result; free functions and static calls are never observations.
             return false;
         }
 
         if ($this->isDirectThisCall($call)) {
-            // `$this->...` is a test-case helper, not the system under test.
             return true;
         }
 
         if (in_array($name, self::SETUP_METHODS, true)) {
-            // Setup verbs such as setTimeout configure the fixture rather than exercise behaviour.
             return true;
         }
 
         $receiver = $this->receiverName($call->var);
 
         if ($receiver === 'process' && in_array($name, self::PROCESS_HARNESS_METHODS, true)) {
-            // Process-harness verbs on $process drive the runner, not the code being tested.
             return true;
         }
 
-        // Otherwise it is an observation only when a known result receiver is read via a getter-style name.
         return $receiver !== null
             && in_array($receiver, self::OBSERVATION_RECEIVERS, true)
             && $this->isObservationMethodName($name);
@@ -264,7 +254,6 @@ final readonly class EagerTestRule implements RuleInterface
      */
     private function isDirectThisCall(Expr\MethodCall $call): bool
     {
-        // True only for the literal `$this` receiver; chained or property receivers are handled elsewhere.
         return $call->var instanceof Expr\Variable
             && $call->var->name === 'this';
     }
@@ -278,27 +267,22 @@ final readonly class EagerTestRule implements RuleInterface
     private function receiverKey(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
         if ($call instanceof Expr\FuncCall) {
-            // A free function has no receiver object, so it cannot anchor a SUT call group.
             return null;
         }
 
         if ($call instanceof Expr\StaticCall) {
             if (!$call->class instanceof Node\Name) {
-                // A dynamic class expression has no stable name to key by.
                 return null;
             }
 
             $class = strtolower($call->class->toString());
             if (in_array($class, ['parent', 'self', 'static'], true)) {
-                // Relative class keywords point back at the test itself, not an external SUT.
                 return null;
             }
 
-            // Group static calls by their concrete class so calls on the same class cluster together.
             return 'static:' . $class;
         }
 
-        // Instance calls are keyed by their receiver expression, unwound to its root.
         return $this->receiverExpressionKey($call->var);
     }
 
@@ -314,21 +298,17 @@ final readonly class EagerTestRule implements RuleInterface
         }
 
         if ($receiver instanceof Expr\Variable && is_string($receiver->name)) {
-            // A plain `$var` receiver is keyed by its lower-cased name so case variants group together.
             return 'var:' . strtolower($receiver->name);
         }
 
         if ($receiver instanceof Expr\New_ && $receiver->class instanceof Node\Name) {
-            // An inline `new X()` receiver is keyed by class, treating each construction site as one SUT.
             return 'new:' . strtolower($receiver->class->toString());
         }
 
         if ($receiver instanceof Expr\PropertyFetch) {
-            // Property-held SUTs (such as `$this->sut`) delegate to the owner-plus-property keying.
             return $this->propertyReceiverKey($receiver);
         }
 
-        // Anything else (dynamic var, array access, call) has no stable identity, so it does not group.
         return null;
     }
 
@@ -341,17 +321,14 @@ final readonly class EagerTestRule implements RuleInterface
     private function propertyReceiverKey(Expr\PropertyFetch $receiver): ?string
     {
         if (!$receiver->name instanceof Node\Identifier) {
-            // A dynamic property name (`$this->$prop`) has no fixed identity to key by.
             return null;
         }
 
         $owner = $this->receiverExpressionKey($receiver->var);
         if ($owner === null) {
-            // Without a keyable owner the property access cannot be grouped either.
             return null;
         }
 
-        // Combine owner and property so `$this->sut` and `$this->other` stay distinct receivers.
         return $owner . '->' . strtolower($receiver->name->toString());
     }
 
@@ -372,7 +349,6 @@ final readonly class EagerTestRule implements RuleInterface
             }
         }
 
-        // The widest set drives the SUT-call count; one busy receiver matters more than many sparse ones.
         return $largest;
     }
 
@@ -388,11 +364,9 @@ final readonly class EagerTestRule implements RuleInterface
         }
 
         if (!$receiver instanceof Expr\Variable || !is_string($receiver->name)) {
-            // Only a plain variable root yields a name; dynamic or non-variable roots are unnamed here.
             return null;
         }
 
-        // Lower-case so receiver-name matching against the observation lists is case-insensitive.
         return strtolower($receiver->name);
     }
 
@@ -405,12 +379,10 @@ final readonly class EagerTestRule implements RuleInterface
     {
         foreach (self::OBSERVATION_METHOD_PREFIXES as $prefix) {
             if (str_starts_with($name, $prefix)) {
-                // A get/has/is prefix marks a reader, so the call inspects rather than mutates the SUT.
                 return true;
             }
         }
 
-        // `count` is the one non-prefixed reader treated as an observation.
         return $name === 'count';
     }
 
@@ -435,7 +407,6 @@ final readonly class EagerTestRule implements RuleInterface
             }
         }
 
-        // These names mark result holders, so later getter calls on them are not counted as SUT exercise.
         return $variables;
     }
 
@@ -471,7 +442,6 @@ final readonly class EagerTestRule implements RuleInterface
             $receiver = $receiver->var;
         }
 
-        // True when the root variable is a recorded result holder, so the call is a getter not SUT exercise.
         return $receiver instanceof Expr\Variable
             && is_string($receiver->name)
             && isset($resultVariables[$receiver->name]);

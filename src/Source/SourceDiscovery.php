@@ -98,7 +98,6 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        // Sorted files plus the missing and ignored records the caller reports back to the user.
         return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -230,7 +229,6 @@ final readonly class SourceDiscovery
      */
     private function absolutePath(string $path): string
     {
-        // Relative inputs are anchored to the project root; absolute inputs pass through unchanged.
         return PathHelper::resolveAgainst($this->projectRoot, $path);
     }
 
@@ -243,7 +241,6 @@ final readonly class SourceDiscovery
      */
     private function canonicalPath(string $path): string
     {
-        // Symlink-resolved path when the file exists, otherwise the input verbatim so callers still get a key.
         return PathHelper::canonical($path);
     }
 
@@ -256,7 +253,6 @@ final readonly class SourceDiscovery
      */
     private function displayPath(string $path): string
     {
-        // Project-relative form for paths inside the root; paths outside it fall back to the canonical absolute path.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 
@@ -301,7 +297,6 @@ final readonly class SourceDiscovery
     {
         $basename = basename($path);
 
-        // True for `.env` and variants like `.env.local`, which carry the secrets the text scanners target.
         return $basename === '.env' || str_starts_with($basename, '.env.');
     }
 
@@ -351,7 +346,6 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        // The Git-derived equivalent of discover()'s result: sorted files plus missing and ignored records.
         return new SourceDiscoveryResult(array_values($files), $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -408,7 +402,6 @@ final readonly class SourceDiscovery
             ];
         }
 
-        // Pre-resolved inputs for the Git query: pathspecs to list, plus the missing/ignored records found so far.
         return [
             'missingPaths'           => $missingPaths,
             'ignoredDetails'         => $ignoredDetails,
@@ -428,7 +421,6 @@ final readonly class SourceDiscovery
         sort($missingPaths, SORT_STRING);
         $ignoredDetails = $this->finalizeIgnored($ignoredDetails);
 
-        // No files matched, but missing and ignored inputs are still reported so the user sees why nothing ran.
         return new SourceDiscoveryResult([], $missingPaths, $this->pathsFromDetails($ignoredDetails), $ignoredDetails);
     }
 
@@ -461,7 +453,6 @@ final readonly class SourceDiscovery
             }
         }
 
-        // Records explaining each explicitly-requested path that Git or generated-file protection withheld.
         return $ignoredDetails;
     }
 
@@ -483,7 +474,6 @@ final readonly class SourceDiscovery
             $this->appendGitVisibleSourceFile($displayPath, $configuredIgnorePatterns, $files, $ignoredDetails);
         }
 
-        // The Git-visible set split into accepted source files and the entries config/default/generated ignores held back.
         return [
             'files'          => $files,
             'ignoredDetails' => $ignoredDetails,
@@ -562,7 +552,6 @@ final readonly class SourceDiscovery
         $process = new Process(['git', 'rev-parse', '--is-inside-work-tree'], $this->projectRoot);
         $process->run();
 
-        // True only when Git both ran successfully and confirmed the root is inside a worktree.
         return $process->isSuccessful() && trim($process->getOutput()) === 'true';
     }
 
@@ -593,7 +582,6 @@ final readonly class SourceDiscovery
         $paths = array_values(array_unique($paths));
         sort($paths, SORT_STRING);
 
-        // Deduplicated, sorted root-relative paths Git considers tracked or unignored-untracked.
         return $paths;
     }
 
@@ -683,7 +671,6 @@ final readonly class SourceDiscovery
             }
         }
 
-        // No directory glob covered this file, so report its own display path.
         return $displayPath;
     }
 
@@ -704,7 +691,6 @@ final readonly class SourceDiscovery
         $deduped = array_values($byPath);
         usort($deduped, static fn(IgnoredPath $left, IgnoredPath $right): int => strcmp($left->path, $right->path));
 
-        // One record per path in stable path order, so repeated runs and snapshots stay deterministic.
         return $deduped;
     }
 

@@ -29,7 +29,6 @@ final readonly class MarkdownReporter
         $this->appendPillarSection($lines, $report);
         $this->appendFindingsSection($lines, $report);
 
-        // Sections are accumulated line-by-line, then joined with a single trailing newline for clean file output.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
@@ -260,7 +259,6 @@ final readonly class MarkdownReporter
         if ($rows === []) {
             $lines[] = '| _(none)_ |  |  |  |  |  |  |';
 
-            // Header is already emitted, so a placeholder row keeps the table well-formed when no pillars apply.
             return;
         }
 
@@ -291,7 +289,6 @@ final readonly class MarkdownReporter
     private function pillarSummaryRows(AnalysisReport $report): array
     {
         if ($report->score === null) {
-            // No score computed (e.g. empty scope), so there are no pillar rows to show.
             return [];
         }
 
@@ -345,7 +342,6 @@ final readonly class MarkdownReporter
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
         $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
-        // Single bullet packing severity, rule id, location, optional symbol, and message into one list item.
         return sprintf(
             '- **%s** `%s` %s%s - %s',
             $finding->severity->value,
@@ -377,7 +373,6 @@ final readonly class MarkdownReporter
             $lines[] = 'None.';
             $lines[] = '';
 
-            // Empty group still prints a "None." marker so an absent section is explicit rather than missing.
             return;
         }
 
@@ -429,7 +424,6 @@ final readonly class MarkdownReporter
             $parts[] = sprintf('%s=%d', $status, $count);
         }
 
-        // Comma-joined `status=count` pairs in the map's own order, mirroring the upstream Infection report.
         return implode(', ', $parts);
     }
 
@@ -449,7 +443,6 @@ final readonly class MarkdownReporter
             }
         }
 
-        // Null signals the caller to omit the context-only line entirely when none of these statuses occurred.
         return $parts === [] ? null : implode(', ', $parts);
     }
 

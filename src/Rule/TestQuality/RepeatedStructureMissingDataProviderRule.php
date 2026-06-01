@@ -42,7 +42,6 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
      */
     public function definition(): RuleDefinition
     {
-        // Advisory at low confidence: structural sameness is a weak signal that a data provider fits, never proof.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Repeated test structure missing data provider',
@@ -153,7 +152,6 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             }
         }
 
-        // No configured glob matched, so this path stays in scope for the rule.
         return false;
     }
 
@@ -175,7 +173,6 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             }
         }
 
-        // No attribute matched; fall back to the legacy @dataProvider docblock tag as the remaining signal.
         return str_contains($classMethod->getDocComment()?->getText() ?? '', '@dataProvider');
     }
 
@@ -204,7 +201,6 @@ final readonly class RepeatedStructureMissingDataProviderRule implements RuleInt
             $tokens[] = $this->tokenFor($node);
         }
 
-        // Joined tokens are the grouping key: two tests with an identical sequence collide into one candidate group.
         return implode('|', $tokens);
     }
 

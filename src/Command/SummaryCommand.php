@@ -65,26 +65,22 @@ final class SummaryCommand extends Command
     {
         $projectRoot = $this->projectRoot($output);
         if ($projectRoot === null) {
-            // No usable working directory means nothing can be scanned.
             return Command::FAILURE;
         }
 
         $format = $this->summaryFormat($input, $output);
         if ($format === null) {
-            // An unsupported --format was already reported as a usage error.
             return Command::INVALID;
         }
 
         $topLimit = $this->topLimit($input, $output);
         if ($topLimit === null) {
-            // A malformed --top was already reported as a usage error.
             return Command::INVALID;
         }
 
         $configPath = $this->configPath($input);
         $noConfig   = (bool)$input->getOption('no-config');
         if ($this->hasConfigConflict($noConfig, $configPath, $output)) {
-            // --no-config and --config are mutually exclusive; the conflict was already reported.
             return Command::INVALID;
         }
 
@@ -97,7 +93,6 @@ final class SummaryCommand extends Command
             shouldSkipConfig:   $noConfig,
         );
         if ($promptExitCode !== null) {
-            // The interactive config prompt decided the outcome (declined, written, or aborted).
             return $promptExitCode;
         }
 
@@ -111,11 +106,9 @@ final class SummaryCommand extends Command
             output:       $output,
         );
         if (!$config instanceof AnalysisConfig) {
-            // Config loading failed and already emitted a CONFIG-ERROR line.
             return Command::INVALID;
         }
 
-        // Hand control to the renderer with the single analysis pass folded into the report data.
         return $this->writeSummary(
             output:            $output,
             format:            $format,
@@ -144,11 +137,9 @@ final class SummaryCommand extends Command
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
 
-            // Null signals the caller to abort; the error has already been shown.
             return null;
         }
 
-        // The current working directory is the project root for this scan.
         return $projectRoot;
     }
 
@@ -164,7 +155,6 @@ final class SummaryCommand extends Command
     {
         $format = $input->getOption('format');
         if (is_string($format) && in_array($format, ['text', 'json'], true)) {
-            // Only the two whitelisted renderers are accepted.
             return $format;
         }
 
@@ -173,7 +163,6 @@ final class SummaryCommand extends Command
                              is_string($format) ? $format : '',
                          ));
 
-        // Null is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return null;
     }
 
@@ -190,13 +179,11 @@ final class SummaryCommand extends Command
         $topRaw = $input->getOption('top');
         // Accept only unsigned decimal digits for the summary row limit.
         if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
-            // The validated digit string becomes the row cap for rules and offenders.
             return (int)$topRaw;
         }
 
         $output->writeln('<error>USAGE-ERROR --top must be a non-negative integer.</error>');
 
-        // Null is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return null;
     }
 
@@ -211,7 +198,6 @@ final class SummaryCommand extends Command
     {
         $configPath = $input->getOption('config');
 
-        // An empty or non-string option is treated as "no explicit config path".
         return is_string($configPath) && $configPath !== '' ? $configPath : null;
     }
 
@@ -227,13 +213,11 @@ final class SummaryCommand extends Command
     private function hasConfigConflict(bool $noConfig, ?string $configPath, OutputInterface $output): bool
     {
         if (!$noConfig || $configPath === null) {
-            // The flags only conflict when both are supplied together.
             return false;
         }
 
         $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
-        // True is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return true;
     }
 
@@ -248,11 +232,9 @@ final class SummaryCommand extends Command
     {
         $paths = $input->getArgument('paths');
         if (!is_array($paths)) {
-            // A missing or scalar argument means the caller requested no explicit paths.
             return [];
         }
 
-        // Drop any non-string entries and re-key so callers get a clean zero-based list.
         return array_values(array_filter($paths, 'is_string'));
     }
 
@@ -283,7 +265,6 @@ final class SummaryCommand extends Command
             $output->writeln(sprintf('<error>[CONFIG-ERROR] %s</error>', $exception->getMessage()));
         }
 
-        // Null marks the load as failed; the CONFIG-ERROR line has already been shown.
         return null;
     }
 
@@ -322,7 +303,6 @@ final class SummaryCommand extends Command
         );
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
 
-        // Fold discovery counts, the score, and the top-N slices into the immutable render payload.
         return new SummaryReportData(
             paths:             $paths,
             configPath:        $effectiveConfigPath,
@@ -356,17 +336,14 @@ final class SummaryCommand extends Command
             } catch (JsonException $exception) {
                 $output->writeln(sprintf('<error>Unable to encode summary: %s</error>', $exception->getMessage()));
 
-                // Encoding failed, so report failure rather than emitting a partial payload.
                 return Command::FAILURE;
             }
 
-            // The JSON payload was written successfully.
             return Command::SUCCESS;
         }
 
         $output->write($this->renderText($summaryReportData));
 
-        // The text report was written successfully.
         return Command::SUCCESS;
     }
 
@@ -385,7 +362,6 @@ final class SummaryCommand extends Command
             $pillarLookup[$definition->id] = $definition->pillar->value;
         }
 
-        // Findings carry their own pillar, but this map lets aggregation prefer the registry's authoritative value.
         return $pillarLookup;
     }
 
@@ -422,11 +398,9 @@ final class SummaryCommand extends Command
         usort($rows, static function (array $left, array $right): int {
             $countDelta = $right['count'] <=> $left['count'];
             if ($countDelta !== 0) {
-                // Higher finding counts sort first.
                 return $countDelta;
             }
 
-            // Equal counts fall back to rule id so the ordering stays deterministic.
             return strcmp($left['ruleId'], $right['ruleId']);
         });
 
@@ -448,7 +422,6 @@ final class SummaryCommand extends Command
             $totals[$finding->severity->value]++;
         }
 
-        // Per-severity counts plus the precomputed grand total for the summary footer.
         return $totals;
     }
 
@@ -466,7 +439,6 @@ final class SummaryCommand extends Command
             }
         }
 
-        // Only parse-error diagnostics count toward the figure shown in the Files line.
         return $count;
     }
 
@@ -501,7 +473,6 @@ final class SummaryCommand extends Command
 
         $sortedPillars = $summaryReportData->score->pillars;
         usort($sortedPillars, static function ($left, $right): int {
-            // Pillars with the most findings lead the listing.
             return $right->findings <=> $left->findings;
         });
 
@@ -571,7 +542,6 @@ final class SummaryCommand extends Command
             $lines[] = '          Use `gruff-php analyse --no-baseline` to audit without a baseline.';
         }
 
-        // Trailing newline so the report is a complete final line callers can append to or print without truncation.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
@@ -605,7 +575,6 @@ final class SummaryCommand extends Command
             'topOffenders'  => array_map(static fn($file): array => $file->toArray(), $summaryReportData->topOffenders),
         ];
 
-        // Pretty-print with unescaped slashes for readable paths; the THROW flag surfaces encode failures.
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
@@ -625,7 +594,6 @@ final class SummaryCommand extends Command
             }
         }
 
-        // The widest value, but never below the requested minimum.
         return $maximum;
     }
 }

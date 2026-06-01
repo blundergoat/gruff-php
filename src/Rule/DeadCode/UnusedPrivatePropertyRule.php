@@ -40,7 +40,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // High-confidence warning: an unread/unwritten private member is dead and safe to remove.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused private property',
@@ -138,7 +137,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             }
         }
 
-        // Plain declarations plus promoted constructor params, keyed by name; later keys win on collision.
         return $privateProps;
     }
 
@@ -169,7 +167,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $this->recordPropertyUsage($node, $name, $reads, $writes);
         }
 
-        // Two name-keyed sets the caller intersects: a property absent from both is unused.
         return ['reads' => $reads, 'writes' => $writes];
     }
 
@@ -250,7 +247,6 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             );
         }
 
-        // One finding per property that failed the read-and-written test; empty when all are live.
         return $findings;
     }
 
@@ -293,11 +289,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     private function resolveClassName(Node $node): string
     {
         if ($node instanceof Class_) {
-            // Anonymous classes carry no name node, so stand in with a stable placeholder.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
-        // Traits and enums are always named; the line-tagged fallback only guards a malformed tree.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 

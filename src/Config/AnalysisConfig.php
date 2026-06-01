@@ -79,7 +79,6 @@ final readonly class AnalysisConfig
             );
         }
 
-        // Seed only registry defaults plus the built-in abbreviations; every other field keeps its constructor default.
         return new self($rules, acceptedAbbreviations: self::DEFAULT_ACCEPTED_ABBREVIATIONS);
     }
 
@@ -93,7 +92,6 @@ final readonly class AnalysisConfig
      */
     public function ruleSettings(string $ruleId): RuleSettings
     {
-        // Unknown ids are caller/config mistakes, so surface them immediately rather than returning a default.
         return $this->rules[$ruleId]
                ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
@@ -116,7 +114,6 @@ final readonly class AnalysisConfig
         $rules          = $this->rules;
         $rules[$ruleId] = $settings;
 
-        // Immutable update: only the one rule's settings change; all other config carries over unchanged.
         return new self(
             $rules,
             $this->minimumPhpVersion,
@@ -136,7 +133,6 @@ final readonly class AnalysisConfig
      */
     public function minimumPhpVersion(): float
     {
-        // Version floor that gates modernisation rules; always set since the constructor rejects values below 7.4.
         return $this->minimumPhpVersion;
     }
 
@@ -149,7 +145,6 @@ final readonly class AnalysisConfig
      */
     public function withMinimumPhpVersion(float $minimumPhpVersion): self
     {
-        // Immutable update: swap only the PHP version floor; the new value is re-validated by the constructor.
         return new self(
             $this->rules,
             $minimumPhpVersion,
@@ -169,7 +164,6 @@ final readonly class AnalysisConfig
      */
     public function rules(): array
     {
-        // Full effective rule map keyed by id; the engine iterates this to know which rules run and how.
         return $this->rules;
     }
 
@@ -180,7 +174,6 @@ final readonly class AnalysisConfig
      */
     public function ruleSelection(): RuleSelection
     {
-        // Include/exclude filters layered over the rule map; an empty selection means run every enabled rule.
         return $this->ruleSelection;
     }
 
@@ -193,7 +186,6 @@ final readonly class AnalysisConfig
      */
     public function withRuleSelection(RuleSelection $ruleSelection): self
     {
-        // Immutable update: replace only the include/exclude selection; rule settings and everything else stay.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,
@@ -213,7 +205,6 @@ final readonly class AnalysisConfig
      */
     public function ignoredPathPatterns(): array
     {
-        // Glob patterns source discovery skips; empty means scan everything the discovery roots reach.
         return $this->ignoredPathPatterns;
     }
 
@@ -224,7 +215,6 @@ final readonly class AnalysisConfig
      */
     public function withIgnoredPathPatterns(array $ignoredPathPatterns): self
     {
-        // Immutable update: swap only the ignore-pattern list; everything else carries over unchanged.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,
@@ -245,9 +235,6 @@ final readonly class AnalysisConfig
      */
     public function acceptedAbbreviations(): array
     {
-        // Identifier fragments naming rules treat as words rather than flagging. Returns the single stored list,
-        // not a merge: the DEFAULT_ACCEPTED_ABBREVIATIONS seed when the user set nothing, otherwise the user's
-        // list, which withAcceptedAbbreviations() substitutes wholesale (built-ins are dropped, never re-merged).
         return $this->acceptedAbbreviations;
     }
 
@@ -258,7 +245,6 @@ final readonly class AnalysisConfig
      */
     public function withAcceptedAbbreviations(array $acceptedAbbreviations): self
     {
-        // Immutable update: replace the accepted-abbreviation list wholesale; the built-in defaults are not re-merged.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,
@@ -279,7 +265,6 @@ final readonly class AnalysisConfig
      */
     public function allowedSecretPreviews(): array
     {
-        // Redacted secret previews the user has cleared as false positives; sensitive-data rules suppress these.
         return $this->allowedSecretPreviews;
     }
 
@@ -290,7 +275,6 @@ final readonly class AnalysisConfig
      */
     public function withAllowedSecretPreviews(array $allowedSecretPreviews): self
     {
-        // Immutable update: swap only the allowed-secret-preview list; all other config is preserved.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,
@@ -312,7 +296,6 @@ final readonly class AnalysisConfig
      */
     public function failThresholdFor(string $command): ?FailThreshold
     {
-        // Null means this command has no severity gate configured, so the caller applies its own default.
         return $this->minimumSeverity[$command] ?? null;
     }
 
@@ -323,7 +306,6 @@ final readonly class AnalysisConfig
      */
     public function withMinimumSeverity(array $minimumSeverity): self
     {
-        // Immutable update: replace only the per-command threshold map; the rest of the config is untouched.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,
@@ -343,7 +325,6 @@ final readonly class AnalysisConfig
      */
     public function failureConditions(): ?FailThresholds
     {
-        // Null means no failureConditions block was configured, so count-based gating is disabled for the run.
         return $this->failureConditions;
     }
 
@@ -354,7 +335,6 @@ final readonly class AnalysisConfig
      */
     public function withFailureConditions(?FailThresholds $failureConditions): self
     {
-        // Immutable update: swap only the failure-condition gate (null clears it); other config carries over.
         return new self(
             $this->rules,
             $this->minimumPhpVersion,

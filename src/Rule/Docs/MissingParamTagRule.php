@@ -36,7 +36,6 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @param tag',
@@ -106,7 +105,6 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
         }
 
-        // One finding per declared parameter absent from the contract-bearing docblock.
         return $findings;
     }
 
@@ -150,7 +148,6 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
         }
 
-        // Variable names of every well-formed @param entry, in docblock order.
         return $paramNames;
     }
 
@@ -194,14 +191,12 @@ final readonly class MissingParamTagRule implements RuleInterface
             if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $stripped, $matches, 0, $position) === 1) {
                 $position += strlen($matches[0]);
 
-                // The documented parameter name, captured without its leading `$`.
                 return $matches[1];
             }
 
             $position++;
         }
 
-        // Input exhausted at depth zero without a variable; the @param tag is malformed.
         return null;
     }
 
@@ -219,7 +214,6 @@ final readonly class MissingParamTagRule implements RuleInterface
         $stripped = preg_replace('/^\s*\/\*\*+/', '', $docText) ?? '';
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
-        // Inner body with per-line `*` decoration removed but line breaks intact.
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
     }
 

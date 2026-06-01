@@ -46,7 +46,6 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Carries the value-object and constructor option defaults the analyse pass reads back out.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Parameter count',
@@ -264,7 +263,6 @@ final readonly class ParameterCountRule implements RuleInterface
      */
     private function isConstructor(ClassMethod $node): bool
     {
-        // The constructor is the method literally named __construct.
         return $node->name->toString() === '__construct';
     }
 
@@ -280,7 +278,6 @@ final readonly class ParameterCountRule implements RuleInterface
         int $paramCount,
         int $constructorMax,
     ): bool {
-        // The opt-in path applies only to a constructor whose count exceeds an enabled (non-zero) cap.
         return $node instanceof ClassMethod
             && $this->isConstructor($node)
             && $constructorMax > 0
@@ -298,7 +295,6 @@ final readonly class ParameterCountRule implements RuleInterface
     {
         $optionValue = $options[$name] ?? $default;
 
-        // Coerce to a safe non-negative int; a missing or non-integer value falls back to the default.
         return is_int($optionValue) ? max(0, $optionValue) : $default;
     }
 
@@ -326,11 +322,9 @@ final readonly class ParameterCountRule implements RuleInterface
         }
 
         if ($node instanceof Function_) {
-            // A free function is identified by its own name alone.
             return $node->name->toString() . '()';
         }
 
-        // Closures and arrow functions have no name, so anchor them to their start line for the reader.
         return sprintf('Closure@%d', $node->getStartLine());
     }
 

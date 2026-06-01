@@ -35,7 +35,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory, medium-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing file PHPDoc',
@@ -78,7 +77,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             return [];
         }
 
-        // No file-level or sole-type documentation found; emit the missing-doc finding.
         return $this->buildFinding($analysisUnit, $topLevel[0]);
     }
 
@@ -104,7 +102,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             $effective[] = $statement;
         }
 
-        // Statements hoisted out of any namespace wrapper, in source order.
         return $effective;
     }
 
@@ -125,7 +122,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             return false;
         }
 
-        // True only when the sole class-like declaration carries its own docblock.
         return $classLikes[0]->getDocComment() !== null;
     }
 
@@ -145,7 +141,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             }
         }
 
-        // Only line or block comments were attached; no docblock present.
         return false;
     }
 
@@ -161,7 +156,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         $definition = $this->definition();
 
-        // Single finding anchored at line 1 flagging the absent file-level documentation.
         return [
             new Finding(
                 ruleId:      $definition->id,
@@ -193,7 +187,6 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         $class = $node::class;
         $short = substr($class, (int)strrpos($class, '\\') + 1);
 
-        // Short class name, lower-cased with the parser's trailing underscore dropped (e.g. "class").
         return strtolower(rtrim($short, '_'));
     }
 }

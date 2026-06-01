@@ -54,14 +54,12 @@ final readonly class DashboardRequestHandler
         if ($request === null) {
             $this->responder->write($client, new DashboardHttpResponse(400, 'Bad Request', 'Bad Request', 'text/plain; charset=UTF-8'), false);
 
-            // Unparseable request line: the 400 is already written, so nothing further to route.
             return;
         }
 
         if ($request instanceof DashboardHttpResponse) {
             $this->responder->write($client, $request, false);
 
-            // Request parsing already produced an error response (size limit, duplicate Host); send it verbatim.
             return;
         }
 
@@ -84,34 +82,28 @@ final readonly class DashboardRequestHandler
         $requestLine = fgets($client, self::MAX_REQUEST_LINE_BYTES + 2);
 
         if (!is_string($requestLine)) {
-            // Socket closed or read failed before any request line arrived; null signals a dropped connection.
             return null;
         }
 
         if (strlen($requestLine) > self::MAX_REQUEST_LINE_BYTES) {
-            // Over-long request line: refuse with 431 rather than read an unbounded URI.
             return $this->tooLargeResponse();
         }
 
         // Parse the HTTP request line into method, target, and protocol version.
         if (!preg_match('/^([A-Z]+)\s+(\S+)\s+HTTP\/\d(?:\.\d)?\r?\n$/', $requestLine, $matches)) {
-            // Malformed request line that is not valid HTTP/1.x; null drops the connection without a response.
             return null;
         }
 
         $headers = $this->headers($client);
 
         if ($headers === null) {
-            // Header read failed or ran off the end of the stream; treat as a dropped connection.
             return null;
         }
 
         if ($headers instanceof DashboardHttpResponse) {
-            // Header parsing hit a limit or a duplicate Host; surface that error response to the caller.
             return $headers;
         }
 
-        // Well-formed request: hand back method, target, and parsed headers for routing.
         return [
             'method' => $matches[1],
             'target' => $matches[2],
@@ -129,7 +121,6 @@ final readonly class DashboardRequestHandler
     private function responseFor(string $method, string $target, array $headers): DashboardHttpResponse
     {
         if ($method !== 'GET' && $method !== 'HEAD') {
-            // Dashboard is read-only, so any verb other than GET/HEAD is rejected with 405.
             return new DashboardHttpResponse(405, 'Method Not Allowed', 'Method Not Allowed', 'text/plain; charset=UTF-8');
         }
 
@@ -143,7 +134,6 @@ final readonly class DashboardRequestHandler
 
         $query = $this->query($target);
 
-        // Route the validated path; any unknown path falls through to 404.
         return match ($path) {
             '/health' => new DashboardHttpResponse(200, 'OK', 'ok', 'text/plain; charset=UTF-8'),
             '/favicon.ico' => new DashboardHttpResponse(204, 'No Content', '', 'text/plain; charset=UTF-8'),
@@ -162,7 +152,6 @@ final readonly class DashboardRequestHandler
     {
         $state = $this->stateFactory->state($this->dashboardRequestContext->input, $this->dashboardRequestContext->projectRoot, $query);
 
-        // Render the assembled dashboard state into the full HTML shell for the response body.
         return (new DashboardPageRenderer())->dashboardHtml($state);
     }
 
@@ -178,7 +167,6 @@ final readonly class DashboardRequestHandler
         $rawQuery = parse_url($target, PHP_URL_QUERY);
 
         if (!is_string($rawQuery) || $rawQuery === '') {
-            // No query string on the target; callers treat the empty map as "use defaults".
             return [];
         }
 
@@ -214,12 +202,10 @@ final readonly class DashboardRequestHandler
             $byteCount += strlen($line);
 
             if ($lineCount > self::MAX_HEADER_LINES || $byteCount > self::MAX_HEADER_BYTES) {
-                // Header block exceeded the line/byte budget; stop reading and answer 431.
                 return $this->tooLargeResponse();
             }
 
             if ($line === "\r\n" || $line === "\n") {
-                // Blank line terminates the header block; return everything collected so far.
                 return $headers;
             }
 
@@ -241,7 +227,6 @@ final readonly class DashboardRequestHandler
             $headers[$name] = trim(substr($line, $separator + 1));
         }
 
-        // Stream ended before the blank terminator line, so the request was truncated; signal a dropped connection.
         return null;
     }
 
@@ -299,7 +284,6 @@ final readonly class DashboardRequestHandler
             $bindHost = '[' . $bindHost . ']';
         }
 
-        // Bound to a specific host: the request Host must match that exact address.
         return $host === $bindHost;
     }
 
@@ -310,7 +294,6 @@ final readonly class DashboardRequestHandler
      */
     private function isBindHostLoopback(): bool
     {
-        // True when the bind host is any spelling of loopback, which restricts isHostAllowed to the loopback names.
         return in_array(strtolower($this->dashboardRequestContext->bindHost), ['127.0.0.1', 'localhost', '::1', '[::1]'], true);
     }
 
@@ -321,7 +304,6 @@ final readonly class DashboardRequestHandler
      */
     private function isBindHostWildcard(): bool
     {
-        // True when bound to a wildcard address; isHostAllowed then cannot pin a host and accepts any matching port.
         return in_array(strtolower($this->dashboardRequestContext->bindHost), ['0.0.0.0', '::', '[::]'], true);
     }
 
@@ -332,7 +314,6 @@ final readonly class DashboardRequestHandler
      */
     private function tooLargeResponse(): DashboardHttpResponse
     {
-        // The shared 431 reply for any request whose line or header block overran the byte/line caps.
         return new DashboardHttpResponse(431, 'Request Header Fields Too Large', 'Request Header Fields Too Large', 'text/plain; charset=UTF-8');
     }
 }

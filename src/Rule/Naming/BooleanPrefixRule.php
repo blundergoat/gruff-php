@@ -79,7 +79,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory naming rule with its predicate-prefix, state-adjective, and accepted-name allowlists as defaults.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Boolean method prefix',
@@ -164,7 +163,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
         }
 
-        // Every ill-named boolean callable, parameter, and property collected across both passes.
         return $findings;
     }
 
@@ -200,7 +198,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
             return [];
         }
 
-        // Single finding: a boolean callable whose name lacks a predicate prefix and is not accepted as-is.
         return [
             new Finding(
                 ruleId:      $definition->id,
@@ -261,7 +258,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
             );
         }
 
-        // One finding per typed-bool parameter in this scope that lacks a predicate prefix or state adjective.
         return $findings;
     }
 
@@ -285,7 +281,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
         string $name,
         ?string $symbol,
     ): Finding {
-        // Advisory finding naming the offending identifier, carrying its kind and name as metadata for filtering.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s "$%s" is typed bool but does not use a boolean prefix or approved state adjective.', ucfirst($kind), $name),
@@ -354,7 +349,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function hasBooleanStyleName(string $name, array $prefixes, array $stateAdjectives, array $acceptedNames): bool
     {
-        // Clear when any of the three signals holds: predicate prefix, allowed state adjective, or accepted name.
         return $this->hasAllowedPrefix($name, $prefixes)
             || in_array(strtolower($name), $stateAdjectives, true)
             || $this->isAcceptedBooleanName($name, $acceptedNames);
@@ -375,7 +369,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
      */
     private function isAcceptedBooleanName(string $name, array $acceptedNames): bool
     {
-        // True when the lowercased whole name is present in the accepted-name allowlist.
         return in_array(strtolower($name), $acceptedNames, true);
     }
 
@@ -406,7 +399,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
         }
 
-        // No configured prefix matched at a word boundary.
         return false;
     }
 
@@ -431,7 +423,6 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
         }
 
-        // No negative flag prefix matched at a word boundary, so this rule may still flag the name.
         return false;
     }
 
@@ -445,11 +436,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
-            // Named callables get their qualified Class::method or function name from the shared resolver.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
-        // Closures and arrow functions have no name, so synthesise a kind@line label instead.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

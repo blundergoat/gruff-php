@@ -50,7 +50,6 @@ final class PhpUnitCoverageSourceMissingRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory severity so teams opt in: a missing coverage source is a gap, not a defect in shipped code.
         return new RuleDefinition(
             id:              self::ID,
             name:            'PHPUnit coverage source missing',

@@ -236,7 +236,6 @@ final readonly class AnalyseCommandOptions
             || $this->noBaseline
             || !is_file(rtrim($projectRoot, '/') . '/' . BaselineStore::DEFAULT_FILENAME)
         ) {
-            // An explicit baseline flag, generate request, opt-out, or absent default file all forbid auto-applying.
             return $this;
         }
 
@@ -370,24 +369,20 @@ final readonly class AnalyseCommandOptions
     private static function reportInteractive(InputInterface $input): bool|string
     {
         if (!$input->hasParameterOption('--report-interactive', true)) {
-            // Flag never passed: interactive reporting stays off by default.
             return false;
         }
 
         $optionValue = $input->getOption('report-interactive');
 
         if ($optionValue === null || $optionValue === true || $optionValue === '') {
-            // A bare --report-interactive (no value) reads as an explicit opt-in.
             return true;
         }
 
         if (is_bool($optionValue)) {
-            // Already a boolean from the input layer; pass it straight through.
             return $optionValue;
         }
 
         if (!is_string($optionValue)) {
-            // Anything non-boolean and non-string can't be a flag value, so report the usage error.
             return '--report-interactive must be true or false.';
         }
 
