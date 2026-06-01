@@ -19,10 +19,10 @@ final readonly class RunDiagnostic
      * @param string|null $path     Input path related to the diagnostic, when no parsed file exists.
      */
     public function __construct(
-        public string $type,
-        public string $message,
+        public string  $type,
+        public string  $message,
         public ?string $filePath = null,
-        public ?int $line = null,
+        public ?int    $line = null,
         public ?string $path = null,
     ) {
     }
@@ -30,17 +30,18 @@ final readonly class RunDiagnostic
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null}
+     * @return array{type: string, message: string, file: string|null, line: int|null, path: string|null} - report-ready snapshot of this diagnostic;
+     *                     the "file" key holds the source path (null when none) and "line"/"path" are null when not applicable
      */
     public function toArray(): array
     {
         // Report-facing JSON keys ("file" for the file path) rather than the internal property names.
         return [
-            'type' => $this->type,
+            'type'    => $this->type,
             'message' => $this->message,
-            'file' => $this->filePath,
-            'line' => $this->line,
-            'path' => $this->path,
+            'file'    => $this->filePath,
+            'line'    => $this->line,
+            'path'    => $this->path,
         ];
     }
 }

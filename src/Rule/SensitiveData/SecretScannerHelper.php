@@ -26,7 +26,7 @@ final class SecretScannerHelper
     /**
      * List key-name fragments that mark literals as secret-like.
      *
-     * @return list<string>
+     * @return list<string> - upper-cased key-name fragments shared by every scanner as secret context
      */
     public static function sensitiveKeyFragments(): array
     {
@@ -38,7 +38,8 @@ final class SecretScannerHelper
      * Build the list of comment byte ranges for an analysis unit so pattern rules can skip in-comment matches.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit whose tokens describe comment spans.
-     * @return list<array{0:int,1:int}> Ordered list of [startOffset, endOffsetExclusive] tuples.
+     *
+     * @return list<array{0:int,1:int}> - ordered [startOffset, endOffsetExclusive] half-open spans callers test offsets against
      */
     public static function commentRanges(AnalysisUnit $analysisUnit): array
     {
@@ -68,7 +69,8 @@ final class SecretScannerHelper
      *
      * @param int                      $offset Zero-based byte offset of a pattern match.
      * @param list<array{0:int,1:int}> $ranges Comment ranges produced by commentRanges().
-     * @return bool True when the offset is inside a comment span and should be skipped.
+     *
+     * @return bool - true when the offset falls inside a comment span, signalling the caller to skip the match
      */
     public static function isInsideComment(int $offset, array $ranges): bool
     {
@@ -88,7 +90,8 @@ final class SecretScannerHelper
      *
      * @param string $source Source text being scanned.
      * @param int    $offset Zero-based byte offset inside the source text.
-     * @return int
+     *
+     * @return int - 1-based line number containing the offset, as findings and editors expect
      */
     public static function lineNumberForOffset(string $source, int $offset): int
     {
@@ -100,7 +103,8 @@ final class SecretScannerHelper
      * Build a redacted preview of a sensitive value (first 4 + last 4 chars for values longer than 8 chars).
      *
      * @param string $secretValue Sensitive value to redact for reporting.
-     * @return string The redacted preview safe for inclusion in findings and reports.
+     *
+     * @return string - redacted preview (length marker, or first/last 4 chars) safe to embed in findings and reports
      */
     public static function redactedPreview(string $secretValue): string
     {
@@ -119,7 +123,8 @@ final class SecretScannerHelper
      *
      * @param string $key         Environment-style key name.
      * @param string $secretValue Sensitive value associated with the key.
-     * @return string
+     *
+     * @return string - `KEY=<redacted:N chars>` with the key kept visible and only the value's byte length disclosed
      */
     public static function redactedKeyValue(string $key, string $secretValue): string
     {
@@ -131,7 +136,8 @@ final class SecretScannerHelper
      * Detect whether the value looks like a placeholder rather than a real secret (changeme / dummy / example / etc.).
      *
      * @param string $secretValue Candidate sensitive value.
-     * @return bool True when the value is empty, low-cardinality, or matches a known placeholder marker.
+     *
+     * @return bool - true when the value is empty, low-cardinality, or a placeholder, so the caller suppresses it
      */
     public static function isLikelyDummyValue(string $secretValue): bool
     {
@@ -156,7 +162,8 @@ final class SecretScannerHelper
      * Detect whether the file's basename is `.env` or `.env.*`.
      *
      * @param string $displayPath Project-relative path being scanned.
-     * @return bool
+     *
+     * @return bool - true when the basename is `.env` or a `.env.*` variant; callers relax dummy-value filtering
      */
     public static function isEnvFile(string $displayPath): bool
     {
@@ -170,7 +177,8 @@ final class SecretScannerHelper
      * Detect whether the path lives under a test or fixtures directory (test, tests, fixture, fixtures).
      *
      * @param string $displayPath Project-relative path being scanned.
-     * @return bool
+     *
+     * @return bool - true when any path segment is a test or fixtures directory; callers downgrade secrets found there
      */
     public static function isTestPath(string $displayPath): bool
     {
@@ -178,16 +186,17 @@ final class SecretScannerHelper
 
         // True when any path segment is a test or fixtures directory; callers downgrade secrets found under these.
         return str_contains($normalized, '/test/')
-            || str_contains($normalized, '/tests/')
-            || str_contains($normalized, '/fixture/')
-            || str_contains($normalized, '/fixtures/');
+               || str_contains($normalized, '/tests/')
+               || str_contains($normalized, '/fixture/')
+               || str_contains($normalized, '/fixtures/');
     }
 
     /**
      * Detect whether the line contains an upper-cased secret-context fragment (API_KEY, PASSWORD, etc.).
      *
      * @param string $line Source line being scanned.
-     * @return bool
+     *
+     * @return bool - true when the line contains a secret-context fragment that raises detector confidence
      */
     public static function hasSensitiveContext(string $line): bool
     {
@@ -208,7 +217,8 @@ final class SecretScannerHelper
      * Compute the Shannon entropy of a string in bits-per-character.
      *
      * @param string $secretValue Candidate secret value.
-     * @return float The entropy; higher values indicate more random / secret-shaped content.
+     *
+     * @return float - bits-per-character Shannon entropy; callers compare it against a threshold to flag secret-shaped literals
      */
     public static function entropy(string $secretValue): float
     {
@@ -224,7 +234,7 @@ final class SecretScannerHelper
 
         foreach ($counts as $count) {
             $probability = $count / $length;
-            $entropy -= $probability * log($probability, 2);
+            $entropy     -= $probability * log($probability, 2);
         }
 
         // Bits per character: callers compare this against an entropy threshold to flag secret-shaped literals.
@@ -242,17 +252,18 @@ final class SecretScannerHelper
      * @param string       $detector     Detector name written to finding metadata.
      * @param string       $preview      Redacted preview written to finding metadata.
      * @param string       $remediation  Suggested remediation text for the finding.
-     * @return Finding
+     *
+     * @return Finding - a SensitiveData/Warning finding carrying the detector name and redacted preview in metadata
      */
     public static function finding(
         AnalysisUnit $analysisUnit,
-        string $ruleId,
-        string $message,
-        int $line,
-        Confidence $confidence,
-        string $detector,
-        string $preview,
-        string $remediation,
+        string       $ruleId,
+        string       $message,
+        int          $line,
+        Confidence   $confidence,
+        string       $detector,
+        string       $preview,
+        string       $remediation,
     ): Finding {
         // Every sensitive-data hit is a SensitiveData/Warning finding; detector and redacted preview ride in metadata.
         return new Finding(
@@ -266,9 +277,9 @@ final class SecretScannerHelper
             confidence:  $confidence,
             remediation: $remediation,
             metadata:    [
-                'detector' => $detector,
-                'preview' => $preview,
-            ],
+                             'detector' => $detector,
+                             'preview'  => $preview,
+                         ],
         );
     }
 }

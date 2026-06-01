@@ -42,10 +42,10 @@ final class InitCliTest extends CliTestCase
 
         try {
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -81,10 +81,10 @@ final class InitCliTest extends CliTestCase
             file_put_contents($configPath, "# existing\n");
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                   ], $project);
             $process->run();
 
             self::assertNotSame(0, $process->getExitCode());
@@ -109,11 +109,11 @@ final class InitCliTest extends CliTestCase
             file_put_contents($configPath, "# existing\n");
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -141,10 +141,10 @@ final class InitCliTest extends CliTestCase
             file_put_contents($legacyPath, "# legacy\n");
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                   ], $project);
             $process->run();
 
             self::assertNotSame(0, $process->getExitCode());
@@ -173,11 +173,11 @@ final class InitCliTest extends CliTestCase
             file_put_contents($legacyPath, "# legacy\n");
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -200,12 +200,12 @@ final class InitCliTest extends CliTestCase
 
         try {
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--project-root',
-                $project,
-            ], $cwd);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--project-root',
+                                       $project,
+                                   ], $cwd);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -231,11 +231,11 @@ final class InitCliTest extends CliTestCase
             $this->writeConfigWithCustomPathIgnores($configPath);
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -259,10 +259,10 @@ final class InitCliTest extends CliTestCase
 
         try {
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -301,11 +301,11 @@ final class InitCliTest extends CliTestCase
             ]));
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -334,11 +334,11 @@ final class InitCliTest extends CliTestCase
             file_put_contents($configPath, "schemaVersion: gruff-php.config.v0.0\n");
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertNotSame(0, $process->getExitCode());
@@ -365,11 +365,11 @@ final class InitCliTest extends CliTestCase
             file_put_contents($configPath, $original);
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'init',
-                '--force',
-            ], $project);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'init',
+                                       '--force',
+                                   ], $project);
             $process->run();
 
             self::assertNotSame(0, $process->getExitCode());
@@ -384,6 +384,7 @@ final class InitCliTest extends CliTestCase
      * Write an existing config with local path-ignore policy.
      *
      * @param string $configPath Destination the pre-existing config is written to before init runs.
+     *
      * @return void
      */
     private function writeConfigWithCustomPathIgnores(string $configPath): void
@@ -404,7 +405,8 @@ final class InitCliTest extends CliTestCase
      * Decode generated YAML config for assertions.
      *
      * @param string $configPath Path of the config init generated, read back for assertions.
-     * @return array<string, mixed>
+     *
+     * @return array<string, mixed> - parsed config narrowed to string keys; values stay mixed for structural assertions
      */
     private function decodedConfig(string $configPath): array
     {
@@ -423,6 +425,7 @@ final class InitCliTest extends CliTestCase
      * Assert the top-level generated config sections exist.
      *
      * @param array<string, mixed> $decoded Parsed config payload.
+     *
      * @return void
      */
     private function assertGeneratedConfigShape(array $decoded): void
@@ -441,6 +444,7 @@ final class InitCliTest extends CliTestCase
      *
      * @param list<string>         $expectedPaths Expected ignored paths.
      * @param array<string, mixed> $decoded       Parsed config payload.
+     *
      * @return void
      */
     private function assertIgnoredPaths(array $expectedPaths, array $decoded): void
@@ -453,6 +457,7 @@ final class InitCliTest extends CliTestCase
      * Assert one representative registry default is emitted.
      *
      * @param array<string, mixed> $decoded Parsed config payload.
+     *
      * @return void
      */
     private function assertCognitiveComplexityDefault(array $decoded): void
@@ -469,7 +474,8 @@ final class InitCliTest extends CliTestCase
      * Assert a decoded YAML value is an array keyed by strings.
      *
      * @param mixed $decodedValue Raw YAML decode result asserted to be a string-keyed array.
-     * @return array<string, mixed>
+     *
+     * @return array<string, mixed> - the same entries re-typed as a string-keyed array once every key is verified to be a string
      */
     private function stringKeyedArray(mixed $decodedValue): array
     {
@@ -489,7 +495,8 @@ final class InitCliTest extends CliTestCase
      * Read generated config file contents for assertions.
      *
      * @param string $configPath Generated config file path.
-     * @return string Generated config file contents.
+     *
+     * @return string - raw file text, asserted non-null first so callers can match against it directly
      */
     private function configContents(string $configPath): string
     {

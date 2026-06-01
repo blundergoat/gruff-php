@@ -36,7 +36,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Describe the unused private property rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - the rule's stable id, name, pillar, tier, and the default severity/confidence the registry applies unless overridden
      */
     public function definition(): RuleDefinition
     {
@@ -57,7 +57,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unused private properties.
+     * @return list<Finding> - one finding per private property that is unread, unwritten, or fully unused across every class-like in the unit; empty
+     *                       when all are live
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -96,7 +97,9 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * Collect private properties declared on a class-like node.
      *
      * @param Class_|Trait_|Enum_ $classLike
-     * @return array<string, array{line: int, writtenByDeclaration: bool}>
+     *
+     * @return array<string, array{line: int, writtenByDeclaration: bool}> - private property names mapped to their declaration line and whether a
+     *                       default or promotion already writes them; empty when the class-like has none
      */
     private function privateProperties(Class_|Trait_|Enum_ $classLike): array
     {
@@ -109,7 +112,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
 
             foreach ($stmt->props as $prop) {
                 $privateProps[$prop->name->toString()] = [
-                    'line' => $prop->getStartLine(),
+                    'line'                 => $prop->getStartLine(),
                     'writtenByDeclaration' => $prop->default !== null,
                 ];
             }
@@ -130,7 +133,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
                 }
 
                 $privateProps[$param->var->name] = [
-                    'line' => $param->getStartLine(),
+                    'line'                 => $param->getStartLine(),
                     'writtenByDeclaration' => true,
                 ];
             }
@@ -146,13 +149,15 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param NodeFinder                                                  $nodeFinder   Walks the body for accesses.
      * @param Class_|Trait_|Enum_                                         $classLike    Owner of the accesses.
      * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps Names to track; rest ignored.
-     * @return array{reads: array<string, true>, writes: array<string, true>}
+     *
+     * @return array{reads: array<string, true>, writes: array<string, true>} - two name-keyed sets flagging which tracked properties were read and
+     *                      which were written; a name absent from both was never accessed
      */
     private function propertyUsage(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
     {
         $reads        = [];
         $writes       = [];
-        $allNodes     = $nodeFinder->find($classLike->stmts, static fn (): bool => true);
+        $allNodes     = $nodeFinder->find($classLike->stmts, static fn(): bool => true);
         $ownClassName = $classLike instanceof Class_ ? $classLike->name?->toString() : ($classLike->name?->toString() ?? null);
 
         foreach ($allNodes as $node) {
@@ -209,14 +214,15 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param Class_|Trait_|Enum_                                            $classLike    Owner; name prefixes ids.
      * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps Defaulted means written.
      * @param array{reads: array<string, true>, writes: array<string, true>} $usage        Reads/writes per name.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - one finding per property that failed the read-and-written test; empty when every private property is live
      */
     private function findingsForProperties(
-        AnalysisUnit $analysisUnit,
-        RuleDefinition $definition,
+        AnalysisUnit        $analysisUnit,
+        RuleDefinition      $definition,
         Class_|Trait_|Enum_ $classLike,
-        array $privateProps,
-        array $usage,
+        array               $privateProps,
+        array               $usage,
     ): array {
         $findings  = [];
         $className = $this->resolveClassName($classLike);
@@ -257,7 +263,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param bool   $isWritten Whether the property is ever written: true if an assignment was seen OR the
      *                          declaration carries a default, so true with zero observed writes means default-only.
      *
-     * @return string Human-readable finding message.
+     * @return string - the finding message phrased for the property's usage state: never used, written-but-never-read, or
+     *                read-but-never-explicitly-written
      */
     private function propertyMessage(string $symbol, bool $isRead, bool $isWritten): string
     {
@@ -281,7 +288,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      *
      * @param Class_|Trait_|Enum_ $node
      *
-     * @return string Class-like display name.
+     * @return string - the declared class/trait/enum name, or a stable placeholder (class@anonymous, or unknown@line for a malformed tree) when no
+     *                name node exists
      */
     private function resolveClassName(Node $node): string
     {
@@ -300,7 +308,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param Node        $node         Candidate access node; only $this-> and own-class static fetches qualify.
      * @param string|null $ownClassName Enclosing class name, or null inside a trait/anonymous scope.
      *
-     * @return string|null Property name, or null when the node is not supported.
+     * @return string|null - the accessed property name for $this-> or own-class static fetches; null means the node is not a self-referential
+     *                     property access and carries no usage signal
      */
     private function propertyAccessName(Node $node, ?string $ownClassName): ?string
     {
@@ -331,7 +340,8 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      * @param Node        $class        Class reference from a static fetch; non-Name targets never match.
      * @param string|null $ownClassName Enclosing class name to compare against, or null when there is none.
      *
-     * @return bool True when the target is self/static or the own class name.
+     * @return bool - true when the static target is self::/static:: or matches the enclosing class name; false for dynamic targets and for
+     *              trait/anonymous scopes that have no name
      */
     private function refersToOwnClass(Node $class, ?string $ownClassName): bool
     {

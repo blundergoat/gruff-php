@@ -50,13 +50,15 @@ final class PhpFileParserTest extends TestCase
      * Resolve a parser fixture path.
      *
      * @param string $path Filesystem path.
-     * @return string
+     *
+     * @return string - absolute, realpath-resolved path to the named fixture; the assertion guarantees the file exists
      */
     private function fixturePath(string $path): string
     {
         $fixture = realpath(__DIR__ . '/../Fixtures/Source/' . $path);
 
         self::assertIsString($fixture);
+
         // Hand back the resolved absolute fixture path; realpath has already confirmed the file exists.
         return $fixture;
     }

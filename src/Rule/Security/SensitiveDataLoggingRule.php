@@ -41,7 +41,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
     /**
      * Describe the sensitive data logging rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar, tier, and default severity/confidence the registry
+     *   uses to list and configure this rule
      */
     public function definition(): RuleDefinition
     {
@@ -62,7 +63,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for sensitive data logging.
+     * @return list<Finding> - one finding per flagged log sink across function, method, and static
+     *   calls; empty when nothing leaks request or secret data
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -97,7 +99,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
      * @param AnalysisUnit                    $analysisUnit Unit being scanned; supplies the display path for findings.
      * @param Expr\MethodCall|Expr\StaticCall $call         Possible logger call whose name and arguments are checked.
      *
-     * @return list<Finding>
+     * @return list<Finding> - zero or one finding; empty when the call is not a tracked logger method or carries no sensitive argument
      */
     private function loggerCallFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
@@ -118,7 +120,9 @@ final class SensitiveDataLoggingRule implements RuleInterface
 
     /**
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args
-     * @return bool True when any argument contains request or sensitive data.
+     *
+     * @return bool - true on the first argument carrying request-tainted or secret-bearing data;
+     *   false when every argument is static or non-sensitive
      */
     private function hasSensitiveArgument(array $args): bool
     {
@@ -146,7 +150,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
      *
      * @param Expr $expr Argument expression to classify; recursed into for arrays and concatenations.
      *
-     * @return bool True when no runtime value can be leaked.
+     * @return bool - true when the argument resolves to only compile-time constant message/context
+     *   values; false when any part can hold runtime data
      */
     private function isStaticLogArgument(Expr $expr): bool
     {
@@ -195,7 +200,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
      * @param Node         $node         Log call flagged as leaking; its start line locates the finding.
      * @param string       $sink         Name of the log function or method, surfaced in the message and metadata.
      *
-     * @return Finding Security finding.
+     * @return Finding - medium-confidence security warning located at the call's start line, naming
+     *   the sink in its message and metadata
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
@@ -211,8 +217,8 @@ final class SensitiveDataLoggingRule implements RuleInterface
             confidence:  Confidence::Medium,
             remediation: 'Log stable identifiers or redacted summaries instead of request payloads, tokens, passwords, or secret-bearing env values.',
             metadata:    [
-                'sink' => $sink,
-            ],
+                             'sink' => $sink,
+                         ],
         );
     }
 }

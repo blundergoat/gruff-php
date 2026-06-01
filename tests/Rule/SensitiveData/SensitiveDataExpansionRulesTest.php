@@ -77,7 +77,7 @@ final class SensitiveDataExpansionRulesTest extends TestCase
      */
     public function testGcpAndPrivateKeyFindingsAreDistinct(): void
     {
-        $gcpFindings       = $this->findingsForRule(self::GCP_FIXTURE, GcpServiceAccountKeyRule::ID);
+        $gcpFindings        = $this->findingsForRule(self::GCP_FIXTURE, GcpServiceAccountKeyRule::ID);
         $privateKeyFindings = $this->findingsForRule(self::GCP_FIXTURE, PrivateKeyRule::ID);
 
         self::assertCount(1, $gcpFindings);
@@ -98,8 +98,8 @@ final class SensitiveDataExpansionRulesTest extends TestCase
         self::assertCount(2, $findings);
         foreach ($findings as $finding) {
             $preview = $finding->metadata['preview'] ?? null;
-            self::assertIsString($preview, sprintf('Finding on line %s should expose a string preview.', (string) $finding->line));
-            self::assertStringContainsString('redacted', $preview, sprintf('Finding on line %s should redact the password.', (string) $finding->line));
+            self::assertIsString($preview, sprintf('Finding on line %s should expose a string preview.', (string)$finding->line));
+            self::assertStringContainsString('redacted', $preview, sprintf('Finding on line %s should redact the password.', (string)$finding->line));
         }
     }
 
@@ -156,7 +156,8 @@ final class SensitiveDataExpansionRulesTest extends TestCase
      *
      * @param string $displayPath Fixture display path.
      * @param string $ruleId      Rule identifier to filter for.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings emitted by that one rule, in detection order; empty when the rule did not fire
      */
     private function findingsForRule(string $displayPath, string $ruleId): array
     {
@@ -166,14 +167,16 @@ final class SensitiveDataExpansionRulesTest extends TestCase
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         // The filtered list is the public contract these rule tests assert.
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 
     /**
      * Run the gruff CLI and return its stdout.
      *
      * @param list<string> $arguments CLI arguments.
-     * @return string CLI stdout.
+     *
+     * @return string - the full rendered report captured from stdout; a non-zero exit aborts via assertion first,
+     *   so the returned text is always the complete report to scan for leaked secrets
      */
     private function runGruff(array $arguments): string
     {

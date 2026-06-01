@@ -26,7 +26,8 @@ final readonly class ChangedLineRange
      *
      * @param int $startLine First line in the compared range.
      * @param int $endLine   Last line in the compared range.
-     * @return bool True when the ranges overlap.
+     *
+     * @return bool - true when the spans share at least one line, including when they meet at a single endpoint
      */
     public function touches(int $startLine, int $endLine): bool
     {
@@ -38,7 +39,7 @@ final readonly class ChangedLineRange
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{start: int, end: int}
+     * @return array{start: int, end: int} - inclusive bounds under the report wire keys, where start/end mirror startLine/endLine
      */
     public function toArray(): array
     {
@@ -46,7 +47,7 @@ final readonly class ChangedLineRange
         // the internal `startLine`/`endLine` property names, so renaming the properties must not leak here.
         return [
             'start' => $this->startLine,
-            'end' => $this->endLine,
+            'end'   => $this->endLine,
         ];
     }
 }

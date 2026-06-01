@@ -27,7 +27,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers sensitive-data detection: credentials with redacted previews, PHI/PII profiles, config-file scanning, dummy/placeholder allowlisting, comment-context skipping, high-entropy false-positive avoidance, and CLI report redaction.
+ * Covers sensitive-data detection: credentials with redacted previews, PHI/PII profiles, config-file scanning, dummy/placeholder allowlisting,
+ * comment-context skipping, high-entropy false-positive avoidance, and CLI report redaction.
  */
 final class SensitiveDataRulesTest extends TestCase
 {
@@ -51,13 +52,13 @@ final class SensitiveDataRulesTest extends TestCase
         self::assertRuleCount(HighEntropyStringRule::ID, 3, $findings);
         self::assertRuleCount(PrivateKeyRule::ID, 1, $findings);
 
-        $messages = implode("\n", array_map(static fn (Finding $finding): string => $finding->message, $findings));
-        $metadata = implode("\n", array_map(
-            static fn (Finding $finding): string => json_encode($finding->metadata, JSON_THROW_ON_ERROR),
+        $messages      = implode("\n", array_map(static fn(Finding $finding): string => $finding->message, $findings));
+        $metadata      = implode("\n", array_map(
+            static fn(Finding $finding): string => json_encode($finding->metadata, JSON_THROW_ON_ERROR),
             $findings,
         ));
-        $messageLeaks  = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($messages, $secret)));
-        $metadataLeaks = array_values(array_filter($this->secretValues(), static fn (string $secret): bool => str_contains($metadata, $secret)));
+        $messageLeaks  = array_values(array_filter($this->secretValues(), static fn(string $secret): bool => str_contains($messages, $secret)));
+        $metadataLeaks = array_values(array_filter($this->secretValues(), static fn(string $secret): bool => str_contains($metadata, $secret)));
 
         self::assertSame([], $messageLeaks, 'Finding messages should not leak secret values.');
         self::assertSame([], $metadataLeaks, 'Finding metadata should not leak secret values.');
@@ -109,9 +110,9 @@ final class SensitiveDataRulesTest extends TestCase
     public function testAllowedDummyValuesAreNotFlagged(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/SensitiveData/safe-dummy-values.php'),
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
-        ));
+                                     $this->analysePath('tests/Fixtures/SensitiveData/safe-dummy-values.php'),
+                                     static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'sensitive-data.'),
+                                 ));
 
         self::assertSame([], $findings);
     }
@@ -145,23 +146,23 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-safe-env-');
         self::assertIsString($path);
-        $path .= '.php';
+        $path   .= '.php';
         $source = "<?php\n\n"
-            . 'const QBO_ACCESS_TOKEN_EXPIRES_AT = ' . var_export('accessTokenExpiresAt', true) . ";\n"
-            . 'const QBO_REFRESH_TOKEN_VALID_PERIOD = ' . var_export('refreshTokenValidationPeriod', true) . ";\n"
-            . 'const ACCESS_TOKEN_PAYMENTS_KEY = ' . var_export('AirwallexApiRequester.payments', true) . ";\n"
-            . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
-            . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
-            . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
-            . '$secret = ' . var_export('API_TOKEN=' . 'qR8vT3mK6p' . 'L9xS2nD4eG', true) . ";\n";
+                  . 'const QBO_ACCESS_TOKEN_EXPIRES_AT = ' . var_export('accessTokenExpiresAt', true) . ";\n"
+                  . 'const QBO_REFRESH_TOKEN_VALID_PERIOD = ' . var_export('refreshTokenValidationPeriod', true) . ";\n"
+                  . 'const ACCESS_TOKEN_PAYMENTS_KEY = ' . var_export('AirwallexApiRequester.payments', true) . ";\n"
+                  . '$header = ' . var_export('AUTH_MODE_X_' . 'API_KEY=x-api-key', true) . ";\n"
+                  . '$prefix = ' . var_export('TOKEN_CACHE_' . 'KEY_PREFIX=voice.' . 'olb.oauth_token.pg_', true) . ";\n"
+                  . '$formId = ' . var_export('OLB_VOICE_CSRF_' . 'TOKEN_ID=olb_voice_agent', true) . ";\n"
+                  . '$secret = ' . var_export('API_TOKEN=' . 'qR8vT3mK6p' . 'L9xS2nD4eG', true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
             $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-env-values.php'));
             $findings = array_values(array_filter(
-                $this->analyseUnits([$unit]),
-                static fn (Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
-            ));
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HardcodedEnvValueRule::ID,
+                                     ));
 
             self::assertCount(1, $findings);
             self::assertStringContainsString('API_TOKEN', $findings[0]->message);
@@ -179,20 +180,20 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-route-entropy-');
         self::assertIsString($path);
-        $path .= '.php';
+        $path   .= '.php';
         $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
         $source = "<?php\n\n"
-            . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
-            . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
-            . '$secret = ' . var_export($secret, true) . ";\n";
+                  . '$help = ' . var_export('/hc/en-au/sections/360005188513-Appointments', true) . ";\n"
+                  . '$report = ' . var_export('/hc/en-au/sections/360005149694-Communication-Report', true) . ";\n"
+                  . '$secret = ' . var_export($secret, true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
             $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-route-entropy.php'));
             $findings = array_values(array_filter(
-                $this->analyseUnits([$unit]),
-                static fn (Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+                                     ));
 
             self::assertCount(1, $findings);
             self::assertStringContainsString('M7qP', $findings[0]->message);
@@ -210,19 +211,19 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-medical-entropy-');
         self::assertIsString($path);
-        $path .= '.php';
+        $path   .= '.php';
         $secret = 'M7qP2vL9' . 'xZ4aB8nC' . '3dF6gH1j' . 'K5mN0rS2' . 'tV9wY4zQ';
         $source = "<?php\n\n"
-            . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
-            . '$secret = ' . var_export($secret, true) . ";\n";
+                  . '$metadata = ' . var_export('{"ConceptCode":"A","CodeSystemOID":"2.16.840.1.113883.5.83","CodeSystemCode":"PH_ObservationInterpretation_HL7_V3","ValueSetCode":"PHVS_ObservationInterpretation_HL7_V3"}', true) . ";\n"
+                  . '$secret = ' . var_export($secret, true) . ";\n";
         self::assertNotFalse(file_put_contents($path, $source));
 
         try {
             $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'tests/Fixtures/SensitiveData/inline-medical-entropy.php'));
             $findings = array_values(array_filter(
-                $this->analyseUnits([$unit]),
-                static fn (Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
-            ));
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === HighEntropyStringRule::ID,
+                                     ));
 
             self::assertCount(1, $findings);
             self::assertStringContainsString('M7qP', $findings[0]->message);
@@ -240,7 +241,7 @@ final class SensitiveDataRulesTest extends TestCase
     {
         $path = tempnam(sys_get_temp_dir(), 'gruff-phi-placeholder-');
         self::assertIsString($path);
-        $path .= '.md';
+        $path                .= '.md';
         $placeholderMedicare = '2345 ' . '67890 ' . '1';
         $realMedicare        = '2123 ' . '45678 ' . '1';
         $source              = implode("\n", [
@@ -254,9 +255,9 @@ final class SensitiveDataRulesTest extends TestCase
         try {
             $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'docs/examples/inline-phi-placeholder.md', SourceFile::TYPE_TEXT));
             $findings = array_values(array_filter(
-                $this->analyseUnits([$unit]),
-                static fn (Finding $finding): bool => $finding->ruleId === PhiPatternRule::ID,
-            ));
+                                         $this->analyseUnits([$unit]),
+                                         static fn(Finding $finding): bool => $finding->ruleId === PhiPatternRule::ID,
+                                     ));
 
             self::assertCount(1, $findings);
             self::assertSame(3, $findings[0]->line);
@@ -289,8 +290,8 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Verify CLI text and JSON reports do not leak full secrets.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testCliTextAndJsonReportsDoNotLeakFullSecrets(): void
     {
@@ -299,9 +300,9 @@ final class SensitiveDataRulesTest extends TestCase
         json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
         $reportLeaks = array_values(array_filter(
-            $this->secretValues(),
-            static fn (string $secret): bool => str_contains($text, $secret) || str_contains($json, $secret),
-        ));
+                                        $this->secretValues(),
+                                        static fn(string $secret): bool => str_contains($text, $secret) || str_contains($json, $secret),
+                                    ));
 
         self::assertSame([], $reportLeaks, 'Reports should not leak secret values.');
 
@@ -315,13 +316,14 @@ final class SensitiveDataRulesTest extends TestCase
      * @param string        $ruleId        Rule whose findings are isolated before counting.
      * @param int           $expectedCount Findings the rule must report for this fixture.
      * @param list<Finding> $findings      Full analysis output to filter by rule id.
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -330,7 +332,8 @@ final class SensitiveDataRulesTest extends TestCase
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
      * @param string $path Project-relative fixture path to parse and scan.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - every rule finding for the fixture, in registry order; empty when nothing flagged
      */
     private function analysePath(string $path): array
     {
@@ -343,7 +346,8 @@ final class SensitiveDataRulesTest extends TestCase
      *
      * @param list<AnalysisUnit> $units  Pre-parsed units to run the default rule set over.
      * @param ?AnalysisConfig    $config Override config; null applies the registry defaults.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - aggregated findings the default rule set produced across the units; empty when none fired
      */
     private function analyseUnits(array $units, ?AnalysisConfig $config = null): array
     {
@@ -360,7 +364,8 @@ final class SensitiveDataRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed unit, typed PHP for .php paths and plain text otherwise
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -374,7 +379,8 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Run text and JSON reports over the secret fixtures.
      *
-     * @return array{string, string} Text output followed by JSON output.
+     * @return array{string, string} - the same fixtures rendered twice: human-readable text first, machine JSON second, so the leak check can scan
+     *                       both surfaces
      */
     private function secretLeakReports(): array
     {
@@ -392,7 +398,8 @@ final class SensitiveDataRulesTest extends TestCase
 
     /**
      * @param list<string> $arguments
-     * @return string CLI stdout.
+     *
+     * @return string - the gruff CLI's stdout; stderr is dropped and a non-zero exit already fails the test before returning
      */
     private function runGruff(array $arguments): string
     {
@@ -408,7 +415,7 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Build synthetic secret-like values for sensitive-data tests.
      *
-     * @return list<string>
+     * @return list<string> - the canonical plaintext secrets the leak checks search reports and findings for
      */
     private function secretValues(): array
     {
@@ -428,8 +435,8 @@ final class SensitiveDataRulesTest extends TestCase
             'npm_' . 'aBcDeFgHiJkLmNoPqRs' . 'TuVwXyZ012345',
             'AIza' . 'SyA1b2C3d4E5f6G7' . 'h8I9j0K1l2M3n4O5p6Q',
             '?sv=2024-01-01&ss=b&srt=sco&sp=rl&se=2026-01-01T00:00:00Z'
-                . '&st=2025-01-01T00:00:00Z&spr=https&sig='
-                . 'rN7pQ4sV9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ%3D',
+            . '&st=2025-01-01T00:00:00Z&spr=https&sig='
+            . 'rN7pQ4sV9xY2zA5bC8dF1gH4jK7mP0sV3wX6yZ%3D',
             'glpat-' . 'aBcDeFgHiJkLmNoPq' . 'RsTuVwXyZ',
             'eyJhbGciOiJIUzI1NiJ9.' . 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.' . 'sflKxwRJSMeKKF2Q' . 'T4fwpMeJf36POk6yJV_adQssw5c',
             'mysql://appuser:' . 'rN7pQ4sV9xY2zA5b' . '@db.internal/app',

@@ -27,7 +27,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Describe the test method too long rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - immutable metadata, default Advisory severity, and the maxMeaningfulLines threshold callers tune via config
      */
     public function definition(): RuleDefinition
     {
@@ -50,15 +50,15 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for oversized test methods.
+     * @return list<Finding> - one Advisory finding per test scope exceeding its threshold; empty when every scope is within budget
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $definition = $this->definition();
-        $settings   = $ruleContext->settingsFor($definition);
-        $threshold  = $this->thresholdForPath(
+        $definition  = $this->definition();
+        $settings    = $ruleContext->settingsFor($definition);
+        $threshold   = $this->thresholdForPath(
             $analysisUnit->file->displayPath,
-            (int) $settings->numericThreshold('maxMeaningfulLines'),
+            (int)$settings->numericThreshold('maxMeaningfulLines'),
             $settings->option('pathOverrides'),
         );
         $sourceLines = explode("\n", $analysisUnit->source);
@@ -76,13 +76,13 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId:  self::ID,
-                message: sprintf(
-                    '%s spans %d meaningful lines, above the threshold of %d.',
-                    $scope->symbol,
-                    $count,
-                    $threshold,
-                ),
+                ruleId:      self::ID,
+                message:     sprintf(
+                                 '%s spans %d meaningful lines, above the threshold of %d.',
+                                 $scope->symbol,
+                                 $count,
+                                 $threshold,
+                             ),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
@@ -106,7 +106,8 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      * @param list<string> $sourceLines All source lines of the unit, indexed from zero (line N is index N-1).
      * @param int          $startLine   First source line of the test scope, inclusive (1-based).
      * @param int          $endLine     Last source line of the test scope, inclusive (1-based).
-     * @return int Count of non-empty, non-comment lines in the method range.
+     *
+     * @return int - meaningful line tally compared against the threshold; blanks, comments, and lone brackets are excluded
      */
     private function countMeaningfulLines(array $sourceLines, int $startLine, int $endLine): int
     {
@@ -146,10 +147,13 @@ final readonly class TestMethodTooLongRule implements RuleInterface
     /**
      * Resolve a path-specific threshold override when configured.
      *
-     * @param string $displayPath File path matched against each override glob; backslashes normalised to slashes first.
-     * @param int $defaultThreshold Threshold applied when no override pattern matches this path.
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides Override map; else default.
-     * @return int Effective max meaningful lines threshold.
+     * @param string                                                        $displayPath      File path matched against each override glob;
+     *                                                                                        backslashes normalised to slashes first.
+     * @param int                                                           $defaultThreshold Threshold applied when no override pattern matches this
+     *                                                                                        path.
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides    Override map; else default.
+     *
+     * @return int - effective max-meaningful-lines budget: the first matching override (floored at 1) or the default when none match
      */
     private function thresholdForPath(string $displayPath, int $defaultThreshold, int|float|bool|string|array $pathOverrides): int
     {
@@ -170,7 +174,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
 
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
                 // First matching glob wins; floor at 1 so a zero or negative override can never disable the rule.
-                return max(1, (int) $threshold);
+                return max(1, (int)$threshold);
             }
         }
 
@@ -182,7 +186,9 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      * Parse a compact `glob=threshold` override entry from config.
      *
      * @param string $pathOverride Single override in `glob=threshold` form, e.g. `tests/Integration/*=60`.
-     * @return array{0: string, 1: int|float|string}
+     *
+     * @return array{0: string, 1: int|float|string} - glob pattern and its parsed numeric threshold; both empty strings when the entry is not a
+     *                  valid `glob=number`
      */
     private function parsePathOverride(string $pathOverride): array
     {
@@ -192,7 +198,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             return ['', ''];
         }
 
-        $threshold = str_contains($parts[1], '.') ? (float) $parts[1] : (int) $parts[1];
+        $threshold = str_contains($parts[1], '.') ? (float)$parts[1] : (int)$parts[1];
 
         // Preserve the numeric kind: a dotted value stays a float, otherwise it is an int threshold.
         return [$parts[0], $threshold];

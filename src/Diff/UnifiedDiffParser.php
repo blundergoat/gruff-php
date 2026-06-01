@@ -13,7 +13,9 @@ final readonly class UnifiedDiffParser
      * Parse unified diff text.
      *
      * @param string $diff Raw `git diff` output; only added-line hunks contribute to the returned ranges.
-     * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>}
+     *
+     * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>} - changed file paths sorted ascending, plus per-file
+     *                      added-line ranges keyed by path; both empty when the diff has no qualifying hunks
      */
     public function parse(string $diff): array
     {
@@ -53,8 +55,8 @@ final readonly class UnifiedDiffParser
                 continue;
             }
 
-            $startLine = (int) $matches[1];
-            $length    = isset($matches[2]) ? (int) $matches[2] : 1;
+            $startLine = (int)$matches[1];
+            $length    = isset($matches[2]) ? (int)$matches[2] : 1;
             if ($length === 0) {
                 continue;
             }
@@ -78,6 +80,7 @@ final readonly class UnifiedDiffParser
      * @param string|null                           $filePath     Project-relative changed path.
      * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     *
      * @return void
      */
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
@@ -95,7 +98,8 @@ final readonly class UnifiedDiffParser
      * Parse the destination path from a unified diff header.
      *
      * @param string $line A `+++ ` header line; its `b/` prefix is stripped to a project-relative path.
-     * @return string|null Current-file path, or null for deleted files.
+     *
+     * @return string|null - project-relative destination path, or null when the header points at /dev/null (a deleted file)
      */
     private function parseNewFilePath(string $line): ?string
     {
@@ -119,7 +123,8 @@ final readonly class UnifiedDiffParser
      * Parse the source path from a unified diff header.
      *
      * @param string $line A `--- ` header line; its `a/` prefix is stripped to a project-relative path.
-     * @return string|null Previous-file path, or null for new files.
+     *
+     * @return string|null - project-relative source path, or null when the header points at /dev/null (a newly added file)
      */
     private function parseOldFilePath(string $line): ?string
     {
@@ -146,7 +151,8 @@ final readonly class UnifiedDiffParser
      * trailing tab-separated metadata that some patch formats append.
      *
      * @param string $rawPath Path slice from a diff header, still possibly C-quoted or tab-suffixed.
-     * @return string Cleaned header path.
+     *
+     * @return string - the path with any trailing tab-metadata removed and git C-quoting decoded, ready to use as a project-relative path
      */
     private function normaliseHeaderPath(string $rawPath): string
     {

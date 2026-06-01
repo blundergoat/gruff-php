@@ -32,24 +32,25 @@ final readonly class AnalysisConfig
     ];
 
     /**
-     * @param array<string, RuleSettings>      $rules                 Effective settings keyed by rule id.
-     * @param float                            $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
-     * @param RuleSelection                    $ruleSelection         Include/exclude rule selection for the run.
-     * @param list<string>                     $ignoredPathPatterns   Path patterns skipped during discovery.
-     * @param list<string>                     $acceptedAbbreviations Abbreviations accepted by naming rules.
-     * @param list<string>                     $allowedSecretPreviews Secret previews explicitly allowed by config.
-     * @param array<string, FailThreshold>     $minimumSeverity       Per-command exit-code thresholds, keyed by command name.
-     * @param FailThresholds|null              $failureConditions     Severity-bucketed count gate from failureConditions config, when set.
+     * @param array<string, RuleSettings>  $rules                 Effective settings keyed by rule id.
+     * @param float                        $minimumPhpVersion     Minimum PHP version used by version-sensitive rules.
+     * @param RuleSelection                $ruleSelection         Include/exclude rule selection for the run.
+     * @param list<string>                 $ignoredPathPatterns   Path patterns skipped during discovery.
+     * @param list<string>                 $acceptedAbbreviations Abbreviations accepted by naming rules.
+     * @param list<string>                 $allowedSecretPreviews Secret previews explicitly allowed by config.
+     * @param array<string, FailThreshold> $minimumSeverity       Per-command exit-code thresholds, keyed by command name.
+     * @param FailThresholds|null          $failureConditions     Severity-bucketed count gate from failureConditions config, when set.
+     *
      * @throws InvalidArgumentException When the PHP version floor is below 7.4.
      */
     public function __construct(
-        private array $rules,
-        private float $minimumPhpVersion = self::DEFAULT_MINIMUM_PHP_VERSION,
-        private RuleSelection $ruleSelection = new RuleSelection(),
-        private array $ignoredPathPatterns = [],
-        private array $acceptedAbbreviations = [],
-        private array $allowedSecretPreviews = [],
-        private array $minimumSeverity = [],
+        private array           $rules,
+        private float           $minimumPhpVersion = self::DEFAULT_MINIMUM_PHP_VERSION,
+        private RuleSelection   $ruleSelection = new RuleSelection(),
+        private array           $ignoredPathPatterns = [],
+        private array           $acceptedAbbreviations = [],
+        private array           $allowedSecretPreviews = [],
+        private array           $minimumSeverity = [],
         private ?FailThresholds $failureConditions = null,
     ) {
         if ($this->minimumPhpVersion < 7.4) {
@@ -61,6 +62,7 @@ final readonly class AnalysisConfig
      * Build default settings for every rule in the registry.
      *
      * @param RuleRegistry $registry Rule registry supplying default rule definitions.
+     *
      * @return self Config initialised with registry defaults.
      */
     public static function fromRegistry(RuleRegistry $registry): self
@@ -85,14 +87,15 @@ final readonly class AnalysisConfig
      * Return the configured settings for a known rule id.
      *
      * @param string $ruleId Rule identifier to read.
+     *
+     * @return RuleSettings - effective settings for the rule; never null since an unknown id throws instead
      * @throws InvalidArgumentException When the rule id is unknown.
-     * @return RuleSettings Settings for the requested rule.
      */
     public function ruleSettings(string $ruleId): RuleSettings
     {
         // Unknown ids are caller/config mistakes, so surface them immediately rather than returning a default.
         return $this->rules[$ruleId]
-            ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
+               ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
@@ -100,8 +103,9 @@ final readonly class AnalysisConfig
      *
      * @param string       $ruleId   Rule identifier to replace.
      * @param RuleSettings $settings New settings for the rule.
-     * @throws InvalidArgumentException When the rule id is unknown.
+     *
      * @return self Config carrying the updated rule settings.
+     * @throws InvalidArgumentException When the rule id is unknown.
      */
     public function withRuleSettings(string $ruleId, RuleSettings $settings): self
     {
@@ -128,7 +132,7 @@ final readonly class AnalysisConfig
     /**
      * Return the minimum PHP version used by version-sensitive rules.
      *
-     * @return float Minimum supported PHP version.
+     * @return float - PHP version floor gating version-sensitive rules; always >= 7.4 per the constructor guard
      */
     public function minimumPhpVersion(): float
     {
@@ -140,6 +144,7 @@ final readonly class AnalysisConfig
      * Return a copy with a different minimum PHP version.
      *
      * @param float $minimumPhpVersion New minimum PHP version floor.
+     *
      * @return self Config carrying the updated PHP version floor.
      */
     public function withMinimumPhpVersion(float $minimumPhpVersion): self
@@ -160,7 +165,7 @@ final readonly class AnalysisConfig
     /**
      * Expose rule settings keyed by rule identifier.
      *
-     * @return array<string, RuleSettings>
+     * @return array<string, RuleSettings> - every rule's effective settings keyed by rule id; never empty since the registry seeds one entry per rule
      */
     public function rules(): array
     {
@@ -171,7 +176,7 @@ final readonly class AnalysisConfig
     /**
      * Return the rule include/exclude selection for this analysis run.
      *
-     * @return RuleSelection Rule selection constraints.
+     * @return RuleSelection - include/exclude filters over the rule map; an empty selection runs every enabled rule
      */
     public function ruleSelection(): RuleSelection
     {
@@ -183,6 +188,7 @@ final readonly class AnalysisConfig
      * Return a copy with a different rule selection.
      *
      * @param RuleSelection $ruleSelection Rule include/exclude selection to apply.
+     *
      * @return self Config carrying the updated rule selection.
      */
     public function withRuleSelection(RuleSelection $ruleSelection): self
@@ -203,7 +209,7 @@ final readonly class AnalysisConfig
     /**
      * Expose configured path ignore patterns.
      *
-     * @return list<string>
+     * @return list<string> - glob patterns discovery skips; empty means scan every path the discovery roots reach
      */
     public function ignoredPathPatterns(): array
     {
@@ -234,7 +240,8 @@ final readonly class AnalysisConfig
     /**
      * Expose identifier abbreviations allowed by naming rules.
      *
-     * @return list<string>
+     * @return list<string> - abbreviations naming rules treat as words; the single stored list (built-in seed or the user's wholesale replacement),
+     *                      never a merge of both
      */
     public function acceptedAbbreviations(): array
     {
@@ -267,7 +274,8 @@ final readonly class AnalysisConfig
     /**
      * Expose redacted secret previews allowed by sensitive-data rules.
      *
-     * @return list<string>
+     * @return list<string> - redacted secret previews cleared as false positives; sensitive-data rules suppress findings matching these, empty means
+     *                      suppress none
      */
     public function allowedSecretPreviews(): array
     {
@@ -299,6 +307,7 @@ final readonly class AnalysisConfig
      * Return the per-command exit-code threshold for the named gating command.
      *
      * @param string $command Gating command name (analyse, report, dashboard).
+     *
      * @return FailThreshold|null Configured threshold for the command, or null when unset.
      */
     public function failThresholdFor(string $command): ?FailThreshold

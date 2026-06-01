@@ -46,7 +46,8 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the test-quality rule pack across PHPUnit and Pest: assertion smells, eager tests, SUT-not-called, oversized methods, unused mocks, global-state leaks, repeated structures, and per-rule severity options.
+ * Covers the test-quality rule pack across PHPUnit and Pest: assertion smells, eager tests, SUT-not-called, oversized methods, unused mocks,
+ * global-state leaks, repeated structures, and per-rule severity options.
  */
 final class TestQualityRulesTest extends TestCase
 {
@@ -61,9 +62,9 @@ final class TestQualityRulesTest extends TestCase
     public function testPhpUnitAndPestTestScopesSupportNoAssertionAndTrivialAssertionChecks(): void
     {
         $findings = $this->analysePaths([
-            'tests/Fixtures/TestQuality/phpunit-core-smells.php',
-            'tests/Fixtures/TestQuality/pest-smells.php',
-        ]);
+                                            'tests/Fixtures/TestQuality/phpunit-core-smells.php',
+                                            'tests/Fixtures/TestQuality/pest-smells.php',
+                                        ]);
 
         self::assertRuleCount(NoAssertionsRule::ID, 4, $findings);
         self::assertRuleCount(TrivialAssertionRule::ID, 2, $findings);
@@ -128,9 +129,9 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestIgnoresResultObservationCallsAfterSingleAct(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/eager-test-observation-cases.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/eager-test-observation-cases.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+                                 ));
 
         self::assertCount(1, $findings);
         self::assertSame('MultipleBehaviorQualityTest::testProcessesOrderAndSendsReceipt()', $findings[0]->symbol);
@@ -144,24 +145,24 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestReportsRealMultiActCasesWithStableMetadata(): void
     {
         $findings = $this->eagerMutationFindings();
-        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertSame([
-            'EagerPositiveMutationCasesTest::testProcessesOrderAndSendsReceipt()',
-            'EagerPositiveMutationCasesTest::testStaticServiceHandlesTwoBehaviors()',
-            'EagerPositiveMutationCasesTest::testNewServiceHandlesTwoBehaviors()',
-            'EagerPositiveMutationCasesTest::testPropertyServiceHandlesTwoBehaviors()',
-            'EagerPositiveMutationCasesTest::testObservationNamedMethodsStillCountOnDomainReceiver()',
-            'EagerPositiveMutationCasesTest::testSkipsNoiseBeforeRealSutCalls()',
-            'EagerPositiveMutationCasesTest::testSkipsResultObservationBeforeRealSutCalls()',
-            'EagerPositiveMutationCasesTest::testDomainStartWaitStopMethodsAreSutCalls()',
-            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForVariables()',
-            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForStaticCalls()',
-            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForNewExpressions()',
-            'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForProperties()',
-            'EagerPositiveMutationCasesTest::testKnownReceiverNonObservationMethodsStillCount()',
-            'EagerPositiveMutationCasesTest::testLargestReceiverTieKeepsFirstReceiver()',
-        ], $symbols);
+                             'EagerPositiveMutationCasesTest::testProcessesOrderAndSendsReceipt()',
+                             'EagerPositiveMutationCasesTest::testStaticServiceHandlesTwoBehaviors()',
+                             'EagerPositiveMutationCasesTest::testNewServiceHandlesTwoBehaviors()',
+                             'EagerPositiveMutationCasesTest::testPropertyServiceHandlesTwoBehaviors()',
+                             'EagerPositiveMutationCasesTest::testObservationNamedMethodsStillCountOnDomainReceiver()',
+                             'EagerPositiveMutationCasesTest::testSkipsNoiseBeforeRealSutCalls()',
+                             'EagerPositiveMutationCasesTest::testSkipsResultObservationBeforeRealSutCalls()',
+                             'EagerPositiveMutationCasesTest::testDomainStartWaitStopMethodsAreSutCalls()',
+                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForVariables()',
+                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForStaticCalls()',
+                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForNewExpressions()',
+                             'EagerPositiveMutationCasesTest::testReceiverCaseIsNormalisedForProperties()',
+                             'EagerPositiveMutationCasesTest::testKnownReceiverNonObservationMethodsStillCount()',
+                             'EagerPositiveMutationCasesTest::testLargestReceiverTieKeepsFirstReceiver()',
+                         ], $symbols);
 
         $expectedAssertionCount = 3;
         self::assertSame($expectedAssertionCount, $findings[0]->metadata['assertions'] ?? null);
@@ -179,7 +180,7 @@ final class TestQualityRulesTest extends TestCase
     public function testEagerTestIgnoresAssertionHarnessAndObservationNoise(): void
     {
         $findings = $this->eagerMutationFindings();
-        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
         self::assertNotContains('EagerNegativeMutationCasesTest::testAssertionHelperCallsDoNotBecomeSutCalls()', $symbols);
@@ -216,10 +217,10 @@ final class TestQualityRulesTest extends TestCase
             new RuleSettings(true, ['minAssertions' => 2.5]),
         );
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php', $config),
-            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-        ));
-        $symbols = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+                                     $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php', $config),
+                                     static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+                                 ));
+        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('EagerNegativeMutationCasesTest::testTwoAssertionMultiActStaysBelowDefaultThreshold()', $symbols);
     }
@@ -232,9 +233,9 @@ final class TestQualityRulesTest extends TestCase
     public function testSutNotCalledOnlyFlagsLeadingMethodStyleTestNames(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/sut-not-called-heuristic.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === SutNotCalledRule::ID,
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/sut-not-called-heuristic.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === SutNotCalledRule::ID,
+                                 ));
 
         self::assertCount(1, $findings);
         self::assertSame('SutNotCalledHeuristicTest::testCalculateTotalReturnsExpectedValue()', $findings[0]->symbol);
@@ -248,9 +249,9 @@ final class TestQualityRulesTest extends TestCase
     public function testMagicNumberAssertionIgnoresContextualNumericContracts(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/magic-number-assertion-heuristic.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === MagicNumberAssertionRule::ID,
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/magic-number-assertion-heuristic.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === MagicNumberAssertionRule::ID,
+                                 ));
 
         self::assertCount(1, $findings);
         self::assertSame('MagicNumberHeuristicTest::testOpaqueBusinessNumberIsFlagged()', $findings[0]->symbol);
@@ -396,17 +397,17 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(MockWithoutExpectationRule::ID, 2, $findings);
 
         $mockFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === MockWithoutExpectationRule::ID,
-        ));
-        $variants = array_values(array_filter(
-            array_map(static fn (Finding $finding): mixed => $finding->metadata['variant'] ?? null, $mockFindings),
-            'is_string',
-        ));
-        $variables = array_values(array_filter(
-            array_map(static fn (Finding $finding): mixed => $finding->metadata['variable'] ?? null, $mockFindings),
-            'is_string',
-        ));
+                                         $findings,
+                                         static fn(Finding $finding): bool => $finding->ruleId === MockWithoutExpectationRule::ID,
+                                     ));
+        $variants     = array_values(array_filter(
+                                         array_map(static fn(Finding $finding): mixed => $finding->metadata['variant'] ?? null, $mockFindings),
+                                         'is_string',
+                                     ));
+        $variables    = array_values(array_filter(
+                                         array_map(static fn(Finding $finding): mixed => $finding->metadata['variable'] ?? null, $mockFindings),
+                                         'is_string',
+                                     ));
 
         sort($variants);
         self::assertSame(['dead-mock', 'stub-only'], $variants);
@@ -421,9 +422,9 @@ final class TestQualityRulesTest extends TestCase
     public function testRepeatedStructureMissingDataProviderDetectedAndDataProviderUsersIgnored(): void
     {
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === RepeatedStructureMissingDataProviderRule::ID,
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/repeated-structure-missing-data-provider.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === RepeatedStructureMissingDataProviderRule::ID,
+                                 ));
 
         self::assertCount(2, $findings);
         self::assertSame('RepeatedShapesTest::testSumsAlpha()', $findings[0]->symbol);
@@ -445,8 +446,8 @@ final class TestQualityRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php');
         self::assertRuleCount(MultipleAaaCyclesRule::ID, 1, $defaultFindings);
 
-        $registry = RuleRegistry::defaults();
-        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry           = RuleRegistry::defaults();
+        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-multiple-aaa-cycles.yaml',
             $registry,
         );
@@ -472,10 +473,10 @@ final class TestQualityRulesTest extends TestCase
             new RuleSettings(true, ['minCycles' => 1], $settings->options),
         );
         $findings = array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config),
-            static fn (Finding $finding): bool => $finding->ruleId === MultipleAaaCyclesRule::ID
-                && $finding->symbol === 'MultipleAaaCyclesTest::testActThenInlineActAssertCountsAsOneCycle()',
-        ));
+                                     $this->analysePath('tests/Fixtures/TestQuality/multiple-aaa-cycles.php', $config),
+                                     static fn(Finding $finding): bool => $finding->ruleId === MultipleAaaCyclesRule::ID
+                                                                          && $finding->symbol === 'MultipleAaaCyclesTest::testActThenInlineActAssertCountsAsOneCycle()',
+                                 ));
 
         self::assertCount(1, $findings);
         self::assertSame(1, $findings[0]->metadata['cycles']);
@@ -514,8 +515,8 @@ final class TestQualityRulesTest extends TestCase
         $defaultFindings = $this->analysePath('tests/Fixtures/TestQuality/testdox-readability.php');
         self::assertRuleCount(TestdoxReadabilityRule::ID, 1, $defaultFindings);
 
-        $registry = RuleRegistry::defaults();
-        $config   = (new ConfigLoader(self::PROJECT_ROOT))->load(
+        $registry           = RuleRegistry::defaults();
+        $config             = (new ConfigLoader(self::PROJECT_ROOT))->load(
             'tests/Fixtures/Config/enable-testdox-readability.yaml',
             $registry,
         );
@@ -533,13 +534,14 @@ final class TestQualityRulesTest extends TestCase
      * @param string        $ruleId        Rule identifier whose findings are counted.
      * @param int           $expectedCount Exact number of findings the rule must emit.
      * @param list<Finding> $findings
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -549,7 +551,8 @@ final class TestQualityRulesTest extends TestCase
      *
      * @param string              $path   Single fixture path to analyse.
      * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - every finding emitted across all rules for the single fixture; empty when nothing fired
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -560,15 +563,15 @@ final class TestQualityRulesTest extends TestCase
     /**
      * Build eager mutation findings for the test-quality rule.
      *
-     * @return list<Finding>
+     * @return list<Finding> - only EagerTestRule findings from the mutation fixture, in source order; empty when none fire
      */
     private function eagerMutationFindings(): array
     {
         // Keep only eager-test findings from the mutation fixture, dropping any other rule that also fires on it.
         return array_values(array_filter(
-            $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php'),
-            static fn (Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
-        ));
+                                $this->analysePath('tests/Fixtures/TestQuality/eager-test-mutation-cases.php'),
+                                static fn(Finding $finding): bool => $finding->ruleId === EagerTestRule::ID,
+                            ));
     }
 
     /**
@@ -576,12 +579,13 @@ final class TestQualityRulesTest extends TestCase
      *
      * @param list<string>        $paths  Fixture paths to parse and analyse together.
      * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - every finding the default registry emits across the combined fixtures; empty when nothing fired
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
         // Run the default registry over the parsed units, defaulting config when the caller passed none.
         return $registry->analyse(
@@ -594,7 +598,8 @@ final class TestQualityRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed fixture, carrying the project-root-relative path as its display name
      */
     private function unitForPath(string $path): AnalysisUnit
     {

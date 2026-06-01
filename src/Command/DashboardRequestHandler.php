@@ -76,7 +76,7 @@ final readonly class DashboardRequestHandler
      * Read one dashboard HTTP request from the client socket.
      *
      * @param resource $client
-     * @return array{method: string, target: string, headers: array<string, string>}|DashboardHttpResponse|null
+     * @return array{method: string, target: string, headers: array<string, string>}|DashboardHttpResponse|null - the parsed request (method, target, headers) when well-formed; a DashboardHttpResponse to send verbatim when a size limit or duplicate Host was hit; null when the connection dropped or the request line was malformed
      */
     private function request($client): array|DashboardHttpResponse|null
     {
@@ -123,7 +123,7 @@ final readonly class DashboardRequestHandler
      * @param string                $target  Raw request target (path plus query); parsed for the route and params.
      * @param array<string, string> $headers Lower-cased request headers; the Host entry gates access before any route.
      *
-     * @return DashboardHttpResponse Response for the request target.
+     * @return DashboardHttpResponse - the routed reply: a 200 page/health/scan body for an allowed GET/HEAD, or the matching error (405 wrong verb, 421 disallowed host, 404 unknown path)
      */
     private function responseFor(string $method, string $target, array $headers): DashboardHttpResponse
     {
@@ -155,7 +155,7 @@ final readonly class DashboardRequestHandler
     /**
      * @param array<string, string> $query
      *
-     * @return string Dashboard HTML shell.
+     * @return string - the complete HTML document for the dashboard page, with state derived from the query params already rendered in
      */
     private function dashboardHtml(array $query): string
     {
@@ -170,7 +170,7 @@ final readonly class DashboardRequestHandler
      *
      * @param string $target Raw request target; only its query string is read, and non-scalar values are dropped.
      *
-     * @return array<string, string>
+     * @return array<string, string> - scalar query params keyed by name, each stringified; empty when the target has no query string
      */
     private function query(string $target): array
     {
@@ -200,7 +200,7 @@ final readonly class DashboardRequestHandler
      * Read dashboard HTTP headers until the request header block ends.
      *
      * @param resource $client
-     * @return array<string, string>|DashboardHttpResponse|null
+     * @return array<string, string>|DashboardHttpResponse|null - lower-cased header name to value map on the blank-line terminator; a DashboardHttpResponse (431/400) when the line/byte budget overran or a duplicate Host appeared; null when the stream ended before the terminator
      */
     private function headers($client): array|DashboardHttpResponse|null
     {
@@ -249,7 +249,7 @@ final readonly class DashboardRequestHandler
      *
      * @param ?string $hostHeader Raw Host header, or null when absent; missing or empty is rejected as not allowed.
      *
-     * @return bool True when the request is allowed for this local dashboard.
+     * @return bool - true when the Host header's name and port match this dashboard's bind target; false denies the request as a likely cross-origin or DNS-rebinding attempt
      */
     private function isHostAllowed(?string $hostHeader): bool
     {
@@ -305,7 +305,7 @@ final readonly class DashboardRequestHandler
     /**
      * Check whether the configured bind host is a loopback address.
      *
-     * @return bool True for localhost loopback hosts.
+     * @return bool - true when the configured bind host is any loopback spelling (127.0.0.1, localhost, ::1), which narrows the allowed Host names to those
      */
     private function isBindHostLoopback(): bool
     {
@@ -316,7 +316,7 @@ final readonly class DashboardRequestHandler
     /**
      * Check whether the configured bind host is a wildcard address.
      *
-     * @return bool True when the dashboard is listening on all interfaces.
+     * @return bool - true when bound to a wildcard address (0.0.0.0, ::), meaning the request Host name cannot be pinned and only its port is checked
      */
     private function isBindHostWildcard(): bool
     {
@@ -327,7 +327,7 @@ final readonly class DashboardRequestHandler
     /**
      * Build the response used when request headers exceed dashboard limits.
      *
-     * @return DashboardHttpResponse 431 response.
+     * @return DashboardHttpResponse - the shared 431 Request Header Fields Too Large reply, reused for both an over-long request line and an over-budget header block
      */
     private function tooLargeResponse(): DashboardHttpResponse
     {

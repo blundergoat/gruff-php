@@ -20,10 +20,10 @@ final readonly class InfectionMutant
      * @param string|null $processOutput Per-mutant process output, when available.
      */
     public function __construct(
-        public string $status,
-        public string $filePath,
-        public ?int $line,
-        public string $mutator,
+        public string  $status,
+        public string  $filePath,
+        public ?int    $line,
+        public string  $mutator,
         public ?string $diff = null,
         public ?string $processOutput = null,
     ) {
@@ -32,17 +32,18 @@ final readonly class InfectionMutant
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null}
+     * @return array{status: string, file: string, line: int|null, mutator: string, diff: string|null, processOutput: string|null} - report-ready map
+     *                       keyed by Infection JSON field names; line/diff/processOutput are null when Infection omitted them
      */
     public function toArray(): array
     {
         // Keys mirror the Infection JSON field names so reports round-trip without remapping.
         return [
-            'status' => $this->status,
-            'file' => $this->filePath,
-            'line' => $this->line,
-            'mutator' => $this->mutator,
-            'diff' => $this->diff,
+            'status'        => $this->status,
+            'file'          => $this->filePath,
+            'line'          => $this->line,
+            'mutator'       => $this->mutator,
+            'diff'          => $this->diff,
             'processOutput' => $this->processOutput,
         ];
     }

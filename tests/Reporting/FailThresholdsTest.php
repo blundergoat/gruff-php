@@ -97,10 +97,10 @@ final class FailThresholdsTest extends TestCase
         $gate = FailThresholds::fromConfig(['total' => 2]);
 
         $trip = $gate->tripsOn([
-            $this->finding(Severity::Advisory),
-            $this->finding(Severity::Advisory),
-            $this->finding(Severity::Advisory),
-        ]);
+                                   $this->finding(Severity::Advisory),
+                                   $this->finding(Severity::Advisory),
+                                   $this->finding(Severity::Advisory),
+                               ]);
         self::assertInstanceOf(ThresholdTrip::class, $trip);
         self::assertSame(ThresholdTrip::KIND_TOTAL, $trip->thresholdKind);
         self::assertSame(3, $trip->count);
@@ -125,8 +125,9 @@ final class FailThresholdsTest extends TestCase
      *
      * @param string $configJson      Malformed failureConditions block encoded as JSON.
      * @param string $expectedMessage ConfigException message the parser must report.
-     * @throws JsonException
+     *
      * @return void
+     * @throws JsonException
      */
     #[DataProvider('invalidFailureConditionsProvider')]
     public function testFromConfigRejectsInvalidFailureConditions(string $configJson, string $expectedMessage): void
@@ -143,7 +144,8 @@ final class FailThresholdsTest extends TestCase
     /**
      * Malformed failureConditions blocks (as JSON) paired with the ConfigException message each must raise.
      *
-     * @return iterable<string, array{string, string}>
+     * @return iterable<string, array{string, string}> - data-provider cases keyed by scenario name; each pair is [malformed JSON config, expected
+     *                          ConfigException message]
      */
     public static function invalidFailureConditionsProvider(): iterable
     {
@@ -250,7 +252,8 @@ final class FailThresholdsTest extends TestCase
      * Build a finding at the requested severity for gate evaluation.
      *
      * @param Severity $severity Severity to attach to the finding.
-     * @return Finding Finding carrying the requested severity.
+     *
+     * @return Finding - a fixed documentation-pillar finding so a test can exercise one severity band of the gate
      */
     private function finding(Severity $severity): Finding
     {

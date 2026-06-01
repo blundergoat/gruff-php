@@ -16,8 +16,9 @@ final readonly class GitDiffProvider
      *
      * @param string $projectRoot Git working tree root.
      * @param string $mode        Diff mode or base ref.
+     *
+     * @return DiffResult - changed-line ranges per file plus diff metadata; base ref is null for local modes
      * @throws DiffException When git diff cannot run or the base ref is unsafe.
-     * @return DiffResult Diff metadata and changed-line ranges for the requested mode.
      */
     public function changedLines(string $projectRoot, string $mode): DiffResult
     {
@@ -28,8 +29,8 @@ final readonly class GitDiffProvider
 
         if (!$process->isSuccessful()) {
             throw new DiffException(trim($process->getErrorOutput()) !== ''
-                ? trim($process->getErrorOutput())
-                : sprintf('Unable to compute git diff for mode "%s".', $mode));
+                                        ? trim($process->getErrorOutput())
+                                        : sprintf('Unable to compute git diff for mode "%s".', $mode));
         }
 
         $parsed      = (new UnifiedDiffParser())->parse($process->getOutput());
@@ -56,8 +57,9 @@ final readonly class GitDiffProvider
      * @param string                                $projectRoot  Git working tree root.
      * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
-     * @throws DiffException When Git cannot list untracked files.
+     *
      * @return void
+     * @throws DiffException When Git cannot list untracked files.
      */
     private function appendUntrackedFiles(string $projectRoot, array &$changedFiles, array &$changedLines): void
     {
@@ -66,8 +68,8 @@ final readonly class GitDiffProvider
 
         if (!$process->isSuccessful()) {
             throw new DiffException(trim($process->getErrorOutput()) !== ''
-                ? trim($process->getErrorOutput())
-                : 'Unable to list untracked files for working-tree diff mode.');
+                                        ? trim($process->getErrorOutput())
+                                        : 'Unable to list untracked files for working-tree diff mode.');
         }
 
         foreach (explode("\0", $process->getOutput()) as $filePath) {
@@ -86,6 +88,7 @@ final readonly class GitDiffProvider
      * Ensure diff mode only runs inside a git working tree.
      *
      * @param string $projectRoot Directory the git probe runs in; must be the working tree to inspect.
+     *
      * @return void
      */
     private function ensureGitWorkTree(string $projectRoot): void
@@ -102,7 +105,8 @@ final readonly class GitDiffProvider
      * Build the git diff command used to calculate changed lines.
      *
      * @param string $mode One of staged|unstaged|working-tree, or a base ref name validated as the diff target.
-     * @return list<string>
+     *
+     * @return list<string> - git command argv where element 0 is "git"; the trailing "--" ends option parsing before paths
      */
     private function diffCommand(string $mode): array
     {
@@ -119,7 +123,8 @@ final readonly class GitDiffProvider
      * Reject unsafe refs before passing them to git.
      *
      * @param string $ref Caller-supplied base ref; rejected unless it is a safe git ref with no leading dash.
-     * @return string The validated git ref name.
+     *
+     * @return string - the same ref unchanged once it has cleared the safe-character guard, safe to pass to git
      */
     private function validatedRef(string $ref): string
     {
@@ -138,6 +143,7 @@ final readonly class GitDiffProvider
      * @param string|null                           $filePath     Project-relative changed path.
      * @param list<string>                          $changedFiles Changed files collected so far.
      * @param array<string, list<ChangedLineRange>> $changedLines Changed ranges keyed by file.
+     *
      * @return void
      */
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void

@@ -41,7 +41,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     /**
      * Describe the global state mutation rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults applied to every finding
      */
     public function definition(): RuleDefinition
     {
@@ -121,7 +121,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope        Cleanup-free test scope scanned for direct superglobal writes.
      *
-     * @return list<Finding>
+     * @return list<Finding> - one finding per unscoped superglobal write in the scope; empty when none are written
      */
     private function superglobalFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
@@ -152,7 +152,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
      * @param TestQualityScope $scope        Cleanup-free test scope; its calls are matched against the state list.
      *
-     * @return list<Finding>
+     * @return list<Finding> - one finding per unscoped state-mutating call in the scope; empty when none are called
      */
     private function stateFunctionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
@@ -270,7 +270,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit Parsed unit whose declared classes seed the lookup table.
      *
-     * @return array<string, Stmt\Class_>
+     * @return array<string, Stmt\Class_> - declared classes keyed by both short and namespaced name; empty when the unit declares none
      */
     private function classesByName(AnalysisUnit $analysisUnit): array
     {
@@ -299,7 +299,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      *
      * @param string $name Fully qualified or already-short class name; an empty-segment result falls back to the input.
      *
-     * @return string Unqualified class name.
+     * @return string - the trailing namespace segment, used to match `extends` targets against short class names
      */
     private function shortName(string $name): string
     {
@@ -316,14 +316,14 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      * @param string                $message      Human-readable text naming the mutated state and the missing cleanup.
      * @param array<string, scalar> $metadata     Structured detail (`variant`, `name`) used to group or filter.
      *
-     * @return Finding Global state mutation finding.
+     * @return Finding - the mutation report stamped with this rule's fixed pillar, tier, severity, and remediation text
      */
     private function finding(
-        AnalysisUnit $analysisUnit,
+        AnalysisUnit     $analysisUnit,
         TestQualityScope $scope,
-        int $line,
-        string $message,
-        array $metadata,
+        int              $line,
+        string           $message,
+        array            $metadata,
     ): Finding {
         // Stamp every finding with this rule's fixed pillar, tier, severity, and remediation guidance.
         return new Finding(

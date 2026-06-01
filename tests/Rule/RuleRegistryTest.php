@@ -109,7 +109,8 @@ use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the default rule registry: stable rule IDs and definitions, enabled-rule execution, disabled-rule skipping, project-level finding deduplication, duplicate-ID rejection, and listable descriptions.
+ * Covers the default rule registry: stable rule IDs and definitions, enabled-rule execution, disabled-rule skipping, project-level finding
+ * deduplication, duplicate-ID rejection, and listable descriptions.
  */
 final class RuleRegistryTest extends TestCase
 {
@@ -169,10 +170,10 @@ final class RuleRegistryTest extends TestCase
             MethodLengthRule::ID, ParameterCountRule::ID,
             PropertyCountRule::ID, PublicMethodCountRule::ID,
         ];
-        $missingRuleIds = array_values(array_filter(
-            $expectedRuleIds,
-            static fn (string $ruleId): bool => !$registry->has($ruleId),
-        ));
+        $missingRuleIds  = array_values(array_filter(
+                                            $expectedRuleIds,
+                                            static fn(string $ruleId): bool => !$registry->has($ruleId),
+                                        ));
 
         self::assertSame([], $missingRuleIds);
     }
@@ -195,7 +196,7 @@ final class RuleRegistryTest extends TestCase
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
-        $findings = array_values(array_filter($allFindings, static fn ($finding) => $finding->ruleId === FileLengthRule::ID));
+        $findings = array_values(array_filter($allFindings, static fn($finding) => $finding->ruleId === FileLengthRule::ID));
 
         self::assertCount(1, $findings);
         self::assertSame(FileLengthRule::ID, $findings[0]->ruleId);
@@ -222,7 +223,7 @@ final class RuleRegistryTest extends TestCase
             new RuleContext(__DIR__ . '/../..', $config),
         );
 
-        $fileLengthFindings = array_filter($allFindings, static fn ($finding) => $finding->ruleId === FileLengthRule::ID);
+        $fileLengthFindings = array_filter($allFindings, static fn($finding) => $finding->ruleId === FileLengthRule::ID);
         self::assertSame([], array_values($fileLengthFindings));
     }
 
@@ -260,9 +261,9 @@ final class RuleRegistryTest extends TestCase
         $this->expectExceptionMessage('Duplicate rule id "test.duplicate".');
 
         new RuleRegistry([
-            $this->fakeRule('test.duplicate'),
-            $this->fakeRule('test.duplicate'),
-        ]);
+                             $this->fakeRule('test.duplicate'),
+                             $this->fakeRule('test.duplicate'),
+                         ]);
     }
 
     /**
@@ -273,12 +274,12 @@ final class RuleRegistryTest extends TestCase
     public function testDefaultRulesHaveListableDescriptions(): void
     {
         $missingDescriptionIds = array_values(array_map(
-            static fn ($rule): string => $rule->definition()->id,
-            array_filter(
-                RuleRegistry::defaults()->all(),
-                static fn ($rule): bool => trim($rule->definition()->description()) === '',
-            ),
-        ));
+                                                  static fn($rule): string => $rule->definition()->id,
+                                                  array_filter(
+                                                      RuleRegistry::defaults()->all(),
+                                                      static fn($rule): bool => trim($rule->definition()->description()) === '',
+                                                  ),
+                                              ));
 
         self::assertSame([], $missingDescriptionIds);
     }
@@ -297,29 +298,29 @@ final class RuleRegistryTest extends TestCase
 
             // The hash asserts the listable definition surface, not object identity.
             return [
-                'id' => $definition->id,
-                'name' => $definition->name,
-                'description' => $definition->description(),
-                'pillar' => $definition->pillar->value,
-                'secondaryPillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $definition->secondaryPillars),
-                'tier' => $definition->tier->value,
-                'defaultSeverity' => $definition->defaultSeverity->value,
-                'confidence' => $definition->confidence->value,
-                'defaultThresholds' => $definition->defaultThresholds,
+                'id'                       => $definition->id,
+                'name'                     => $definition->name,
+                'description'              => $definition->description(),
+                'pillar'                   => $definition->pillar->value,
+                'secondaryPillars'         => array_map(static fn(Pillar $pillar): string => $pillar->value, $definition->secondaryPillars),
+                'tier'                     => $definition->tier->value,
+                'defaultSeverity'          => $definition->defaultSeverity->value,
+                'confidence'               => $definition->confidence->value,
+                'defaultThresholds'        => $definition->defaultThresholds,
                 'defaultSeverityThreshold' => $single === null
                     ? null
                     : ['threshold' => $single->threshold, 'severity' => $single->severity->value],
-                'defaultEnabled' => $definition->isEnabledByDefault,
-                'defaultOptions' => $definition->defaultOptions,
+                'defaultEnabled'           => $definition->isEnabledByDefault,
+                'defaultOptions'           => $definition->defaultOptions,
             ];
         }, RuleRegistry::defaults()->all());
 
-        usort($definitions, static fn (array $left, array $right): int => $left['id'] <=> $right['id']);
+        usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
         self::assertCount(128, $definitions);
         self::assertSame(
-            'bc136cbaba6f3cfe6972' . '2b974e8246501f8a1e2f4f602bd0964cb31fd748ef37',
+            '3e945242ee28af5d7404' . '323a51423ac8d7a09272519ab82e1d089becff396345',
             hash('sha256', $json),
         );
     }
@@ -328,7 +329,8 @@ final class RuleRegistryTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $displayPath Fixture display path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed fixture ready for rule analysis
      */
     private function parseFixture(string $displayPath): AnalysisUnit
     {
@@ -342,7 +344,8 @@ final class RuleRegistryTest extends TestCase
      * Build a fixture rule with the requested identifier.
      *
      * @param string $id Rule identifier.
-     * @return RuleInterface
+     *
+     * @return RuleInterface - an anonymous rule emitting one finding under the given id
      */
     private function fakeRule(string $id): RuleInterface
     {
@@ -360,7 +363,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return metadata for the fixture rule.
              *
-             * @return RuleDefinition
+             * @return RuleDefinition - the fixture's deterministic identity and reporting metadata
              */
             public function definition(): RuleDefinition
             {
@@ -380,7 +383,8 @@ final class RuleRegistryTest extends TestCase
              *
              * @param AnalysisUnit $analysisUnit Analysis unit.
              * @param RuleContext  $ruleContext  Rule context for the fixture.
-             * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+             *
+             * @return list<\GruffPhp\Finding\Finding> - exactly one synthetic finding tagged with this rule's id, per unit
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
@@ -404,7 +408,7 @@ final class RuleRegistryTest extends TestCase
     /**
      * Build a project-level fixture rule with duplicate identity.
      *
-     * @return RuleInterface
+     * @return RuleInterface - an anonymous rule reusing the project-level id to force a collision
      */
     private function duplicateProjectRule(): RuleInterface
     {
@@ -413,7 +417,7 @@ final class RuleRegistryTest extends TestCase
             /**
              * Return metadata for the fixture rule.
              *
-             * @return RuleDefinition
+             * @return RuleDefinition - the project-level fixture identity, deliberately sharing one id
              */
             public function definition(): RuleDefinition
             {
@@ -433,7 +437,8 @@ final class RuleRegistryTest extends TestCase
              *
              * @param AnalysisUnit $analysisUnit Analysis unit.
              * @param RuleContext  $ruleContext  Rule context for the fixture.
-             * @return list<\GruffPhp\Finding\Finding> Fixture findings.
+             *
+             * @return list<\GruffPhp\Finding\Finding> - one README-scoped finding per unit, so dedup must collapse them to one
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {

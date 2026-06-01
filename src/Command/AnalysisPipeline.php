@@ -40,13 +40,27 @@ final class AnalysisPipeline
     private readonly Closure $projectContextUnitsResolver;
 
     /**
-     * @param RuleRegistry                                                                                                             $registry Rule registry used to execute enabled rules.
+     * @param RuleRegistry                                                                                                             $registry Rule
+     *                                                                                                                                           registry
+     *                                                                                                                                           used
+     *                                                                                                                                           to
+     *                                                                                                                                           execute
+     *                                                                                                                                           enabled
+     *                                                                                                                                           rules.
      * @param Closure(string, AnalyseCommandOptions, AnalysisConfig, RuleRegistry, ?DiffResult, AnalysisSourceSet): list<AnalysisUnit> $closure
-     *                                                                                                                                           Resolves full project context units for legacy review analysis.
+     *                                                                                                                                           Resolves
+     *                                                                                                                                           full
+     *                                                                                                                                           project
+     *                                                                                                                                           context
+     *                                                                                                                                           units
+     *                                                                                                                                           for
+     *                                                                                                                                           legacy
+     *                                                                                                                                           review
+     *                                                                                                                                           analysis.
      */
     public function __construct(
         private readonly RuleRegistry $registry,
-        Closure $closure,
+        Closure                       $closure,
     ) {
         $this->projectContextUnitsResolver = $closure;
     }
@@ -62,31 +76,33 @@ final class AnalysisPipeline
      * @param list<string>|null       $analysisPaths      Paths to analyse, or null when setup failed.
      * @param int                     $discoverStart      Monotonic start timestamp for discovery timing.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing observer.
+     *
      * @return array{
      *     sources: AnalysisSourceSet,
      *     findings: list<Finding>,
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * }
+     * } - analysis result for the run: discovered sources, finalised findings, discover/parse and analyse
+     *     timings in nanoseconds, and the resolved project-context units (empty under the streaming path)
      */
     public function runAnalysis(
-        string $projectRoot,
+        string                $projectRoot,
         AnalyseCommandOptions $options,
-        AnalysisConfig $config,
-        RuleContext $ruleContext,
-        ?DiffResult $reviewDiff,
-        ?array $analysisPaths,
-        int $discoverStart,
-        ?RuleRunnerObserver $ruleRunnerObserver,
+        AnalysisConfig        $config,
+        RuleContext           $ruleContext,
+        ?DiffResult           $reviewDiff,
+        ?array                $analysisPaths,
+        int                   $discoverStart,
+        ?RuleRunnerObserver   $ruleRunnerObserver,
     ): array {
         if ($analysisPaths === null) {
             // Setup failed upstream, so emit an empty result that still carries the discovery timing measured so far.
             return [
-                'sources' => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
-                'findings' => [],
-                'discoverParseNs' => hrtime(true) - $discoverStart,
-                'analyseNs' => 0,
+                'sources'             => new AnalysisSourceSet(new SourceDiscoveryResult([], [], []), [], []),
+                'findings'            => [],
+                'discoverParseNs'     => hrtime(true) - $discoverStart,
+                'analyseNs'           => 0,
                 'projectContextUnits' => [],
             ];
         }
@@ -123,18 +139,20 @@ final class AnalysisPipeline
      * @param AnalyseCommandOptions $options     CLI options; changed-region and diff modes force the legacy path.
      * @param DiffResult|null       $reviewDiff  Review diff metadata; an active review keeps the base snapshot.
      * @param RuleContext           $ruleContext Context whose enabled rules must all tolerate per-unit release.
-     * @return bool True when each unit can be released immediately after analysis.
+     *
+     * @return bool - true when every unit can be released immediately after analysis (streaming is safe), false when a review/diff or changed-region
+     *              mode forces the legacy load-all path
      */
     private function canStream(
         AnalyseCommandOptions $options,
-        ?DiffResult $reviewDiff,
-        RuleContext $ruleContext,
+        ?DiffResult           $reviewDiff,
+        RuleContext           $ruleContext,
     ): bool {
         // Stream only when no review/diff retains the base snapshot and every enabled rule tolerates per-unit release.
         return ($reviewDiff === null || !$reviewDiff->active)
-            && !$options->hasChangedRegionMode()
-            && $options->diffVs === null
-            && $this->registry->supportsStreaming($ruleContext);
+               && !$options->hasChangedRegionMode()
+               && $options->diffVs === null
+               && $this->registry->supportsStreaming($ruleContext);
     }
 
     /**
@@ -148,24 +166,26 @@ final class AnalysisPipeline
      * @param list<string>            $analysisPaths      Project-relative paths to discover under; never null here.
      * @param int                     $discoverStart      Monotonic hrtime start for the discover-and-parse span.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing sink, or null to skip timing.
+     *
      * @return array{
      *     sources: AnalysisSourceSet,
      *     findings: list<Finding>,
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * }
+     * } - streaming-path result: discovered sources, finalised findings, discover/parse and analyse timings
+     *     in nanoseconds, and an always-empty projectContextUnits since streaming retains no parsed units
      */
     private function runStreaming(
-        string $projectRoot,
+        string                $projectRoot,
         AnalyseCommandOptions $options,
-        AnalysisConfig $config,
-        RuleContext $ruleContext,
-        array $analysisPaths,
-        int $discoverStart,
-        ?RuleRunnerObserver $ruleRunnerObserver,
+        AnalysisConfig        $config,
+        RuleContext           $ruleContext,
+        array                 $analysisPaths,
+        int                   $discoverStart,
+        ?RuleRunnerObserver   $ruleRunnerObserver,
     ): array {
-        $discovery = (new AnalysisSourceLoader())->discover(
+        $discovery         = (new AnalysisSourceLoader())->discover(
             $projectRoot,
             $analysisPaths,
             $options->shouldIncludeIgnored,
@@ -233,10 +253,10 @@ final class AnalysisPipeline
 
         // Streaming never retains parsed units, so report no project-context units alongside the finalised findings.
         return [
-            'sources' => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount),
-            'findings' => $findings,
-            'discoverParseNs' => $discoverParseNs,
-            'analyseNs' => $analyseNs,
+            'sources'             => new AnalysisSourceSet($discoveryResult, [], $sourceDiagnostics, $parsedCount),
+            'findings'            => $findings,
+            'discoverParseNs'     => $discoverParseNs,
+            'analyseNs'           => $analyseNs,
             'projectContextUnits' => [],
         ];
     }
@@ -253,25 +273,27 @@ final class AnalysisPipeline
      * @param list<string>            $analysisPaths      Project-relative paths to load and parse; never null here.
      * @param int                     $discoverStart      Monotonic hrtime start for the discover-and-parse span.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing sink, or null to skip timing.
+     *
      * @return array{
      *     sources: AnalysisSourceSet,
      *     findings: list<Finding>,
      *     discoverParseNs: int,
      *     analyseNs: int,
      *     projectContextUnits: list<AnalysisUnit>
-     * }
+     * } - legacy-path result: discovered sources, finalised findings, discover/parse and analyse timings in
+     *     nanoseconds, and the resolved project-context units that diff/review flows compare to the base snapshot
      */
     private function runLegacy(
-        string $projectRoot,
+        string                $projectRoot,
         AnalyseCommandOptions $options,
-        AnalysisConfig $config,
-        RuleContext $ruleContext,
-        ?DiffResult $reviewDiff,
-        array $analysisPaths,
-        int $discoverStart,
-        ?RuleRunnerObserver $ruleRunnerObserver,
+        AnalysisConfig        $config,
+        RuleContext           $ruleContext,
+        ?DiffResult           $reviewDiff,
+        array                 $analysisPaths,
+        int                   $discoverStart,
+        ?RuleRunnerObserver   $ruleRunnerObserver,
     ): array {
-        $sources = (new AnalysisSourceLoader())->load(
+        $sources             = (new AnalysisSourceLoader())->load(
             $projectRoot,
             $analysisPaths,
             $options->shouldIncludeIgnored,
@@ -289,20 +311,20 @@ final class AnalysisPipeline
 
         $analyseStart = hrtime(true);
         $findings     = $this->registry->analyse(
-            $sources->analysisUnits,
-            $ruleContext,
-            $projectContextUnits,
-            $ruleRunnerObserver,
+                                             $sources->analysisUnits,
+                                             $ruleContext,
+                                             $projectContextUnits,
+                                             $ruleRunnerObserver,
             shouldReleaseUnitsAfterAnalysis: true,
         );
-        $analyseNs = hrtime(true) - $analyseStart;
+        $analyseNs    = hrtime(true) - $analyseStart;
 
         // Surface the resolved project-context units too so review flows can diff them against the base snapshot.
         return [
-            'sources' => $sources,
-            'findings' => $findings,
-            'discoverParseNs' => $discoverParseNs,
-            'analyseNs' => $analyseNs,
+            'sources'             => $sources,
+            'findings'            => $findings,
+            'discoverParseNs'     => $discoverParseNs,
+            'analyseNs'           => $analyseNs,
             'projectContextUnits' => $projectContextUnits,
         ];
     }

@@ -46,7 +46,8 @@ final readonly class SleepInTestRule implements RuleInterface
     /**
      * Describe the rule for the registry and reports.
      *
-     * @return RuleDefinition
+     * @return RuleDefinition - static descriptor (id, name, pillar, tier, default severity, confidence) the registry uses to list and report this
+     *                        rule
      */
     public function definition(): RuleDefinition
     {
@@ -67,7 +68,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding>
+     * @return list<Finding> - every sleep and wall-clock finding across all test scopes in this unit; empty when the unit has no tests or none offend
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -75,7 +76,7 @@ final readonly class SleepInTestRule implements RuleInterface
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
             array_push(
-                $findings,
+                   $findings,
                 ...$this->functionFindings($analysisUnit, $scope),
                 ...$this->dateTimeFindings($analysisUnit, $scope),
             );
@@ -91,7 +92,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto each finding.
      * @param TestQualityScope $scope        Single test method scope whose calls are searched for sleeps/clock reads.
      *
-     * @return list<Finding>
+     * @return list<Finding> - one finding per sleep or wall-clock function call in this scope; empty when no call matches either set
      */
     private function functionFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
@@ -125,7 +126,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param Expr\FuncCall    $call         The call expression under inspection; its start line anchors the finding.
      * @param string           $name         Lowercased called-function name already resolved from the call.
      *
-     * @return Finding|null
+     * @return Finding|null - the sleep- or wall-clock-variant finding for the call, or null when the call is neither family
      */
     private function functionFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): ?Finding
     {
@@ -149,7 +150,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param AnalysisUnit     $analysisUnit Parsed unit supplying the display path stamped onto each finding.
      * @param TestQualityScope $scope        Test scope whose descendant `new` expressions are checked for clock reads.
      *
-     * @return list<Finding>
+     * @return list<Finding> - one finding per current-time DateTime construction in this scope; empty when every construction uses a fixed timestamp
      */
     private function dateTimeFindings(AnalysisUnit $analysisUnit, TestQualityScope $scope): array
     {
@@ -170,7 +171,8 @@ final readonly class SleepInTestRule implements RuleInterface
      *
      * @param Expr\New_ $newExpression Object-construction node; only DateTime-family classes are considered.
      *
-     * @return bool True when the class is a DateTime variant constructed with "now" or no argument.
+     * @return bool - true when the class is a DateTime variant constructed with "now" or no argument; false for any non-DateTime class or a
+     *              fixed-timestamp construction
      */
     private function isWallClockDateTimeConstructor(Expr\New_ $newExpression): bool
     {
@@ -183,7 +185,7 @@ final readonly class SleepInTestRule implements RuleInterface
 
         // True only for a DateTime-family class AND a current-time argument; both conditions are required.
         return in_array($className, self::WALL_CLOCK_DATETIME_CLASSES, true)
-            && $this->isWallClockDateTime($newExpression);
+               && $this->isWallClockDateTime($newExpression);
     }
 
     /**
@@ -192,7 +194,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param Expr\New_ $newExpression Construction node whose first argument is examined; non-literal args are treated
      *                                 as not-now so only provably current-time constructions are flagged.
      *
-     * @return bool True when no argument is passed or the first argument is the literal "now".
+     * @return bool - true when no argument is passed or the first argument is the literal "now"; false when a fixed or non-literal argument is given
      */
     private function isWallClockDateTime(Expr\New_ $newExpression): bool
     {
@@ -221,7 +223,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param Expr\FuncCall    $call         The sleep call; its start line locates the finding for the reviewer.
      * @param string           $name         Lowercased sleep-function name recorded in the finding metadata.
      *
-     * @return Finding
+     * @return Finding - warning finding tagged as the "sleep" variant, anchored at the call's start line, naming the offending test
      */
     private function sleepFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
@@ -249,7 +251,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param Expr\FuncCall    $call         The wall-clock call; its start line locates the finding for the reviewer.
      * @param string           $name         Lowercased clock-function name woven into the message and metadata.
      *
-     * @return Finding
+     * @return Finding - warning finding tagged as the "wall-clock" variant, anchored at the call's start line, naming the offending test
      */
     private function wallClockFunctionFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\FuncCall $call, string $name): Finding
     {
@@ -277,7 +279,7 @@ final readonly class SleepInTestRule implements RuleInterface
      * @param Expr\New_        $newExpression The current-time construction; its start line and class name feed the finding.
      *                                        Caller must guarantee a named class, or this method throws LogicException.
      *
-     * @return Finding
+     * @return Finding - warning finding tagged as the "datetime" variant, anchored at the construction's start line, naming the offending test
      */
     private function dateTimeFinding(AnalysisUnit $analysisUnit, TestQualityScope $scope, Expr\New_ $newExpression): Finding
     {

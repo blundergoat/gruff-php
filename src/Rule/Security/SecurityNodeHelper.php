@@ -21,7 +21,7 @@ final class SecurityNodeHelper
     /**
      * List PHP superglobals treated as request-controlled input.
      *
-     * @return list<string>
+     * @return list<string> - superglobal variable names without the leading `$`, treated as tainted sources
      */
     public static function userInputSuperglobals(): array
     {
@@ -33,7 +33,8 @@ final class SecurityNodeHelper
      * Resolve a non-namespaced function call to its lower-case name.
      *
      * @param FuncCall $call Function call node to inspect.
-     * @return string|null Function name, or null for dynamic or namespaced calls.
+     *
+     * @return string|null - lower-cased global function name, or null for dynamic or namespaced calls that cannot match
      */
     public static function globalFunctionName(FuncCall $call): ?string
     {
@@ -55,7 +56,8 @@ final class SecurityNodeHelper
     /**
      * @param array<int|string, Node\Arg|Node\VariadicPlaceholder> $args  Call argument nodes to inspect.
      * @param int                                                  $index Zero-based argument index.
-     * @return Expr|null Argument expression at the requested index, or null when absent.
+     *
+     * @return Expr|null - unwrapped argument value at the index, or null when the slot is absent or a variadic spread
      */
     public static function argumentValue(array $args, int $index): ?Expr
     {
@@ -73,7 +75,8 @@ final class SecurityNodeHelper
      * Resolve a constant fetch to its normalized constant name.
      *
      * @param Node $node Node to inspect.
-     * @return string|null Constant name, or null for unsupported expressions.
+     *
+     * @return string|null - upper-cased constant name, or null for namespaced or non-constant-fetch expressions
      */
     public static function constantName(Node $node): ?string
     {
@@ -96,7 +99,8 @@ final class SecurityNodeHelper
      * Determine whether a node statically represents a false-like value.
      *
      * @param Node $node Node to inspect.
-     * @return bool True when the node is literally false or integer zero.
+     *
+     * @return bool - true when the node is the literal `false` or integer 0 (the disabled-flag values rules look for)
      */
     public static function isFalseLike(Node $node): bool
     {
@@ -121,7 +125,8 @@ final class SecurityNodeHelper
      * expression so sinks catch `$next = $_GET["next"]; header($next);`.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when the node tree contains request-sourced input.
+     *
+     * @return bool - true when the tree reads request input directly or via a same-scope laundered local; false if clean
      */
     public static function containsUserInput(Node $node): bool
     {
@@ -138,7 +143,8 @@ final class SecurityNodeHelper
      * Detect direct reads from request superglobals within a node tree.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when the node tree directly contains request-sourced input.
+     *
+     * @return bool - true when the tree directly reads a request superglobal; false ignores laundered locals
      */
     private static function containsDirectUserInput(Node $node): bool
     {
@@ -146,18 +152,19 @@ final class SecurityNodeHelper
 
         // True when any node in the tree is a superglobal read; presence of a match is the taint signal.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-            // A variable whose name is one of the request superglobals is the attacker-controlled source.
-            return $candidate instanceof Expr\Variable
-                && is_string($candidate->name)
-                && in_array($candidate->name, self::userInputSuperglobals(), true);
-        }) instanceof Node;
+                // A variable whose name is one of the request superglobals is the attacker-controlled source.
+                return $candidate instanceof Expr\Variable
+                       && is_string($candidate->name)
+                       && in_array($candidate->name, self::userInputSuperglobals(), true);
+            }) instanceof Node;
     }
 
     /**
      * Detect local variables that were assigned request data earlier in the same scope.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when the node references a same-scope tainted local variable.
+     *
+     * @return bool - true when the node reads a local filled from request input by an earlier same-scope assignment
      */
     private static function containsTaintedLocal(Node $node): bool
     {
@@ -202,7 +209,8 @@ final class SecurityNodeHelper
      * @param list<Node\Stmt> $statements
      * @param FunctionLike    $scope        Scope that owns the sink expression.
      * @param int             $sinkPosition Byte offset of the sink expression.
-     * @return array<string, true>
+     *
+     * @return array<string, true> - set of local variable names tainted at the sink, keyed by name; empty when none
      */
     private static function taintedVariableNamesBefore(array $statements, FunctionLike $scope, int $sinkPosition): array
     {
@@ -210,9 +218,9 @@ final class SecurityNodeHelper
         $nodeFinder       = new NodeFinder();
         $assignments      = $nodeFinder->find(
             $statements,
-            static fn (Node $candidate): bool => $candidate instanceof Expr\Assign
-                && $candidate->getStartFilePos() >= 0
-                && $candidate->getStartFilePos() < $sinkPosition,
+            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+                                                && $candidate->getStartFilePos() >= 0
+                                                && $candidate->getStartFilePos() < $sinkPosition,
         );
 
         foreach ($assignments as $assignment) {
@@ -248,9 +256,10 @@ final class SecurityNodeHelper
     /**
      * Check whether a node references a known tainted variable.
      *
-     * @param Node                $node             Node tree to inspect.
+     * @param Node                $node Node tree to inspect.
      * @param array<string, true> $taintedVariables
-     * @return bool True when the node references any known tainted variable.
+     *
+     * @return bool - true when the tree reads any name in $taintedVariables, propagating taint to this expression
      */
     private static function hasTaintedVariableReference(Node $node, array $taintedVariables): bool
     {
@@ -269,13 +278,14 @@ final class SecurityNodeHelper
      * Return non-superglobal variable names referenced by a node tree.
      *
      * @param Node $node Node tree to inspect.
-     * @return list<string>
+     *
+     * @return list<string> - deduplicated local variable names touched by the tree, superglobals excluded; empty when none
      */
     private static function referencedVariableNames(Node $node): array
     {
         $names      = [];
         $nodeFinder = new NodeFinder();
-        $variables  = $nodeFinder->find($node, static fn (Node $candidate): bool => $candidate instanceof Expr\Variable);
+        $variables  = $nodeFinder->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable);
 
         foreach ($variables as $variable) {
             if (!$variable instanceof Expr\Variable) {
@@ -295,7 +305,8 @@ final class SecurityNodeHelper
      * Find the function, method, or closure scope containing a node.
      *
      * @param Node $node Node whose containing function-like scope is needed.
-     * @return FunctionLike|null Containing scope, or null outside function-like code.
+     *
+     * @return FunctionLike|null - nearest enclosing function/method/closure, or null when the node lives at file scope
      */
     private static function enclosingFunctionLike(Node $node): ?FunctionLike
     {
@@ -318,7 +329,8 @@ final class SecurityNodeHelper
      * Detect string construction patterns that can hide unsafe concatenation.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when concatenation or interpolation appears in the node tree.
+     *
+     * @return bool - true when the tree builds a string via `.` concatenation or interpolation, which can splice in untrusted data
      */
     public static function containsConcatOrInterpolation(Node $node): bool
     {
@@ -326,17 +338,18 @@ final class SecurityNodeHelper
 
         // True when any node builds a string by joining parts, the shape that can splice untrusted data in.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-            // A `.` concatenation or a "$var" interpolated string is the dynamic-construction signal.
-            return $candidate instanceof Expr\BinaryOp\Concat
-                || $candidate instanceof Scalar\Encapsed;
-        }) instanceof Node;
+                // A `.` concatenation or a "$var" interpolated string is the dynamic-construction signal.
+                return $candidate instanceof Expr\BinaryOp\Concat
+                       || $candidate instanceof Scalar\Encapsed;
+            }) instanceof Node;
     }
 
     /**
      * Identify literal string nodes for security-rule exemptions.
      *
      * @param Node $node Node to inspect.
-     * @return bool True when the node is a string scalar.
+     *
+     * @return bool - true when the node is a literal string scalar, so rules can exempt statically-trusted constant args
      */
     public static function isStringLiteral(Node $node): bool
     {
@@ -348,7 +361,8 @@ final class SecurityNodeHelper
      * Build the display name used when reporting a function call.
      *
      * @param FuncCall $call Function call node to describe.
-     * @return string Function name or dynamic-call fallback label.
+     *
+     * @return string - the resolved function name, or the label "dynamic function call" so findings never show an empty name
      */
     public static function functionNameForMessage(FuncCall $call): string
     {
@@ -362,7 +376,8 @@ final class SecurityNodeHelper
      * Resolve a method name to its lower-case string when statically known.
      *
      * @param Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
-     * @return string|null Method name, or null for dynamic method calls.
+     *
+     * @return string|null - lower-cased method name, or null when the name is computed (e.g. $obj->$method())
      */
     public static function methodName(Expr\MethodCall|Expr\StaticCall $call): ?string
     {
@@ -379,7 +394,8 @@ final class SecurityNodeHelper
      * Resolve a class node to a lower-case class name when statically known.
      *
      * @param Node $class Class node from a new/static call.
-     * @return string|null Resolved class name, or null for dynamic/anonymous classes.
+     *
+     * @return string|null - lower-cased class name, FQCN-resolved when available, or null for dynamic/anonymous classes
      */
     public static function className(Node $class): ?string
     {
@@ -403,7 +419,8 @@ final class SecurityNodeHelper
      *
      * @param Node         $class      Class node from a new/static call.
      * @param list<string> $classNames FQCNs or short class names to match.
-     * @return bool True when the class matches one of the supplied names.
+     *
+     * @return bool - true when the resolved class equals a target FQCN or shares a short target's final namespace segment
      */
     public static function hasMatchingClassName(Node $class, array $classNames): bool
     {
@@ -434,7 +451,8 @@ final class SecurityNodeHelper
      * Detect whether a node tree contains an HTTP(S) literal.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when an HTTP or HTTPS string literal appears.
+     *
+     * @return bool - true when a literal string in the tree starts with http:// or https://, used to gate URL-only sinks
      */
     public static function containsUrlLiteral(Node $node): bool
     {
@@ -442,21 +460,22 @@ final class SecurityNodeHelper
 
         // True when any string literal in the tree is an outbound URL, used to gate URL-only sinks.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-            if (!$candidate instanceof Scalar\String_) {
-                // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
-                return false;
-            }
+                if (!$candidate instanceof Scalar\String_) {
+                    // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
+                    return false;
+                }
 
-            // Match literal outbound URL strings for URL-only sinks.
-            return preg_match('/^https?:\/\//i', $candidate->value) === 1;
-        }) instanceof Node;
+                // Match literal outbound URL strings for URL-only sinks.
+                return preg_match('/^https?:\/\//i', $candidate->value) === 1;
+            }) instanceof Node;
     }
 
     /**
      * Detect whether an expression references likely sensitive data.
      *
      * @param Node $node Node tree to inspect.
-     * @return bool True when variable names, string keys, or env reads carry secret context.
+     *
+     * @return bool - true when a variable name, property, array key, string literal, or env read in the tree names a secret
      */
     public static function containsSensitiveReference(Node $node): bool
     {
@@ -464,41 +483,42 @@ final class SecurityNodeHelper
 
         // True when any node in the tree names a secret; each branch maps a node kind to its identifier text.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
-            if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
-                // A variable name like $apiKey signals secret context.
-                return self::hasSensitiveContext($candidate->name);
-            }
+                if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
+                    // A variable name like $apiKey signals secret context.
+                    return self::hasSensitiveContext($candidate->name);
+                }
 
-            if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
-                // A property access like $config->secret signals secret context.
-                return self::hasSensitiveContext($candidate->name->toString());
-            }
+                if ($candidate instanceof Expr\PropertyFetch && $candidate->name instanceof Identifier) {
+                    // A property access like $config->secret signals secret context.
+                    return self::hasSensitiveContext($candidate->name->toString());
+                }
 
-            if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
-                // A literal array key like $env['password'] signals secret context.
-                return self::hasSensitiveContext($candidate->dim->value);
-            }
+                if ($candidate instanceof Expr\ArrayDimFetch && $candidate->dim instanceof Scalar\String_) {
+                    // A literal array key like $env['password'] signals secret context.
+                    return self::hasSensitiveContext($candidate->dim->value);
+                }
 
-            if ($candidate instanceof Scalar\String_) {
-                // A bare string literal whose text itself names a secret signals secret context.
-                return self::hasSensitiveContext($candidate->value);
-            }
+                if ($candidate instanceof Scalar\String_) {
+                    // A bare string literal whose text itself names a secret signals secret context.
+                    return self::hasSensitiveContext($candidate->value);
+                }
 
-            if ($candidate instanceof Expr\FuncCall) {
-                // A call may be an env reader pulling a secret-named key; defer to that check.
-                return self::isSensitiveEnvironmentRead($candidate);
-            }
+                if ($candidate instanceof Expr\FuncCall) {
+                    // A call may be an env reader pulling a secret-named key; defer to that check.
+                    return self::isSensitiveEnvironmentRead($candidate);
+                }
 
-            // Node kinds we do not classify carry no secret context.
-            return false;
-        }) instanceof Node;
+                // Node kinds we do not classify carry no secret context.
+                return false;
+            }) instanceof Node;
     }
 
     /**
      * Detect env-reader calls that request a sensitive key.
      *
      * @param FuncCall $call Call node to inspect; only env readers (getenv/env/apache_getenv) are considered.
-     * @return bool True when getenv/env reads a secret-like key.
+     *
+     * @return bool - true when an env reader requests a secret-like key, or reads the whole environment via no argument
      */
     private static function isSensitiveEnvironmentRead(FuncCall $call): bool
     {
@@ -522,7 +542,8 @@ final class SecurityNodeHelper
      * Detect secret-like words in identifiers or string keys.
      *
      * @param string $contextText Identifier or string-key text to scan; the value itself, never a read secret.
-     * @return bool True when the text names likely sensitive data.
+     *
+     * @return bool - true when the text matches the secret-name pattern (api key, token, password, secret, etc.)
      */
     private static function hasSensitiveContext(string $contextText): bool
     {

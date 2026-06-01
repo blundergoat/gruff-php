@@ -20,10 +20,10 @@ final readonly class TrendReport
      */
     public function __construct(
         public string $path,
-        public float $currentScore,
+        public float  $currentScore,
         public ?float $previousScore,
         public ?float $delta,
-        public array $entries,
+        public array  $entries,
     ) {
     }
 
@@ -34,17 +34,17 @@ final readonly class TrendReport
      *     previousScore: float|null,
      *     delta: float|null,
      *     entries: list<TrendEntry>
-     * }
+     * } - JSON-ready snapshot keys for report writers; previousScore and delta are null on the first snapshot
      */
     public function toArray(): array
     {
         // Mirror the snapshot as JSON-ready keys for the report writers that serialise trend output.
         return [
-            'path' => $this->path,
-            'currentScore' => $this->currentScore,
+            'path'          => $this->path,
+            'currentScore'  => $this->currentScore,
             'previousScore' => $this->previousScore,
-            'delta' => $this->delta,
-            'entries' => $this->entries,
+            'delta'         => $this->delta,
+            'entries'       => $this->entries,
         ];
     }
 }

@@ -107,6 +107,7 @@ final class ReportCommand extends Command
      *
      * @param InputInterface  $input  Console input carrying report paths, format, and forwarded analyse options.
      * @param OutputInterface $output Destination for the rendered report, status lines, and forwarded child stderr.
+     *
      * @return int Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -115,6 +116,7 @@ final class ReportCommand extends Command
 
         if ($projectRoot === false) {
             $output->writeln('<error>Unable to determine current working directory.</error>');
+
             // No working directory means no project to resolve paths against; abort the run.
             return Command::FAILURE;
         }
@@ -125,6 +127,7 @@ final class ReportCommand extends Command
             $resolvedOutput = PathHelper::resolveAgainst($projectRoot, $outputPath);
             if (!is_dir(dirname($resolvedOutput))) {
                 $output->writeln(sprintf('<error>Report output directory does not exist: %s</error>', dirname($resolvedOutput)));
+
                 // Refuse to scan when the requested output directory is absent, so nothing is silently dropped.
                 return Command::INVALID;
             }
@@ -136,7 +139,7 @@ final class ReportCommand extends Command
             symfonyApplication: $this->getApplication(),
             projectRoot:        $projectRoot,
             explicitConfigPath: $this->optionalStringOption($input, 'config'),
-            shouldSkipConfig:   (bool) $input->getOption('no-config'),
+            shouldSkipConfig:   (bool)$input->getOption('no-config'),
         );
         if ($promptExitCode !== null) {
             // The missing-config prompt resolved the run (declined or errored); honour its exit code.
@@ -151,6 +154,7 @@ final class ReportCommand extends Command
 
         if ($resolvedOutput === null) {
             $output->write($report, false, OutputInterface::OUTPUT_RAW);
+
             // Streamed straight to stdout, so the analyse subprocess's own pass/fail code is the result.
             return $process->getExitCode() ?? Command::FAILURE;
         }
@@ -159,17 +163,20 @@ final class ReportCommand extends Command
 
         if ($exitCode === Command::INVALID || ($report === '' && $exitCode !== Command::SUCCESS)) {
             $output->writeln(sprintf('<error>Analyse exited with code %d; %s was not written.</error>', $exitCode, $outputPath));
+
             // Analyse failed or produced nothing usable; propagate its code rather than write a partial file.
             return $exitCode;
         }
 
         if (file_put_contents($resolvedOutput, $report) === false) {
             $output->writeln(sprintf('<error>Unable to write report: %s</error>', $resolvedOutput));
+
             // A failed write must fail the command even if analyse itself succeeded.
             return Command::FAILURE;
         }
 
         $output->writeln(sprintf('<info>Report written to %s</info>', $resolvedOutput));
+
         // Report persisted; the command's success hinges on analyse's verdict, so surface its code.
         return $exitCode;
     }
@@ -178,7 +185,8 @@ final class ReportCommand extends Command
      * Build the analyse command argv used by report generation.
      *
      * @param InputInterface $input Report-command input whose options and paths are translated into analyse flags.
-     * @return list<string>
+     *
+     * @return list<string> - full analyse subprocess argv, starting with the PHP binary and `analyse`, with forwarded flags and trailing paths
      */
     private function analyseCommand(InputInterface $input): array
     {
@@ -195,6 +203,7 @@ final class ReportCommand extends Command
         $this->appendReportInteractiveOption($command, $input);
         $this->appendDiffOption($command, $input);
         $this->appendPaths($command, $input);
+
         // Hand back the fully assembled analyse argv for the report subprocess to run.
         return $command;
     }
@@ -204,6 +213,7 @@ final class ReportCommand extends Command
      *
      * @param list<string>   $command Analyse command arguments built so far.
      * @param InputInterface $input   Supplies the variadic paths argument appended after the `--` separator.
+     *
      * @return void
      */
     private function appendPaths(array &$command, InputInterface $input): void
@@ -290,7 +300,7 @@ final class ReportCommand extends Command
     private function appendBooleanOptions(array &$command, InputInterface $input): void
     {
         foreach (self::BOOLEAN_OPTIONS as $option) {
-            if ((bool) $input->getOption($option)) {
+            if ((bool)$input->getOption($option)) {
                 $command[] = '--' . $option;
             }
         }
@@ -372,6 +382,7 @@ final class ReportCommand extends Command
      * analyse's own precedence chain (which has a different binary default).
      *
      * @param InputInterface $input Console input for the report command.
+     *
      * @return string Resolved threshold suitable for `--fail-on`.
      */
     private function resolveFailOn(InputInterface $input): string
@@ -403,11 +414,12 @@ final class ReportCommand extends Command
      * path. Returning null lets the caller fall back to the binary default.
      *
      * @param InputInterface $input Console input for the report command.
+     *
      * @return string|null Resolved threshold string, or null when unavailable.
      */
     private function loadConfigFailThreshold(InputInterface $input): ?string
     {
-        if ((bool) $input->getOption('no-config')) {
+        if ((bool)$input->getOption('no-config')) {
             // --no-config opts out of config entirely, so there is no threshold to contribute.
             return null;
         }
@@ -435,6 +447,7 @@ final class ReportCommand extends Command
      *
      * @param InputInterface $input Console input to read the option from.
      * @param string         $name  Option name to read, without the leading dashes.
+     *
      * @return string|null Option value, or null when omitted/empty.
      */
     private function optionalStringOption(InputInterface $input, string $name): ?string
@@ -461,6 +474,7 @@ final class ReportCommand extends Command
      *
      * @param OutputInterface $output Target stream; the dedicated error channel is used when one is available.
      * @param string          $stderr Captured analyse stderr; an empty string is a no-op, otherwise a newline is ensured.
+     *
      * @return void
      */
     private function writeStderr(OutputInterface $output, string $stderr): void

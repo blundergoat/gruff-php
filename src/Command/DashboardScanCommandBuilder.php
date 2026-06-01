@@ -24,7 +24,8 @@ final readonly class DashboardScanCommandBuilder
      * Parse a dashboard paths string into command arguments.
      *
      * @param string $paths Space-separated paths from the dashboard form, with double quotes for paths containing spaces.
-     * @return list<string>
+     *
+     * @return list<string> - parsed path operands in form order; defaults to ['.'] when input is blank or all-empty
      */
     public function parsePaths(string $paths): array
     {
@@ -51,8 +52,9 @@ final readonly class DashboardScanCommandBuilder
     /**
      * Decode only the quote and backslash escapes emitted by the dashboard path tokenizer.
      *
-     * @param  string $quotedPath Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
-     * @return string Path with wrapper-level escapes removed.
+     * @param string $quotedPath Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
+     *
+     * @return string - decoded path with the wrapper \" and \\ escapes resolved; inner content otherwise untouched
      */
     private function unescapeQuotedPath(string $quotedPath): string
     {
@@ -63,10 +65,12 @@ final readonly class DashboardScanCommandBuilder
     }
 
     /**
-     * @param         list<string>                                                                                                                                                                                        $paths
-     * @param         array<string, string>                                                                                                                                                                               $state
-     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string, noConfig: string, includeIgnored: string, reportInteractive: string} $state
-     * @return list<string>
+     * @param list<string>                                                                                                                                                                                                $paths
+     * @param array<string, string>                                                                                                                                                                                       $state
+     *
+     * @phpstan-param array{project: string, paths: string, scanScope: string, failOn: string, config: string, baseline: string, noBaseline: string,
+     *                noConfig: string, includeIgnored: string, reportInteractive: string} $state
+     * @return list<string> - full argv for the analyse run: PHP binary, gruff binary, flags, then path operands after the -- separator
      */
     public function analyseCommand(array $paths, array $state): array
     {

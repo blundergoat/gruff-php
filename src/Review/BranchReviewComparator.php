@@ -17,13 +17,15 @@ final readonly class BranchReviewComparator
      * @param string        $baseRef       Base ref used to produce the comparison.
      * @param bool          $isChangedOnly Whether unchanged changed-file scope applies.
      * @param float|null    $deltaScore    Optional score delta between base and current runs.
-     * @return BranchReviewResult Introduced, removed, and unchanged finding sets.
+     *
+     * @return BranchReviewResult - findings partitioned into introduced, removed, and unchanged sets plus the
+     *   score delta, ready for the caller to render the branch review
      */
     public function compare(
-        array $current,
-        array $base,
+        array  $current,
+        array  $base,
         string $baseRef,
-        bool $isChangedOnly,
+        bool   $isChangedOnly,
         ?float $deltaScore,
     ): BranchReviewResult {
         $findingReviewIdentity = new FindingReviewIdentity();
@@ -64,7 +66,9 @@ final readonly class BranchReviewComparator
      *
      * @param list<Finding>         $findings
      * @param FindingReviewIdentity $identity Key strategy that buckets findings so matching ignores line drift.
-     * @return array<string, list<Finding>>
+     *
+     * @return array<string, list<Finding>> - findings bucketed by review-identity key, keys sorted ascending so iteration order is deterministic;
+     *                       empty when no findings
      */
     private function index(array $findings, FindingReviewIdentity $identity): array
     {

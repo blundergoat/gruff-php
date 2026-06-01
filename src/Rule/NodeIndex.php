@@ -59,6 +59,7 @@ final class NodeIndex
      * unreachable nodes until the unit itself is garbage collected.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit to remove from the cache.
+     *
      * @return void
      */
     public static function evictUnit(AnalysisUnit $analysisUnit): void
@@ -77,7 +78,8 @@ final class NodeIndex
      * @template T of Node
      * @param AnalysisUnit    $analysisUnit Parsed unit whose AST is indexed.
      * @param class-string<T> $class
-     * @return list<T>
+     *
+     * @return list<T> - matching nodes in document preorder; empty when the unit holds none of that class
      */
     public static function nodesOf(AnalysisUnit $analysisUnit, string $class): array
     {
@@ -94,7 +96,8 @@ final class NodeIndex
      *
      * @param AnalysisUnit             $analysisUnit Parsed unit whose AST is indexed.
      * @param list<class-string<Node>> $classes
-     * @return list<Node>
+     *
+     * @return list<Node> - union of matching nodes in preorder, deduplicated so a node matching several classes appears once; empty when none match
      */
     public static function nodesOfAny(AnalysisUnit $analysisUnit, array $classes): array
     {
@@ -123,7 +126,8 @@ final class NodeIndex
      * Return every descendant below a function or method body in preorder.
      *
      * @param Node $node Function-like node whose statements should be walked.
-     * @return list<Node>
+     *
+     * @return list<Node> - body descendants in preorder; empty when the node has no body or is not function-like
      */
     public static function bodyDescendants(Node $node): array
     {
@@ -145,7 +149,8 @@ final class NodeIndex
      * @template T of Node
      * @param Node                  $node    Function-like node whose body should be scanned.
      * @param list<class-string<T>> $classes Concrete node classes to keep.
-     * @return list<T>
+     *
+     * @return list<T> - body descendants matching any supplied class, in preorder, each kept once; empty when no classes or no body
      */
     public static function descendantsOfAny(Node $node, array $classes): array
     {
@@ -172,12 +177,14 @@ final class NodeIndex
      * Count distinct non-Nop statement start lines below a function-like body.
      *
      * @param Node $node Function-like node whose logical lines should be counted.
-     * @return int Distinct logical statement line count.
+     *
+     * @return int - count of distinct start lines carrying a real statement; Nop placeholders are excluded and statements sharing one physical line
+     *             count once
      */
     public static function logicalStatementLineCount(Node $node): int
     {
         self::$logicalLineCountCache ??= new WeakMap();
-        $cached = self::$logicalLineCountCache[$node] ?? null;
+        $cached                      = self::$logicalLineCountCache[$node] ?? null;
         if (is_int($cached)) {
             // is_int guards the WeakMap miss; a hit means this body was already counted, so reuse it.
             return $cached;
@@ -207,12 +214,13 @@ final class NodeIndex
      * Index parsed nodes by concrete PhpParser class.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit whose full AST is walked once; the result is memoised against it.
-     * @return array<class-string<Node>, list<Node>>
+     *
+     * @return array<class-string<Node>, list<Node>> - map from each concrete, ancestor, and interface class-string to its preorder nodes
      */
     private static function index(AnalysisUnit $analysisUnit): array
     {
         self::$cache ??= new WeakMap();
-        $cached = self::$cache[$analysisUnit] ?? null;
+        $cached      = self::$cache[$analysisUnit] ?? null;
         if ($cached !== null) {
             // A populated entry means this unit was already walked, so reuse it instead of re-traversing the AST.
             return $cached;
@@ -236,7 +244,8 @@ final class NodeIndex
              * implemented interface so abstract base lookups still work.
              *
              * @param Node $node Node currently being traversed.
-             * @return null Keeps traversal running.
+             *
+             * @return null - the PhpParser visitor signal to leave the node in place and keep descending into its children
              */
             public function enterNode(Node $node): null
             {
@@ -275,7 +284,7 @@ final class NodeIndex
              * Return nodes collected by concrete class, ancestor class, and
              * implemented interface keys.
              *
-             * @return array<class-string<Node>, list<Node>>
+             * @return array<class-string<Node>, list<Node>> - accumulated index keyed by concrete, ancestor, and interface class-string; preorder within each key
              */
             public function nodesByClass(): array
             {
@@ -300,12 +309,13 @@ final class NodeIndex
      * Index nodes that appear inside function-like bodies.
      *
      * @param Node $node Function-like node confirmed to carry a body; its statements are walked once and memoised.
-     * @return list<Node>
+     *
+     * @return list<Node> - body descendants in preorder; empty when the body holds no statements
      */
     private static function bodyIndex(Node $node): array
     {
         self::$bodyCache ??= new WeakMap();
-        $cached = self::$bodyCache[$node] ?? null;
+        $cached          = self::$bodyCache[$node] ?? null;
         if ($cached !== null) {
             // A populated entry means this body was already walked, so reuse it instead of re-walking the statements.
             return $cached;
@@ -319,7 +329,8 @@ final class NodeIndex
              * Add a body descendant to the source-order list.
              *
              * @param Node $node Node currently being traversed.
-             * @return null Keeps traversal running.
+             *
+             * @return null - the PhpParser visitor signal to leave the node unchanged and keep descending into the body
              */
             public function enterNode(Node $node): null
             {
@@ -332,7 +343,7 @@ final class NodeIndex
             /**
              * Return body descendants in source order.
              *
-             * @return list<Node>
+             * @return list<Node> - body descendants in the source order the preorder walk visited them
              */
             public function nodes(): array
             {

@@ -140,6 +140,7 @@ final class PathIgnoreResolverTest extends TestCase
      *
      * @param string       $root Repository root.
      * @param list<string> $args Git arguments.
+     *
      * @return void
      */
     private function runGit(string $root, array $args): void
@@ -153,7 +154,7 @@ final class PathIgnoreResolverTest extends TestCase
     /**
      * Create a temporary repository directory tracked for teardown.
      *
-     * @return string
+     * @return string - absolute path to the freshly created directory, already registered for teardown
      */
     private function tempDir(): string
     {
@@ -170,6 +171,7 @@ final class PathIgnoreResolverTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Directory path.
+     *
      * @return void
      */
     private function removeDir(string $path): void

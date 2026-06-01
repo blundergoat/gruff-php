@@ -26,7 +26,8 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers modernisation rule detection: PHP version gating, PHP 8.x candidates, exemption of legitimate mutable cases, and error-suppression flagged as security-with-modernisation pillar.
+ * Covers modernisation rule detection: PHP version gating, PHP 8.x candidates, exemption of legitimate mutable cases, and error-suppression flagged
+ * as security-with-modernisation pillar.
  */
 final class ModernisationRulesTest extends TestCase
 {
@@ -118,9 +119,9 @@ final class ModernisationRulesTest extends TestCase
     public function testLateMutationInheritanceDtoAndControllerCasesAreNotFlagged(): void
     {
         $findings = $this->analysePaths([
-            'tests/Fixtures/Modernisation/non-candidates.php',
-            'tests/Fixtures/Modernisation/Controller/RequestController.php',
-        ]);
+                                            'tests/Fixtures/Modernisation/non-candidates.php',
+                                            'tests/Fixtures/Modernisation/Controller/RequestController.php',
+                                        ]);
 
         self::assertRuleCount(ReadonlyPropertyCandidateRule::ID, 0, $findings);
         self::assertRuleCount(ConstructorPromotionCandidateRule::ID, 0, $findings);
@@ -174,33 +175,34 @@ final class ModernisationRulesTest extends TestCase
     {
         $findings            = $this->analysePath('tests/Fixtures/Modernisation/cumulative-modernisation.php');
         $suppressionFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === ErrorSuppressionRule::ID,
-        ));
+                                                $findings,
+                                                static fn(Finding $finding): bool => $finding->ruleId === ErrorSuppressionRule::ID,
+                                            ));
 
         self::assertCount(1, $suppressionFindings);
         self::assertContains(Pillar::Modernisation, $suppressionFindings[0]->secondaryPillars);
 
         $duplicateModernisationFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === 'modernisation.error-suppression',
-        ));
+                                                           $findings,
+                                                           static fn(Finding $finding): bool => $finding->ruleId === 'modernisation.error-suppression',
+                                                       ));
         self::assertSame([], $duplicateModernisationFindings);
     }
 
     /**
      * Assert the expected modernisation finding count for a rule.
      *
-     * @param string $ruleId Rule id whose findings are counted.
-     * @param int $expectedCount Number of findings the fixture should trip for that rule.
-     * @param list<Finding> $findings Full finding set to filter down to the rule.
+     * @param string        $ruleId        Rule id whose findings are counted.
+     * @param int           $expectedCount Number of findings the fixture should trip for that rule.
+     * @param list<Finding> $findings      Full finding set to filter down to the rule.
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -208,9 +210,10 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @param string $path Project-relative fixture path to scan.
+     * @param string              $path   Project-relative fixture path to scan.
      * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - every finding the registry raised for the single fixture; empty when it is clean
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
@@ -221,13 +224,14 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @param list<string> $paths Project-relative fixture paths to scan together.
+     * @param list<string>        $paths  Project-relative fixture paths to scan together.
      * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings aggregated across all supplied fixtures; empty when none trip
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
     {
-        $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
+        $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
         $registry = RuleRegistry::defaults();
 
         // Findings across every supplied fixture, run under the override config or the registry default.
@@ -241,7 +245,8 @@ final class ModernisationRulesTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed fixture ready for rule analysis, carrying the project-relative display path
      */
     private function unitForPath(string $path): AnalysisUnit
     {
@@ -255,7 +260,8 @@ final class ModernisationRulesTest extends TestCase
      * Build analysis configuration for modernisation assertions.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisConfig
+     *
+     * @return AnalysisConfig - config loaded from the fixture's own YAML, applying its rule overrides
      */
     private function config(string $path): AnalysisConfig
     {

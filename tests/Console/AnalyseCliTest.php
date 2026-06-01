@@ -8,7 +8,8 @@ use JsonException;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers the analyse CLI end-to-end: single-file mode, syntax-error handling, threshold-driven exits, JSON/HTML/SARIF/GitHub outputs, profile and selection config, scoring, and editor-link options.
+ * Covers the analyse CLI end-to-end: single-file mode, syntax-error handling, threshold-driven exits, JSON/HTML/SARIF/GitHub outputs, profile and
+ * selection config, scoring, and editor-link options.
  */
 final class AnalyseCliTest extends CliTestCase
 {
@@ -20,14 +21,14 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandRunsAsNoOp(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed',
-            '--no-config',
-            '--fail-on',
-            'error',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed',
+                                   '--no-config',
+                                   '--fail-on',
+                                   'error',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -40,23 +41,23 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command supports an explicit single-file option.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandSupportsSingleFileOption(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            '--file',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            '--no-config',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   '--file',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   '--no-config',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -81,13 +82,13 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsSyntaxErrorsWithoutAborting(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            'tests/Fixtures/Source/syntax-error/broken.php',
-            '--no-config',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   'tests/Fixtures/Source/syntax-error/broken.php',
+                                   '--no-config',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -104,16 +105,16 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsWarningFindingsWithoutFailingByDefault(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            '--config',
-            'tests/Fixtures/Config/file-length-warning.yaml',
-            '--fail-on',
-            'error',
-            '--no-baseline',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/file-length-warning.yaml',
+                                   '--fail-on',
+                                   'error',
+                                   '--no-baseline',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -130,13 +131,13 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandFailsWhenFindingMeetsDefaultErrorThreshold(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            '--config',
-            'tests/Fixtures/Config/file-length-error.yaml',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/file-length-error.yaml',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
@@ -152,15 +153,15 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandCanFailOnWarningThreshold(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            '--config',
-            'tests/Fixtures/Config/file-length-warning.yaml',
-            '--fail-on',
-            'warning',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/file-length-warning.yaml',
+                                   '--fail-on',
+                                   'warning',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(1, $process->getExitCode());
@@ -171,24 +172,24 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON report.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandOutputsJsonReport(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed/alpha.php',
-            '--config',
-            'tests/Fixtures/Config/file-length-warning.yaml',
-            '--format',
-            'json',
-            '--fail-on',
-            'error',
-            '--no-baseline',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/file-length-warning.yaml',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'error',
+                                   '--no-baseline',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -206,7 +207,7 @@ final class AnalyseCliTest extends CliTestCase
         self::assertSame(1, $summary['filesDiscovered'] ?? null);
         self::assertSame(0, $summary['exitCode'] ?? null);
         self::assertIsArray($findings);
-        self::assertCount(3, $findings);
+        self::assertCount(4, $findings);
 
         $sizeFinding = null;
         foreach ($findings as $finding) {
@@ -222,20 +223,20 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs JSON parse errors.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandOutputsJsonParseErrors(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/syntax-error',
-            '--format',
-            'json',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/syntax-error',
+                                   '--format',
+                                   'json',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -262,13 +263,13 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandFailsInvalidConfig(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            '--config',
-            'tests/Fixtures/Config/unknown-rule.yaml',
-            'tests/Fixtures/Source/mixed/alpha.php',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   '--config',
+                                   'tests/Fixtures/Config/unknown-rule.yaml',
+                                   'tests/Fixtures/Source/mixed/alpha.php',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -278,23 +279,23 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command applies configured rule selection.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandAppliesConfiguredRuleSelection(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--config',
-            'tests/Fixtures/Config/only-size-rules.yaml',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--config',
+                                   'tests/Fixtures/Config/only-size-rules.yaml',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -310,24 +311,24 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify security profile limits rule execution to security and sensitive-data rules.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandSecurityProfileRunsSecurityRulesOnly(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Security/cumulative-security.php',
-            '--no-config',
-            '--profile',
-            'security',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Security/cumulative-security.php',
+                                   '--no-config',
+                                   '--profile',
+                                   'security',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -356,25 +357,25 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify security profile replaces configured rule selection.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandSecurityProfileOverridesConfiguredSelection(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Security/cumulative-security.php',
-            '--config',
-            'tests/Fixtures/Config/only-size-rules.yaml',
-            '--profile',
-            'security',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Security/cumulative-security.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/only-size-rules.yaml',
+                                   '--profile',
+                                   'security',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -383,7 +384,7 @@ final class AnalyseCliTest extends CliTestCase
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
         $ruleIds = array_map(
-            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+            static fn(mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
             $findings,
         );
 
@@ -399,13 +400,13 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsInvalidProfile(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            '--profile',
-            'security-plus',
-            'tests/Fixtures/Source/Code',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   '--profile',
+                                   'security-plus',
+                                   'tests/Fixtures/Source/Code',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -420,15 +421,15 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandAppliesConfiguredPathIgnores(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/mixed',
-            '--config',
-            'tests/Fixtures/Config/ignore-alpha.yaml',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/mixed',
+                                   '--config',
+                                   'tests/Fixtures/Config/ignore-alpha.yaml',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -445,13 +446,13 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsInvalidSelectionConfig(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            '--config',
-            'tests/Fixtures/Config/invalid-selection-rule.yaml',
-            'tests/Fixtures/Source/Code',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   '--config',
+                                   'tests/Fixtures/Config/invalid-selection-rule.yaml',
+                                   'tests/Fixtures/Source/Code',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -461,23 +462,23 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command applies configured secret preview allowlist.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandAppliesConfiguredSecretPreviewAllowlist(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/SensitiveData/synthetic-secrets.php',
-            '--config',
-            'tests/Fixtures/Config/allow-aws-preview.yaml',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/SensitiveData/synthetic-secrets.php',
+                                   '--config',
+                                   'tests/Fixtures/Config/allow-aws-preview.yaml',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -485,7 +486,7 @@ final class AnalyseCliTest extends CliTestCase
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
         $ruleIds = array_map(
-            static fn (mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
+            static fn(mixed $finding): mixed => is_array($finding) ? ($finding['ruleId'] ?? null) : null,
             $findings,
         );
 
@@ -501,18 +502,18 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsMissingInfectionExecutableInRunMode(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--infection-run',
-            '--infection-bin',
-            'tests/Fixtures/Mutation/missing-infection',
-            '--infection-report',
-            'tests/Fixtures/Mutation/Infection/infection-clean.json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--infection-run',
+                                   '--infection-bin',
+                                   'tests/Fixtures/Mutation/missing-infection',
+                                   '--infection-report',
+                                   'tests/Fixtures/Mutation/Infection/infection-clean.json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(2, $process->getExitCode());
@@ -523,21 +524,21 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify analyse command outputs scoring data in JSON report.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandOutputsScoringDataInJsonReport(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'json',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'json',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -563,15 +564,15 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandOutputsHtmlReport(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'html',
+                                   '--fail-on',
+                                   'none',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -592,18 +593,18 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandSupportsHtmlEditorLinks(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-editor-link',
-            'vscode',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'html',
+                                   '--fail-on',
+                                   'none',
+                                   '--report-editor-link',
+                                   'vscode',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -619,18 +620,18 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandDefaultsHtmlLocationsToCopyableSpans(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-editor-link',
-            'none',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'html',
+                                   '--fail-on',
+                                   'none',
+                                   '--report-editor-link',
+                                   'none',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -647,17 +648,17 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandSupportsInteractiveHtmlReport(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-interactive',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'html',
+                                   '--fail-on',
+                                   'none',
+                                   '--report-interactive',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -665,17 +666,17 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('<script type="module">', $process->getOutput());
 
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-interactive=false',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'html',
+                                   '--fail-on',
+                                   'none',
+                                   '--report-interactive=false',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -691,17 +692,17 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandReportsInvalidHtmlReportOptions(): void
     {
         $editorProcess = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-editor-link=bad',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                         PHP_BINARY,
+                                         __DIR__ . '/../../bin/gruff-php',
+                                         'analyse',
+                                         'tests/Fixtures/Source/Code',
+                                         '--format',
+                                         'html',
+                                         '--fail-on',
+                                         'none',
+                                         '--report-editor-link=bad',
+                                         '--no-config',
+                                     ], __DIR__ . '/../..');
         $editorProcess->run();
 
         self::assertSame(2, $editorProcess->getExitCode());
@@ -709,17 +710,17 @@ final class AnalyseCliTest extends CliTestCase
         self::assertStringContainsString('--report-editor-link must be one of: vscode, phpstorm, none.', $editorProcess->getOutput());
 
         $interactiveProcess = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'html',
-            '--fail-on',
-            'none',
-            '--report-interactive=maybe',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                              PHP_BINARY,
+                                              __DIR__ . '/../../bin/gruff-php',
+                                              'analyse',
+                                              'tests/Fixtures/Source/Code',
+                                              '--format',
+                                              'html',
+                                              '--fail-on',
+                                              'none',
+                                              '--report-interactive=maybe',
+                                              '--no-config',
+                                          ], __DIR__ . '/../..');
         $interactiveProcess->run();
 
         self::assertSame(2, $interactiveProcess->getExitCode());
@@ -735,16 +736,16 @@ final class AnalyseCliTest extends CliTestCase
     public function testAnalyseCommandOutputsGithubAnnotations(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            __DIR__ . '/../../bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Source/Code',
-            '--format',
-            'github',
-            '--fail-on',
-            'none',
-            '--no-config',
-        ], __DIR__ . '/../..');
+                                   PHP_BINARY,
+                                   __DIR__ . '/../../bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Source/Code',
+                                   '--format',
+                                   'github',
+                                   '--fail-on',
+                                   'none',
+                                   '--no-config',
+                               ], __DIR__ . '/../..');
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -765,15 +766,15 @@ final class AnalyseCliTest extends CliTestCase
             file_put_contents($tempDir . '/Example.php', "<?php\n\nfinal class Example\n{\n    public function run(): void {}\n}\n");
 
             $process = new Process([
-                PHP_BINARY,
-                __DIR__ . '/../../bin/gruff-php',
-                'analyse',
-                '.',
-                '--diff',
-                'unstaged',
-                '--fail-on',
-                'none',
-            ], $tempDir);
+                                       PHP_BINARY,
+                                       __DIR__ . '/../../bin/gruff-php',
+                                       'analyse',
+                                       '.',
+                                       '--diff',
+                                       'unstaged',
+                                       '--fail-on',
+                                       'none',
+                                   ], $tempDir);
             $process->run();
 
             self::assertSame(2, $process->getExitCode());
@@ -787,8 +788,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify changed-ranges mode reports only findings attributable to the changed symbol.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandChangedRangesUsesSymbolScopeAndSuppressedCount(): void
     {
@@ -798,18 +799,18 @@ final class AnalyseCliTest extends CliTestCase
             file_put_contents($tempDir . '/Example.php', $this->changedRegionSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'Example.php',
-                '--changed-ranges',
-                '11-11',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-                '--no-config',
-            ], $tempDir);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'Example.php',
+                                       '--changed-ranges',
+                                       '11-11',
+                                       '--format',
+                                       'json',
+                                       '--fail-on',
+                                       'none',
+                                       '--no-config',
+                                   ], $tempDir);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -829,8 +830,8 @@ final class AnalyseCliTest extends CliTestCase
     /**
      * Verify unified diff stdin mode feeds the same changed-region filter.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testAnalyseCommandDiffStdinParsesUnifiedDiff(): void
     {
@@ -840,25 +841,26 @@ final class AnalyseCliTest extends CliTestCase
             file_put_contents($tempDir . '/Example.php', $this->changedRegionSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'Example.php',
-                '--diff',
-                '-',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-                '--no-config',
-            ], $tempDir);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'Example.php',
+                                       '--diff',
+                                       '-',
+                                       '--format',
+                                       'json',
+                                       '--fail-on',
+                                       'none',
+                                       '--no-config',
+                                   ], $tempDir);
             $process->setInput(<<<'PATCH'
 diff --git a/Example.php b/Example.php
 --- a/Example.php
 +++ b/Example.php
 @@ -10,0 +11,1 @@
 +        echo 'new';
-PATCH);
+PATCH
+            );
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -878,7 +880,8 @@ PATCH);
      * Load an expected CLI golden output fixture.
      *
      * @param string $fileName Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
-     * @return string Fixture contents.
+     *
+     * @return string - verbatim fixture text to assert the CLI's actual output against
      */
     private function goldenOutput(string $fileName): string
     {
@@ -891,7 +894,8 @@ PATCH);
 
     /**
      * @param array<mixed> $findings
-     * @return list<string>
+     *
+     * @return list<string> - symbol names of findings that carry one, in finding order; entries without a string symbol are omitted
      */
     private function symbolsFromJsonFindings(array $findings): array
     {
@@ -908,7 +912,7 @@ PATCH);
     }
 
     /**
-     * @return string PHP source with a changed method body and an unchanged sibling.
+     * @return string - PHP source with one edited and one untouched method, so diff-mode tests can target a changed region
      */
     private function changedRegionSource(): string
     {

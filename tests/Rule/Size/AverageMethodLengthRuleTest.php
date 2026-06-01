@@ -87,9 +87,9 @@ final class AverageMethodLengthRuleTest extends TestCase
         $findings = $this->analyse('few-properties.php', ['warning' => 1, 'error' => 2]);
 
         $avgFindings = array_values(array_filter(
-            $findings,
-            static fn ($finding) => $finding->ruleId === AverageMethodLengthRule::ID,
-        ));
+                                        $findings,
+                                        static fn($finding) => $finding->ruleId === AverageMethodLengthRule::ID,
+                                    ));
 
         self::assertSame([], $avgFindings);
     }
@@ -99,13 +99,14 @@ final class AverageMethodLengthRuleTest extends TestCase
      *
      * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds Rule option overrides applied before the fixture runs.
-     * @return list<\GruffPhp\Finding\Finding>
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings this rule emitted for the fixture; empty when the average is under threshold
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit     = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $unit        = $this->parseFixture($fixture);
+        $registry    = RuleRegistry::defaults();
+        $config      = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             AverageMethodLengthRule::ID,
             new RuleSettings(true, $thresholds),
         );
@@ -119,7 +120,8 @@ final class AverageMethodLengthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with its display path set to the repo-relative location
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

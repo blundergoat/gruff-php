@@ -74,7 +74,7 @@ final class DependencyComposerRulesTest extends TestCase
 
         self::assertCount(3, $findings);
 
-        $packages = array_map(static fn (Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings);
+        $packages = array_map(static fn(Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings);
         self::assertContains('acme/wildcard-lib', $packages);
         self::assertContains('acme/branch-lib', $packages);
         self::assertContains('acme/unbounded-helper', $packages);
@@ -93,7 +93,7 @@ final class DependencyComposerRulesTest extends TestCase
 
         self::assertCount(1, $findings);
 
-        $events = array_map(static fn (Finding $finding): mixed => $finding->metadata['event'] ?? null, $findings);
+        $events = array_map(static fn(Finding $finding): mixed => $finding->metadata['event'] ?? null, $findings);
         self::assertContains('post-install-cmd', $events);
         self::assertNotContains('lint', $events);
     }
@@ -106,11 +106,11 @@ final class DependencyComposerRulesTest extends TestCase
     public function testSafeManifestProducesNoFindings(): void
     {
         foreach ([
-            DependencyComposerVcsRule::ID,
-            DependencyComposerPathRule::ID,
-            DependencyComposerUnpinnedRule::ID,
-            DependencyComposerScriptRule::ID,
-        ] as $ruleId) {
+                     DependencyComposerVcsRule::ID,
+                     DependencyComposerPathRule::ID,
+                     DependencyComposerUnpinnedRule::ID,
+                     DependencyComposerScriptRule::ID,
+                 ] as $ruleId) {
             self::assertSame([], $this->findingsForRule(self::CLEAN_FIXTURE, $ruleId), $ruleId);
         }
     }
@@ -123,17 +123,17 @@ final class DependencyComposerRulesTest extends TestCase
     public function testNonManifestPathIsIgnored(): void
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(
-            self::PROJECT_ROOT . '/' . self::RISKY_FIXTURE,
-            'tests/Fixtures/Security/ComposerDependency/not-a-manifest.json',
-            SourceFile::TYPE_TEXT,
-        ));
+                                                     self::PROJECT_ROOT . '/' . self::RISKY_FIXTURE,
+                                                     'tests/Fixtures/Security/ComposerDependency/not-a-manifest.json',
+                                                     SourceFile::TYPE_TEXT,
+                                                 ));
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         $dependencyFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'security.dependency-composer-'),
-        ));
+                                               $findings,
+                                               static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.dependency-composer-'),
+                                           ));
 
         self::assertSame([], $dependencyFindings);
     }
@@ -143,19 +143,20 @@ final class DependencyComposerRulesTest extends TestCase
      *
      * @param string $displayPath Fixture display path (basename decides manifest detection).
      * @param string $ruleId      Rule identifier to filter for.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings emitted only by the named rule, empty when that rule stayed silent
      */
     private function findingsForRule(string $displayPath, string $ruleId): array
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(
-            self::PROJECT_ROOT . '/' . $displayPath,
-            $displayPath,
-            SourceFile::TYPE_TEXT,
-        ));
+                                                     self::PROJECT_ROOT . '/' . $displayPath,
+                                                     $displayPath,
+                                                     SourceFile::TYPE_TEXT,
+                                                 ));
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         // The filtered list isolates the dependency-composer rule under test.
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 }

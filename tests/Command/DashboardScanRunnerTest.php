@@ -15,7 +15,8 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
 /**
- * Covers dashboard scan caching: source-fingerprint and content-hash invalidation, diff and include-ignored bypass, config/baseline change invalidation, and error rendering for empty or timed-out scans.
+ * Covers dashboard scan caching: source-fingerprint and content-hash invalidation, diff and include-ignored bypass, config/baseline change
+ * invalidation, and error rendering for empty or timed-out scans.
  */
 final class DashboardScanRunnerTest extends TestCase
 {
@@ -53,7 +54,7 @@ final class DashboardScanRunnerTest extends TestCase
         self::assertStringContainsString('scan 1', $first);
         self::assertStringContainsString('scan 1', $second);
         self::assertStringContainsString('scan 2', $third);
-        self::assertSame('2', trim((string) file_get_contents($project . '/scan-count.txt')));
+        self::assertSame('2', trim((string)file_get_contents($project . '/scan-count.txt')));
         self::assertStringContainsString('gruff-dashboard-meta', $first);
     }
 
@@ -73,7 +74,7 @@ final class DashboardScanRunnerTest extends TestCase
         $runner->scanHtml($context, ['paths' => 'src', 'includeIgnored' => '1']);
         $runner->scanHtml($context, ['paths' => 'src', 'includeIgnored' => '1']);
 
-        self::assertSame('4', trim((string) file_get_contents($project . '/scan-count.txt')));
+        self::assertSame('4', trim((string)file_get_contents($project . '/scan-count.txt')));
     }
 
     /**
@@ -100,7 +101,7 @@ final class DashboardScanRunnerTest extends TestCase
         self::assertStringContainsString('scan 1', $second);
         self::assertStringContainsString('scan 2', $third);
         self::assertStringContainsString('scan 3', $fourth);
-        self::assertSame('3', trim((string) file_get_contents($project . '/scan-count.txt')));
+        self::assertSame('3', trim((string)file_get_contents($project . '/scan-count.txt')));
     }
 
     /**
@@ -124,7 +125,7 @@ final class DashboardScanRunnerTest extends TestCase
 
         self::assertStringContainsString('scan 1', $first);
         self::assertStringContainsString('scan 2', $second);
-        self::assertSame('2', trim((string) file_get_contents($project . '/scan-count.txt')));
+        self::assertSame('2', trim((string)file_get_contents($project . '/scan-count.txt')));
     }
 
     /**
@@ -146,7 +147,7 @@ final class DashboardScanRunnerTest extends TestCase
 
         self::assertStringContainsString('scan 1', $first);
         self::assertStringContainsString('scan 1', $second);
-        self::assertSame('1', trim((string) file_get_contents($project . '/scan-count.txt')));
+        self::assertSame('1', trim((string)file_get_contents($project . '/scan-count.txt')));
     }
 
     /**
@@ -199,7 +200,8 @@ final class DashboardScanRunnerTest extends TestCase
      * Build a runner fixture.
      *
      * @param string $binary Fake gruff-php binary path.
-     * @return DashboardScanRunner
+     *
+     * @return DashboardScanRunner - runner wired to the fake binary so scans run hermetically without the real CLI
      */
     private function runner(string $binary): DashboardScanRunner
     {
@@ -211,7 +213,8 @@ final class DashboardScanRunnerTest extends TestCase
      * Build a request context for a project.
      *
      * @param string $project Project root.
-     * @return DashboardRequestContext
+     *
+     * @return DashboardRequestContext - loopback request context rooted at the project with a short scan timeout
      */
     private function context(string $project): DashboardRequestContext
     {
@@ -222,27 +225,27 @@ final class DashboardScanRunnerTest extends TestCase
     /**
      * Build dashboard console input defaults.
      *
-     * @return ArrayInput
+     * @return ArrayInput - empty input carrying only the option definitions the runner reads from the request
      */
     private function input(): ArrayInput
     {
         // Empty input carrying just the option definitions the runner reads.
         return new ArrayInput([], new InputDefinition([
-            new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-            new InputOption('fail-on', null, InputOption::VALUE_REQUIRED, '', 'none'),
-            new InputOption('config', null, InputOption::VALUE_REQUIRED),
-            new InputOption('baseline', null, InputOption::VALUE_OPTIONAL),
-            new InputOption('no-baseline', null, InputOption::VALUE_NONE),
-            new InputOption('no-config', null, InputOption::VALUE_NONE),
-            new InputOption('diff', null, InputOption::VALUE_NONE),
-            new InputOption('include-ignored', null, InputOption::VALUE_NONE),
-        ]));
+                                                          new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                                                          new InputOption('fail-on', null, InputOption::VALUE_REQUIRED, '', 'none'),
+                                                          new InputOption('config', null, InputOption::VALUE_REQUIRED),
+                                                          new InputOption('baseline', null, InputOption::VALUE_OPTIONAL),
+                                                          new InputOption('no-baseline', null, InputOption::VALUE_NONE),
+                                                          new InputOption('no-config', null, InputOption::VALUE_NONE),
+                                                          new InputOption('diff', null, InputOption::VALUE_NONE),
+                                                          new InputOption('include-ignored', null, InputOption::VALUE_NONE),
+                                                      ]));
     }
 
     /**
      * Create a temporary dashboard project.
      *
-     * @return string Project directory.
+     * @return string - absolute path to a freshly seeded temp project (src/Example.php), tracked for teardown removal
      */
     private function projectDir(): string
     {
@@ -259,7 +262,8 @@ final class DashboardScanRunnerTest extends TestCase
      * Create a fake gruff-php executable.
      *
      * @param string $mode Fake executable mode.
-     * @return string Binary path.
+     *
+     * @return string - filesystem path to the executable stub whose output matches the requested mode (counter/empty/slow)
      */
     private function fakeGruffBinary(string $mode): string
     {
@@ -288,6 +292,7 @@ PHP,
      * Recursively remove a temporary directory.
      *
      * @param string $directory Directory to remove.
+     *
      * @return void
      */
     private function removeDir(string $directory): void

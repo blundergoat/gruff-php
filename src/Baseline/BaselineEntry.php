@@ -22,12 +22,12 @@ final readonly class BaselineEntry
      * @param string      $message     Finding message preserved for stale-entry reporting.
      */
     public function __construct(
-        public string $fingerprint,
-        public string $ruleId,
-        public string $filePath,
-        public ?int $line,
+        public string  $fingerprint,
+        public string  $ruleId,
+        public string  $filePath,
+        public ?int    $line,
         public ?string $symbol,
-        public string $message,
+        public string  $message,
     ) {
     }
 
@@ -35,7 +35,8 @@ final readonly class BaselineEntry
      * Create a baseline entry from a live analysis finding.
      *
      * @param Finding $finding Live analysis finding to persist in the baseline.
-     * @return self Baseline entry carrying the finding fingerprint and identity.
+     *
+     * @return self - baseline entry snapshotting the finding's fingerprint and identity, decoupled from later mutation
      */
     public static function fromFinding(Finding $finding): self
     {
@@ -53,8 +54,9 @@ final readonly class BaselineEntry
     /**
      * @param array<string, bool|float|int|string|null> $baselineRow Serialized baseline row decoded from JSON.
      * @param int                                       $index       Zero-based baseline entry position for error messages.
+     *
+     * @return self - baseline entry rebuilt from a validated on-disk row, ready to match against live findings
      * @throws BaselineException When required fields are missing or malformed.
-     * @return self Baseline entry decoded from serialized baseline data.
      */
     public static function fromArray(array $baselineRow, int $index): self
     {
@@ -88,18 +90,19 @@ final readonly class BaselineEntry
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string}
+     * @return array{fingerprint: string, ruleId: string, file: string, line: int|null, symbol: string|null, message: string} - JSON-ready baseline
+     *                            row; "file" holds the display path, line/symbol null when the finding lacked them
      */
     public function toArray(): array
     {
         // On-disk baseline JSON keys ("file" for the file path) that fromArray() reads back.
         return [
             'fingerprint' => $this->fingerprint,
-            'ruleId' => $this->ruleId,
-            'file' => $this->filePath,
-            'line' => $this->line,
-            'symbol' => $this->symbol,
-            'message' => $this->message,
+            'ruleId'      => $this->ruleId,
+            'file'        => $this->filePath,
+            'line'        => $this->line,
+            'symbol'      => $this->symbol,
+            'message'     => $this->message,
         ];
     }
 }

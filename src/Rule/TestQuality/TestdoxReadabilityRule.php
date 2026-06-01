@@ -28,7 +28,7 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     /**
      * Describe the TestDox readability rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar/tier, advisory severity, and the default minWords=2 threshold; enabled by default
      */
     public function definition(): RuleDefinition
     {
@@ -51,11 +51,12 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for unreadable TestDox names.
+     * @return list<Finding> - one advisory finding per non-Pest test method whose name yields fewer words than the threshold; empty when every name
+     *                       passes
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
-        $threshold = (int) $ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
+        $threshold = (int)$ruleContext->settingsFor($this->definition())->numericThreshold('minWords');
         $findings  = [];
 
         foreach (TestQualityNodeHelper::testScopes($analysisUnit) as $scope) {
@@ -71,14 +72,14 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
             }
 
             $findings[] = new Finding(
-                ruleId:  self::ID,
-                message: sprintf(
-                    '%s would render as testdox "%s" (%d words), below the %d-word readability threshold.',
-                    $scope->symbol,
-                    $this->renderTestdox($words),
-                    count($words),
-                    $threshold,
-                ),
+                ruleId:      self::ID,
+                message:     sprintf(
+                                 '%s would render as testdox "%s" (%d words), below the %d-word readability threshold.',
+                                 $scope->symbol,
+                                 $this->renderTestdox($words),
+                                 count($words),
+                                 $threshold,
+                             ),
                 filePath:    $analysisUnit->file->displayPath,
                 line:        $scope->line,
                 severity:    Severity::Advisory,
@@ -99,21 +100,23 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
      * Split testdox text into words for readability checks.
      *
      * @param string $methodName Raw test method name; the `test` prefix is stripped and CamelCase split into words.
-     * @return list<string>
+     *
+     * @return list<string> - the test name's words in order, `test` prefix removed and CamelCase split; empty when the name reduces to nothing
      */
     private function splitWords(string $methodName): array
     {
         $name   = preg_replace('/^test[_]?/i', '', $methodName) ?? $methodName;
-        $name   = (string) preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
+        $name   = (string)preg_replace('/(?<!^)([A-Z])/', ' $1', $name);
         $tokens = preg_split('/[\s_]+/', $name) ?: [];
 
         // Drop empty tokens so the word count reflects real words, not separators between them.
-        return array_values(array_filter($tokens, static fn (string $token): bool => $token !== ''));
+        return array_values(array_filter($tokens, static fn(string $token): bool => $token !== ''));
     }
 
     /**
      * @param list<string> $words Words split from the test name, in order; empty when the name reduced to nothing.
-     * @return string Rendered TestDox phrase.
+     *
+     * @return string - the words lower-cased and space-joined to mirror PHPUnit's testdox output; empty string when no words remain
      */
     private function renderTestdox(array $words): string
     {

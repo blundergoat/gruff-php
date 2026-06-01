@@ -40,7 +40,8 @@ final readonly class BaselineStore
      * Read and validate a baseline file.
      *
      * @param string $path Baseline path to read, relative to the project root when needed.
-     * @return BaselineData Parsed baseline data.
+     *
+     * @return BaselineData - in-memory baseline carrying the source path and one entry per validated finding row
      */
     public function read(string $path): BaselineData
     {
@@ -54,7 +55,8 @@ final readonly class BaselineStore
      * Decode the baseline JSON root and validate its schema envelope.
      *
      * @param string $path Baseline path to decode; a missing file or bad schema throws BaselineException.
-     * @return BaselineFileData
+     *
+     * @return BaselineFileData - validated envelope with the schema version pinned and every finding row checked
      */
     private function readBaselineObject(string $path): array
     {
@@ -85,7 +87,7 @@ final readonly class BaselineStore
         // Normalised envelope with the schema pinned and the findings key validated into a list of scalar-keyed rows.
         return [
             'schemaVersion' => self::SCHEMA_VERSION,
-            'findings' => $this->readFindingsList($decoded['findings'] ?? null),
+            'findings'      => $this->readFindingsList($decoded['findings'] ?? null),
         ];
     }
 
@@ -93,7 +95,9 @@ final readonly class BaselineStore
      * Read findings list for the baseline workflow.
      *
      * @param mixed $findings Raw decoded JSON findings key; anything but a list of scalar-keyed objects throws.
-     * @return list<BaselineFindingRow>
+     *
+     * @return list<BaselineFindingRow> - findings in file order, each a string-keyed map of scalar-or-null values; empty when the source list was
+     *                                  empty
      */
     private function readFindingsList(mixed $findings): array
     {
@@ -132,7 +136,8 @@ final readonly class BaselineStore
      * Build entries from findings for the baseline workflow.
      *
      * @param list<BaselineFindingRow> $findings
-     * @return list<BaselineEntry>
+     *
+     * @return list<BaselineEntry> - one entry per input row in file order; empty when no findings were supplied
      */
     private function entriesFromFindings(array $findings): array
     {
@@ -148,14 +153,15 @@ final readonly class BaselineStore
     /**
      * @param string        $path     Baseline path to write, relative to the project root when needed.
      * @param list<Finding> $findings Findings to persist in the baseline.
+     *
+     * @return BaselineData - the baseline exactly as persisted, so callers can report what was written without re-reading the file
      * @throws BaselineException When the baseline file cannot be encoded or written.
      *
-     * @return BaselineData Data written to disk.
      */
     public function write(string $path, array $findings): BaselineData
     {
-        $entries = array_map(
-            static fn (Finding $finding): BaselineEntry => BaselineEntry::fromFinding($finding),
+        $entries      = array_map(
+            static fn(Finding $finding): BaselineEntry => BaselineEntry::fromFinding($finding),
             $findings,
         );
         $baselineData = new BaselineData($path, $entries);
@@ -168,9 +174,9 @@ final readonly class BaselineStore
 
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
-            'generatedAt' => gmdate('c'),
-            'findings' => array_map(
-                static fn (BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
+            'generatedAt'   => gmdate('c'),
+            'findings'      => array_map(
+                static fn(BaselineEntry $baselineEntry): array => $baselineEntry->toArray(),
                 $entries,
             ),
         ];
@@ -193,6 +199,7 @@ final readonly class BaselineStore
      * @param string $absolutePath Final on-disk destination the temporary file is renamed onto.
      * @param string $payload      Exact bytes to persist, written in full before the rename; partial writes raise.
      * @param string $displayPath  Project-relative path used only in error messages, never for filesystem access.
+     *
      * @return void
      */
     private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
@@ -244,6 +251,7 @@ final readonly class BaselineStore
      * @param string $tempPath     Source temporary file; removed before throwing if the move cannot complete.
      * @param string $absolutePath Final destination; on Windows an existing target is unlinked before the rename.
      * @param string $displayPath  Project-relative path used only in error messages, never for filesystem access.
+     *
      * @return void
      */
     private function replaceBaselineFile(string $tempPath, string $absolutePath, string $displayPath): void
@@ -264,6 +272,7 @@ final readonly class BaselineStore
      *
      * @param string $tempPath    Temporary file to delete; treated as already gone when it is not a file.
      * @param string $displayPath Project-relative path used only in the error message if the unlink itself fails.
+     *
      * @return void
      */
     private function removeTemporaryFile(string $tempPath, string $displayPath): void
@@ -282,7 +291,8 @@ final readonly class BaselineStore
      * Resolve a path relative to the project root when needed.
      *
      * @param string $path Baseline path returned unchanged when already absolute, else joined to the project root.
-     * @return string Absolute path.
+     *
+     * @return string - filesystem-absolute path: the input untouched when already absolute, else joined onto the project root
      */
     private function absolutePath(string $path): string
     {

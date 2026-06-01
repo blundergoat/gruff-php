@@ -26,7 +26,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
-     * @return list<array{name: string, pattern: string}>
+     * @return list<array{name: string, pattern: string}> - one entry per PII family, each a detector name paired with its match regex; order is the
+     *                          scan order
      */
     private function patterns(): array
     {
@@ -42,7 +43,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Describe the PII test fixture rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - id, name, pillar, tier, and the warning/medium defaults a caller applies unless overridden
      */
     public function definition(): RuleDefinition
     {
@@ -63,7 +64,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for suspicious fixture values.
+     * @return list<\GruffPhp\Finding\Finding> - one finding per realistic PII match left after allow-list and attribution filtering; empty for
+     *                                         non-test paths or clean fixtures
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -115,7 +117,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      *
      * @param string $candidateFixture Matched fixture text, lower-cased here before substring checks.
      *
-     * @return bool True when the matched value is an accepted example fixture.
+     * @return bool - true to suppress the match as a known-synthetic example (reserved domain or 555-010x phone block); false lets it be flagged
      */
     private function isAllowedExample(string $candidateFixture): bool
     {
@@ -123,11 +125,11 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         // True for reserved example/test domains and the 555-010x phone block, all guaranteed non-real.
         return str_contains($normalized, '@example.')
-            || str_contains($normalized, '@example-')
-            || str_contains($normalized, '@test.')
-            || str_contains($normalized, 'example')
-            || str_contains($normalized, '555-010')
-            || str_contains($normalized, '555 010');
+               || str_contains($normalized, '@example-')
+               || str_contains($normalized, '@test.')
+               || str_contains($normalized, 'example')
+               || str_contains($normalized, '555-010')
+               || str_contains($normalized, '555 010');
     }
 
     /**
@@ -136,7 +138,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      * @param string $source Full unit source, used to recover the physical line around the match.
      * @param int    $offset Byte offset of the email match within the source.
      *
-     * @return bool True when the email appears in attribution context.
+     * @return bool - true when the email sits on an author/copyright line (maintainer metadata, not fixture PII) and should be skipped
      */
     private function isAttributionEmail(string $source, int $offset): bool
     {
@@ -148,7 +150,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
 
         // True for author/copyright lines, where a maintainer email is metadata rather than fixture PII.
         return str_contains($line, '@author')
-            || str_contains($line, 'copyright')
-            || str_contains($line, '@copyright');
+               || str_contains($line, 'copyright')
+               || str_contains($line, '@copyright');
     }
 }

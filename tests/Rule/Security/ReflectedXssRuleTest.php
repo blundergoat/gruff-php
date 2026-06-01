@@ -37,7 +37,7 @@ final class ReflectedXssRuleTest extends TestCase
     {
         $findings = $this->findings(self::FIXTURE);
 
-        $lines = array_map(static fn (Finding $finding): ?int => $finding->line, $findings);
+        $lines = array_map(static fn(Finding $finding): ?int => $finding->line, $findings);
         sort($lines);
 
         // directEcho, concatEcho, printSink, printfSink, aliasedEcho, serverEcho.
@@ -54,16 +54,16 @@ final class ReflectedXssRuleTest extends TestCase
         $findings = $this->findings(self::FIXTURE);
 
         self::assertCount(6, $findings);
-        self::assertSame(array_fill(0, 6, Severity::Warning), array_map(static fn (Finding $finding): Severity => $finding->severity, $findings));
-        self::assertSame(array_fill(0, 6, Pillar::Security), array_map(static fn (Finding $finding): Pillar => $finding->pillar, $findings));
-        self::assertSame(array_fill(0, 6, Confidence::Medium), array_map(static fn (Finding $finding): Confidence => $finding->confidence, $findings));
+        self::assertSame(array_fill(0, 6, Severity::Warning), array_map(static fn(Finding $finding): Severity => $finding->severity, $findings));
+        self::assertSame(array_fill(0, 6, Pillar::Security), array_map(static fn(Finding $finding): Pillar => $finding->pillar, $findings));
+        self::assertSame(array_fill(0, 6, Confidence::Medium), array_map(static fn(Finding $finding): Confidence => $finding->confidence, $findings));
 
-        $sinks        = array_map(static fn (Finding $finding): mixed => $finding->metadata['sink'] ?? null, $findings);
+        $sinks        = array_map(static fn(Finding $finding): mixed => $finding->metadata['sink'] ?? null, $findings);
         $allowedSinks = ['echo', 'print', 'printf', 'vprintf'];
         $unknownSinks = array_values(array_filter(
-            $sinks,
-            static fn (mixed $sink): bool => !is_string($sink) || !in_array($sink, $allowedSinks, true),
-        ));
+                                         $sinks,
+                                         static fn(mixed $sink): bool => !is_string($sink) || !in_array($sink, $allowedSinks, true),
+                                     ));
         self::assertSame([], $unknownSinks);
         self::assertContains('echo', $sinks);
         self::assertContains('print', $sinks);
@@ -92,19 +92,20 @@ final class ReflectedXssRuleTest extends TestCase
      * Analyse a fixture and return only reflected-XSS findings.
      *
      * @param string $displayPath Fixture display path.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - reflected-XSS findings for the fixture in registry order; empty when the rule fires none
      */
     private function findings(string $displayPath): array
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(
-            self::PROJECT_ROOT . '/' . $displayPath,
-            $displayPath,
-            SourceFile::TYPE_PHP,
-        ));
+                                                     self::PROJECT_ROOT . '/' . $displayPath,
+                                                     $displayPath,
+                                                     SourceFile::TYPE_PHP,
+                                                 ));
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         // Only reflected-XSS findings are relevant to this fixture helper.
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === ReflectedXssRule::ID));
+        return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === ReflectedXssRule::ID));
     }
 }

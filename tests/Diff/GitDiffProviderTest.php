@@ -22,7 +22,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter scope, and rejection of unsafe base refs.
+ * Covers git diff parsing (changed lines, modes, renames, deletions, paths with spaces, untracked files), merge-base resolution, finding-filter
+ * scope, and rejection of unsafe base refs.
  */
 final class GitDiffProviderTest extends TestCase
 {
@@ -41,7 +42,7 @@ final class GitDiffProviderTest extends TestCase
             changedFiles: ['src/Example.php'],
             message:      'test',
         );
-        $findings = [
+        $findings   = [
             $this->finding('src/Example.php', 11),
             $this->finding('src/Example.php', 20),
             $this->finding('src/Other.php', 11),
@@ -257,7 +258,7 @@ final class GitDiffProviderTest extends TestCase
             changedFiles: ['src/Example.php'],
             message:      'test',
         );
-        $findings = [
+        $findings   = [
             $this->finding('src/Example.php', 20),
             $this->finding('src/Other.php', 20),
         ];
@@ -296,7 +297,7 @@ final class GitDiffProviderTest extends TestCase
             changedFiles: ['src/Example.php'],
             message:      'test',
         );
-        $findings = [
+        $findings   = [
             $this->finding('src/Example.php', 4),
             $this->finding('src/Example.php', 9),
         ];
@@ -381,16 +382,16 @@ PATCH;
     /**
      * Provide unsafe diff mode cases for parameterized tests.
      *
-     * @return array<string, array{string}>
+     * @return array<string, array{string}> - dataset keyed by case label, each row holding one ref the provider must reject as unsafe
      */
     public static function unsafeDiffModeProvider(): array
     {
         // Each row feeds one ref argument the provider must reject as unsafe.
         return [
-            'no-renames option' => ['--no-renames'],
+            'no-renames option'  => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
             'leading hyphen ref' => ['-x'],
-            'whitespace ref' => ['feature branch'],
+            'whitespace ref'     => ['feature branch'],
         ];
     }
 
@@ -398,6 +399,7 @@ PATCH;
      * Verify Git diff provider rejects unsafe base refs.
      *
      * @param string $mode Unsafe diff mode argument.
+     *
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('unsafeDiffModeProvider')]
@@ -423,7 +425,8 @@ PATCH;
      *
      * @param string $filePath Finding file path.
      * @param int    $line     Finding line number.
-     * @return Finding
+     *
+     * @return Finding - an advisory missing-public-phpdoc finding fixed at the given path and line for filter assertions
      */
     private function finding(string $filePath, int $line): Finding
     {
@@ -445,7 +448,8 @@ PATCH;
      *
      * @param string $displayPath Reporting path the parsed unit should carry in findings.
      * @param string $source      PHP source the fixture unit is parsed from.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the unit parsed from the source, reported under the supplied display path
      */
     private function analysisUnit(string $displayPath, string $source): AnalysisUnit
     {
@@ -462,7 +466,7 @@ PATCH;
     }
 
     /**
-     * @return string PHP source with two sibling methods.
+     * @return string - PHP source declaring one edited and one untouched sibling method for scope filtering
      */
     private function symbolScopeSource(): string
     {
@@ -502,7 +506,7 @@ PHP;
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to a freshly created, unique temporary directory for a fixture repository
      */
     private function tempDir(): string
     {
@@ -519,6 +523,7 @@ PHP;
      *
      * @param string $cwd  Working directory.
      * @param string $args Command arguments.
+     *
      * @return void
      */
     private function runGit(string $cwd, string ...$args): void
@@ -533,6 +538,7 @@ PHP;
      * Initialise a repository with two committed PHP files.
      *
      * @param string $tempDir Fixture repository root.
+     *
      * @return void
      */
     private function initialiseRepository(string $tempDir): void
@@ -550,6 +556,7 @@ PHP;
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void

@@ -148,14 +148,14 @@ final class RuleRegistry
      * Lower numbers win. The order is the M51 documented deferral contract.
      */
     private const NAMING_RULE_PRIORITY = [
-        'naming.class-file-mismatch' => 0,
-        'naming.confusing-name' => 1,
-        'naming.negative-boolean' => 2,
-        'naming.boolean-prefix' => 3,
-        'naming.identifier-quality' => 4,
-        'naming.hungarian-notation' => 5,
-        'naming.suffix-hungarian' => 6,
-        'naming.short-variable' => 7,
+        'naming.class-file-mismatch'    => 0,
+        'naming.confusing-name'         => 1,
+        'naming.negative-boolean'       => 2,
+        'naming.boolean-prefix'         => 3,
+        'naming.identifier-quality'     => 4,
+        'naming.hungarian-notation'     => 5,
+        'naming.suffix-hungarian'       => 6,
+        'naming.short-variable'         => 7,
         'naming.abbreviation-allowlist' => 8,
     ];
 
@@ -164,6 +164,7 @@ final class RuleRegistry
 
     /**
      * @param list<RuleInterface|ProjectRuleInterface> $rules Rule instances to index by id.
+     *
      * @throws InvalidArgumentException When two rules declare the same id.
      */
     public function __construct(array $rules)
@@ -187,147 +188,147 @@ final class RuleRegistry
     /**
      * Build the default registry containing every built-in rule.
      *
-     * @return self Registry indexed by rule id.
+     * @return self - registry pre-loaded with every built-in rule, keyed and sorted by rule id
      */
     public static function defaults(): self
     {
         // The built-in catalogue is centralised here so config, docs, and tests share one source.
         return new self([
-            new CognitiveComplexityRule(),
-            new CyclomaticComplexityRule(),
-            new HalsteadVolumeRule(),
-            new MaintainabilityIndexRule(),
-            new NestingDepthRule(),
-            new UnusedPrivateMethodRule(),
-            new UnusedPrivatePropertyRule(),
-            new CommentedOutCodeRule(),
-            new EmptyClassRule(),
-            new EmptyMethodRule(),
-            new OneLineMethodRule(),
-            new RedundantVariableRule(),
-            new UnreachableCodeRule(),
-            new UnusedImportRule(),
-            new UnusedParameterRule(),
-            new AbbreviationAllowlistRule(),
-            new BooleanPrefixRule(),
-            new ClassFileMismatchRule(),
-            new ConfusingNameRule(),
-            new GenericMethodNameRule(),
-            new HungarianNotationRule(),
-            new IdentifierQualityRule(),
-            new NegativeBooleanRule(),
-            new ShortVariableRule(),
-            new SuffixHungarianRule(),
-            new TestNamingConsistencyRule(),
-            new ConstructorPromotionCandidateRule(),
-            new EnumCandidateRule(),
-            new FirstClassCallableCandidateRule(),
-            new ForbiddenGlobalAccessRule(),
-            new MatchExpressionCandidateRule(),
-            new MixedTypeOveruseRule(),
-            new NamedArgumentOpportunityRule(),
-            new PhpDocMixedOveruseRule(),
-            new PublicPropertyRule(),
-            new ReadonlyPropertyCandidateRule(),
-            new ApiKeyPatternRule(),
-            new AwsAccessKeyRule(),
-            new DatabaseUrlPasswordRule(),
-            new GcpServiceAccountKeyRule(),
-            new HardcodedEnvValueRule(),
-            new HighEntropyStringRule(),
-            new JwtTokenRule(),
-            new PhiPatternRule(),
-            new PiiTestFixtureRule(),
-            new PrivateKeyRule(),
-            new UrlEmbeddedCredentialsRule(),
-            new DangerousFunctionCallRule(),
-            new DebugModeEnabledRule(),
-            new DependencyComposerPathRule(),
-            new DependencyComposerScriptRule(),
-            new DependencyComposerUnpinnedRule(),
-            new DependencyComposerVcsRule(),
-            new DisabledSslVerificationRule(),
-            new ErrorSuppressionRule(),
-            new ExtractCompactUserInputRule(),
-            new GithubActionsRiskyWorkflowRule(),
-            new HeaderInjectionRule(),
-            new InsecureRandomRule(),
-            new PathTraversalFileAccessRule(),
-            new PermissiveCorsRule(),
-            new ProcessCommandConstructionRule(),
-            new ReflectedXssRule(),
-            new RequestControlledUrlRule(),
-            new SensitiveDataLoggingRule(),
-            new SilentCatchRule(),
-            new SqlConcatenationRule(),
-            new UnsafeArchiveExtractionRule(),
-            new UnsafeXmlLoadingRule(),
-            new UnsafeUnserializeRule(),
-            new VariableIncludeRule(),
-            new WeakCryptoRule(),
-            new ConditionalTestLogicRule(),
-            new DataProviderAnnotationRule(),
-            new EagerTestRule(),
-            new EmptyDataProviderRule(),
-            new ExceptionTypeOnlyRule(),
-            new ExcessiveMockingRule(),
-            new ExtendsProductionClassRule(),
-            new GlobalStateMutationRule(),
-            new LoopAssertionWithoutMessageRule(),
-            new MagicNumberAssertionRule(),
-            new MockOnlyTestRule(),
-            new MockWithoutExpectationRule(),
-            new MockingDomainObjectRule(),
-            new MultipleAaaCyclesRule(),
-            new MysteryGuestRule(),
-            new NoAssertionsRule(),
-            new PhpUnitCoverageSourceMissingRule(),
-            new PhpUnitDeprecationsNotFatalRule(),
-            new PhpUnitStrictFlagsMissingRule(),
-            new PrivateReflectionRule(),
-            new RepeatedStructureMissingDataProviderRule(),
-            new SetupBloatRule(),
-            new SkippedWithoutReasonRule(),
-            new SleepInTestRule(),
-            new SutNotCalledRule(),
-            new TautologicalTypeAssertionRule(),
-            new TestLongerThanSutRule(),
-            new TestMethodTooLongRule(),
-            new TestQualityNamingConsistencyRule(),
-            new TestdoxReadabilityRule(),
-            new TrivialAssertionRule(),
-            new TrivialSnapshotRule(),
-            new UnusedMockRule(),
-            new MissingClassPhpdocRule(),
-            new MissingConstantPhpdocRule(),
-            new MissingFilePhpdocRule(),
-            new MissingParamTagRule(),
-            new MissingPropertyPhpdocRule(),
-            new MissingPublicPhpdocRule(),
-            new MissingReadmeRule(),
-            new MissingReturnTagRule(),
-            new MissingThrowsTagRule(),
-            new RegexCommentRule(),
-            new ReturnCommentRule(),
-            new StaleParamTagRule(),
-            new TodoDensityRule(),
-            new BarePhpdocTagsRule(),
-            new VarAnnotationDescriptionRule(),
-            new AverageMethodLengthRule(),
-            new ClassLengthRule(),
-            new FileLengthRule(),
-            new MethodLengthRule(),
-            new ParameterCountRule(),
-            new PropertyCountRule(),
-            new PublicMethodCountRule(),
-            new SingleImplementorInterfaceRule(),
-        ]);
+                            new CognitiveComplexityRule(),
+                            new CyclomaticComplexityRule(),
+                            new HalsteadVolumeRule(),
+                            new MaintainabilityIndexRule(),
+                            new NestingDepthRule(),
+                            new UnusedPrivateMethodRule(),
+                            new UnusedPrivatePropertyRule(),
+                            new CommentedOutCodeRule(),
+                            new EmptyClassRule(),
+                            new EmptyMethodRule(),
+                            new OneLineMethodRule(),
+                            new RedundantVariableRule(),
+                            new UnreachableCodeRule(),
+                            new UnusedImportRule(),
+                            new UnusedParameterRule(),
+                            new AbbreviationAllowlistRule(),
+                            new BooleanPrefixRule(),
+                            new ClassFileMismatchRule(),
+                            new ConfusingNameRule(),
+                            new GenericMethodNameRule(),
+                            new HungarianNotationRule(),
+                            new IdentifierQualityRule(),
+                            new NegativeBooleanRule(),
+                            new ShortVariableRule(),
+                            new SuffixHungarianRule(),
+                            new TestNamingConsistencyRule(),
+                            new ConstructorPromotionCandidateRule(),
+                            new EnumCandidateRule(),
+                            new FirstClassCallableCandidateRule(),
+                            new ForbiddenGlobalAccessRule(),
+                            new MatchExpressionCandidateRule(),
+                            new MixedTypeOveruseRule(),
+                            new NamedArgumentOpportunityRule(),
+                            new PhpDocMixedOveruseRule(),
+                            new PublicPropertyRule(),
+                            new ReadonlyPropertyCandidateRule(),
+                            new ApiKeyPatternRule(),
+                            new AwsAccessKeyRule(),
+                            new DatabaseUrlPasswordRule(),
+                            new GcpServiceAccountKeyRule(),
+                            new HardcodedEnvValueRule(),
+                            new HighEntropyStringRule(),
+                            new JwtTokenRule(),
+                            new PhiPatternRule(),
+                            new PiiTestFixtureRule(),
+                            new PrivateKeyRule(),
+                            new UrlEmbeddedCredentialsRule(),
+                            new DangerousFunctionCallRule(),
+                            new DebugModeEnabledRule(),
+                            new DependencyComposerPathRule(),
+                            new DependencyComposerScriptRule(),
+                            new DependencyComposerUnpinnedRule(),
+                            new DependencyComposerVcsRule(),
+                            new DisabledSslVerificationRule(),
+                            new ErrorSuppressionRule(),
+                            new ExtractCompactUserInputRule(),
+                            new GithubActionsRiskyWorkflowRule(),
+                            new HeaderInjectionRule(),
+                            new InsecureRandomRule(),
+                            new PathTraversalFileAccessRule(),
+                            new PermissiveCorsRule(),
+                            new ProcessCommandConstructionRule(),
+                            new ReflectedXssRule(),
+                            new RequestControlledUrlRule(),
+                            new SensitiveDataLoggingRule(),
+                            new SilentCatchRule(),
+                            new SqlConcatenationRule(),
+                            new UnsafeArchiveExtractionRule(),
+                            new UnsafeXmlLoadingRule(),
+                            new UnsafeUnserializeRule(),
+                            new VariableIncludeRule(),
+                            new WeakCryptoRule(),
+                            new ConditionalTestLogicRule(),
+                            new DataProviderAnnotationRule(),
+                            new EagerTestRule(),
+                            new EmptyDataProviderRule(),
+                            new ExceptionTypeOnlyRule(),
+                            new ExcessiveMockingRule(),
+                            new ExtendsProductionClassRule(),
+                            new GlobalStateMutationRule(),
+                            new LoopAssertionWithoutMessageRule(),
+                            new MagicNumberAssertionRule(),
+                            new MockOnlyTestRule(),
+                            new MockWithoutExpectationRule(),
+                            new MockingDomainObjectRule(),
+                            new MultipleAaaCyclesRule(),
+                            new MysteryGuestRule(),
+                            new NoAssertionsRule(),
+                            new PhpUnitCoverageSourceMissingRule(),
+                            new PhpUnitDeprecationsNotFatalRule(),
+                            new PhpUnitStrictFlagsMissingRule(),
+                            new PrivateReflectionRule(),
+                            new RepeatedStructureMissingDataProviderRule(),
+                            new SetupBloatRule(),
+                            new SkippedWithoutReasonRule(),
+                            new SleepInTestRule(),
+                            new SutNotCalledRule(),
+                            new TautologicalTypeAssertionRule(),
+                            new TestLongerThanSutRule(),
+                            new TestMethodTooLongRule(),
+                            new TestQualityNamingConsistencyRule(),
+                            new TestdoxReadabilityRule(),
+                            new TrivialAssertionRule(),
+                            new TrivialSnapshotRule(),
+                            new UnusedMockRule(),
+                            new MissingClassPhpdocRule(),
+                            new MissingConstantPhpdocRule(),
+                            new MissingFilePhpdocRule(),
+                            new MissingParamTagRule(),
+                            new MissingPropertyPhpdocRule(),
+                            new MissingPublicPhpdocRule(),
+                            new MissingReadmeRule(),
+                            new MissingReturnTagRule(),
+                            new MissingThrowsTagRule(),
+                            new RegexCommentRule(),
+                            new ReturnCommentRule(),
+                            new StaleParamTagRule(),
+                            new TodoDensityRule(),
+                            new BarePhpdocTagsRule(),
+                            new VarAnnotationDescriptionRule(),
+                            new AverageMethodLengthRule(),
+                            new ClassLengthRule(),
+                            new FileLengthRule(),
+                            new MethodLengthRule(),
+                            new ParameterCountRule(),
+                            new PropertyCountRule(),
+                            new PublicMethodCountRule(),
+                            new SingleImplementorInterfaceRule(),
+                        ]);
     }
 
     /**
      * List every registered rule in execution order.
      *
-     * @return list<RuleInterface|ProjectRuleInterface>
+     * @return list<RuleInterface|ProjectRuleInterface> - all registered rules, id-sorted ascending; empty when none were registered
      */
     public function all(): array
     {
@@ -339,7 +340,8 @@ final class RuleRegistry
      * Check whether a rule id is registered.
      *
      * @param string $ruleId Rule identifier to check.
-     * @return bool True when the rule exists in the registry.
+     *
+     * @return bool - true when a rule with this id is registered; false for unknown or misspelled ids
      */
     public function has(string $ruleId): bool
     {
@@ -351,42 +353,46 @@ final class RuleRegistry
      * Return a registered rule by id.
      *
      * @param string $ruleId Rule identifier to look up.
+     *
+     * @return RuleInterface|ProjectRuleInterface - the shared rule instance registered under this id; never null (throws on miss)
      * @throws InvalidArgumentException When the rule id is unknown.
-     * @return RuleInterface|ProjectRuleInterface Matching rule instance.
      */
     public function get(string $ruleId): RuleInterface|ProjectRuleInterface
     {
         // Unknown ids are caller/config mistakes, so surface them immediately.
         return $this->rules[$ruleId]
-            ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
+               ?? throw new InvalidArgumentException(sprintf('Unknown rule id "%s".', $ruleId));
     }
 
     /**
      * Return rules enabled by the effective analysis config.
      *
      * @param AnalysisConfig $config Config used to filter registered rules.
-     * @return list<RuleInterface|ProjectRuleInterface> Enabled rule instances.
+     *
+     * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
+     *                                                  disables all
      */
     public function enabledRules(AnalysisConfig $config): array
     {
         // The returned list is already filtered to rules that can run for this config.
         return array_values(array_filter(
-            $this->rules,
-            static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
-                $definition = $rule->definition();
+                                $this->rules,
+                                static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
+                                    $definition = $rule->definition();
 
-                // Enabled rules must pass both per-rule toggles and selection filters.
-                return $config->ruleSettings($definition->id)->enabled
-                    && $config->ruleSelection()->allows($definition);
-            },
-        ));
+                                    // Enabled rules must pass both per-rule toggles and selection filters.
+                                    return $config->ruleSettings($definition->id)->enabled
+                                           && $config->ruleSelection()->allows($definition);
+                                },
+                            ));
     }
 
     /**
      * Check whether the effective config enables at least one project-level rule.
      *
      * @param AnalysisConfig $config Config used to filter registered rules.
-     * @return bool True when project-level analysis needs complete project context.
+     *
+     * @return bool - true when at least one enabled rule needs whole-project context; false when a per-unit pass suffices
      */
     public function hasEnabledProjectRules(AnalysisConfig $config): bool
     {
@@ -409,7 +415,8 @@ final class RuleRegistry
      * streaming-friendly.
      *
      * @param RuleContext $ruleContext Rule execution context.
-     * @return bool True when every enabled project rule supports streaming.
+     *
+     * @return bool - true when the run can stream unit-by-unit; false when a legacy project rule forces buffering all units
      */
     public function supportsStreaming(RuleContext $ruleContext): bool
     {
@@ -428,6 +435,7 @@ final class RuleRegistry
      * Initialise project-rule accumulators before a streaming analysis pass.
      *
      * @param RuleContext $ruleContext Rule execution context.
+     *
      * @return void
      */
     public function beginStreaming(RuleContext $ruleContext): void
@@ -449,15 +457,17 @@ final class RuleRegistry
      * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
      * @param RuleContext             $ruleContext        Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
-     * @return list<Finding> Findings produced for this unit only.
+     *
+     * @return list<Finding> - file-scoped findings for this unit only; accumulator output is deferred to endStreaming()
      */
     public function analyseUnit(
-        AnalysisUnit $analysisUnit,
-        RuleContext $ruleContext,
+        AnalysisUnit        $analysisUnit,
+        RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
         $findings = $this->runPerUnitRules($analysisUnit, $ruleContext, $ruleRunnerObserver);
         $this->accumulateForUnit($analysisUnit, $ruleContext, $ruleRunnerObserver);
+
         // Streaming callers receive only immediate file-scoped findings for this unit.
         return $findings;
     }
@@ -468,11 +478,12 @@ final class RuleRegistry
      * @param AnalysisUnit            $analysisUnit       Parsed unit to analyse.
      * @param RuleContext             $ruleContext        Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
-     * @return list<Finding> Findings produced for this unit only.
+     *
+     * @return list<Finding> - findings from per-unit rules in rule-execution order, not yet deduped or final-sorted
      */
     private function runPerUnitRules(
-        AnalysisUnit $analysisUnit,
-        RuleContext $ruleContext,
+        AnalysisUnit        $analysisUnit,
+        RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         if ($analysisUnit->hasParseErrors()) {
@@ -513,11 +524,12 @@ final class RuleRegistry
      * @param AnalysisUnit            $analysisUnit       Parsed unit to accumulate.
      * @param RuleContext             $ruleContext        Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
+     *
      * @return void
      */
     private function accumulateForUnit(
-        AnalysisUnit $analysisUnit,
-        RuleContext $ruleContext,
+        AnalysisUnit        $analysisUnit,
+        RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
         if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
@@ -547,10 +559,11 @@ final class RuleRegistry
      *
      * @param RuleContext             $ruleContext        Rule execution context.
      * @param RuleRunnerObserver|null $ruleRunnerObserver Optional per-rule timing hook.
-     * @return list<Finding> Project-level findings from accumulated state.
+     *
+     * @return list<Finding> - project-level findings flushed from accumulator state; empty when no accumulators ran or matched
      */
     public function endStreaming(
-        RuleContext $ruleContext,
+        RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
     ): array {
         $findings = [];
@@ -583,7 +596,8 @@ final class RuleRegistry
      * the non-streaming analyse() flow byte-for-byte.
      *
      * @param list<Finding> $findings
-     * @return list<Finding>
+     *
+     * @return list<Finding> - deduped findings in canonical report order (file, line, rule id, message); empty when no findings survive
      */
     public function finalizeFindings(array $findings): array
     {
@@ -591,17 +605,17 @@ final class RuleRegistry
 
         usort(
             $findings,
-            static fn (Finding $leftFinding, Finding $rightFinding): int => [
-                $leftFinding->filePath,
-                $leftFinding->line ?? 0,
-                $leftFinding->ruleId,
-                $leftFinding->message,
-            ] <=> [
-                $rightFinding->filePath,
-                $rightFinding->line ?? 0,
-                $rightFinding->ruleId,
-                $rightFinding->message,
-            ],
+            static fn(Finding $leftFinding, Finding $rightFinding): int => [
+                                                                               $leftFinding->filePath,
+                                                                               $leftFinding->line ?? 0,
+                                                                               $leftFinding->ruleId,
+                                                                               $leftFinding->message,
+                                                                           ] <=> [
+                                                                               $rightFinding->filePath,
+                                                                               $rightFinding->line ?? 0,
+                                                                               $rightFinding->ruleId,
+                                                                               $rightFinding->message,
+                                                                           ],
         );
 
         // Final ordering is part of the stable report contract.
@@ -616,19 +630,20 @@ final class RuleRegistry
      * @param list<AnalysisUnit>|null $projectUnits                    Parsed units available to project-level rules.
      * @param RuleRunnerObserver|null $ruleRunnerObserver              Optional per-rule timing hook; default analyse runs leave this null.
      * @param bool                    $shouldReleaseUnitsAfterAnalysis Whether units can release AST contents after analysis.
-     * @return list<Finding> Findings produced by enabled rules.
+     *
+     * @return list<Finding> - all per-unit, accumulator, and legacy project findings, deduped and in canonical report order
      */
     public function analyse(
-        array $units,
-        RuleContext $ruleContext,
-        ?array $projectUnits = null,
+        array               $units,
+        RuleContext         $ruleContext,
+        ?array              $projectUnits = null,
         ?RuleRunnerObserver $ruleRunnerObserver = null,
-        bool $shouldReleaseUnitsAfterAnalysis = false,
+        bool                $shouldReleaseUnitsAfterAnalysis = false,
     ): array {
         $legacyProjectRules = $this->legacyProjectRules($ruleContext);
         $canReleaseUnits    = $shouldReleaseUnitsAfterAnalysis
-            && $legacyProjectRules === []
-            && $projectUnits === null;
+                              && $legacyProjectRules === []
+                              && $projectUnits === null;
 
         $this->beginStreaming($ruleContext);
 
@@ -668,7 +683,9 @@ final class RuleRegistry
      * Find enabled project rules that still need the full unit list.
      *
      * @param RuleContext $ruleContext Rule execution context.
-     * @return list<ProjectRuleInterface> Enabled non-accumulator project rules.
+     *
+     * @return list<ProjectRuleInterface> - enabled project rules lacking accumulator support, which must run with the full unit list; empty when all
+     *                                    stream
      */
     private function legacyProjectRules(RuleContext $ruleContext): array
     {
@@ -678,6 +695,7 @@ final class RuleRegistry
                 $rules[] = $rule;
             }
         }
+
         // Legacy rules run after the per-unit phase with the complete context.
         return $rules;
     }
@@ -689,18 +707,19 @@ final class RuleRegistry
      * @param list<AnalysisUnit>         $contextUnits       Candidate units available to project rules.
      * @param RuleContext                $ruleContext        Rule execution context.
      * @param RuleRunnerObserver|null    $ruleRunnerObserver Optional per-rule timing hook.
-     * @return list<Finding> Project-rule findings.
+     *
+     * @return list<Finding> - findings from the supplied legacy project rules; empty when no parse-clean PHP units remain to analyse
      */
     private function runLegacyProjectRules(
-        array $rules,
-        array $contextUnits,
-        RuleContext $ruleContext,
+        array               $rules,
+        array               $contextUnits,
+        RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): array {
         $analyseableUnits = array_values(array_filter(
-            $contextUnits,
-            static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
-        ));
+                                             $contextUnits,
+                                             static fn(AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors() && $analysisUnit->file->isPhp(),
+                                         ));
 
         if ($analyseableUnits === []) {
             // Project rules reason only over parse-clean PHP units.
@@ -729,7 +748,8 @@ final class RuleRegistry
      * Build deduplicate findings for the component.
      *
      * @param list<Finding> $findings Findings to collapse by full reporting identity.
-     * @return list<Finding> Findings with exact duplicates removed.
+     *
+     * @return list<Finding> - input order preserved with later exact-identity duplicates dropped (first occurrence wins)
      */
     private function deduplicateFindings(array $findings): array
     {
@@ -740,9 +760,9 @@ final class RuleRegistry
             $key = implode("\0", [
                 $finding->ruleId,
                 $finding->filePath,
-                (string) ($finding->line ?? ''),
-                (string) ($finding->endLine ?? ''),
-                (string) ($finding->column ?? ''),
+                (string)($finding->line ?? ''),
+                (string)($finding->endLine ?? ''),
+                (string)($finding->column ?? ''),
                 $finding->symbol ?? '',
                 $finding->message,
                 $finding->metadata === [] ? '' : serialize($finding->metadata),
@@ -765,7 +785,8 @@ final class RuleRegistry
      * report the same identifier at the same source location.
      *
      * @param list<Finding> $findings Findings that may contain overlapping naming reports.
-     * @return list<Finding> Findings with lower-priority naming overlaps removed.
+     *
+     * @return list<Finding> - relative order preserved, keeping only the highest-priority naming finding per overlapping identifier
      */
     private function deduplicateNamingFindings(array $findings): array
     {
@@ -799,7 +820,8 @@ final class RuleRegistry
      * Build the cross-rule identifier key used to collapse duplicate naming findings.
      *
      * @param Finding $finding Finding to classify for naming-rule overlap.
-     * @return string|null Deduplication key for naming findings.
+     *
+     * @return string|null - overlap-bucket key (file, line, column, symbol, identifier); null when the finding cannot participate in naming dedup
      */
     private function namingOverlapKey(Finding $finding): ?string
     {
@@ -817,8 +839,8 @@ final class RuleRegistry
         // File, location, symbol, and identifier define the overlap bucket.
         return implode("\0", [
             $finding->filePath,
-            (string) ($finding->line ?? ''),
-            (string) ($finding->column ?? ''),
+            (string)($finding->line ?? ''),
+            (string)($finding->column ?? ''),
             $finding->symbol ?? '',
             strtolower($identifierName),
         ]);
@@ -828,7 +850,8 @@ final class RuleRegistry
      * Extract the identifier name from finding metadata.
      *
      * @param Finding $finding Finding whose metadata may carry an identifier.
-     * @return string|null Identifier name if this finding carries one.
+     *
+     * @return string|null - identifier from metadata, falling back to the finding symbol; null when neither is present
      */
     private function findingIdentifierName(Finding $finding): ?string
     {

@@ -49,7 +49,7 @@ final class SummaryCommand extends Command
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format: text or json.', default: 'text')
-            ->addOption('top', null, InputOption::VALUE_REQUIRED, 'How many top rules and file offenders to list.', default: (string) self::DEFAULT_TOP)
+            ->addOption('top', null, InputOption::VALUE_REQUIRED, 'How many top rules and file offenders to list.', default: (string)self::DEFAULT_TOP)
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.');
     }
 
@@ -58,6 +58,7 @@ final class SummaryCommand extends Command
      *
      * @param InputInterface  $input  Parsed console arguments and options for this summary invocation.
      * @param OutputInterface $output Destination for the rendered summary and any usage or config errors.
+     *
      * @return int Symfony command exit code.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -81,7 +82,7 @@ final class SummaryCommand extends Command
         }
 
         $configPath = $this->configPath($input);
-        $noConfig   = (bool) $input->getOption('no-config');
+        $noConfig   = (bool)$input->getOption('no-config');
         if ($this->hasConfigConflict($noConfig, $configPath, $output)) {
             // --no-config and --config are mutually exclusive; the conflict was already reported.
             return Command::INVALID;
@@ -116,17 +117,17 @@ final class SummaryCommand extends Command
 
         // Hand control to the renderer with the single analysis pass folded into the report data.
         return $this->writeSummary(
-            output:               $output,
-            format:               $format,
-            summaryReportData:    $this->summaryData(
-                projectRoot:          $projectRoot,
-                paths:                $this->paths($input),
-                shouldIncludeIgnored: (bool) $input->getOption('include-ignored'),
-                effectiveConfigPath:  $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
-                config:               $config,
-                registry:             $registry,
-                topLimit:             $topLimit,
-            ),
+            output:            $output,
+            format:            $format,
+            summaryReportData: $this->summaryData(
+                                   projectRoot:          $projectRoot,
+                                   paths:                $this->paths($input),
+                                   shouldIncludeIgnored: (bool)$input->getOption('include-ignored'),
+                                   effectiveConfigPath:  $noConfig ? null : ($configPath ?? $configLoader->resolveConfigPath(null)),
+                                   config:               $config,
+                                   registry:             $registry,
+                                   topLimit:             $topLimit,
+                               ),
         );
     }
 
@@ -134,6 +135,7 @@ final class SummaryCommand extends Command
      * Resolve the current project root or emit an error when it cannot be read.
      *
      * @param OutputInterface $output Destination for the error shown when the working directory is unreadable.
+     *
      * @return string|null Project root path, or null when unavailable.
      */
     private function projectRoot(OutputInterface $output): ?string
@@ -155,6 +157,7 @@ final class SummaryCommand extends Command
      *
      * @param InputInterface  $input  Console input carrying the optional --format value.
      * @param OutputInterface $output Destination for the usage error shown when the format is unrecognised.
+     *
      * @return string|null Summary format, or null after emitting a usage error.
      */
     private function summaryFormat(InputInterface $input, OutputInterface $output): ?string
@@ -166,9 +169,9 @@ final class SummaryCommand extends Command
         }
 
         $output->writeln(sprintf(
-            '<error>USAGE-ERROR Unsupported summary format "%s". Use text or json.</error>',
-            is_string($format) ? $format : '',
-        ));
+                             '<error>USAGE-ERROR Unsupported summary format "%s". Use text or json.</error>',
+                             is_string($format) ? $format : '',
+                         ));
 
         // Null is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return null;
@@ -179,6 +182,7 @@ final class SummaryCommand extends Command
      *
      * @param InputInterface  $input  Console input carrying the optional --top value.
      * @param OutputInterface $output Destination for the usage error shown when --top is not a non-negative integer.
+     *
      * @return int|null Top limit, or null after emitting a usage error.
      */
     private function topLimit(InputInterface $input, OutputInterface $output): ?int
@@ -187,7 +191,7 @@ final class SummaryCommand extends Command
         // Accept only unsigned decimal digits for the summary row limit.
         if (is_string($topRaw) && preg_match('/^\d+$/', $topRaw) === 1) {
             // The validated digit string becomes the row cap for rules and offenders.
-            return (int) $topRaw;
+            return (int)$topRaw;
         }
 
         $output->writeln('<error>USAGE-ERROR --top must be a non-negative integer.</error>');
@@ -200,6 +204,7 @@ final class SummaryCommand extends Command
      * Read the optional config path from console input.
      *
      * @param InputInterface $input Console input carrying the optional --config value.
+     *
      * @return string|null Config path, or null when omitted.
      */
     private function configPath(InputInterface $input): ?string
@@ -216,6 +221,7 @@ final class SummaryCommand extends Command
      * @param bool            $noConfig   Whether --no-config was requested.
      * @param string|null     $configPath Explicit --config path, or null when none was given.
      * @param OutputInterface $output     Destination for the usage error shown when both flags are present.
+     *
      * @return bool True when the options are invalid.
      */
     private function hasConfigConflict(bool $noConfig, ?string $configPath, OutputInterface $output): bool
@@ -235,6 +241,7 @@ final class SummaryCommand extends Command
      * Return normalized path arguments from console input.
      *
      * @param InputInterface $input Console input carrying the variadic paths argument.
+     *
      * @return list<string> Project-relative paths requested by the summary command.
      */
     private function paths(InputInterface $input): array
@@ -257,13 +264,14 @@ final class SummaryCommand extends Command
      * @param RuleRegistry    $registry     Rule set used to seed defaults and validate configured rule ids.
      * @param ConfigLoader    $configLoader Loader that reads and merges the YAML config for this project.
      * @param OutputInterface $output       Destination for the CONFIG-ERROR line shown when loading fails.
+     *
      * @return AnalysisConfig|null Loaded config, or null when config loading fails.
      */
     private function analysisConfig(
-        bool $noConfig,
-        ?string $configPath,
-        RuleRegistry $registry,
-        ConfigLoader $configLoader,
+        bool            $noConfig,
+        ?string         $configPath,
+        RuleRegistry    $registry,
+        ConfigLoader    $configLoader,
         OutputInterface $output,
     ): ?AnalysisConfig {
         try {
@@ -282,36 +290,37 @@ final class SummaryCommand extends Command
     /**
      * Build summary render data from one analysis pass.
      *
-     * @param string            $projectRoot          Absolute project root that anchors source discovery.
-     * @param list<string>      $paths                Project-relative paths requested by the summary command.
-     * @param bool              $shouldIncludeIgnored When true, scan ignored files via filesystem traversal instead of Git/default ignores.
-     * @param string|null       $effectiveConfigPath  Config path to echo in the report, or null when running without config.
-     * @param AnalysisConfig    $config               Resolved configuration driving rule selection and ignore patterns.
-     * @param RuleRegistry      $registry             Rule set executed against the discovered sources.
-     * @param int               $topLimit             Maximum rows kept for the top-rules and top-offenders lists.
+     * @param string         $projectRoot          Absolute project root that anchors source discovery.
+     * @param list<string>   $paths                Project-relative paths requested by the summary command.
+     * @param bool           $shouldIncludeIgnored When true, scan ignored files via filesystem traversal instead of Git/default ignores.
+     * @param string|null    $effectiveConfigPath  Config path to echo in the report, or null when running without config.
+     * @param AnalysisConfig $config               Resolved configuration driving rule selection and ignore patterns.
+     * @param RuleRegistry   $registry             Rule set executed against the discovered sources.
+     * @param int            $topLimit             Maximum rows kept for the top-rules and top-offenders lists.
+     *
      * @return SummaryReportData Source, score, and aggregate finding data.
      */
     private function summaryData(
-        string $projectRoot,
-        array $paths,
-        bool $shouldIncludeIgnored,
-        ?string $effectiveConfigPath,
+        string         $projectRoot,
+        array          $paths,
+        bool           $shouldIncludeIgnored,
+        ?string        $effectiveConfigPath,
         AnalysisConfig $config,
-        RuleRegistry $registry,
-        int $topLimit,
+        RuleRegistry   $registry,
+        int            $topLimit,
     ): SummaryReportData {
-        $sources = (new AnalysisSourceLoader())->load(
+        $sources  = (new AnalysisSourceLoader())->load(
             $projectRoot,
             $paths,
             $shouldIncludeIgnored,
             $config->ignoredPathPatterns(),
         );
         $findings = $registry->analyse(
-            $sources->analysisUnits,
-            new RuleContext($projectRoot, $config),
+                                             $sources->analysisUnits,
+                                             new RuleContext($projectRoot, $config),
             shouldReleaseUnitsAfterAnalysis: true,
         );
-        $score = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
+        $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive(), $topLimit, analysisConfig: $config);
 
         // Fold discovery counts, the score, and the top-N slices into the immutable render payload.
         return new SummaryReportData(
@@ -335,6 +344,7 @@ final class SummaryCommand extends Command
      * @param OutputInterface   $output            Destination for the rendered summary or an encode-failure error.
      * @param string            $format            Validated output format, either 'text' or 'json'.
      * @param SummaryReportData $summaryReportData Aggregated run data to render.
+     *
      * @return int Symfony command exit code.
      */
     private function writeSummary(OutputInterface $output, string $format, SummaryReportData $summaryReportData): int
@@ -364,6 +374,7 @@ final class SummaryCommand extends Command
      * Build a lookup table from rule ID to pillar value.
      *
      * @param RuleRegistry $registry Rule set whose definitions supply the rule-id-to-pillar mapping.
+     *
      * @return array<string, string> Pillar values keyed by rule ID.
      */
     private function pillarLookup(RuleRegistry $registry): array
@@ -383,7 +394,9 @@ final class SummaryCommand extends Command
      *
      * @param list<Finding>         $findings
      * @param array<string, string> $pillarLookup
-     * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}>
+     *
+     * @return list<array{ruleId: string, count: int, advisory: int, warning: int, error: int, pillar: string}> - per-rule tallies ordered by
+     *                            descending total count, ties broken by rule id; empty when there are no findings
      */
     private function aggregateByRule(array $findings, array $pillarLookup): array
     {
@@ -392,12 +405,12 @@ final class SummaryCommand extends Command
             $ruleId = $finding->ruleId;
             if (!isset($aggregates[$ruleId])) {
                 $aggregates[$ruleId] = [
-                    'ruleId' => $ruleId,
-                    'count' => 0,
+                    'ruleId'   => $ruleId,
+                    'count'    => 0,
                     'advisory' => 0,
-                    'warning' => 0,
-                    'error' => 0,
-                    'pillar' => $pillarLookup[$ruleId] ?? $finding->pillar->value,
+                    'warning'  => 0,
+                    'error'    => 0,
+                    'pillar'   => $pillarLookup[$ruleId] ?? $finding->pillar->value,
                 ];
             }
 
@@ -425,7 +438,9 @@ final class SummaryCommand extends Command
      * Count findings by severity for summary output.
      *
      * @param list<Finding> $findings
-     * @return array{advisory: int, warning: int, error: int, total: int}
+     *
+     * @return array{advisory: int, warning: int, error: int, total: int} - per-severity finding counts plus the grand total; every key is zero when
+     *                         there are no findings
      */
     private function severityTotals(array $findings): array
     {
@@ -440,6 +455,7 @@ final class SummaryCommand extends Command
 
     /**
      * @param list<\GruffPhp\Analysis\RunDiagnostic> $diagnostics
+     *
      * @return int Number of parse-error diagnostics in the source set.
      */
     private function parseErrorCount(array $diagnostics): int
@@ -459,6 +475,7 @@ final class SummaryCommand extends Command
      * Render a human-readable summary report.
      *
      * @param SummaryReportData $summaryReportData Aggregated run data to format as aligned console text.
+     *
      * @return string Human-readable summary report.
      */
     private function renderText(SummaryReportData $summaryReportData): string
@@ -489,7 +506,7 @@ final class SummaryCommand extends Command
             return $right->findings <=> $left->findings;
         });
 
-        $pillarWidth = $this->columnWidth(array_map(static fn ($pillar): string => $pillar->pillar, $sortedPillars), 14);
+        $pillarWidth = $this->columnWidth(array_map(static fn($pillar): string => $pillar->pillar, $sortedPillars), 14);
         foreach ($sortedPillars as $pillar) {
             $grade     = $pillar->grade === null ? 'n/a' : $pillar->grade->letter;
             $scoreText = $pillar->grade === null ? '  n/a ' : sprintf('%6.2f', $pillar->grade->score);
@@ -508,7 +525,7 @@ final class SummaryCommand extends Command
         if ($summaryReportData->topRules !== []) {
             $lines[] = '';
             $lines[] = sprintf('Top %d rules by finding count', count($summaryReportData->topRules));
-            $idWidth = $this->columnWidth(array_map(static fn (array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
+            $idWidth = $this->columnWidth(array_map(static fn(array $ruleSummary): string => $ruleSummary['ruleId'], $summaryReportData->topRules), 30);
             foreach ($summaryReportData->topRules as $ruleSummary) {
                 $lines[] = sprintf(
                     '  %5d  %-' . $idWidth . 's  %s  a=%d w=%d e=%d',
@@ -525,7 +542,7 @@ final class SummaryCommand extends Command
         if ($summaryReportData->topOffenders !== []) {
             $lines[]   = '';
             $lines[]   = sprintf('Top %d file offenders', count($summaryReportData->topOffenders));
-            $fileWidth = $this->columnWidth(array_map(static fn ($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
+            $fileWidth = $this->columnWidth(array_map(static fn($file): string => $file->filePath, $summaryReportData->topOffenders), 30);
             foreach ($summaryReportData->topOffenders as $file) {
                 $lines[] = sprintf(
                     '  %s  %6.2f  %-' . $fileWidth . 's  findings=%-4d a=%d w=%d e=%d',
@@ -563,6 +580,7 @@ final class SummaryCommand extends Command
      * Render a JSON-encoded summary report.
      *
      * @param SummaryReportData $summaryReportData Aggregated run data to serialise under the gruff.summary schema.
+     *
      * @return string JSON-encoded summary report.
      * @throws JsonException When the summary payload cannot be encoded.
      */
@@ -570,22 +588,22 @@ final class SummaryCommand extends Command
     {
         $payload = [
             'schemaVersion' => self::SCHEMA_VERSION,
-            'tool' => ['name' => Application::NAME, 'version' => Application::VERSION],
-            'scope' => [
-                'paths' => $summaryReportData->paths,
-                'configPath' => $summaryReportData->configPath,
+            'tool'          => ['name' => Application::NAME, 'version' => Application::VERSION],
+            'scope'         => [
+                'paths'           => $summaryReportData->paths,
+                'configPath'      => $summaryReportData->configPath,
                 'filesDiscovered' => $summaryReportData->sourcesDiscovered,
-                'filesParsed' => $summaryReportData->sourcesParsed,
-                'ignoredPaths' => $summaryReportData->ignoredPaths,
-                'missingPaths' => $summaryReportData->missingPaths,
-                'parseErrors' => $summaryReportData->parseErrors,
-                'scope' => $summaryReportData->score->scope,
+                'filesParsed'     => $summaryReportData->sourcesParsed,
+                'ignoredPaths'    => $summaryReportData->ignoredPaths,
+                'missingPaths'    => $summaryReportData->missingPaths,
+                'parseErrors'     => $summaryReportData->parseErrors,
+                'scope'           => $summaryReportData->score->scope,
             ],
-            'composite' => $summaryReportData->score->composite->toArray(),
-            'findings' => $summaryReportData->totals,
-            'pillars' => array_map(static fn ($pillar): array => $pillar->toArray(), $summaryReportData->score->pillars),
-            'topRules' => $summaryReportData->topRules,
-            'topOffenders' => array_map(static fn ($file): array => $file->toArray(), $summaryReportData->topOffenders),
+            'composite'     => $summaryReportData->score->composite->toArray(),
+            'findings'      => $summaryReportData->totals,
+            'pillars'       => array_map(static fn($pillar): array => $pillar->toArray(), $summaryReportData->score->pillars),
+            'topRules'      => $summaryReportData->topRules,
+            'topOffenders'  => array_map(static fn($file): array => $file->toArray(), $summaryReportData->topOffenders),
         ];
 
         // Pretty-print with unescaped slashes for readable paths; the THROW flag surfaces encode failures.
@@ -594,7 +612,8 @@ final class SummaryCommand extends Command
 
     /**
      * @param list<string> $columnTexts
-     * @param int           $minimum Floor width applied when every value is shorter, keeping columns from collapsing.
+     * @param int          $minimum Floor width applied when every value is shorter, keeping columns from collapsing.
+     *
      * @return int Width needed for aligned summary columns.
      */
     private function columnWidth(array $columnTexts, int $minimum): int

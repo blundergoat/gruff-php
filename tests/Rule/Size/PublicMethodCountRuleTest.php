@@ -41,6 +41,7 @@ final class PublicMethodCountRuleTest extends TestCase
      *
      * @param string             $fixture    Fixture filename.
      * @param array<string, int> $thresholds Rule thresholds.
+     *
      * @return void
      */
     #[DataProvider('allowedPublicMethodShapeProvider')]
@@ -72,13 +73,14 @@ final class PublicMethodCountRuleTest extends TestCase
      *
      * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds Warning/error public-method-count limits for this case.
-     * @return list<\GruffPhp\Finding\Finding>
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings from this rule only; empty when the fixture stays within limits
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit     = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $unit        = $this->parseFixture($fixture);
+        $registry    = RuleRegistry::defaults();
+        $config      = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             PublicMethodCountRule::ID,
             new RuleSettings(true, $thresholds),
         );
@@ -91,7 +93,7 @@ final class PublicMethodCountRuleTest extends TestCase
     /**
      * Provide fixture and threshold combinations that should stay below the rule limit.
      *
-     * @return iterable<string, array{0: string, 1: array<string, int>}>
+     * @return iterable<string, array{0: string, 1: array<string, int>}> - named cases pairing a fixture filename with its warning/error thresholds
      */
     public static function allowedPublicMethodShapeProvider(): iterable
     {
@@ -104,7 +106,8 @@ final class PublicMethodCountRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture with a repo-relative display path for finding reports
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

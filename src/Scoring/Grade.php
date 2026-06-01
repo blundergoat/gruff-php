@@ -16,7 +16,7 @@ final readonly class Grade
      * @param string $letter Display letter for the score.
      */
     public function __construct(
-        public float $score,
+        public float  $score,
         public string $letter,
     ) {
     }
@@ -25,7 +25,8 @@ final readonly class Grade
      * Build a grade after clamping and rounding a score.
      *
      * @param float $score Raw score to clamp into the 0-100 range.
-     * @return self Grade for the normalised score.
+     *
+     * @return self - grade carrying the score clamped to 0-100 and rounded to 2 decimals, plus its derived letter
      */
     public static function fromScore(float $score): self
     {
@@ -39,7 +40,8 @@ final readonly class Grade
      * Resolve the letter grade for a numeric score.
      *
      * @param float $score Normalized score to classify.
-     * @return string Letter grade.
+     *
+     * @return string - single uppercase letter A-F by descending band; F for anything below 60
      */
     public static function letterFor(float $score): string
     {
@@ -70,7 +72,7 @@ final readonly class Grade
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{score: float, grade: string}
+     * @return array{score: float, grade: string} - report row with the numeric score and its letter under the `grade` key
      */
     public function toArray(): array
     {

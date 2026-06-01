@@ -22,12 +22,12 @@ final readonly class MutationFileSummary
      */
     public function __construct(
         public string $filePath,
-        public int $totalMutants,
-        public int $killedMutants,
-        public int $survivedMutants,
-        public int $notCoveredMutants,
-        public float $msi,
-        public float $coveredMsi,
+        public int    $totalMutants,
+        public int    $killedMutants,
+        public int    $survivedMutants,
+        public int    $notCoveredMutants,
+        public float  $msi,
+        public float  $coveredMsi,
     ) {
     }
 
@@ -40,19 +40,20 @@ final readonly class MutationFileSummary
      *     notCoveredMutants: int,
      *     msi: float,
      *     coveredMsi: float
-     * }
+     * } - serialisable per-file row for report output; 'file' holds the display path, counts are raw mutant tallies, and the two MSI values are
+     * percentages (0-100)
      */
     public function toArray(): array
     {
         // Serialisable per-file row; the 'file' key carries the display path while the constructor field is $filePath.
         return [
-            'file' => $this->filePath,
-            'totalMutants' => $this->totalMutants,
-            'killedMutants' => $this->killedMutants,
-            'survivedMutants' => $this->survivedMutants,
+            'file'              => $this->filePath,
+            'totalMutants'      => $this->totalMutants,
+            'killedMutants'     => $this->killedMutants,
+            'survivedMutants'   => $this->survivedMutants,
             'notCoveredMutants' => $this->notCoveredMutants,
-            'msi' => $this->msi,
-            'coveredMsi' => $this->coveredMsi,
+            'msi'               => $this->msi,
+            'coveredMsi'        => $this->coveredMsi,
         ];
     }
 }

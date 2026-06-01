@@ -35,9 +35,10 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     public const ID = 'docs.var-annotation-description';
 
     /**
-     * Describe the local @var annotation description rule.
+     * Describe the local @return RuleDefinition - metadata and defaults the registry uses to wire this rule (id, pillar, tier, severity).
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @var annotation description rule.
+     *
      */
     public function definition(): RuleDefinition
     {
@@ -54,12 +55,13 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     }
 
     /**
-     * Find local @var assertions that do not explain why the assertion is needed.
+     * Find local @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      *
-     * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
-     * @param RuleContext  $ruleContext  Rule context for this analysis pass.
+     * @param RuleContext $ruleContext Rule context for this analysis pass.
      *
-     * @return list<Finding> Findings for bare local @var annotations.
+     * @return list<Finding> - one finding per bare local @var assertion; empty when every assertion carries a reason.
+     * @var assertions that do not explain why the assertion is needed.
+     *
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,7 +84,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 
         $candidates = $nodeFinder->find(
             $analysisUnit->statements,
-            static fn (Node $node): bool => $node->getDocComment() instanceof Doc,
+            static fn(Node $node): bool => $node->getDocComment() instanceof Doc,
         );
 
         foreach ($candidates as $node) {
@@ -127,26 +129,27 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
      * @param Node $node AST node carrying the @var docblock; a declaration node means the tag documents that
      *                   declaration rather than a local assertion, so it is exempt from this rule.
      *
-     * @return bool True when the docblock belongs to a declaration node.
+     * @return bool - true when the docblock documents a declaration (exempt); false for a local @var assertion to judge.
      */
     private function isDeclarationNode(Node $node): bool
     {
         // A @var on any of these declaration shapes documents the declaration, not a local assertion to flag.
         return $node instanceof Property
-            || $node instanceof ClassMethod
-            || $node instanceof Function_
-            || $node instanceof ClassConst
-            || $node instanceof Const_
-            || $node instanceof ClassLike
-            || $node instanceof Param;
+               || $node instanceof ClassMethod
+               || $node instanceof Function_
+               || $node instanceof ClassConst
+               || $node instanceof Const_
+               || $node instanceof ClassLike
+               || $node instanceof Param;
     }
 
     /**
-     * Find local @var annotations that name a type without explaining intent.
+     * Find local @param string $docText Raw docblock text, including the comment markers, that trim() strips line by line.
      *
-     * @param string $docText Raw docblock text, including the comment markers, that trim() strips line by line.
+     * @return list<string> - variable names whose local @var stated a type but no reason; empty when the docblock
+     *                         carries any prose line or every @var annotations that name a type without explaining intent.
      *
-     * @return list<string>
+     * @var already explains itself
      */
     private function bareVarAnnotations(string $docText): array
     {

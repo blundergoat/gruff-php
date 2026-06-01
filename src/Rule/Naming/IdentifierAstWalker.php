@@ -20,7 +20,8 @@ final readonly class IdentifierAstWalker
     /**
      * @param list<Node>           $nodes     Roots to traverse.
      * @param callable(Node): bool $predicate Predicate that selects matching descendants.
-     * @return list<Node> Descendant nodes that match the predicate.
+     *
+     * @return list<Node> - every descendant satisfying the predicate, gathered across all roots; empty when none match
      */
     public function nodesMatching(array $nodes, callable $predicate): array
     {
@@ -38,6 +39,7 @@ final readonly class IdentifierAstWalker
      * @param Node                 $node      Current node to test; recursion stops at function-like boundaries.
      * @param callable(Node): bool $predicate Predicate that selects matching descendants.
      * @param list<Node>           $matches   Output list of matching descendant nodes.
+     *
      * @return void
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
@@ -60,7 +62,8 @@ final readonly class IdentifierAstWalker
      * List direct child nodes that can be recursively traversed.
      *
      * @param Node $node Parent node whose declared sub-node slots are flattened into traversable children.
-     * @return list<Node>
+     *
+     * @return list<Node> - the node's immediate child Nodes in sub-node declaration order; empty when it has no Node-valued slots
      */
     private function childNodes(Node $node): array
     {
@@ -77,14 +80,16 @@ final readonly class IdentifierAstWalker
     /**
      * Append traversable child nodes to the current collection.
      *
-     * @param mixed      $subNode  One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
+     * @param mixed      $subNode One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children
+     *
      * @return void
      */
     private function collectChildNodes(mixed $subNode, array &$children): void
     {
         if ($subNode instanceof Node) {
             $children[] = $subNode;
+
             // A bare Node is itself a child; record it and do not recurse into a non-array.
             return;
         }

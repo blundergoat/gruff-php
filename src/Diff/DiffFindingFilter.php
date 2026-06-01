@@ -21,7 +21,8 @@ final readonly class DiffFindingFilter
     /**
      * @param list<Finding> $findings Findings to filter against the diff scope.
      * @param DiffResult    $diff     Diff result used to retain changed-file findings.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - the kept findings in input order; empty when every finding was out of diff scope
      */
     public function filter(array $findings, DiffResult $diff): array
     {
@@ -31,11 +32,12 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param list<Finding> $findings Findings to filter against the diff scope.
-     * @param DiffResult $diff Diff result used to retain changed-file findings.
+     * @param list<Finding>      $findings      Findings to filter against the diff scope.
+     * @param DiffResult         $diff          Diff result used to retain changed-file findings.
      * @param list<AnalysisUnit> $analysisUnits Parsed units used to recover enclosing declarations.
-     * @param string $scope SCOPE_SYMBOL widens a hit to its enclosing declaration; SCOPE_HUNK keeps only hunk hits.
-     * @return DiffFilterResult Retained findings and the number suppressed as out of scope.
+     * @param string             $scope         SCOPE_SYMBOL widens a hit to its enclosing declaration; SCOPE_HUNK keeps only hunk hits.
+     *
+     * @return DiffFilterResult - kept findings in input order paired with the count dropped as out of diff scope
      */
     public function apply(array $findings, DiffResult $diff, array $analysisUnits = [], string $scope = self::SCOPE_SYMBOL): DiffFilterResult
     {
@@ -48,8 +50,8 @@ final readonly class DiffFindingFilter
         $declarationRanges = $scope === self::SCOPE_SYMBOL
             ? $this->declarationRangesByFile($analysisUnits)
             : [];
-        $kept            = [];
-        $suppressedCount = 0;
+        $kept              = [];
+        $suppressedCount   = 0;
 
         foreach ($findings as $finding) {
             if ($this->isFindingInScope($finding, $diff, $declarationRanges)) {
@@ -66,8 +68,8 @@ final readonly class DiffFindingFilter
     }
 
     /**
-     * @param Finding $finding Single finding whose location is tested for diff membership.
-     * @param DiffResult $diff Source of changed files and changed-line ranges to test against.
+     * @param Finding                               $finding           Single finding whose location is tested for diff membership.
+     * @param DiffResult                            $diff              Source of changed files and changed-line ranges to test against.
      * @param array<string, list<ChangedLineRange>> $declarationRanges Per-file declaration spans for symbol widening.
      */
     private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges): bool
@@ -154,7 +156,9 @@ final readonly class DiffFindingFilter
 
     /**
      * @param list<AnalysisUnit> $analysisUnits
-     * @return array<string, list<ChangedLineRange>>
+     *
+     * @return array<string, list<ChangedLineRange>> - declaration spans keyed by display path, each list pre-sorted smallest-span-first; files with
+     *                       no statements are absent
      */
     private function declarationRangesByFile(array $analysisUnits): array
     {
@@ -172,13 +176,13 @@ final readonly class DiffFindingFilter
 
             usort(
                 $ranges,
-                static fn (ChangedLineRange $left, ChangedLineRange $right): int => [
-                    $left->endLine - $left->startLine,
-                    $left->startLine,
-                ] <=> [
-                    $right->endLine - $right->startLine,
-                    $right->startLine,
-                ],
+                static fn(ChangedLineRange $left, ChangedLineRange $right): int => [
+                                                                                       $left->endLine - $left->startLine,
+                                                                                       $left->startLine,
+                                                                                   ] <=> [
+                                                                                       $right->endLine - $right->startLine,
+                                                                                       $right->startLine,
+                                                                                   ],
             );
 
             $rangesByFile[$analysisUnit->file->displayPath] = $ranges;
@@ -192,6 +196,7 @@ final readonly class DiffFindingFilter
     /**
      * @param Node                   $node   Subtree root walked recursively for scope-defining declarations.
      * @param list<ChangedLineRange> $ranges Accumulator appended to in place as scope spans are discovered.
+     *
      * @return void
      */
     private function collectDeclarationRanges(Node $node, array &$ranges): void
@@ -229,21 +234,21 @@ final readonly class DiffFindingFilter
         // Defines what counts as an enclosing "symbol" for diff scoping: control-flow blocks are listed
         // alongside callables so a finding inside an edited if/loop/try is attributed to that edited block.
         return $node instanceof Stmt\ClassLike
-            || $node instanceof Stmt\ClassMethod
-            || $node instanceof Stmt\Function_
-            || $node instanceof Expr\Closure
-            || $node instanceof Expr\ArrowFunction
-            || $node instanceof Stmt\If_
-            || $node instanceof Stmt\ElseIf_
-            || $node instanceof Stmt\Else_
-            || $node instanceof Stmt\For_
-            || $node instanceof Stmt\Foreach_
-            || $node instanceof Stmt\While_
-            || $node instanceof Stmt\Do_
-            || $node instanceof Stmt\Switch_
-            || $node instanceof Stmt\Case_
-            || $node instanceof Stmt\TryCatch
-            || $node instanceof Stmt\Catch_
-            || $node instanceof Stmt\Finally_;
+               || $node instanceof Stmt\ClassMethod
+               || $node instanceof Stmt\Function_
+               || $node instanceof Expr\Closure
+               || $node instanceof Expr\ArrowFunction
+               || $node instanceof Stmt\If_
+               || $node instanceof Stmt\ElseIf_
+               || $node instanceof Stmt\Else_
+               || $node instanceof Stmt\For_
+               || $node instanceof Stmt\Foreach_
+               || $node instanceof Stmt\While_
+               || $node instanceof Stmt\Do_
+               || $node instanceof Stmt\Switch_
+               || $node instanceof Stmt\Case_
+               || $node instanceof Stmt\TryCatch
+               || $node instanceof Stmt\Catch_
+               || $node instanceof Stmt\Finally_;
     }
 }

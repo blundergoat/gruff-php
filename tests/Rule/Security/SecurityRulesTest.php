@@ -39,7 +39,8 @@ use PhpParser\ParserFactory;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers the security rule pack: dangerous execution and deserialisation, dynamic-call discrimination, sensitive-logger handling, request-data heuristics, workflow risks, and config-driven disables.
+ * Covers the security rule pack: dangerous execution and deserialisation, dynamic-call discrimination, sensitive-logger handling, request-data
+ * heuristics, workflow risks, and config-driven disables.
  */
 final class SecurityRulesTest extends TestCase
 {
@@ -68,7 +69,7 @@ final class SecurityRulesTest extends TestCase
         self::assertCount(9, $findings);
         self::assertSame(Severity::Warning, $findings[0]->severity);
 
-        $functions = array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
+        $functions = array_map(static fn(Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
         self::assertContains('exec', $functions);
         self::assertContains('shell_exec', $functions);
         self::assertContains('eval', $functions);
@@ -84,7 +85,7 @@ final class SecurityRulesTest extends TestCase
     public function testTypedCallableInvocationsAreNotDangerousDynamicCalls(): void
     {
         $findings  = $this->findingsForRule($this->typedCallableUnit(), DangerousFunctionCallRule::ID);
-        $functions = array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
+        $functions = array_map(static fn(Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
 
         self::assertNotContains('dynamic function call', $functions);
         self::assertContains('system', $functions);
@@ -98,7 +99,7 @@ final class SecurityRulesTest extends TestCase
     public function testLocalClosureInvocationsAreNotDangerousDynamicCalls(): void
     {
         $findings  = $this->findingsForRule($this->localClosureUnit(), DangerousFunctionCallRule::ID);
-        $functions = array_map(static fn (Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
+        $functions = array_map(static fn(Finding $finding): mixed => $finding->metadata['function'] ?? null, $findings);
 
         self::assertSame(['dynamic function call'], $functions);
     }
@@ -226,9 +227,9 @@ final class SecurityRulesTest extends TestCase
         ];
 
         $securityFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
-        ));
+                                             $findings,
+                                             static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
+                                         ));
 
         self::assertSame([], $securityFindings);
     }
@@ -253,14 +254,14 @@ final class SecurityRulesTest extends TestCase
     public function testCumulativeSecurityFixtureCoversEverySecurityRuleWithoutDuplicateFindings(): void
     {
         $findings = array_values(array_filter(
-            [
-                ...$this->analyse('cumulative-security.php'),
-                ...$this->analyse('.github/workflows/cumulative-workflow.yml'),
-            ],
-            static fn (Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
-        ));
+                                     [
+                                         ...$this->analyse('cumulative-security.php'),
+                                         ...$this->analyse('.github/workflows/cumulative-workflow.yml'),
+                                     ],
+                                     static fn(Finding $finding): bool => str_starts_with($finding->ruleId, 'security.'),
+                                 ));
 
-        $ruleIds         = array_map(static fn (Finding $finding): string => $finding->ruleId, $findings);
+        $ruleIds         = array_map(static fn(Finding $finding): string => $finding->ruleId, $findings);
         $expectedRuleIds = [
             DangerousFunctionCallRule::ID,
             ProcessCommandConstructionRule::ID,
@@ -286,7 +287,7 @@ final class SecurityRulesTest extends TestCase
 
         self::assertSame([], $missingRuleIds);
 
-        $fingerprints = array_map(static fn (Finding $finding): string => $finding->fingerprint(), $findings);
+        $fingerprints = array_map(static fn(Finding $finding): string => $finding->fingerprint(), $findings);
         self::assertCount(count($fingerprints), array_unique($fingerprints));
     }
 
@@ -314,16 +315,17 @@ final class SecurityRulesTest extends TestCase
     /**
      * Assert the expected security finding count for a rule.
      *
-     * @param string $ruleId rule id whose findings are counted; all other rules' findings are filtered out first
-     * @param int $expectedCount exact findings expected for that rule, including zero to assert it never fires
+     * @param string        $ruleId        rule id whose findings are counted; all other rules' findings are filtered out first
+     * @param int           $expectedCount exact findings expected for that rule, including zero to assert it never fires
      * @param list<Finding> $findings
+     *
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
     {
         self::assertCount(
             $expectedCount,
-            array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId)),
+            array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
     }
@@ -332,8 +334,9 @@ final class SecurityRulesTest extends TestCase
      * Run one security rule against a fixture and return its findings.
      *
      * @param AnalysisUnit $analysisUnit already-parsed fixture to run the full default registry over
-     * @param string $ruleId rule id to retain; findings from every other rule are discarded
-     * @return list<Finding>
+     * @param string       $ruleId       rule id to retain; findings from every other rule are discarded
+     *
+     * @return list<Finding> - only the findings whose ruleId matches $ruleId, re-indexed from zero; empty when that rule never fired
      */
     private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId): array
     {
@@ -343,16 +346,17 @@ final class SecurityRulesTest extends TestCase
 
         // Narrow the full run down to the single rule under test so assertions are not polluted by neighbours.
         return array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === $ruleId,
-        ));
+                                $findings,
+                                static fn(Finding $finding): bool => $finding->ruleId === $ruleId,
+                            ));
     }
 
     /**
      * Analyse security fixtures and return findings for assertions.
      *
      * @param string $fixture fixture basename under the security fixtures directory to parse and run every rule over
-     * @return list<Finding>
+     *
+     * @return list<Finding> - every finding the default registry raised against the fixture, in discovery order; empty when the fixture is clean
      */
     private function analyse(string $fixture): array
     {
@@ -370,7 +374,8 @@ final class SecurityRulesTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed fixture, tagged PHP or text by extension so non-PHP fixtures still feed the text-based rules
      */
     private function parseFixture(string $filename): AnalysisUnit
     {
@@ -384,7 +389,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the dangerous-execution fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit holding the inline source whose execution-sink calls DangerousFunctionCallRule should flag
      */
     private function dangerousExecutionUnit(): AnalysisUnit
     {
@@ -417,7 +422,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Parse the typed-callable fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit whose typed-callable invocations must stay clean, leaving only the literal system() call to flag
      */
     private function typedCallableUnit(): AnalysisUnit
     {
@@ -459,7 +464,7 @@ PHP,
     /**
      * Parse the local-closure fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit whose locally bound closures and array callables are safe, leaving only the dynamic system() call to flag
      */
     private function localClosureUnit(): AnalysisUnit
     {
@@ -501,7 +506,7 @@ PHP,
     /**
      * Parse the callable-collection fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit invoking callables drawn from a property array, none of which are sinks, so it must stay clean
      */
     private function callableCollectionUnit(): AnalysisUnit
     {
@@ -547,7 +552,7 @@ PHP,
     /**
      * Parse the static logger message fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit whose constant log messages only mention secret-like words, so SensitiveDataLoggingRule must stay clean
      */
     private function staticLoggerMessageUnit(): AnalysisUnit
     {
@@ -573,7 +578,7 @@ PHP,
     /**
      * Parse the runtime logger value fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit logging a runtime $password and a token-keyed context, the genuine leaks the rule must catch
      */
     private function runtimeLoggerValueUnit(): AnalysisUnit
     {
@@ -598,7 +603,7 @@ PHP,
     /**
      * Parse the fixed-include fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit whose constant-path requires are safe, leaving only the $_GET-driven include to flag
      */
     private function fixedIncludeUnit(): AnalysisUnit
     {
@@ -622,7 +627,7 @@ PHP,
     /**
      * Parse the safe-unserialize fixture into an analysis unit.
      *
-     * @return AnalysisUnit
+     * @return AnalysisUnit - unit whose unserialize call is guarded by allowed_classes => false, so the rule must not flag it
      */
     private function safeUnserializeUnit(): AnalysisUnit
     {
@@ -645,7 +650,8 @@ PHP,
      *
      * @param string $source      Source directory.
      * @param string $displayPath Fixture display path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - unit carrying the parsed statements and tokens under $displayPath, with parent attributes connected for rule traversal
      */
     private function parseSource(string $source, string $displayPath): AnalysisUnit
     {

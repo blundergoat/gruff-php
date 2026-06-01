@@ -26,15 +26,15 @@ final readonly class FileScore
      */
     public function __construct(
         public string $filePath,
-        public Grade $grade,
-        public int $findings,
-        public int $advisory,
-        public int $warning,
-        public int $error,
-        public float $penalty,
-        public ?int $maxCyclomatic,
-        public ?int $maxCognitive,
-        public ?int $maxLines,
+        public Grade  $grade,
+        public int    $findings,
+        public int    $advisory,
+        public int    $warning,
+        public int    $error,
+        public float  $penalty,
+        public ?int   $maxCyclomatic,
+        public ?int   $maxCognitive,
+        public ?int   $maxLines,
         public ?float $mutationScore,
     ) {
     }
@@ -60,23 +60,23 @@ final readonly class FileScore
      *     maxCognitive: int|null,
      *     maxLines: int|null,
      *     mutationScore: float|null
-     * } the report row; null metric values mean "not measured", not zero
+     * } - the report row; null metric values mean "not measured", not zero
      */
     public function toArray(): array
     {
         // Penalty rounded here (not at the call site) so every serialised row reports the same precision.
         return [
-            'file' => $this->filePath,
-            'score' => $this->grade->score,
-            'grade' => $this->grade->letter,
-            'findings' => $this->findings,
-            'advisory' => $this->advisory,
-            'warning' => $this->warning,
-            'error' => $this->error,
-            'penalty' => round($this->penalty, 2),
+            'file'          => $this->filePath,
+            'score'         => $this->grade->score,
+            'grade'         => $this->grade->letter,
+            'findings'      => $this->findings,
+            'advisory'      => $this->advisory,
+            'warning'       => $this->warning,
+            'error'         => $this->error,
+            'penalty'       => round($this->penalty, 2),
             'maxCyclomatic' => $this->maxCyclomatic,
-            'maxCognitive' => $this->maxCognitive,
-            'maxLines' => $this->maxLines,
+            'maxCognitive'  => $this->maxCognitive,
+            'maxLines'      => $this->maxLines,
             'mutationScore' => $this->mutationScore,
         ];
     }

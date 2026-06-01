@@ -49,8 +49,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify an explicit configured-ignored file yields no findings and is reported with its pattern.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testExplicitIgnoredFileProducesNoFindingsAndReportsPattern(): void
     {
@@ -72,8 +72,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify the same file produces findings once the configured ignore no longer applies.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSameFileProducesFindingsWhenNotConfiguredIgnored(): void
     {
@@ -91,8 +91,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify a changed-region diff touching an ignored file still yields no findings for it.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testChangedRangesOnIgnoredFileProducesNoFindings(): void
     {
@@ -110,8 +110,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify --include-ignored never overrides a configured paths.ignore match.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testIncludeIgnoredStillHonoursConfiguredIgnore(): void
     {
@@ -132,8 +132,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Verify check-ignore reports the verdict, source, and pattern for every input path.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testCheckIgnoreReportsVerdictSourceAndPattern(): void
     {
@@ -142,17 +142,17 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertSame([
-            ['path' => 'legacy/Bad.php', 'ignored' => true, 'source' => 'config', 'pattern' => 'legacy/**'],
-            ['path' => 'src/Good.php', 'ignored' => false, 'source' => null, 'pattern' => null],
-            ['path' => 'debug.log', 'ignored' => true, 'source' => 'gitignore', 'pattern' => '*.log'],
-        ], $this->decodeJsonList($process));
+                             ['path' => 'legacy/Bad.php', 'ignored' => true, 'source' => 'config', 'pattern' => 'legacy/**'],
+                             ['path' => 'src/Good.php', 'ignored' => false, 'source' => null, 'pattern' => null],
+                             ['path' => 'debug.log', 'ignored' => true, 'source' => 'gitignore', 'pattern' => '*.log'],
+                         ], $this->decodeJsonList($process));
     }
 
     /**
      * Verify check-ignore and analyse agree on source and pattern for the same path (shared engine).
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testCheckIgnoreSharesEngineWithAnalyse(): void
     {
@@ -191,7 +191,8 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      * Build a gruff-php subprocess rooted at the temporary fixture project.
      *
      * @param list<string> $args CLI arguments passed after the binary.
-     * @return Process Configured but unstarted process.
+     *
+     * @return Process - configured but not yet started, so the caller decides when and how it runs
      */
     private function runGruff(array $args): Process
     {
@@ -206,7 +207,9 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      * Decode a check-ignore JSON array response into a list of result rows.
      *
      * @param Process $process Completed check-ignore process whose stdout holds the JSON array.
-     * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}>
+     *
+     * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> - one row per input path in argument order;
+     *                          source/pattern are null when the path is not ignored
      * @throws JsonException
      */
     private function decodeJsonList(Process $process): array
@@ -223,6 +226,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      * Run a git command inside the fixture project.
      *
      * @param list<string> $args Git arguments.
+     *
      * @return void
      */
     private function runGit(array $args): void
@@ -238,6 +242,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      *
      * @param string $path     Project-relative file path.
      * @param string $contents File contents.
+     *
      * @return void
      */
     private function writeProjectFile(string $path, string $contents): void

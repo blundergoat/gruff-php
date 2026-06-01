@@ -41,23 +41,23 @@ final class FindingTest extends TestCase
         );
 
         self::assertSame([
-            'ruleId' => 'size.file-length',
-            'message' => 'File is too long.',
-            'file' => 'src/Example.php',
-            'line' => 10,
-            'endLine' => 20,
-            'column' => 4,
-            'symbol' => 'Example',
-            'severity' => 'warning',
-            'pillar' => 'size',
-            'secondaryPillars' => ['maintainability'],
-            'tier' => 'v0.1',
-            'confidence' => 'high',
-            'remediation' => 'Split the file.',
-            'fingerprint' => $finding->fingerprint(),
-            'stableIdentity' => $finding->stableIdentity(),
-            'metadata' => ['lines' => 401, 'threshold' => 400],
-        ], $finding->toArray());
+                             'ruleId' => 'size.file-length',
+                                                                                                                                                                             'message' => 'File is too long.',
+                                                                                                                                                                                                                 'file' => 'src/Example.php',
+                                                                                                                                                                                                                 'line' => 10,
+                                                                                                                                                                                                                 'endLine' => 20,
+                                                                                                                                                                                                                             'column' => 4,
+                                                                                                                                                                                                                             'symbol' => 'Example',
+                                                                                                                                                                                                                             'severity' => 'warning',
+                                                                                                                                                                                                                                                                                                                             'pillar' => 'size',
+                                                                                                                                                                                                                                                                                                                             'secondaryPillars' => ['maintainability'],
+                                                                                                                                                                                                                                                                                                                                                                                                        'tier' => 'v0.1',
+                                                                                                                                                                                                                                                                                                                                                                                                        'confidence' => 'high',
+                                                                                                                                                                                                                                                                                                                                                                                                                                'remediation' => 'Split the file.',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                 'fingerprint' => $finding->fingerprint(),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'stableIdentity' => $finding->stableIdentity(),
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        'metadata' => ['lines' => 401, 'threshold' => 400],
+                         ], $finding->toArray());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->fingerprint());
         self::assertMatchesRegularExpression('/^[a-f0-9]{16}$/', $finding->stableIdentity());
     }
@@ -145,26 +145,27 @@ final class FindingTest extends TestCase
      * @param int         $line   Source line the fixture finding points at; varied across cases to probe identity.
      * @param string|null $symbol Enclosing symbol, or null when the finding is file-level rather than scoped.
      * @param string      $ruleId Rule the finding was raised under; defaulted so cases vary only line and symbol.
-     * @return Finding
+     *
+     * @return Finding - a fully populated Size/Warning fixture whose fingerprint and stableIdentity the tests compare
      */
     private function finding(
-        int $line,
+        int     $line,
         ?string $symbol,
-        string $ruleId = 'size.file-length',
+        string  $ruleId = 'size.file-length',
     ): Finding {
         // Hand back the fully built fixture finding so a test can compare its stable identity.
         return new Finding(
-            ruleId:           $ruleId,
-            message:          'File is too long.',
-            filePath:         'src/Example.php',
-            line:             $line,
-            severity:         Severity::Warning,
-            pillar:           Pillar::Size,
-            tier:             RuleTier::V01,
-            confidence:       Confidence::High,
-            endLine:          $line + 10,
-            column:           4,
-            symbol:           $symbol,
+            ruleId:     $ruleId,
+            message:    'File is too long.',
+            filePath:   'src/Example.php',
+            line:       $line,
+            severity:   Severity::Warning,
+            pillar:     Pillar::Size,
+            tier:       RuleTier::V01,
+            confidence: Confidence::High,
+            endLine:    $line + 10,
+            column:     4,
+            symbol:     $symbol,
         );
     }
 }

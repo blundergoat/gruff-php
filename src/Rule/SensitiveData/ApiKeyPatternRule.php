@@ -26,7 +26,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
-     * @return list<array{name: string, pattern: string}>
+     * @return list<array{name: string, pattern: string}> - each entry pairs a provider label with its detection regex; ordering is the scan order
+     *                          applied per source unit
      */
     private function patterns(): array
     {
@@ -50,7 +51,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
     /**
      * Describe the API key pattern sensitive-data rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - identity, pillar, tier, and the Warning/High defaults the engine applies unless a config override raises or silences
+     *                        this rule
      */
     public function definition(): RuleDefinition
     {
@@ -71,7 +73,8 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for API key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - one finding per non-dummy key-like literal outside comments; empty means clean (no prefix hit, or
+     *                                         every match was a comment or dummy value), not an error
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {

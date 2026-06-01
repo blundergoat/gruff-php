@@ -25,18 +25,19 @@ final readonly class StmtChildVisitor
      * Whether a node is a control-flow statement that owns child blocks.
      *
      * @param Node $node Node to inspect.
-     * @return bool True for If/For/Foreach/While/Do/Switch/TryCatch.
+     *
+     * @return bool - true when the node is an If/For/Foreach/While/Do/Switch/TryCatch that childBlocks() walks; false otherwise
      */
     public static function isControlFlowStmt(Node $node): bool
     {
         // Must list exactly the statement kinds childBlocks() yields for; keep the two in lockstep.
         return $node instanceof Stmt\If_
-            || $node instanceof Stmt\For_
-            || $node instanceof Stmt\Foreach_
-            || $node instanceof Stmt\While_
-            || $node instanceof Stmt\Do_
-            || $node instanceof Stmt\Switch_
-            || $node instanceof Stmt\TryCatch;
+               || $node instanceof Stmt\For_
+               || $node instanceof Stmt\Foreach_
+               || $node instanceof Stmt\While_
+               || $node instanceof Stmt\Do_
+               || $node instanceof Stmt\Switch_
+               || $node instanceof Stmt\TryCatch;
     }
 
     /**
@@ -45,7 +46,8 @@ final readonly class StmtChildVisitor
      * Yields nothing for non-control-flow nodes.
      *
      * @param Node $node Node to inspect.
-     * @return iterable<StmtChildBlock>
+     *
+     * @return iterable<StmtChildBlock> - one block per child statement list in source order; empty for non-control-flow nodes
      */
     public static function childBlocks(Node $node): iterable // @phpstan-return iterable<StmtChildBlock>
     {

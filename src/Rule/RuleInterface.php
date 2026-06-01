@@ -15,7 +15,7 @@ interface RuleInterface
     /**
      * Describe this source-file rule for configuration and reporting.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - this rule's identity, category, severity, and default config used by the registry and reports
      */
     public function definition(): RuleDefinition;
 
@@ -24,7 +24,8 @@ interface RuleInterface
      *
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings raised by this rule for the unit; empty when the file is clean
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array;
 }

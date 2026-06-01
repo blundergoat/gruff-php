@@ -1,6 +1,6 @@
 # ADR-006: Control-Flow Comment Policy
 
-**Status:** Partially reversed (2026-05-31) — `docs.return-comment` restored; `docs.continue-comment` stays deleted. See "Update" below.
+**Status:** Partially reversed (2026-05-31), then return-comment shape narrowed by ADR-025 (2026-06-01) — `docs.return-comment` reworked from "comment above every return" to "value-returning functions need a described `@return`"; `docs.continue-comment` stays deleted. See "Update" below and ADR-025.
 **Date:** 2026-05-13
 
 ## Update (2026-05-31): return-comment restored

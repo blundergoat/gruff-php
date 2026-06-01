@@ -41,7 +41,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Provide rejected host request cases for parameterized tests.
      *
-     * @return array<string, array{string, string, 2?: bool}>
+     * @return array<string, array{string, string, 2?: bool}> - keyed test cases; each row is raw request bytes, the expected status line, and an optional flag to half-close the write side
      */
     public static function rejectedHostRequestProvider(): array
     {
@@ -114,7 +114,7 @@ final class DashboardRequestHandlerTest extends TestCase
      *
      * @param string $request          Raw HTTP request.
      * @param bool   $shouldCloseWrite When true, half-close the write side to exercise truncated-request handling.
-     * @return string
+     * @return string - the exact bytes the handler wrote back to the socket, including status line and body
      */
     private function responseFor(string $request, bool $shouldCloseWrite = false): string
     {
@@ -141,7 +141,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Build a dashboard request handler fixture.
      *
-     * @return DashboardRequestHandler
+     * @return DashboardRequestHandler - handler wired to a loopback context and a stub scanner binary so tests never spawn the real scanner
      */
     private function handler(): DashboardRequestHandler
     {
@@ -167,7 +167,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Build an empty console input fixture.
      *
-     * @return ArrayInput
+     * @return ArrayInput - empty input carrying only the option definitions the handler reads, with no arguments supplied
      */
     private function input(): ArrayInput
     {
@@ -187,7 +187,7 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Create a fake gruff-php executable for dashboard tests.
      *
-     * @return string
+     * @return string - filesystem path to a freshly written temp stub script that prints fixed HTML in place of the real gruff binary
      */
     private function fakeGruffBinary(): string
     {

@@ -76,7 +76,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
 
             $lines = array_filter(
                 array_map('trim', explode("\n", $stripped)),
-                static fn (string $line): bool => $line !== '',
+                static fn(string $line): bool => $line !== '',
             );
 
             $hasNonTagContent = false;
@@ -153,42 +153,7 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             return false;
         }
 
-        // A @return is bare exactly when no prose follows its type, so negate the description check.
-        return !$this->hasReturnTagDescription(trim(substr($line, strlen('@return '))));
-    }
-
-    /**
-     * Detect prose after a return type while tolerating spaces inside PHPDoc generic types.
-     *
-     * @param string $body Text following `@return `, e.g. `array<string, int> remaining counts`, to scan.
-     *
-     * @return bool True when text follows the type.
-     */
-    private function hasReturnTagDescription(string $body): bool
-    {
-        $depth  = 0;
-        $length = strlen($body);
-
-        for ($offset = 0; $offset < $length; $offset++) {
-            $character = $body[$offset];
-
-            if (str_contains('<{[(', $character)) {
-                $depth++;
-                continue;
-            }
-
-            if (str_contains('>}])', $character) && $depth > 0) {
-                $depth--;
-                continue;
-            }
-
-            if ($depth === 0 && ctype_space($character)) {
-                // First space outside any generic brackets ends the type; description present if anything follows.
-                return trim(substr($body, $offset + 1)) !== '';
-            }
-        }
-
-        // Reached the end with no top-level space, so the type stood alone with no description.
-        return false;
+        // A @return is bare exactly when no prose follows its type, so negate the shared description check.
+        return !PhpdocTagText::hasReturnTagDescription(trim(substr($line, strlen('@return '))));
     }
 }

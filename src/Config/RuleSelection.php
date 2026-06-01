@@ -33,7 +33,8 @@ final readonly class RuleSelection
      * Decide whether a rule definition passes the include and exclude filters.
      *
      * @param RuleDefinition $definition Rule definition to test against selection filters.
-     * @return bool True when the rule should remain enabled for the selection.
+     *
+     * @return bool - true keeps the rule enabled; false drops it (no include matched, or an exclude filter vetoed it)
      */
     public function allows(RuleDefinition $definition): bool
     {
@@ -68,17 +69,18 @@ final readonly class RuleSelection
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array<string, list<string>>
+     * @return array<string, list<string>> - selection keyed by filter name (tiers, pillars, rules, excludePillars, excludeRules); each value is the
+     *                       list for that filter, empty when unset
      */
     public function toArray(): array
     {
         // Keys mirror the YAML selection schema so reports round-trip back into config unchanged.
         return [
-            'tiers' => $this->tiers,
-            'pillars' => $this->pillars,
-            'rules' => $this->rules,
+            'tiers'          => $this->tiers,
+            'pillars'        => $this->pillars,
+            'rules'          => $this->rules,
             'excludePillars' => $this->excludePillars,
-            'excludeRules' => $this->excludeRules,
+            'excludeRules'   => $this->excludeRules,
         ];
     }
 }

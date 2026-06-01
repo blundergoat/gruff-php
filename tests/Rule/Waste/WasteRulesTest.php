@@ -423,7 +423,7 @@ final class WasteRulesTest extends TestCase
      * @param string              $ruleId  Rule identifier to keep; all other findings are discarded.
      * @param AnalysisConfig|null $config  Overriding config, or null to use the registry defaults.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @return list<\GruffPhp\Finding\Finding> - findings emitted only by the requested rule, in analyser order; empty when that rule produced none
      */
     private function analyseRule(string $fixture, string $ruleId, ?AnalysisConfig $config = null): array
     {

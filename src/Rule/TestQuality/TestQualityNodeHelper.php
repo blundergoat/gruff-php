@@ -26,7 +26,8 @@ final class TestQualityNodeHelper
      * Detect whether the unit looks like a PHPUnit test file by path or filename.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit whose path should be classified.
-     * @return bool True when the file lives under tests/ or has a Test/TestCase basename suffix.
+     *
+     * @return bool - true when the file lives under tests/ or has a Test/TestCase basename suffix
      */
     public static function looksLikePhpUnitTestFile(AnalysisUnit $analysisUnit): bool
     {
@@ -47,7 +48,8 @@ final class TestQualityNodeHelper
      * Discover PHPUnit and Pest test scopes in an analysis unit.
      *
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect for test scopes.
-     * @return list<TestQualityScope> Test scopes discovered in source order.
+     *
+     * @return list<TestQualityScope> - test scopes discovered in source order; empty when the unit has no tests
      */
     public static function testScopes(AnalysisUnit $analysisUnit): array
     {
@@ -119,7 +121,8 @@ final class TestQualityNodeHelper
      * Detect whether the method is a PHPUnit test (Test attribute, @test annotation, or test*-prefix on a TestCase subclass).
      *
      * @param Stmt\ClassMethod $classMethod Method node to classify.
-     * @return bool True when the method should be analysed as a test body.
+     *
+     * @return bool - true when the method should be analysed as a test body
      */
     public static function isTestMethod(Stmt\ClassMethod $classMethod): bool
     {
@@ -150,7 +153,8 @@ final class TestQualityNodeHelper
      * Detect a real PHPUnit `@test` annotation line.
      *
      * @param Stmt\ClassMethod $classMethod Method node whose docblock is scanned for a standalone `@test` tag.
-     * @return bool True when the method docblock declares `@test` as a tag.
+     *
+     * @return bool - true when the method docblock declares `@test` as a standalone tag line
      */
     private static function hasTestAnnotation(Stmt\ClassMethod $classMethod): bool
     {
@@ -164,7 +168,8 @@ final class TestQualityNodeHelper
      * Detect whether the class extends a *TestCase base.
      *
      * @param Stmt\Class_|null $class Class node to inspect, or null when the method is detached.
-     * @return bool True when the parent name ends with `testcase` (case-insensitive).
+     *
+     * @return bool - true when the parent name ends with `testcase` (case-insensitive)
      */
     public static function extendsTestCase(?Stmt\Class_ $class): bool
     {
@@ -183,7 +188,8 @@ final class TestQualityNodeHelper
      * Collect function, method, and static calls from a test scope.
      *
      * @param TestQualityScope $scope Test scope whose statements should be walked.
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Calls found in the scope.
+     *
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - every call the scope makes, of any of the three call shapes
      */
     public static function calls(TestQualityScope $scope): array
     {
@@ -195,22 +201,24 @@ final class TestQualityNodeHelper
      * Collect assertion-like calls from a test scope.
      *
      * @param TestQualityScope $scope Test scope whose calls should be filtered.
-     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> Assertion calls found in the scope.
+     *
+     * @return list<Expr\FuncCall|Expr\MethodCall|Expr\StaticCall> - the assertion subset of the scope's calls, re-indexed as a list
      */
     public static function assertionCalls(TestQualityScope $scope): array
     {
         // Keep only the subset of calls that count as assertions; array_values re-indexes to a list.
         return array_values(array_filter(
-            self::calls($scope),
-            static fn (Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => self::isAssertionCall($call),
-        ));
+                                self::calls($scope),
+                                static fn(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool => self::isAssertionCall($call),
+                            ));
     }
 
     /**
      * Detect whether the call is a PHPUnit assertion, Pest expectation, or other supported assertion shape.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
-     * @return bool True when the call counts as an assertion for test-quality rules.
+     *
+     * @return bool - true when the call counts as an assertion for test-quality rules
      */
     public static function isAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -247,7 +255,7 @@ final class TestQualityNodeHelper
             'expectdeprecationmessage',
             'expectdeprecationmessagematches',
             'expectnottoperformassertions',
-        ], true)) {
+        ],           true)) {
             // PHPUnit expect*() methods declare an expectation, which the rules treat as an assertion.
             return true;
         }
@@ -307,14 +315,15 @@ final class TestQualityNodeHelper
             'tothrow',
             'tothrowif',
             'tothrowunless',
-        ], true);
+        ],              true);
     }
 
     /**
      * Detect whether the assertion is trivially-true (e.g. assertTrue(true), assertSame($x, $x)).
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call to inspect.
-     * @return bool True when the assertion's literal arguments make it tautological.
+     *
+     * @return bool - true when the assertion's literal arguments make it tautological
      */
     public static function isTrivialAssertion(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -329,9 +338,9 @@ final class TestQualityNodeHelper
             'asserttrue' => self::literalValue(self::firstArgValue($call)) === true,
             'assertfalse' => self::literalValue(self::firstArgValue($call)) === false,
             'tobetrue' => $call instanceof Expr\MethodCall
-                && self::literalValue(self::pestExpectationValue($call)) === true,
+                          && self::literalValue(self::pestExpectationValue($call)) === true,
             'tobefalse' => $call instanceof Expr\MethodCall
-                && self::literalValue(self::pestExpectationValue($call)) === false,
+                           && self::literalValue(self::pestExpectationValue($call)) === false,
             'assertequals', 'assertsame' => self::hasSameLiteralArguments($call),
             'tobe', 'toequal' => $call instanceof Expr\MethodCall && self::hasSamePestLiteralArguments($call),
             default => false,
@@ -342,7 +351,8 @@ final class TestQualityNodeHelper
      * Detect whether the call's first two arguments are the same literal value.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call assertSame/assertEquals call to compare.
-     * @return bool True when both arguments resolve to the same scalar literal.
+     *
+     * @return bool - true when both arguments resolve to the same scalar literal (non-literals never match)
      */
     private static function hasSameLiteralArguments(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -357,7 +367,8 @@ final class TestQualityNodeHelper
      * Detect whether a Pest expectation's literal argument matches the expected value.
      *
      * @param Expr\MethodCall $call toBe/toEqual matcher; its argument is compared with the expect()'d value.
-     * @return bool True when expect($x)->toBe($x) has equal literal arguments.
+     *
+     * @return bool - true when expect($x)->toBe($x) has equal literal arguments (non-literals never match)
      */
     private static function hasSamePestLiteralArguments(Expr\MethodCall $call): bool
     {
@@ -372,7 +383,8 @@ final class TestQualityNodeHelper
      * Lowercase short name of the call (method, function, or static), or null when the name is dynamic.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node whose name should be normalized.
-     * @return string|null The lowercase identifier, or null when the call target is a variable / expression.
+     *
+     * @return string|null - the lowercase identifier, or null when the call target is a variable / expression
      */
     public static function callName(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
     {
@@ -394,7 +406,8 @@ final class TestQualityNodeHelper
      * Lowercase function name, or null when the call target is not a Name node.
      *
      * @param Expr\FuncCall $call Function call node to inspect.
-     * @return string|null
+     *
+     * @return string|null - lowercase function name, or null when the target is a variable function with no static name
      */
     public static function functionName(Expr\FuncCall $call): ?string
     {
@@ -411,7 +424,8 @@ final class TestQualityNodeHelper
      * Detect whether the call creates a mock, stub, or spy via a recognised factory name.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
-     * @return bool True when the call name is one of createMock / createStub / getMockBuilder / mock / partialMock / spy / prophesize.
+     *
+     * @return bool - true when the call name is one of createMock / createStub / getMockBuilder / mock / partialMock / spy / prophesize
      */
     public static function isMockCreationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -419,21 +433,22 @@ final class TestQualityNodeHelper
 
         // True only for the recognised mock/stub/spy factory names; a dynamic call (null name) never matches.
         return $name !== null && in_array($name, [
-            'createmock',
-            'createstub',
-            'getmockbuilder',
-            'mock',
-            'partialmock',
-            'spy',
-            'prophesize',
-        ], true);
+                'createmock',
+                'createstub',
+                'getmockbuilder',
+                'mock',
+                'partialmock',
+                'spy',
+                'prophesize',
+            ],                            true);
     }
 
     /**
      * Detect whether the call wires a mock expectation (expects, shouldReceive, once, etc.).
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to classify.
-     * @return bool True when the call name matches a mock-verification idiom.
+     *
+     * @return bool - true when the call name matches a mock-verification idiom (expects, shouldReceive, once, etc.)
      */
     public static function isMockVerificationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
     {
@@ -441,21 +456,22 @@ final class TestQualityNodeHelper
 
         // True only for the recognised expectation-wiring idioms; a dynamic call (null name) never matches.
         return $name !== null && in_array($name, [
-            'expects',
-            'shouldreceive',
-            'shouldhavebeencalled',
-            'once',
-            'never',
-            'with',
-            'method',
-        ], true);
+                'expects',
+                'shouldreceive',
+                'shouldhavebeencalled',
+                'once',
+                'never',
+                'with',
+                'method',
+            ],                            true);
     }
 
     /**
      * Value of the call's first argument, or null when the call has no first argument.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call node to inspect.
-     * @return Expr|null
+     *
+     * @return Expr|null - the first argument's expression, or null when the call has no first argument
      */
     public static function firstArgValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?Expr
     {
@@ -468,7 +484,8 @@ final class TestQualityNodeHelper
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  Call node to inspect.
      * @param int                                           $index Zero-based argument index.
-     * @return Expr|null
+     *
+     * @return Expr|null - the argument's expression at that index, or null when it is missing or a spread placeholder
      */
     public static function argValue(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, int $index): ?Expr
     {
@@ -485,7 +502,8 @@ final class TestQualityNodeHelper
      * String literal value of the argument, or null when the argument is not a string literal.
      *
      * @param Arg $arg Argument node to inspect.
-     * @return string|null
+     *
+     * @return string|null - the literal string value, or null when the argument is not a bare string literal
      */
     public static function argString(Arg $arg): ?string
     {
@@ -497,7 +515,9 @@ final class TestQualityNodeHelper
      * Resolve the literal value of an expression (scalar literal or const true/false/null), or null when not a literal.
      *
      * @param Expr|null $expr Expression to resolve.
-     * @return bool|int|float|string|null
+     *
+     * @return bool|int|float|string|null - the resolved compile-time value; null when the expression is not a literal (note the literal `null` const
+     *                                    also yields null)
      */
     public static function literalValue(?Expr $expr): bool|int|float|string|null
     {
@@ -526,7 +546,8 @@ final class TestQualityNodeHelper
      * Walk a Pest expectation chain back to the expect()'d value.
      *
      * @param Expr\MethodCall $call Pest expectation method call to unwind.
-     * @return Expr|null The expression originally wrapped by expect(...), or null when the chain doesn't start with expect().
+     *
+     * @return Expr|null - the expression originally wrapped by expect(...), or null when the chain doesn't start with expect()
      */
     public static function pestExpectationValue(Expr\MethodCall $call): ?Expr
     {
@@ -551,6 +572,7 @@ final class TestQualityNodeHelper
      *
      * @param Stmt\ClassMethod $node      Method node whose attributes should be inspected.
      * @param string           $shortName Attribute short name to match case-insensitively.
+     *
      * @return bool True when at least one #[...] attribute group has an attribute whose last name segment matches.
      */
     public static function hasAttribute(Stmt\ClassMethod $node, string $shortName): bool
@@ -572,7 +594,8 @@ final class TestQualityNodeHelper
      * Get the enclosing Class_ node via the `parent` AST attribute, or null when unattached.
      *
      * @param Node $node Node whose parent chain should be inspected.
-     * @return Stmt\Class_|null
+     *
+     * @return Stmt\Class_|null - the enclosing class node, or null when the node is unattached or sits in a trait/interface
      */
     public static function parentClass(Node $node): ?Stmt\Class_
     {
@@ -587,21 +610,23 @@ final class TestQualityNodeHelper
      * Strip the test* prefix and non-alphanumeric chars from a test method name; lowercase the result.
      *
      * @param string $name Test method name to normalize.
-     * @return string The normalised form used for cross-method comparisons.
+     *
+     * @return string - the normalised form (prefix-stripped, separators removed, lowercased) used for cross-method comparisons
      */
     public static function normalizedTestName(string $name): string
     {
         $name = preg_replace('/^test[_]?/i', '', $name) ?? $name;
 
         // Strip separators and casing so testFooBar / test_foo_bar / fooBar collapse to one comparable key.
-        return strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $name));
+        return strtolower((string)preg_replace('/[^a-z0-9]+/i', '', $name));
     }
 
     /**
      * Detect a non-trivial integer literal used as the assertion's expected value, or null when none.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Assertion call to inspect.
-     * @return int|null The literal expected value, ignoring -1 / 0 / 1 as not-magic.
+     *
+     * @return int|null - the magic expected value, or null when the expected value is absent, non-integer, or one of -1 / 0 / 1
      */
     public static function isAssertionMagicNumber(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?int
     {

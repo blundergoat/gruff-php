@@ -12,7 +12,8 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 /**
- * Covers trend history recording: previous-score delta computation, nested history bounding, missing-history handling, and rejection of invalid payloads.
+ * Covers trend history recording: previous-score delta computation, nested history bounding, missing-history handling, and rejection of invalid
+ * payloads.
  *
  * @phpstan-type InvalidHistoryScalar bool|float|int|string
  * @phpstan-type InvalidHistoryNested array<array-key, InvalidHistoryScalar>
@@ -31,15 +32,15 @@ final class TrendRecorderTest extends TestCase
 
         try {
             file_put_contents($root . '/history.json', json_encode([
-                [
-                    'schemaVersion' => 'gruff.analysis.v2',
-                    'timestamp' => '2026-05-12T00:00:00+00:00',
-                    'score' => 80.0,
-                    'grade' => 'B',
-                    'scope' => 'full-project',
-                    'findings' => 12,
-                ],
-            ], JSON_THROW_ON_ERROR));
+                                                                       [
+                                                                           'schemaVersion' => 'gruff.analysis.v2',
+                                                                           'timestamp'     => '2026-05-12T00:00:00+00:00',
+                                                                           'score'         => 80.0,
+                                                                           'grade'         => 'B',
+                                                                           'scope'         => 'full-project',
+                                                                           'findings'      => 12,
+                                                                       ],
+                                                                   ], JSON_THROW_ON_ERROR));
 
             $report = (new TrendRecorder())->record($root, 'history.json', $this->score(90.25), 3);
 
@@ -67,11 +68,11 @@ final class TrendRecorderTest extends TestCase
             for ($index = 1; $index <= 55; $index++) {
                 $history[] = [
                     'schemaVersion' => 'gruff.analysis.v2',
-                    'timestamp' => sprintf('2026-05-12T00:%02d:00+00:00', $index % 60),
-                    'score' => (float) $index,
-                    'grade' => 'D',
-                    'scope' => 'full-project',
-                    'findings' => $index,
+                    'timestamp'     => sprintf('2026-05-12T00:%02d:00+00:00', $index % 60),
+                    'score'         => (float)$index,
+                    'grade'         => 'D',
+                    'scope'         => 'full-project',
+                    'findings'      => $index,
                 ];
             }
 
@@ -79,7 +80,7 @@ final class TrendRecorderTest extends TestCase
             file_put_contents($root . '/var/history.json', json_encode($history, JSON_THROW_ON_ERROR));
 
             $report    = (new TrendRecorder())->record($root, 'var/nested/history.json', $this->score(91.0), 7);
-            $persisted = json_decode((string) file_get_contents($root . '/var/nested/history.json'), true);
+            $persisted = json_decode((string)file_get_contents($root . '/var/nested/history.json'), true);
 
             self::assertSame('var/nested/history.json', $report->path);
             self::assertNull($report->previousScore);
@@ -96,7 +97,7 @@ final class TrendRecorderTest extends TestCase
             self::assertSame(7, $firstPersisted['findings'] ?? null);
 
             $report    = (new TrendRecorder())->record($root, 'var/history.json', $this->score(92.0), 8);
-            $persisted = json_decode((string) file_get_contents($root . '/var/history.json'), true);
+            $persisted = json_decode((string)file_get_contents($root . '/var/history.json'), true);
 
             self::assertSame(55.0, $report->previousScore);
             self::assertSame(37.0, $report->delta);
@@ -142,6 +143,7 @@ final class TrendRecorderTest extends TestCase
      *
      * @param InvalidHistoryPayload $historyPayload Invalid history payload.
      * @param string                $message        Expected exception message.
+     *
      * @return void
      */
     #[DataProvider('invalidHistoryProvider')]
@@ -164,7 +166,8 @@ final class TrendRecorderTest extends TestCase
     /**
      * Provide invalid persisted history payloads.
      *
-     * @return iterable<string, array{0: InvalidHistoryPayload, 1: string}>
+     * @return iterable<string, array{0: InvalidHistoryPayload, 1: string}> - data-provider cases keyed by name, each pairing a malformed history
+     *                          payload with the exception message it must trigger
      */
     public static function invalidHistoryProvider(): iterable
     {
@@ -179,7 +182,7 @@ final class TrendRecorderTest extends TestCase
         yield 'nested entry value' => [
             [
                 [
-                    'score' => 80.0,
+                    'score'  => 80.0,
                     'nested' => ['not' => 'allowed'],
                 ],
             ],
@@ -191,7 +194,8 @@ final class TrendRecorderTest extends TestCase
      * Build a score report fixture for trend assertions.
      *
      * @param float $score
-     * @return ScoreReport
+     *
+     * @return ScoreReport - a minimal full-project report graded from the given score, with empty pillars and offenders
      */
     private function score(float $score): ScoreReport
     {
@@ -209,7 +213,7 @@ final class TrendRecorderTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to the freshly created, unique, empty temp directory
      */
     private function tempDir(): string
     {
@@ -225,6 +229,7 @@ final class TrendRecorderTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void

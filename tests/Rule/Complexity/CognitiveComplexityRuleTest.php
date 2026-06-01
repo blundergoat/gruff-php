@@ -17,7 +17,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers cognitive complexity counting on fixtures, threshold stability, no-finding cases, warning emission, and same-operator boolean chain collapsing.
+ * Covers cognitive complexity counting on fixtures, threshold stability, no-finding cases, warning emission, and same-operator boolean chain
+ * collapsing.
  */
 final class CognitiveComplexityRuleTest extends TestCase
 {
@@ -40,30 +41,31 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Provide method cc cases for parameterized tests.
      *
-     * @return array<string, array{string, int}>
+     * @return array<string, array{string, int}> - data-provider rows keyed by case label; each row is the fixture method name paired with its
+     *                       expected cognitive score
      */
     public static function methodCcProvider(): array
     {
         // Each row pairs a fixture method with its expected cognitive score; the oracle the counter is checked against.
         return [
-            'flat method' => ['flat', 0],
-            'single if' => ['oneIf', 1],
-            'nested if/else' => ['nestedIf', 4],
-            'boolean chain switching' => ['booleanChain', 3],
-            'same operator chain' => ['sameOperatorChain', 2],
-            'switch only' => ['switchOnly', 1],
-            'deeply nested' => ['deeplyNested', 11],
-            'while boolean condition' => ['whileWithBooleanCondition', 2],
-            'do while boolean condition' => ['doWhileWithBooleanCondition', 2],
-            'try catch finally branches' => ['tryCatchFinallyBranches', 5],
-            'jumps and goto' => ['jumpsAndGoto', 12],
-            'logical keyword chain' => ['logicalKeywordChain', 3],
+            'flat method'                     => ['flat', 0],
+            'single if'                       => ['oneIf', 1],
+            'nested if/else'                  => ['nestedIf', 4],
+            'boolean chain switching'         => ['booleanChain', 3],
+            'same operator chain'             => ['sameOperatorChain', 2],
+            'switch only'                     => ['switchOnly', 1],
+            'deeply nested'                   => ['deeplyNested', 11],
+            'while boolean condition'         => ['whileWithBooleanCondition', 2],
+            'do while boolean condition'      => ['doWhileWithBooleanCondition', 2],
+            'try catch finally branches'      => ['tryCatchFinallyBranches', 5],
+            'jumps and goto'                  => ['jumpsAndGoto', 12],
+            'logical keyword chain'           => ['logicalKeywordChain', 3],
             'expression and return ternaries' => ['expressionAndReturnTernaries', 4],
-            'closure and arrow function' => ['closureAndArrowFunction', 4],
-            'elseif and nested branches' => ['elseifAndNestedBranches', 8],
-            'switch with nested cases' => ['switchWithNestedCases', 8],
-            'short ternary' => ['shortTernary', 3],
-            'plain return' => ['plainReturn', 1],
+            'closure and arrow function'      => ['closureAndArrowFunction', 4],
+            'elseif and nested branches'      => ['elseifAndNestedBranches', 8],
+            'switch with nested cases'        => ['switchWithNestedCases', 8],
+            'short ternary'                   => ['shortTernary', 3],
+            'plain return'                    => ['plainReturn', 1],
         ];
     }
 
@@ -72,6 +74,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      *
      * @param string $methodName Fixture method name.
      * @param int    $expectedCc Expected cognitive complexity.
+     *
      * @return void
      */
     #[DataProvider('methodCcProvider')]
@@ -118,13 +121,13 @@ final class CognitiveComplexityRuleTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('CognitiveFixture::deeplyNested()', $symbols);
 
         $deeplyNested = array_values(array_filter(
-            $findings,
-            static fn ($finding): bool => $finding->symbol === 'CognitiveFixture::deeplyNested()',
-        ))[0] ?? null;
+                                         $findings,
+                                         static fn($finding): bool => $finding->symbol === 'CognitiveFixture::deeplyNested()',
+                                     ))[0] ?? null;
 
         self::assertNotNull($deeplyNested);
         self::assertSame(11, $deeplyNested->metadata['complexity'] ?? null);
@@ -184,7 +187,8 @@ final class CognitiveComplexityRuleTest extends TestCase
      *
      * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
      * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
-     *   emitting, so a test can force or suppress findings on the same fixture.
+     *                                       emitting, so a test can force or suppress findings on the same fixture.
+     *
      * @return list<\GruffPhp\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
     private function analyse(string $fixture, array $thresholds): array
@@ -204,7 +208,8 @@ final class CognitiveComplexityRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - parsed fixture carrying its statements and the repo-relative display path the rule reports against
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

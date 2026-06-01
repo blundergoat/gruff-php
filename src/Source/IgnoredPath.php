@@ -15,8 +15,8 @@ final readonly class IgnoredPath
      * @param string|null $pattern Matching glob, directory token, filename, or git rule.
      */
     public function __construct(
-        public string $path,
-        public string $source,
+        public string  $path,
+        public string  $source,
         public ?string $pattern,
     ) {
     }
@@ -26,7 +26,8 @@ final readonly class IgnoredPath
      *
      * @param string         $path     Display path that was ignored.
      * @param IgnoreDecision $decision Engine decision carrying the source and pattern.
-     * @return self Ignored-path detail.
+     *
+     * @return self - immutable detail pairing the display path with the resolved source and matching pattern
      */
     public static function from(string $path, IgnoreDecision $decision): self
     {
@@ -37,14 +38,14 @@ final readonly class IgnoredPath
     /**
      * Serialize the ignored-path detail into the report array shape.
      *
-     * @return array{path: string, source: string, pattern: string|null}
+     * @return array{path: string, source: string, pattern: string|null} - report row; pattern is null when the exclusion had no concrete match string
      */
     public function toArray(): array
     {
         // Flatten to the report row shape; pattern stays null when the exclusion had no concrete match string.
         return [
-            'path' => $this->path,
-            'source' => $this->source,
+            'path'    => $this->path,
+            'source'  => $this->source,
             'pattern' => $this->pattern,
         ];
     }

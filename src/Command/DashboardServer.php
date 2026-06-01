@@ -20,7 +20,7 @@ final readonly class DashboardServer
      */
     public function __construct(
         private DashboardStateFactory $stateFactory,
-        private string $gruffBinary,
+        private string                $gruffBinary,
     ) {
     }
 
@@ -31,7 +31,8 @@ final readonly class DashboardServer
      * @param string                  $host                    Hostname or address to bind.
      * @param int                     $port                    Port to bind.
      * @param DashboardRequestContext $dashboardRequestContext Request context shared with handlers.
-     * @return int Symfony command exit code.
+     *
+     * @return int - Command::SUCCESS on clean shutdown (socket closed), Command::FAILURE when the bind never succeeded
      */
     public function serve(OutputInterface $output, string $host, int $port, DashboardRequestContext $dashboardRequestContext): int
     {
@@ -77,7 +78,8 @@ final readonly class DashboardServer
      * @param string                  $host                    Bound host the browser should connect back to.
      * @param int                     $port                    Bound TCP port to embed in the URL.
      * @param DashboardRequestContext $dashboardRequestContext Request context whose input/projectRoot seed the default query string.
-     * @return string Dashboard URL with default query state.
+     *
+     * @return string - http URL the operator opens, pre-seeded with the launch options as the default query string
      */
     private function url(string $host, int $port, DashboardRequestContext $dashboardRequestContext): string
     {
@@ -94,7 +96,8 @@ final readonly class DashboardServer
      * Format a host for use in a browser URL.
      *
      * @param string $host Bound host or address; an unbracketed IPv6 literal here gets wrapped.
-     * @return string Host, bracketed when it is an IPv6 literal.
+     *
+     * @return string - the host unchanged, except a bare IPv6 literal is wrapped in brackets for safe URL embedding
      */
     private function urlHost(string $host): string
     {
@@ -111,7 +114,8 @@ final readonly class DashboardServer
      * Build the per-request dashboard handler.
      *
      * @param DashboardRequestContext $dashboardRequestContext Request context threaded into the handler and its scan runner.
-     * @return DashboardRequestHandler HTTP request handler.
+     *
+     * @return DashboardRequestHandler - handler pre-wired with its renderer, scan runner, and responder per connection
      */
     private function handler(DashboardRequestContext $dashboardRequestContext): DashboardRequestHandler
     {
@@ -125,17 +129,18 @@ final readonly class DashboardServer
     /**
      * Open the listening socket with PHP warnings suppressed so the caller handles bind failures.
      *
-     * @param string      $host         Host or address to bind; IPv6 literals are bracketed before use.
-     * @param int         $port         TCP port to bind.
-     * @param int|null    $errorCode    Receives the socket errno on failure; caller passes an unset variable to be filled.
-     * @param string|null $errorMessage Receives the human-readable bind error on failure; pairs with $errorCode.
-     * @param-out int|null $errorCode
+     * @param string          $host         Host or address to bind; IPv6 literals are bracketed before use.
+     * @param int             $port         TCP port to bind.
+     * @param int|null        $errorCode    Receives the socket errno on failure; caller passes an unset variable to be filled.
+     * @param string|null     $errorMessage Receives the human-readable bind error on failure; pairs with $errorCode.
+     * @param-out int|null    $errorCode
      * @param-out string|null $errorMessage
-     * @return resource|false Listening stream on success, or false when the bind fails (details land in the out params).
+     *
+     * @return resource|false - listening stream on success, or false when the bind fails (details in the out params)
      */
     private function createServer(string $host, int $port, ?int &$errorCode, ?string &$errorMessage)
     {
-        set_error_handler(static fn (): bool => true);
+        set_error_handler(static fn(): bool => true);
 
         try {
             // Return the listening socket (or false) while the suppressing handler is active so bind warnings stay quiet.
@@ -149,11 +154,12 @@ final readonly class DashboardServer
      * Accept one dashboard HTTP client connection.
      *
      * @param resource $server
-     * @return resource|false
+     *
+     * @return resource|false - accepted client stream, or false on the 1s accept timeout or error so the loop retries
      */
     private function acceptClient($server)
     {
-        set_error_handler(static fn (): bool => true);
+        set_error_handler(static fn(): bool => true);
 
         try {
             // Accept with a 1s timeout so the loop wakes periodically; false on timeout/error lets the caller retry.

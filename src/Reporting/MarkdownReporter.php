@@ -17,7 +17,8 @@ final readonly class MarkdownReporter
      * Render an analysis report as Markdown.
      *
      * @param AnalysisReport $report Analysis report to render.
-     * @return string Markdown report output.
+     *
+     * @return string - the complete Markdown document (summary, branch review, pillars, findings) with a single trailing newline
      */
     public function render(AnalysisReport $report): string
     {
@@ -37,6 +38,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendSummary(array &$lines, AnalysisReport $report): void
@@ -125,6 +127,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
@@ -140,9 +143,9 @@ final readonly class MarkdownReporter
             return;
         }
 
-        $improved  = array_slice(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] < 0), 0, 5);
+        $improved  = array_slice(array_filter($rows, static fn(array $ruleDelta): bool => $ruleDelta['net'] < 0), 0, 5);
         $regressed = array_slice(
-            array_reverse(array_filter($rows, static fn (array $ruleDelta): bool => $ruleDelta['net'] > 0)),
+            array_reverse(array_filter($rows, static fn(array $ruleDelta): bool => $ruleDelta['net'] > 0)),
             0,
             5,
         );
@@ -152,7 +155,7 @@ final readonly class MarkdownReporter
                 '**Top %d improved:** %s',
                 count($improved),
                 implode(', ', array_map(
-                    static fn (array $ruleDelta): string => sprintf('`%d %s`', $ruleDelta['net'], $ruleDelta['ruleId']),
+                    static fn(array $ruleDelta): string => sprintf('`%d %s`', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $improved,
                 )),
             );
@@ -163,7 +166,7 @@ final readonly class MarkdownReporter
                 '**Top %d regressed:** %s',
                 count($regressed),
                 implode(', ', array_map(
-                    static fn (array $ruleDelta): string => sprintf('`+%d %s`', $ruleDelta['net'], $ruleDelta['ruleId']),
+                    static fn(array $ruleDelta): string => sprintf('`+%d %s`', $ruleDelta['net'], $ruleDelta['ruleId']),
                     $regressed,
                 )),
             );
@@ -175,6 +178,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendMutationSummary(array &$lines, AnalysisReport $report): void
@@ -193,7 +197,7 @@ final readonly class MarkdownReporter
             $mutation->survivedCount(),
             $mutation->report->totalMutants(),
         );
-        $lines[] = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
+        $lines[]  = sprintf('**Mutation statuses:** %s.', $this->mutationStatusSummary($mutation->report->statusCounts()));
 
         $contextStatuses = $this->mutationContextSummary($mutation->report->statusCounts());
         if ($contextStatuses !== null) {
@@ -209,6 +213,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendBranchReviewSection(array &$lines, AnalysisReport $report): void
@@ -236,6 +241,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendPillarSection(array &$lines, AnalysisReport $report): void
@@ -253,6 +259,7 @@ final readonly class MarkdownReporter
 
         if ($rows === []) {
             $lines[] = '| _(none)_ |  |  |  |  |  |  |';
+
             // Header is already emitted, so a placeholder row keeps the table well-formed when no pillars apply.
             return;
         }
@@ -278,7 +285,8 @@ final readonly class MarkdownReporter
      * recomputed by the markdown reporter.
      *
      * @param AnalysisReport $report Analysis report providing the optional score.
-     * @return list<PillarScore>
+     *
+     * @return list<PillarScore> - applicable pillars only, ordered findings DESC then pillar name ASC; empty when no score was computed
      */
     private function pillarSummaryRows(AnalysisReport $report): array
     {
@@ -310,6 +318,7 @@ final readonly class MarkdownReporter
      *
      * @param list<string>   $lines  Markdown lines being built.
      * @param AnalysisReport $report Analysis report to render.
+     *
      * @return void
      */
     private function appendFindingsSection(array &$lines, AnalysisReport $report): void
@@ -329,7 +338,8 @@ final readonly class MarkdownReporter
      * Render one finding as a Markdown list item.
      *
      * @param Finding $finding Finding to format; a null line omits the line suffix and a null symbol omits its token.
-     * @return string Markdown finding line.
+     *
+     * @return string - one Markdown list item packing severity, rule id, location, optional symbol, and message
      */
     private function findingLine(Finding $finding): string
     {
@@ -350,9 +360,9 @@ final readonly class MarkdownReporter
     /**
      * Append finding groups details to report output.
      *
-     * @param list<string>  $lines     Markdown lines being built; mutated in place with the rendered group.
-     * @param string        $title     Section heading text, emitted only when $hasHeading is true.
-     * @param list<Finding> $findings  Findings to group by severity then file path; an empty list renders "None.".
+     * @param list<string>  $lines      Markdown lines being built; mutated in place with the rendered group.
+     * @param string        $title      Section heading text, emitted only when $hasHeading is true.
+     * @param list<Finding> $findings   Findings to group by severity then file path; an empty list renders "None.".
      * @param bool          $hasHeading Whether to print the section heading; false for the inline current-findings.
      *
      * @return void
@@ -367,6 +377,7 @@ final readonly class MarkdownReporter
         if ($findings === []) {
             $lines[] = 'None.';
             $lines[] = '';
+
             // Empty group still prints a "None." marker so an absent section is explicit rather than missing.
             return;
         }
@@ -404,7 +415,8 @@ final readonly class MarkdownReporter
 
     /**
      * @param array<string, int> $counts
-     * @return string Human-readable mutation status summary.
+     *
+     * @return string - comma-joined `status=count` pairs in the map's order; the literal "none" when no mutants ran
      */
     private function mutationStatusSummary(array $counts): string
     {
@@ -424,7 +436,8 @@ final readonly class MarkdownReporter
 
     /**
      * @param array<string, int> $counts
-     * @return string|null Context-only status summary, or null when absent.
+     *
+     * @return string|null - comma-joined `status=count` pairs for context-only statuses; null tells the caller to omit the line when none occurred
      */
     private function mutationContextSummary(array $counts): ?string
     {

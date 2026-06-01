@@ -15,7 +15,10 @@ final readonly class BaselineFilter
      * @param BaselineData  $baseline     Loaded baseline data to apply.
      * @param list<Finding> $findings     Findings to compare against the baseline.
      * @param bool          $hasDiffScope Whether diff filtering is active for this baseline pass.
-     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, report: BaselineReport}
+     *
+     * @return array{findings: list<Finding>, new: list<Finding>, unchanged: list<Finding>, report: BaselineReport} - partitioned result: "findings"
+     *                         and "new" both hold the unsuppressed findings callers act on (empty when every finding matched the baseline),
+     *                         "unchanged" the baseline-suppressed ones, and "report" the summary with stale-entry accounting
      */
     public function apply(BaselineData $baseline, array $findings, bool $hasDiffScope): array
     {
@@ -58,7 +61,7 @@ final readonly class BaselineFilter
             'findings'  => $newFindings,
             'new'       => $newFindings,
             'unchanged' => $unchangedFindings,
-            'report' => new BaselineReport(
+            'report'    => new BaselineReport(
                 path:               $baseline->path,
                 generated:          false,
                 totalEntries:       count($baseline->entries),

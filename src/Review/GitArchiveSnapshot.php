@@ -18,10 +18,11 @@ final readonly class GitArchiveSnapshot
      * @param string       $projectRoot Git working tree root.
      * @param string       $ref         Git ref to archive.
      * @param list<string> $paths       Optional path filters to include in the archive.
-     * @throws DiffException When the ref is unsafe or git/tar cannot produce the snapshot.
+     *
+     * @return string - path to the extracted snapshot tree; empty directory when path filters match nothing at the ref
      * @throws RuntimeException When the temporary snapshot directory cannot be created.
      *
-     * @return string Temporary snapshot root path.
+     * @throws DiffException When the ref is unsafe or git/tar cannot produce the snapshot.
      */
     public function create(string $projectRoot, string $ref, array $paths = []): string
     {
@@ -53,8 +54,8 @@ final readonly class GitArchiveSnapshot
 
             if (!$archiveProcess->isSuccessful()) {
                 throw new DiffException(trim($archiveProcess->getErrorOutput()) !== ''
-                    ? trim($archiveProcess->getErrorOutput())
-                    : sprintf('Unable to archive base ref "%s".', $ref));
+                                            ? trim($archiveProcess->getErrorOutput())
+                                            : sprintf('Unable to archive base ref "%s".', $ref));
             }
 
             $extractProcess = new Process(['tar', '-xf', $archivePath, '-C', $tempRoot]);
@@ -62,8 +63,8 @@ final readonly class GitArchiveSnapshot
 
             if (!$extractProcess->isSuccessful()) {
                 throw new DiffException(trim($extractProcess->getErrorOutput()) !== ''
-                    ? trim($extractProcess->getErrorOutput())
-                    : sprintf('Unable to extract base ref "%s".', $ref));
+                                            ? trim($extractProcess->getErrorOutput())
+                                            : sprintf('Unable to extract base ref "%s".', $ref));
             }
 
             // Archive and extract both succeeded; the snapshot root now holds the ref's tree for comparison.
@@ -86,6 +87,7 @@ final readonly class GitArchiveSnapshot
      * Recursively remove a snapshot directory.
      *
      * @param string $path Snapshot directory path to remove.
+     *
      * @return void
      */
     public function remove(string $path): void
@@ -124,7 +126,8 @@ final readonly class GitArchiveSnapshot
      * @param string       $projectRoot Working tree the git ls-tree runs in.
      * @param string       $ref         Git ref whose tree is queried for the requested paths.
      * @param list<string> $paths       Path filters to test; normalised to root-relative before the query.
-     * @return list<string>
+     *
+     * @return list<string> - root-relative paths present at the ref, sorted and de-duplicated; empty when none match
      */
     private function existingPathsInRef(string $projectRoot, string $ref, array $paths): array
     {
@@ -142,14 +145,14 @@ final readonly class GitArchiveSnapshot
 
         if (!$process->isSuccessful()) {
             throw new DiffException(trim($process->getErrorOutput()) !== ''
-                ? trim($process->getErrorOutput())
-                : sprintf('Unable to list files for base ref "%s".', $ref));
+                                        ? trim($process->getErrorOutput())
+                                        : sprintf('Unable to list files for base ref "%s".', $ref));
         }
 
         $paths = array_values(array_filter(
-            explode("\0", $process->getOutput()),
-            static fn (string $path): bool => $path !== '',
-        ));
+                                  explode("\0", $process->getOutput()),
+                                  static fn(string $path): bool => $path !== '',
+                              ));
         $paths = array_values(array_unique($paths));
         sort($paths, SORT_STRING);
 
@@ -162,7 +165,8 @@ final readonly class GitArchiveSnapshot
      *
      * @param string       $projectRoot Root that absolute inputs are made relative to; paths outside it are dropped.
      * @param list<string> $paths       Caller path filters, absolute or relative, possibly with `./` prefixes.
-     * @return list<string>
+     *
+     * @return list<string> - root-relative path filters, sorted and de-duplicated; empty when every input was out-of-tree
      */
     private function normaliseArchivePaths(string $projectRoot, array $paths): array
     {
@@ -205,7 +209,8 @@ final readonly class GitArchiveSnapshot
      * Validate a Git ref before passing it to archive commands.
      *
      * @param string $ref Untrusted caller-supplied ref name to allowlist before it reaches the command line.
-     * @return string Safe Git ref name.
+     *
+     * @return string - the same ref, returned unchanged once it passes the allowlist so callers can splice it unquoted
      */
     private function validatedRef(string $ref): string
     {

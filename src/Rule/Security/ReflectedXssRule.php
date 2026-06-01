@@ -52,25 +52,25 @@ final class ReflectedXssRule implements RuleInterface
     /**
      * Describe the reflected-XSS rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - warning-severity, medium-confidence security metadata plus the escaping false-positive shape
      */
     public function definition(): RuleDefinition
     {
         // The rule reports warning-level sinks because unescaped request output is exploitable.
         return new RuleDefinition(
-            id:              self::ID,
-            name:            'Reflected XSS sink',
-            pillar:          Pillar::Security,
-            tier:            RuleTier::V01,
-            defaultSeverity: Severity::Warning,
-            confidence:      Confidence::Medium,
-            description:     'Request-derived data echoed/printed without HTML escaping (reflected XSS).',
+            id:                  self::ID,
+            name:                'Reflected XSS sink',
+            pillar:              Pillar::Security,
+            tier:                RuleTier::V01,
+            defaultSeverity:     Severity::Warning,
+            confidence:          Confidence::Medium,
+            description:         'Request-derived data echoed/printed without HTML escaping (reflected XSS).',
             falsePositiveShapes: [
-                [
-                    'shape'      => 'Request value escaped or cast before output (htmlspecialchars/e()/(int)).',
-                    'mitigation' => 'The rule treats escaper/encoder/numeric-cast wrappers as safe; wrap the value at the output site.',
-                ],
-            ],
+                                     [
+                                         'shape'      => 'Request value escaped or cast before output (htmlspecialchars/e()/(int)).',
+                                         'mitigation' => 'The rule treats escaper/encoder/numeric-cast wrappers as safe; wrap the value at the output site.',
+                                     ],
+                                 ],
         );
     }
 
@@ -80,7 +80,7 @@ final class ReflectedXssRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<Finding> Reflected-XSS findings.
+     * @return list<Finding> - one finding per output sink reached by unescaped request data; empty when the unit is clean
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -124,7 +124,8 @@ final class ReflectedXssRule implements RuleInterface
      *
      * @param Expr         $output       Expression rendered to output.
      * @param AnalysisUnit $analysisUnit Parsed unit (top-level scope fallback).
-     * @return bool True when a request source reaches output without escaping.
+     *
+     * @return bool - true when a request source reaches the sink unescaped, whether directly or via a tainted local alias
      */
     private function hasUnescapedRequestSource(Expr $output, AnalysisUnit $analysisUnit): bool
     {
@@ -160,7 +161,8 @@ final class ReflectedXssRule implements RuleInterface
      * @param list<Stmt>        $statements   Statements of the owning scope.
      * @param FunctionLike|null $scope        Owning function-like scope, or null for top level.
      * @param int               $sinkPosition Byte offset of the output expression.
-     * @return array<string, true> Tainted variable names carrying unescaped request data.
+     *
+     * @return array<string, true> - variable names still tainted immediately before the sink, keyed for set-membership lookup
      */
     private function unescapedTaintedLocals(array $statements, ?FunctionLike $scope, int $sinkPosition): array
     {
@@ -173,13 +175,13 @@ final class ReflectedXssRule implements RuleInterface
         $nodeFinder  = new NodeFinder();
         $assignments = $nodeFinder->find(
             $statements,
-            static fn (Node $candidate): bool => $candidate instanceof Expr\Assign
-                && $candidate->getStartFilePos() >= 0
-                && $candidate->getStartFilePos() < $sinkPosition,
+            static fn(Node $candidate): bool => $candidate instanceof Expr\Assign
+                                                && $candidate->getStartFilePos() >= 0
+                                                && $candidate->getStartFilePos() < $sinkPosition,
         );
         usort(
             $assignments,
-            static fn (Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos(),
+            static fn(Node $left, Node $right): int => $left->getStartFilePos() <=> $right->getStartFilePos(),
         );
 
         foreach ($assignments as $assignment) {
@@ -208,7 +210,8 @@ final class ReflectedXssRule implements RuleInterface
      *
      * @param Expr                $expr    Right-hand side expression.
      * @param array<string, true> $tainted Already-tainted local variable names.
-     * @return bool True when the expression carries unescaped request data.
+     *
+     * @return bool - true when the right-hand side reads a request superglobal or a still-tainted alias without an escaper
      */
     private function hasUnescapedRequestExpression(Expr $expr, array $tainted): bool
     {
@@ -235,7 +238,8 @@ final class ReflectedXssRule implements RuleInterface
      *
      * @param Node $leaf Request-source leaf node.
      * @param Node $root Output expression boundary (inclusive).
-     * @return bool True when an escaping wrapper encloses the leaf within the root.
+     *
+     * @return bool - true when an escaper/encoder call or numeric cast encloses the leaf on the path up to the root
      */
     private function isEscapedBetween(Node $leaf, Node $root): bool
     {
@@ -262,7 +266,8 @@ final class ReflectedXssRule implements RuleInterface
      * Detect an escaper/encoder function call.
      *
      * @param Node $node Candidate node.
-     * @return bool True when the node is an escaper/encoder call.
+     *
+     * @return bool - true when the node is a global call to one of the recognised escaper/encoder functions
      */
     private function isEscaperCall(Node $node): bool
     {
@@ -281,21 +286,23 @@ final class ReflectedXssRule implements RuleInterface
      * Detect a numeric/boolean cast that neutralises markup.
      *
      * @param Node $node Candidate node.
-     * @return bool True when the node is an int/float/bool cast.
+     *
+     * @return bool - true for an int, float, or bool cast, which strips markup before it can reach an HTML sink
      */
     private function isNumericCast(Node $node): bool
     {
         // Numeric/boolean casts prevent markup from surviving into an HTML sink.
         return $node instanceof Expr\Cast\Int_
-            || $node instanceof Expr\Cast\Double
-            || $node instanceof Expr\Cast\Bool_;
+               || $node instanceof Expr\Cast\Double
+               || $node instanceof Expr\Cast\Bool_;
     }
 
     /**
      * List request-superglobal variable nodes within an expression.
      *
      * @param Node $node Expression to inspect.
-     * @return list<Expr\Variable>
+     *
+     * @return list<Expr\Variable> - request-superglobal variable leaves found beneath the node; empty when none are request sources
      */
     private function superglobalLeaves(Node $node): array
     {
@@ -314,12 +321,13 @@ final class ReflectedXssRule implements RuleInterface
      * List variable nodes within an expression.
      *
      * @param Node $node Expression to inspect.
-     * @return list<Expr\Variable>
+     *
+     * @return list<Expr\Variable> - every variable leaf in the expression subtree, in finder order; empty when the node has no variables
      */
     private function variableLeaves(Node $node): array
     {
         $variables = [];
-        foreach ((new NodeFinder())->find($node, static fn (Node $candidate): bool => $candidate instanceof Expr\Variable) as $variable) {
+        foreach ((new NodeFinder())->find($node, static fn(Node $candidate): bool => $candidate instanceof Expr\Variable) as $variable) {
             if ($variable instanceof Expr\Variable) {
                 $variables[] = $variable;
             }
@@ -333,7 +341,8 @@ final class ReflectedXssRule implements RuleInterface
      * Find the function, method, or closure scope containing a node.
      *
      * @param Node $node Node whose containing function-like scope is needed.
-     * @return FunctionLike|null Containing scope, or null at file top level.
+     *
+     * @return FunctionLike|null - closest enclosing function/method/closure that bounds aliasing, or null at file top level
      */
     private function enclosingFunctionLike(Node $node): ?FunctionLike
     {
@@ -358,7 +367,8 @@ final class ReflectedXssRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit being analysed.
      * @param int          $line         Sink line number.
      * @param string       $sink         Output sink name (echo/print/printf/vprintf).
-     * @return Finding Reflected-XSS finding.
+     *
+     * @return Finding - warning-level finding naming only the sink, with remediation; never includes the tainted value
      */
     private function finding(AnalysisUnit $analysisUnit, int $line, string $sink): Finding
     {
@@ -374,8 +384,8 @@ final class ReflectedXssRule implements RuleInterface
             confidence:  Confidence::Medium,
             remediation: 'Escape request data for the output context with htmlspecialchars()/htmlentities() (or e() in Blade), or cast to int/float/bool when the value is numeric.',
             metadata:    [
-                'sink' => $sink,
-            ],
+                             'sink' => $sink,
+                         ],
         );
     }
 }

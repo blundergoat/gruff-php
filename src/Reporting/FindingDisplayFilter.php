@@ -22,10 +22,10 @@ final readonly class FindingDisplayFilter
      */
     public function __construct(
         public ?Severity $minSeverity = null,
-        public array $includePillars = [],
-        public array $excludePillars = [],
-        public array $includeRules = [],
-        public array $excludeRules = [],
+        public array     $includePillars = [],
+        public array     $excludePillars = [],
+        public array     $includeRules = [],
+        public array     $excludeRules = [],
     ) {
     }
 
@@ -33,27 +33,28 @@ final readonly class FindingDisplayFilter
      * Keep only findings visible under the selected display filter.
      *
      * @param list<Finding> $findings
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings that pass every active filter, re-keyed to a 0-indexed list; empty when all are filtered out
      */
     public function apply(array $findings): array
     {
         // Re-key to a list so the result stays a 0-indexed list<Finding> after filtered slots are removed.
-        return array_values(array_filter($findings, fn (Finding $finding): bool => $this->allows($finding)));
+        return array_values(array_filter($findings, fn(Finding $finding): bool => $this->allows($finding)));
     }
 
     /**
      * Check whether any display filter is configured.
      *
-     * @return bool True when at least one filter is active.
+     * @return bool - true when at least one filter dimension is configured; callers use it to decide whether to annotate filtered output
      */
     public function isActive(): bool
     {
         // Any single configured dimension counts as active; callers use this to decide whether to annotate output.
         return $this->minSeverity !== null
-            || $this->includePillars !== []
-            || $this->excludePillars !== []
-            || $this->includeRules !== []
-            || $this->excludeRules !== [];
+               || $this->includePillars !== []
+               || $this->excludePillars !== []
+               || $this->includeRules !== []
+               || $this->excludeRules !== [];
     }
 
     /**
@@ -64,18 +65,19 @@ final readonly class FindingDisplayFilter
      *     excludePillars: list<string>,
      *     includeRules: list<string>,
      *     excludeRules: list<string>
-     * }
+     * } - JSON-serialisable snapshot of the filter; enums flattened to string values, null minSeverity means no floor, empty lists mean that
+     * dimension is unfiltered
      */
     public function toArray(): array
     {
         // Enums are flattened to their string values so the filter survives JSON serialisation in reports.
         return [
-            'active' => $this->isActive(),
-            'minSeverity' => $this->minSeverity?->value,
-            'includePillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $this->includePillars),
-            'excludePillars' => array_map(static fn (Pillar $pillar): string => $pillar->value, $this->excludePillars),
-            'includeRules' => $this->includeRules,
-            'excludeRules' => $this->excludeRules,
+            'active'         => $this->isActive(),
+            'minSeverity'    => $this->minSeverity?->value,
+            'includePillars' => array_map(static fn(Pillar $pillar): string => $pillar->value, $this->includePillars),
+            'excludePillars' => array_map(static fn(Pillar $pillar): string => $pillar->value, $this->excludePillars),
+            'includeRules'   => $this->includeRules,
+            'excludeRules'   => $this->excludeRules,
         ];
     }
 
@@ -83,7 +85,8 @@ final readonly class FindingDisplayFilter
      * Determine whether one finding passes all configured filters.
      *
      * @param Finding $finding Finding under test against severity floor and pillar/rule include-exclude sets.
-     * @return bool True when the finding should be displayed.
+     *
+     * @return bool - true when the finding clears the severity floor and every pillar/rule include-exclude gate; false drops it from output
      */
     private function allows(Finding $finding): bool
     {
@@ -115,7 +118,8 @@ final readonly class FindingDisplayFilter
      * Convert severity to a comparable rank.
      *
      * @param Severity $severity Severity whose ordering position is needed for the minimum-severity comparison.
-     * @return int Severity rank where larger is more severe.
+     *
+     * @return int - ordering rank where a larger value is more severe, so the minimum-severity floor can be compared with a numeric >=
      */
     private function severityRank(Severity $severity): int
     {

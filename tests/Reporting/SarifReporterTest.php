@@ -43,12 +43,12 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify SARIF output preserves native report identity while exposing code-scanning metadata.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifReporterEmitsRegistryRulesResultIdentityAndRunProperties(): void
     {
-        $finding = new Finding(
+        $finding  = new Finding(
             ruleId:           'security.dangerous-function-call',
             message:          'Dangerous call to eval().',
             filePath:         './src\\app.php',
@@ -68,12 +68,12 @@ final class SarifReporterTest extends TestCase
         $score    = (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
         $report   = $this->report($findings, $score);
 
-        $payload  = $this->decode((new SarifReporter())->render($report));
-        $sarifRun = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
-        $driver   = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
-        $rules    = $this->listValue($driver, 'rules');
-        $ruleIds  = array_map(
-            fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
+        $payload       = $this->decode((new SarifReporter())->render($report));
+        $sarifRun      = $this->stringKeyedArray($this->listValue($payload, 'runs')[0] ?? null);
+        $driver        = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules         = $this->listValue($driver, 'rules');
+        $ruleIds       = array_map(
+            fn(mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
             $rules,
         );
         $sortedRuleIds = $ruleIds;
@@ -135,8 +135,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify empty reports stay valid SARIF while omitting absent score data.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifReporterHandlesEmptyReportAndOmittedScore(): void
     {
@@ -146,7 +146,7 @@ final class SarifReporterTest extends TestCase
 
         self::assertSame([], $this->listValue($sarifRun, 'results'));
         self::assertContains('size.file-length', array_map(
-            fn (mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
+            fn(mixed $rule): string => $this->stringValue($this->stringKeyedArray($rule), 'id'),
             $this->listValue($driver, 'rules'),
         ));
         $runProperties = $this->stringKeyedArray($sarifRun, 'properties');
@@ -161,16 +161,16 @@ final class SarifReporterTest extends TestCase
      * @param Severity $severity Finding severity to render.
      * @param string   $level    Expected SARIF level.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     #[DataProvider('severityLevels')]
     public function testSarifReporterMapsSeverityLevels(Severity $severity, string $level): void
     {
         $payload = $this->decode((new SarifReporter())->render($this->report([
-            $this->finding(severity: $severity),
-        ])));
-        $result = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
+                                                                                 $this->finding(severity: $severity),
+                                                                             ])));
+        $result  = $this->stringKeyedArray($this->listValue($this->sarifRun($payload), 'results')[0] ?? null);
 
         self::assertSame($level, $this->stringValue($result, 'level'));
     }
@@ -178,7 +178,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Provide SARIF severity examples for reporter tests.
      *
-     * @return iterable<string, array{0: Severity, 1: string}>
+     * @return iterable<string, array{0: Severity, 1: string}> - data-provider cases keyed by case name, each pairing a finding severity with its
+     *                          expected SARIF level
      */
     public static function severityLevels(): iterable
     {
@@ -190,37 +191,37 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify non-registry mutation findings receive deterministic fallback driver rules.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifReporterEmitsFallbackRuleForMutationFinding(): void
     {
         $mutationAnalysisResult = new MutationAnalysisResult(new InfectionReport(
-            reportPath: 'infection.json',
-            stats:      [
-                'totalMutantsCount' => 1,
-                'msi' => 0.0,
-                'coveredCodeMsi' => 0.0,
-                'mutationCodeCoverage' => 100.0,
-            ],
-            mutants:    [
-                new InfectionMutant(
-                    status:        'escaped',
-                    filePath:      './tests\\ExampleTest.php',
-                    line:          22,
-                    mutator:       'PublicVisibility',
-                    diff:          'diff',
-                    processOutput: 'output',
-                ),
-            ],
-        ));
-        $finding   = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
-        $payload   = $this->decode((new SarifReporter())->render($this->report([$finding])));
-        $sarifRun  = $this->sarifRun($payload);
-        $driver    = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
-        $rules     = $this->listValue($driver, 'rules');
-        $result    = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
-        $ruleIndex = $result['ruleIndex'] ?? null;
+                                                                 reportPath: 'infection.json',
+                                                                 stats:      [
+                                                                                 'totalMutantsCount'    => 1,
+                                                                                 'msi'                  => 0.0,
+                                                                                 'coveredCodeMsi'       => 0.0,
+                                                                                 'mutationCodeCoverage' => 100.0,
+                                                                             ],
+                                                                 mutants:    [
+                                                                                 new InfectionMutant(
+                                                                                     status:        'escaped',
+                                                                                     filePath:      './tests\\ExampleTest.php',
+                                                                                     line:          22,
+                                                                                     mutator:       'PublicVisibility',
+                                                                                     diff:          'diff',
+                                                                                     processOutput: 'output',
+                                                                                 ),
+                                                                             ],
+                                                             ));
+        $finding                = (new MutationFindingFactory())->findingsFor($mutationAnalysisResult)[0];
+        $payload                = $this->decode((new SarifReporter())->render($this->report([$finding])));
+        $sarifRun               = $this->sarifRun($payload);
+        $driver                 = $this->stringKeyedArray($this->stringKeyedArray($this->stringKeyedArray($sarifRun, 'tool'), 'driver'));
+        $rules                  = $this->listValue($driver, 'rules');
+        $result                 = $this->stringKeyedArray($this->listValue($sarifRun, 'results')[0] ?? null);
+        $ruleIndex              = $result['ruleIndex'] ?? null;
         self::assertIsInt($ruleIndex);
         $matchingRule = $this->stringKeyedArray($rules[$ruleIndex] ?? null);
 
@@ -239,16 +240,16 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify optional regions and additional path shapes render without fabricated data.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifReporterHandlesOptionalRegionsAndAdditionalPathShapes(): void
     {
         $payload = $this->decode((new SarifReporter())->render($this->report([
-            $this->finding(ruleId: 'fixture.no-line', filePath: 'src\\NoLine.php', line: null),
-            $this->finding(ruleId: 'fixture.nested-dot', filePath: '././src/NestedDot.php', line: 4),
-            $this->finding(ruleId: 'fixture.windows-mixed', filePath: 'C:\\repo/src\\Mixed.php', line: 8),
-        ])));
+                                                                                 $this->finding(ruleId: 'fixture.no-line', filePath: 'src\\NoLine.php', line: null),
+                                                                                 $this->finding(ruleId: 'fixture.nested-dot', filePath: '././src/NestedDot.php', line: 4),
+                                                                                 $this->finding(ruleId: 'fixture.windows-mixed', filePath: 'C:\\repo/src\\Mixed.php', line: 8),
+                                                                             ])));
         $results = $this->listValue($this->sarifRun($payload), 'results');
 
         $firstLocation = $this->physicalLocation($results[0] ?? null);
@@ -267,15 +268,15 @@ final class SarifReporterTest extends TestCase
     /**
      * Verify SARIF and native JSON preserve the same report identity over one report instance.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifReporterPreservesNativeJsonSchemaAndFindingCount(): void
     {
-        $report = $this->report([
-            $this->finding(ruleId: 'fixture.warning', severity: Severity::Warning),
-            $this->finding(ruleId: 'fixture.advisory', severity: Severity::Advisory),
-        ]);
+        $report   = $this->report([
+                                      $this->finding(ruleId: 'fixture.warning', severity: Severity::Warning),
+                                      $this->finding(ruleId: 'fixture.advisory', severity: Severity::Advisory),
+                                  ]);
         $json     = $this->decode((new JsonReporter())->render($report));
         $sarif    = $this->decode((new SarifReporter())->render($report));
         $sarifRun = $this->sarifRun($sarif);
@@ -285,11 +286,11 @@ final class SarifReporterTest extends TestCase
         self::assertCount(count($this->listValue($json, 'findings')), $this->listValue($sarifRun, 'results'));
         self::assertSame(
             array_map(
-                fn (mixed $finding): string => $this->stringValue($this->stringKeyedArray($finding), 'ruleId'),
+                fn(mixed $finding): string => $this->stringValue($this->stringKeyedArray($finding), 'ruleId'),
                 $this->listValue($json, 'findings'),
             ),
             array_map(
-                fn (mixed $result): string => $this->stringValue($this->stringKeyedArray($result), 'ruleId'),
+                fn(mixed $result): string => $this->stringValue($this->stringKeyedArray($result), 'ruleId'),
                 $this->listValue($sarifRun, 'results'),
             ),
         );
@@ -298,7 +299,8 @@ final class SarifReporterTest extends TestCase
     /**
      * @param list<Finding>    $findings Findings to attach to the report.
      * @param ScoreReport|null $score    Precomputed score, or null to let assertions exercise an unscored report.
-     * @return AnalysisReport Focused report fixture.
+     *
+     * @return AnalysisReport - a sarif-format report carrying only the given findings and optional score, so a test renders a known input
      */
     private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
     {
@@ -323,16 +325,17 @@ final class SarifReporterTest extends TestCase
     /**
      * Build a focused finding for SARIF renderer tests.
      *
-     * @param string      $ruleId   Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
-     * @param string      $filePath Artifact path the SARIF location should reference, relative to the scanned root.
-     * @param int|null    $line     One-based location line; null exercises rendering when a finding has no line.
-     * @param Severity    $severity Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
-     * @return Finding Focused finding fixture.
+     * @param string   $ruleId   Emitted as the SARIF ruleId; defaulted so tests override only what they assert.
+     * @param string   $filePath Artifact path the SARIF location should reference, relative to the scanned root.
+     * @param int|null $line     One-based location line; null exercises rendering when a finding has no line.
+     * @param Severity $severity Drives the mapped SARIF result level; varied to check the severity-to-level mapping.
+     *
+     * @return Finding - a single finding built from the given fields, ready to render through the SARIF reporter and assert against
      */
     private function finding(
-        string $ruleId = 'security.dangerous-function-call',
-        string $filePath = 'src/app.php',
-        ?int $line = 1,
+        string   $ruleId = 'security.dangerous-function-call',
+        string   $filePath = 'src/app.php',
+        ?int     $line = 1,
         Severity $severity = Severity::Warning,
     ): Finding {
         // Hand back the finding fixture so a test can render it through the SARIF reporter and inspect the result.
@@ -350,7 +353,8 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param JsonArray $payload SARIF payload.
-     * @return JsonArray
+     *
+     * @return JsonArray - the single run object at runs[0], holding the tool driver, results, and run properties
      */
     private function sarifRun(array $payload): array
     {
@@ -362,7 +366,8 @@ final class SarifReporterTest extends TestCase
      * Extract the physical location object from a SARIF result fixture.
      *
      * @param mixed $result One decoded SARIF result object; mixed because it arrives straight from json_decode.
-     * @return JsonArray Location payload.
+     *
+     * @return JsonArray - the physicalLocation object under the result's first location, holding the artifact URI and optional region
      */
     private function physicalLocation(mixed $result): array
     {
@@ -376,12 +381,14 @@ final class SarifReporterTest extends TestCase
 
     /**
      * @param string $json Rendered SARIF document to decode; expected to be a single top-level JSON object.
+     *
+     * @return JsonArray - the decoded document as a string-keyed array so callers can index named top-level fields
      * @throws JsonException
-     * @return JsonArray
      */
     private function decode(string $json): array
     {
         $decodedJson = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
         // Hand back the decoded document narrowed to a string-keyed array so callers can index named fields.
         return $this->stringKeyedArray($decodedJson);
     }
@@ -389,12 +396,14 @@ final class SarifReporterTest extends TestCase
     /**
      * @param JsonArray $payload Source array.
      * @param string    $key     Key whose value must itself be an array; the test fails if it is absent or scalar.
-     * @return list<JsonValue>
+     *
+     * @return list<JsonValue> - the child array re-indexed as a 0-based list so positional access ignores the original keys
      */
     private function listValue(array $payload, string $key): array
     {
         $payloadValue = $payload[$key] ?? null;
         self::assertIsArray($payloadValue);
+
         // Hand back the child re-indexed as a list so positional [0] access does not depend on original keys.
         return array_values($payloadValue);
     }
@@ -404,7 +413,8 @@ final class SarifReporterTest extends TestCase
      *
      * @param mixed       $payload Decoded JSON node; mixed because it comes from json_decode, and non-arrays fail.
      * @param string|null $key     When set, descend into that child first; null treats $payload itself as the target.
-     * @return JsonArray String-keyed payload.
+     *
+     * @return JsonArray - the resolved node narrowed to a JSON object, after the test has failed on any non-array or scalar leaf
      */
     private function stringKeyedArray(mixed $payload, ?string $key = null): array
     {
@@ -418,7 +428,8 @@ final class SarifReporterTest extends TestCase
     /**
      * Assert that decoded SARIF contains an object at the requested key.
      *
-     * @param mixed $payload Value under test; passes only when it is an array whose leaves are all JSON scalars.
+     * @param mixed              $payload Value under test; passes only when it is an array whose leaves are all JSON scalars.
+     *
      * @phpstan-assert JsonArray $payload
      * @return void
      */
@@ -447,7 +458,8 @@ final class SarifReporterTest extends TestCase
     /**
      * @param JsonArray $payload Source array.
      * @param string    $key     Key whose value must be a string; the test fails if it is missing or non-string.
-     * @return string String value.
+     *
+     * @return string - the string value at $key, after the assertion has failed the test on a missing or non-string field
      */
     private function stringValue(array $payload, string $key): string
     {

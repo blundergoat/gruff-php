@@ -121,7 +121,7 @@ final class MethodLengthRuleTest extends TestCase
         );
 
         $findings       = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
-        $methodFindings = array_filter($findings, static fn ($finding) => $finding->ruleId === MethodLengthRule::ID);
+        $methodFindings = array_filter($findings, static fn($finding) => $finding->ruleId === MethodLengthRule::ID);
 
         self::assertSame([], array_values($methodFindings));
     }
@@ -131,13 +131,14 @@ final class MethodLengthRuleTest extends TestCase
      *
      * @param string             $fixture    Fixture filename under tests/Fixtures/Size to scan.
      * @param array<string, int> $thresholds Rule option overrides applied before the fixture runs.
-     * @return list<\GruffPhp\Finding\Finding>
+     *
+     * @return list<\GruffPhp\Finding\Finding> - findings the rule raised for the fixture; empty when nothing tripped the thresholds
      */
     private function analyse(string $fixture, array $thresholds): array
     {
-        $unit     = $this->parseFixture($fixture);
-        $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+        $unit        = $this->parseFixture($fixture);
+        $registry    = RuleRegistry::defaults();
+        $config      = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
             MethodLengthRule::ID,
             new RuleSettings(true, $thresholds),
         );
@@ -151,7 +152,8 @@ final class MethodLengthRuleTest extends TestCase
      * Parse the named fixture into an analysis unit.
      *
      * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - the parsed fixture ready for the rule to analyse, carrying the repo-relative display path
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

@@ -17,7 +17,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Identify the in-repo named-argument alignment fixer.
      *
-     * @return string
+     * @return string - the fixer's registration key (`GruffPhp/align_named_arguments`) that setRules() must reference
      */
     public function getName(): string
     {
@@ -28,7 +28,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Describe the named-argument alignment fixer for PHP-CS-Fixer.
      *
-     * @return FixerDefinitionInterface
+     * @return FixerDefinitionInterface - the summary and worked code sample PHP-CS-Fixer displays for this fixer
      */
     public function getDefinition(): FixerDefinitionInterface
     {
@@ -46,7 +46,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
     /**
      * Run after built-in whitespace fixers so alignment sees final argument layout.
      *
-     * @return int
+     * @return int - run priority; negative (-100) sequences this fixer after the whitespace fixers
      */
     public function getPriority(): int
     {
@@ -58,7 +58,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether the token stream may contain named arguments.
      *
      * @param Tokens $tokens Token stream to fix.
-     * @return bool
+     * @return bool - true when the code contains a colon (a possible named argument); false skips the full pass
      */
     public function isCandidate(Tokens $tokens): bool
     {
@@ -89,7 +89,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Align consecutive multiline named-argument groups in source code.
      *
      * @param string $code Source code to inspect.
-     * @return string
+     * @return string - the source with named-argument groups aligned; the input unchanged when nothing aligns or the split fails
      */
     private function alignNamedArgumentGroups(string $code): string
     {
@@ -133,7 +133,7 @@ final class AlignNamedArgumentsFixer extends PhpCsFixer\AbstractFixer
      * Report whether a source line contains a named argument.
      *
      * @param string $line Source line to inspect.
-     * @return bool
+     * @return bool - true when the line is an indented `name: value` argument; false for any other line, including `::` calls
      */
     private function isNamedArgumentLine(string $line): bool
     {

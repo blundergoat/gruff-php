@@ -47,51 +47,52 @@ final readonly class Finding
      * @param FindingMetadata $metadata         Machine-readable rule metadata for reporters.
      */
     public function __construct(
-        public string $ruleId,
-        public string $message,
-        public string $filePath,
-        public ?int $line,
-        public Severity $severity,
-        public Pillar $pillar,
-        public RuleTier $tier,
+        public string     $ruleId,
+        public string     $message,
+        public string     $filePath,
+        public ?int       $line,
+        public Severity   $severity,
+        public Pillar     $pillar,
+        public RuleTier   $tier,
         public Confidence $confidence,
-        public ?int $endLine = null,
-        public ?int $column = null,
-        public ?string $symbol = null,
-        public ?string $remediation = null,
-        public array $secondaryPillars = [],
-        public array $metadata = [],
+        public ?int       $endLine = null,
+        public ?int       $column = null,
+        public ?string    $symbol = null,
+        public ?string    $remediation = null,
+        public array      $secondaryPillars = [],
+        public array      $metadata = [],
     ) {
     }
 
     /**
      * Serialise the finding for report payloads.
      *
-     * @return FindingArray
+     * @return FindingArray - canonical report payload with fingerprint and stableIdentity recomputed, never stored; empty metadata serialises as an
+     *                      object
      */
     public function toArray(): array
     {
         // Derived fingerprint/identity are recomputed here, never stored, so the payload stays canonical.
         return [
-            'ruleId' => $this->ruleId,
-            'message' => $this->message,
-            'file' => $this->filePath,
-            'line' => $this->line,
-            'endLine' => $this->endLine,
-            'column' => $this->column,
-            'symbol' => $this->symbol,
-            'severity' => $this->severity->value,
-            'pillar' => $this->pillar->value,
+            'ruleId'           => $this->ruleId,
+            'message'          => $this->message,
+            'file'             => $this->filePath,
+            'line'             => $this->line,
+            'endLine'          => $this->endLine,
+            'column'           => $this->column,
+            'symbol'           => $this->symbol,
+            'severity'         => $this->severity->value,
+            'pillar'           => $this->pillar->value,
             'secondaryPillars' => array_map(
-                static fn (Pillar $pillar): string => $pillar->value,
+                static fn(Pillar $pillar): string => $pillar->value,
                 $this->secondaryPillars,
             ),
-            'tier' => $this->tier->value,
-            'confidence' => $this->confidence->value,
-            'remediation' => $this->remediation,
-            'fingerprint' => $this->fingerprint(),
-            'stableIdentity' => $this->stableIdentity(),
-            'metadata' => $this->metadata === [] ? (object) [] : $this->metadata,
+            'tier'             => $this->tier->value,
+            'confidence'       => $this->confidence->value,
+            'remediation'      => $this->remediation,
+            'fingerprint'      => $this->fingerprint(),
+            'stableIdentity'   => $this->stableIdentity(),
+            'metadata'         => $this->metadata === [] ? (object)[] : $this->metadata,
         ];
     }
 
@@ -102,7 +103,9 @@ final readonly class Finding
      * restored inputs, never read from the payload, so a round-trip is lossless.
      *
      * @param array<string, mixed> $serialized Serialized finding produced by toArray().
-     * @return self Reconstructed finding.
+     *
+     * @return self - finding rebuilt from the payload, with every field coerced through a narrowing helper so a malformed payload yields safe
+     *              defaults rather than throwing
      */
     public static function fromArray(array $serialized): self
     {
@@ -118,7 +121,7 @@ final readonly class Finding
         $metadata    = [];
         if (is_array($rawMetadata)) {
             foreach ($rawMetadata as $metadataKey => $metadataValue) {
-                $metadata[is_string($metadataKey) ? $metadataKey : (string) $metadataKey] = self::metadataValue($metadataValue);
+                $metadata[is_string($metadataKey) ? $metadataKey : (string)$metadataKey] = self::metadataValue($metadataValue);
             }
         }
 
@@ -143,7 +146,8 @@ final readonly class Finding
 
     /**
      * @param mixed $value Raw value from a decoded payload.
-     * @return string String value, or an empty string when not a string.
+     *
+     * @return string - the value unchanged when it is a string, otherwise an empty string so an absent or wrong-typed field can't raise a type error
      */
     private static function stringField(mixed $value): string
     {
@@ -155,7 +159,9 @@ final readonly class Finding
      * Narrow a decoded metadata value to the supported scalar/list shape.
      *
      * @param mixed $value Raw decoded metadata value.
-     * @return bool|float|int|string|null|array<array-key, bool|float|int|string|null> Narrowed metadata value.
+     *
+     * @return bool|float|int|string|null|array<array-key, bool|float|int|string|null> - scalars and null pass through; arrays become a flat list
+     *                                                     with non-scalar entries replaced by null; any other type collapses to null
      */
     private static function metadataValue(mixed $value): bool|float|int|string|null|array
     {
@@ -180,7 +186,8 @@ final readonly class Finding
 
     /**
      * @param mixed $value Raw value from a decoded payload.
-     * @return int|null Integer value, or null when not an integer.
+     *
+     * @return int|null - the integer unchanged, or null for any non-int (numeric strings included) so absent line/column data stays absent
      */
     private static function nullableInt(mixed $value): ?int
     {
@@ -190,7 +197,8 @@ final readonly class Finding
 
     /**
      * @param mixed $value Raw value from a decoded payload.
-     * @return string|null String value, or null when not a non-empty string.
+     *
+     * @return string|null - the value unchanged when it is a string, otherwise null so optional fields like symbol/remediation read as "not set"
      */
     private static function nullableString(mixed $value): ?string
     {
@@ -201,19 +209,20 @@ final readonly class Finding
     /**
      * Build the stable short hash used to identify equivalent findings.
      *
-     * @return string Sixteen-character SHA-256 prefix for the finding identity.
+     * @return string - 16-hex-char SHA-256 prefix over ruleId/file/line/endLine/column/symbol/message; wide enough to avoid collisions, short enough
+     *                to store in baselines
      */
     public function fingerprint(): string
     {
         $encoded = json_encode([
-            'ruleId' => $this->ruleId,
-            'file' => $this->filePath,
-            'line' => $this->line,
-            'endLine' => $this->endLine,
-            'column' => $this->column,
-            'symbol' => $this->symbol,
-            'message' => $this->message,
-        ], JSON_THROW_ON_ERROR);
+                                   'ruleId' => $this->ruleId,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'file' => $this->filePath,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'line' => $this->line,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'endLine' => $this->endLine,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'column' => $this->column,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'symbol' => $this->symbol,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                'message' => $this->message,
+                               ], JSON_THROW_ON_ERROR);
 
         // Truncate to a 16-hex-char digest: short enough to store, wide enough to avoid finding collisions.
         return substr(hash('sha256', $encoded), 0, 16);
@@ -233,7 +242,8 @@ final readonly class Finding
      * still use {@see fingerprint()}; this field is informational for external
      * diff tooling.
      *
-     * @return string Sixteen-character SHA-256 prefix for the line-insensitive identity.
+     * @return string - 16-hex-char SHA-256 prefix that omits line/endLine/column, so the identity survives line shifts; informational for external
+     *                diff tooling, not baseline matching
      */
     public function stableIdentity(): string
     {

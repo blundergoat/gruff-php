@@ -11,7 +11,8 @@ use JsonException;
  * Parses Infection JSON reports into gruff mutation report objects.
  *
  * @phpstan-type JsonScalar bool|float|int|string|null
- * @phpstan-type JsonValue JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>>
+ * @phpstan-type JsonValue JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key,
+ *               JsonScalar>>>>
  * @phpstan-type JsonObject array<string, JsonValue>
  */
 final readonly class InfectionReportParser
@@ -29,8 +30,10 @@ final readonly class InfectionReportParser
      * Parse an Infection JSON report from disk.
      *
      * @param string $path Infection report path to read.
+     *
+     * @return InfectionReport - fully validated report; only returned once every stats key and section row passed validation, so callers never see a
+     *                         partial parse
      * @throws MutationReportException When the report is missing, unreadable, invalid JSON, or structurally invalid.
-     * @return InfectionReport Parsed mutation report.
      */
     public function parse(string $path): InfectionReport
     {
@@ -71,7 +74,9 @@ final readonly class InfectionReportParser
      * Resolve and validate a report path.
      *
      * @param string $path Caller-supplied report path, absolute or relative to the project root.
-     * @return string Absolute report path when realpath is available.
+     *
+     * @return string - canonical absolute path, or the unresolved candidate when realpath fails (e.g. broken symlink); the file is guaranteed to
+     *                exist at return time
      */
     private function resolvePath(string $path): string
     {
@@ -92,7 +97,8 @@ final readonly class InfectionReportParser
      *
      * @param JsonObject $decoded
      * @param string     $path Original report path, used only to label validation failures.
-     * @return array<string, int|float>
+     *
+     * @return array<string, int|float> - report stats keyed by Infection metric name; guaranteed to include the four required MSI keys
      */
     private function parseStats(array $decoded, string $path): array
     {
@@ -127,7 +133,9 @@ final readonly class InfectionReportParser
      * @param string $status       Normalised mutant status already mapped from the section name.
      * @param string $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
      * @param string $path         Original report path, used only to label validation failures.
-     * @return InfectionMutant Parsed mutant record.
+     *
+     * @return InfectionMutant - one validated mutant carrying the normalised status, display file path, and start line; empty diff/processOutput
+     *                         strings are collapsed to null
      */
     private function parseMutant(mixed $mutantRecord, string $status, string $location, string $path): InfectionMutant
     {
@@ -153,11 +161,13 @@ final readonly class InfectionReportParser
      * @param JsonObject $mutantRecord Already-validated mutant object to pull the "mutator" entry from.
      * @param string     $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
      * @param string     $path         Original report path, used only to label validation failures.
-     * @return JsonObject
+     *
+     * @return JsonObject - the validated mutator sub-object for this mutant row
      */
     private function requireMutatorObject(array $mutantRecord, string $location, string $path): array
     {
         $mutator = $mutantRecord['mutator'] ?? null;
+
         // A missing or non-object mutator key is a malformed report, so reuse the object guard to reject it.
         return $this->requireJsonObject($mutator, sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
     }
@@ -167,7 +177,8 @@ final readonly class InfectionReportParser
      *
      * @param mixed  $decodedValue Decoded value expected to be a string-keyed array, not a list or scalar.
      * @param string $message      Exception message thrown verbatim when the value is not an object.
-     * @return JsonObject
+     *
+     * @return JsonObject - a freshly built string-keyed map containing only the shape-validated entries
      */
     private function requireJsonObject(mixed $decodedValue, string $message): array
     {
@@ -192,7 +203,8 @@ final readonly class InfectionReportParser
      * Normalise one decoded Infection JSON value.
      *
      * @param mixed $decodedValue One decoded value, routed to array narrowing or scalar validation by type.
-     * @return JsonValue
+     *
+     * @return JsonValue - the value narrowed to the supported nested-array or leaf-scalar shape
      */
     private function jsonValue(mixed $decodedValue): array|bool|float|int|string|null
     {
@@ -209,7 +221,8 @@ final readonly class InfectionReportParser
      * Validate scalar Infection JSON values after decoding.
      *
      * @param mixed $decodedValue Value that must already be a bool, int, float, string, or null; else throws.
-     * @return JsonScalar
+     *
+     * @return JsonScalar - the value unchanged once proven to be a permitted bool, int, float, string, or null
      */
     private function jsonScalar(mixed $decodedValue): bool|float|int|string|null
     {
@@ -225,7 +238,9 @@ final readonly class InfectionReportParser
      * Keep decoded mutation-report values within the supported nested JSON shape.
      *
      * @param array<array-key, mixed> $values
-     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>>
+     *
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>> - the array
+     *                          narrowed to the supported four-deep nesting shape
      */
     private function jsonArray(array $values): array
     {
@@ -243,7 +258,9 @@ final readonly class InfectionReportParser
      * Keep second-level mutation-report values within the supported JSON shape.
      *
      * @param array<array-key, mixed> $values
-     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>>
+     *
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar|array<array-key, JsonScalar>>> - the second-level array narrowed to permit at
+     *                          most three further nesting layers
      */
     private function jsonArrayDepth2(array $values): array
     {
@@ -261,7 +278,8 @@ final readonly class InfectionReportParser
      * Keep third-level mutation-report values within the supported JSON shape.
      *
      * @param array<array-key, mixed> $values
-     * @return array<array-key, JsonScalar|array<array-key, JsonScalar>>
+     *
+     * @return array<array-key, JsonScalar|array<array-key, JsonScalar>> - the third-level array narrowed to permit at most one further nested array
      */
     private function jsonArrayDepth3(array $values): array
     {
@@ -279,7 +297,8 @@ final readonly class InfectionReportParser
      * Keep fourth-level mutation-report values as scalar JSON values.
      *
      * @param array<array-key, mixed> $values
-     * @return array<array-key, JsonScalar>
+     *
+     * @return array<array-key, JsonScalar> - the deepest supported level, where every entry is a flat scalar
      */
     private function jsonArrayDepth4(array $values): array
     {
@@ -303,7 +322,7 @@ final readonly class InfectionReportParser
      * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
      * @param string     $path     Original report path, used only to label validation failures.
      *
-     * @return string Required mutator field value.
+     * @return string - the requested field's value, guaranteed non-empty; a missing or empty field throws rather than returning a blank string
      */
     private function requireMutatorString(array $mutator, string $field, string $location, string $path): string
     {
@@ -321,7 +340,8 @@ final readonly class InfectionReportParser
      * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
      * @param string     $path     Original report path, used only to label validation failures.
      *
-     * @return int|null Original start line, or null when absent.
+     * @return int|null - the originalStartLine when present; null means the report simply omitted it (an expected miss, not a parse failure), while
+     *                  a non-integer value throws
      */
     private function optionalMutatorLine(array $mutator, string $location, string $path): ?int
     {
@@ -337,20 +357,20 @@ final readonly class InfectionReportParser
     /**
      * Map Infection status section keys to normalised mutant statuses.
      *
-     * @return array<string, string>
+     * @return array<string, string> - map from Infection JSON section name to the human-facing status gruff reports
      */
     private function statusSections(): array
     {
         // Keys are Infection's JSON section names; values are the human-facing statuses gruff reports.
         return [
-            'escaped' => 'escaped',
-            'timeouted' => 'timed out',
-            'killed' => 'killed',
+            'escaped'                => 'escaped',
+            'timeouted'              => 'timed out',
+            'killed'                 => 'killed',
             'killedByStaticAnalysis' => 'killed by SA',
-            'errored' => 'error',
-            'syntaxErrors' => 'syntax error',
-            'uncovered' => 'not covered',
-            'ignored' => 'ignored',
+            'errored'                => 'error',
+            'syntaxErrors'           => 'syntax error',
+            'uncovered'              => 'not covered',
+            'ignored'                => 'ignored',
         ];
     }
 
@@ -358,7 +378,9 @@ final readonly class InfectionReportParser
      * Convert an absolute report path to a project-relative display path when possible.
      *
      * @param string $path Absolute or canonical filesystem path to render for display.
-     * @return string Display path for report metadata.
+     *
+     * @return string - project-relative path for readable output, falling back to the canonical absolute path when the file sits outside the project
+     *                root
      */
     private function displayPath(string $path): string
     {

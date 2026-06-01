@@ -10,7 +10,8 @@ use GruffPhp\Support\PathHelper;
  * Normalises scalar and list configuration values into validated string lists.
  *
  * @phpstan-type ConfigScalar bool|float|int|object|string|null
- * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar>>>>
+ * @phpstan-type ConfigValue ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key, ConfigScalar|array<array-key,
+ *               ConfigScalar>>>>
  */
 final readonly class StringListConfigParser
 {
@@ -19,7 +20,8 @@ final readonly class StringListConfigParser
      * @param string      $path            Config path used in validation messages.
      * @param bool        $hasPathPatterns Whether values are interpreted as path patterns.
      * @param bool        $allowsGlobs     Whether glob-like wildcard patterns are accepted.
-     * @return list<string>
+     *
+     * @return list<string> - deduplicated, reindexed strings in first-seen order; empty when the input list is empty
      * @throws ConfigException When the config value is not a valid string list.
      */
     public function parse(object|array|string|int|float|bool|null $configValue, string $path, bool $hasPathPatterns, bool $allowsGlobs): array
@@ -42,19 +44,20 @@ final readonly class StringListConfigParser
     /**
      * Normalize one configured string and validate optional path-pattern rules.
      *
-     * @param mixed      $rawConfigValue One list element; must be a non-empty string or the call throws.
+     * @param mixed      $rawConfigValue  One list element; must be a non-empty string or the call throws.
      * @param string     $path            Parent config key, prefixed onto error messages for locatability.
      * @param int|string $index           Element's position in the list, appended to the key to pinpoint a bad entry.
      * @param bool       $hasPathPatterns When true, the value must also pass project-relative path-pattern checks.
      * @param bool       $allowsGlobs     When true, `*` wildcards are allowed; only read under $hasPathPatterns.
-     * @return string Trimmed string with directory separators normalized.
+     *
+     * @return string - canonical form: input trimmed and every backslash folded to `/` for path comparison
      */
     private function normalizedString(
-        mixed $rawConfigValue,
-        string $path,
+        mixed      $rawConfigValue,
+        string     $path,
         int|string $index,
-        bool $hasPathPatterns,
-        bool $allowsGlobs,
+        bool       $hasPathPatterns,
+        bool       $allowsGlobs,
     ): string {
         if (!is_string($rawConfigValue) || trim($rawConfigValue) === '') {
             throw new ConfigException(sprintf('Config key "%s.%s" must be a non-empty string.', $path, $index));
@@ -78,6 +81,7 @@ final readonly class StringListConfigParser
      * @param string     $path        Parent config key, prefixed onto the rejection message for locatability.
      * @param int|string $index       List position, appended to the key to pinpoint the offending entry.
      * @param bool       $allowsGlobs When false, any `*` in the pattern is rejected as unsupported glob syntax.
+     *
      * @return void
      */
     private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowsGlobs): void

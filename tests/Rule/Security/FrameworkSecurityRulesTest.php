@@ -68,7 +68,7 @@ final class FrameworkSecurityRulesTest extends TestCase
 
         self::assertCount(2, $findings);
 
-        $directives = array_map(static fn (Finding $finding): mixed => $finding->metadata['directive'] ?? null, $findings);
+        $directives = array_map(static fn(Finding $finding): mixed => $finding->metadata['directive'] ?? null, $findings);
         self::assertContains('display_errors', $directives);
         self::assertContains('display_startup_errors', $directives);
     }
@@ -78,19 +78,20 @@ final class FrameworkSecurityRulesTest extends TestCase
      *
      * @param string $displayPath Fixture display path.
      * @param string $ruleId      Rule identifier to filter for.
-     * @return list<Finding>
+     *
+     * @return list<Finding> - findings emitted by the named rule for the fixture; empty when the rule did not fire
      */
     private function findingsForRule(string $displayPath, string $ruleId): array
     {
         $unit     = (new PhpFileParser())->parse(new SourceFile(
-            self::PROJECT_ROOT . '/' . $displayPath,
-            $displayPath,
-            SourceFile::TYPE_PHP,
-        ));
+                                                     self::PROJECT_ROOT . '/' . $displayPath,
+                                                     $displayPath,
+                                                     SourceFile::TYPE_PHP,
+                                                 ));
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         // The filtered list isolates the framework-misconfiguration rule under test.
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->ruleId === $ruleId));
+        return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId));
     }
 }

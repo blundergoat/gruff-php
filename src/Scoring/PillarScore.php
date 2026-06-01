@@ -23,13 +23,13 @@ final readonly class PillarScore
      */
     public function __construct(
         public string $pillar,
-        public bool $applicable,
+        public bool   $applicable,
         public ?Grade $grade,
-        public int $findings,
-        public int $advisory,
-        public int $warning,
-        public int $error,
-        public float $penalty,
+        public int    $findings,
+        public int    $advisory,
+        public int    $warning,
+        public int    $error,
+        public float  $penalty,
     ) {
     }
 
@@ -44,21 +44,22 @@ final readonly class PillarScore
      *     warning: int,
      *     error: int,
      *     penalty: float
-     * }
+     * } - report-ready snapshot of this pillar; score and grade are null when the pillar is inapplicable, and penalty is rounded to 2 decimals to
+     * match report precision
      */
     public function toArray(): array
     {
         // score and grade are null for an inapplicable pillar (no grade); penalty is rounded to match report precision.
         return [
-            'pillar' => $this->pillar,
+            'pillar'     => $this->pillar,
             'applicable' => $this->applicable,
-            'score' => $this->grade?->score,
-            'grade' => $this->grade?->letter,
-            'findings' => $this->findings,
-            'advisory' => $this->advisory,
-            'warning' => $this->warning,
-            'error' => $this->error,
-            'penalty' => round($this->penalty, 2),
+            'score'      => $this->grade?->score,
+            'grade'      => $this->grade?->letter,
+            'findings'   => $this->findings,
+            'advisory'   => $this->advisory,
+            'warning'    => $this->warning,
+            'error'      => $this->error,
+            'penalty'    => round($this->penalty, 2),
         ];
     }
 }

@@ -32,8 +32,8 @@ final readonly class ThresholdTrip
      */
     public function __construct(
         public string $thresholdKind,
-        public int $count,
-        public int $cap,
+        public int    $count,
+        public int    $cap,
         public string $scope = self::SCOPE_TOTAL,
     ) {
     }
@@ -42,7 +42,8 @@ final readonly class ThresholdTrip
      * Return a copy of this trip re-scoped to the given finding set.
      *
      * @param string $scope Scope to apply: "total" or "new".
-     * @return self Trip carrying the requested scope.
+     *
+     * @return self - new trip with the same kind/count/cap but the supplied scope; the original is left unchanged
      */
     public function withScope(string $scope): self
     {
@@ -53,7 +54,7 @@ final readonly class ThresholdTrip
     /**
      * Build a one-line human-readable description of the trip.
      *
-     * @return string Failure explanation suitable for CI logs.
+     * @return string - one-line gate-failure explanation naming the overflowing severity (or total) and the breached cap
      */
     public function message(): string
     {
@@ -68,17 +69,18 @@ final readonly class ThresholdTrip
     /**
      * Serialize this value object into the array shape used by reports.
      *
-     * @return array{thresholdKind: string, count: int, cap: int, scope: string, message: string}
+     * @return array{thresholdKind: string, count: int, cap: int, scope: string, message: string} - flat report payload with the pre-rendered message
+     *                              included alongside the raw fields
      */
     public function toArray(): array
     {
         // Pre-render the message into the payload so report consumers never rebuild the wording themselves.
         return [
             'thresholdKind' => $this->thresholdKind,
-            'count' => $this->count,
-            'cap' => $this->cap,
-            'scope' => $this->scope,
-            'message' => $this->message(),
+            'count'         => $this->count,
+            'cap'           => $this->cap,
+            'scope'         => $this->scope,
+            'message'       => $this->message(),
         ];
     }
 }

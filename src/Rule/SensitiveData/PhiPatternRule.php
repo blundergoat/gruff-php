@@ -26,7 +26,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * List the regex patterns enforced by this rule.
      *
-     * @return list<array{name: string, pattern: string}>
+     * @return list<array{name: string, pattern: string}> - one entry per identifier family; name keys the context check and message, pattern is the
+     *                          matching regex
      */
     private function patterns(): array
     {
@@ -43,7 +44,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Describe the PHI identifier pattern rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - the rule's id, pillar, tier, and default Warning/Medium severity used by the registry
      */
     public function definition(): RuleDefinition
     {
@@ -64,7 +65,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit Parsed unit to inspect.
      * @param RuleContext  $ruleContext  Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> Findings for contextual PHI-like identifiers.
+     * @return list<\GruffPhp\Finding\Finding> - one finding per non-comment, non-placeholder pattern hit that had PHI context on its line; empty
+     *                                         when none qualify
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -123,7 +125,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      * @param string $line     Source line that produced the candidate match.
      * @param string $detector Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
      *
-     * @return bool True when the line supports a PHI finding.
+     * @return bool - true when the line names this detector or any health-domain keyword, so a raw pattern hit may become a finding
      */
     private function hasPhiContext(string $line, string $detector): bool
     {
@@ -131,14 +133,14 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
 
         // True when the line names this detector or any health-domain keyword, gating raw pattern hits.
         return str_contains($normalized, $detector)
-            || str_contains($normalized, 'health')
-            || str_contains($normalized, 'medicare')
-            || str_contains($normalized, 'mrn')
-            || str_contains($normalized, 'nhi')
-            || str_contains($normalized, 'patient')
-            || str_contains($normalized, 'ssn')
-            || str_contains($normalized, 'tax_file_number')
-            || str_contains($normalized, 'tfn');
+               || str_contains($normalized, 'health')
+               || str_contains($normalized, 'medicare')
+               || str_contains($normalized, 'mrn')
+               || str_contains($normalized, 'nhi')
+               || str_contains($normalized, 'patient')
+               || str_contains($normalized, 'ssn')
+               || str_contains($normalized, 'tax_file_number')
+               || str_contains($normalized, 'tfn');
     }
 
     /**
@@ -148,7 +150,8 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      * @param string $candidateSecret Matched identifier text; punctuation is stripped before comparison.
      * @param string $displayPath     Unit path; example/placeholder wording only suppresses under docs/.
      *
-     * @return bool True when the line describes non-real sample data.
+     * @return bool - true to suppress the match as sample data: the known fund-membership placeholder, or an example/placeholder/sample line under
+     *              docs/
      */
     private function isPlaceholderPhiLine(string $line, string $candidateSecret, string $displayPath): bool
     {
@@ -167,9 +170,9 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
 
         // Under docs/, suppress lines that flag themselves as examples, placeholders, or snippets.
         return str_contains($normalizedLine, 'example')
-            || str_contains($normalizedLine, 'placeholder')
-            || str_contains($normalizedLine, 'sample')
-            || str_contains($normalizedLine, 'source_snippet');
+               || str_contains($normalizedLine, 'placeholder')
+               || str_contains($normalizedLine, 'sample')
+               || str_contains($normalizedLine, 'source_snippet');
     }
 
     /**
@@ -178,7 +181,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      * @param string $source     Full unit source to slice by newline.
      * @param int    $lineNumber 1-based line to read; out-of-range numbers yield an empty string.
      *
-     * @return string Line text, or an empty string when unavailable.
+     * @return string - the requested line's text, or an empty string when the line number is past the end of the source
      */
     private function lineText(string $source, int $lineNumber): string
     {

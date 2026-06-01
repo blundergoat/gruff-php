@@ -11,7 +11,8 @@ final readonly class IdentifierTokenizer
 {
     /**
      * @param string $identifier Identifier text to split into words.
-     * @return list<string>
+     *
+     * @return list<string> - lowercased word tokens in source order; empty when the identifier holds only separators
      */
     public function tokenize(string $identifier): array
     {

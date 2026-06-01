@@ -42,7 +42,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Build a finding fixture for assertions.
      *
-     * @return Finding
+     * @return Finding - one fixed advisory documentation finding the store round-trips through these tests
      */
     private function finding(): Finding
     {
@@ -62,7 +62,7 @@ final class BaselineStoreTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to a freshly created unique temp dir for the caller to populate and tear down
      */
     private function tempDir(): string
     {
@@ -78,6 +78,7 @@ final class BaselineStoreTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void

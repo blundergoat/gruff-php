@@ -9,7 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
 /**
- * Covers agent workflow CLI flows: list-rules metadata, display filters, SARIF output, branch-review introduced/removed/line-shifted findings, changed-only scoping, and review-mode option validation.
+ * Covers agent workflow CLI flows: list-rules metadata, display filters, SARIF output, branch-review introduced/removed/line-shifted findings,
+ * changed-only scoping, and review-mode option validation.
  */
 final class AgentWorkflowCliTest extends TestCase
 {
@@ -19,8 +20,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify list rules JSON includes identifier quality metadata.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testListRulesJsonIncludesIdentifierQualityMetadata(): void
     {
@@ -47,23 +48,23 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify display filters are report metadata and do not enable rules.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testDisplayFiltersAreReportMetadataAndDoNotEnableRules(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Naming',
-            '--format=json',
-            '--fail-on=none',
-            '--no-config',
-            '--no-baseline',
-            '--include-rule=naming.identifier-quality',
-            '--min-severity=warning',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Naming',
+                                   '--format=json',
+                                   '--fail-on=none',
+                                   '--no-config',
+                                   '--no-baseline',
+                                   '--include-rule=naming.identifier-quality',
+                                   '--min-severity=warning',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -85,22 +86,22 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify SARIF output is JSON and contains findings.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testSarifOutputIsJsonAndContainsFindings(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            'tests/Fixtures/Naming',
-            '--format=sarif',
-            '--fail-on=none',
-            '--no-config',
-            '--no-baseline',
-            '--include-rule=naming.identifier-quality',
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   'tests/Fixtures/Naming',
+                                   '--format=sarif',
+                                   '--fail-on=none',
+                                   '--no-config',
+                                   '--no-baseline',
+                                   '--include-rule=naming.identifier-quality',
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
@@ -115,36 +116,36 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify paths relative to normalizes JSON finding files.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testPathsRelativeToNormalizesJsonFindingFiles(): void
     {
         $process = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            self::PROJECT_ROOT . '/tests/Fixtures/Naming',
-            '--format=json',
-            '--fail-on=none',
-            '--no-config',
-            '--no-baseline',
-            '--include-rule=naming.identifier-quality',
-            '--paths-relative-to=' . self::PROJECT_ROOT,
-        ], self::PROJECT_ROOT);
+                                   PHP_BINARY,
+                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                   'analyse',
+                                   self::PROJECT_ROOT . '/tests/Fixtures/Naming',
+                                   '--format=json',
+                                   '--fail-on=none',
+                                   '--no-config',
+                                   '--no-baseline',
+                                   '--include-rule=naming.identifier-quality',
+                                   '--paths-relative-to=' . self::PROJECT_ROOT,
+                               ], self::PROJECT_ROOT);
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $report = $this->decodeJson($process);
 
-        $files = array_map(
-            fn (mixed $findingValue): string => $this->stringValue($this->stringKeyedArray($findingValue), 'file'),
+        $files           = array_map(
+            fn(mixed $findingValue): string => $this->stringValue($this->stringKeyedArray($findingValue), 'file'),
             $this->listValue($report, 'findings'),
         );
         $unexpectedFiles = array_values(array_filter(
-            $files,
-            static fn (string $file): bool => !str_starts_with($file, 'tests/Fixtures/Naming/'),
-        ));
+                                            $files,
+                                            static fn(string $file): bool => !str_starts_with($file, 'tests/Fixtures/Naming/'),
+                                        ));
 
         self::assertSame([], $unexpectedFiles, sprintf('Unexpected finding files: %s', implode(', ', $unexpectedFiles)));
     }
@@ -152,8 +153,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review keeps line shifted finding unchanged and reports introduced.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewKeepsLineShiftedFindingUnchangedAndReportsIntroduced(): void
     {
@@ -172,18 +173,18 @@ final class AgentWorkflowCliTest extends TestCase
             file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::changedExampleSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -202,18 +203,18 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertContains('Example::calculate()', $unchangedSymbols);
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=markdown',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=markdown',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -228,8 +229,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review reports removed findings.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewReportsRemovedFindings(): void
     {
@@ -248,18 +249,18 @@ final class AgentWorkflowCliTest extends TestCase
             file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::baseExampleSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -279,8 +280,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review added file does not fail base snapshot.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewAddedFileDoesNotFailBaseSnapshot(): void
     {
@@ -300,18 +301,18 @@ final class AgentWorkflowCliTest extends TestCase
             $this->runGit($repo, 'add', 'src/NewRisk.php');
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src/NewRisk.php',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src/NewRisk.php',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -331,8 +332,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review changed only without paths scopes current scan to changed files.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewChangedOnlyWithoutPathsScopesCurrentScanToChangedFiles(): void
     {
@@ -352,17 +353,17 @@ final class AgentWorkflowCliTest extends TestCase
             file_put_contents($repo . '/src/Target.php', AgentWorkflowFixtureSources::changedExampleSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -385,8 +386,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify changed-only review gives project rules full context before changed-file filtering.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules(): void
     {
@@ -407,17 +408,17 @@ final class AgentWorkflowCliTest extends TestCase
             file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', AgentWorkflowFixtureSources::changedBookingGatewayInterfaceSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--include-rule=design.single-implementor-interface',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--include-rule=design.single-implementor-interface',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -445,8 +446,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify branch review deleted file reports removed findings.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testBranchReviewDeletedFileReportsRemovedFindings(): void
     {
@@ -465,18 +466,18 @@ final class AgentWorkflowCliTest extends TestCase
             unlink($repo . '/src/Deleted.php');
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                       '--changed-only',
+                                       '--exclude-rule=docs.return-comment',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -490,18 +491,18 @@ final class AgentWorkflowCliTest extends TestCase
             self::assertContains('Example::oldRisk()', $this->symbolsFromFindings($review['removed'] ?? null));
 
             $explicitPathProcess = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src/Deleted.php',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-                '--changed-only',
-                '--exclude-rule=docs.return-comment',
-            ], $repo);
+                                                   PHP_BINARY,
+                                                   self::PROJECT_ROOT . '/bin/gruff-php',
+                                                   'analyse',
+                                                   'src/Deleted.php',
+                                                   '--format=json',
+                                                   '--fail-on=none',
+                                                   '--no-config',
+                                                   '--no-baseline',
+                                                   '--diff-vs=HEAD',
+                                                   '--changed-only',
+                                                   '--exclude-rule=docs.return-comment',
+                                               ], $repo);
             $explicitPathProcess->run();
 
             self::assertSame(0, $explicitPathProcess->getExitCode(), $explicitPathProcess->getOutput() . $explicitPathProcess->getErrorOutput());
@@ -521,8 +522,8 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Verify review mode reports non Git diagnostic.
      *
-     * @throws JsonException
      * @return void
+     * @throws JsonException
      */
     public function testReviewModeReportsNonGitDiagnostic(): void
     {
@@ -533,16 +534,16 @@ final class AgentWorkflowCliTest extends TestCase
             file_put_contents($repo . '/src/Example.php', AgentWorkflowFixtureSources::baseExampleSource());
 
             $process = new Process([
-                PHP_BINARY,
-                self::PROJECT_ROOT . '/bin/gruff-php',
-                'analyse',
-                'src',
-                '--format=json',
-                '--fail-on=none',
-                '--no-config',
-                '--no-baseline',
-                '--diff-vs=HEAD',
-            ], $repo);
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       'src',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff-vs=HEAD',
+                                   ], $repo);
             $process->run();
 
             self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
@@ -562,24 +563,24 @@ final class AgentWorkflowCliTest extends TestCase
     public function testReviewModeInvalidOptionCombinationsFailEarly(): void
     {
         $changedOnlyProcess = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            '--changed-only',
-        ], self::PROJECT_ROOT);
+                                              PHP_BINARY,
+                                              self::PROJECT_ROOT . '/bin/gruff-php',
+                                              'analyse',
+                                              '--changed-only',
+                                          ], self::PROJECT_ROOT);
         $changedOnlyProcess->run();
 
         self::assertSame(2, $changedOnlyProcess->getExitCode(), $changedOnlyProcess->getOutput() . $changedOnlyProcess->getErrorOutput());
         self::assertStringContainsString('--changed-only requires --diff-vs.', $changedOnlyProcess->getOutput());
 
         $diffConflictProcess = new Process([
-            PHP_BINARY,
-            self::PROJECT_ROOT . '/bin/gruff-php',
-            'analyse',
-            '--diff',
-            'working-tree',
-            '--diff-vs=HEAD',
-        ], self::PROJECT_ROOT);
+                                               PHP_BINARY,
+                                               self::PROJECT_ROOT . '/bin/gruff-php',
+                                               'analyse',
+                                               '--diff',
+                                               'working-tree',
+                                               '--diff-vs=HEAD',
+                                           ], self::PROJECT_ROOT);
         $diffConflictProcess->run();
 
         self::assertSame(2, $diffConflictProcess->getExitCode(), $diffConflictProcess->getOutput() . $diffConflictProcess->getErrorOutput());
@@ -590,6 +591,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Decode a finished CLI process's stdout into a string-keyed payload.
      *
      * @param Process $process - finished CLI process whose stdout holds the report JSON; caller must run it first.
+     *
      * @return array<string, mixed>
      * @throws JsonException
      */
@@ -605,8 +607,9 @@ final class AgentWorkflowCliTest extends TestCase
      * Read an associative array from decoded JSON output.
      *
      * @param array<string, mixed> $payload
-     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
-     * @return array<string, mixed>
+     * @param string               $key - key whose value must itself be a string-keyed array; missing key asserts.
+     *
+     * @return array<string, mixed> - the nested JSON object at that key, ready for further key reads
      */
     private function arrayValue(array $payload, string $key): array
     {
@@ -616,8 +619,9 @@ final class AgentWorkflowCliTest extends TestCase
 
     /**
      * @param array<string, mixed> $payload
-     * @param string               $key     - key whose value must be an int; a non-int (or missing) value fails the test.
-     * @return int Integer payload value.
+     * @param string               $key - key whose value must be an int; a non-int (or missing) value fails the test.
+     *
+     * @return int - the value at that key, asserted to be an int so callers can use it without re-checking
      */
     private function intValue(array $payload, string $key): int
     {
@@ -632,8 +636,9 @@ final class AgentWorkflowCliTest extends TestCase
      * Read a list from decoded JSON output.
      *
      * @param array<string, mixed> $payload
-     * @param string               $key     - key whose value must be a list; missing key resolves to null and asserts.
-     * @return list<mixed>
+     * @param string               $key - key whose value must be a list; missing key resolves to null and asserts.
+     *
+     * @return list<mixed> - the JSON array at that key, reindexed to 0-based order
      */
     private function listValue(array $payload, string $key): array
     {
@@ -643,8 +648,9 @@ final class AgentWorkflowCliTest extends TestCase
 
     /**
      * @param array<string, mixed> $payload
-     * @param string               $key     - key whose value must be a string; a non-string (or missing) value fails.
-     * @return string String payload value.
+     * @param string               $key - key whose value must be a string; a non-string (or missing) value fails.
+     *
+     * @return string - the value at that key, asserted to be a string so callers can use it without re-checking
      */
     private function stringValue(array $payload, string $key): string
     {
@@ -659,7 +665,8 @@ final class AgentWorkflowCliTest extends TestCase
      * Extract diagnostic type names from decoded JSON output.
      *
      * @param array<string, mixed> $payload
-     * @return list<string>
+     *
+     * @return list<string> - diagnostic type names in diagnostics order; empty when the report has no diagnostics
      */
     private function diagnosticTypes(array $payload): array
     {
@@ -678,7 +685,8 @@ final class AgentWorkflowCliTest extends TestCase
      * Build symbols from findings for the branch-review workflow.
      *
      * @param mixed $findings - decoded `findings` value expected to be a list of finding objects; non-list fails the test.
-     * @return list<mixed>
+     *
+     * @return list<mixed> - one symbol string per finding, in finding order, with null where a finding has no symbol
      */
     private function symbolsFromFindings(mixed $findings): array
     {
@@ -697,7 +705,8 @@ final class AgentWorkflowCliTest extends TestCase
      * Validate that a decoded JSON value is a list.
      *
      * @param mixed $payload - decoded JSON value expected to be an array; a scalar or null fails the assertion.
-     * @return list<mixed>
+     *
+     * @return list<mixed> - the same values reindexed to a 0-based list, never object-style keys
      */
     private function mixedList(mixed $payload): array
     {
@@ -711,7 +720,8 @@ final class AgentWorkflowCliTest extends TestCase
      * Validate that a decoded JSON value is an associative array.
      *
      * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
-     * @return array<string, mixed>
+     *
+     * @return array<string, mixed> - only the confirmed string-keyed entries, narrowed for type-safe callers
      */
     private function stringKeyedArray(mixed $payload): array
     {
@@ -747,6 +757,7 @@ final class AgentWorkflowCliTest extends TestCase
      *
      * @param string $cwd  Working directory.
      * @param string $args Command arguments.
+     *
      * @return void
      */
     private function runGit(string $cwd, string ...$args): void
@@ -760,7 +771,7 @@ final class AgentWorkflowCliTest extends TestCase
     /**
      * Create a temporary directory for filesystem assertions.
      *
-     * @return string
+     * @return string - absolute path to the freshly created unique temp directory
      */
     private function tempDir(): string
     {
@@ -776,6 +787,7 @@ final class AgentWorkflowCliTest extends TestCase
      * Remove a temporary directory tree.
      *
      * @param string $path Filesystem path.
+     *
      * @return void
      */
     private function removeDir(string $path): void

@@ -18,7 +18,8 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers detection of overused PHPDoc mixed types with exemptions for unstructured array bags, generic templates, throws-only blocks, and untyped-signature mixed docs; checks advisory severity and modernisation pillar.
+ * Covers detection of overused PHPDoc mixed types with exemptions for unstructured array bags, generic templates, throws-only blocks, and
+ * untyped-signature mixed docs; checks advisory severity and modernisation pillar.
  */
 final class PhpDocMixedOveruseRuleTest extends TestCase
 {
@@ -39,9 +40,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         self::assertCount(26, $findings, 'Expected 26 phpdoc-mixed findings on the fixture.');
 
         $methodsFlagged = array_values(array_unique(array_map(
-            static fn (Finding $finding): string => $finding->symbol ?? '',
-            $findings,
-        )));
+                                                        static fn(Finding $finding): string => $finding->symbol ?? '',
+                                                        $findings,
+                                                    )));
         sort($methodsFlagged);
 
         self::assertSame(
@@ -96,9 +97,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         ];
 
         $unexpectedFindings = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => in_array($finding->symbol, $allowedSymbols, true),
-        ));
+                                               $findings,
+                                               static fn(Finding $finding): bool => in_array($finding->symbol, $allowedSymbols, true),
+                                           ));
 
         self::assertSame([], $unexpectedFindings);
     }
@@ -113,7 +114,7 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     public function testPreciseArrayShapeEnvelopesAreAllowedWhileLooseShapesStillFire(): void
     {
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
-        $symbols  = array_map(static fn (Finding $finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn(Finding $finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('PhpDocMixedOveruseFixture::preciseArrayShapeWithMixedLeaf()', $symbols);
         self::assertNotContains('PhpDocMixedOveruseFixture::preciseArrayShapeOptionalMixed()', $symbols);
@@ -133,21 +134,21 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->analyseFixture();
 
         $standaloneMixedParam = array_values(array_filter(
-            $this->phpdocMixedFindings($findings),
-            static fn (Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::standaloneMixedParam()',
-        ));
+                                                 $this->phpdocMixedFindings($findings),
+                                                 static fn(Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::standaloneMixedParam()',
+                                             ));
         self::assertSame([], $standaloneMixedParam, 'Standalone @param mixed must not fire when the signature already declares mixed.');
 
         $standaloneMixedReturn = array_values(array_filter(
-            $this->phpdocMixedFindings($findings),
-            static fn (Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::standaloneMixedReturn()',
-        ));
+                                                  $this->phpdocMixedFindings($findings),
+                                                  static fn(Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::standaloneMixedReturn()',
+                                              ));
         self::assertSame([], $standaloneMixedReturn);
 
         $standaloneMixedVar = array_values(array_filter(
-            $this->phpdocMixedFindings($findings),
-            static fn (Finding $finding): bool => $finding->symbol === '$standaloneMixedVar',
-        ));
+                                               $this->phpdocMixedFindings($findings),
+                                               static fn(Finding $finding): bool => $finding->symbol === '$standaloneMixedVar',
+                                           ));
         self::assertSame([], $standaloneMixedVar);
     }
 
@@ -161,9 +162,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         $untyped = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::untypedSignatureMixedDoc()',
-        ));
+                                    $findings,
+                                    static fn(Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::untypedSignatureMixedDoc()',
+                                ));
 
         self::assertCount(1, $untyped, 'PHPDoc-only mixed must flag when the signature is untyped.');
         self::assertSame('param', $untyped[0]->metadata['tagKind'] ?? null);
@@ -180,9 +181,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         $template = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::templateGeneric()',
-        ));
+                                     $findings,
+                                     static fn(Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::templateGeneric()',
+                                 ));
 
         self::assertSame([], $template, '@template T should not be confused with mixed.');
     }
@@ -197,9 +198,9 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         $throws = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::throwsOnly()',
-        ));
+                                   $findings,
+                                   static fn(Finding $finding): bool => $finding->symbol === 'PhpDocMixedOveruseFixture::throwsOnly()',
+                               ));
 
         self::assertSame([], $throws, '@throws is never scanned.');
     }
@@ -214,10 +215,10 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->phpdocMixedFindings($this->analyseFixture());
 
         self::assertNotEmpty($findings);
-        $severityValues  = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
-        $pillarValues    = array_values(array_unique(array_map(static fn ($finding): string => $finding->pillar->value, $findings)));
-        $missingTagKinds = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['tagKind'] ?? null) === null));
-        $missingSnippets = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['snippet'] ?? '') === ''));
+        $severityValues  = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
+        $pillarValues    = array_values(array_unique(array_map(static fn($finding): string => $finding->pillar->value, $findings)));
+        $missingTagKinds = array_values(array_filter($findings, static fn($finding): bool => ($finding->metadata['tagKind'] ?? null) === null));
+        $missingSnippets = array_values(array_filter($findings, static fn($finding): bool => ($finding->metadata['snippet'] ?? '') === ''));
 
         self::assertSame([Severity::Advisory->value], $severityValues);
         self::assertSame([Pillar::Modernisation->value], $pillarValues);
@@ -235,11 +236,11 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $findings = $this->analyseFixture();
 
         $signatureMixed = array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === MixedTypeOveruseRule::ID,
-        ));
+                                           $findings,
+                                           static fn(Finding $finding): bool => $finding->ruleId === MixedTypeOveruseRule::ID,
+                                       ));
 
-        $symbols = array_map(static fn (Finding $finding): string => $finding->symbol ?? '', $signatureMixed);
+        $symbols = array_map(static fn(Finding $finding): string => $finding->symbol ?? '', $signatureMixed);
 
         self::assertContains(
             'standaloneMixedParam()',
@@ -252,21 +253,22 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      * Build phpdoc mixed findings for the modernisation rule.
      *
      * @param list<Finding> $findings
-     * @return list<Finding>
+     *
+     * @return list<Finding> - only the PHPDoc-mixed rule's findings, in input order; empty when none matched
      */
     private function phpdocMixedFindings(array $findings): array
     {
         // Keep only the PHPDoc-mixed rule's findings so other modernisation noise stays out of the assertion.
         return array_values(array_filter(
-            $findings,
-            static fn (Finding $finding): bool => $finding->ruleId === PhpDocMixedOveruseRule::ID,
-        ));
+                                $findings,
+                                static fn(Finding $finding): bool => $finding->ruleId === PhpDocMixedOveruseRule::ID,
+                            ));
     }
 
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @return list<Finding>
+     * @return list<Finding> - every default-registry finding raised on the fixture, across all rules and pillars
      */
     private function analyseFixture(): array
     {
@@ -284,7 +286,8 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
      * Parse the requested path into an analysis unit.
      *
      * @param string $path Filesystem path.
-     * @return AnalysisUnit
+     *
+     * @return AnalysisUnit - the parsed fixture whose display path mirrors the project-relative input
      */
     private function unitForPath(string $path): AnalysisUnit
     {

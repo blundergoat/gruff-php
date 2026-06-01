@@ -58,7 +58,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * Describe the PHPUnit strict flags rule.
      *
-     * @return RuleDefinition Rule metadata and defaults.
+     * @return RuleDefinition - the rule's identity, pillar, tier, and default severity/confidence used by the registry
      */
     public function definition(): RuleDefinition
     {
@@ -78,7 +78,9 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
      *
      * @param AnalysisUnit $analysisUnit Parsed unit used to decide whether the project has PHPUnit tests.
      * @param RuleContext  $ruleContext  Rule context carrying project root.
-     * @return list<Finding> Findings for missing strict PHPUnit flags.
+     *
+     * @return list<Finding> - one finding naming the absent strict flags, emitted once per project root; empty when fully configured or not a
+     *                       PHPUnit project
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -112,12 +114,12 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
         // At least one strict flag is absent, so risky/noisy tests could pass unnoticed; report the gap once.
         return [
             new Finding(
-                ruleId:  self::ID,
-                message: sprintf(
-                    '%s is missing strict-mode attribute(s): %s.',
-                    $config->displayPath,
-                    implode(', ', $missing),
-                ),
+                ruleId:      self::ID,
+                message:     sprintf(
+                                 '%s is missing strict-mode attribute(s): %s.',
+                                 $config->displayPath,
+                                 implode(', ', $missing),
+                             ),
                 filePath:    $config->displayPath,
                 line:        1,
                 severity:    Severity::Warning,
@@ -135,7 +137,8 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
      * List PHPUnit strictness flags missing from configuration.
      *
      * @param PhpUnitConfig $config Discovered config whose <phpunit> root attributes are checked for each flag.
-     * @return list<string>
+     *
+     * @return list<string> - missing strict flag names in STRICT_FLAGS order; empty when strictness is fully configured
      */
     private function missingFlags(PhpUnitConfig $config): array
     {
