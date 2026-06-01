@@ -36,6 +36,7 @@ final readonly class BaselineApplication
      * @param list<Finding>              $findings - Findings to generate from or filter in place.
      * @param DiffResult|null            $diff - Diff scope used to preserve changed-line findings when present.
      * @param list<RunDiagnostic>        $diagnostics - Diagnostics collected during baseline handling.
+     * @param bool                       $hasPartialScope - Whether the run scanned only part of the project, so absent baseline entries are not evaluated.
      *
      * @return BaselineReport|null - Baseline report when a baseline was generated or applied.
      */
@@ -45,6 +46,7 @@ final readonly class BaselineApplication
         array &$findings,
         ?DiffResult $diff,
         array &$diagnostics,
+        bool $hasPartialScope = false,
     ): ?BaselineReport {
         $baselineStore = new BaselineStore($projectRoot);
 
@@ -65,6 +67,7 @@ final readonly class BaselineApplication
             findings:    $findings,
             diff:        $diff,
             diagnostics: $diagnostics,
+            hasPartialScope: $hasPartialScope,
         );
     }
 
@@ -113,6 +116,7 @@ final readonly class BaselineApplication
      * @param list<Finding>              $findings - Filtered in place; replaced with the surviving (unmatched) set.
      * @param DiffResult|null            $diff - Changed-line findings stay unsuppressed; null disables diff scope.
      * @param list<RunDiagnostic>        $diagnostics - Accumulator; a read failure appends a baseline-error entry.
+     * @param bool                       $hasPartialScope - Whether files outside the scan scope cannot be marked absent/resolved.
      *
      * @return BaselineReport|null - Applied baseline report, or null when reading fails.
      */
@@ -122,10 +126,11 @@ final readonly class BaselineApplication
         array &$findings,
         ?DiffResult $diff,
         array &$diagnostics,
+        bool $hasPartialScope,
     ): ?BaselineReport {
         try {
             $baseline    = $store->read($options->baselinePath ?? '');
-            $application = (new BaselineFilter())->apply($baseline, $findings, $diff instanceof DiffResult && $diff->active);
+            $application = (new BaselineFilter())->apply($baseline, $findings, $hasPartialScope || ($diff instanceof DiffResult && $diff->active));
         } catch (BaselineException $exception) {
             $diagnostics[] = new RunDiagnostic(
                 type:    'baseline-error',

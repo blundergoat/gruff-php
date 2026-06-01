@@ -158,6 +158,7 @@ final class TestQualityNodeHelper
     {
         $docText = $classMethod->getDocComment()?->getText() ?? '';
 
+        // Match a standalone PHPUnit @test annotation line inside the method docblock.
         return preg_match('/^\s*\*\s*@test\b/m', $docText) === 1;
     }
 

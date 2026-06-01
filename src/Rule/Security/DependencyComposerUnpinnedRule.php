@@ -113,12 +113,36 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     {
         $normalized = strtolower(trim($constraint));
 
+        foreach (preg_split('/\s*\|\|?\s*/', $normalized) ?: [$normalized] as $alternative) {
+            if ($this->isUnpinnedAlternative($alternative)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Decide whether a single Composer constraint alternative is unpinned.
+     *
+     * @param string $constraint - One OR-separated Composer version alternative.
+     *
+     * @return bool - True when the alternative is wildcarded, branch-based, or missing an upper bound.
+     */
+    private function isUnpinnedAlternative(string $constraint): bool
+    {
+        $normalized = trim($constraint);
+
         if ($normalized === '*' || $normalized === '') {
             // A wildcard or empty constraint accepts any published version, so the install is non-reproducible.
             return true;
         }
 
-        if (str_starts_with($normalized, 'dev-')) {
+        if (str_contains($normalized, '*')) {
+            return true;
+        }
+
+        if (str_starts_with($normalized, 'dev-') || str_ends_with($normalized, '@dev')) {
             // A dev- branch tracks a moving HEAD, not a release, so resolved code can change silently.
             return true;
         }

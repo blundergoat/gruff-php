@@ -6,6 +6,7 @@ namespace GruffPhp\Cache;
 
 use GruffPhp\Finding\Finding;
 use JsonException;
+use Throwable;
 
 /**
  * Content-addressed, on-disk cache of per-file findings for warm hook feedback.
@@ -86,8 +87,12 @@ final readonly class ResultCache
                 return null;
             }
 
-            /** @var array<string, mixed> $entry A cached row is a string-keyed finding payload; the is_array guard cannot express that to PHPStan. */
-            $findings[] = Finding::fromArray($entry);
+            try {
+                /** @var array<string, mixed> $entry A cached row is a string-keyed finding payload; the is_array guard cannot express that to PHPStan. */
+                $findings[] = Finding::fromArray($entry);
+            } catch (Throwable) {
+                return null;
+            }
         }
 
         return $findings;

@@ -338,26 +338,100 @@ final class GitDiffProviderTest extends TestCase
     }
 
     /**
-     * Verify unified diff stdin parsing exposes changed files and hunk ranges.
+     * Verify symbol scope widens to the owning method, not an inner control-flow block.
      *
      * @return void
      */
-    public function testUnifiedDiffParserParsesPatchText(): void
+    public function testDiffFindingFilterSymbolScopeUsesOwningMethodNotControlFlowBlock(): void
     {
-        $patch = <<<'PATCH'
+        $unit       = $this->analysisUnit('src/Example.php', $this->controlFlowScopeSource());
+        $diffResult = new DiffResult(
+            active:       true,
+            mode:         'explicit-ranges',
+            base:         null,
+            changedLines: ['src/Example.php' => [new ChangedLineRange(9, 9)]],
+            changedFiles: ['src/Example.php'],
+            message:      'test',
+        );
+
+        $result = (new DiffFindingFilter())->apply(
+            [$this->finding('src/Example.php', 7)],
+            $diffResult,
+            [$unit],
+            DiffFindingFilter::SCOPE_SYMBOL,
+        );
+
+        self::assertCount(1, $result->findings);
+        self::assertSame(7, $result->findings[0]->line);
+        self::assertSame(0, $result->suppressedCount);
+    }
+
+    /**
+     * Provide unified-diff parser cases for changed-line range assertions.
+     *
+     * @return array<string, array{string, int, int}> - patch text plus the expected start and end line.
+     */
+    public static function unifiedDiffPatchProvider(): array
+    {
+        return [
+            'added lines' => [
+                <<<'PATCH'
 diff --git a/src/Example.php b/src/Example.php
 --- a/src/Example.php
 +++ b/src/Example.php
 @@ -10,0 +11,2 @@
 +        $value = 1;
 +        echo $value;
-PATCH;
+PATCH,
+                11,
+                12,
+            ],
+            'context lines ignored' => [
+                <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -10,3 +10,3 @@
+         $before = 1;
+-        $value = 1;
++        $value = 2;
+         $after = 3;
+PATCH,
+                11,
+                11,
+            ],
+            'deletion-only anchor' => [
+                <<<'PATCH'
+diff --git a/src/Example.php b/src/Example.php
+--- a/src/Example.php
++++ b/src/Example.php
+@@ -20,2 +20,0 @@
+-        $old = 1;
+-        $gone = 2;
+PATCH,
+                20,
+                20,
+            ],
+        ];
+    }
 
+    /**
+     * Verify unified diff parsing exposes changed files and added-line ranges.
+     *
+     * @param string $patch - Unified diff patch text.
+     * @param int    $expectedStart - Expected range start line.
+     * @param int    $expectedEnd - Expected range end line.
+     *
+     * @return void
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('unifiedDiffPatchProvider')]
+    public function testUnifiedDiffParserParsesChangedLineRanges(string $patch, int $expectedStart, int $expectedEnd): void
+    {
         $parsed = (new UnifiedDiffParser())->parse($patch);
 
         self::assertSame(['src/Example.php'], $parsed['files']);
         self::assertCount(1, $parsed['lines']['src/Example.php'] ?? []);
-        self::assertSame(['start' => 11, 'end' => 12], $parsed['lines']['src/Example.php'][0]->toArray());
+        self::assertSame(['start' => $expectedStart, 'end' => $expectedEnd], $parsed['lines']['src/Example.php'][0]->toArray());
     }
 
     /**
@@ -478,6 +552,26 @@ final class Example
 
     public function changed(): void
     {
+        echo 'new';
+    }
+}
+PHP;
+    }
+
+    /**
+     * @return string - PHP source with a finding inside an if block and an edit elsewhere in the same method
+     */
+    private function controlFlowScopeSource(): string
+    {
+        return <<<'PHP'
+<?php
+final class Example
+{
+    public function changed(): void
+    {
+        if (true) {
+            echo 'old';
+        }
         echo 'new';
     }
 }

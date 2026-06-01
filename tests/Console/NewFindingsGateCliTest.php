@@ -61,6 +61,46 @@ final class NewFindingsGateCliTest extends CliTestCase
     }
 
     /**
+     * Verify --fail-on-new does not also apply the default total-findings gate.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testFailOnNewDoesNotApplyDefaultTotalGate(): void
+    {
+        $this->writeCalc(true);
+        $this->git(['init', '-q']);
+        $this->git(['add', 'src/Calc.php', 'README.md']);
+        $this->git(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base']);
+
+        $process = $this->runGruff(['analyse', 'src', '--no-config', '--no-baseline', '--diff-vs', 'HEAD', '--fail-on-new', '--format', 'json']);
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $report = $this->decodeJsonOutput($process);
+        self::assertSame(0, $report['newFindingsCount'] ?? null);
+        self::assertArrayNotHasKey('failureReason', $report);
+    }
+
+    /**
+     * Verify explicit --fail-on overrides a configured new-findings gate unless --fail-on-new is also set.
+     *
+     * @return void
+     */
+    public function testExplicitFailOnOverridesConfiguredNewFindingsGate(): void
+    {
+        $this->writeProjectFile(
+            'gate.yaml',
+            "schemaVersion: gruff-php.config.v0.1\nfailureConditions:\n    newFindings:\n        severityThresholds:\n            error: 0\n",
+        );
+
+        $process = $this->runGruff(['analyse', 'src', '--config', 'gate.yaml', '--no-baseline', '--fail-on', 'none', '--format', 'text']);
+
+        self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+        self::assertStringNotContainsString('new-findings gate needs a reference point', $process->getOutput());
+    }
+
+    /**
      * Verify --fail-on-new fails with a "new" scope on a finding not in the baseline.
      *
      * @throws JsonException

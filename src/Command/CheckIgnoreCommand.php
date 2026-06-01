@@ -107,7 +107,14 @@ final class CheckIgnoreCommand extends Command
             ];
         }
 
-        $rendered = $this->render($results, $format, $output->isVerbose());
+        try {
+            $rendered = $this->render($results, $format, $output->isVerbose());
+        } catch (JsonException $exception) {
+            $output->writeln(sprintf('<error>JSON-ERROR %s</error>', $exception->getMessage()));
+
+            return Command::INVALID;
+        }
+
         if ($rendered !== null) {
             $output->write($rendered, false, OutputInterface::OUTPUT_RAW);
         }
@@ -194,19 +201,14 @@ final class CheckIgnoreCommand extends Command
      * @param bool   $isVerbose - When true, text output appends the matching source and pattern per path.
      *
      * @return string|null - Rendered output, or null when there is nothing to print.
+     * @throws JsonException When JSON mode cannot encode the result payload.
      */
     private function render(array $results, string $format, bool $isVerbose): ?string
     {
         if ($format === 'json') {
-            try {
-                // JSON mode reports every path (ignored or not) so machine consumers get the full
-                // decision set; pretty-print with unescaped slashes to keep paths human-readable.
-                return json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
-            } catch (JsonException) {
-                // Encoding failed, so emit nothing rather than partial JSON; the SUCCESS/FAILURE exit
-                // code still conveys whether any path matched.
-                return null;
-            }
+            // JSON mode reports every path (ignored or not) so machine consumers get the full
+            // decision set; pretty-print with unescaped slashes to keep paths human-readable.
+            return json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
         }
 
         $lines = [];

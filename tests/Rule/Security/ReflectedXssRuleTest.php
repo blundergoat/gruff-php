@@ -89,6 +89,25 @@ final class ReflectedXssRuleTest extends TestCase
     }
 
     /**
+     * Verify JSON encoding does not count as escaping for an HTML output sink.
+     *
+     * @return void
+     */
+    public function testJsonEncodeDoesNotCountAsHtmlEscaping(): void
+    {
+        $findings = $this->findingsForSource(<<<'PHP'
+<?php
+function render(): void
+{
+    echo json_encode($_GET['name']);
+}
+PHP);
+
+        self::assertCount(1, $findings);
+        self::assertSame(4, $findings[0]->line);
+    }
+
+    /**
      * Analyse a fixture and return only reflected-XSS findings.
      *
      * @param string $displayPath - Fixture display path.
@@ -106,5 +125,29 @@ final class ReflectedXssRuleTest extends TestCase
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === ReflectedXssRule::ID));
+    }
+
+    /**
+     * Analyse inline PHP source and return reflected-XSS findings.
+     *
+     * @param string $source - PHP source to parse.
+     *
+     * @return list<Finding> - reflected-XSS findings for the source
+     */
+    private function findingsForSource(string $source): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'gruff-xss-');
+        self::assertIsString($path);
+        file_put_contents($path, $source);
+
+        try {
+            $unit     = (new PhpFileParser())->parse(new SourceFile($path, 'inline.php', SourceFile::TYPE_PHP));
+            $registry = RuleRegistry::defaults();
+            $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
+
+            return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === ReflectedXssRule::ID));
+        } finally {
+            unlink($path);
+        }
     }
 }

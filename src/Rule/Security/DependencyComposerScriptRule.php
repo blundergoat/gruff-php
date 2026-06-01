@@ -48,6 +48,26 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     ];
 
     /**
+     * Composer lifecycle events that run during install/update/create-project flows.
+     *
+     * @var list<string>
+     */
+    private const INSTALL_TIME_EVENTS = [
+        'pre-install-cmd',
+        'post-install-cmd',
+        'pre-update-cmd',
+        'post-update-cmd',
+        'pre-autoload-dump',
+        'post-autoload-dump',
+        'post-root-package-install',
+        'post-create-project-cmd',
+        'pre-package-install',
+        'post-package-install',
+        'pre-package-update',
+        'post-package-update',
+    ];
+
+    /**
      * Describe the risky Composer script rule.
      *
      * @return RuleDefinition - Rule metadata and defaults.
@@ -88,7 +108,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
 
         $findings = [];
         foreach ($manifest['scripts'] as $event => $commands) {
-            if (!is_string($event) || !$this->hasRiskyCommand($commands)) {
+            if (!is_string($event) || !in_array($event, self::INSTALL_TIME_EVENTS, true) || !$this->hasRiskyCommand($commands)) {
                 continue;
             }
 

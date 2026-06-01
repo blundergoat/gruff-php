@@ -55,7 +55,7 @@ final readonly class BranchReviewBuilder
 
         $gitArchiveSnapshot       = new GitArchiveSnapshot();
         $baseRoot                 = null;
-        $shouldLoadProjectContext = $this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff);
+        $shouldLoadProjectContext = $this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff);
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
@@ -157,12 +157,12 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         AnalysisSourceSet $analysisSourceSet,
     ): array {
-        if (!$this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
+        if (!$this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff)) {
             return $analysisSourceSet->analysisUnits;
         }
 
-        // A project-wide rule is active under changed-only, so load the whole tree it must see
-        // beyond the changed files.
+        // A project-wide rule is active under narrowed analysis, so load the whole tree it must see
+        // beyond the changed files or changed line ranges.
         return (new AnalysisSourceLoader())->load(
             $projectRoot,
             [],
@@ -262,24 +262,31 @@ final readonly class BranchReviewBuilder
     }
 
     /**
-     * Report whether changed-only mode still has to load whole-tree context for project-level rules.
+     * Report whether narrowed analysis still has to load whole-tree context for project-level rules.
      *
-     * @param AnalyseCommandOptions $options - Effective CLI options; only changed-only runs can need this.
+     * @param AnalyseCommandOptions $options - Effective CLI options carrying changed-only and changed-region flags.
      * @param RuleRegistry          $registry - Rule registry consulted for any enabled project-wide rule.
      * @param AnalysisConfig        $config - Effective rule and path config for resolving enabled rules.
      * @param DiffResult|null       $reviewDiff - Review diff metadata; null or no changes means no context.
      *
-     * @return bool - True when changed-only mode still needs complete context for project-level rules.
+     * @return bool - True when a narrowed run still needs complete context for project-level rules.
      */
-    private function shouldLoadChangedOnlyProjectContext(
+    private function shouldLoadProjectContext(
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
+        if (!$registry->hasEnabledProjectRules($config)) {
+            return false;
+        }
+
+        if ($options->hasChangedRegionMode()) {
+            return true;
+        }
+
         return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
-            && $reviewDiff->changedFiles !== []
-            && $registry->hasEnabledProjectRules($config);
+            && $reviewDiff->changedFiles !== [];
     }
 }

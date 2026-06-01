@@ -248,24 +248,12 @@ final readonly class DiffFindingFilter
      */
     private function isScopeNode(Node $node): bool
     {
-        // Defines what counts as an enclosing "symbol" for diff scoping: control-flow blocks are listed
-        // alongside callables so a finding inside an edited if/loop/try is attributed to that edited block.
+        // Defines what counts as an enclosing "symbol" for diff scoping: declarations and callables
+        // are reviewable units, while nested control-flow blocks are too narrow for symbol scope.
         return $node instanceof Stmt\ClassLike
                || $node instanceof Stmt\ClassMethod
                || $node instanceof Stmt\Function_
                || $node instanceof Expr\Closure
-               || $node instanceof Expr\ArrowFunction
-               || $node instanceof Stmt\If_
-               || $node instanceof Stmt\ElseIf_
-               || $node instanceof Stmt\Else_
-               || $node instanceof Stmt\For_
-               || $node instanceof Stmt\Foreach_
-               || $node instanceof Stmt\While_
-               || $node instanceof Stmt\Do_
-               || $node instanceof Stmt\Switch_
-               || $node instanceof Stmt\Case_
-               || $node instanceof Stmt\TryCatch
-               || $node instanceof Stmt\Catch_
-               || $node instanceof Stmt\Finally_;
+               || $node instanceof Expr\ArrowFunction;
     }
 }

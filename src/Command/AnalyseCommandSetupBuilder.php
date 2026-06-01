@@ -233,22 +233,25 @@ final readonly class AnalyseCommandSetupBuilder
         FailThreshold $failThreshold,
     ): FailThresholds {
         $configFailureConditions = $config->failureConditions();
+        $hasExplicitFailOn       = $input->hasParameterOption('--fail-on', true);
+        $hasExplicitFailOnNew    = $input->hasParameterOption('--fail-on-new', true);
 
-        if ($input->hasParameterOption('--fail-on', true)) {
-            $totalGate = FailThresholds::fromFailOn($failThreshold);
-        } elseif ($configFailureConditions instanceof FailThresholds) {
-            $totalGate = $configFailureConditions;
-        } else {
-            $totalGate = FailThresholds::fromFailOn($failThreshold);
+        if ($hasExplicitFailOn) {
+            return FailThresholds::fromFailOn($failThreshold)->withNewFindingsGate(
+                $hasExplicitFailOnNew ? FailThresholds::fromFailOn(FailThreshold::Error) : null,
+            );
         }
 
-        // New-findings gate is independent of the total gate: explicit --fail-on-new
-        // wins, else the config's failureConditions.newFindings sub-gate, else none.
-        $newFindingsGate = $input->hasParameterOption('--fail-on-new', true)
-            ? FailThresholds::fromFailOn(FailThreshold::Error)
-            : $configFailureConditions?->newFindingsGate;
+        if ($hasExplicitFailOnNew) {
+            return FailThresholds::fromFailOn(FailThreshold::None)
+                ->withNewFindingsGate(FailThresholds::fromFailOn(FailThreshold::Error));
+        }
 
-        return $totalGate->withNewFindingsGate($newFindingsGate);
+        if ($configFailureConditions instanceof FailThresholds) {
+            return $configFailureConditions;
+        }
+
+        return FailThresholds::fromFailOn($failThreshold);
     }
 
     /**

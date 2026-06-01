@@ -540,7 +540,6 @@ rules:
                 - FindingDisplayFilter::apply()
                 - IgnoredPath::from()
                 - NestingDepthRule::computeMaximumNestingDepth()
-                - NpathComplexityRule::computeNpathComplexity()
                 - ModernisationNodeHelper::supportsPhp()
                 - ResultCache::forProject()
                 - RuleContext::settingsFor()

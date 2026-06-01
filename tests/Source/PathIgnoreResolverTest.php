@@ -30,17 +30,44 @@ final class PathIgnoreResolverTest extends TestCase
     }
 
     /**
-     * Verify a configured pattern is reported as the config source with its glob.
+     * Provide ignored-path source and pattern cases.
+     *
+     * @return array<string, array{string, string, list<string>, string, string}> - display path, absolute path, configured patterns, expected
+     *                                                              source, and expected matching pattern.
+     */
+    public static function ignoredPathDecisionProvider(): array
+    {
+        return [
+            'configured file glob' => ['legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], 'config', 'legacy/**'],
+            'configured directory glob' => ['legacy', '/project/legacy', ['legacy/**'], 'config', 'legacy/**'],
+            'generated lockfile' => ['composer.lock', '/project/composer.lock', [], 'generated', 'composer.lock'],
+        ];
+    }
+
+    /**
+     * Verify ignored paths report their source and matching pattern.
+     *
+     * @param string       $displayPath - Project-relative display path.
+     * @param string       $absolutePath - Absolute path passed to the resolver.
+     * @param list<string> $configuredPatterns - Configured ignore patterns.
+     * @param string       $expectedSource - Expected ignore source.
+     * @param string       $expectedPattern - Expected matching pattern.
      *
      * @return void
      */
-    public function testConfiguredPatternIsReportedWithGlob(): void
-    {
-        $decision = (new PathIgnoreResolver('/project'))->decide('legacy/Bad.php', '/project/legacy/Bad.php', ['legacy/**'], false);
+    #[\PHPUnit\Framework\Attributes\DataProvider('ignoredPathDecisionProvider')]
+    public function testIgnoredPathDecisionReportsSourceAndPattern(
+        string $displayPath,
+        string $absolutePath,
+        array $configuredPatterns,
+        string $expectedSource,
+        string $expectedPattern,
+    ): void {
+        $decision = (new PathIgnoreResolver('/project'))->decide($displayPath, $absolutePath, $configuredPatterns, false);
 
         self::assertTrue($decision->ignored);
-        self::assertSame('config', $decision->source);
-        self::assertSame('legacy/**', $decision->pattern);
+        self::assertSame($expectedSource, $decision->source);
+        self::assertSame($expectedPattern, $decision->pattern);
     }
 
     /**
@@ -72,20 +99,6 @@ final class PathIgnoreResolverTest extends TestCase
 
         $included = $resolver->decide('vendor/acme/V.php', '/project/vendor/acme/V.php', [], true);
         self::assertFalse($included->ignored);
-    }
-
-    /**
-     * Verify a known lockfile is reported as the generated source.
-     *
-     * @return void
-     */
-    public function testGeneratedFilenameSource(): void
-    {
-        $decision = (new PathIgnoreResolver('/project'))->decide('composer.lock', '/project/composer.lock', [], false);
-
-        self::assertTrue($decision->ignored);
-        self::assertSame('generated', $decision->source);
-        self::assertSame('composer.lock', $decision->pattern);
     }
 
     /**

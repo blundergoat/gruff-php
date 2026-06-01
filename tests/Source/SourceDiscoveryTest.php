@@ -210,7 +210,7 @@ final class SourceDiscoveryTest extends TestCase
                              'package-lock.json',
                              'vendor/ignored.php',
                          ], array_map(static fn($file): string => $file->displayPath, $result->files));
-        self::assertContains('nested/beta.php', $result->ignoredPaths);
+        self::assertContains('nested', $result->ignoredPaths);
         self::assertContains('build', $result->ignoredPaths);
     }
 
@@ -323,7 +323,7 @@ final class SourceDiscoveryTest extends TestCase
             $result->ignoredPathDetails,
         );
 
-        self::assertContains(['legacy/B.php', 'config', 'legacy/**'], $details);
+        self::assertContains(['legacy', 'config', 'legacy/**'], $details);
         self::assertContains(['vendor', 'default', 'vendor'], $details);
     }
 

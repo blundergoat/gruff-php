@@ -240,13 +240,13 @@ Read baseline movement to see how debt changed. Every applied-baseline run class
 
 - **new** — present this run, not in the baseline (the set a new-findings gate would block);
 - **unchanged** — matched a baseline entry (accepted debt, removed before scoring);
-- **resolved** — a baseline entry with no matching finding this run (a fixed item).
+- **absent** — a baseline entry with no matching finding this run (a resolved/fixed item).
 
 ```bash
 php bin/gruff-php analyse src --baseline --format json --fail-on none | jq '.baseline.buckets'
 ```
 
-Pass `--baseline-include-absent` to list the resolved entries in text, markdown, and HTML output (off by default to keep PR comments short). In diff-scoped runs the resolved bucket is reported as zero, because baseline entries outside the diff are not evaluated.
+Pass `--baseline-include-absent` to list the absent/resolved entries in text, markdown, and HTML output (off by default to keep PR comments short). In diff-scoped runs the absent bucket is reported as zero, because baseline entries outside the diff are not evaluated.
 
 ## Output Formats for Agents
 

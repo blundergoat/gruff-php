@@ -201,11 +201,12 @@ final class AnalyseCommand extends Command
 
         $findings       = $findingSupport->filterAllowedSecretPreviews($findings, $config);
         $baselineReport = (new BaselineApplication())->apply(
-            projectRoot: $projectRoot,
-            options:     $options->baseline,
-            findings:    $findings,
-            diff:        $diff,
-            diagnostics: $diagnostics,
+            projectRoot:     $projectRoot,
+            options:         $options->baseline,
+            findings:        $findings,
+            diff:            $diff,
+            diagnostics:     $diagnostics,
+            hasPartialScope: $options->diffVs !== null && $options->isChangedOnly,
         );
         $findings       = $findingSupport->normalizeFindingPaths($findings, $options->pathsRelativeTo);
 
@@ -224,7 +225,7 @@ final class AnalyseCommand extends Command
             options:         $options,
             config:          $config,
             registry:        $registry,
-            currentFindings: $findings,
+            currentFindings: $reviewFindings,
             currentScore:    $reviewScore,
             reviewDiff:      $reviewDiff,
             diagnostics:     $diagnostics,

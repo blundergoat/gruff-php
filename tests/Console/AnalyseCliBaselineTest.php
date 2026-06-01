@@ -519,6 +519,45 @@ final class AnalyseCliBaselineTest extends CliTestCase
     }
 
     /**
+     * Verify changed-only runs do not mark unscanned baseline entries absent.
+     *
+     * @throws JsonException
+     *
+     * @return void
+     */
+    public function testChangedOnlyBaselineDoesNotMarkUnscannedEntriesAbsent(): void
+    {
+        $project = $this->createBaselineProject();
+
+        try {
+            file_put_contents(
+                $project . '/src/Changed.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Clean file used for changed-only baseline scope.\n */\nfinal readonly class Changed\n{\n    /**\n     * Return the input amount.\n     *\n     * @param int \$amount Input amount.\n     * @return int Same amount.\n     */\n    public function amount(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+            $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--generate-baseline']);
+            $this->gitInProject($project, ['init', '-q']);
+            $this->gitInProject($project, ['add', 'README.md', 'src/OrderCalculator.php', 'src/Changed.php', 'gruff-baseline.json']);
+            $this->gitInProject($project, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base']);
+
+            file_put_contents(
+                $project . '/src/Changed.php',
+                "<?php\n\ndeclare(strict_types=1);\n\n/**\n * File changed after baseline generation.\n */\nfinal readonly class Changed\n{\n    public function amount(int \$amount): int\n    {\n        return \$amount;\n    }\n}\n",
+            );
+
+            $jsonRun  = $this->runInProject($project, ['analyse', 'src', '--format', 'json', '--fail-on', 'none', '--diff-vs', 'HEAD', '--changed-only']);
+            $baseline = $this->decodeJsonOutput($jsonRun)['baseline'] ?? null;
+            self::assertIsArray($baseline);
+            self::assertSame('not-evaluated-diff-scope', $baseline['staleEvaluation'] ?? null);
+            $buckets = $baseline['buckets'] ?? null;
+            self::assertIsArray($buckets);
+            self::assertSame(0, $buckets['absent'] ?? null);
+            self::assertGreaterThanOrEqual(1, $buckets['new'] ?? 0);
+        } finally {
+            $this->removeDir($project);
+        }
+    }
+
+    /**
      * Run the analyse CLI inside a project directory and return the finished process.
      *
      * @param string       $project - Working directory the binary runs in, so relative paths resolve against it.
@@ -533,5 +572,21 @@ final class AnalyseCliBaselineTest extends CliTestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         return $process;
+    }
+
+    /**
+     * Run git inside a fixture project.
+     *
+     * @param string       $project - Fixture repository root.
+     * @param list<string> $args - Git arguments.
+     *
+     * @return void
+     */
+    private function gitInProject(string $project, array $args): void
+    {
+        $process = new Process(array_merge(['git'], $args), $project);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
     }
 }

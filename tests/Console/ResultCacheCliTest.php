@@ -58,6 +58,21 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
+     * Verify a structurally invalid cache entry fails open to a cold scan.
+     *
+     * @return void
+     */
+    public function testInvalidCacheFindingRowsAreTreatedAsMisses(): void
+    {
+        $this->writeInvalidCacheEntries();
+
+        $warm = $this->runScan();
+
+        self::assertSame(0, $warm->getExitCode(), $warm->getErrorOutput());
+        self::assertCount(1, $this->decodeFindings($warm));
+    }
+
+    /**
      * Verify --no-cache produces output identical to a cached run.
      *
      * @return void
@@ -104,6 +119,35 @@ final class ResultCacheCliTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         self::assertDirectoryDoesNotExist($this->project . '/.gruff-cache');
+    }
+
+    /**
+     * Prime the cache and replace each cache entry with an invalid finding row.
+     *
+     * @return void
+     */
+    private function writeInvalidCacheEntries(): void
+    {
+        $cold = $this->runScan();
+        self::assertSame(0, $cold->getExitCode(), $cold->getErrorOutput());
+
+        foreach ($this->cacheEntryPaths() as $entry) {
+            file_put_contents($entry, '[{}]');
+        }
+    }
+
+    /**
+     * Return cache entry paths after a cache-producing run.
+     *
+     * @return list<string> - non-empty list of cache entry paths.
+     */
+    private function cacheEntryPaths(): array
+    {
+        $entries = glob($this->project . '/.gruff-cache/*.json');
+        self::assertIsArray($entries);
+        self::assertNotSame([], $entries);
+
+        return $entries;
     }
 
     /**

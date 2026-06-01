@@ -230,6 +230,13 @@ final readonly class PathIgnoreResolver
         $normalizedPattern = trim(str_replace('\\', '/', $pattern), '/');
         $normalizedPath    = trim($displayPath, '/');
 
+        if (str_ends_with($normalizedPattern, '/**')) {
+            $directoryPrefix = substr($normalizedPattern, 0, -3);
+            if ($directoryPrefix !== '' && ($normalizedPath === $directoryPrefix || str_starts_with($normalizedPath, $directoryPrefix . '/'))) {
+                return true;
+            }
+        }
+
         if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
             // A literal or directory-prefix match needs no glob, so short-circuit before building the regex.
             return true;

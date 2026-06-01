@@ -55,6 +55,57 @@ final class AgentWorkflowDeadCodeCliTest extends TestCase
     }
 
     /**
+     * Verify changed-region diff mode gives internal dead-code rules full context before hunk filtering.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testChangedRegionDiffUsesFullProjectContextForInternalDeadCodeRules(): void
+    {
+        $this->skipWhenGitIsUnavailable();
+        $repository = $this->temporaryDirectory();
+
+        try {
+            $this->initializeRepository($repository);
+            $changedClassPath = $repository . '/src/UsedOnlyFromContext.php';
+            $contextCallerPath = $repository . '/src/ContextCaller.php';
+            $composerPath = $repository . '/composer.json';
+            file_put_contents($composerPath, AgentWorkflowFixtureSources::projectDeadCodeComposerSource());
+            file_put_contents($changedClassPath, AgentWorkflowFixtureSources::referencedInternalClassSource());
+            file_put_contents($contextCallerPath, AgentWorkflowFixtureSources::internalClassReferenceSource());
+            $this->runGit($repository, 'add', 'composer.json', 'src/UsedOnlyFromContext.php', 'src/ContextCaller.php');
+            $this->runGit($repository, 'commit', '-m', 'base');
+
+            file_put_contents($changedClassPath, AgentWorkflowFixtureSources::changedReferencedInternalClassSource());
+
+            $process = new Process([
+                                       PHP_BINARY,
+                                       self::PROJECT_ROOT . '/bin/gruff-php',
+                                       'analyse',
+                                       '--format=json',
+                                       '--fail-on=none',
+                                       '--no-config',
+                                       '--no-baseline',
+                                       '--diff=HEAD',
+                                       '--include-rule=dead-code.unused-internal-class',
+                                   ], $repository);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+            $decoded  = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+            $report   = $this->objectFromMixed($decoded);
+            $summary  = $this->objectValue($report, 'summary');
+            $findings = $this->objectValue($summary, 'findings');
+
+            self::assertSame([], $this->diagnosticTypes($report));
+            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
+            self::assertSame(0, $this->intValue($findings, 'total'));
+        } finally {
+            $this->removeDirectory($repository);
+        }
+    }
+
+    /**
      * Verify changed-only review reports a newly added dead internal declaration.
      *
      * @return void

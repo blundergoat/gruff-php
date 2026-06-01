@@ -72,12 +72,14 @@ final class DependencyComposerRulesTest extends TestCase
     {
         $findings = $this->findingsForRule(self::RISKY_FIXTURE, DependencyComposerUnpinnedRule::ID);
 
-        self::assertCount(3, $findings);
+        self::assertCount(5, $findings);
 
         $packages = array_map(static fn(Finding $finding): mixed => $finding->metadata['package'] ?? null, $findings);
         self::assertContains('acme/wildcard-lib', $packages);
+        self::assertContains('acme/partial-wildcard-lib', $packages);
         self::assertContains('acme/branch-lib', $packages);
         self::assertContains('acme/unbounded-helper', $packages);
+        self::assertContains('acme/mixed-range-lib', $packages);
         self::assertNotContains('acme/pinned-lib', $packages);
         self::assertNotContains('php', $packages);
     }
@@ -95,6 +97,7 @@ final class DependencyComposerRulesTest extends TestCase
 
         $events = array_map(static fn(Finding $finding): mixed => $finding->metadata['event'] ?? null, $findings);
         self::assertContains('post-install-cmd', $events);
+        self::assertNotContains('build', $events);
         self::assertNotContains('lint', $events);
     }
 
