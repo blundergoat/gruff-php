@@ -12,21 +12,21 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 125
+Total rules: 132
 
 ## Summary By Pillar
 
 | Pillar | Rules |
 | --- | ---: |
 | `complexity` | 4 |
-| `dead-code` | 9 |
+| `dead-code` | 13 |
 | `design` | 1 |
-| `documentation` | 14 |
+| `documentation` | 15 |
 | `maintainability` | 2 |
 | `modernisation` | 10 |
 | `naming` | 11 |
 | `security` | 25 |
-| `sensitive-data` | 9 |
+| `sensitive-data` | 11 |
 | `size` | 7 |
 | `test-quality` | 33 |
 
@@ -41,10 +41,14 @@ Total rules: 125
 | `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
-### `dead-code` (9)
+### `dead-code` (13)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
+| `dead-code.unused-internal-class` | Unused internal class-like | `advisory` | `medium` | yes |
+| `dead-code.unused-internal-constant` | Unused internal constant | `advisory` | `medium` | yes |
+| `dead-code.unused-internal-function` | Unused internal function | `advisory` | `medium` | yes |
+| `dead-code.unused-private-constant` | Unused private constant | `warning` | `high` | yes |
 | `dead-code.unused-private-method` | Unused private method | `warning` | `high` | yes |
 | `dead-code.unused-private-property` | Unused private property | `warning` | `high` | yes |
 | `waste.commented-out-code` | Commented-out code | `advisory` | `medium` | yes |
@@ -172,7 +176,7 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
 | `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
 
-### `sensitive-data` (9)
+### `sensitive-data` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -186,6 +190,7 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `sensitive-data.phi-pattern` | PHI identifier pattern | `warning` | `medium` | yes |
 | `sensitive-data.pii-test-fixture` | PII in test fixture | `warning` | `medium` | yes |
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
+| `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
 
 ### `size` (7)
 

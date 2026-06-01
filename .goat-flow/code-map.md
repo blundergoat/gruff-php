@@ -130,6 +130,16 @@ src/
 |   |   |-- MaintainabilityIndexRule.php      = `complexity.maintainability-index` (Maintainability pillar)
 |   |   `-- NestingDepthRule.php              = `complexity.nesting-depth`
 |   |-- DeadCode/
+|   |   |-- AbstractUnusedInternalSymbolRule.php = shared `ProjectRuleAccumulator` base for internal class/function/constant dead-code rules
+|   |   |-- DeadCodeNameResolver.php       = declaration/reference FQN resolver for project-wide dead-code summaries
+|   |   |-- DeadCodeProjectIndex.php        = project-wide declaration/reference summary index derived from Composer/configured internal namespace ownership
+|   |   |-- DeadCodeProjectScope.php        = per-run ownership, entrypoint, exclusion, framework-attribute, and test-reference policy for project-wide dead-code checks
+|   |   |-- DeadCodeSymbolDeclaration.php   = typed declaration summary used by the project-wide dead-code index
+|   |   |-- DeadCodeSymbolReference.php     = typed reference summary used by the project-wide dead-code index
+|   |   |-- UnusedInternalClassRule.php     = `dead-code.unused-internal-class`
+|   |   |-- UnusedInternalConstantRule.php  = `dead-code.unused-internal-constant`
+|   |   |-- UnusedInternalFunctionRule.php  = `dead-code.unused-internal-function`
+|   |   |-- UnusedPrivateConstantRule.php   = `dead-code.unused-private-constant`
 |   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
 |   |-- Design/
@@ -182,13 +192,15 @@ src/
 |   |   |-- ApiKeyPatternRule.php             = `sensitive-data.api-key-pattern` (common provider token patterns)
 |   |   |-- AwsAccessKeyRule.php              = `sensitive-data.aws-access-key`
 |   |   |-- DatabaseUrlPasswordRule.php       = `sensitive-data.database-url-password`
+|   |   |-- GcpServiceAccountKeyRule.php     = `sensitive-data.gcp-service-account-key`
 |   |   |-- HardcodedEnvValueRule.php         = `sensitive-data.hardcoded-env-value`
 |   |   |-- HighEntropyStringRule.php         = `sensitive-data.high-entropy-string`
 |   |   |-- JwtTokenRule.php                  = `sensitive-data.jwt-token`
 |   |   |-- PhiPatternRule.php                = `sensitive-data.phi-pattern`
 |   |   |-- PiiTestFixtureRule.php            = `sensitive-data.pii-test-fixture`
 |   |   |-- PrivateKeyRule.php                = `sensitive-data.private-key`
-|   |   `-- SecretScannerHelper.php           = shared regex/entropy helpers for the sensitive-data pack
+|   |   |-- SecretScannerHelper.php           = shared regex/entropy/redaction helpers for the sensitive-data pack
+|   |   `-- UrlEmbeddedCredentialsRule.php    = `sensitive-data.url-credentials`
 |   |-- Security/                             = AST-driven heuristic rules plus scoped source-text workflow checks
 |   |   |-- DangerousFunctionCallRule.php     = `security.dangerous-function-call`
 |   |   |-- DisabledSslVerificationRule.php   = `security.disabled-ssl-verification`
@@ -306,7 +318,8 @@ tests/
 |-- Reporting/
 |   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
 |-- Review/
-|   `-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
+|   |-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
+|   `-- AgentWorkflowDeadCodeCliTest.php      = branch-review changed-only coverage for project-wide dead-code rules
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
@@ -317,12 +330,14 @@ tests/
 |   |   |-- CyclomaticComplexityRuleTest.php
 |   |   `-- NestingDepthRuleTest.php
 |   |-- DeadCode/
-|   |   `-- DeadCodeRulesTest.php
+|   |   |-- DeadCodeRulesTest.php
+|   |   `-- ProjectDeadCodeRulesTest.php
 |   |-- Docs/
 |   |   `-- DocsRulesTest.php
 |   |-- Naming/
 |   |   `-- NamingRulesTest.php
 |   |-- SensitiveData/
+|   |   |-- SensitiveDataExpansionRulesTest.php
 |   |   `-- SensitiveDataRulesTest.php
 |   |-- Security/
 |   |   `-- SecurityRulesTest.php

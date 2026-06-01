@@ -183,4 +183,98 @@ final class BookingOtpGateway implements BookingGatewayInterface
 }
 PHP;
     }
+
+    /**
+     * Return composer metadata for project-wide dead-code review fixtures.
+     *
+     * @return string - composer JSON declaring App\ as project-owned PSR-4 source
+     */
+    public static function projectDeadCodeComposerSource(): string
+    {
+        // Project-wide dead-code rules derive ownership from composer PSR-4 prefixes.
+        return <<<'JSON'
+{"autoload":{"psr-4":{"App\\":"src/"}}}
+JSON;
+    }
+
+    /**
+     * Return a project-owned class declaration used by an unchanged context file.
+     *
+     * @return string - PHP source for a referenced internal class
+     */
+    public static function referencedInternalClassSource(): string
+    {
+        // Declaration side for the changed-only full-context project-dead-code review scenario.
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class UsedOnlyFromContext
+{
+}
+PHP;
+    }
+
+    /**
+     * Return the changed declaration source for a referenced internal class.
+     *
+     * @return string - PHP source with a trivial edit that keeps the class referenced by an unchanged file
+     */
+    public static function changedReferencedInternalClassSource(): string
+    {
+        // Trivial branch edit pulls the declaration into changed-only scope without making it dead.
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+// Branch edit keeps this declaration in changed-only scope.
+final class UsedOnlyFromContext
+{
+}
+PHP;
+    }
+
+    /**
+     * Return an unchanged reference to the project-owned class fixture.
+     *
+     * @return string - PHP source that references UsedOnlyFromContext from an unchanged file
+     */
+    public static function internalClassReferenceSource(): string
+    {
+        // Unchanged context that must still count as a reference during changed-only review.
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class ContextCaller
+{
+    public function make(): UsedOnlyFromContext
+    {
+        return new UsedOnlyFromContext();
+    }
+}
+PHP;
+    }
+
+    /**
+     * Return an added dead internal class fixture.
+     *
+     * @return string - PHP source for a new project-owned class with no references
+     */
+    public static function addedDeadInternalClassSource(): string
+    {
+        // A new project-owned class with no supported references should appear after changed-only filtering.
+        return <<<'PHP'
+<?php
+
+namespace App;
+
+final class AddedDeadInternal
+{
+}
+PHP;
+    }
 }

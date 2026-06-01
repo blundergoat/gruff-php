@@ -13,6 +13,9 @@ use GruffPhp\Rule\Complexity\CognitiveComplexityRule;
 use GruffPhp\Rule\Complexity\CyclomaticComplexityRule;
 use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalConstantRule;
+use GruffPhp\Rule\DeadCode\UnusedInternalFunctionRule;
 use GruffPhp\Rule\Docs\MissingReadmeRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
@@ -48,10 +51,10 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         [$units, $findings, $json] = $this->analysePaths(['tests/Fixtures']);
 
-        self::assertCount(161, $units);
-        self::assertCount(2325, $findings);
+        self::assertCount(169, $units);
+        self::assertCount(2408, $findings);
         self::assertSame(
-            '51b9df4d17bb7d5e19854e' . 'a4ffde1e576253cdc4cb1608b4d14c17415a88cc36',
+            'd0d79f24dbd96063bb37' . '85d09816b0df40abed4f7c5a84d2dbb50bec1b2f058e',
             hash('sha256', $json),
         );
     }
@@ -74,6 +77,9 @@ final class RuleRegressionSnapshotTest extends TestCase
                              CyclomaticComplexityRule::ID,
                              HalsteadVolumeRule::ID,
                              MaintainabilityIndexRule::ID,
+                             UnusedInternalClassRule::ID,
+                             UnusedInternalConstantRule::ID,
+                             UnusedInternalFunctionRule::ID,
                              MissingReadmeRule::ID,
                              AverageMethodLengthRule::ID,
                              ClassLengthRule::ID,
@@ -152,6 +158,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         array_push(
                $findings,
             ...$this->missingReadmeFindings(),
+            ...$this->projectWideDeadCodeCalibrationFindings(),
             ...$this->phpUnitConfigCalibrationFindings(),
             ...$this->analysePaths(
             ['tests/Fixtures/TestQuality/mocking-domain-object.php'],
@@ -189,6 +196,19 @@ final class RuleRegressionSnapshotTest extends TestCase
         } finally {
             $this->removeDir($root);
         }
+    }
+
+    /**
+     * Build project-wide dead-code findings for the fixture project.
+     *
+     * @return list<Finding> - findings from the fixture project whose composer.json defines App\ as internal
+     */
+    private function projectWideDeadCodeCalibrationFindings(): array
+    {
+        $projectRoot = self::PROJECT_ROOT . '/tests/Fixtures/DeadCode/project-wide';
+
+        // Analyse this fixture with its own project root so composer PSR-4 ownership resolves to App\.
+        return $this->analysePaths(['src', 'entrypoints', 'tests'], projectRoot: $projectRoot)[1];
     }
 
     /**

@@ -14,6 +14,7 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
+use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
@@ -80,6 +81,30 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
         self::assertSame('custom', $settings->option('label'));
         self::assertSame(['alpha'], $settings->option('names'));
         self::assertSame([1, 2], $settings->option('levels'));
+    }
+
+    /**
+     * Verify loads project-wide dead-code rule options.
+     *
+     * @return void
+     */
+    public function testLoadsProjectWideDeadCodeOptions(): void
+    {
+        $path = $this->writeTempConfig(sprintf(
+                                           '{"rules":{"%s":{"options":{"internalNamespacePrefixes":["App\\\\"],"entrypointSymbols":["App\\\\Console"],"entrypointPathPrefixes":["bin/"],"additionalExcludedPaths":["vendor-copy/"],"externalNamespacePrefixes":["Psr\\\\"],"frameworkAttributePrefixes":["Symfony\\\\"],"treatTestsAsReferences":false}}}}',
+                                           UnusedInternalClassRule::ID,
+                                       ));
+
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(UnusedInternalClassRule::ID);
+
+        self::assertSame(['App\\'], $settings->stringListOption('internalNamespacePrefixes'));
+        self::assertSame(['App\\Console'], $settings->stringListOption('entrypointSymbols'));
+        self::assertSame(['bin/'], $settings->stringListOption('entrypointPathPrefixes'));
+        self::assertSame(['vendor-copy/'], $settings->stringListOption('additionalExcludedPaths'));
+        self::assertSame(['Psr\\'], $settings->stringListOption('externalNamespacePrefixes'));
+        self::assertSame(['Symfony\\'], $settings->stringListOption('frameworkAttributePrefixes'));
+        self::assertFalse($settings->option('treatTestsAsReferences'));
     }
 
     /**
@@ -161,6 +186,29 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
+     * Provide invalid project-wide dead-code option type cases.
+     *
+     * @return array<string, array{string, string}> - config payload and expected validation message
+     */
+    public static function invalidProjectWideDeadCodeOptionProvider(): array
+    {
+        return [
+            'entrypoint symbols list shape'       => [
+                '{"rules":{"%s":{"options":{"entrypointSymbols":"App\\\\Console"}}}}',
+                'Option "rules.%s.options.entrypointSymbols" must be a list.',
+            ],
+            'internal namespace string item'      => [
+                '{"rules":{"%s":{"options":{"internalNamespacePrefixes":[123]}}}}',
+                'Option "rules.%s.options.internalNamespacePrefixes.0" must be a string.',
+            ],
+            'treat tests as references boolean'   => [
+                '{"rules":{"%s":{"options":{"treatTestsAsReferences":"false"}}}}',
+                'Option "rules.%s.options.treatTestsAsReferences" must be boolean.',
+            ],
+        ];
+    }
+
+    /**
      * Verify rejects invalid rule option type variants.
      *
      * @param string $configTemplate  Config JSON template.
@@ -178,6 +226,25 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
         $this->expectExceptionMessage(sprintf($messageTemplate, FixtureOptionsRule::ID));
 
         (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
+    }
+
+    /**
+     * Verify rejects invalid project-wide dead-code option variants.
+     *
+     * @param string $configTemplate  Config JSON template.
+     * @param string $messageTemplate Expected exception message template.
+     *
+     * @return void
+     */
+    #[DataProvider('invalidProjectWideDeadCodeOptionProvider')]
+    public function testRejectsInvalidProjectWideDeadCodeOptionVariants(string $configTemplate, string $messageTemplate): void
+    {
+        $path = $this->writeTempConfig(sprintf($configTemplate, UnusedInternalClassRule::ID));
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage(sprintf($messageTemplate, UnusedInternalClassRule::ID));
+
+        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
     }
 }
 

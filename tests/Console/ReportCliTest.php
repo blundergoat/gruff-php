@@ -13,6 +13,13 @@ use Symfony\Component\Process\Process;
 final class ReportCliTest extends CliTestCase
 {
     /**
+     * Raw sensitive snippets that report surfaces must never render.
+     *
+     * @var list<string>
+     */
+    private const SENSITIVE_SNIPPETS = ['MIIBVgIBADANBgkqhkiG', 's3cr3tValue', 'Tok3nXyZ9'];
+
+    /**
      * Verify report command outputs static HTML report.
      *
      * @return void
@@ -96,6 +103,36 @@ final class ReportCliTest extends CliTestCase
 
         $report = $this->decodeJsonOutput($process);
         self::assertSame('gruff.analysis.v2', $report['schemaVersion'] ?? null);
+    }
+
+    /**
+     * Verify report command does not leak raw sensitive-data snippets.
+     *
+     * @return void
+     */
+    public function testReportCommandDoesNotLeakSensitiveDataSecrets(): void
+    {
+        foreach (['html', 'json'] as $format) {
+            $process = new Process([
+                PHP_BINARY,
+                self::PROJECT_ROOT . '/bin/gruff-php',
+                'report',
+                'tests/Fixtures/SensitiveData/gcp-service-account-key.json',
+                'tests/Fixtures/SensitiveData/url-credentials.php',
+                '--format',
+                $format,
+                '--fail-on',
+                'none',
+                '--no-config',
+            ], self::PROJECT_ROOT);
+            $process->run();
+
+            self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
+            foreach (self::SENSITIVE_SNIPPETS as $sensitiveSnippet) {
+                self::assertStringNotContainsString($sensitiveSnippet, $process->getOutput(), sprintf('%s report leaked a raw secret.', $format));
+            }
+            self::assertStringContainsString('redacted', $process->getOutput(), sprintf('%s report should show a redacted preview.', $format));
+        }
     }
 
     /**
