@@ -112,7 +112,6 @@ final class AverageMethodLengthRuleTest extends TestCase
         );
         $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
-        // Only this rule runs, so every finding returned belongs to the case under test.
         return $this->rule->analyse($unit, $ruleContext);
     }
 
@@ -127,7 +126,6 @@ final class AverageMethodLengthRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 
-        // Display path stays repo-relative so findings report the fixture, not the temp absolute path.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Size/' . $filename));
     }
 }

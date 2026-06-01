@@ -264,7 +264,6 @@ final readonly class FailThresholds
      */
     public function withNewFindingsGate(?FailThresholds $newFindingsGate): self
     {
-        // Readonly value object, so swapping the sub-gate means returning a fresh copy of the caps.
         return new self($this->total, $this->severityCounts, $newFindingsGate);
     }
 

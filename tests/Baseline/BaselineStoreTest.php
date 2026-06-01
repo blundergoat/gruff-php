@@ -46,7 +46,6 @@ final class BaselineStoreTest extends TestCase
      */
     private function finding(): Finding
     {
-        // A single fixed finding the store round-trips through in these tests.
         return new Finding(
             ruleId:     'docs.example',
             message:    'Example finding.',

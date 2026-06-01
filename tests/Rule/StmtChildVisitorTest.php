@@ -218,7 +218,6 @@ final class StmtChildVisitorTest extends TestCase
         self::assertNotNull($statements);
         self::assertNotEmpty($statements);
 
-        // assertNotEmpty already failed the test on an empty parse, so index 0 is a safe unchecked access.
         return $statements[0];
     }
 
@@ -231,7 +230,6 @@ final class StmtChildVisitorTest extends TestCase
      */
     private function blocksOf(Node $node): array
     {
-        // Drain the generator into an ordered list so tests can index and count blocks.
         return iterator_to_array(StmtChildVisitor::childBlocks($node), false);
     }
 }

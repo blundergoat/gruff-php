@@ -38,7 +38,6 @@ final readonly class TrendReport
      */
     public function toArray(): array
     {
-        // Mirror the snapshot as JSON-ready keys for the report writers that serialise trend output.
         return [
             'path'          => $this->path,
             'currentScore'  => $this->currentScore,

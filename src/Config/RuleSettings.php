@@ -33,7 +33,6 @@ final readonly class RuleSettings
      */
     public function isExcludedFromScore(): bool
     {
-        // Report-only rules surface findings but stay out of the composite score (ADR-016).
         return $this->excludeFromScore;
     }
 
@@ -53,7 +52,6 @@ final readonly class RuleSettings
             throw new LogicException(sprintf('Missing numeric threshold "%s".', $name));
         }
 
-        // The configured limit for this rule (e.g. the warning or error budget a metric is compared against).
         return $thresholdValue;
     }
 

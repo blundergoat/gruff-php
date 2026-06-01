@@ -234,7 +234,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
 
-        // Anchor the context at the project root joined with the relative root the helper test targets.
         return new RuleContext(
             self::PROJECT_ROOT . '/' . $relativeRoot,
             AnalysisConfig::fromRegistry($registry),
@@ -266,7 +265,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
      */
     private function expectedRuleIds(): array
     {
-        // Every test-quality rule id that an enabled scan must surface; drift here means a rule was lost.
         return [
             NoAssertionsRule::ID,
             TrivialAssertionRule::ID,
@@ -308,7 +306,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
-        // Delegate to the multi-path analyser so single- and multi-fixture callers share one code path.
         return $this->analysePaths([$path], $config);
     }
 
@@ -325,7 +322,6 @@ final class TestQualityConfigurationRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
-        // Run the default registry over the parsed units, defaulting config when the caller passed none.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),

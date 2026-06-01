@@ -274,7 +274,6 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
         $unit     = $this->unitForPath(self::FIXTURE);
         $registry = RuleRegistry::defaults();
 
-        // Every default-registry finding for the fixture; callers narrow it to the rule they assert on.
         return $registry->analyse(
             [$unit],
             new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)),
@@ -292,7 +291,6 @@ final class PhpDocMixedOveruseRuleTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
-        // Display path mirrors the project-relative input so findings reference the real fixture.
         return (new PhpFileParser())->parse($sourceFile);
     }
 }

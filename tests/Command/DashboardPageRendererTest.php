@@ -163,7 +163,6 @@ final class DashboardPageRendererTest extends TestCase
      */
     private function renderer(): DashboardPageRenderer
     {
-        // Plain renderer under test; it takes no collaborators.
         return new DashboardPageRenderer();
     }
 
@@ -178,7 +177,6 @@ final class DashboardPageRendererTest extends TestCase
      */
     private function state(array $overrides = []): array
     {
-        // Full default state so each test only spells out the field it cares about.
         return array_merge([
                                'project' => '/repo',
                                                                                                                                                                                                                       'paths' => '',

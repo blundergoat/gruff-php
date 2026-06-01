@@ -127,7 +127,6 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         self::assertSame(count($files), count($units));
 
-        // Bundle the parsed units, raw findings, and canonical JSON so callers can assert on any of the three.
         return [$units, $findings, $json];
     }
 
@@ -190,7 +189,6 @@ final class RuleRegressionSnapshotTest extends TestCase
             self::assertTrue(mkdir($root . '/src', 0777, true));
             file_put_contents($root . '/src/Example.php', "<?php\n\nfinal class Example {}\n");
 
-            // A src tree with no README is what trips docs.missing-readme; return only its findings.
             return $this->analysePaths(['src/Example.php'], projectRoot: $root)[1];
         } finally {
             $this->removeDir($root);
@@ -206,7 +204,6 @@ final class RuleRegressionSnapshotTest extends TestCase
     {
         $projectRoot = self::PROJECT_ROOT . '/tests/Fixtures/DeadCode/project-wide';
 
-        // Analyse this fixture with its own project root so composer PSR-4 ownership resolves to App\.
         return $this->analysePaths(['src', 'entrypoints', 'tests'], projectRoot: $projectRoot)[1];
     }
 
@@ -223,7 +220,6 @@ final class RuleRegressionSnapshotTest extends TestCase
                                                      'tests/Fixtures/TestQuality/non-candidates.php',
                                                  ));
 
-        // Run against the lax phpunit-config fixture root so the phpunit.* config rules fire for the snapshot.
         return $registry->analyse(
             [$unit],
             new RuleContext(

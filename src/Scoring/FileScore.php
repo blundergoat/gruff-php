@@ -64,7 +64,6 @@ final readonly class FileScore
      */
     public function toArray(): array
     {
-        // Penalty rounded here (not at the call site) so every serialised row reports the same precision.
         return [
             'file'          => $this->filePath,
             'score'         => $this->grade->score,

@@ -96,7 +96,6 @@ final class AnalysisReportTest extends TestCase
      */
     private function finding(string $ruleId, Severity $severity): Finding
     {
-        // Only ruleId and severity vary per case; the rest is fixed fixture noise.
         return new Finding(
             ruleId:     $ruleId,
             message:    'Example finding.',

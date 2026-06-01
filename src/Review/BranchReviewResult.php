@@ -41,7 +41,6 @@ final readonly class BranchReviewResult
      */
     public function filtered(callable $filter): self
     {
-        // Metadata (base, changed-only flag, delta) is copied verbatim; only the finding lists pass through the filter.
         return new self(
             base:          $this->base,
             isChangedOnly: $this->isChangedOnly,
@@ -95,7 +94,6 @@ final readonly class BranchReviewResult
                 ?: strcmp($left['ruleId'], $right['ruleId']),
         );
 
-        // Total order, so report output and regression snapshots stay byte-stable regardless of map insertion order.
         return $rows;
     }
 

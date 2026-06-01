@@ -28,7 +28,6 @@ final readonly class InfectionReport
      */
     public function totalMutants(): int
     {
-        // Fall back to the parsed row count when Infection omits the aggregate stat.
         return (int)($this->stats['totalMutantsCount'] ?? count($this->mutants));
     }
 
@@ -39,7 +38,6 @@ final readonly class InfectionReport
      */
     public function msi(): float
     {
-        // A missing MSI stat reads as 0.0 so callers never divide against an absent score.
         return (float)($this->stats['msi'] ?? 0.0);
     }
 
@@ -50,7 +48,6 @@ final readonly class InfectionReport
      */
     public function coveredMsi(): float
     {
-        // Absent covered-code MSI reads as 0.0 rather than throwing on a partial report.
         return (float)($this->stats['coveredCodeMsi'] ?? 0.0);
     }
 
@@ -61,7 +58,6 @@ final readonly class InfectionReport
      */
     public function coverageRate(): float
     {
-        // Treat a missing coverage stat as 0.0 so unreported runs surface as uncovered, not as an error.
         return (float)($this->stats['mutationCodeCoverage'] ?? 0.0);
     }
 
@@ -72,7 +68,6 @@ final readonly class InfectionReport
      */
     public function survivedMutants(): array
     {
-        // Infection records survivors under both "escaped" and "timed out"; re-index to a clean list.
         return array_values(array_filter(
                                 $this->mutants,
                                 static fn(InfectionMutant $infectionMutant): bool => in_array($infectionMutant->status, ['escaped', 'timed out'], true),
@@ -95,7 +90,6 @@ final readonly class InfectionReport
 
         ksort($counts, SORT_STRING);
 
-        // Status-keyed tallies are sorted so report ordering stays stable across runs.
         return $counts;
     }
 
@@ -147,7 +141,6 @@ final readonly class InfectionReport
             );
         }
 
-        // One summary per source file, ordered by path for deterministic per-file reporting.
         return $summaries;
     }
 }

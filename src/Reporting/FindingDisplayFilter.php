@@ -38,7 +38,6 @@ final readonly class FindingDisplayFilter
      */
     public function apply(array $findings): array
     {
-        // Re-key to a list so the result stays a 0-indexed list<Finding> after filtered slots are removed.
         return array_values(array_filter($findings, fn(Finding $finding): bool => $this->allows($finding)));
     }
 
@@ -49,7 +48,6 @@ final readonly class FindingDisplayFilter
      */
     public function isActive(): bool
     {
-        // Any single configured dimension counts as active; callers use this to decide whether to annotate output.
         return $this->minSeverity !== null
                || $this->includePillars !== []
                || $this->excludePillars !== []
@@ -70,7 +68,6 @@ final readonly class FindingDisplayFilter
      */
     public function toArray(): array
     {
-        // Enums are flattened to their string values so the filter survives JSON serialisation in reports.
         return [
             'active'         => $this->isActive(),
             'minSeverity'    => $this->minSeverity?->value,

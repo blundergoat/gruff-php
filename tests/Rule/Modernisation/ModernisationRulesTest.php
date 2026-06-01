@@ -221,7 +221,6 @@ final class ModernisationRulesTest extends TestCase
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
-        // Single-path convenience over analysePaths(); the multi-path form holds the real work.
         return $this->analysePaths([$path], $config);
     }
 
@@ -238,7 +237,6 @@ final class ModernisationRulesTest extends TestCase
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
         $registry = RuleRegistry::defaults();
 
-        // Findings across every supplied fixture, run under the override config or the registry default.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -256,7 +254,6 @@ final class ModernisationRulesTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
-        // Display path mirrors the project-relative input so findings reference the real fixture.
         return (new PhpFileParser())->parse($sourceFile);
     }
 
@@ -269,7 +266,6 @@ final class ModernisationRulesTest extends TestCase
      */
     private function config(string $path): AnalysisConfig
     {
-        // Load the fixture's own config so a test can exercise project-level rule overrides.
         return (new ConfigLoader(self::PROJECT_ROOT))->load($path, RuleRegistry::defaults());
     }
 }

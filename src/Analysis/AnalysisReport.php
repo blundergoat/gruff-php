@@ -108,7 +108,6 @@ final readonly class AnalysisReport
             $counts[$finding->severity->value]++;
         }
 
-        // Per-severity tally plus a precomputed total, ready for report summary metadata.
         return $counts;
     }
 
@@ -148,7 +147,6 @@ final readonly class AnalysisReport
                 ?: strcmp($left['ruleId'], $right['ruleId']),
         );
 
-        // Noisiest-first rows for the triage view, with ties broken by ruleId for deterministic output.
         return $rows;
     }
 
@@ -160,7 +158,6 @@ final readonly class AnalysisReport
      */
     public function parseErrorCount(): int
     {
-        // Only parse-error diagnostics count here; other diagnostic types (e.g. baseline-error) are excluded.
         return count(array_filter(
                          $this->diagnostics,
                          static fn(RunDiagnostic $diagnostic): bool => $diagnostic->type === 'parse-error',
@@ -249,7 +246,6 @@ final readonly class AnalysisReport
             $report['review'] = $this->review->toArray();
         }
 
-        // Core report plus only the optional sections that were populated, so absent context stays absent.
         return $report;
     }
 
@@ -265,12 +261,10 @@ final readonly class AnalysisReport
     {
         foreach ($this->findings as $finding) {
             if ($finding->severity === $severity) {
-                // Stop at the first match; one finding at this severity is enough to answer the gate.
                 return true;
             }
         }
 
-        // No finding reached this severity, so the gate sees nothing at the requested level.
         return false;
     }
 }

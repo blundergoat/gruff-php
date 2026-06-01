@@ -556,7 +556,6 @@ final class TestQualityRulesTest extends TestCase
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
-        // Delegate to the multi-path analyser so single- and multi-fixture callers share one code path.
         return $this->analysePaths([$path], $config);
     }
 
@@ -586,7 +585,6 @@ final class TestQualityRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn(string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
-        // Run the default registry over the parsed units, defaulting config when the caller passed none.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),

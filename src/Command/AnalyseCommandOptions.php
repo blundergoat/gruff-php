@@ -184,7 +184,6 @@ final readonly class AnalyseCommandOptions
      */
     public function withMutationBudget(?int $mutationBudget): self
     {
-        // Readonly value object: copy every field, swapping only the mutation budget into a fresh options bag.
         return new self(
             paths:                $this->paths,
             shouldIncludeIgnored: $this->shouldIncludeIgnored,
@@ -241,7 +240,6 @@ final readonly class AnalyseCommandOptions
             return $this;
         }
 
-        // Inject the implicit (non-explicit) default baseline so an unflagged run still honours the on-disk file.
         return new self(
             paths:                $this->paths,
             shouldIncludeIgnored: $this->shouldIncludeIgnored,
@@ -282,7 +280,6 @@ final readonly class AnalyseCommandOptions
      */
     public function usageError(): ?string
     {
-        // First failing check wins; null means every flag combination validated, so the run may proceed.
         return $this->optionError
                ?? $this->configUsageError()
                   ?? $this->profileUsageError()
@@ -300,7 +297,6 @@ final readonly class AnalyseCommandOptions
      */
     public function displayFilter(): FindingDisplayFilter
     {
-        // Translate the validated string options into the enum-typed filter the reporter consumes.
         return new FindingDisplayFilter(
             minSeverity:    $this->minSeverity === null ? null : Severity::from($this->minSeverity),
             includePillars: array_map(static fn(string $optionValue): Pillar => Pillar::from($optionValue), $this->includePillars),
@@ -319,11 +315,9 @@ final readonly class AnalyseCommandOptions
     public function profileRuleSelection(): ?RuleSelection
     {
         if ($this->profile !== self::PROFILE_SECURITY) {
-            // Only the security profile overrides selection; every other profile keeps the configured rule set.
             return null;
         }
 
-        // Security profile narrows execution to the two security-facing pillars and nothing else.
         return new RuleSelection(pillars: [
                                               Pillar::Security->value,
                                               Pillar::SensitiveData->value,
@@ -338,11 +332,9 @@ final readonly class AnalyseCommandOptions
     public function profileScorePillars(): ?array
     {
         if ($this->profile !== self::PROFILE_SECURITY) {
-            // Non-security profiles fall back to the default all-pillar composite score.
             return null;
         }
 
-        // Security profile scores only the security-facing pillars so unrun pillars do not dilute the grade.
         return [Pillar::Security, Pillar::SensitiveData];
     }
 
@@ -353,7 +345,6 @@ final readonly class AnalyseCommandOptions
      */
     public function hasChangedRegionMode(): bool
     {
-        // True when any of the three changed-region opt-ins is set; usageError guarantees at most one of them.
         return $this->diffMode !== null
                || $this->since !== null
                || $this->changedRanges !== null;
@@ -366,7 +357,6 @@ final readonly class AnalyseCommandOptions
      */
     public function usesChangedFilesForDiscovery(): bool
     {
-        // Only diff and since derive a concrete file list; changed-ranges names paths the caller already supplied.
         return $this->diffMode !== null || $this->since !== null;
     }
 
@@ -422,7 +412,6 @@ final readonly class AnalyseCommandOptions
     {
         $optionValue = $input->getOption($name);
 
-        // Empty string is treated as "not supplied" so callers can use the null-coalescing default.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 
@@ -455,7 +444,6 @@ final readonly class AnalyseCommandOptions
             $items[] = $optionValue;
         }
 
-        // Every occurrence was a non-empty string; hand back the values verbatim, no comma splitting.
         return $items;
     }
 
@@ -491,7 +479,6 @@ final readonly class AnalyseCommandOptions
             }
         }
 
-        // Re-key after de-duplication so the result is a clean list with each value appearing once.
         return array_values(array_unique($items));
     }
 
@@ -506,17 +493,14 @@ final readonly class AnalyseCommandOptions
     private static function diffMode(InputInterface $input, array $paths): ?string
     {
         if (!$input->hasParameterOption('--diff', true)) {
-            // No --diff flag at all means diff analysis is not requested.
             return null;
         }
 
         $optionValue = $input->getOption('diff');
         if (in_array('-', $paths, true)) {
-            // A "-" path signals stdin; that takes precedence over any explicit --diff ref value.
             return '-';
         }
 
-        // A bare --diff defaults to the working tree; otherwise honour the explicit ref the user passed.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : 'working-tree';
     }
 
@@ -528,11 +512,9 @@ final readonly class AnalyseCommandOptions
     private function configUsageError(): ?string
     {
         if (!$this->noConfig || $this->configPath === null) {
-            // Either flag alone is fine; only the both-set combination is contradictory.
             return null;
         }
 
-        // Disabling config while also pointing at one is contradictory, so reject the run.
         return '--no-config cannot be combined with --config.';
     }
 
@@ -544,7 +526,6 @@ final readonly class AnalyseCommandOptions
     private function profileUsageError(): ?string
     {
         if (in_array($this->profile, [self::PROFILE_DEFAULT, self::PROFILE_SECURITY], true)) {
-            // Profile is one of the two recognised names, so it is accepted.
             return null;
         }
 
@@ -602,7 +583,6 @@ final readonly class AnalyseCommandOptions
             return '--changed-ranges requires at least one file path.';
         }
 
-        // Every diff-related constraint held, so there is no usage error from this group.
         return null;
     }
 
@@ -659,7 +639,6 @@ final readonly class AnalyseCommandOptions
             }
         }
 
-        // Severity and every pillar resolved, so displayFilter() can safely build the enum-typed filter.
         return null;
     }
 }

@@ -37,7 +37,6 @@ final readonly class InfectionMutant
      */
     public function toArray(): array
     {
-        // Keys mirror the Infection JSON field names so reports round-trip without remapping.
         return [
             'status'        => $this->status,
             'file'          => $this->filePath,

@@ -145,7 +145,6 @@ final class TestQualityCalibrationRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $unit     = $this->unitForPath($path);
 
-        // Run the full default rule set; callers filter to the rule they assert on.
         return $registry->analyse(
             [$unit],
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -163,7 +162,6 @@ final class TestQualityCalibrationRulesTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
-        // Display path stays repo-relative so findings report the fixture, not the absolute path.
         return (new PhpFileParser())->parse($sourceFile);
     }
 }

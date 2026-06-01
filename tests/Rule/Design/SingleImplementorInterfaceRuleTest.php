@@ -267,7 +267,6 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             new RuleContext(self::PROJECT_ROOT, $config),
         );
 
-        // Drop other rules' findings so assertions read the single-implementor output without filtering noise per test.
         return array_values(array_filter(
                                 $allFindings,
                                 static fn(Finding $finding): bool => $finding->ruleId === SingleImplementorInterfaceRule::ID,
@@ -299,7 +298,6 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             $units[]  = $phpFileParser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
         }
 
-        // All fixtures parse as one batch because the rule resolves implementors across units, not file by file.
         return $units;
     }
 }

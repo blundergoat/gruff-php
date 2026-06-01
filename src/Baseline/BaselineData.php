@@ -33,7 +33,6 @@ final readonly class BaselineData
             $indexed[$entry->fingerprint] = $entry;
         }
 
-        // Fingerprint-keyed map for O(1) lookup; a duplicate fingerprint keeps the last entry seen.
         return $indexed;
     }
 }

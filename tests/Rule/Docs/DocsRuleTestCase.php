@@ -43,7 +43,6 @@ abstract class DocsRuleTestCase extends TestCase
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
-        // Every finding the default rule set raises against this fixture, unfiltered.
         return $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
     }
 
@@ -57,7 +56,6 @@ abstract class DocsRuleTestCase extends TestCase
      */
     protected function analyseRule(string $fixture, string $ruleId): array
     {
-        // Narrow the full fixture run down to the one rule under test.
         return array_values(array_filter(
                                 $this->analyseFixture($fixture),
                                 static fn($finding): bool => $finding->ruleId === $ruleId,
@@ -75,7 +73,6 @@ abstract class DocsRuleTestCase extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Docs/' . $filename;
 
-        // Display path stays repo-relative so finding output matches a real checkout.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Docs/' . $filename));
     }
 }

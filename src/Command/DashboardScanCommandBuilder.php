@@ -30,7 +30,6 @@ final readonly class DashboardScanCommandBuilder
     public function parsePaths(string $paths): array
     {
         if (trim($paths) === '') {
-            // Blank input means the dashboard form left the path box empty, so scan the project root.
             return ['.'];
         }
 
@@ -45,7 +44,6 @@ final readonly class DashboardScanCommandBuilder
             }
         }
 
-        // Tokens that were all empty collapse to a root scan rather than an argument-less analyse call.
         return $parsedPaths === [] ? ['.'] : $parsedPaths;
     }
 

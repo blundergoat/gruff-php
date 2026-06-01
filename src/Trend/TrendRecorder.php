@@ -55,7 +55,6 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
         }
 
-        // Report the just-written snapshot plus its delta against the prior run for callers to display.
         return new TrendReport(
             path:          PathHelper::relativeToRoot($resolvedPath, $projectRoot) ?? PathHelper::canonical($resolvedPath),
             currentScore:  $score->composite->score,
@@ -76,7 +75,6 @@ final readonly class TrendRecorder
     {
         $contents = $this->readHistoryFile($path);
         if ($contents === null) {
-            // No file or a blank file means there is simply no prior history yet.
             return [];
         }
 
@@ -157,7 +155,6 @@ final readonly class TrendRecorder
     private function normaliseEntryValue(mixed $trendValue, string $path): bool|float|int|string|null
     {
         if (is_bool($trendValue) || is_float($trendValue) || is_int($trendValue) || is_string($trendValue) || $trendValue === null) {
-            // Pass scalars through untouched; only their type is contractually guaranteed.
             return $trendValue;
         }
 

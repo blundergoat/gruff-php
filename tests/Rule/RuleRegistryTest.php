@@ -357,7 +357,6 @@ final class RuleRegistryTest extends TestCase
      */
     private function fakeRule(string $id): RuleInterface
     {
-        // Anonymous rule classes keep fixture behaviour local to this test.
         return new readonly class ($id) implements RuleInterface {
             /**
              * Build the anonymous fixture rule.
@@ -375,7 +374,6 @@ final class RuleRegistryTest extends TestCase
              */
             public function definition(): RuleDefinition
             {
-                // Fixture rules expose stable metadata so registry assertions are deterministic.
                 return new RuleDefinition(
                     id:              $this->id,
                     name:            'Fake rule',
@@ -396,7 +394,6 @@ final class RuleRegistryTest extends TestCase
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
-                // One synthetic finding is enough to exercise registry routing.
                 return [
                     new Finding(
                         ruleId:     $this->id,
@@ -420,7 +417,6 @@ final class RuleRegistryTest extends TestCase
      */
     private function duplicateProjectRule(): RuleInterface
     {
-        // This anonymous rule intentionally reuses the project-level fixture id.
         return new readonly class () implements RuleInterface {
             /**
              * Return metadata for the fixture rule.
@@ -429,7 +425,6 @@ final class RuleRegistryTest extends TestCase
              */
             public function definition(): RuleDefinition
             {
-                // The duplicate id intentionally collides with project-rule tests.
                 return new RuleDefinition(
                     id:              'test.project-level',
                     name:            'Project-level fixture',
@@ -450,7 +445,6 @@ final class RuleRegistryTest extends TestCase
              */
             public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
             {
-                // The README finding mimics a project-level documentation rule.
                 return [
                     new Finding(
                         ruleId:     'test.project-level',

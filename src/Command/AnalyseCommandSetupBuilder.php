@@ -169,7 +169,6 @@ final readonly class AnalyseCommandSetupBuilder
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
 
-        // Every gate passed; hand back the assembled setup the analyse command will execute against.
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
             projectRoot:    $projectRoot,
             options:        $options,
@@ -259,7 +258,6 @@ final readonly class AnalyseCommandSetupBuilder
             ? FailThresholds::fromFailOn(FailThreshold::Error)
             : $configFailureConditions?->newFindingsGate;
 
-        // Combine the resolved total gate with the independent new-findings sub-gate into the final exit-code policy.
         return $totalGate->withNewFindingsGate($newFindingsGate);
     }
 
@@ -394,7 +392,6 @@ final readonly class AnalyseCommandSetupBuilder
         string $message,
         string $type = 'usage-error',
     ): AnalysisReport {
-        // No analysis ran, so emit a report with zero files/findings carrying only the diagnostic and INVALID code.
         return new AnalysisReport(
             toolVersion:     Application::VERSION,
             requestedPaths:  $options->paths,

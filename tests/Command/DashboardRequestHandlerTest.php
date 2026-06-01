@@ -135,7 +135,6 @@ final class DashboardRequestHandlerTest extends TestCase
 
         self::assertIsString($response);
 
-        // Give back exactly what the handler wrote to the socket for the test to assert on.
         return $response;
     }
 
@@ -149,7 +148,6 @@ final class DashboardRequestHandlerTest extends TestCase
         $dashboardStateFactory = new DashboardStateFactory();
         $dashboardPageRenderer = new DashboardPageRenderer();
 
-        // Handler wired to a loopback context and a fake binary so tests never spawn the real scanner.
         return new DashboardRequestHandler(
             new DashboardRequestContext(
                 $this->input(),
@@ -172,7 +170,6 @@ final class DashboardRequestHandlerTest extends TestCase
      */
     private function input(): ArrayInput
     {
-        // Empty input carrying just the option definitions the handler reads.
         return new ArrayInput([], new InputDefinition([
             new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
             new InputOption('fail-on', null, InputOption::VALUE_REQUIRED, '', 'none'),
@@ -195,7 +192,6 @@ final class DashboardRequestHandlerTest extends TestCase
         $path = sys_get_temp_dir() . '/gruff-dashboard-test-' . bin2hex(random_bytes(6)) . '.php';
         file_put_contents($path, "<?php echo '<!doctype html><html><body>scan</body></html>'; \n");
 
-        // Path to a stub script that prints fixed HTML, standing in for the real gruff binary.
         return $path;
     }
 }

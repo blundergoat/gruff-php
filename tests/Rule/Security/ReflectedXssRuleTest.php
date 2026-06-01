@@ -105,7 +105,6 @@ final class ReflectedXssRuleTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(self::PROJECT_ROOT, AnalysisConfig::fromRegistry($registry)));
 
-        // Only reflected-XSS findings are relevant to this fixture helper.
         return array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === ReflectedXssRule::ID));
     }
 }

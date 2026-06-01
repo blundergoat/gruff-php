@@ -205,7 +205,6 @@ final class DashboardScanRunnerTest extends TestCase
      */
     private function runner(string $binary): DashboardScanRunner
     {
-        // Runner under test, pointed at the fake binary so scans stay hermetic.
         return new DashboardScanRunner($binary, new DashboardStateFactory(), new DashboardPageRenderer());
     }
 
@@ -218,7 +217,6 @@ final class DashboardScanRunnerTest extends TestCase
      */
     private function context(string $project): DashboardRequestContext
     {
-        // Loopback context rooted at the temp project, with a short timeout for the scan.
         return new DashboardRequestContext($this->input(), $project, $project, 5.0, '127.0.0.1', 8765);
     }
 
@@ -229,7 +227,6 @@ final class DashboardScanRunnerTest extends TestCase
      */
     private function input(): ArrayInput
     {
-        // Empty input carrying just the option definitions the runner reads.
         return new ArrayInput([], new InputDefinition([
                                                           new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                                                           new InputOption('fail-on', null, InputOption::VALUE_REQUIRED, '', 'none'),
@@ -283,7 +280,6 @@ PHP,
         file_put_contents($binary, $script);
         chmod($binary, 0755);
 
-        // Path to the stub binary whose behaviour matches the requested mode (empty/slow/counting).
         return $binary;
     }
 

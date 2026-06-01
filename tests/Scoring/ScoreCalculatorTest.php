@@ -318,7 +318,6 @@ final class ScoreCalculatorTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $settings = $config->ruleSettings($ruleId);
 
-        // Clone the config with this rule flagged so its findings drop out of the composite score.
         return $config->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
             enabled:           $settings->enabled,
             thresholds:        $settings->thresholds,

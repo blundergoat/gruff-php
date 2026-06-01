@@ -49,7 +49,6 @@ final readonly class PillarScore
      */
     public function toArray(): array
     {
-        // score and grade are null for an inapplicable pillar (no grade); penalty is rounded to match report precision.
         return [
             'pillar'     => $this->pillar,
             'applicable' => $this->applicable,

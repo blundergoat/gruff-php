@@ -45,7 +45,6 @@ final readonly class MutationFileSummary
      */
     public function toArray(): array
     {
-        // Serialisable per-file row; the 'file' key carries the display path while the constructor field is $filePath.
         return [
             'file'              => $this->filePath,
             'totalMutants'      => $this->totalMutants,

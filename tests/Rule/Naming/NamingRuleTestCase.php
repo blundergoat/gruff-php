@@ -89,7 +89,6 @@ abstract class NamingRuleTestCase extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Naming/' . $filename;
 
-        // Display path stays repo-relative so finding output matches a real checkout.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Naming/' . $filename));
     }
 }

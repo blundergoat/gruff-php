@@ -62,7 +62,6 @@ final readonly class ScoreReport
      */
     public function toArray(): array
     {
-        // Each nested value object owns its own wire shape, so delegate rather than rebuild the schema here.
         return [
             'composite'              => $this->composite->toArray(),
             'pillars'                => array_map(

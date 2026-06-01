@@ -79,7 +79,6 @@ final readonly class BranchReviewComparator
 
         ksort($indexed, SORT_STRING);
 
-        // Return the key-sorted buckets so introduced/removed ordering stays deterministic across runs.
         return $indexed;
     }
 }
