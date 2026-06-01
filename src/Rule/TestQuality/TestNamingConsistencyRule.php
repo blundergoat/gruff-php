@@ -144,7 +144,6 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             }
         }
 
-        // No configured pattern matched, so the name is treated as acceptable.
         return null;
     }
 

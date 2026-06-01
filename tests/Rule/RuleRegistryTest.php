@@ -344,7 +344,6 @@ final class RuleRegistryTest extends TestCase
     {
         $absolutePath = __DIR__ . '/../..' . '/' . $displayPath;
 
-        // Tests need the same parser path production analysis uses.
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $displayPath));
     }
 

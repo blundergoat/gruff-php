@@ -51,7 +51,7 @@ final class ErrorSuppressionRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for suppressed expressions.
+     * @return list<Finding> - One finding per `@`-suppressed expression in the unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -72,7 +72,6 @@ final class ErrorSuppressionRule implements RuleInterface
             );
         }
 
-        // One finding per `@`-suppressed expression in this unit; empty when the file uses none.
         return $findings;
     }
 }

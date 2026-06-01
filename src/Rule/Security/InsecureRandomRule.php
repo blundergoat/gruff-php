@@ -55,7 +55,7 @@ final class InsecureRandomRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for insecure random usage.
+     * @return list<Finding> - One finding per non-cryptographic random call in the unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -83,7 +83,6 @@ final class InsecureRandomRule implements RuleInterface
             );
         }
 
-        // One finding per non-cryptographic random call in this unit; empty when the file uses none.
         return $findings;
     }
 }

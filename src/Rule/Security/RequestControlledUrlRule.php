@@ -100,7 +100,6 @@ final class RequestControlledUrlRule implements RuleInterface
             $findings[] = $this->finding($analysisUnit, $call, $method);
         }
 
-        // At most one finding: a single client call has a single URL argument to taint-check.
         return $findings;
     }
 

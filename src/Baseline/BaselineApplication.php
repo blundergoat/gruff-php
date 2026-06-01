@@ -27,7 +27,6 @@ final readonly class BaselineApplication
     {
         $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
 
-        // Caller only wants the surviving findings here, so drop the report metadata the filter also returns.
         return (new BaselineFilter())->apply($baseline, $findings, false)['findings'];
     }
 
@@ -96,7 +95,6 @@ final readonly class BaselineApplication
             return null;
         }
 
-        // Baseline written: report it as generated, with no findings suppressed on a generate run.
         return new BaselineReport(
             path:               $baseline->path,
             generated:          true,

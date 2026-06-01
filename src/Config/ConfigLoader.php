@@ -99,12 +99,10 @@ final readonly class ConfigLoader
 
         foreach ([self::DEFAULT_CONFIG_FILE, self::LEGACY_DEFAULT_CONFIG_FILE] as $candidate) {
             if (is_file($root . '/' . $candidate)) {
-                // Either filename present is enough; the loader resolves which one to use later.
                 return true;
             }
         }
 
-        // Neither the preferred nor the legacy filename exists, so the root has no project config.
         return false;
     }
 
@@ -122,11 +120,9 @@ final readonly class ConfigLoader
         $resolvedPath = $this->resolveConfigPath($configPath);
 
         if ($resolvedPath === null) {
-            // No config file anywhere, so run on the registry defaults unchanged.
             return $config;
         }
 
-        // Layer the discovered config file (and its extends chain) over those defaults.
         return $this->applyConfigFile($config, $registry, $resolvedPath);
     }
 
@@ -284,7 +280,6 @@ final readonly class ConfigLoader
                                           ));
             }
 
-            // Bundled preset resolved to its shipped profile file under resources/profiles.
             return $presetPath;
         }
 
@@ -296,7 +291,6 @@ final readonly class ConfigLoader
             throw new ConfigException(sprintf('Config "extends" target not found: %s.', $reference));
         }
 
-        // A non-preset reference is a path, resolved relative to the file that declared the extends.
         return $candidate;
     }
 
@@ -385,7 +379,6 @@ final readonly class ConfigLoader
     private function applyMinimumSeverityConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
         if (!array_key_exists('minimumSeverity', $rootConfig)) {
-            // Block is optional: absent means leave any inherited severity thresholds untouched.
             return $config;
         }
 
@@ -443,7 +436,6 @@ final readonly class ConfigLoader
     private function applyMinimumPhpVersion(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
         if (!array_key_exists('minimumPhpVersion', $rootConfig)) {
-            // Key is optional; without it the modernisation rules keep their built-in version floor.
             return $config;
         }
 
@@ -470,7 +462,6 @@ final readonly class ConfigLoader
     private function applyPathConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
         if (!array_key_exists('paths', $rootConfig)) {
-            // No paths block, so discovery keeps whatever ignore patterns were already in effect.
             return $config;
         }
 
@@ -490,7 +481,6 @@ final readonly class ConfigLoader
     private function applyFailureConditionsConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
         if (!array_key_exists('failureConditions', $rootConfig)) {
-            // Block is optional; absent leaves any inherited count gates in place.
             return $config;
         }
 
@@ -517,7 +507,6 @@ final readonly class ConfigLoader
     private function applyAllowlistConfig(AnalysisConfig $config, array $rootConfig): AnalysisConfig
     {
         if (!array_key_exists('allowlists', $rootConfig)) {
-            // No allowlists block, so the registry-seeded abbreviation and secret-preview defaults stand.
             return $config;
         }
 
@@ -549,7 +538,6 @@ final readonly class ConfigLoader
         array          $rootConfig,
     ): AnalysisConfig {
         if (!array_key_exists('selection', $rootConfig)) {
-            // No selection block, so the previously active include/exclude set carries forward.
             return $config;
         }
 
@@ -654,7 +642,6 @@ final readonly class ConfigLoader
             throw new ConfigException(sprintf('Invalid YAML config: %s', $exception->getMessage()), 0, $exception);
         }
 
-        // A valid YAML document can still be a list or scalar; require a mapping at the root.
         return $this->requireObject($decoded, 'Config root must be an object.');
     }
 
@@ -695,11 +682,9 @@ final readonly class ConfigLoader
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
         if (is_array($decodedValue)) {
-            // Arrays recurse so nesting limits and per-element scalar checks apply at every depth.
             return $this->configArray($decodedValue);
         }
 
-        // A leaf scalar is validated directly against the allowed YAML/JSON scalar types.
         return $this->configScalar($decodedValue);
     }
 

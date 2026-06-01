@@ -50,7 +50,7 @@ final readonly class EmptyClassRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for empty classes.
+     * @return list<Finding> - One finding per concrete, member-less class that is not an exception marker.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -89,7 +89,6 @@ final readonly class EmptyClassRule implements RuleInterface
             );
         }
 
-        // One finding per concrete, member-less class that is not an exception marker.
         return $findings;
     }
 

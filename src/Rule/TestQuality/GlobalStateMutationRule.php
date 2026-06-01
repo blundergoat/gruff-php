@@ -201,7 +201,6 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             return null;
         }
 
-        // Report the base variable only when it is one of the tracked superglobals; otherwise it is an ordinary array.
         return in_array($variable->name, self::SUPERGLOBALS, true) ? $variable->name : null;
     }
 

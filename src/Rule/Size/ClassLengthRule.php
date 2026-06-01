@@ -59,7 +59,7 @@ final readonly class ClassLengthRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for oversized classes, traits, or enums.
+     * @return list<Finding> - One finding per oversized class-like scope; empty when every type is within budget.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -114,7 +114,6 @@ final readonly class ClassLengthRule implements RuleInterface
             );
         }
 
-        // One finding per class-like scope that exceeded its threshold; empty when every type stayed within budget.
         return $findings;
     }
 
@@ -151,16 +150,14 @@ final readonly class ClassLengthRule implements RuleInterface
      *
      * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
-     * @return string - Human-readable threshold value.
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Genuine fractional thresholds keep their decimals so the message stays precise.
             return (string) $number;
         }
 
-        // Whole values render without a ".0" so an integer threshold reads as a plain integer.
         return (string) (int) $number;
     }
 }

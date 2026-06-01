@@ -108,7 +108,6 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             }
         }
 
-        // One finding per fixture match that is neither a synthetic example nor an attribution email.
         return $findings;
     }
 
@@ -123,7 +122,6 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     {
         $normalized = strtolower($candidateFixture);
 
-        // True for reserved example/test domains and the 555-010x phone block, all guaranteed non-real.
         return str_contains($normalized, '@example.')
                || str_contains($normalized, '@example-')
                || str_contains($normalized, '@test.')
@@ -148,7 +146,6 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         $lineEnd   = $lineEnd === false ? strlen($source) : $lineEnd;
         $line      = strtolower(substr($source, $lineStart, $lineEnd - $lineStart));
 
-        // True for author/copyright lines, where a maintainer email is metadata rather than fixture PII.
         return str_contains($line, '@author')
                || str_contains($line, 'copyright')
                || str_contains($line, '@copyright');

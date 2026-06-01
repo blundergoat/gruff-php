@@ -152,7 +152,6 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
             }
         }
 
-        // Names of flags that are unset, blank, or "false"; an empty list means strictness is fully configured.
         return $missing;
     }
 }

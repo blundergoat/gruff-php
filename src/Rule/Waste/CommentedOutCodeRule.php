@@ -49,7 +49,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for suspicious comment blocks.
+     * @return list<Finding> - One finding per comment token whose stripped body crosses the code-shape threshold.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -85,7 +85,6 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             }
         }
 
-        // One finding per comment token whose stripped body crosses the code-shape threshold.
         return $findings;
     }
 

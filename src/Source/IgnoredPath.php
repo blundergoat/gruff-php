@@ -42,7 +42,6 @@ final readonly class IgnoredPath
      */
     public function toArray(): array
     {
-        // Flatten to the report row shape; pattern stays null when the exclusion had no concrete match string.
         return [
             'path'    => $this->path,
             'source'  => $this->source,

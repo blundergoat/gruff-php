@@ -50,7 +50,7 @@ final class WeakCryptoRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for weak cryptography usage.
+     * @return list<Finding> - Findings for weak cryptography usage; empty when the file calls none.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,7 +82,6 @@ final class WeakCryptoRule implements RuleInterface
             );
         }
 
-        // Empty when the file calls no md5/sha1/mcrypt_* primitive; the caller treats that as a clean file.
         return $findings;
     }
 }

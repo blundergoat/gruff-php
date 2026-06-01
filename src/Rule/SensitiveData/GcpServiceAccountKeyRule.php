@@ -52,7 +52,7 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> - Findings for GCP service-account keys.
+     * @return list<\GruffPhp\Finding\Finding> - GCP service-account findings anchored at the service-account marker.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -100,7 +100,6 @@ final readonly class GcpServiceAccountKeyRule implements SourceTextRuleInterface
             );
         }
 
-        // Findings stay anchored at the service-account marker, not the private key body.
         return $findings;
     }
 

@@ -113,7 +113,6 @@ final readonly class UnusedMockRule implements RuleInterface
             ];
         }
 
-        // First assignment per variable name wins; later reassignments do not move the reported line.
         return $mockAssignments;
     }
 
@@ -143,7 +142,6 @@ final readonly class UnusedMockRule implements RuleInterface
             $reads[$var->name] = true;
         }
 
-        // Set of variable names read somewhere other than their own assignment target.
         return $reads;
     }
 
@@ -187,7 +185,6 @@ final readonly class UnusedMockRule implements RuleInterface
             );
         }
 
-        // One finding per mock variable that was created but never read back.
         return $findings;
     }
 

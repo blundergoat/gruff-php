@@ -120,11 +120,9 @@ final readonly class TestdoxReadabilityRule implements RuleInterface
     private function renderTestdox(array $words): string
     {
         if ($words === []) {
-            // No words to render means an empty testdox phrase, matching how PHPUnit would display it.
             return '';
         }
 
-        // Lower-case the joined words to mirror PHPUnit's testdox formatting in the finding message.
         return strtolower(implode(' ', $words));
     }
 }

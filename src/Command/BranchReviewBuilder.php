@@ -50,7 +50,6 @@ final readonly class BranchReviewBuilder
         array &$diagnostics,
     ): ?BranchReviewResult {
         if ($options->diffVs === null || $reviewDiff === null) {
-            // No base ref requested or the diff lookup failed, so there is no branch review to build.
             return null;
         }
 
@@ -159,7 +158,6 @@ final readonly class BranchReviewBuilder
         AnalysisSourceSet $analysisSourceSet,
     ): array {
         if (!$this->shouldLoadChangedOnlyProjectContext($options, $registry, $config, $reviewDiff)) {
-            // No project-wide rule needs extra context, so the requested-path units already cover it.
             return $analysisSourceSet->analysisUnits;
         }
 
@@ -192,28 +190,23 @@ final readonly class BranchReviewBuilder
         $support = new AnalysisFindingSupport();
 
         if (!$options->isChangedOnly) {
-            // Full-tree mode snapshots exactly the requested paths, regardless of what changed.
             return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
         if ($shouldLoadProjectContext) {
-            // The whole-tree snapshot is taken separately, so this changed-only path adds nothing.
             return [];
         }
 
         if ($reviewDiff->changedFiles === []) {
-            // Nothing changed versus the base ref, so no base files need copying.
             return [];
         }
 
         if ($options->paths === []) {
-            // No path filter given: snapshot every changed file.
             return $reviewDiff->changedFiles;
         }
 
         $requestedPaths = $support->normaliseRequestedPaths($projectRoot, $options->paths);
         if ($requestedPaths === []) {
-            // The path filter resolved to nothing on disk, so no changed file can match it.
             return [];
         }
 
@@ -238,16 +231,13 @@ final readonly class BranchReviewBuilder
     private function baseAnalysisPaths(string $projectRoot, AnalyseCommandOptions $options, DiffResult $reviewDiff): array
     {
         if ($options->isChangedOnly && $options->paths === []) {
-            // Changed-only with no path filter analyses exactly the changed files.
             return $reviewDiff->changedFiles;
         }
 
         if ($options->paths === []) {
-            // No path filter outside changed-only mode: let the loader walk the snapshot itself.
             return [];
         }
 
-        // A path filter is set, so analyse just those requested paths within the snapshot.
         return (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
     }
 
@@ -287,7 +277,6 @@ final readonly class BranchReviewBuilder
         AnalysisConfig $config,
         ?DiffResult $reviewDiff,
     ): bool {
-        // Only changed-only runs with real changes and an enabled project rule need the full tree loaded.
         return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== []

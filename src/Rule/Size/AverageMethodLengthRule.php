@@ -59,7 +59,7 @@ final readonly class AverageMethodLengthRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for large average method bodies.
+     * @return list<Finding> - One finding per class-like scope whose average trips a threshold; empty when none do.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -126,7 +126,6 @@ final readonly class AverageMethodLengthRule implements RuleInterface
             );
         }
 
-        // One finding per class-like scope whose average tripped a threshold; empty when every type stayed under.
         return $findings;
     }
 
@@ -163,16 +162,14 @@ final readonly class AverageMethodLengthRule implements RuleInterface
      *
      * @param int|float $number - Threshold value to render; whole floats are shown without a trailing decimal.
      *
-     * @return string - Human-readable threshold value.
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Genuine fractional thresholds keep their decimals so the message stays precise.
             return (string) $number;
         }
 
-        // Whole values render without a ".0" so an integer threshold reads as a plain integer.
         return (string) (int) $number;
     }
 }

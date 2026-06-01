@@ -437,11 +437,9 @@ final readonly class CognitiveComplexityRule implements RuleInterface
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Keep a genuine fraction visible (e.g. "2.5") instead of truncating it to an int.
             return (string) $number;
         }
 
-        // Whole numbers, including whole-valued floats, render without a trailing ".0".
         return (string) (int) $number;
     }
 }

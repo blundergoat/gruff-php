@@ -367,7 +367,6 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
             $rules[$name][] = $finding->ruleId;
         }
 
-        // Map of identifier name to the rule ids that flagged it, for asserting which names overlap.
         return $rules;
     }
 }

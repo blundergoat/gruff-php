@@ -82,7 +82,6 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
             }
         }
 
-        // One finding per conditional accumulated across every test scope in the unit.
         return $findings;
     }
 
@@ -100,12 +99,10 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
-                // Path matched an exemption glob, so the caller treats this file as intentionally branchy.
                 return true;
             }
         }
 
-        // No exemption glob matched, so conditionals in this file remain reportable.
         return false;
     }
 }

@@ -71,7 +71,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for risky scripts.
+     * @return list<Finding> - One finding per script event with a risky command.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -108,7 +108,6 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
             );
         }
 
-        // One finding per scripts event with a risky command; empty when every event is a plain PHP callable or alias.
         return $findings;
     }
 

@@ -47,7 +47,6 @@ final readonly class BaselineStore
     {
         $decoded = $this->readBaselineObject($path);
 
-        // Validated envelope turned into the in-memory baseline: the source path plus one entry per persisted finding.
         return new BaselineData($path, $this->entriesFromFindings($decoded['findings']));
     }
 
@@ -84,7 +83,6 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
 
-        // Normalised envelope with the schema pinned and the findings key validated into a list of scalar-keyed rows.
         return [
             'schemaVersion' => self::SCHEMA_VERSION,
             'findings'      => $this->readFindingsList($decoded['findings'] ?? null),
@@ -128,7 +126,6 @@ final readonly class BaselineStore
             $rows[] = $baselineFinding;
         }
 
-        // Every finding row, each proven to be a string-keyed map of scalar-or-null values ready for entry hydration.
         return $rows;
     }
 
@@ -189,7 +186,6 @@ final readonly class BaselineStore
 
         $this->writeAtomically($absolutePath, $json . PHP_EOL, $path);
 
-        // The baseline as persisted: returned so callers can report what was written without re-reading the file.
         return $baselineData;
     }
 

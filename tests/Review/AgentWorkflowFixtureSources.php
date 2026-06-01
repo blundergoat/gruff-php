@@ -16,7 +16,6 @@ final class AgentWorkflowFixtureSources
      */
     public static function baseExampleSource(): string
     {
-        // Clean single-method class: the "before" side a branch-review diff compares against.
         return <<<'PHP'
 <?php
 
@@ -40,7 +39,6 @@ PHP;
      */
     public static function changedExampleSource(): string
     {
-        // Adds newRisk() on top of the base so the diff carries a method that lands in changed-only scope.
         return <<<'PHP'
 <?php
 
@@ -71,7 +69,6 @@ PHP;
      */
     public static function removedBaseExampleSource(): string
     {
-        // Carries oldRisk() present only on the base side, so comparison must report it as a removed finding.
         return <<<'PHP'
 <?php
 
@@ -100,7 +97,6 @@ PHP;
      */
     public static function addedRiskSource(): string
     {
-        // unserialize() of caller input trips a real security rule, so the added method yields a genuine finding.
         return <<<'PHP'
 <?php
 
@@ -124,7 +120,6 @@ PHP;
      */
     public static function bookingGatewayInterfaceSource(): string
     {
-        // Interface with exactly one implementor: the base side of the single-implementor project-rule scenario.
         return <<<'PHP'
 <?php
 
@@ -145,7 +140,6 @@ PHP;
      */
     public static function changedBookingGatewayInterfaceSource(): string
     {
-        // Same interface with a trivial edit, pulling it into changed-only scope without altering its contract.
         return <<<'PHP'
 <?php
 
@@ -166,7 +160,6 @@ PHP;
      */
     public static function bookingOtpGatewaySource(): string
     {
-        // Unchanged implementor that keeps the interface at one implementor, so the rule sees a complete pair.
         return <<<'PHP'
 <?php
 
@@ -191,7 +184,6 @@ PHP;
      */
     public static function projectDeadCodeComposerSource(): string
     {
-        // Project-wide dead-code rules derive ownership from composer PSR-4 prefixes.
         return <<<'JSON'
 {"autoload":{"psr-4":{"App\\":"src/"}}}
 JSON;
@@ -204,7 +196,6 @@ JSON;
      */
     public static function referencedInternalClassSource(): string
     {
-        // Declaration side for the changed-only full-context project-dead-code review scenario.
         return <<<'PHP'
 <?php
 
@@ -223,7 +214,6 @@ PHP;
      */
     public static function changedReferencedInternalClassSource(): string
     {
-        // Trivial branch edit pulls the declaration into changed-only scope without making it dead.
         return <<<'PHP'
 <?php
 
@@ -243,7 +233,6 @@ PHP;
      */
     public static function internalClassReferenceSource(): string
     {
-        // Unchanged context that must still count as a reference during changed-only review.
         return <<<'PHP'
 <?php
 
@@ -266,7 +255,6 @@ PHP;
      */
     public static function addedDeadInternalClassSource(): string
     {
-        // A new project-owned class with no supported references should appear after changed-only filtering.
         return <<<'PHP'
 <?php
 

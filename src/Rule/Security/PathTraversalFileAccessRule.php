@@ -70,7 +70,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for request-controlled filesystem paths.
+     * @return list<Finding> - One finding per filesystem sink fed request-controlled data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -104,7 +104,6 @@ final class PathTraversalFileAccessRule implements RuleInterface
             }
         }
 
-        // One finding per filesystem sink fed request-controlled data; empty when no tainted path reaches a sink.
         return $findings;
     }
 

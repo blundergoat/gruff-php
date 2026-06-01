@@ -96,7 +96,6 @@ final readonly class PrivateReflectionRule implements RuleInterface
             );
         }
 
-        // One finding per test scope that reaches into privates; empty when every scope stays on public contracts.
         return $findings;
     }
 

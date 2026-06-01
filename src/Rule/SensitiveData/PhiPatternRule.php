@@ -31,7 +31,6 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      */
     private function patterns(): array
     {
-        // Detector name plus regex per identifier family; the name keys both the context check and the message.
         return [
             ['name' => 'ssn', 'pattern' => '/\b\d{3}-\d{2}-\d{4}\b/'],
             ['name' => 'nhi', 'pattern' => '/\b[A-HJ-NP-Z]{3}\d{4}\b/'],
@@ -115,7 +114,6 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             }
         }
 
-        // One finding per non-comment, non-placeholder pattern hit that had PHI context on its own line.
         return $findings;
     }
 
@@ -131,7 +129,6 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     {
         $normalized = strtolower($line);
 
-        // True when the line names this detector or any health-domain keyword, gating raw pattern hits.
         return str_contains($normalized, $detector)
                || str_contains($normalized, 'health')
                || str_contains($normalized, 'medicare')
@@ -187,7 +184,6 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     {
         $lines = explode("\n", $source);
 
-        // Empty string when the line number is past the end, so callers see no spurious context.
         return $lines[$lineNumber - 1] ?? '';
     }
 }

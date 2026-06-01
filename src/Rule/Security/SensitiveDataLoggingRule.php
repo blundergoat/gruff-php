@@ -97,7 +97,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
      * @param AnalysisUnit                    $analysisUnit - Unit being scanned; supplies the display path for findings.
      * @param Expr\MethodCall|Expr\StaticCall $call - Possible logger call whose name and arguments are checked.
      *
-     * @return list<Finding> - zero or one finding; empty when the call is not a tracked logger method or carries no sensitive argument
+     * @return list<Finding> - zero or one finding; a single logger call is one sink, flagged once
      */
     private function loggerCallFindings(AnalysisUnit $analysisUnit, Expr\MethodCall|Expr\StaticCall $call): array
     {
@@ -112,7 +112,6 @@ final class SensitiveDataLoggingRule implements RuleInterface
             return [];
         }
 
-        // At most one finding: a single logger call is one sink, flagged once.
         return [$this->finding($analysisUnit, $call, $method)];
     }
 

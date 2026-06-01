@@ -42,7 +42,6 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory/medium-confidence defaults the registry and config layer read to wire this rule up.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing constant PHPDoc',
@@ -105,7 +104,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param RuleDefinition $definition - Shared rule defaults so every finding carries identical severity and tier.
      * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path reported with each finding.
      *
-     * @return list<Finding> - Findings for undocumented class constants.
+     * @return list<Finding> - One finding per undocumented constant name; multi-name statements yield several.
      */
     private function classConstantFindings(
         ClassLike $classLike,
@@ -134,7 +133,6 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             }
         }
 
-        // One finding per undocumented constant name; a multi-name `const A, B;` statement yields several.
         return $findings;
     }
 
@@ -202,7 +200,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      * @param RuleDefinition $definition - Shared rule defaults so every finding carries identical severity and tier.
      * @param AnalysisUnit   $analysisUnit - Parsed unit supplying the display path reported with each finding.
      *
-     * @return list<Finding> - Findings for undocumented enum cases.
+     * @return list<Finding> - One finding per undocumented enum case; empty when every case is documented.
      */
     private function enumCaseFindings(
         ClassLike $classLike,
@@ -231,7 +229,6 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             );
         }
 
-        // One finding per undocumented case; empty when every case already carries its own docblock.
         return $findings;
     }
 

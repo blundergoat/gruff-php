@@ -35,7 +35,6 @@ final readonly class FileLengthRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Carries the 1000-line error threshold the analyse pass reads back via settingsFor().
         return new RuleDefinition(
             id:                self::ID,
             name:              'File length',
@@ -53,7 +52,7 @@ final readonly class FileLengthRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for oversized files.
+     * @return list<Finding> - Empty when the file is within budget; otherwise the single exceeded-length finding.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -63,11 +62,9 @@ final readonly class FileLengthRule implements RuleInterface
         $thresholdMatch = $settings->highValueThresholdMatch($lineCount);
 
         if ($thresholdMatch === null) {
-            // Line count sits at or below every configured threshold, so the file is within budget.
             return [];
         }
 
-        // Report the single breach; a file has one length, so at most one finding is ever produced.
         return [
             new Finding(
                 ruleId:  $definition->id,
@@ -100,16 +97,14 @@ final readonly class FileLengthRule implements RuleInterface
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
-     * @return string - Human-readable threshold value.
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Keep the decimal only for a genuinely fractional threshold, such as 2.5.
             return (string) $number;
         }
 
-        // Whole numbers print without a trailing ".0" so messages read cleanly.
         return (string) (int) $number;
     }
 }

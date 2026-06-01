@@ -148,7 +148,6 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
-        // True when any node in the tree is a superglobal read; presence of a match is the taint signal.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
                 // A variable whose name is one of the request superglobals is the attacker-controlled source.
                 return $candidate instanceof Expr\Variable
@@ -334,7 +333,6 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
-        // True when any node builds a string by joining parts, the shape that can splice untrusted data in.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
                 // A `.` concatenation or a "$var" interpolated string is the dynamic-construction signal.
                 return $candidate instanceof Expr\BinaryOp\Concat
@@ -449,7 +447,6 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
-        // True when any string literal in the tree is an outbound URL, used to gate URL-only sinks.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
                 if (!$candidate instanceof Scalar\String_) {
                     // Only literal strings can be inspected for a scheme; non-literals are never a URL match here.
@@ -472,7 +469,6 @@ final class SecurityNodeHelper
     {
         $nodeFinder = new NodeFinder();
 
-        // True when any node in the tree names a secret; each branch maps a node kind to its identifier text.
         return $nodeFinder->findFirst($node, static function (Node $candidate): bool {
                 if ($candidate instanceof Expr\Variable && is_string($candidate->name)) {
                     // A variable name like $apiKey signals secret context.

@@ -132,7 +132,6 @@ JSON;
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
-        // Funnel through stringKeyedArray so a non-object top level fails the test rather than returning loosely.
         return $this->stringKeyedArray($decoded);
     }
 
@@ -146,7 +145,6 @@ JSON;
      */
     private function arrayValue(array $payload, string $key): array
     {
-        // Absent key yields null, which stringKeyedArray rejects, so a missing nested object fails loudly.
         return $this->stringKeyedArray($payload[$key] ?? null);
     }
 
@@ -184,7 +182,6 @@ JSON;
             $result[$key] = $entryValue;
         }
 
-        // Rebuilt array carries only the string-key entries the assertions confirmed, narrowing the type for callers.
         return $result;
     }
 

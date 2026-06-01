@@ -115,7 +115,6 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
             );
         }
 
-        // One finding per test scope that expects an exception type but never narrows it to a message, code, or object.
         return $findings;
     }
 }

@@ -424,7 +424,6 @@ final readonly class AnalyseCommandOptions
         $values = $input->getOption($name);
 
         if (!is_array($values)) {
-            // Option was never given (no array of occurrences), so there is nothing to collect.
             return [];
         }
 
@@ -455,7 +454,6 @@ final readonly class AnalyseCommandOptions
         $values = $input->getOption($name);
 
         if (!is_array($values)) {
-            // Option was never given, so there are no occurrences to comma-expand.
             return [];
         }
 
@@ -536,7 +534,6 @@ final readonly class AnalyseCommandOptions
     private function baselineUsageError(): ?string
     {
         if ($this->baseline->baselinePath === null || $this->baseline->generateBaselinePath === null) {
-            // At most one baseline mode is set, so there is no conflict to report.
             return null;
         }
 
@@ -589,7 +586,6 @@ final readonly class AnalyseCommandOptions
     private function changedOnlyUsageError(): ?string
     {
         if (!$this->isChangedOnly || $this->diffVs !== null) {
-            // Valid when changed-only is off, or when it is on and has the comparison ref it needs.
             return null;
         }
 
@@ -605,7 +601,6 @@ final readonly class AnalyseCommandOptions
     private function noBaselineUsageError(): ?string
     {
         if (!$this->noBaseline || $this->baseline->baselinePath === null) {
-            // Either flag alone is fine; only asking to both ignore and apply a baseline is contradictory.
             return null;
         }
 

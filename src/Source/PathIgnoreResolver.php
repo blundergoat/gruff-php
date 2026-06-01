@@ -118,7 +118,6 @@ final readonly class PathIgnoreResolver
             return IgnoreDecision::ignored(self::SOURCE_GENERATED, $generatedFilename);
         }
 
-        // No configured or built-in rule claimed the path, so it is in scope for analysis.
         return IgnoreDecision::notIgnored();
     }
 
@@ -141,7 +140,6 @@ final readonly class PathIgnoreResolver
             }
         }
 
-        // No configured glob matched, so the path is not config-ignored.
         return null;
     }
 
@@ -169,7 +167,6 @@ final readonly class PathIgnoreResolver
             }
         }
 
-        // No built-in directory token appears as a path segment, so the path is not default-ignored.
         return null;
     }
 
@@ -244,7 +241,6 @@ final readonly class PathIgnoreResolver
             '\\?' => '[^/]',
         ]) . '$#';
 
-        // Apply the converted glob pattern to the normalized project-relative path.
         return preg_match($regex, $normalizedPath) === 1;
     }
 }

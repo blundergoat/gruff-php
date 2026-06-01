@@ -55,7 +55,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for redundant return variables.
+     * @return list<Finding> - One finding per assign-then-return pair found across every function-like body.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -68,7 +68,6 @@ final readonly class RedundantVariableRule implements RuleInterface
             $this->checkBlock($function->stmts ?? [], $analysisUnit, $definition, $findings);
         }
 
-        // One finding per assign-then-return pair found across every function-like body in the unit.
         return $findings;
     }
 

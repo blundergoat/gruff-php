@@ -39,7 +39,6 @@ final class MissingReadmeRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Warning-severity, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing README',
@@ -70,14 +69,12 @@ final class MissingReadmeRule implements RuleInterface
             ??= file_exists($root . '/README.md');
 
         if ($readmePresent) {
-            // A README.md exists at the project root; nothing to report.
             return [];
         }
 
         $this->emitted = true;
         $definition    = $this->definition();
 
-        // Single project-level finding marking the absent root README.md.
         return [
             new Finding(
                 ruleId:      $definition->id,

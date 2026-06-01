@@ -84,7 +84,6 @@ final readonly class ExcessiveMockingRule implements RuleInterface
             );
         }
 
-        // One finding per test scope whose mock count exceeds the configured maxMocks threshold.
         return $findings;
     }
 }

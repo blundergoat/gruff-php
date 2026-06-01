@@ -333,16 +333,14 @@ final readonly class ParameterCountRule implements RuleInterface
      *
      * @param int|float $number - Threshold value to render; whole values are shown without a trailing decimal.
      *
-     * @return string - Human-readable threshold value.
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Keep the decimal only for a genuinely fractional threshold, such as 2.5.
             return (string) $number;
         }
 
-        // Whole numbers print without a trailing ".0" so messages read cleanly.
         return (string) (int) $number;
     }
 }

@@ -68,7 +68,7 @@ final class DebugModeEnabledRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Debug-mode findings.
+     * @return list<Finding> - One finding per literal display-errors toggle in the parsed unit.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -105,7 +105,6 @@ final class DebugModeEnabledRule implements RuleInterface
             );
         }
 
-        // Every finding represents a literal display-errors toggle in this parsed unit.
         return $findings;
     }
 

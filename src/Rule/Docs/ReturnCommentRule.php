@@ -112,7 +112,6 @@ final readonly class ReturnCommentRule implements RuleInterface
             );
         }
 
-        // One finding per value-returning function-like whose @return tag is present but carries no description.
         return $findings;
     }
 

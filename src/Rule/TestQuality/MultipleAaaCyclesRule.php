@@ -148,7 +148,6 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             $sawNonAssertionCall = $hasNonAssertionCall;
         }
 
-        // Total runs where an act was followed by its own assertions; the caller compares this to the threshold.
         return $cycles;
     }
 
@@ -166,12 +165,10 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
 
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
-                // Path matched an exemption glob, so the whole file is treated as an accepted broad shape.
                 return true;
             }
         }
 
-        // No exemption glob matched, so this path is subject to the cycle check.
         return false;
     }
 

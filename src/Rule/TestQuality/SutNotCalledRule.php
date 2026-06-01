@@ -195,12 +195,10 @@ final readonly class SutNotCalledRule implements RuleInterface
 
             $name = TestQualityNodeHelper::callName($call);
             if ($name !== null && isset($candidateLookup[TestQualityNodeHelper::normalizedTestName($name)])) {
-                // A non-assertion call resolves to a candidate name: the SUT is exercised, so no finding.
                 return true;
             }
         }
 
-        // No call matched any candidate; the SUT appears unexercised and the test should be flagged.
         return false;
     }
 
@@ -311,7 +309,6 @@ final readonly class SutNotCalledRule implements RuleInterface
             return [];
         }
 
-        // Words and digit groups in source order, preserving original casing for later normalisation.
         return $matches[0];
     }
 
@@ -326,12 +323,10 @@ final readonly class SutNotCalledRule implements RuleInterface
     {
         foreach ($tokens as $index => $token) {
             if (in_array($token, self::OUTCOME_MARKERS, true)) {
-                // First marker position: the boundary where the method phrase ends and outcome begins.
                 return $index;
             }
         }
 
-        // No outcome marker found, so the name has no method/outcome split to act on.
         return null;
     }
 

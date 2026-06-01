@@ -117,7 +117,6 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
             }
         }
 
-        // Empty when every match sat in a comment or looked like a dummy value; the caller treats that as a clean file.
         return $findings;
     }
 }

@@ -53,7 +53,8 @@ final readonly class UnreachableCodeRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for unreachable statements.
+     * @return list<Finding> - Accumulated findings for statements past terminators; empty when every block can
+     *                         fall through.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -66,7 +67,6 @@ final readonly class UnreachableCodeRule implements RuleInterface
             $this->checkBlock($fn->stmts ?? [], $analysisUnit, $findings);
         }
 
-        // Accumulated across every function body; empty when no block has code past a terminator.
         return $findings;
     }
 

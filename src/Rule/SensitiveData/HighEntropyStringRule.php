@@ -286,7 +286,6 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
         $lines = explode("\n", $source);
 
         // Hand back the literal's own line for the metadata field-name check;
-        // empty when the number is past the end of source.
         return $lines[$lineNumber - 1] ?? '';
     }
 }

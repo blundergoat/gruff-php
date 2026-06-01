@@ -126,7 +126,6 @@ final readonly class SourceDiscovery
         if (!file_exists($absolutePath)) {
             $missingPaths[] = $path;
 
-            // A non-existent input is reported as missing rather than silently dropped from discovery.
             return;
         }
 
@@ -135,7 +134,6 @@ final readonly class SourceDiscovery
         if ($decision->ignored) {
             $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
 
-            // An ignored input contributes an ignore record but never a discovered file.
             return;
         }
 
@@ -149,7 +147,6 @@ final readonly class SourceDiscovery
                 );
             }
 
-            // A single requested file needs no directory walk; stop once it is classified.
             return;
         }
 
@@ -269,7 +266,6 @@ final readonly class SourceDiscovery
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         if ($extension === self::PHP_EXTENSION) {
-            // A .php extension routes the file to the AST-based analysis path.
             return SourceFile::TYPE_PHP;
         }
 
@@ -278,11 +274,9 @@ final readonly class SourceDiscovery
             || in_array(basename($path), self::TEXT_FILENAMES, true)
             || $this->isEnvLikeFile($path)
         ) {
-            // Recognised config/dotfile extensions route to the text-based secret/content scanners.
             return SourceFile::TYPE_TEXT;
         }
 
-        // Unrecognised files are excluded from discovery rather than scanned blindly.
         return null;
     }
 
@@ -599,16 +593,13 @@ final readonly class SourceDiscovery
         $canonicalPath = $this->canonicalPath($absolutePath);
 
         if ($canonicalPath === $root) {
-            // The root maps to "." so Git scans the whole worktree.
             return '.';
         }
 
         if (str_starts_with($canonicalPath, $root . '/')) {
-            // Strip the root prefix to yield a path Git interprets relative to the worktree.
             return substr($canonicalPath, strlen($root) + 1);
         }
 
-        // Paths outside the worktree have no pathspec, signalling the caller to drop Git discovery.
         return null;
     }
 
@@ -625,23 +616,19 @@ final readonly class SourceDiscovery
         $normalizedPathspec = trim($pathspec, '/');
 
         if ($normalizedPathspec === '' || $normalizedPathspec === '.') {
-            // A whole-root request is satisfied by any visible path at all.
             return $visiblePaths !== [];
         }
 
         foreach ($visiblePaths as $visiblePath) {
             if ($isFile && $visiblePath === $normalizedPathspec) {
-                // A file request matches only its own exact path.
                 return true;
             }
 
             if (!$isFile && ($visiblePath === $normalizedPathspec || str_starts_with($visiblePath, $normalizedPathspec . '/'))) {
-                // A directory request matches the directory itself or anything beneath it.
                 return true;
             }
         }
 
-        // No visible path matched, so the requested input was withheld by Git or ignore rules.
         return false;
     }
 

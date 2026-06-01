@@ -115,7 +115,6 @@ final class ReflectedXssRule implements RuleInterface
             }
         }
 
-        // Each finding corresponds to one output sink reached by unescaped request data.
         return $findings;
     }
 

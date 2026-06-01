@@ -92,7 +92,6 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
             );
         }
 
-        // One finding per *Test class whose parent is not a recognised *TestCase base.
         return $findings;
     }
 }

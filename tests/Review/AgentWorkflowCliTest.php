@@ -568,7 +568,6 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
-        // Route through stringKeyedArray so a non-object top level fails the test instead of slipping through.
         return $this->stringKeyedArray($decoded);
     }
 
@@ -582,7 +581,6 @@ final class AgentWorkflowCliTest extends TestCase
      */
     private function arrayValue(array $payload, string $key): array
     {
-        // Absent key yields null, which stringKeyedArray rejects, so a missing nested object fails the test.
         return $this->stringKeyedArray($payload[$key] ?? null);
     }
 
@@ -610,7 +608,6 @@ final class AgentWorkflowCliTest extends TestCase
      */
     private function listValue(array $payload, string $key): array
     {
-        // Absent key yields null, which mixedList rejects, so a missing list value fails the test rather than passing empty.
         return $this->mixedList($payload[$key] ?? null);
     }
 
@@ -644,7 +641,6 @@ final class AgentWorkflowCliTest extends TestCase
             $types[]    = $this->stringValue($diagnostic, 'type');
         }
 
-        // Collected type names in diagnostics order, so assertions can check presence and sequence together.
         return $types;
     }
 
@@ -664,7 +660,6 @@ final class AgentWorkflowCliTest extends TestCase
             $symbols[] = $finding['symbol'] ?? null;
         }
 
-        // Preserves a null per finding that lacks a symbol, so assertions can detect missing symbols positionally.
         return $symbols;
     }
 
@@ -679,7 +674,6 @@ final class AgentWorkflowCliTest extends TestCase
     {
         self::assertIsArray($payload);
 
-        // array_values reindexes so callers always get a 0-based list even if JSON gave object-style keys.
         return array_values($payload);
     }
 
@@ -700,7 +694,6 @@ final class AgentWorkflowCliTest extends TestCase
             $result[$key] = $entryValue;
         }
 
-        // Rebuilt array carries only the string-key entries the assertions confirmed, narrowing the type for callers.
         return $result;
     }
 

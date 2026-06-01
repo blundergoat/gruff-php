@@ -158,7 +158,6 @@ final class TestQualityNodeHelper
     {
         $docText = $classMethod->getDocComment()?->getText() ?? '';
 
-        // Detect PHPUnit's @test tag inside a method docblock line.
         return preg_match('/^\s*\*\s*@test\b/m', $docText) === 1;
     }
 

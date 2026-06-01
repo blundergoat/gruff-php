@@ -35,7 +35,6 @@ final readonly class MissingReturnTagRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Advisory, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @return tag',
@@ -96,7 +95,6 @@ final readonly class MissingReturnTagRule implements RuleInterface
             );
         }
 
-        // One finding per documented function-like declaration lacking an @return tag.
         return $findings;
     }
 

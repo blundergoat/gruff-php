@@ -55,7 +55,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for VCS repositories.
+     * @return list<Finding> - One finding per VCS repository; empty when every repository resolves through Packagist.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -98,7 +98,6 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
             );
         }
 
-        // One finding per VCS repository; empty when every declared repository resolves through Packagist.
         return $findings;
     }
 }

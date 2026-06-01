@@ -108,7 +108,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
      * @param int|null $runBlockIndent - Current block scalar run indentation, updated in place.
      * @param int|null $reportedRunBlockLine - First reported run-block interpolation line, updated in place.
      *
-     * @return list<string> - Finding sinks detected on the line.
+     * @return list<string> - Per-line sinks, including at most one run-block interpolation per block.
      */
     private function lineFindingSinks(
         string $line,
@@ -132,7 +132,6 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
             $sinks[]              = 'github-event-run-interpolation';
         }
 
-        // Return the per-line sinks, including the at-most-one run-block interpolation flagged for this block.
         return $sinks;
     }
 
@@ -140,7 +139,7 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
      * @param string $line - One raw YAML line to scan for single-line risky patterns.
      * @param bool   $hasPullRequestEvent - True when a pull_request event is present, enabling the secrets-in-PR sink.
      *
-     * @return list<string> - Finding sinks that do not need multiline run-block state.
+     * @return list<string> - Single-line sinks that do not need multiline run-block state.
      */
     private function directLineSinks(string $line, bool $hasPullRequestEvent): array
     {
@@ -164,7 +163,6 @@ final class GithubActionsRiskyWorkflowRule implements SourceTextRuleInterface
             $sinks[] = 'github-event-run-interpolation';
         }
 
-        // Return the single-line sinks gathered for this line; multiline run-block state is handled by the caller.
         return $sinks;
     }
 

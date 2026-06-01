@@ -74,11 +74,9 @@ CSS;
         }
 
         if (!$interactive) {
-            // Static report: no filter UI to style, so return the base stylesheet plus any diagnostic rules.
             return $css;
         }
 
-        // Interactive report: append the styles for the filter form and grouped finding sections.
         return $css . <<<'CSS'
 .finding-filters{border:1px solid var(--rule);background:var(--ink-3);padding:18px;margin:0 0 22px;display:grid;gap:16px}.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.finding-filters label,.filter-group legend{display:flex;flex-direction:column;gap:7px;color:var(--paper-mute);font-size:10px;text-transform:uppercase;letter-spacing:.14em}.finding-filters input,.finding-filters select{width:100%;border:1px solid var(--rule);background:var(--ink);color:var(--paper);padding:8px 10px;font:12px var(--mono)}.finding-filters select{min-height:96px}.finding-filters input:focus-visible,.finding-filters select:focus-visible,.finding-filters button:focus-visible{outline:2px solid var(--forge);outline-offset:3px}.filter-group{border:0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.filter-group legend{margin-right:4px}.filter-group .radio{flex-direction:row;align-items:center;text-transform:none;letter-spacing:0;font-size:12px;color:var(--paper-dim)}.filter-group input{width:auto}.filter-actions{display:flex;justify-content:space-between;align-items:center;gap:16px}.filter-actions button{border:1px solid var(--forge);background:var(--forge);color:var(--ink);padding:9px 12px;font:700 12px var(--mono);cursor:pointer}.filter-count{color:var(--paper-dim);font-size:12px}.finding-group{border-top:1px solid var(--rule);padding-top:10px}.finding-group-title{font:700 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--paper-dim);margin:12px 0 2px}@media(max-width:900px){.filter-grid{grid-template-columns:1fr 1fr}.filter-actions{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.filter-grid{grid-template-columns:1fr}.finding{grid-template-columns:1fr}.points{text-align:left;padding-left:0}}
 CSS;

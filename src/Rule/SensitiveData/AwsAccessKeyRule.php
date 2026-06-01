@@ -47,7 +47,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> - Findings for AWS key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for AWS keys; empty when matches are comments or dummy values.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -82,7 +82,6 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             );
         }
 
-        // Empty when every AKIA/ASIA match sat in a comment or looked like a dummy value; treated as a clean file.
         return $findings;
     }
 }

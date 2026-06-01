@@ -542,12 +542,10 @@ final class NamingRulesTest extends NamingRuleTestCase
             }
 
             if ($finding->symbol !== null && str_starts_with($finding->symbol, $symbolPrefix)) {
-                // A finding matched the rule, metadata, and symbol prefix, so the expectation holds.
                 return true;
             }
         }
 
-        // No finding matched every criterion across the whole list.
         return false;
     }
 

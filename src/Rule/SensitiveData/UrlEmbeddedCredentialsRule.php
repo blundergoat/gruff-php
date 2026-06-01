@@ -50,7 +50,7 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> - Findings for credential-bearing URLs.
+     * @return list<\GruffPhp\Finding\Finding> - Findings for credential-bearing URLs with only redacted previews.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -97,7 +97,6 @@ final readonly class UrlEmbeddedCredentialsRule implements SourceTextRuleInterfa
             );
         }
 
-        // Every finding carries only a redacted URL preview.
         return $findings;
     }
 }

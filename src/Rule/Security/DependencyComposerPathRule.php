@@ -48,7 +48,7 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for path repositories.
+     * @return list<Finding> - One finding per path repository; empty when every repository declared another type.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -91,7 +91,6 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
             );
         }
 
-        // One finding per path repository; empty when every repository declared some other type.
         return $findings;
     }
 }

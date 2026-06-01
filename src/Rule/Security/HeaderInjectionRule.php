@@ -50,7 +50,7 @@ final class HeaderInjectionRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for possible header injection.
+     * @return list<Finding> - One finding per header() call reached by request data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -79,7 +79,6 @@ final class HeaderInjectionRule implements RuleInterface
             );
         }
 
-        // One finding per header() call reached by request data; empty when no header argument is tainted.
         return $findings;
     }
 }

@@ -51,7 +51,7 @@ final class VariableIncludeRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for variable include paths.
+     * @return list<Finding> - Findings for variable include paths; empty when every include uses a fixed path.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -75,7 +75,6 @@ final class VariableIncludeRule implements RuleInterface
             );
         }
 
-        // Empty when every include/require used a fixed path; the caller treats that as a clean file, not an error.
         return $findings;
     }
 

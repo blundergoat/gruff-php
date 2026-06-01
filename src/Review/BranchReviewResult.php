@@ -105,7 +105,6 @@ final readonly class BranchReviewResult
      */
     public function toArray(): array
     {
-        // Report payload; active=true flags that a branch review ran, and counts are derived from the finding lists.
         return [
             'active'       => true,
             'base'         => $this->base,

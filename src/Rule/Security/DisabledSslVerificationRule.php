@@ -51,7 +51,7 @@ final class DisabledSslVerificationRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for disabled SSL verification.
+     * @return list<Finding> - One finding per cURL call that turns peer or hostname verification off.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -68,7 +68,6 @@ final class DisabledSslVerificationRule implements RuleInterface
             }
         }
 
-        // One finding per cURL call that turns peer or hostname verification off; empty when none do.
         return $findings;
     }
 

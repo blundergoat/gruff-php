@@ -52,7 +52,7 @@ final class UnsafeXmlLoadingRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Findings for unsafe XML loading.
+     * @return list<Finding> - Findings for network-capable XML loaders fed request data.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -78,7 +78,6 @@ final class UnsafeXmlLoadingRule implements RuleInterface
             array_push($findings, ...$this->xmlMethodFindings($analysisUnit, $call));
         }
 
-        // Empty when every loader was fed trusted data or already passed LIBXML_NONET; a clean file, not an error.
         return $findings;
     }
 

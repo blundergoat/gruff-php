@@ -81,7 +81,6 @@ final class PresetIntegrityTest extends TestCase
      */
     private static function presetPath(string $preset): string
     {
-        // Resolve the preset against the package's shipped profiles directory, mirroring how ConfigLoader finds it.
         return ConfigLoader::packageRoot() . '/resources/profiles/' . $preset . '.yaml';
     }
 }

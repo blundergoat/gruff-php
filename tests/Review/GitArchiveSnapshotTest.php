@@ -214,7 +214,6 @@ final class GitArchiveSnapshotTest extends TestCase
 
         sort($files, SORT_STRING);
 
-        // Sorted before returning so assertions compare on content, not on filesystem iteration order.
         return $files;
     }
 
@@ -229,7 +228,6 @@ final class GitArchiveSnapshotTest extends TestCase
         self::assertIsArray($paths);
         sort($paths, SORT_STRING);
 
-        // Sorted so the before/after diff that detects leaked snapshot dirs is stable across runs.
         return $paths;
     }
 
@@ -277,7 +275,6 @@ final class GitArchiveSnapshotTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
-        // Directory now exists on disk; the caller owns it and must tear it down via removeDir().
         return $path;
     }
 

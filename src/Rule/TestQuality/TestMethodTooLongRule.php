@@ -139,7 +139,6 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             $count++;
         }
 
-        // Report the meaningful-line tally the threshold comparison is measured against.
         return $count;
     }
 
@@ -177,7 +176,6 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             }
         }
 
-        // No override matched this path, so fall back to the rule's default threshold.
         return $defaultThreshold;
     }
 

@@ -184,7 +184,6 @@ final class SecretScannerHelper
     {
         $normalized = '/' . str_replace('\\', '/', $displayPath);
 
-        // True when any path segment is a test or fixtures directory; callers downgrade secrets found under these.
         return str_contains($normalized, '/test/')
                || str_contains($normalized, '/tests/')
                || str_contains($normalized, '/fixture/')
@@ -237,7 +236,6 @@ final class SecretScannerHelper
             $entropy     -= $probability * log($probability, 2);
         }
 
-        // Bits per character: callers compare this against an entropy threshold to flag secret-shaped literals.
         return $entropy;
     }
 
@@ -265,7 +263,6 @@ final class SecretScannerHelper
         string       $preview,
         string       $remediation,
     ): Finding {
-        // Every sensitive-data hit is a SensitiveData/Warning finding; detector and redacted preview ride in metadata.
         return new Finding(
             ruleId:      $ruleId,
             message:     $message,

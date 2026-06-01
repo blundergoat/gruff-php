@@ -79,7 +79,6 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
             );
         }
 
-        // One finding per method whose docblock still carries the legacy @dataProvider annotation.
         return $findings;
     }
 }

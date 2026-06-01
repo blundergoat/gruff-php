@@ -449,9 +449,12 @@ final class InfectionReportParserTest extends TestCase
      * @param string   $diff - Unified diff body the report would carry; blank when a test does not assert on it.
      * @param string   $processOutput - Captured runner stdout for the mutant; blank when irrelevant to the case.
      *
-     * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string} -
-     *                        one mutant entry in the exact shape Infection writes into its status lists; originalStartLine is omitted when line is
-     *                        null
+     * @return array{
+     *     mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int},
+     *     diff: string,
+     *     processOutput: string
+     * } - one mutant entry in the exact shape Infection writes into status lists; originalStartLine is omitted
+     *     when line is null
      */
     private function mutant(string $filePath, string $mutatorName, ?int $line, string $diff = '', string $processOutput = ''): array
     {

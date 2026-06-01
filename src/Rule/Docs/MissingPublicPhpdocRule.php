@@ -34,7 +34,6 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
-        // Error-severity, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing method PHPDoc',
@@ -67,7 +66,6 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             $findings[] = $this->findingForMethod($analysisUnit, $definition, $classMethod);
         }
 
-        // One finding per method declaration that has no attached docblock.
         return $findings;
     }
 

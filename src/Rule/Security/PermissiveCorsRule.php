@@ -59,7 +59,7 @@ final class PermissiveCorsRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<Finding> - Permissive-CORS findings.
+     * @return list<Finding> - Findings only for scopes that contain both unsafe CORS headers.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -114,7 +114,6 @@ final class PermissiveCorsRule implements RuleInterface
             );
         }
 
-        // Findings are emitted only for scopes that contain both unsafe CORS headers.
         return $findings;
     }
 

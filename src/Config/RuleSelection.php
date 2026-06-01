@@ -74,7 +74,6 @@ final readonly class RuleSelection
      */
     public function toArray(): array
     {
-        // Keys mirror the YAML selection schema so reports round-trip back into config unchanged.
         return [
             'tiers'          => $this->tiers,
             'pillars'        => $this->pillars,

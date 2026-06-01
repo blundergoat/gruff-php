@@ -56,7 +56,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context carrying thresholds.
      *
-     * @return list<Finding> - Findings for low maintainability index scores.
+     * @return list<Finding> - One finding per node below the maintainability threshold; empty when all nodes pass.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -105,7 +105,6 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             );
         }
 
-        // One finding per node whose index fell below a threshold; empty when every node stayed maintainable.
         return $findings;
     }
 
@@ -141,16 +140,14 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      *
      * @param int|float $number - Configured maintainability threshold; an integral float drops its ".0" tail.
      *
-     * @return string - Human-readable threshold value.
+     * @return string - Human-readable threshold value with fractional values preserved and whole values stripped.
      */
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
-            // Genuine fraction: keep every digit so a precise threshold reads back exactly.
             return (string) $number;
         }
 
-        // Integral value: cast through int to drop the ".0" a float would otherwise print.
         return (string) (int) $number;
     }
 }

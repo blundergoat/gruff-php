@@ -47,7 +47,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      * @param AnalysisUnit $analysisUnit - Parsed unit to inspect.
      * @param RuleContext  $ruleContext - Rule context for this analysis pass.
      *
-     * @return list<\GruffPhp\Finding\Finding> - Findings for private key-like literals.
+     * @return list<\GruffPhp\Finding\Finding> - One finding per private-key header; the key body is not stored.
      */
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
@@ -73,7 +73,6 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
             );
         }
 
-        // One finding per private-key header; the key body itself is never read or stored.
         return $findings;
     }
 }

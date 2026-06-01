@@ -74,7 +74,6 @@ final class PathHelper
             return $path;
         }
 
-        // The path is relative, so anchor it under the root with a single separator.
         return $root . '/' . $path;
     }
 
@@ -262,7 +261,6 @@ final class PathHelper
             $segments[] = $segment;
         }
 
-        // Return the reduced segment list in order; the caller re-joins them and re-attaches any root.
         return $segments;
     }
 }
