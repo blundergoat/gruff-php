@@ -71,6 +71,7 @@ final readonly class Finding
      */
     public function toArray(): array
     {
+        // Derived fingerprint/identity are recomputed here, never stored, so the payload stays canonical.
         return [
             'ruleId' => $this->ruleId,
             'message' => $this->message,
@@ -121,6 +122,7 @@ final readonly class Finding
             }
         }
 
+        // Every field is coerced through a narrowing helper so a malformed payload can't construct a bad finding.
         return new self(
             ruleId:           self::stringField($serialized['ruleId'] ?? null),
             message:          self::stringField($serialized['message'] ?? null),
@@ -145,6 +147,7 @@ final readonly class Finding
      */
     private static function stringField(mixed $value): string
     {
+        // A wrong-typed or absent field collapses to an empty string rather than raising a type error.
         return is_string($value) ? $value : '';
     }
 
@@ -157,10 +160,12 @@ final readonly class Finding
     private static function metadataValue(mixed $value): bool|float|int|string|null|array
     {
         if (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null) {
+            // Scalars and null are already in the supported shape and pass through untouched.
             return $value;
         }
 
         if (!is_array($value)) {
+            // Objects, resources, and closures have no safe metadata representation, so drop them to null.
             return null;
         }
 
@@ -169,6 +174,7 @@ final readonly class Finding
             $list[$itemKey] = is_bool($item) || is_int($item) || is_float($item) || is_string($item) || $item === null ? $item : null;
         }
 
+        // Each element is individually narrowed; non-scalar entries become null so the list stays flat.
         return $list;
     }
 
@@ -178,6 +184,7 @@ final readonly class Finding
      */
     private static function nullableInt(mixed $value): ?int
     {
+        // Non-integers (including numeric strings) become null so absent line/column data stays absent.
         return is_int($value) ? $value : null;
     }
 
@@ -187,6 +194,7 @@ final readonly class Finding
      */
     private static function nullableString(mixed $value): ?string
     {
+        // Non-strings become null so optional fields like symbol/remediation read as "not set".
         return is_string($value) ? $value : null;
     }
 
@@ -207,6 +215,7 @@ final readonly class Finding
             'message' => $this->message,
         ], JSON_THROW_ON_ERROR);
 
+        // Truncate to a 16-hex-char digest: short enough to store, wide enough to avoid finding collisions.
         return substr(hash('sha256', $encoded), 0, 16);
     }
 
@@ -232,6 +241,8 @@ final readonly class Finding
             ? ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'symbol' => $this->symbol, 'message' => $this->message]
             : ['ruleId' => $this->ruleId, 'file' => $this->filePath, 'message' => $this->message];
 
+        // $payload omits line/endLine/column, so this identity survives line shifts. Same 16-hex
+        // width as fingerprint() so both read as one finding-id format to external diff tooling.
         return substr(hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR)), 0, 16);
     }
 }

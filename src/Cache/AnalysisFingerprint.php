@@ -66,6 +66,7 @@ final readonly class AnalysisFingerprint
             'rules' => $rules,
         ], JSON_THROW_ON_ERROR);
 
+        // The run digest is the SHA-256 of every run-level input; any config or rule-set change yields a fresh key.
         return new self(hash('sha256', $payload));
     }
 
@@ -81,6 +82,7 @@ final readonly class AnalysisFingerprint
      */
     public function forFile(string $displayPath, string $contents): string
     {
+        // Per-file key binds the run digest, display path, and content hash; NUL separators keep them unambiguous.
         return hash('sha256', $this->runDigest . "\0" . $displayPath . "\0" . hash('sha256', $contents));
     }
 }

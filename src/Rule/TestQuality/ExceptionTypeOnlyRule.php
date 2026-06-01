@@ -47,6 +47,7 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a bare expectException is sometimes intentional, so this stays advisory.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Exception type-only assertion',
@@ -114,6 +115,7 @@ final readonly class ExceptionTypeOnlyRule implements RuleInterface
             );
         }
 
+        // One finding per test scope that expects an exception type but never narrows it to a message, code, or object.
         return $findings;
     }
 }

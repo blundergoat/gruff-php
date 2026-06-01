@@ -162,6 +162,7 @@ final class PathIgnoreResolverTest extends TestCase
         self::assertTrue(mkdir($path));
         $this->tempDirs[] = $path;
 
+        // Hand back the freshly created repo root now registered for teardown.
         return $path;
     }
 
@@ -174,6 +175,7 @@ final class PathIgnoreResolverTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 

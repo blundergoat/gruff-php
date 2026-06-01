@@ -44,6 +44,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
      */
     public static function indexProvider(): array
     {
+        // Each row pins a fixture method to its hand-computed index; the oracle the formula output is checked against.
         return [
             'flat' => ['flat', 97.7576810884],
             'one if' => ['oneIf', 80.4379624235],
@@ -152,6 +153,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
 
         foreach ($nodeFinder->findInstanceOf($analysisUnit->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
+                // Fixture method names are unique, so the first match is the node under test; stop scanning here.
                 return $method;
             }
         }
@@ -168,6 +170,7 @@ final class MaintainabilityIndexRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
+        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
     }
 }

@@ -34,6 +34,7 @@ final class ProcessCommandConstructionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning severity at medium confidence: request-tainted process commands are a likely RCE sink, not certain.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Process command construction',
@@ -87,16 +88,23 @@ final class ProcessCommandConstructionRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per shell-exec, Symfony Process, or fromShellCommandLine sink fed request data.
         return $findings;
     }
 
     /**
      * Build the process command finding.
      *
+     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path reported to the reviewer.
+     * @param Node         $node         Tainted sink node whose start line anchors the finding for the reviewer.
+     * @param string       $sink         Sink discriminator (shell-exec, symfony-process, process-shell-commandline)
+     *                                   echoed into the message and metadata so a reviewer sees which construct fired.
+     *
      * @return Finding Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Emit a fixed warning: every caller already confirmed the sink carries request-controlled data.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Process command construction with request-controlled data detected: %s.', $sink),

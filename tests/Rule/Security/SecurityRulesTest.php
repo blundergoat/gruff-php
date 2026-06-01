@@ -314,6 +314,8 @@ final class SecurityRulesTest extends TestCase
     /**
      * Assert the expected security finding count for a rule.
      *
+     * @param string $ruleId rule id whose findings are counted; all other rules' findings are filtered out first
+     * @param int $expectedCount exact findings expected for that rule, including zero to assert it never fires
      * @param list<Finding> $findings
      * @return void
      */
@@ -329,6 +331,8 @@ final class SecurityRulesTest extends TestCase
     /**
      * Run one security rule against a fixture and return its findings.
      *
+     * @param AnalysisUnit $analysisUnit already-parsed fixture to run the full default registry over
+     * @param string $ruleId rule id to retain; findings from every other rule are discarded
      * @return list<Finding>
      */
     private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId): array
@@ -337,6 +341,7 @@ final class SecurityRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$analysisUnit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Narrow the full run down to the single rule under test so assertions are not polluted by neighbours.
         return array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => $finding->ruleId === $ruleId,
@@ -346,6 +351,7 @@ final class SecurityRulesTest extends TestCase
     /**
      * Analyse security fixtures and return findings for assertions.
      *
+     * @param string $fixture fixture basename under the security fixtures directory to parse and run every rule over
      * @return list<Finding>
      */
     private function analyse(string $fixture): array
@@ -353,6 +359,7 @@ final class SecurityRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $config   = AnalysisConfig::fromRegistry($registry);
 
+        // Hand back every finding the default registry raises against the fixture, in discovery order.
         return $registry->analyse(
             [$this->parseFixture($fixture)],
             new RuleContext(__DIR__ . '/../../..', $config),
@@ -370,6 +377,7 @@ final class SecurityRulesTest extends TestCase
         $path = __DIR__ . '/../../Fixtures/Security/' . $filename;
         $type = str_ends_with($filename, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
 
+        // Hand back the parsed unit, tagged PHP or text so non-PHP fixtures still feed the text-based rules.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Security/' . $filename, $type));
     }
 
@@ -380,6 +388,7 @@ final class SecurityRulesTest extends TestCase
      */
     private function dangerousExecutionUnit(): AnalysisUnit
     {
+        // Function names are split-concatenated so this test file is not itself flagged as dangerous source.
         return $this->parseSource(
             implode("\n", [
                 '<?php',
@@ -412,6 +421,7 @@ final class SecurityRulesTest extends TestCase
      */
     private function typedCallableUnit(): AnalysisUnit
     {
+        // Invoking typed callables is not command execution; only the literal system() call should fire here.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -453,6 +463,7 @@ PHP,
      */
     private function localClosureUnit(): AnalysisUnit
     {
+        // Locally bound closures and array callables are safe; the rule should only react to the dynamic system() call.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -494,6 +505,7 @@ PHP,
      */
     private function callableCollectionUnit(): AnalysisUnit
     {
+        // Calling callables drawn from a property array must stay clean; none of these are command-execution sinks.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -539,6 +551,7 @@ PHP,
      */
     private function staticLoggerMessageUnit(): AnalysisUnit
     {
+        // Constant log messages that merely mention secret-like words are not leaks; this fixture must stay clean.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -564,6 +577,7 @@ PHP,
      */
     private function runtimeLoggerValueUnit(): AnalysisUnit
     {
+        // Logging a runtime $password and a token-keyed context is the genuine leak the rule must catch here.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -588,6 +602,7 @@ PHP,
      */
     private function fixedIncludeUnit(): AnalysisUnit
     {
+        // Constant-path requires are safe; only the trailing $_GET-driven include is a variable include to flag.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -611,6 +626,7 @@ PHP,
      */
     private function safeUnserializeUnit(): AnalysisUnit
     {
+        // The allowed_classes => false guard makes this unserialize call safe, so the rule must not flag it.
         return $this->parseSource(
             <<<'PHP'
 <?php
@@ -646,6 +662,7 @@ PHP,
         /** @var list<Stmt> $traversed Statements connected to parent attributes for rule traversal. */
         $traversed = $nodeTraverser->traverse($statements);
 
+        // Hand back a unit carrying the parsed statements and tokens under a stable display path for the rules.
         return new AnalysisUnit(
             new SourceFile(__FILE__, $displayPath),
             $source,

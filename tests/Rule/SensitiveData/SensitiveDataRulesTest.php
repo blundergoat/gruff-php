@@ -312,7 +312,9 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Assert the expected sensitive-data finding count for a rule.
      *
-     * @param list<Finding> $findings
+     * @param string        $ruleId        Rule whose findings are isolated before counting.
+     * @param int           $expectedCount Findings the rule must report for this fixture.
+     * @param list<Finding> $findings      Full analysis output to filter by rule id.
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
@@ -327,23 +329,27 @@ final class SensitiveDataRulesTest extends TestCase
     /**
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
+     * @param string $path Project-relative fixture path to parse and scan.
      * @return list<Finding>
      */
     private function analysePath(string $path): array
     {
+        // Single-fixture convenience wrapper around the multi-unit analyser.
         return $this->analyseUnits([$this->unitForPath($path)]);
     }
 
     /**
      * Analyse sensitive-data fixtures and return findings for assertions.
      *
-     * @param list<AnalysisUnit> $units
+     * @param list<AnalysisUnit> $units  Pre-parsed units to run the default rule set over.
+     * @param ?AnalysisConfig    $config Override config; null applies the registry defaults.
      * @return list<Finding>
      */
     private function analyseUnits(array $units, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
 
+        // Hand back the findings the default rule set produced for these units.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -361,6 +367,7 @@ final class SensitiveDataRulesTest extends TestCase
         $absolutePath = self::PROJECT_ROOT . '/' . $path;
         $type         = str_ends_with($path, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
 
+        // Non-PHP fixtures parse as plain text so secret scanners still see the bytes.
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $path, $type));
     }
 
@@ -376,6 +383,7 @@ final class SensitiveDataRulesTest extends TestCase
             'tests/Fixtures/SensitiveData/config-secrets.json',
         ];
 
+        // Same fixtures run twice so the leak check can compare text and JSON renderings.
         return [
             $this->runGruff(['analyse', ...$paths, '--fail-on', 'none', '--no-config']),
             $this->runGruff(['analyse', ...$paths, '--format', 'json', '--fail-on', 'none', '--no-config']),
@@ -393,6 +401,7 @@ final class SensitiveDataRulesTest extends TestCase
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput() . $process->getOutput());
 
+        // Returns stdout only; the assertSame on the exit code already failed the test if the run errored.
         return $process->getOutput();
     }
 
@@ -403,6 +412,7 @@ final class SensitiveDataRulesTest extends TestCase
      */
     private function secretValues(): array
     {
+        // Canonical secrets the leak check hunts for; split by concatenation so this file isn't flagged.
         return [
             'AKIA' . 'Z9Y8X7W6V5U4T3R2',
             'sk_live_' . '51N7uQbP0JZ6r' . 'T9vL3mK8sX2y',

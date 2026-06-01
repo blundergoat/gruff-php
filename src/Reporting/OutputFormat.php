@@ -52,6 +52,7 @@ enum OutputFormat: string
      */
     public static function fromInput(string $rawInput): ?self
     {
+        // Unrecognised format strings yield null so the caller can reject CLI input rather than guess a default.
         return match ($rawInput) {
             self::Text->value => self::Text,
             self::Json->value => self::Json,

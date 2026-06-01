@@ -21,6 +21,7 @@ final readonly class DirectLineComment
     public static function hasCommentAbove(AnalysisUnit $unit, int $line): bool
     {
         if ($line <= 1) {
+            // Line 1 has nothing above it, so no preceding comment can exist.
             return false;
         }
 
@@ -28,6 +29,7 @@ final readonly class DirectLineComment
         $lineText    = self::sourceLine($unit, $commentLine);
 
         if (!self::isStandaloneOneLineComment($lineText)) {
+            // The line directly above is code or blank, so the comment-above contract is unmet.
             return false;
         }
 
@@ -36,9 +38,11 @@ final readonly class DirectLineComment
                 continue;
             }
 
+            // The source text looked like a comment; confirm the token is genuinely one physical line.
             return !str_contains($token->text, "\n") && !str_contains($token->text, "\r");
         }
 
+        // No comment token started on that line, so the textual match was a false positive.
         return false;
     }
 
@@ -54,9 +58,11 @@ final readonly class DirectLineComment
         $lines = preg_split('/\R/', $unit->source);
 
         if ($lines === false) {
+            // Split failed, so treat the source as having no readable line here.
             return '';
         }
 
+        // Hand back the requested line, or empty when the number is past the end of source.
         return $lines[$line - 1] ?? '';
     }
 
@@ -70,17 +76,19 @@ final readonly class DirectLineComment
     {
         $trimmed = trim($line);
 
-        // A `//` line comment carrying at least one non-space character of text.
+        // Matches a `//` line that has at least one non-space character of text after the slashes.
         if (preg_match('/^\/\/\s*\S/', $trimmed) === 1) {
+            // A `//` line carrying real text counts as a standalone comment.
             return true;
         }
 
-        // A `#` line comment carrying at least one non-space character of text.
+        // Matches a `#` line that has at least one non-space character of text after the hash.
         if (preg_match('/^#\s*\S/', $trimmed) === 1) {
+            // A `#` line carrying real text counts as a standalone comment.
             return true;
         }
 
-        // A single-line `/* ... */` block comment that is not a `/**` docblock.
+        // Matches a single-line `/* ... */` block but excludes `/**` docblocks via the negative lookahead.
         return preg_match('/^\/\*(?!\*)\s*\S.*\*\/$/', $trimmed) === 1;
     }
 }

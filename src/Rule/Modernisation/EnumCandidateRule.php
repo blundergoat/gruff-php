@@ -34,6 +34,7 @@ final readonly class EnumCandidateRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: the enum rewrite is a judgement call, so it suggests rather than gates.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Enum candidate',
@@ -55,6 +56,7 @@ final readonly class EnumCandidateRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
+            // Enums need PHP 8.1, so stay silent when the target version cannot adopt the suggestion.
             return [];
         }
 
@@ -88,6 +90,7 @@ final readonly class EnumCandidateRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per constant-only class identified as an enum candidate.
         return $findings;
     }
 
@@ -106,11 +109,13 @@ final readonly class EnumCandidateRule implements RuleInterface
                 } elseif ($constant->value instanceof Scalar\Int_) {
                     $observedScalarTypes['int'] = true;
                 } else {
+                    // A non-string, non-int constant cannot back an enum, so reject the whole group.
                     return false;
                 }
             }
         }
 
+        // A backed enum is single-typed, so accept only when one scalar type (all string or all int) was seen.
         return count($observedScalarTypes) === 1;
     }
 }

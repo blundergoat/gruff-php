@@ -44,6 +44,7 @@ final class HalsteadVolumeRuleTest extends TestCase
      */
     public static function metricsProvider(): array
     {
+        // Each row pins a fixture method to its expected Halstead metrics; the oracle the formula is checked against.
         return [
             'flat' => ['flat', 2.0, 0.5, 1.0, 2, 2],
             'one if' => ['oneIf', 18.5754247591, 3.0, 55.7262742773, 5, 8],
@@ -163,6 +164,7 @@ final class HalsteadVolumeRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
+        // Run the single rule under the test-supplied thresholds so each case controls its own finding boundary.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
@@ -178,6 +180,7 @@ final class HalsteadVolumeRuleTest extends TestCase
 
         foreach ($nodeFinder->findInstanceOf($this->parseFixture()->statements, ClassMethod::class) as $method) {
             if ($method->name->toString() === $methodName) {
+                // Fixture method names are unique, so the first match is the node under test; stop scanning here.
                 return $method;
             }
         }
@@ -194,6 +197,7 @@ final class HalsteadVolumeRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/cognitive.php';
 
+        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/cognitive.php'));
     }
 }

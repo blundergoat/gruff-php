@@ -31,6 +31,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: mock count is a heuristic for over-specification, so this is advisory and tunable.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Excessive mocking',
@@ -83,6 +84,7 @@ final readonly class ExcessiveMockingRule implements RuleInterface
             );
         }
 
+        // One finding per test scope whose mock count exceeds the configured maxMocks threshold.
         return $findings;
     }
 }

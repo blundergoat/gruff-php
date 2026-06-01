@@ -30,6 +30,8 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning at medium confidence: the three-segment shape is distinctive,
+        // but test fixtures legitimately embed sample tokens.
         return new RuleDefinition(
             id:              self::ID,
             name:            'JWT token literal',
@@ -51,6 +53,7 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'eyJ')) {
+            // Every JWT header segment begins "eyJ"; without it no token can match, so skip the scan.
             return [];
         }
 
@@ -81,6 +84,7 @@ final readonly class JwtTokenRule implements SourceTextRuleInterface
             );
         }
 
+        // Hand back one finding per JWT-like literal that survived the comment and dummy-value filters.
         return $findings;
     }
 }

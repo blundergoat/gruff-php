@@ -173,7 +173,8 @@ final readonly class ShortVariableRule implements RuleInterface
             }
         }
 
-        // One finding per offending local; loop counters and caught-exception names are filtered out above.
+        // Reportable short locals only: allowlisted loop counters and caught-exception names never reach this list,
+        // so an empty result means every local in the scope is either long enough or an exempted convention.
         return $findings;
     }
 
@@ -198,17 +199,18 @@ final readonly class ShortVariableRule implements RuleInterface
         string $name,
         string $symbol,
     ): ?Finding {
-        // Multi-character names and the throwaway `$_` placeholder are by definition not too short.
         if (strlen($name) > 1 || $name === '_') {
+            // Multi-character names and the throwaway `$_` placeholder are by definition not too short.
             return null;
         }
 
-        // A name the project explicitly allows (config) is intentional and must not be flagged.
         if (in_array($name, $ruleContext->config->acceptedAbbreviations(), true)) {
+            // A name the project explicitly allows (config) is intentional, so emit nothing for it.
             return null;
         }
 
-        // Past both guards the name is a genuine single-character violation worth surfacing.
+        // The name is a single-character identifier the project has not opted out of, so surface it as a Naming
+        // finding telling the reviewer the variable's intent is unclear and pointing them at where to rename it.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('%s $%s in %s is a single character.', ucfirst($kind), $name, $symbol),
@@ -237,14 +239,14 @@ final readonly class ShortVariableRule implements RuleInterface
     {
         $lines = preg_split('/\R/', $analysisUnit->source);
 
-        // A malformed split means we cannot index lines, so give up on a precise column.
         if (!is_array($lines)) {
+            // A malformed split means we cannot index lines, so give up on a precise column.
             return null;
         }
 
         $line = $lines[$node->getStartLine() - 1] ?? null;
-        // Node line falls outside the source we have; no line means no column to report.
         if ($line === null) {
+            // Node line falls outside the source we have; no line means no column to report.
             return null;
         }
 
@@ -364,8 +366,8 @@ final readonly class ShortVariableRule implements RuleInterface
      */
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
-        // Stop at any nested callable: its variables belong to that inner scope, not this one.
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            // Stop at any nested callable: its variables belong to that inner scope, not this one.
             return;
         }
 
@@ -411,8 +413,8 @@ final readonly class ShortVariableRule implements RuleInterface
             return;
         }
 
-        // Scalars, strings, and nulls are leaf attributes, not children, so there is nothing to collect.
         if (!is_array($subNode)) {
+            // Scalars, strings, and nulls are leaf attributes, not children, so there is nothing to collect.
             return;
         }
 

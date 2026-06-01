@@ -39,6 +39,7 @@ final readonly class BaselineEntry
      */
     public static function fromFinding(Finding $finding): self
     {
+        // Snapshot the finding's identity now; the entry must stay stable even if the finding changes later.
         return new self(
             fingerprint: $finding->fingerprint(),
             ruleId:      $finding->ruleId,
@@ -73,6 +74,7 @@ final readonly class BaselineEntry
             throw new BaselineException(sprintf('Baseline finding %d field "symbol" must be a string or null.', $index));
         }
 
+        // Row has passed every field guard above, so build the entry from the now-trusted values.
         return new self(
             fingerprint: $baselineRow['fingerprint'],
             ruleId:      $baselineRow['ruleId'],
@@ -90,6 +92,7 @@ final readonly class BaselineEntry
      */
     public function toArray(): array
     {
+        // On-disk baseline JSON keys ("file" for the file path) that fromArray() reads back.
         return [
             'fingerprint' => $this->fingerprint,
             'ruleId' => $this->ruleId,

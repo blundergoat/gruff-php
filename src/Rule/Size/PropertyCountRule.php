@@ -39,6 +39,7 @@ final readonly class PropertyCountRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Carries the 15-property error threshold the analyse pass reads back via settingsFor().
         return new RuleDefinition(
             id:                self::ID,
             name:              'Property count',
@@ -105,6 +106,7 @@ final readonly class PropertyCountRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per class-like scope that breached the threshold; empty when all fit.
         return $findings;
     }
 
@@ -131,42 +133,51 @@ final readonly class PropertyCountRule implements RuleInterface
             }
         }
 
+        // Sum of declared properties plus promoted constructor params; both own instance state.
         return $count;
     }
 
     /**
      * Build a display symbol for a class-like node.
      *
+     * @param Node $node Class, trait, or enum declaration to render as a finding symbol.
      * @return string Class-like display symbol.
      */
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof Class_) {
+            // Named class shows its name; an anonymous class falls back to its start line.
             return $node->name?->toString() ?? sprintf('class@anonymous:%d', $node->getStartLine());
         }
 
         if ($node instanceof Trait_) {
+            // Traits are always named, but guard the nullable name and anchor to the line if absent.
             return $node->name?->toString() ?? sprintf('trait@%d', $node->getStartLine());
         }
 
         if ($node instanceof Enum_) {
+            // Enums are always named, but guard the nullable name and anchor to the line if absent.
             return $node->name?->toString() ?? sprintf('enum@%d', $node->getStartLine());
         }
 
+        // Unreachable for the finder's class-like set; kept so an unexpected node still renders a symbol.
         return sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
      * @return string Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
+            // Keep the decimal only for a genuinely fractional threshold, such as 2.5.
             return (string) $number;
         }
 
+        // Whole numbers print without a trailing ".0" so messages read cleanly.
         return (string) (int) $number;
     }
 }

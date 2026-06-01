@@ -55,13 +55,15 @@ final readonly class BranchReviewComparator
             }
         }
 
+        // Hand back the three partitioned finding sets plus the score delta the caller renders as the review.
         return new BranchReviewResult($baseRef, $isChangedOnly, $introduced, $removed, $unchanged, $deltaScore);
     }
 
     /**
      * Index findings by branch-review identity.
      *
-     * @param list<Finding> $findings
+     * @param list<Finding>         $findings
+     * @param FindingReviewIdentity $identity Key strategy that buckets findings so matching ignores line drift.
      * @return array<string, list<Finding>>
      */
     private function index(array $findings, FindingReviewIdentity $identity): array
@@ -74,6 +76,7 @@ final readonly class BranchReviewComparator
 
         ksort($indexed, SORT_STRING);
 
+        // Return the key-sorted buckets so introduced/removed ordering stays deterministic across runs.
         return $indexed;
     }
 }

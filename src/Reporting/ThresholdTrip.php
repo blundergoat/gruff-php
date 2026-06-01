@@ -46,6 +46,7 @@ final readonly class ThresholdTrip
      */
     public function withScope(string $scope): self
     {
+        // Readonly value object, so re-scoping yields a fresh copy rather than mutating the original trip.
         return new self($this->thresholdKind, $this->count, $this->cap, $scope);
     }
 
@@ -58,6 +59,7 @@ final readonly class ThresholdTrip
     {
         $scopeWord = $this->scope === self::SCOPE_NEW ? 'new ' : '';
 
+        // The total cap reads as a bare count; a per-severity cap names which severity overflowed.
         return $this->thresholdKind === self::KIND_TOTAL
             ? sprintf('%d %sfindings exceed the total cap of %d', $this->count, $scopeWord, $this->cap)
             : sprintf('%d %s%s finding(s) exceed the cap of %d', $this->count, $scopeWord, $this->thresholdKind, $this->cap);
@@ -70,6 +72,7 @@ final readonly class ThresholdTrip
      */
     public function toArray(): array
     {
+        // Pre-render the message into the payload so report consumers never rebuild the wording themselves.
         return [
             'thresholdKind' => $this->thresholdKind,
             'count' => $this->count,

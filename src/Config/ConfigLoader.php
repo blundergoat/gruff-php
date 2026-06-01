@@ -573,7 +573,8 @@ final readonly class ConfigLoader
             return [];
         }
 
-        // Discovery patterns are trimmed and non-empty (the trailing true,true flags), so blanks are dropped.
+        // hasPathPatterns + allowsGlobs: ignore entries are relative path globs, so enable path-escape and
+        // glob validation; a blank or absolute/traversing pattern throws rather than silently widening discovery.
         return (new StringListConfigParser())->parse($this->configValue($pathsConfig['ignore']), 'paths.ignore', true, true);
     }
 
@@ -781,7 +782,7 @@ final readonly class ConfigLoader
             $normalizedConfigValues[$key] = $this->configScalar($decodedItem);
         }
 
-        // Deepest supported level: every value here is a scalar, since any further array already threw above.
+        // Deepest supported level: a nested array at depth 4 is rejected, so every retained value is a scalar.
         return $normalizedConfigValues;
     }
 }

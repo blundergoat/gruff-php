@@ -30,6 +30,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      */
     private function patterns(): array
     {
+        // Detector name plus regex per identifier family; the name keys both the context check and the message.
         return [
             ['name' => 'ssn', 'pattern' => '/\b\d{3}-\d{2}-\d{4}\b/'],
             ['name' => 'nhi', 'pattern' => '/\b[A-HJ-NP-Z]{3}\d{4}\b/'],
@@ -46,6 +47,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning, medium confidence: pattern hits need same-line context, so a false positive is plausible.
         return new RuleDefinition(
             id:              self::ID,
             name:            'PHI identifier pattern',
@@ -71,6 +73,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         // keyword anywhere, none of the per-pattern matches can ever pass
         // hasPhiContext().
         if (preg_match('/\b(?:health|medicare|mrn|nhi|patient|ssn|tax_file_number|tfn)\b/i', $analysisUnit->source) !== 1) {
+            // No PHI context keyword anywhere, so no per-pattern match could survive hasPhiContext().
             return [];
         }
 
@@ -110,11 +113,15 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
             }
         }
 
+        // One finding per non-comment, non-placeholder pattern hit that had PHI context on its own line.
         return $findings;
     }
 
     /**
      * Check whether a matched identifier line contains health-data context.
+     *
+     * @param string $line     Source line that produced the candidate match.
+     * @param string $detector Pattern name (e.g. ssn, mrn) whose own keyword also counts as context.
      *
      * @return bool True when the line supports a PHI finding.
      */
@@ -122,6 +129,7 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     {
         $normalized = strtolower($line);
 
+        // True when the line names this detector or any health-domain keyword, gating raw pattern hits.
         return str_contains($normalized, $detector)
             || str_contains($normalized, 'health')
             || str_contains($normalized, 'medicare')
@@ -136,6 +144,10 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Suppress PHI-looking identifiers that are obvious examples or placeholders.
      *
+     * @param string $line            Source line carrying the match, lower-cased here for keyword checks.
+     * @param string $candidateSecret Matched identifier text; punctuation is stripped before comparison.
+     * @param string $displayPath     Unit path; example/placeholder wording only suppresses under docs/.
+     *
      * @return bool True when the line describes non-real sample data.
      */
     private function isPlaceholderPhiLine(string $line, string $candidateSecret, string $displayPath): bool
@@ -144,13 +156,16 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
         $normalizedCandidate = preg_replace('/[^a-z0-9]/i', '', $candidateSecret) ?? '';
 
         if ($normalizedCandidate === '123456789' && str_contains($normalizedLine, 'patientfundmembershipnum')) {
+            // The fund-membership sample 123456789 is a documented placeholder, never a real identifier.
             return true;
         }
 
         if (!str_starts_with($displayPath, 'docs/')) {
+            // Outside docs/, treat every match as real; only documentation may carry sample identifiers.
             return false;
         }
 
+        // Under docs/, suppress lines that flag themselves as examples, placeholders, or snippets.
         return str_contains($normalizedLine, 'example')
             || str_contains($normalizedLine, 'placeholder')
             || str_contains($normalizedLine, 'sample')
@@ -160,12 +175,16 @@ final readonly class PhiPatternRule implements SourceTextRuleInterface
     /**
      * Return source text for a 1-based line number.
      *
+     * @param string $source     Full unit source to slice by newline.
+     * @param int    $lineNumber 1-based line to read; out-of-range numbers yield an empty string.
+     *
      * @return string Line text, or an empty string when unavailable.
      */
     private function lineText(string $source, int $lineNumber): string
     {
         $lines = explode("\n", $source);
 
+        // Empty string when the line number is past the end, so callers see no spurious context.
         return $lines[$lineNumber - 1] ?? '';
     }
 }

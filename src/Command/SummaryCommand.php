@@ -170,7 +170,7 @@ final class SummaryCommand extends Command
             is_string($format) ? $format : '',
         ));
 
-        // Null tells execute() to exit INVALID after the usage error above.
+        // Null is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return null;
     }
 
@@ -192,7 +192,7 @@ final class SummaryCommand extends Command
 
         $output->writeln('<error>USAGE-ERROR --top must be a non-negative integer.</error>');
 
-        // Null tells execute() to exit INVALID after the usage error above.
+        // Null is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return null;
     }
 
@@ -227,7 +227,7 @@ final class SummaryCommand extends Command
 
         $output->writeln('<error>USAGE-ERROR --no-config cannot be combined with --config.</error>');
 
-        // True tells execute() to exit INVALID after the usage error above.
+        // True is the caller's INVALID-exit signal; the usage error is the user-facing half of the same contract.
         return true;
     }
 
@@ -555,7 +555,7 @@ final class SummaryCommand extends Command
             $lines[] = '          Use `gruff-php analyse --no-baseline` to audit without a baseline.';
         }
 
-        // Join the accumulated rows into one block and terminate with a trailing newline.
+        // Trailing newline so the report is a complete final line callers can append to or print without truncation.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 

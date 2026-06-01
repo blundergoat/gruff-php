@@ -31,6 +31,7 @@ final readonly class TestMethodTooLongRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory by default: an oversized test is a smell, not a failure, so teams opt in to gating on it.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Test method too long',
@@ -95,11 +96,16 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per test scope that exceeded its (possibly path-overridden) line budget.
         return $findings;
     }
 
     /**
-     * @param list<string> $sourceLines
+     * Count the meaningful body lines of a test method, skipping blanks, comments, and lone brackets.
+     *
+     * @param list<string> $sourceLines All source lines of the unit, indexed from zero (line N is index N-1).
+     * @param int          $startLine   First source line of the test scope, inclusive (1-based).
+     * @param int          $endLine     Last source line of the test scope, inclusive (1-based).
      * @return int Count of non-empty, non-comment lines in the method range.
      */
     private function countMeaningfulLines(array $sourceLines, int $startLine, int $endLine): int
@@ -133,18 +139,22 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             $count++;
         }
 
+        // Report the meaningful-line tally the threshold comparison is measured against.
         return $count;
     }
 
     /**
      * Resolve a path-specific threshold override when configured.
      *
-     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides Configured path override map.
+     * @param string $displayPath File path matched against each override glob; backslashes normalised to slashes first.
+     * @param int $defaultThreshold Threshold applied when no override pattern matches this path.
+     * @param int|float|bool|string|array<array-key, int|float|bool|string> $pathOverrides Override map; else default.
      * @return int Effective max meaningful lines threshold.
      */
     private function thresholdForPath(string $displayPath, int $defaultThreshold, int|float|bool|string|array $pathOverrides): int
     {
         if (!is_array($pathOverrides)) {
+            // Malformed config (not a map): ignore it and apply the default rather than throwing.
             return $defaultThreshold;
         }
 
@@ -159,27 +169,32 @@ final readonly class TestMethodTooLongRule implements RuleInterface
             }
 
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                // First matching glob wins; floor at 1 so a zero or negative override can never disable the rule.
                 return max(1, (int) $threshold);
             }
         }
 
+        // No override matched this path, so fall back to the rule's default threshold.
         return $defaultThreshold;
     }
 
     /**
      * Parse a compact `glob=threshold` override entry from config.
      *
+     * @param string $pathOverride Single override in `glob=threshold` form, e.g. `tests/Integration/*=60`.
      * @return array{0: string, 1: int|float|string}
      */
     private function parsePathOverride(string $pathOverride): array
     {
         $parts = explode('=', $pathOverride, 2);
         if (count($parts) !== 2 || !is_numeric($parts[1])) {
+            // Not a parseable `glob=number` entry: return empty parts so the caller skips it.
             return ['', ''];
         }
 
         $threshold = str_contains($parts[1], '.') ? (float) $parts[1] : (int) $parts[1];
 
+        // Preserve the numeric kind: a dotted value stays a float, otherwise it is an int threshold.
         return [$parts[0], $threshold];
     }
 }

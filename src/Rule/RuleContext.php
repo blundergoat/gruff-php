@@ -32,6 +32,7 @@ final readonly class RuleContext
      */
     public function settingsFor(RuleDefinition $definition): RuleSettings
     {
+        // Resolution is by the definition's id; config owns merging defaults with any per-rule override.
         return $this->config->ruleSettings($definition->id);
     }
 }

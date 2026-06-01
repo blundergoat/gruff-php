@@ -30,6 +30,7 @@ final readonly class IgnoreDecision
      */
     public static function ignored(string $source, ?string $pattern): self
     {
+        // Always flags ignored=true; the source and pattern record why so reports can attribute the exclusion.
         return new self(true, $source, $pattern);
     }
 
@@ -40,6 +41,7 @@ final readonly class IgnoreDecision
      */
     public static function notIgnored(): self
     {
+        // In-scope path: source and pattern stay null because there is no exclusion to attribute.
         return new self(false);
     }
 }

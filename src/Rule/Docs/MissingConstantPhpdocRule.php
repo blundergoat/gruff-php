@@ -42,6 +42,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory/medium-confidence defaults the registry and config layer read to wire this rule up.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing constant PHPDoc',
@@ -77,16 +78,20 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             );
         }
 
+        // Hand back every undocumented-constant and undocumented-case finding gathered across the unit.
         return $findings;
     }
 
     /**
      * Check whether a class-like node can own constants or enum cases.
      *
+     * @param ClassLike $classLike Class-like node to test; only constant- and case-bearing kinds qualify.
+     *
      * @return bool True when the node should be inspected.
      */
     private function isSupportedClassLike(ClassLike $classLike): bool
     {
+        // True only for the four node kinds that can carry constants or enum cases worth documenting.
         return $classLike instanceof Class_
             || $classLike instanceof Trait_
             || $classLike instanceof Interface_
@@ -95,6 +100,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
 
     /**
      * Find undocumented class constants in one class-like node.
+     *
+     * @param ClassLike      $classLike    Node whose direct `const` statements are scanned for missing docs.
+     * @param string         $className    Owning class name, used to build the `Class::CONST` symbol per finding.
+     * @param RuleDefinition $definition   Shared rule defaults so every finding carries identical severity and tier.
+     * @param AnalysisUnit   $analysisUnit Parsed unit supplying the display path reported with each finding.
      *
      * @return list<Finding> Findings for undocumented class constants.
      */
@@ -125,11 +135,19 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             }
         }
 
+        // One finding per undocumented constant name; a multi-name `const A, B;` statement yields several.
         return $findings;
     }
 
     /**
      * Build one class-constant PHPDoc finding.
+     *
+     * @param string         $constantName   Bare constant name; combined with the class to form the reported symbol.
+     * @param string         $className      Owning class name for the `Class::CONST` symbol and message text.
+     * @param int            $line           1-based line of the `const` statement the finding points the reviewer at.
+     * @param RuleDefinition $definition     Rule defaults supplying the id, severity, tier, pillar, and confidence.
+     * @param AnalysisUnit   $analysisUnit   Parsed unit whose display path is recorded on the finding.
+     * @param bool           $hasLineComment True when a leading `//` exists; switches the message to "promote".
      *
      * @return Finding Finding for an undocumented class constant.
      */
@@ -161,6 +179,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $metadata['commentKind'] = 'line';
         }
 
+        // The advisory finding a reviewer diffs: names the constant to document and how (add vs promote a comment).
         return new Finding(
             ruleId:      $definition->id,
             message:     $message,
@@ -179,6 +198,11 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
     /**
      * Find undocumented enum cases when the enum itself is undocumented.
      *
+     * @param ClassLike      $classLike    Node inspected; non-enums and documented enums short-circuit to none.
+     * @param string         $className    Owning enum name, used to build the `Enum::CASE` symbol per finding.
+     * @param RuleDefinition $definition   Shared rule defaults so every finding carries identical severity and tier.
+     * @param AnalysisUnit   $analysisUnit Parsed unit supplying the display path reported with each finding.
+     *
      * @return list<Finding> Findings for undocumented enum cases.
      */
     private function enumCaseFindings(
@@ -188,6 +212,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
         AnalysisUnit $analysisUnit,
     ): array {
         if (!$classLike instanceof Enum_ || $classLike->getDocComment() !== null) {
+            // A class-level enum docblock already documents the cases, so per-case findings would be noise.
             return [];
         }
 
@@ -207,11 +232,19 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             );
         }
 
+        // One finding per undocumented case; empty when every case already carries its own docblock.
         return $findings;
     }
 
     /**
      * Build one enum-case PHPDoc finding.
+     *
+     * @param string         $caseName       Bare case name; combined with the enum to form the reported symbol.
+     * @param string         $className      Owning enum name for the `Enum::CASE` symbol and message text.
+     * @param int            $line           1-based line of the `case` statement the finding points the reviewer at.
+     * @param RuleDefinition $definition     Rule defaults supplying the id, severity, tier, pillar, and confidence.
+     * @param AnalysisUnit   $analysisUnit   Parsed unit whose display path is recorded on the finding.
+     * @param bool           $hasLineComment True when a leading `//` exists; switches the message to "promote".
      *
      * @return Finding Finding for an undocumented enum case.
      */
@@ -243,6 +276,7 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
             $metadata['commentKind'] = 'line';
         }
 
+        // The advisory finding a reviewer diffs: it names the case to document and how (add vs promote a comment).
         return new Finding(
             ruleId:      $definition->id,
             message:     $message,
@@ -260,25 +294,32 @@ final readonly class MissingConstantPhpdocRule implements RuleInterface
 
     /**
      * Detect a leading non-doc `//` or `#` line comment attached to the statement.
+     *
+     * @param Node\Stmt $statement Const or case statement whose attached leading comments are examined.
      */
     private function hasLeadingLineComment(Node\Stmt $statement): bool
     {
         foreach ($statement->getComments() as $comment) {
             if (!$comment instanceof Doc && $this->isLineComment($comment)) {
+                // A leading `//`/`#` already records intent, so the finding steers toward promoting it to a docblock.
                 return true;
             }
         }
 
+        // No line comment present, so the constant or case is genuinely undocumented.
         return false;
     }
 
     /**
      * Distinguish `//` and `#` single-line comment shapes from block comments.
+     *
+     * @param Comment $comment Already-confirmed non-doc comment whose opening delimiter is classified.
      */
     private function isLineComment(Comment $comment): bool
     {
         $text = ltrim($comment->getText());
 
+        // True for the `//` and `#` line forms; `/* ... */` block comments fall through to false.
         return str_starts_with($text, '//') || str_starts_with($text, '#');
     }
 }

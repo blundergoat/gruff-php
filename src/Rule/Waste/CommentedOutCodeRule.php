@@ -32,6 +32,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence and advisory: the code-shape heuristic can misread prose, so teams opt in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Commented-out code',
@@ -84,22 +85,26 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             }
         }
 
+        // One finding per comment token whose stripped body crosses the code-shape threshold.
         return $findings;
     }
 
     /**
      * Check whether a parser token is a regular comment.
      *
+     * @param Token $token Lexer token to classify; only line and inline block comments qualify, never docblocks.
      * @return bool True for non-docblock comment tokens.
      */
     private function isCommentToken(Token $token): bool
     {
+        // Docblocks lex as T_DOC_COMMENT, so matching only T_COMMENT excludes `/**` from this rule.
         return $token->id === T_COMMENT;
     }
 
     /**
      * Remove PHP comment delimiters before code-shape checks.
      *
+     * @param string $text Raw comment token text, still carrying its leading slashes, hash, or block delimiters.
      * @return string Trimmed comment body.
      */
     private function stripCommentMarkers(string $text): string
@@ -108,23 +113,27 @@ final readonly class CommentedOutCodeRule implements RuleInterface
         $text = preg_replace('/^\s*\*\s?/m', '', $text) ?? $text;
         $text = preg_replace('/^\/\/\s?/m', '', $text) ?? $text;
 
+        // Inner content with every delimiter and per-line decoration removed, ready for the shape scan.
         return trim($text);
     }
 
     /**
      * Detect whether comment content has enough PHP-like syntax signals.
      *
+     * @param string $content Delimiter-stripped comment body to scan for disabled-code signals.
      * @return bool True when the content looks like disabled code.
      */
     private function isCodeLike(string $content): bool
     {
         if (strlen($content) < 5) {
+            // Too short to carry a meaningful statement; never treat tiny comments as code.
             return false;
         }
 
         $lines = array_filter(explode("\n", $content), static fn (string $line): bool => trim($line) !== '');
 
         if ($lines === []) {
+            // Only blank lines remained after filtering, so there is nothing to classify.
             return false;
         }
 
@@ -154,6 +163,7 @@ final readonly class CommentedOutCodeRule implements RuleInterface
             }
         }
 
+        // Require at least two signals so a single `$`-mention or stray keyword in prose stays below the bar.
         return $codeIndicators >= 2;
     }
 }

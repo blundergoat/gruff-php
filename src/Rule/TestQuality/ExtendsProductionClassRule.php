@@ -33,6 +33,7 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Error: a test inheriting production internals couples to private state instead of the public surface.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test extends production class',
@@ -91,6 +92,7 @@ final readonly class ExtendsProductionClassRule implements RuleInterface
             );
         }
 
+        // One finding per *Test class whose parent is not a recognised *TestCase base.
         return $findings;
     }
 }

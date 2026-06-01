@@ -177,6 +177,7 @@ final class DocsTagAndStructureRulesTest extends DocsRuleTestCase
             array_map(static function ($finding): ?string {
                 $functionName = $finding->metadata['function'] ?? null;
 
+                // Normalise a missing or non-string metadata value to null so the comparison stays typed.
                 return is_string($functionName) ? $functionName : null;
             }, $findings),
         );

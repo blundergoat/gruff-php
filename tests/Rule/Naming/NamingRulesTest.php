@@ -478,6 +478,7 @@ final class NamingRulesTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Keep only identifier-quality findings so option-tuning assertions are not diluted by other naming rules.
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === IdentifierQualityRule::ID,
@@ -487,6 +488,7 @@ final class NamingRulesTest extends NamingRuleTestCase
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
+     * @param string $fixture fixture basename under the naming fixtures dir, parsed then run through the full rule pack
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyseFixture(string $fixture): array
@@ -494,6 +496,7 @@ final class NamingRulesTest extends NamingRuleTestCase
         $unit     = $this->parseFixture($fixture);
         $registry = RuleRegistry::defaults();
 
+        // Hand back every finding the default registry raises against the fixture, in discovery order.
         return $registry->analyse([$unit], new RuleContext(
             __DIR__ . '/../../..',
             AnalysisConfig::fromRegistry($registry),
@@ -502,6 +505,10 @@ final class NamingRulesTest extends NamingRuleTestCase
 
     /**
      * @param list<\GruffPhp\Finding\Finding> $findings
+     * @param string $ruleId rule the finding must come from; others are skipped
+     * @param string $metadataKey finding metadata entry to match on, such as the reported identifier name
+     * @param string $metadataValue exact value that metadata entry must hold for a match
+     * @param string $symbolPrefix prefix the reported symbol must start with, scoping the match to one declaration
      * @return bool True when the expected finding is present.
      */
     private function hasFinding(
@@ -517,10 +524,12 @@ final class NamingRulesTest extends NamingRuleTestCase
             }
 
             if ($finding->symbol !== null && str_starts_with($finding->symbol, $symbolPrefix)) {
+                // A finding matched the rule, metadata, and symbol prefix, so the expectation holds.
                 return true;
             }
         }
 
+        // No finding matched every criterion across the whole list.
         return false;
     }
 
@@ -547,6 +556,7 @@ final class NamingRulesTest extends NamingRuleTestCase
             $reported[$name][] = $finding->symbol;
         }
 
+        // Hand back the reported symbols bucketed by variable name for duplicate-report assertions.
         return $reported;
     }
 }

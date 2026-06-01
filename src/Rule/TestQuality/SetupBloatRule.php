@@ -33,6 +33,7 @@ final readonly class SetupBloatRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: a heavy setUp may be deliberate, so this nudges rather than gates.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Setup bloat',
@@ -99,6 +100,7 @@ final readonly class SetupBloatRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per class whose setUp clears the threshold and outweighs its average test method.
         return $findings;
     }
 }

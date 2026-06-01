@@ -220,6 +220,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
      */
     private function phpUnitDummyUnit(): AnalysisUnit
     {
+        // Hand back a parsed unit for a fixture with no candidates, so helper tests have a non-null subject.
         return $this->unitForPath('tests/Fixtures/TestQuality/non-candidates.php');
     }
 
@@ -233,6 +234,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
     {
         $registry = RuleRegistry::defaults();
 
+        // Anchor the context at the project root joined with the relative root the helper test targets.
         return new RuleContext(
             self::PROJECT_ROOT . '/' . $relativeRoot,
             AnalysisConfig::fromRegistry($registry),
@@ -242,6 +244,8 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Assert the expected test-quality finding count for a rule.
      *
+     * @param string        $ruleId        Rule identifier whose findings are counted.
+     * @param int           $expectedCount Exact number of findings the rule must emit.
      * @param list<Finding> $findings
      * @return void
      */
@@ -261,6 +265,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
      */
     private function expectedRuleIds(): array
     {
+        // Every test-quality rule id that an enabled scan must surface; drift here means a rule was lost.
         return [
             NoAssertionsRule::ID,
             TrivialAssertionRule::ID,
@@ -295,17 +300,21 @@ final class TestQualityConfigurationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
+     * @param string              $path   Single fixture path to analyse.
+     * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
+        // Delegate to the multi-path analyser so single- and multi-fixture callers share one code path.
         return $this->analysePaths([$path], $config);
     }
 
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
-     * @param list<string> $paths
+     * @param list<string>        $paths  Fixture paths to parse and analyse together.
+     * @param AnalysisConfig|null $config Overriding config, or null to use the registry defaults.
      * @return list<Finding>
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
@@ -313,6 +322,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
 
+        // Run the default registry over the parsed units, defaulting config when the caller passed none.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -327,6 +337,7 @@ final class TestQualityConfigurationRulesTest extends TestCase
      */
     private function unitForPath(string $path): AnalysisUnit
     {
+        // Hand back the fixture parsed from the project-root-relative path, with that path kept as its display name.
         return (new PhpFileParser())->parse(new SourceFile(self::PROJECT_ROOT . '/' . $path, $path));
     }
 }

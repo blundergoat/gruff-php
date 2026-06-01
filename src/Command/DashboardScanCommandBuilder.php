@@ -29,6 +29,7 @@ final readonly class DashboardScanCommandBuilder
     public function parsePaths(string $paths): array
     {
         if (trim($paths) === '') {
+            // Blank input means the dashboard form left the path box empty, so scan the project root.
             return ['.'];
         }
 
@@ -43,18 +44,21 @@ final readonly class DashboardScanCommandBuilder
             }
         }
 
+        // Tokens that were all empty collapse to a root scan rather than an argument-less analyse call.
         return $parsedPaths === [] ? ['.'] : $parsedPaths;
     }
 
     /**
      * Decode only the quote and backslash escapes emitted by the dashboard path tokenizer.
      *
+     * @param  string $quotedPath Raw inner text of a double-quoted token, still carrying \" and \\ escapes.
      * @return string Path with wrapper-level escapes removed.
      */
     private function unescapeQuotedPath(string $quotedPath): string
     {
         $unescapedPath = preg_replace('/\\\\(["\\\\])/', '$1', $quotedPath);
 
+        // preg_replace returns null only on engine error; fall back to the input so a path is always produced.
         return is_string($unescapedPath) ? $unescapedPath : $quotedPath;
     }
 
@@ -97,6 +101,7 @@ final readonly class DashboardScanCommandBuilder
         $command[] = '--';
         array_push($command, ...$paths);
 
+        // Hand back the full argv: binary, analyse flags, then the path operands after the -- separator.
         return $command;
     }
 }

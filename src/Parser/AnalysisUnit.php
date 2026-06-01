@@ -42,6 +42,7 @@ final class AnalysisUnit
      */
     public function hasParseErrors(): bool
     {
+        // A non-empty diagnostics list is the recorded signal that parsing failed for this file.
         return $this->diagnostics !== [];
     }
 
@@ -53,9 +54,11 @@ final class AnalysisUnit
     public function lineCount(): int
     {
         if ($this->source === '') {
+            // An empty file has no lines; count zero rather than reporting a phantom first line.
             return 0;
         }
 
+        // Add one because the final line carries no trailing newline, so newline count undercounts by one.
         return substr_count($this->source, "\n") + 1;
     }
 
@@ -86,6 +89,7 @@ final class AnalysisUnit
      * Recursively clear the `parent` attribute every node carries from
      * ParentConnectingVisitor so the AST is no longer a cycle.
      *
+     * @param Node $node Subtree root to descend; its `parent` back-edge and every descendant's are nulled in place.
      * @return void
      */
     private static function breakParentLinks(Node $node): void

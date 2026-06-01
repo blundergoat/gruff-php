@@ -33,10 +33,14 @@ abstract class CliTestCase extends TestCase
         // Provide a README so docs.missing-readme does not add an extra baseline entry.
         file_put_contents($project . '/README.md', "Baseline workflow fixture.\n");
 
+        // Hand back the isolated project root the baseline CLI test will scan.
         return $project;
     }
 
     /**
+     * Decode a finished CLI process's stdout as the JSON report object.
+     *
+     * @param Process $process Completed CLI process whose stdout holds the JSON report.
      * @return array<string, mixed>
      * @throws JsonException
      */
@@ -53,6 +57,7 @@ abstract class CliTestCase extends TestCase
             $report[$key] = $value;
         }
 
+        // Hand back the report keyed by its string field names for assertion.
         return $report;
     }
 
@@ -67,6 +72,7 @@ abstract class CliTestCase extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the freshly created temp directory for filesystem assertions.
         return $path;
     }
 
@@ -79,6 +85,7 @@ abstract class CliTestCase extends TestCase
     protected function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 
@@ -121,6 +128,7 @@ abstract class CliTestCase extends TestCase
                     $name = $file->getFilename();
 
                     if ($file->isDir() && in_array($name, ['.git', 'vendor', 'node_modules', '.idea'], true)) {
+                        // Prune heavy or environment-specific trees the fixture must not carry.
                         return false;
                     }
 
@@ -129,10 +137,12 @@ abstract class CliTestCase extends TestCase
 
                     foreach (['.goat-flow/logs/', '.goat-flow/scratchpad/', '.goat-flow/tasks/'] as $ignoredPrefix) {
                         if (str_starts_with($relativePath, $ignoredPrefix)) {
+                            // Drop volatile workspace state so the copied fixture stays deterministic.
                             return false;
                         }
                     }
 
+                    // Keep every other entry; it belongs in the copied package tree.
                     return true;
                 },
             ),
@@ -168,6 +178,7 @@ abstract class CliTestCase extends TestCase
         set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
             $warningMessage = $message;
 
+            // Returning true suppresses PHP's default warning so the bind failure surfaces via our message.
             return true;
         });
 
@@ -193,6 +204,7 @@ abstract class CliTestCase extends TestCase
             throw new RuntimeException('Unable to read allocated test port.');
         }
 
+        // Hand back the OS-assigned ephemeral port the dashboard test should bind.
         return (int) $matches[1];
     }
 
@@ -216,6 +228,8 @@ abstract class CliTestCase extends TestCase
                 $response = $this->fetchHttp($port, '/health');
 
                 if (str_contains($response, "HTTP/1.1 200 OK\r\n")) {
+                    // A TCP connect can succeed before the request handler is wired; only a 200 from
+                    // /health proves the full pipeline serves, so later dashboard requests cannot race startup.
                     return;
                 }
             } catch (RuntimeException) {
@@ -240,6 +254,7 @@ abstract class CliTestCase extends TestCase
         set_error_handler(static function (int $severity, string $message) use (&$warningMessage): bool {
             $warningMessage = $message;
 
+            // Returning true suppresses PHP's default warning so the connect failure surfaces via our message.
             return true;
         });
 
@@ -266,6 +281,7 @@ abstract class CliTestCase extends TestCase
             throw new RuntimeException('Unable to read HTTP response.');
         }
 
+        // Hand back the raw status-line-plus-body text for the caller to inspect.
         return $response;
     }
 }

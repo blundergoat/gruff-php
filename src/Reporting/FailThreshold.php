@@ -39,6 +39,7 @@ enum FailThreshold: string
      */
     public static function fromInput(string $rawInput): ?self
     {
+        // Exact-match the CLI string to a case; anything else is an unsupported value the caller reports, hence null.
         return match ($rawInput) {
             self::None->value => self::None,
             self::Advisory->value => self::Advisory,
@@ -56,6 +57,7 @@ enum FailThreshold: string
      */
     public function isTriggeredBy(Severity $severity): bool
     {
+        // Each case names the floor: a severity trips the gate only when it is at least as severe as the threshold.
         return match ($this) {
             self::None => false,
             self::Advisory => true,

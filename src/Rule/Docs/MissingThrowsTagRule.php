@@ -37,6 +37,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory because an undocumented throw is a contract gap, not a defect; callers tune severity in config.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @throws tag',
@@ -105,6 +106,7 @@ final readonly class MissingThrowsTagRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per documented public throw-site that omits the matching @throws contract.
         return $findings;
     }
 }

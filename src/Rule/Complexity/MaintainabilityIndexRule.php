@@ -36,6 +36,9 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory: a low index flags a refactor candidate to weigh, not a confirmed defect, so it ships at the
+        // lowest severity tier and sorts below warnings/errors. The shipped --fail-on default is advisory, so this
+        // does fail the gate; a consumer who wants it non-blocking raises --fail-on to warning.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Maintainability index',
@@ -101,6 +104,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
             );
         }
 
+        // One finding per node whose index fell below a threshold; empty when every node stayed maintainable.
         return $findings;
     }
 
@@ -116,6 +120,7 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
         $endLine   = $node->getEndLine();
 
         if ($startLine < 0 || $endLine < 0) {
+            // No line info to measure (synthetic node), so award a perfect score rather than penalise on no evidence.
             return 100.0;
         }
 
@@ -126,20 +131,25 @@ final readonly class MaintainabilityIndexRule implements RuleInterface
 
         $mi = (171.0 - 5.2 * log($volume) - 0.23 * $ccn - 16.2 * log($lloc)) * 100.0 / 171.0;
 
+        // Clamp at zero: the normalised SEI index has a 0-100 floor, so a very dense method cannot report negative.
         return max(0.0, $mi);
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+     * @param int|float $number Configured maintainability threshold; an integral float drops its ".0" tail.
+     *
      * @return string Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
+            // Genuine fraction: keep every digit so a precise threshold reads back exactly.
             return (string) $number;
         }
 
+        // Integral value: cast through int to drop the ".0" a float would otherwise print.
         return (string) (int) $number;
     }
 }

@@ -32,6 +32,7 @@ final readonly class SourceDiscoveryResult
      */
     public function hasInputErrors(): bool
     {
+        // Any unresolved requested path is a caller-facing input error, distinct from a clean empty result.
         return $this->missingPaths !== [];
     }
 }

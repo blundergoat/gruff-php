@@ -33,6 +33,7 @@ final readonly class ReturnCommentRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: presence of a preceding comment is unambiguous; severity is advisory so teams opt in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Return comment',
@@ -76,6 +77,7 @@ final readonly class ReturnCommentRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per return whose immediately-preceding line is not a standalone comment.
         return $findings;
     }
 }

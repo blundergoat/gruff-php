@@ -37,6 +37,7 @@ final readonly class RedundantVariableRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory, not warning: an assign-then-return is legible, so flag it as a cleanup hint a team opts into.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Redundant variable',
@@ -66,12 +67,21 @@ final readonly class RedundantVariableRule implements RuleInterface
             $this->checkBlock($function->stmts ?? [], $analysisUnit, $definition, $findings);
         }
 
+        // One finding per assign-then-return pair found across every function-like body in the unit.
         return $findings;
     }
 
     /**
-     * @param array<Stmt>   $statements
-     * @param list<Finding> &$findings
+     * Inspect a single statement list, then recurse into the child blocks of each statement.
+     *
+     * The pattern is only flagged when the assignment and the return are the block's *only* two
+     * statements (count === 2); a variable used more than once first is not redundant. Recursion still
+     * visits nested blocks so the same two-statement shape inside an inner scope is caught.
+     *
+     * @param array<Stmt>    $statements   Sibling statements of one block, in source order.
+     * @param AnalysisUnit   $analysisUnit Unit supplying the display path stamped onto any finding.
+     * @param RuleDefinition $definition   Pre-resolved metadata reused for every finding this pass.
+     * @param list<Finding>  &$findings    Accumulator the caller owns; appended to in place, never reset.
      * @return void
      */
     private function checkBlock(array $statements, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
@@ -94,30 +104,46 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * @param list<Finding> &$findings
+     * Append a finding when the two given statements are exactly "assign $x" then "return $x".
+     *
+     * Every guard below is a precondition the caller must have satisfied for the pair to qualify; any
+     * unmet guard means this is not the redundant shape and the method exits without recording anything.
+     * A `@var`/`@phpstan-var` narrowing docblock on either statement is treated as load-bearing and
+     * suppresses the finding, because inlining the return would drop that type contract.
+     *
+     * @param Stmt           $assignment      First statement; must be an expression wrapping an assignment.
+     * @param Stmt           $returnStatement Second statement; must return the same bare variable.
+     * @param AnalysisUnit   $analysisUnit    Unit supplying the display path stamped onto the finding.
+     * @param RuleDefinition $definition      Pre-resolved metadata copied into the finding.
+     * @param list<Finding>  &$findings       Accumulator the caller owns; appended to in place, never reset.
      * @return void
      */
     private function flagRedundantPair(Stmt $assignment, Stmt $returnStatement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
     {
         if (!$assignment instanceof Stmt\Expression || !$assignment->expr instanceof Assign) {
+            // Not an assignment statement, so there is no temporary variable to collapse.
             return;
         }
 
         $assignedVariable = $assignment->expr->var;
         if (!$assignedVariable instanceof Variable || !is_string($assignedVariable->name)) {
+            // Assigning to a property/array element/etc., not a plain `$name`, so the pattern does not apply.
             return;
         }
 
         if (!$returnStatement instanceof Stmt\Return_ || !$returnStatement->expr instanceof Variable) {
+            // Second statement is not `return <variable>`, so it cannot be returning the just-assigned temp.
             return;
         }
 
         $returnedVariable = $returnStatement->expr;
         if (!is_string($returnedVariable->name) || $returnedVariable->name !== $assignedVariable->name) {
+            // Returns a different variable than the one assigned, so neither line is redundant.
             return;
         }
 
         if ($this->hasPhpStanNarrowingTag($assignment, $returnStatement, $assignedVariable->name)) {
+            // A type-narrowing docblock makes the temp load-bearing; inlining would lose the pinned type.
             return;
         }
 
@@ -138,7 +164,13 @@ final readonly class RedundantVariableRule implements RuleInterface
     }
 
     /**
-     * @param list<Finding> &$findings
+     * Re-run the block check on each nested block a statement contains (if/else arms, loop and try
+     * bodies), so the assign-then-return pattern is detected at every depth, not just top level.
+     *
+     * @param Stmt           $statement    Statement whose child blocks (via StmtChildVisitor) get scanned.
+     * @param AnalysisUnit   $analysisUnit Unit forwarded unchanged so nested findings carry the same path.
+     * @param RuleDefinition $definition   Pre-resolved metadata forwarded to the recursive check.
+     * @param list<Finding>  &$findings    Accumulator the caller owns; nested findings are appended in place.
      * @return void
      */
     private function checkChildBlocks(Stmt $statement, AnalysisUnit $analysisUnit, RuleDefinition $definition, array &$findings): void
@@ -166,10 +198,12 @@ final readonly class RedundantVariableRule implements RuleInterface
         foreach ([$returnStatement, $assignment] as $statement) {
             $docComment = $statement->getDocComment();
             if ($docComment !== null && preg_match($pattern, $docComment->getText()) === 1) {
+                // Found a `@var $name` narrowing on this statement, so the temp carries a real type contract.
                 return true;
             }
         }
 
+        // Neither statement pins the variable's type, so collapsing the temp is safe.
         return false;
     }
 }

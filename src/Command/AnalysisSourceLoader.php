@@ -46,6 +46,7 @@ final readonly class AnalysisSourceLoader
             }
         }
 
+        // Hand the caller the fully parsed corpus plus any missing-path and parse-error diagnostics.
         return new AnalysisSourceSet($discoveryResult, $analysisUnits, $diagnostics);
     }
 
@@ -68,6 +69,7 @@ final readonly class AnalysisSourceLoader
     ): array {
         $discoveryResult = (new SourceDiscovery($projectRoot))->discover($paths, $shouldIncludeIgnored, $ignoredPathPatterns);
 
+        // Return discovery results unparsed; the streaming caller parses each file in turn so ASTs stay short-lived.
         return [
             'discovery' => $discoveryResult,
             'diagnostics' => $this->missingPathDiagnostics($discoveryResult),
@@ -78,6 +80,7 @@ final readonly class AnalysisSourceLoader
      * Build the diagnostics list for paths that disappeared between argument
      * parsing and discovery.
      *
+     * @param SourceDiscoveryResult $sourceDiscoveryResult Discovery output; each missing path yields one diagnostic.
      * @return list<RunDiagnostic>
      */
     private function missingPathDiagnostics(SourceDiscoveryResult $sourceDiscoveryResult): array
@@ -91,6 +94,7 @@ final readonly class AnalysisSourceLoader
             );
         }
 
+        // One diagnostic per requested path that vanished before discovery; empty when every path resolved.
         return $diagnostics;
     }
 }

@@ -75,6 +75,7 @@ final class BranchReviewMutationCliTest extends TestCase
      */
     private function infectionReportJson(): string
     {
+        // One killed and one escaped mutant pin msi to 50.0, the non-perfect score the delta-score assertion expects.
         return <<<'JSON'
 {
   "stats": {
@@ -121,6 +122,7 @@ JSON;
     /**
      * Decode CLI JSON output into a string-keyed payload.
      *
+     * @param Process $process - finished CLI process whose stdout must hold the report JSON; caller runs it first.
      * @return array<string, mixed> Decoded CLI report.
      * @throws JsonException When CLI output is invalid JSON.
      */
@@ -128,6 +130,7 @@ JSON;
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
+        // Funnel through stringKeyedArray so a non-object top level fails the test rather than returning loosely.
         return $this->stringKeyedArray($decoded);
     }
 
@@ -135,10 +138,12 @@ JSON;
      * Read a nested string-keyed array from a payload.
      *
      * @param array<string, mixed> $payload Source payload.
+     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
      * @return array<string, mixed> Nested payload.
      */
     private function arrayValue(array $payload, string $key): array
     {
+        // Absent key yields null, which stringKeyedArray rejects, so a missing nested object fails loudly.
         return $this->stringKeyedArray($payload[$key] ?? null);
     }
 
@@ -146,6 +151,7 @@ JSON;
      * Read a numeric value from a payload as float.
      *
      * @param array<string, mixed> $payload Source payload.
+     * @param string               $key     - key whose value must be int or float; a non-numeric value fails the test.
      * @return float Numeric payload value.
      */
     private function floatValue(array $payload, string $key): float
@@ -153,12 +159,14 @@ JSON;
         $payloadValue = $payload[$key] ?? null;
         self::assertTrue(is_int($payloadValue) || is_float($payloadValue));
 
+        // Cast int-or-float to float so JSON whole numbers (e.g. 0) compare cleanly against float expectations.
         return (float) $payloadValue;
     }
 
     /**
      * Assert a decoded JSON value is an array with string keys.
      *
+     * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
      * @return array<string, mixed> String-keyed payload.
      */
     private function stringKeyedArray(mixed $payload): array
@@ -171,6 +179,7 @@ JSON;
             $result[$key] = $entryValue;
         }
 
+        // Rebuilt array carries only the string-key entries the assertions confirmed, narrowing the type for callers.
         return $result;
     }
 
@@ -215,6 +224,7 @@ JSON;
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the path only after mkdir succeeds, so callers never operate on a directory that was not created.
         return $path;
     }
 
@@ -227,6 +237,7 @@ JSON;
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the fixture directory was never created (e.g. an early test failure).
             return;
         }
 

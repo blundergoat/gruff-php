@@ -43,10 +43,12 @@ final class BranchReviewComparatorTest extends TestCase
     /**
      * Build a finding fixture.
      *
+     * @param string $message - finding message; pass the same value twice to mint two identical-identity findings.
      * @return Finding
      */
     private function finding(string $message): Finding
     {
+        // Fixed ruleId/path/line/symbol so identity is decided solely by the message argument under test.
         return new Finding(
             ruleId:     'docs.example',
             message:    $message,

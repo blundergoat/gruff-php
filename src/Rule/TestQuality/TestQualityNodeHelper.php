@@ -348,7 +348,8 @@ final class TestQualityNodeHelper
     {
         $expected = self::literalValue(self::firstArgValue($call));
 
-        // A non-literal first argument yields null, so the strict equality below also gates out non-literals.
+        // literalValue() returns null for non-literals; the null guard excludes those so two
+        // non-literals (both null) cannot count as matching arguments.
         return $expected !== null && $expected === self::literalValue(self::argValue($call, 1));
     }
 
@@ -362,7 +363,8 @@ final class TestQualityNodeHelper
     {
         $expected = self::literalValue(self::firstArgValue($call));
 
-        // A non-literal matcher argument yields null, so the strict equality also rules out non-literals.
+        // literalValue() returns null for non-literals; the null guard excludes those so a
+        // non-literal matcher and a non-literal expectation (both null) cannot count as matching.
         return $expected !== null && $expected === self::literalValue(self::pestExpectationValue($call));
     }
 

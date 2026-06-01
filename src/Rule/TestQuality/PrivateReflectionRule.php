@@ -40,6 +40,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning at high confidence: reflection/closure-bind access to privates is a clear test-design smell.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Private member reflection',
@@ -95,17 +96,20 @@ final readonly class PrivateReflectionRule implements RuleInterface
             );
         }
 
+        // One finding per test scope that reaches into privates; empty when every scope stays on public contracts.
         return $findings;
     }
 
     /**
      * Detect reflection or closure binding nodes that expose private members.
      *
+     * @param Node $node Candidate AST node (a new-expression, static call, or method call) to classify.
      * @return bool True when the node performs private reflection access.
      */
     private function isPrivateReflectionNode(Node $node): bool
     {
         if ($node instanceof Expr\New_ && $node->class instanceof Name) {
+            // Constructing a Reflection* object is the entry point for reaching privates; match by class name.
             return in_array(strtolower($node->class->getLast()), self::REFLECTION_CLASSES, true);
         }
 
@@ -113,6 +117,7 @@ final readonly class PrivateReflectionRule implements RuleInterface
             $name      = TestQualityNodeHelper::callName($node);
             $className = strtolower($node->class->getLast());
 
+            // Closure::bind rebinds scope to read privates without reflection, so it counts as the same smell.
             return $className === 'closure' && $name === 'bind';
         }
 
@@ -122,12 +127,15 @@ final readonly class PrivateReflectionRule implements RuleInterface
             if ($name === 'setaccessible'
                 && TestQualityNodeHelper::literalValue(TestQualityNodeHelper::firstArgValue($node)) === true
             ) {
+                // setAccessible(true) is the explicit act of unlocking a private member; flag only the literal true.
                 return true;
             }
 
+            // bindTo on an existing closure rebinds its scope, the instance-call equivalent of Closure::bind.
             return $name === 'bindto';
         }
 
+        // Any other node kind cannot reach privates through these mechanisms, so it is not a violation.
         return false;
     }
 }

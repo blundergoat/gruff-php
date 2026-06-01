@@ -444,10 +444,12 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
             } elseif ($char === '>' || $char === '}' || $char === ')' || $char === ']') {
                 $depth = max(0, $depth - 1);
             } elseif ($char === ':' && $depth === 0) {
+                // First colon outside any brackets separates the field key from its type.
                 return $i;
             }
         }
 
+        // No unbracketed colon: the pair is positional or malformed, not `key: type`.
         return null;
     }
 
@@ -461,6 +463,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         $body = trim($body);
         if ($body === '') {
+            // An empty body has no type to extract.
             return null;
         }
 
@@ -486,6 +489,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
         $type = trim($type);
 
+        // The leading type token, or null when nothing but whitespace preceded the description.
         return $type === '' ? null : $type;
     }
 
@@ -501,9 +505,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
 
         // Remove the alias name and optional equals sign before parsing the aliased type.
         if (preg_match('/^\S+\s+(?:=\s*)?(?<type>.+)$/s', $body, $matches) !== 1) {
+            // A bare alias name with no following type yields nothing to classify.
             return null;
         }
 
+        // Parse the text after the alias name as an ordinary type expression.
         return $this->extractTypeExpression($matches['type']);
     }
 
@@ -517,9 +523,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         // Capture the first PHPDoc parameter variable name in the tag body.
         if (preg_match('/\$([A-Za-z_][A-Za-z0-9_]*)/', $body, $matches) === 1) {
+            // The matched name without its leading `$`, as the signature comparison expects.
             return $matches[1];
         }
 
+        // A `@param` body with no `$name` token (e.g. type-only) has no name to extract.
         return null;
     }
 
@@ -535,6 +543,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     {
         if (in_array($tagKind, self::PARAM_TAGS, true)) {
             if ($paramName === null) {
+                // Without a name there is no signature parameter to compare against.
                 return false;
             }
 
@@ -544,30 +553,37 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                         continue;
                     }
                     if ($param->var->name === $paramName) {
+                        // Matched the named parameter: coverage holds only if its hint is also `mixed`.
                         return ModernisationNodeHelper::typeName($param->type) === 'mixed';
                     }
                 }
             }
 
+            // No parameter of that name exists on the node, so the docblock mirrors nothing.
             return false;
         }
 
         if (in_array($tagKind, self::RETURN_TAGS, true)) {
             if ($node instanceof ClassMethod || $node instanceof Function_) {
+                // Return coverage holds only when the native return hint is also `mixed`.
                 return ModernisationNodeHelper::typeName($node->returnType) === 'mixed';
             }
 
+            // A return tag on a non-callable node mirrors no signature.
             return false;
         }
 
         if (in_array($tagKind, self::VAR_TAGS, true)) {
             if ($node instanceof Property) {
+                // Var coverage holds only when the property's native type is also `mixed`.
                 return ModernisationNodeHelper::typeName($node->type) === 'mixed';
             }
 
+            // A var tag off a property declaration mirrors no signature.
             return false;
         }
 
+        // Property/type-alias tags have no native declaration to mirror, so they never count as covered.
         return false;
     }
 
@@ -580,6 +596,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function resolveSymbol(Node $node): string
     {
         if ($node instanceof ClassMethod || $node instanceof Function_) {
+            // Reuse the shared `Class::method` / `function()` formatting for callables.
             return CyclomaticComplexityRule::resolveSymbol($node);
         }
 
@@ -589,6 +606,7 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 $names[] = '$' . $prop->name->toString();
             }
 
+            // A grouped property declaration can name several variables; list them all.
             return implode(', ', $names);
         }
 
@@ -598,9 +616,11 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
                 $names[] = $const->name->toString();
             }
 
+            // A single `const` statement can declare several names; list them all.
             return implode(', ', $names);
         }
 
+        // Unreachable for the node kinds this rule indexes; a stable label for any other kind.
         return 'unknown';
     }
 
@@ -616,13 +636,16 @@ final readonly class PhpDocMixedOveruseRule implements RuleInterface
     private function stripTopLevelNullUnion(string $type): string
     {
         if (str_ends_with($type, '|null')) {
+            // Drop a trailing `|null` so the remaining type can be matched as a bare bag.
             return substr($type, 0, -strlen('|null'));
         }
 
         if (str_starts_with($type, 'null|')) {
+            // Drop a leading `null|` so the remaining type can be matched as a bare bag.
             return substr($type, strlen('null|'));
         }
 
+        // Not a top-level nullable union; hand the type back untouched.
         return $type;
     }
 }

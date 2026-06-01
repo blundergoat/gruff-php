@@ -18,6 +18,7 @@ final readonly class IdentifierTokenizer
         $trimmed = trim($identifier, "_ \t\n\r\0\x0B");
 
         if ($trimmed === '') {
+            // An identifier that is only separators carries no words, so return no tokens.
             return [];
         }
 
@@ -39,6 +40,7 @@ final readonly class IdentifierTokenizer
             }
         }
 
+        // Hand back the lowercased words in source order, ready for downstream naming comparisons.
         return $tokens;
     }
 }

@@ -303,8 +303,9 @@ final class ParameterCountRuleTest extends TestCase
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param array<string, int>                                                           $thresholds
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @param string                                                                       $fixture    Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int>                                                           $thresholds Warning/error parameter-count limits for this case.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options    Extra rule options merged over the rule defaults.
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyse(string $fixture, array $thresholds, array $options = []): array
@@ -318,13 +319,15 @@ final class ParameterCountRuleTest extends TestCase
         );
         $ruleContext = new RuleContext(__DIR__ . '/../../..', $config);
 
+        // Only this rule runs, so every finding returned belongs to the case under test.
         return $this->rule->analyse($unit, $ruleContext);
     }
 
     /**
      * Analyse fixture paths and return findings for assertions.
      *
-     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options
+     * @param string                                                                       $fixture Fixture filename under tests/Fixtures/Size to scan.
+     * @param array<string, int|float|bool|string|array<array-key, int|float|bool|string>> $options Option overrides layered onto the shipped defaults, thresholds untouched.
      * @return list<\GruffPhp\Finding\Finding>
      */
     private function analyseWithDefaultSettings(string $fixture, array $options): array
@@ -342,6 +345,7 @@ final class ParameterCountRuleTest extends TestCase
             ),
         );
 
+        // Default thresholds preserved; this path exercises option handling in isolation.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
@@ -355,6 +359,7 @@ final class ParameterCountRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Size/' . $filename;
 
+        // Display path stays repo-relative so findings report the fixture, not the temp absolute path.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Size/' . $filename));
     }
 }

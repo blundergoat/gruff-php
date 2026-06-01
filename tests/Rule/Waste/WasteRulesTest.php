@@ -23,7 +23,8 @@ use GruffPhp\Source\SourceFile;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Covers waste detection: unreachable code, empty methods and classes, unused imports and parameters, commented-out code, one-line wrapper methods (with intent and allowlist exemptions), and redundant variable-before-return.
+ * Covers waste detection: unreachable code, empty methods and classes, unused imports and parameters, commented-out code, one-line wrapper methods
+ * (with intent and allowlist exemptions), and redundant variable-before-return.
  */
 final class WasteRulesTest extends TestCase
 {
@@ -51,8 +52,8 @@ final class WasteRulesTest extends TestCase
 
         self::assertCount(3, $findings);
 
-        $ruleIds        = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
-        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $ruleIds        = array_values(array_unique(array_map(static fn($finding): string => $finding->ruleId, $findings)));
+        $severityValues = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
 
         self::assertSame([UnreachableCodeRule::ID], $ruleIds);
         self::assertSame([Severity::Warning->value], $severityValues);
@@ -81,8 +82,8 @@ final class WasteRulesTest extends TestCase
 
         self::assertNotSame([], $findings);
 
-        $ruleIds        = array_values(array_unique(array_map(static fn ($finding): string => $finding->ruleId, $findings)));
-        $severityValues = array_values(array_unique(array_map(static fn ($finding): string => $finding->severity->value, $findings)));
+        $ruleIds        = array_values(array_unique(array_map(static fn($finding): string => $finding->ruleId, $findings)));
+        $severityValues = array_values(array_unique(array_map(static fn($finding): string => $finding->severity->value, $findings)));
 
         self::assertSame([EmptyMethodRule::ID], $ruleIds);
         self::assertSame([Severity::Advisory->value], $severityValues);
@@ -97,7 +98,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('AbstractFixture::abstractMethod()', $symbols);
     }
 
@@ -110,7 +111,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('empty-members.php', EmptyMethodRule::ID);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('PromotedConstructorFixture::__construct()', $symbols);
     }
 
@@ -136,7 +137,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('empty-members.php', EmptyClassRule::ID);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('EmptyExceptionFixture', $symbols);
     }
 
@@ -151,7 +152,7 @@ final class WasteRulesTest extends TestCase
 
         self::assertCount(2, $findings);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertContains('InvalidArgumentException', $symbols);
         self::assertContains('LogicException', $symbols);
     }
@@ -165,7 +166,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-imports.php', UnusedImportRule::ID);
 
-        $symbols = array_map(static fn ($finding) => $finding->symbol, $findings);
+        $symbols = array_map(static fn($finding) => $finding->symbol, $findings);
         self::assertNotContains('RuntimeException', $symbols);
     }
 
@@ -178,7 +179,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
 
-        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $findings);
+        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
         self::assertContains('unused', $params);
     }
 
@@ -191,7 +192,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
 
-        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $findings);
+        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
         self::assertNotContains('used', $params);
         self::assertNotContains('a', $params);
         self::assertNotContains('b', $params);
@@ -207,14 +208,14 @@ final class WasteRulesTest extends TestCase
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
 
         $reported = array_values(array_filter(
-            array_map(
-                static fn ($finding): ?string => $finding->symbol !== null && is_string($finding->metadata['parameter'] ?? null)
-                    ? $finding->symbol . ':' . $finding->metadata['parameter']
-                    : null,
-                $findings,
-            ),
-            'is_string',
-        ));
+                                     array_map(
+                                         static fn($finding): ?string => $finding->symbol !== null && is_string($finding->metadata['parameter'] ?? null)
+                                             ? $finding->symbol . ':' . $finding->metadata['parameter']
+                                             : null,
+                                         $findings,
+                                     ),
+                                     'is_string',
+                                 ));
 
         self::assertContains('UnusedParameterFixture::publicMethod():detailed', $reported);
     }
@@ -246,7 +247,7 @@ final class WasteRulesTest extends TestCase
     {
         $findings = $this->analyseRule('unused-parameter.php', UnusedParameterRule::ID);
 
-        $params = array_map(static fn ($finding) => $finding->metadata['parameter'] ?? null, $findings);
+        $params = array_map(static fn($finding) => $finding->metadata['parameter'] ?? null, $findings);
         self::assertNotContains('promoted', $params);
     }
 
@@ -271,7 +272,7 @@ final class WasteRulesTest extends TestCase
     public function testOneLineCallWrapperMethodsAreDetected(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
         self::assertSame(Severity::Advisory, $findings[0]->severity);
@@ -287,7 +288,7 @@ final class WasteRulesTest extends TestCase
     public function testOneLineMethodRuleSkipsPureExpressionsAndNoArgumentAccessors(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('OneLineMethodFixture::formatGreeting()', $symbols);
         self::assertNotContains('OneLineMethodFixture::getName()', $symbols);
@@ -308,14 +309,14 @@ final class WasteRulesTest extends TestCase
                 true,
                 [],
                 [
-                    'minParameters' => 1,
-                    'minInFileCallers' => 2,
+                    'minParameters'                 => 1,
+                    'minInFileCallers'              => 2,
                     'namedAlternativeFactoryExempt' => true,
                 ],
             ),
         );
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         self::assertContains('OneLineMethodFixture::isEligible()', $symbols);
         self::assertContains('SingleFactoryFixture::only()', $symbols);
@@ -334,7 +335,7 @@ final class WasteRulesTest extends TestCase
     public function testOneLineMethodRuleScopesCallerCountToOwningClass(): void
     {
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID);
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         // CrossClassCallerOwnerB::save() has only one in-class caller and must still fire,
         // even though CrossClassCallerOwnerA::save() (different class, same method name)
@@ -360,15 +361,15 @@ final class WasteRulesTest extends TestCase
                 true,
                 [],
                 [
-                    'minParameters' => 1,
-                    'minInFileCallers' => 0,
+                    'minParameters'                 => 1,
+                    'minInFileCallers'              => 0,
                     'namedAlternativeFactoryExempt' => false,
-                    'allowedSymbols' => ['OneLineMethodFixture::isEligible()'],
+                    'allowedSymbols'                => ['OneLineMethodFixture::isEligible()'],
                 ],
             ),
         );
         $findings = $this->analyseRule('one-line-methods.php', OneLineMethodRule::ID, $config);
-        $symbols  = array_map(static fn ($finding): ?string => $finding->symbol, $findings);
+        $symbols  = array_map(static fn($finding): ?string => $finding->symbol, $findings);
 
         self::assertNotContains('OneLineMethodFixture::isEligible()', $symbols);
         self::assertContains('OneLineMethodFixture::sharedHelper()', $symbols);
@@ -382,7 +383,7 @@ final class WasteRulesTest extends TestCase
     public function testRedundantVariableBeforeReturnDetected(): void
     {
         $findings  = $this->analyseRule('redundant-variable.php', RedundantVariableRule::ID);
-        $variables = array_map(static fn ($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
+        $variables = array_map(static fn($finding): mixed => $finding->metadata['variable'] ?? null, $findings);
 
         self::assertSame(['result', 'branchResult'], $variables);
     }
@@ -411,12 +412,16 @@ final class WasteRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
-        $wasteFindings = array_filter($findings, static fn ($finding) => str_starts_with($finding->ruleId, 'waste.') || str_starts_with($finding->ruleId, 'dead-code.'));
+        $wasteFindings = array_filter($findings, static fn($finding) => str_starts_with($finding->ruleId, 'waste.') || str_starts_with($finding->ruleId, 'dead-code.'));
         self::assertSame([], array_values($wasteFindings));
     }
 
     /**
      * Analyse waste-rule fixtures and return findings for assertions.
+     *
+     * @param string              $fixture Fixture filename under the dead-code fixtures directory.
+     * @param string              $ruleId  Rule identifier to keep; all other findings are discarded.
+     * @param AnalysisConfig|null $config  Overriding config, or null to use the registry defaults.
      *
      * @return list<\GruffPhp\Finding\Finding>
      */
@@ -426,14 +431,16 @@ final class WasteRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config ?? AnalysisConfig::fromRegistry($registry)));
 
-        return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
+        // Keep only the requested rule's findings so each assertion sees one rule in isolation.
+        return array_values(array_filter($findings, static fn($finding) => $finding->ruleId === $ruleId));
     }
 
     /**
      * Parse the named fixture into an analysis unit.
      *
-     * @param string $filename Fixture filename.
-     * @return \GruffPhp\Parser\AnalysisUnit
+     * @param string $filename - Fixture filename
+     *
+     * @return \GruffPhp\Parser\AnalysisUnit - Hand back the dead-code fixture parsed from disk, with its project-relative display path attached
      */
     private function parseFixture(string $filename): \GruffPhp\Parser\AnalysisUnit
     {

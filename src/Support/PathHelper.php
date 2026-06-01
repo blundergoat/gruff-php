@@ -19,9 +19,11 @@ final class PathHelper
     {
         $path = trim($path);
         if ($path === '') {
+            // An empty string is already canonical; downstream callers treat "" as "no path".
             return '';
         }
 
+        // Backslash is Windows' separator; forward slash is the one form every other comparison here assumes.
         return str_replace('\\', '/', $path);
     }
 
@@ -35,12 +37,14 @@ final class PathHelper
     {
         $path = self::normalizeSeparators($path);
         if ($path === '') {
+            // No characters means no root, so it cannot be anchored to a filesystem root.
             return false;
         }
 
         // Match Windows drive-letter roots such as C:/repo without accepting C:relative.
         $hasDriveLetterRoot = preg_match('/^[A-Za-z]:($|\/)/', $path) === 1;
 
+        // A leading "/" anchors a Unix or UNC root; a drive letter anchors a Windows one. Either is absolute.
         return str_starts_with($path, '/')
             || $hasDriveLetterRoot;
     }
@@ -58,13 +62,16 @@ final class PathHelper
         $path = self::normalizeSeparators($path);
 
         if ($path === '') {
+            // An empty target resolves to the root itself; there is nothing to append.
             return $root;
         }
 
         if (self::isAbsolute($path)) {
+            // An already-absolute path ignores the root, matching POSIX path-join semantics.
             return $path;
         }
 
+        // The path is relative, so anchor it under the root with a single separator.
         return $root . '/' . $path;
     }
 
@@ -79,9 +86,11 @@ final class PathHelper
         $realPath = realpath($path);
 
         if (is_string($realPath)) {
+            // The path exists on disk, so prefer the OS-resolved real path (symlinks and dot segments already gone).
             return self::normalizeSeparators($realPath);
         }
 
+        // The path does not exist (or realpath() failed), so collapse dot segments textually instead of via disk.
         return self::collapseDotSegments(self::normalizeSeparators($path));
     }
 
@@ -98,13 +107,16 @@ final class PathHelper
         $root = rtrim(self::canonical($root), '/');
 
         if ($path === $root) {
+            // The path is the root itself; "." is the conventional relative spelling of "here".
             return '.';
         }
 
         if (str_starts_with($path, $root . '/')) {
+            // The path sits inside root, so strip the root prefix and its trailing separator.
             return substr($path, strlen($root) + 1);
         }
 
+        // The path escapes the root, so it has no representation relative to it; null signals "outside the project".
         return null;
     }
 
@@ -122,6 +134,7 @@ final class PathHelper
             $path = substr($path, 2);
         }
 
+        // Drop a trailing separator so two spellings of the same directory compare equal during matching.
         return rtrim($path, '/');
     }
 
@@ -134,6 +147,7 @@ final class PathHelper
     private static function collapseDotSegments(string $path): string
     {
         if ($path === '') {
+            // Nothing to collapse; an empty path stays empty.
             return '';
         }
 
@@ -143,43 +157,57 @@ final class PathHelper
         $collapsed = implode('/', self::collapsedSegments($remaining, $prefix !== ''));
 
         if ($prefix === '') {
+            // Relative input has no root to re-attach, so the collapsed segments are the whole answer.
             return $collapsed;
         }
 
+        // Re-attach the root prefix that was split off so an absolute path stays absolute.
         return $prefix . $collapsed;
     }
 
     /**
      * Split an absolute root prefix from the rest of a normalized path.
      *
+     * Callers must pass a path that has already been through normalizeSeparators(); the patterns here
+     * assume forward slashes and would miss Windows roots written with backslashes.
+     *
+     * @param string $path Forward-slash-normalized path whose root, if any, should be peeled off.
      * @return array{prefix: string, remaining: string} Root prefix and remaining path.
      */
     private static function splitRoot(string $path): array
     {
-        // Match a Windows drive-letter root such as C:/ before segment processing.
         if (preg_match('/^[A-Za-z]:\//', $path) === 1) {
+            // Keep the three-character drive root (e.g. "C:/") as the prefix so it is never treated as a segment.
             return self::rootParts(substr($path, 0, 3), substr($path, 3));
         }
 
-        // Match a bare Windows drive root such as C:.
         if (preg_match('/^[A-Za-z]:$/', $path) === 1) {
+            // A bare drive ("C:") is all root and has no segments to collapse.
             return self::rootParts($path, '');
         }
 
         if (str_starts_with($path, '//')) {
+            // A leading "//" is a UNC/network root; preserve both slashes so it stays absolute after collapsing.
             return self::rootParts('//', substr($path, 2));
         }
 
         if (str_starts_with($path, '/')) {
+            // A single leading "/" is the Unix root; keep it so the collapsed result stays absolute.
             return self::rootParts('/', substr($path, 1));
         }
 
+        // No recognised root, so the input is relative: empty prefix, whole path as segments.
         return self::rootParts('', $path);
     }
 
     /**
      * Package a path root split without looking like callable-array syntax.
      *
+     * Building the array key-by-key (rather than `['prefix' => ..., 'remaining' => ...]`) keeps the
+     * literal from resembling a `[Class, method]` callable, which static analysers otherwise flag here.
+     *
+     * @param string $prefix    Root segment to preserve verbatim (e.g. "/", "//", "C:/"), empty for relative paths.
+     * @param string $remaining Path after the root, still slash-separated, for the caller to collapse into segments.
      * @return array{prefix: string, remaining: string} Root split parts.
      */
     private static function rootParts(string $prefix, string $remaining): array
@@ -188,12 +216,16 @@ final class PathHelper
         $parts['prefix']    = $prefix;
         $parts['remaining'] = $remaining;
 
+        // Hand back the two halves as a named shape so callers read $parts['prefix'] / ['remaining'] explicitly.
         return $parts;
     }
 
     /**
      * Collapse relative path segments after the root has been separated.
      *
+     * @param string $path       Rootless path remainder (root already peeled by splitRoot) to reduce to clean segments.
+     * @param bool   $isAbsolute True when the path had a root: leading ".." is then dropped (cannot ascend past the
+     *                           root); false keeps leading ".." so a relative path can still climb above its base.
      * @return list<string> Normalized path segments.
      */
     private static function collapsedSegments(string $path, bool $isAbsolute): array
@@ -221,6 +253,7 @@ final class PathHelper
             $segments[] = $segment;
         }
 
+        // Return the reduced segment list in order; the caller re-joins them and re-attaches any root.
         return $segments;
     }
 }

@@ -38,6 +38,7 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning at medium confidence: reading superglobals in domain code is a real leak, not a mere style smell.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Forbidden direct global access',
@@ -59,6 +60,7 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if ($this->isControllerPath($analysisUnit->file->displayPath)) {
+            // Controllers are the sanctioned boundary for superglobals, so exempt the whole file there.
             return [];
         }
 
@@ -92,11 +94,14 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per distinct forbidden superglobal read found outside a controller.
         return $findings;
     }
 
     /**
      * Check whether a file path is treated as a controller boundary.
+     *
+     * @param string $displayPath File path as shown in findings; matched by convention to spot controller code.
      *
      * @return bool True when direct request/session access is allowed.
      */
@@ -104,6 +109,7 @@ final readonly class ForbiddenGlobalAccessRule implements RuleInterface
     {
         $normalized = '/' . str_replace('\\', '/', $displayPath);
 
+        // Treat a Controller/Controllers directory or a *Controller.php suffix as the request-handling boundary.
         return str_contains($normalized, '/Controller/')
             || str_contains($normalized, '/Controllers/')
             || str_ends_with($displayPath, 'Controller.php');

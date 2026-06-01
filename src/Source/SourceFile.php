@@ -40,6 +40,7 @@ final readonly class SourceFile
      */
     public function isPhp(): bool
     {
+        // PHP-typed files take the AST parser path; every other type is scanned as plain text instead.
         return $this->type === self::TYPE_PHP;
     }
 }

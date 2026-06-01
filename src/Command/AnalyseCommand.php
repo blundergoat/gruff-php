@@ -312,7 +312,7 @@ final class AnalyseCommand extends Command
      * @param array{discoverParseNs: int, analyseNs: int, scoreNs: int, reportNs: int} $phaseDurationsNs Timed analyse phase durations in nanoseconds.
      * @param int $filesParsed Count of source files actually parsed this run.
      * @param int $rulesExecuted Count of rules enabled for this run.
-     * @param RuntimeTimingObserver|null $runtimeTimingObserver Per-rule timings source; null unless detailed mode collected them.
+     * @param RuntimeTimingObserver|null $runtimeTimingObserver Per-rule timings source; null unless detailed mode ran.
      * @param bool $isDetailed Whether to attach per-rule totals; requires a non-null observer to take effect.
      * @return void
      */
@@ -361,7 +361,7 @@ final class AnalyseCommand extends Command
     /**
      * Render setup errors using either plain console text or the requested report format.
      *
-     * @param AnalyseCommandSetupResult $result Failed setup outcome carrying the error, exit code, and any partial report.
+     * @param AnalyseCommandSetupResult $result Failed setup outcome with the error, exit code, and any partial report.
      * @param OutputInterface $output Destination the error text or formatted report is written to.
      * @return int Setup failure exit code.
      */
@@ -415,7 +415,7 @@ final class AnalyseCommand extends Command
      * Build the changed-region diff result requested by --diff, --since, or --changed-ranges.
      *
      * @param string $projectRoot Project root the diff and requested paths resolve against.
-     * @param AnalyseCommandOptions $options Effective CLI options selecting the changed-region source (ranges, since, or diff).
+     * @param AnalyseCommandOptions $options CLI options selecting the changed-region source (ranges, since, or diff).
      * @param list<RunDiagnostic> $diagnostics Run diagnostics; a diff-mode error is appended in place on failure.
      * @return DiffResult|null Diff result, inactive result, or null when diff lookup fails.
      */
@@ -657,8 +657,8 @@ final class AnalyseCommand extends Command
     /**
      * Decide the command exit code from run diagnostics and whether any fail threshold tripped.
      *
-     * @param list<RunDiagnostic>             $diagnostics Run diagnostics; any present force an INVALID exit ahead of findings.
-     * @param list<\GruffPhp\Finding\Finding> $findings    Full post-baseline finding set the all-findings gate inspects.
+     * @param list<RunDiagnostic>             $diagnostics Run diagnostics; any present force INVALID ahead of findings.
+     * @param list<\GruffPhp\Finding\Finding> $findings    Post-baseline finding set the all-findings gate inspects.
      * @param list<\GruffPhp\Finding\Finding> $newFindings Change-introduced subset the new-findings gate inspects.
      * @param FailThresholds                  $failThresholds Configured gate that decides which findings cause failure.
      *

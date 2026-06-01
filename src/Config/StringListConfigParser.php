@@ -34,12 +34,19 @@ final readonly class StringListConfigParser
             $strings[] = $this->normalizedString($rawConfigValue, $path, $index, hasPathPatterns: $hasPathPatterns, allowsGlobs: $allowsGlobs);
         }
 
+        // Dedupe so a repeated pattern is not validated or matched twice; array_values reindexes the
+        // gaps array_unique leaves behind so the result satisfies the list<string> contract callers rely on.
         return array_values(array_unique($strings));
     }
 
     /**
      * Normalize one configured string and validate optional path-pattern rules.
      *
+     * @param mixed      $rawConfigValue One list element; must be a non-empty string or the call throws.
+     * @param string     $path            Parent config key, prefixed onto error messages for locatability.
+     * @param int|string $index           Element's position in the list, appended to the key to pinpoint a bad entry.
+     * @param bool       $hasPathPatterns When true, the value must also pass project-relative path-pattern checks.
+     * @param bool       $allowsGlobs     When true, `*` wildcards are allowed; only read under $hasPathPatterns.
      * @return string Trimmed string with directory separators normalized.
      */
     private function normalizedString(
@@ -59,12 +66,18 @@ final readonly class StringListConfigParser
             $this->assertPathPattern($normalized, $path, $index, $allowsGlobs);
         }
 
+        // Hand back the canonical form (trimmed, backslashes folded to `/`) so every downstream path
+        // comparison sees one separator convention regardless of how the value was written in config.
         return $normalized;
     }
 
     /**
      * Reject path patterns that can escape the project or use disallowed globs.
      *
+     * @param string     $normalized  Already-normalized pattern to vet; must stay inside the project tree.
+     * @param string     $path        Parent config key, prefixed onto the rejection message for locatability.
+     * @param int|string $index       List position, appended to the key to pinpoint the offending entry.
+     * @param bool       $allowsGlobs When false, any `*` in the pattern is rejected as unsupported glob syntax.
      * @return void
      */
     private function assertPathPattern(string $normalized, string $path, int|string $index, bool $allowsGlobs): void

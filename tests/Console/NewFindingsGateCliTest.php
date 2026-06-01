@@ -142,6 +142,7 @@ final class NewFindingsGateCliTest extends CliTestCase
         $process = new Process(array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args), $this->project);
         $process->run();
 
+        // Hand back the already-run process so the caller can assert on its exit code and output.
         return $process;
     }
 

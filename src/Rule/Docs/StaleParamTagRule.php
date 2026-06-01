@@ -36,6 +36,7 @@ final readonly class StaleParamTagRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning, not advisory: a @param naming a parameter that no longer exists actively misleads a reader.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Stale @param tag',
@@ -107,6 +108,7 @@ final readonly class StaleParamTagRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per documented @param whose name matches no current parameter on its callable.
         return $findings;
     }
 }

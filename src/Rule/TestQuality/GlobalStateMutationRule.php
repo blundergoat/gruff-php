@@ -45,6 +45,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning severity and medium confidence: mutation without cleanup is likely, not certain, test rot.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Global state mutation in test',
@@ -81,23 +82,27 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
+        // Hand back every unscoped-mutation finding gathered across the unit's test scopes.
         return $findings;
     }
 
     /**
-     * @param array<int, bool>           $cleanupCache
-     * @param array<string, Stmt\Class_> $classesByName
+     * @param TestQualityScope           $scope         Scope to test; Pest scopes are exempt from cleanup checks.
+     * @param array<int, bool>           $cleanupCache  Memo by enclosing class object id; true means a hook was found.
+     * @param array<string, Stmt\Class_> $classesByName Declared classes by name, used to resolve parent cleanup hooks.
      *
      * @return bool True when the scope should be scanned for cleanup-sensitive mutations.
      */
     private function shouldCheckScopeCleanup(TestQualityScope $scope, array &$cleanupCache, array $classesByName): bool
     {
         if ($scope->isPest) {
+            // Pest closures carry no class to hold a cleanup hook, so this rule has nothing to assert against them.
             return false;
         }
 
         $class = $scope->node->getAttribute('parent');
         if (!$class instanceof Stmt\Class_) {
+            // A method outside a class cannot inherit tearDown either; skip rather than guess.
             return false;
         }
 
@@ -106,11 +111,15 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             $cleanupCache[$classKey] = $this->hasCleanupInClass($class, $classesByName);
         }
 
+        // Scan only when the class has no cleanup hook; a present hook is assumed to reset the mutation.
         return !$cleanupCache[$classKey];
     }
 
     /**
      * Build superglobal findings for the test-quality rule.
+     *
+     * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
+     * @param TestQualityScope $scope        Cleanup-free test scope scanned for direct superglobal writes.
      *
      * @return list<Finding>
      */
@@ -133,11 +142,15 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
+        // One finding per superglobal write reached in this scope; empty when the scope writes none.
         return $findings;
     }
 
     /**
      * Build state function findings for the test-quality rule.
+     *
+     * @param AnalysisUnit     $analysisUnit Parsed unit; supplies the display path recorded on each finding.
+     * @param TestQualityScope $scope        Cleanup-free test scope; its calls are matched against the state list.
      *
      * @return list<Finding>
      */
@@ -164,17 +177,21 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             );
         }
 
+        // One finding per state-mutating call reached in this scope; empty when the scope calls none.
         return $findings;
     }
 
     /**
      * Extract the written superglobal name from an assignment target.
      *
+     * @param Expr $target Left-hand side of an assignment; nested array-dim writes are unwrapped to the base variable.
+     *
      * @return string|null Superglobal name, or null when the assignment is not to a tracked superglobal.
      */
     private function superglobalWriteName(Expr $target): ?string
     {
         if (!$target instanceof Expr\ArrayDimFetch) {
+            // Only indexed writes such as $_GET['x'] mutate a superglobal; a bare assignment is out of scope.
             return null;
         }
 
@@ -184,15 +201,18 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         }
 
         if (!$variable instanceof Expr\Variable || !is_string($variable->name)) {
+            // A dynamic or non-variable base ($$x[...]) cannot be resolved to a known superglobal name.
             return null;
         }
 
+        // Report the base variable only when it is one of the tracked superglobals; otherwise it is an ordinary array.
         return in_array($variable->name, self::SUPERGLOBALS, true) ? $variable->name : null;
     }
 
     /**
-     * @param array<string, Stmt\Class_> $classesByName
-     * @param array<int, true>           $visited
+     * @param Stmt\Class_                $class         Class whose own methods and ancestors are searched for a hook.
+     * @param array<string, Stmt\Class_> $classesByName Declared classes by name, used to follow `extends` to a parent.
+     * @param array<int, true>           $visited       Object ids already walked; guards against cycles in the graph.
      *
      * @return bool True when the class or an ancestor declares a cleanup hook.
      */
@@ -200,6 +220,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $classId = spl_object_id($class);
         if (isset($visited[$classId])) {
+            // Cycle break: a class already on the walk path contributes no new hook, so stop recursing.
             return false;
         }
 
@@ -209,22 +230,26 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             $methodName = strtolower($classMethod->name->toString());
 
             if (in_array($methodName, ['teardown', 'teardownafterclass'], true)) {
+                // A tearDown / tearDownAfterClass method is treated as cleanup, so the class is exempt.
                 return true;
             }
 
             $doc = strtolower($classMethod->getDocComment()?->getText() ?? '');
             if (str_contains($doc, '@after') || str_contains($doc, '@afterclass')) {
+                // An @after / @afterClass annotation marks an arbitrarily named cleanup hook; honour it.
                 return true;
             }
 
             if (TestQualityNodeHelper::hasAttribute($classMethod, 'After')
                 || TestQualityNodeHelper::hasAttribute($classMethod, 'AfterClass')
             ) {
+                // The #[After] / #[AfterClass] attribute is the modern cleanup form; treat it the same.
                 return true;
             }
         }
 
         if ($class->extends === null) {
+            // No own hook and no parent to inherit one from, so this class has no cleanup.
             return false;
         }
 
@@ -232,14 +257,18 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         $parent     = $classesByName[$parentName] ?? $classesByName[$this->shortName($parentName)] ?? null;
 
         if (!$parent instanceof Stmt\Class_) {
+            // Parent source is unavailable: assume cleanup exists unless it is the bare PHPUnit TestCase root.
             return !in_array($this->shortName($parentName), ['TestCase'], true);
         }
 
+        // Inherit the parent's verdict; a hook anywhere up the chain clears the whole subtree.
         return $this->hasCleanupInClass($parent, $classesByName, $visited);
     }
 
     /**
      * Index declared classes by fully qualified and short names.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose declared classes seed the lookup table.
      *
      * @return array<string, Stmt\Class_>
      */
@@ -261,11 +290,14 @@ final readonly class GlobalStateMutationRule implements RuleInterface
             }
         }
 
+        // Each class is keyed under both its short and namespaced names so `extends` lookups hit either form.
         return $classes;
     }
 
     /**
      * Return the final segment of a fully qualified class name.
+     *
+     * @param string $name Fully qualified or already-short class name; an empty-segment result falls back to the input.
      *
      * @return string Unqualified class name.
      */
@@ -273,11 +305,16 @@ final readonly class GlobalStateMutationRule implements RuleInterface
     {
         $parts = explode('\\', $name);
 
+        // The trailing segment is the unqualified name; an empty split falls back to the original input.
         return $parts[array_key_last($parts)] ?? $name;
     }
 
     /**
-     * @param array<string, scalar> $metadata
+     * @param AnalysisUnit          $analysisUnit Parsed unit; supplies the display path recorded on the finding.
+     * @param TestQualityScope      $scope        Offending test scope; its symbol identifies the test in the finding.
+     * @param int                   $line         1-based source line of the mutation, reported to the user.
+     * @param string                $message      Human-readable text naming the mutated state and the missing cleanup.
+     * @param array<string, scalar> $metadata     Structured detail (`variant`, `name`) used to group or filter.
      *
      * @return Finding Global state mutation finding.
      */
@@ -288,6 +325,7 @@ final readonly class GlobalStateMutationRule implements RuleInterface
         string $message,
         array $metadata,
     ): Finding {
+        // Stamp every finding with this rule's fixed pillar, tier, severity, and remediation guidance.
         return new Finding(
             ruleId:      self::ID,
             message:     $message,

@@ -172,7 +172,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate SUT call whose ancestors are walked for an enclosing assertion.
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate SUT call whose ancestors are
+     *                                                            walked for an enclosing assertion.
      * @return bool True when the call is only part of an assertion expression.
      */
     private function isNestedInAssertionCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -195,7 +196,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call whose ancestors are walked for an enclosing finally block.
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call whose ancestors are
+     *                                                            walked for an enclosing finally block.
      * @return bool True when the call belongs to teardown rather than exercise.
      */
     private function isNestedInFinallyBlock(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
@@ -216,8 +218,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call under inspection; only method calls can be observations.
-     * @param  string $name Called method name resolved by the caller; compared against the lower-case observation conventions.
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Candidate call under inspection; only
+     *                                                            method calls can be observations.
+     * @param  string $name Called method name resolved by the caller; compared against the lower-case
+     *                      observation conventions.
      * @return bool True when the call reads or shapes test output rather than exercising the SUT.
      */
     private function isObservationCall(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
@@ -262,7 +266,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call to key by receiver; free functions and self/parent/static yield null.
+     * @param  Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Call to key by receiver; free functions
+     *                                                            and self/parent/static yield null.
      * @return string|null Stable receiver identity for SUT call grouping.
      */
     private function receiverKey(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): ?string
@@ -322,7 +327,8 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr\PropertyFetch $receiver Property access (such as `$this->sut`) keyed as owner plus property name; dynamic names yield null.
+     * @param  Expr\PropertyFetch $receiver Property access (such as `$this->sut`) keyed as owner plus
+     *                                      property name; dynamic names yield null.
      * @return string|null Receiver identity for property-held SUTs.
      */
     private function propertyReceiverKey(Expr\PropertyFetch $receiver): ?string
@@ -363,7 +369,7 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr $receiver Receiver expression unwound through method-call chains to its root variable for name matching.
+     * @param  Expr $receiver Receiver expression unwound through method-call chains to its root variable.
      * @return string|null Receiver variable name, or null for dynamic/non-variable receivers.
      */
     private function receiverName(Expr $receiver): ?string
@@ -382,7 +388,7 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  string $name Method name to classify; matched against the get/has/is prefixes and the bare `count` reader.
+     * @param  string $name Method name to classify against the get/has/is prefixes and the bare `count` reader.
      * @return bool True when the method name follows a result-observation convention.
      */
     private function isObservationMethodName(string $name): bool
@@ -440,8 +446,10 @@ final readonly class EagerTestRule implements RuleInterface
     }
 
     /**
-     * @param  Expr                $receiver        Receiver expression unwound to its root variable before the membership test.
-     * @param  array<string, true> $resultVariables Result-variable name set from collectResultVariables(), keyed by variable name.
+     * @param  Expr                $receiver        Receiver expression unwound to its root variable before
+     *                                              the membership test.
+     * @param  array<string, true> $resultVariables Result-variable name set from collectResultVariables(),
+     *                                              keyed by variable name.
      *
      * @return bool True when the receiver roots at a known result variable.
      */

@@ -33,6 +33,7 @@ final class WeakCryptoRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: md5/sha1/mcrypt_* are unambiguous names, so a match is a near-certain weak-primitive use.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Weak cryptography primitives',
@@ -81,6 +82,7 @@ final class WeakCryptoRule implements RuleInterface
             );
         }
 
+        // Empty when the file calls no md5/sha1/mcrypt_* primitive; the caller treats that as a clean file.
         return $findings;
     }
 }

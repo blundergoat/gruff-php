@@ -36,6 +36,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Low confidence and advisory: only fires once a project opts in by listing its own domain namespaces.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Mocking a domain object',
@@ -60,6 +61,7 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     {
         $patterns = $ruleContext->settingsFor($this->definition())->stringListOption('domainNamespaces');
         if ($patterns === []) {
+            // With no domain namespaces configured, every class is a legitimate mock target; stay silent.
             return [];
         }
 
@@ -105,11 +107,14 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per mock whose target class matched a configured domain-object pattern.
         return $findings;
     }
 
     /**
      * Map imported class aliases to fully qualified names.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose `use` and group-use statements supply the alias map.
      *
      * @return array<string, string>
      */
@@ -132,11 +137,15 @@ final readonly class MockingDomainObjectRule implements RuleInterface
             }
         }
 
+        // Local alias keyed to its fully qualified target, so short class references can be resolved later.
         return $useAliases;
     }
 
     /**
      * Extract a `ClassName::class` argument from a mock creation call.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call  Mock-creation call whose argument is read.
+     * @param int                                           $index Zero-based argument position holding the class.
      *
      * @return string|null Class name string, or null when absent.
      */
@@ -144,25 +153,30 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     {
         $classConstFetch = TestQualityNodeHelper::argValue($call, $index);
         if (!$classConstFetch instanceof Expr\ClassConstFetch || !$classConstFetch->class instanceof Name) {
+            // The argument is not a `Something::class` fetch, so no class name can be recovered.
             return null;
         }
 
         $name = $classConstFetch->name;
         if (!$name instanceof Node\Identifier || strtolower($name->toString()) !== 'class') {
+            // A `::CONST` other than `::class` does not name a type to mock.
             return null;
         }
 
+        // The left-hand side of the `::class` fetch is the mocked class name.
         return $classConstFetch->class->toString();
     }
 
     /**
-     * @param array<string, string> $useAliases
+     * @param string                $className  Class reference as written at the mock site, aliased or qualified.
+     * @param array<string, string> $useAliases Import alias map used to expand a leading short segment.
      *
      * @return string Resolved class name.
      */
     private function resolveClassName(string $className, array $useAliases): string
     {
         if (str_starts_with($className, '\\')) {
+            // Already fully qualified; just drop the leading separator to match the alias-map form.
             return ltrim($className, '\\');
         }
 
@@ -171,14 +185,17 @@ final readonly class MockingDomainObjectRule implements RuleInterface
         if (isset($useAliases[$first])) {
             $rest = substr($className, strlen($first));
 
+            // The leading segment was imported, so expand it to its fully qualified target.
             return $useAliases[$first] . $rest;
         }
 
+        // No matching import, so the reference is already same-namespace or global and stands as written.
         return $className;
     }
 
     /**
-     * @param list<string> $patterns
+     * @param string       $className Fully qualified class name to test against the domain-object globs.
+     * @param list<string> $patterns  fnmatch globs marking namespaces the project treats as domain objects.
      *
      * @return string|null Matching pattern, or null when none match.
      */
@@ -186,10 +203,12 @@ final readonly class MockingDomainObjectRule implements RuleInterface
     {
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $className, FNM_NOESCAPE)) {
+                // First glob the class matches is reported back so the finding can name which rule it tripped.
                 return $pattern;
             }
         }
 
+        // No configured pattern matched, so this class is not a domain object for the rule's purposes.
         return null;
     }
 }

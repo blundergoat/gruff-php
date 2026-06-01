@@ -30,6 +30,7 @@ final readonly class MutationAnalysisResult
      */
     public function survivedCount(): int
     {
+        // Survivors are mutants the suite failed to kill; this is the figure the budget is measured against.
         return count($this->report->survivedMutants());
     }
 
@@ -40,6 +41,7 @@ final readonly class MutationAnalysisResult
      */
     public function isBudgetExceeded(): bool
     {
+        // No configured budget can never be exceeded; the strict greater-than means hitting the cap exactly is allowed.
         return $this->mutationBudget !== null && $this->survivedCount() > $this->mutationBudget;
     }
 
@@ -51,9 +53,11 @@ final readonly class MutationAnalysisResult
     public function msiDelta(): ?float
     {
         if (!$this->baselineReport instanceof InfectionReport) {
+            // Null means "no baseline to compare", which callers render as no delta rather than a zero change.
             return null;
         }
 
+        // Positive delta means MSI improved over the baseline; rounded to two places to match reported precision.
         return round($this->report->msi() - $this->baselineReport->msi(), 2);
     }
 
@@ -78,6 +82,7 @@ final readonly class MutationAnalysisResult
      */
     public function toArray(): array
     {
+        // Flat serialisable snapshot for report consumers; baseline and budget keys collapse to null when unset.
         return [
             'source' => $this->report->reportPath,
             'stats' => $this->report->stats,

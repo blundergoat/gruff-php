@@ -101,10 +101,14 @@ final class BranchReviewResultTest extends TestCase
     /**
      * Build a finding fixture for delta tests.
      *
-     * @return Finding
+     * @param string $ruleId - rule id to stamp on the fixture; the only field that varies across
+     *   cases, since perRuleDelta() buckets and sorts purely on this value.
+     * @return Finding - finding whose every other field is held constant so delta grouping and
+     *   tie-breaking depend on $ruleId alone.
      */
     private function finding(string $ruleId): Finding
     {
+        // Hold all non-rule fields fixed so each call differs only by ruleId, isolating the bucketing logic.
         return new Finding(
             ruleId:     $ruleId,
             message:    'Example finding.',

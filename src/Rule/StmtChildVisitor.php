@@ -29,6 +29,7 @@ final readonly class StmtChildVisitor
      */
     public static function isControlFlowStmt(Node $node): bool
     {
+        // Must list exactly the statement kinds childBlocks() yields for; keep the two in lockstep.
         return $node instanceof Stmt\If_
             || $node instanceof Stmt\For_
             || $node instanceof Stmt\Foreach_
@@ -59,6 +60,7 @@ final readonly class StmtChildVisitor
                 yield new StmtChildBlock(StmtChildBlock::KIND_ELSE_BODY, $node->else->stmts, $node->else);
             }
 
+            // If_ blocks are fully yielded; node kinds are mutually exclusive, so stop the generator here.
             return;
         }
 
@@ -69,6 +71,7 @@ final readonly class StmtChildVisitor
         ) {
             yield new StmtChildBlock(StmtChildBlock::KIND_LOOP_BODY, $node->stmts, $node);
 
+            // The single loop body is yielded; node kinds are mutually exclusive, so stop the generator here.
             return;
         }
 
@@ -77,6 +80,7 @@ final readonly class StmtChildVisitor
                 yield new StmtChildBlock(StmtChildBlock::KIND_SWITCH_CASE, $case->stmts, $case);
             }
 
+            // Every switch case is yielded; node kinds are mutually exclusive, so stop the generator here.
             return;
         }
 

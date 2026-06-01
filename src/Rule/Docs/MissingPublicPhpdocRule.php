@@ -34,6 +34,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Error-severity, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing method PHPDoc',
@@ -66,11 +67,16 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
             $findings[] = $this->findingForMethod($analysisUnit, $definition, $classMethod);
         }
 
+        // One finding per method declaration that has no attached docblock.
         return $findings;
     }
 
     /**
      * Build the missing PHPDoc finding for one method.
+     *
+     * @param AnalysisUnit  $analysisUnit Parsed unit supplying the display path reported in the finding.
+     * @param RuleDefinition $definition  Rule metadata supplying severity, pillar, tier, and confidence.
+     * @param ClassMethod   $classMethod  Undocumented method whose name and start line are reported.
      *
      * @return Finding Documentation finding.
      */
@@ -78,6 +84,7 @@ final readonly class MissingPublicPhpdocRule implements RuleInterface
     {
         $symbol = CyclomaticComplexityRule::resolveSymbol($classMethod);
 
+        // Finding anchored at the method declaration line, flagging its absent docblock.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Method %s needs a brief intent description above its declaration (one plain-English line; not a restatement of the method signature).', $symbol),

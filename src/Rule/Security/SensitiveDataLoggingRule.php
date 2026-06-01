@@ -45,6 +45,7 @@ final class SensitiveDataLoggingRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Sensitive data logging',
@@ -86,11 +87,15 @@ final class SensitiveDataLoggingRule implements RuleInterface
             array_push($findings, ...$this->loggerCallFindings($analysisUnit, $call));
         }
 
+        // Hand back every sensitive-logging finding gathered across function, method, and static log sinks.
         return $findings;
     }
 
     /**
      * Build logger call findings for the security rule.
+     *
+     * @param AnalysisUnit                    $analysisUnit Unit being scanned; supplies the display path for findings.
+     * @param Expr\MethodCall|Expr\StaticCall $call         Possible logger call whose name and arguments are checked.
      *
      * @return list<Finding>
      */
@@ -98,13 +103,16 @@ final class SensitiveDataLoggingRule implements RuleInterface
     {
         $method = SecurityNodeHelper::methodName($call);
         if ($method === null || !in_array($method, self::LOG_METHODS, true)) {
+            // The callee is not one of the modelled logger methods, so it cannot be a sink we track.
             return [];
         }
 
         if (!$this->hasSensitiveArgument($call->args)) {
+            // Every argument is static or non-sensitive, so nothing request-controlled can leak here.
             return [];
         }
 
+        // At most one finding: a single logger call is one sink, flagged once.
         return [$this->finding($analysisUnit, $call, $method)];
     }
 
@@ -124,58 +132,74 @@ final class SensitiveDataLoggingRule implements RuleInterface
             }
 
             if (SecurityNodeHelper::containsUserInput($arg->value) || SecurityNodeHelper::containsSensitiveReference($arg->value)) {
+                // One request-tainted or secret-bearing argument is enough to flag the log call.
                 return true;
             }
         }
 
+        // No argument carried request or sensitive data, so this log call is safe to ignore.
         return false;
     }
 
     /**
      * Detect logger arguments that contain only static message/context values.
      *
+     * @param Expr $expr Argument expression to classify; recursed into for arrays and concatenations.
+     *
      * @return bool True when no runtime value can be leaked.
      */
     private function isStaticLogArgument(Expr $expr): bool
     {
         if ($expr instanceof Scalar) {
+            // A literal value carries no runtime data, so it can never leak request input.
             return true;
         }
 
         if ($expr instanceof Expr\ClassConstFetch) {
+            // Class constants are compile-time fixed, so they are safe message tokens.
             return true;
         }
 
         if ($expr instanceof Expr\ConstFetch) {
             $name = strtolower($expr->name->toString());
 
+            // Only the language literals are static; any other constant may resolve to runtime data.
             return in_array($name, ['false', 'null', 'true'], true);
         }
 
         if ($expr instanceof Expr\Array_) {
             foreach ($expr->items as $item) {
                 if ($item->unpack || !$this->isStaticLogArgument($item->value)) {
+                    // A spread or any non-static element can carry runtime data, so the whole array is unsafe.
                     return false;
                 }
             }
 
+            // Every element is itself static, so the array as a whole leaks nothing.
             return true;
         }
 
         if ($expr instanceof Expr\BinaryOp\Concat) {
+            // A concatenation is static only when both operands are; either dynamic side taints the result.
             return $this->isStaticLogArgument($expr->left) && $this->isStaticLogArgument($expr->right);
         }
 
+        // Anything not matched above (variables, calls, fetches) may hold runtime data, so treat it as dynamic.
         return false;
     }
 
     /**
      * Build the sensitive data logging finding.
      *
+     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node         Log call flagged as leaking; its start line locates the finding.
+     * @param string       $sink         Name of the log function or method, surfaced in the message and metadata.
+     *
      * @return Finding Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Detection is heuristic, so emit a medium-confidence warning naming the sink for the reviewer.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Logging or dumping of request-controlled or sensitive-looking data detected: %s.', $sink),

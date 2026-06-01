@@ -34,6 +34,7 @@ final class UnsafeUnserializeRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a non-literal first argument is heuristic, not proof of attacker control; warn not error.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unsafe unserialize usage',
@@ -83,11 +84,14 @@ final class UnsafeUnserializeRule implements RuleInterface
             );
         }
 
+        // Empty when no unserialize() call took untrusted input; the caller treats that as a clean file, not an error.
         return $findings;
     }
 
     /**
      * Detect `unserialize($payload, ['allowed_classes' => false])` object-hydration guardrails.
+     *
+     * @param Expr\FuncCall $call unserialize() call whose second argument is checked for an options array.
      *
      * @return bool True when object deserialization has been disabled by options.
      */
@@ -95,6 +99,7 @@ final class UnsafeUnserializeRule implements RuleInterface
     {
         $options = SecurityNodeHelper::argumentValue($call->args, 1);
         if (!$options instanceof Expr\Array_) {
+            // No literal options array means we cannot prove the guardrail is set, so treat the call as unguarded.
             return false;
         }
 
@@ -104,10 +109,12 @@ final class UnsafeUnserializeRule implements RuleInterface
             }
 
             if ($item->key->value === 'allowed_classes' && SecurityNodeHelper::isFalseLike($item->value)) {
+                // allowed_classes => false disables object hydration entirely, which neutralises the gadget-chain risk.
                 return true;
             }
         }
 
+        // The options array exists but never sets allowed_classes to false, so object hydration is still possible.
         return false;
     }
 }

@@ -27,6 +27,7 @@ final readonly class FindingReviewIdentity
                 (string) ($finding->column ?? 0),
             ]);
 
+        // NUL joins fields so a path or message containing a colon cannot collide with another finding's key.
         return implode("\0", [
             $finding->filePath,
             $finding->ruleId,

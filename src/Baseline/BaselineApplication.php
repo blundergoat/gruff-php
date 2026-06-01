@@ -26,6 +26,7 @@ final readonly class BaselineApplication
     {
         $baseline = (new BaselineStore($projectRoot))->read($baselinePath);
 
+        // Caller only wants the surviving findings here, so drop the report metadata the filter also returns.
         return (new BaselineFilter())->apply($baseline, $findings, false)['findings'];
     }
 
@@ -47,13 +48,16 @@ final readonly class BaselineApplication
         $baselineStore = new BaselineStore($projectRoot);
 
         if ($options->generateBaselinePath !== null) {
+            // Generate mode takes precedence: write a fresh baseline rather than filter against one.
             return $this->generate($baselineStore, $options->generateBaselinePath, $findings, $diagnostics);
         }
 
         if ($options->baselinePath === null) {
+            // No baseline configured, so the run carries no baseline report.
             return null;
         }
 
+        // Otherwise apply the configured baseline, suppressing matched findings in place.
         return $this->applyExistingBaseline(
             store:       $baselineStore,
             options:     $options,
@@ -64,8 +68,10 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param list<Finding>       $findings
-     * @param list<RunDiagnostic> $diagnostics
+     * @param BaselineStore       $store                Store that writes and locates the baseline file.
+     * @param string              $generateBaselinePath Destination path to write the new baseline to.
+     * @param list<Finding>       $findings             Findings to record as the new baseline snapshot.
+     * @param list<RunDiagnostic> $diagnostics          Accumulator; a write failure appends a baseline-error entry.
      * @return BaselineReport|null Generated baseline report, or null when writing fails.
      */
     private function generate(
@@ -83,9 +89,11 @@ final readonly class BaselineApplication
                 path:    $generateBaselinePath,
             );
 
+            // Write failed; the error is recorded as a diagnostic, so signal "no baseline report".
             return null;
         }
 
+        // Baseline written: report it as generated, with no findings suppressed on a generate run.
         return new BaselineReport(
             path:               $baseline->path,
             generated:          true,
@@ -99,8 +107,11 @@ final readonly class BaselineApplication
     }
 
     /**
-     * @param list<Finding>       $findings
-     * @param list<RunDiagnostic> $diagnostics
+     * @param BaselineStore              $store       Store that reads the baseline file from disk.
+     * @param BaselineApplicationOptions $options     Baseline path plus whether it was explicitly set or defaulted.
+     * @param list<Finding>              $findings    Filtered in place; replaced with the surviving (unmatched) set.
+     * @param DiffResult|null            $diff        Changed-line findings stay unsuppressed; null disables diff scope.
+     * @param list<RunDiagnostic>        $diagnostics Accumulator; a read failure appends a baseline-error entry.
      * @return BaselineReport|null Applied baseline report, or null when reading fails.
      */
     private function applyExistingBaseline(
@@ -120,12 +131,14 @@ final readonly class BaselineApplication
                 path:    $options->baselinePath,
             );
 
+            // Read/parse failed; the error is recorded as a diagnostic, so signal "no baseline report".
             return null;
         }
 
         $findings = $application['findings'];
         $report   = $application['report'];
 
+        // Re-stamp the filter's report with this run's source classification (explicit vs default).
         return new BaselineReport(
             path:               $report->path,
             generated:          $report->generated,

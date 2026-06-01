@@ -37,6 +37,7 @@ final readonly class FindingDisplayFilter
      */
     public function apply(array $findings): array
     {
+        // Re-key to a list so the result stays a 0-indexed list<Finding> after filtered slots are removed.
         return array_values(array_filter($findings, fn (Finding $finding): bool => $this->allows($finding)));
     }
 
@@ -47,6 +48,7 @@ final readonly class FindingDisplayFilter
      */
     public function isActive(): bool
     {
+        // Any single configured dimension counts as active; callers use this to decide whether to annotate output.
         return $this->minSeverity !== null
             || $this->includePillars !== []
             || $this->excludePillars !== []
@@ -66,6 +68,7 @@ final readonly class FindingDisplayFilter
      */
     public function toArray(): array
     {
+        // Enums are flattened to their string values so the filter survives JSON serialisation in reports.
         return [
             'active' => $this->isActive(),
             'minSeverity' => $this->minSeverity?->value,
@@ -79,36 +82,44 @@ final readonly class FindingDisplayFilter
     /**
      * Determine whether one finding passes all configured filters.
      *
+     * @param Finding $finding Finding under test against severity floor and pillar/rule include-exclude sets.
      * @return bool True when the finding should be displayed.
      */
     private function allows(Finding $finding): bool
     {
         if ($this->minSeverity !== null && $this->severityRank($finding->severity) < $this->severityRank($this->minSeverity)) {
+            // Below the severity floor: drop it before any pillar or rule check runs.
             return false;
         }
 
         if ($this->includePillars !== [] && !in_array($finding->pillar, $this->includePillars, true)) {
+            // An include set is an allowlist; a pillar outside it is excluded.
             return false;
         }
 
         if (in_array($finding->pillar, $this->excludePillars, true)) {
+            // Exclude wins over include for pillars already passed above.
             return false;
         }
 
         if ($this->includeRules !== [] && !in_array($finding->ruleId, $this->includeRules, true)) {
+            // Same allowlist semantics at the rule-id granularity.
             return false;
         }
 
+        // Survived every gate; display unless the rule id is explicitly excluded.
         return !in_array($finding->ruleId, $this->excludeRules, true);
     }
 
     /**
      * Convert severity to a comparable rank.
      *
+     * @param Severity $severity Severity whose ordering position is needed for the minimum-severity comparison.
      * @return int Severity rank where larger is more severe.
      */
     private function severityRank(Severity $severity): int
     {
+        // Explicit ranks let severities be compared as integers since the enum itself has no inherent ordering.
         return match ($severity) {
             Severity::Advisory => 1,
             Severity::Warning => 2,

@@ -41,6 +41,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory by default: naming style is a convention, so the poor-name patterns ship as a tunable option.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test naming consistency',
@@ -123,11 +124,15 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             );
         }
 
+        // Hand back the poor-name and mixed-style findings gathered across every class in the unit.
         return $findings;
     }
 
     /**
-     * @param list<string> $patterns
+     * Return the first configured poor-name pattern this method name matches, if any.
+     *
+     * @param string       $methodName Full test method name including the `test` prefix, matched as-is.
+     * @param list<string> $patterns   Configured regexes flagging low-signal names; first match wins.
      *
      * @return string|null Matching poor-name pattern, or null when none match.
      */
@@ -135,16 +140,20 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
     {
         foreach ($patterns as $pattern) {
             if ($this->isPatternMatch($pattern, $methodName)) {
+                // Surface the offending regex so the finding can name which rule the test name tripped.
                 return $pattern;
             }
         }
 
+        // No configured pattern matched, so the name is treated as acceptable.
         return null;
     }
 
     /**
      * Safely test a user-configured regex pattern against a method name.
      *
+     * @param string $pattern    User-configured regex with delimiters; an invalid pattern matches nothing, not errors.
+     * @param string $methodName Test method name to test the pattern against.
      * @return bool True when the pattern matches.
      */
     private function isPatternMatch(string $pattern, string $methodName): bool

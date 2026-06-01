@@ -30,6 +30,7 @@ final class ComposerManifest
         $slashPosition  = strrpos($normalizedPath, '/');
         $basename       = $slashPosition === false ? $normalizedPath : substr($normalizedPath, $slashPosition + 1);
 
+        // Gate on the basename alone so a composer.json in any directory qualifies; the path prefix is irrelevant.
         return $basename === self::FILENAME;
     }
 
@@ -44,14 +45,17 @@ final class ComposerManifest
         try {
             $decoded = json_decode($source, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
+            // Malformed JSON is not the rules' problem to report, so signal "no manifest to scan" with null.
             return null;
         }
 
         if (!is_array($decoded)) {
+            // Valid JSON decoding to a scalar or null is not a manifest object; callers skip it like a parse failure.
             return null;
         }
 
         /** @var array<string, mixed> $decoded A decoded JSON object always has string keys; the is_array guard cannot express that to PHPStan. */
+        // Top-level object reached the caller; per-key shape is still each rule's responsibility to validate.
         return $decoded;
     }
 
@@ -68,14 +72,17 @@ final class ComposerManifest
     public static function lineOf(string $source, string $needle): int
     {
         if ($needle === '') {
+            // An empty needle can never anchor a finding precisely, so fall back to the top of the file.
             return 1;
         }
 
         $position = strpos($source, $needle);
         if ($position === false) {
+            // Token absent (e.g. the key was renamed since decode); anchor the finding at line 1 rather than guess.
             return 1;
         }
 
+        // Count newlines before the match and add 1 to convert the 0-based offset into a 1-based line number.
         return substr_count($source, "\n", 0, $position) + 1;
     }
 }

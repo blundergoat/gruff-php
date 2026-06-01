@@ -46,6 +46,7 @@ final readonly class GenericMethodNameRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory and medium confidence: a generic name is a smell, not a defect, and may be deliberate.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Generic method name',
@@ -99,11 +100,14 @@ final readonly class GenericMethodNameRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per callable whose name is in the generic list and is not a framework override.
         return $findings;
     }
 
     /**
      * Allow known framework-required generic method names.
+     *
+     * @param ClassMethod $classMethod Method whose name and signature decide whether a framework forces it.
      *
      * @return bool True when the method matches a supported framework override.
      */
@@ -112,32 +116,41 @@ final readonly class GenericMethodNameRule implements RuleInterface
         $name = strtolower($classMethod->name->toString());
 
         if ($name === 'execute' && $this->matchesSymfonyConsoleExecute($classMethod)) {
+            // Symfony forces this name, so exempting it keeps the rule from fighting the framework contract.
             return true;
         }
 
+        // No recognised framework requires this generic name here, so the caller should still flag it.
         return false;
     }
 
     /**
      * Detect Symfony Console command `execute()` overrides.
      *
+     * @param ClassMethod $classMethod Candidate `execute` method to match against the Symfony command signature.
+     *
      * @return bool True when parameters match the Symfony command signature.
      */
     private function matchesSymfonyConsoleExecute(ClassMethod $classMethod): bool
     {
         if (count($classMethod->params) !== 2) {
+            // Symfony's execute() takes exactly InputInterface and OutputInterface, so any other arity rules it out.
             return false;
         }
 
         $first  = $classMethod->params[0]->type ?? null;
         $second = $classMethod->params[1]->type ?? null;
 
+        // Both positional types must match the Symfony signature for this to count as the framework override.
         return $this->hasParameterTypeShortName($first, 'InputInterface')
             && $this->hasParameterTypeShortName($second, 'OutputInterface');
     }
 
     /**
      * Compare a parameter type node against an unqualified class/interface name.
+     *
+     * @param Node|null $type      Declared parameter type node, or null when the parameter is untyped.
+     * @param string    $shortName Unqualified class or interface name to match, ignoring any namespace prefix.
      *
      * @return bool True when the type short name matches.
      */
@@ -147,13 +160,16 @@ final readonly class GenericMethodNameRule implements RuleInterface
             $parts = $type->getParts();
             $last  = $parts[count($parts) - 1] ?? null;
 
+            // Compare only the final namespace segment so a fully-qualified type still matches the short name.
             return $last === $shortName;
         }
 
         if ($type instanceof Identifier) {
+            // A bare identifier type (no namespace) compares directly against the wanted short name.
             return $type->toString() === $shortName;
         }
 
+        // Null or any other node shape cannot carry a class short name, so it never matches.
         return false;
     }
 }

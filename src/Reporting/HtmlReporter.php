@@ -602,16 +602,20 @@ final readonly class HtmlReporter
     /**
      * Build the editor-link URL for the configured editor, or null when disabled.
      *
+     * @param string   $filePath Path to open; resolved to absolute before being encoded into the editor URL.
+     * @param int|null $line Target line for the editor to jump to, or null to open the file without a line anchor.
      * @return string|null The editor-protocol URL, or null when editor links are off or the editor is unsupported.
      */
     private function editorHref(string $filePath, ?int $line): ?string
     {
         if ($this->editorLink === 'none') {
+            // Editor linking is disabled, so the location stays a plain span rather than an anchor.
             return null;
         }
 
         $absolutePath = $this->absolutePath($filePath);
 
+        // Dispatch on the configured editor; an unrecognised value yields no link rather than a broken one.
         return match ($this->editorLink) {
             'vscode' => $this->vscodeHref($absolutePath, $line),
             'phpstorm' => 'phpstorm://open?file=' . rawurlencode($absolutePath) . ($line === null ? '' : '&line=' . $line),
@@ -622,6 +626,8 @@ final readonly class HtmlReporter
     /**
      * Build a VS Code file protocol URL for Unix, Windows drive, and UNC paths.
      *
+     * @param string   $absolutePath Absolute filesystem path; separators are normalised and each segment URL-encoded.
+     * @param int|null $line Line to open at, appended as ":line", or null to open the file without a line anchor.
      * @return string VS Code file URL.
      */
     private function vscodeHref(string $absolutePath, ?int $line): string
@@ -642,17 +648,20 @@ final readonly class HtmlReporter
             $encodedPath = '/' . $encodedPath;
         }
 
+        // Assemble the vscode://file URL from the leading-slash-normalised path plus the optional line anchor.
         return 'vscode://file' . $encodedPath . ($line === null ? '' : ':' . $line);
     }
 
     /**
      * Resolve the absolute path of a report-relative file path, using the configured project root.
      *
+     * @param string $filePath Path from a finding; already-absolute paths pass through, relative ones join the project root.
      * @return string The absolute filesystem path.
      */
     private function absolutePath(string $filePath): string
     {
         if (PathHelper::isAbsolute($filePath)) {
+            // Already absolute, so return it unchanged rather than prefixing the project root again.
             return $filePath;
         }
 
@@ -662,12 +671,14 @@ final readonly class HtmlReporter
             $projectRoot = is_string($cwd) ? $cwd : '';
         }
 
+        // Join the relative path onto the project root (falling back to cwd) with exactly one separator.
         return rtrim($projectRoot, '/') . '/' . ltrim($filePath, '/');
     }
 
     /**
      * Render the interactive filter form for findings (severity, pillar, path, text, group-by).
      *
+     * @param AnalysisReport $report Report whose findings supply the distinct pillar options and the total finding count.
      * @return string HTML for the filter form.
      */
     private function findingFilters(AnalysisReport $report): string
@@ -685,6 +696,7 @@ final readonly class HtmlReporter
             $pillarOptions .= sprintf('<option value="%s">%s</option>', $this->escape($pillar), $this->escape($pillar));
         }
 
+        // Build the filter form: severity and pillar selects, path/search inputs, group-by radios, and the live count.
         return '<form class="finding-filters" data-finding-filters aria-label="Filter flagged findings">'
             . '<div class="filter-grid">'
             . '<label>Severity<select name="severity" multiple size="3">'
@@ -709,10 +721,12 @@ final readonly class HtmlReporter
     /**
      * Render a single row of the diagnostics list.
      *
+     * @param RunDiagnostic $diagnostic Diagnostic whose type, message, and optional location populate the row.
      * @return string HTML for one diagnostic row.
      */
     private function diagnosticRow(RunDiagnostic $diagnostic): string
     {
+        // One diagnostic line: its type label, message, and (when present) the file/line it points at.
         return sprintf(
             '<div class="diagnostic"><span class="diagnostic-type">%s</span><span class="diagnostic-message">%s</span>%s</div>',
             $this->escape($diagnostic->type),
@@ -724,6 +738,7 @@ final readonly class HtmlReporter
     /**
      * Render the file-and-line span for a diagnostic, or empty when no location is set.
      *
+     * @param RunDiagnostic $diagnostic Diagnostic whose filePath or path locates it; a line is appended only with a filePath.
      * @return string HTML for the location span, or an empty string when absent.
      */
     private function diagnosticLocation(RunDiagnostic $diagnostic): string
@@ -731,6 +746,7 @@ final readonly class HtmlReporter
         $location = $diagnostic->filePath ?? $diagnostic->path;
 
         if ($location === null) {
+            // No file or path is attached, so there is nothing to locate and the span is omitted.
             return '';
         }
 
@@ -738,16 +754,19 @@ final readonly class HtmlReporter
             $location .= ':' . $diagnostic->line;
         }
 
+        // Wrap the resolved location (path, optionally with line) as the diagnostic's location span.
         return sprintf('<span class="diagnostic-location">%s</span>', $this->escape($location));
     }
 
     /**
      * Escape a value for safe insertion into HTML attribute or text content.
      *
+     * @param string $text Untrusted text (path, message, label) to neutralise before it reaches the document.
      * @return string The escaped value.
      */
     private function escape(string $text): string
     {
+        // Escape quotes too so the value is safe in both attribute and text contexts; invalid bytes are substituted.
         return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
@@ -758,6 +777,7 @@ final readonly class HtmlReporter
      */
     private function interactiveScript(): string
     {
+        // Hand back the client-side filter script verbatim; it is inlined into the page only in interactive mode.
         return <<<'JS'
 const form=document.querySelector('[data-finding-filters]');
 const list=document.querySelector('[data-findings-list]');
@@ -798,6 +818,7 @@ JS;
     /**
      * Inline CSS for the report; appends diagnostic-specific rules when present.
      *
+     * @param bool $hasDiagnostics True to append the diagnostic-section rules; pass false when no diagnostics are rendered.
      * @return string The inline stylesheet body.
      */
     private function css(bool $hasDiagnostics = false): string
@@ -813,9 +834,11 @@ CSS;
         }
 
         if (!$this->interactive) {
+            // Static report: no filter UI to style, so return the base stylesheet (plus any diagnostic rules).
             return $css;
         }
 
+        // Interactive report: append the styles for the filter form and grouped finding sections.
         return $css . <<<'CSS'
 .finding-filters{border:1px solid var(--rule);background:var(--ink-3);padding:18px;margin:0 0 22px;display:grid;gap:16px}.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.finding-filters label,.filter-group legend{display:flex;flex-direction:column;gap:7px;color:var(--paper-mute);font-size:10px;text-transform:uppercase;letter-spacing:.14em}.finding-filters input,.finding-filters select{width:100%;border:1px solid var(--rule);background:var(--ink);color:var(--paper);padding:8px 10px;font:12px var(--mono)}.finding-filters select{min-height:96px}.finding-filters input:focus-visible,.finding-filters select:focus-visible,.finding-filters button:focus-visible{outline:2px solid var(--forge);outline-offset:3px}.filter-group{border:0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.filter-group legend{margin-right:4px}.filter-group .radio{flex-direction:row;align-items:center;text-transform:none;letter-spacing:0;font-size:12px;color:var(--paper-dim)}.filter-group input{width:auto}.filter-actions{display:flex;justify-content:space-between;align-items:center;gap:16px}.filter-actions button{border:1px solid var(--forge);background:var(--forge);color:var(--ink);padding:9px 12px;font:700 12px var(--mono);cursor:pointer}.filter-count{color:var(--paper-dim);font-size:12px}.finding-group{border-top:1px solid var(--rule);padding-top:10px}.finding-group-title{font:700 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--paper-dim);margin:12px 0 2px}@media(max-width:900px){.filter-grid{grid-template-columns:1fr 1fr}.filter-actions{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.filter-grid{grid-template-columns:1fr}.finding{grid-template-columns:1fr}.points{text-align:left;padding-left:0}}
 CSS;

@@ -35,6 +35,8 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: a tags-only docblock can be deliberate on a trivial unit, so this nudges
+        // toward describing intent rather than gating a build.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Bare PHPDoc tags',
@@ -127,11 +129,14 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per docblock that carried only bare param/return tags with no descriptive prose.
         return $findings;
     }
 
     /**
      * Check whether one PHPDoc tag has a type but no description.
+     *
+     * @param string $line Single trimmed docblock line, already stripped of comment markers, to classify.
      *
      * @return bool True when the tag is a bare parameter or return tag.
      */
@@ -139,18 +144,23 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
     {
         // Match @param tags that end at the variable name with no descriptive prose.
         if (preg_match('/^@param\s+\S+(?:\s+\S+)*\s+\$\w+\s*$/', $line) === 1) {
+            // A @param stopping at the variable name carries no description, so it is bare.
             return true;
         }
 
         if (!str_starts_with($line, '@return ')) {
+            // Lines that are neither a bare @param nor a @return cannot be a bare return tag.
             return false;
         }
 
+        // A @return is bare exactly when no prose follows its type, so negate the description check.
         return !$this->hasReturnTagDescription(trim(substr($line, strlen('@return '))));
     }
 
     /**
      * Detect prose after a return type while tolerating spaces inside PHPDoc generic types.
+     *
+     * @param string $body Text following `@return `, e.g. `array<string, int> remaining counts`, to scan.
      *
      * @return bool True when text follows the type.
      */
@@ -173,10 +183,12 @@ final readonly class BarePhpdocTagsRule implements RuleInterface
             }
 
             if ($depth === 0 && ctype_space($character)) {
+                // First space outside any generic brackets ends the type; description present if anything follows.
                 return trim(substr($body, $offset + 1)) !== '';
             }
         }
 
+        // Reached the end with no top-level space, so the type stood alone with no description.
         return false;
     }
 }

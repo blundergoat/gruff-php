@@ -33,6 +33,7 @@ final readonly class PublicPropertyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Hand back this rule's fixed identity and defaults for the registry and reports.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Public mutable property',
@@ -85,6 +86,7 @@ final readonly class PublicPropertyRule implements RuleInterface
             }
         }
 
+        // Hand back every public mutable property finding gathered across the unit's non-DTO classes.
         return $findings;
     }
 }

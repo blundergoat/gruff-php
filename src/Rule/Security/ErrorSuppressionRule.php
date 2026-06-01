@@ -33,6 +33,7 @@ final class ErrorSuppressionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the `@` operator is an unambiguous AST node, so the gate can rely on this warning.
         return new RuleDefinition(
             id:               self::ID,
             name:             'Error suppression operator',
@@ -71,6 +72,7 @@ final class ErrorSuppressionRule implements RuleInterface
             );
         }
 
+        // One finding per `@`-suppressed expression in this unit; empty when the file uses none.
         return $findings;
     }
 }

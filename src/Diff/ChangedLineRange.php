@@ -30,6 +30,8 @@ final readonly class ChangedLineRange
      */
     public function touches(int $startLine, int $endLine): bool
     {
+        // Overlap is the negation of "one range lies entirely before the other"; the inclusive
+        // bounds mean ranges sharing a single endpoint (start == end) still count as touching.
         return $this->startLine <= $endLine && $this->endLine >= $startLine;
     }
 
@@ -40,6 +42,8 @@ final readonly class ChangedLineRange
      */
     public function toArray(): array
     {
+        // Report consumers key on `start`/`end`; that wire contract is deliberately decoupled from
+        // the internal `startLine`/`endLine` property names, so renaming the properties must not leak here.
         return [
             'start' => $this->startLine,
             'end' => $this->endLine,

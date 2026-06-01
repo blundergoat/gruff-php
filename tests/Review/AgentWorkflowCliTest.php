@@ -587,6 +587,9 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
+     * Decode a finished CLI process's stdout into a string-keyed payload.
+     *
+     * @param Process $process - finished CLI process whose stdout holds the report JSON; caller must run it first.
      * @return array<string, mixed>
      * @throws JsonException
      */
@@ -594,6 +597,7 @@ final class AgentWorkflowCliTest extends TestCase
     {
         $decoded = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
+        // Route through stringKeyedArray so a non-object top level fails the test instead of slipping through.
         return $this->stringKeyedArray($decoded);
     }
 
@@ -601,15 +605,18 @@ final class AgentWorkflowCliTest extends TestCase
      * Read an associative array from decoded JSON output.
      *
      * @param array<string, mixed> $payload
+     * @param string               $key     - key whose value must itself be a string-keyed array; missing key asserts.
      * @return array<string, mixed>
      */
     private function arrayValue(array $payload, string $key): array
     {
+        // Absent key yields null, which stringKeyedArray rejects, so a missing nested object fails the test.
         return $this->stringKeyedArray($payload[$key] ?? null);
     }
 
     /**
      * @param array<string, mixed> $payload
+     * @param string               $key     - key whose value must be an int; a non-int (or missing) value fails the test.
      * @return int Integer payload value.
      */
     private function intValue(array $payload, string $key): int
@@ -617,6 +624,7 @@ final class AgentWorkflowCliTest extends TestCase
         $payloadValue = $payload[$key] ?? null;
         self::assertIsInt($payloadValue);
 
+        // Returned only after assertIsInt narrows the value, so callers receive a guaranteed int.
         return $payloadValue;
     }
 
@@ -624,15 +632,18 @@ final class AgentWorkflowCliTest extends TestCase
      * Read a list from decoded JSON output.
      *
      * @param array<string, mixed> $payload
+     * @param string               $key     - key whose value must be a list; missing key resolves to null and asserts.
      * @return list<mixed>
      */
     private function listValue(array $payload, string $key): array
     {
+        // Absent key yields null, which mixedList rejects, so a missing list value fails the test rather than passing empty.
         return $this->mixedList($payload[$key] ?? null);
     }
 
     /**
      * @param array<string, mixed> $payload
+     * @param string               $key     - key whose value must be a string; a non-string (or missing) value fails.
      * @return string String payload value.
      */
     private function stringValue(array $payload, string $key): string
@@ -640,6 +651,7 @@ final class AgentWorkflowCliTest extends TestCase
         $payloadValue = $payload[$key] ?? null;
         self::assertIsString($payloadValue);
 
+        // Returned only after assertIsString narrows the value, so callers receive a guaranteed string.
         return $payloadValue;
     }
 
@@ -658,12 +670,14 @@ final class AgentWorkflowCliTest extends TestCase
             $types[]    = $this->stringValue($diagnostic, 'type');
         }
 
+        // Collected type names in diagnostics order, so assertions can check presence and sequence together.
         return $types;
     }
 
     /**
      * Build symbols from findings for the branch-review workflow.
      *
+     * @param mixed $findings - decoded `findings` value expected to be a list of finding objects; non-list fails the test.
      * @return list<mixed>
      */
     private function symbolsFromFindings(mixed $findings): array
@@ -675,24 +689,28 @@ final class AgentWorkflowCliTest extends TestCase
             $symbols[] = $finding['symbol'] ?? null;
         }
 
+        // Preserves a null per finding that lacks a symbol, so assertions can detect missing symbols positionally.
         return $symbols;
     }
 
     /**
      * Validate that a decoded JSON value is a list.
      *
+     * @param mixed $payload - decoded JSON value expected to be an array; a scalar or null fails the assertion.
      * @return list<mixed>
      */
     private function mixedList(mixed $payload): array
     {
         self::assertIsArray($payload);
 
+        // array_values reindexes so callers always get a 0-based list even if JSON gave object-style keys.
         return array_values($payload);
     }
 
     /**
      * Validate that a decoded JSON value is an associative array.
      *
+     * @param mixed $payload - decoded JSON value expected to be a JSON object; arrays and scalars fail the assertion.
      * @return array<string, mixed>
      */
     private function stringKeyedArray(mixed $payload): array
@@ -705,6 +723,7 @@ final class AgentWorkflowCliTest extends TestCase
             $result[$key] = $entryValue;
         }
 
+        // Rebuilt array carries only the string-key entries the assertions confirmed, narrowing the type for callers.
         return $result;
     }
 
@@ -749,6 +768,7 @@ final class AgentWorkflowCliTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the path only after mkdir succeeds, so callers never operate on a directory that was not created.
         return $path;
     }
 
@@ -761,6 +781,7 @@ final class AgentWorkflowCliTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the fixture directory was never created (e.g. an early test failure).
             return;
         }
 

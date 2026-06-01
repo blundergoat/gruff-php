@@ -46,6 +46,7 @@ final class BaselineStoreTest extends TestCase
      */
     private function finding(): Finding
     {
+        // A single fixed finding the store round-trips through in these tests.
         return new Finding(
             ruleId:     'docs.example',
             message:    'Example finding.',
@@ -69,6 +70,7 @@ final class BaselineStoreTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the freshly created dir for the test to populate and later tear down.
         return $path;
     }
 
@@ -81,6 +83,7 @@ final class BaselineStoreTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean when setup never created the dir; keep teardown idempotent.
             return;
         }
 

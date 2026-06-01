@@ -31,6 +31,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory by default: snapshotting a tiny literal is a style smell, and the length cap is tunable per project.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Trivial snapshot',
@@ -88,6 +89,7 @@ final readonly class TrivialSnapshotRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per snapshot assertion whose literal is short enough to assert directly instead.
         return $findings;
     }
 }

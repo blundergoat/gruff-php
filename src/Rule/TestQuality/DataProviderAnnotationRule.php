@@ -32,6 +32,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory tier: attribute providers need PHPUnit 10+, so the annotation form stays valid on older suites.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Data provider annotation',
@@ -78,6 +79,7 @@ final readonly class DataProviderAnnotationRule implements RuleInterface
             );
         }
 
+        // One finding per method whose docblock still carries the legacy @dataProvider annotation.
         return $findings;
     }
 }

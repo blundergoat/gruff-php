@@ -31,6 +31,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Hand back this rule's identity and defaults so the registry can list and configure it.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Mock-only test',
@@ -80,6 +81,7 @@ final readonly class MockOnlyTestRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per test scope that wires and verifies a mock yet asserts nothing.
         return $findings;
     }
 }

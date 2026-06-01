@@ -42,6 +42,7 @@ final readonly class ResultCache
      */
     public static function forProject(string $projectRoot): self
     {
+        // Cache lives in a fixed gitignored directory directly under the project root.
         return new self(rtrim($projectRoot, '/') . '/' . self::DIRECTORY);
     }
 
@@ -55,27 +56,32 @@ final readonly class ResultCache
     {
         $path = $this->pathFor($key);
         if (!is_file($path) || !is_readable($path)) {
+            // No entry on disk for this key, or it is unreadable: a plain cache miss, so callers re-run cold.
             return null;
         }
 
         $raw = file_get_contents($path);
         if (!is_string($raw)) {
+            // The entry could not be read despite existing; fail open to a miss rather than risk a stale serve.
             return null;
         }
 
         try {
             $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
+            // A corrupt or truncated entry is treated as absent so a bad cache file never poisons the run.
             return null;
         }
 
         if (!is_array($decoded)) {
+            // The payload decoded to a non-array, so it is not a findings list; discard it as a miss.
             return null;
         }
 
         $findings = [];
         foreach ($decoded as $entry) {
             if (!is_array($entry)) {
+                // One malformed row invalidates the whole entry; reconstructing a partial list could drop findings.
                 return null;
             }
 
@@ -83,6 +89,7 @@ final readonly class ResultCache
             $findings[] = Finding::fromArray($entry);
         }
 
+        // Fully reconstructed findings for the key; a byte-identical cold run would have produced this same list.
         return $findings;
     }
 
@@ -96,10 +103,12 @@ final readonly class ResultCache
     public function put(string $key, array $findings): void
     {
         if (!is_dir($this->cacheDir) && !mkdir($this->cacheDir, 0775, true) && !is_dir($this->cacheDir)) {
+            // Cache directory is absent and could not be created; skip persisting since the cache is best-effort.
             return;
         }
 
         if (!is_writable($this->cacheDir)) {
+            // Read-only cache directory: give up silently rather than fail the run for an optional optimisation.
             return;
         }
 
@@ -108,6 +117,7 @@ final readonly class ResultCache
         try {
             $json = json_encode($payload, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
+            // Findings that will not encode are simply not cached; the next run recomputes them from source.
             return;
         }
 
@@ -123,6 +133,7 @@ final readonly class ResultCache
      */
     private function pathFor(string $key): string
     {
+        // One JSON file per key inside the cache directory; the key is already a hex hash so it is filename-safe.
         return $this->cacheDir . '/' . $key . '.json';
     }
 
@@ -135,6 +146,7 @@ final readonly class ResultCache
     {
         $entries = glob($this->cacheDir . '/*.json');
         if (!is_array($entries) || count($entries) <= self::MAX_ENTRIES) {
+            // Glob failed or the cache is still within its size cap, so there is nothing to evict this pass.
             return;
         }
 

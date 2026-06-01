@@ -41,6 +41,7 @@ final readonly class MethodLengthRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Carries the 100-line error threshold the analyse pass reads back via settingsFor().
         return new RuleDefinition(
             id:                self::ID,
             name:              'Method length',
@@ -117,12 +118,14 @@ final readonly class MethodLengthRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per callable that breached its threshold; empty when every body fits.
         return $findings;
     }
 
     /**
      * Build a display symbol for a callable node.
      *
+     * @param Node $node Callable node (method, function, or closure) to render as a finding symbol.
      * @return string Callable display symbol.
      */
     private function resolveSymbol(Node $node): string
@@ -135,29 +138,35 @@ final readonly class MethodLengthRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
+            // Qualify with the owning type when known; an anonymous class leaves just the bare method name.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
         if ($node instanceof Function_) {
+            // A free function is identified by its own name alone.
             return $node->name->toString() . '()';
         }
 
+        // Closures have no name, so anchor them to their start line for the reader.
         return sprintf('Closure@%d', $node->getStartLine());
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
      * @return string Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
+            // Keep the decimal only for a genuinely fractional threshold, such as 2.5.
             return (string) $number;
         }
 
+        // Whole numbers print without a trailing ".0" so messages read cleanly.
         return (string) (int) $number;
     }
 }

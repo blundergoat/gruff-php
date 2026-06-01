@@ -35,6 +35,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory, medium-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing file PHPDoc',
@@ -56,28 +57,35 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if ($analysisUnit->statements === []) {
+            // An empty file carries no declaration to demand documentation of.
             return [];
         }
 
         $topLevel = $this->topLevelStatements($analysisUnit);
 
         if ($topLevel === []) {
+            // Nothing survives namespace unwrapping; no top-level statement to anchor a finding to.
             return [];
         }
 
         if ($this->isSingleDocumentedClassLikeFile($topLevel)) {
+            // A lone documented class-like already orients the reader; the file docblock is redundant.
             return [];
         }
 
         if ($this->hasFirstStatementDoc($topLevel[0])) {
+            // A docblock on the first statement satisfies the file-level documentation requirement.
             return [];
         }
 
+        // No file-level or sole-type documentation found; emit the missing-doc finding.
         return $this->buildFinding($analysisUnit, $topLevel[0]);
     }
 
     /**
      * List top-level statements that count toward file documentation.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose namespaced statements are flattened.
      *
      * @return list<Node\Stmt>
      */
@@ -96,6 +104,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
             $effective[] = $statement;
         }
 
+        // Statements hoisted out of any namespace wrapper, in source order.
         return $effective;
     }
 
@@ -112,14 +121,18 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         ));
 
         if (count($classLikes) !== 1) {
+            // Zero or multiple types means file-level docs are still required.
             return false;
         }
 
+        // True only when the sole class-like declaration carries its own docblock.
         return $classLikes[0]->getDocComment() !== null;
     }
 
     /**
      * Check whether the first effective statement carries a docblock comment.
+     *
+     * @param Node\Stmt $statement First top-level statement whose attached comments are scanned.
      *
      * @return bool True when a docblock is attached to the statement.
      */
@@ -127,15 +140,20 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         foreach ($statement->getComments() as $comment) {
             if ($comment instanceof Doc) {
+                // A structured docblock counts as file-level documentation.
                 return true;
             }
         }
 
+        // Only line or block comments were attached; no docblock present.
         return false;
     }
 
     /**
      * Build finding for the documentation rule.
+     *
+     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path reported in the finding.
+     * @param Node\Stmt    $first        First top-level statement, used to record the offending statement kind.
      *
      * @return list<Finding>
      */
@@ -143,6 +161,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     {
         $definition = $this->definition();
 
+        // Single finding anchored at line 1 flagging the absent file-level documentation.
         return [
             new Finding(
                 ruleId:      $definition->id,
@@ -165,6 +184,8 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
     /**
      * Return a compact statement kind for finding metadata.
      *
+     * @param Node\Stmt $node Statement whose class name is reduced to a short kind label.
+     *
      * @return string Lowercase parser statement kind.
      */
     private function statementKind(Node\Stmt $node): string
@@ -172,6 +193,7 @@ final readonly class MissingFilePhpdocRule implements RuleInterface
         $class = $node::class;
         $short = substr($class, (int) strrpos($class, '\\') + 1);
 
+        // Short class name, lower-cased with the parser's trailing underscore dropped (e.g. "class").
         return strtolower(rtrim($short, '_'));
     }
 }

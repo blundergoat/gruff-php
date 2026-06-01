@@ -52,13 +52,16 @@ final readonly class RuleSelection
         }
 
         if (!$included) {
+            // No include filter matched this rule, so an explicit include list silently drops it.
             return false;
         }
 
         if (in_array($definition->pillar->value, $this->excludePillars, true)) {
+            // An excluded pillar wins over any include, so the whole pillar stays off.
             return false;
         }
 
+        // Included and not pillar-excluded: keep the rule unless its id is named on the exclude list.
         return !in_array($definition->id, $this->excludeRules, true);
     }
 
@@ -69,6 +72,7 @@ final readonly class RuleSelection
      */
     public function toArray(): array
     {
+        // Keys mirror the YAML selection schema so reports round-trip back into config unchanged.
         return [
             'tiers' => $this->tiers,
             'pillars' => $this->pillars,

@@ -240,7 +240,8 @@ final class SecurityNodeHelper
             unset($taintedVariables[$variableName]);
         }
 
-        // The tainted-name set as of just before the sink; a later clean reassignment drops a name above.
+        // Taint state evaluated at the sink: because assignments are walked in source order, the last write
+        // to a variable wins, so a clean reassignment that overwrote earlier request data leaves it absent.
         return $taintedVariables;
     }
 

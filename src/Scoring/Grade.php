@@ -31,6 +31,7 @@ final readonly class Grade
     {
         $normalisedScore = max(0.0, min(100.0, round($score, 2)));
 
+        // Letter is always derived from the clamped score, never the raw input, so the two never disagree.
         return new self($normalisedScore, self::letterFor($normalisedScore));
     }
 
@@ -43,21 +44,26 @@ final readonly class Grade
     public static function letterFor(float $score): string
     {
         if ($score >= 90.0) {
+            // 90 and above is the top band; bounds are inclusive at the floor and open above.
             return 'A';
         }
 
         if ($score >= 80.0) {
+            // 80-89.99 falls one band below A.
             return 'B';
         }
 
         if ($score >= 70.0) {
+            // 70-79.99 is the middle passing band.
             return 'C';
         }
 
         if ($score >= 60.0) {
+            // 60-69.99 is the lowest still-passing band.
             return 'D';
         }
 
+        // Anything under 60 is the failing grade; this is the catch-all once every floor is missed.
         return 'F';
     }
 
@@ -68,6 +74,7 @@ final readonly class Grade
      */
     public function toArray(): array
     {
+        // Report shape exposes the letter under the key `grade`, not `letter`, to match the documented schema.
         return [
             'score' => $this->score,
             'grade' => $this->letter,

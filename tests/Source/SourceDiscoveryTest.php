@@ -338,6 +338,7 @@ final class SourceDiscoveryTest extends TestCase
 
         self::assertIsString($root);
 
+        // Hand back the canonical absolute fixture root, symlinks already resolved by realpath.
         return $root;
     }
 
@@ -353,6 +354,7 @@ final class SourceDiscoveryTest extends TestCase
         self::assertTrue(mkdir($path));
         $this->tempDirs[] = $path;
 
+        // Hand back the new project root now registered for teardown.
         return $path;
     }
 
@@ -415,6 +417,7 @@ final class SourceDiscoveryTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove when the path was never created or already gone.
             return;
         }
 

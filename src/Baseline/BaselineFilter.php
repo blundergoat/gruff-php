@@ -53,6 +53,7 @@ final readonly class BaselineFilter
             }
         }
 
+        // "findings" carries the unsuppressed (new) set callers act on; the buckets and report drive reporting.
         return [
             'findings'  => $newFindings,
             'new'       => $newFindings,

@@ -96,23 +96,28 @@ final readonly class PathIgnoreResolver
     ): IgnoreDecision {
         $configuredPattern = $this->matchedConfiguredPattern($displayPath, $configuredPatterns);
         if ($configuredPattern !== null) {
+            // Configured paths.ignore wins first and unconditionally, even when ignored files are requested.
             return IgnoreDecision::ignored(self::SOURCE_CONFIG, $configuredPattern);
         }
 
         if ($shouldIncludeIgnored) {
+            // Requesting ignored files bypasses only the built-in default/generated exclusions below.
             return IgnoreDecision::notIgnored();
         }
 
         $defaultDirectory = $this->matchedDefaultDirectory($displayPath);
         if ($defaultDirectory !== null) {
+            // A built-in tool/vendor directory match is the next exclusion source after config.
             return IgnoreDecision::ignored(self::SOURCE_DEFAULT, $defaultDirectory);
         }
 
         $generatedFilename = $this->matchedGeneratedFilename($absolutePath);
         if ($generatedFilename !== null) {
+            // A known generated/lock filename is the last built-in exclusion before falling through.
             return IgnoreDecision::ignored(self::SOURCE_GENERATED, $generatedFilename);
         }
 
+        // No configured or built-in rule claimed the path, so it is in scope for analysis.
         return IgnoreDecision::notIgnored();
     }
 
@@ -129,10 +134,12 @@ final readonly class PathIgnoreResolver
 
         foreach ($patterns as $pattern) {
             if ($this->matchesPathPattern($normalizedDisplayPath, $pattern)) {
+                // First matching glob wins; return it verbatim so callers can report which rule excluded the path.
                 return $pattern;
             }
         }
 
+        // No configured glob matched, so the path is not config-ignored.
         return null;
     }
 
@@ -153,11 +160,13 @@ final readonly class PathIgnoreResolver
 
             for ($i = 0, $max = count($segments) - $ignoredCount; $i <= $max; $i++) {
                 if (array_slice($segments, $i, $ignoredCount) === $ignoredSegments) {
+                    // A matched directory token anywhere in the path excludes it; return the token that matched.
                     return $ignoredDirectory;
                 }
             }
         }
 
+        // No built-in directory token appears as a path segment, so the path is not default-ignored.
         return null;
     }
 
@@ -171,6 +180,7 @@ final readonly class PathIgnoreResolver
     {
         $basename = basename($absolutePath);
 
+        // Match on the bare filename only, so a generated artifact is ignored wherever it sits in the tree.
         return in_array($basename, self::IGNORED_FILENAMES, true) ? $basename : null;
     }
 
@@ -186,11 +196,13 @@ final readonly class PathIgnoreResolver
         $process->run();
 
         if ($process->getExitCode() !== 0) {
+            // Non-zero exit is git's "not ignored" signal; report no rule rather than treating it as an error.
             return null;
         }
 
         $output = trim($process->getOutput());
         if ($output === '') {
+            // Git confirmed the ignore but gave no rule text, so fall back to the pathspec as the rule label.
             return $pathspec;
         }
 
@@ -199,12 +211,15 @@ final readonly class PathIgnoreResolver
         $rule  = explode(':', $parts[0]);
         $patternText = trim((string) end($rule));
 
+        // Prefer the parsed pattern; fall back to the pathspec when parsing yielded an empty rule.
         return $patternText === '' ? $pathspec : $patternText;
     }
 
     /**
      * Detect whether the display path matches a glob-style pattern (`*`, `**`, `?` supported).
      *
+     * @param string $displayPath Project-relative path to test; backslashes and edge slashes are normalized here.
+     * @param string $pattern     Glob with `*` (within a segment), `**` (across segments), and `?` placeholders.
      * @return bool True when the normalized path matches the pattern.
      */
     private function matchesPathPattern(string $displayPath, string $pattern): bool
@@ -213,6 +228,7 @@ final readonly class PathIgnoreResolver
         $normalizedPath    = trim($displayPath, '/');
 
         if ($normalizedPattern === $normalizedPath || str_starts_with($normalizedPath, $normalizedPattern . '/')) {
+            // A literal or directory-prefix match needs no glob, so short-circuit before building the regex.
             return true;
         }
 

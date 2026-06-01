@@ -38,6 +38,7 @@ final readonly class GitArchiveSnapshot
             $archivePaths  = $hasPathFilter ? $this->existingPathsInRef($projectRoot, $ref, $paths) : [];
 
             if ($hasPathFilter && $archivePaths === []) {
+                // None of the requested paths exist at the ref, so git archive would error; yield an empty snapshot.
                 return $tempRoot;
             }
 
@@ -65,6 +66,7 @@ final readonly class GitArchiveSnapshot
                     : sprintf('Unable to extract base ref "%s".', $ref));
             }
 
+            // Archive and extract both succeeded; the snapshot root now holds the ref's tree for comparison.
             return $tempRoot;
         } catch (\Throwable $throwable) {
             if (is_file($archivePath)) {
@@ -89,6 +91,7 @@ final readonly class GitArchiveSnapshot
     public function remove(string $path): void
     {
         if (!is_dir($path)) {
+            // Already gone or never created, so deletion is a no-op; tolerating this keeps cleanup idempotent.
             return;
         }
 
@@ -118,13 +121,16 @@ final readonly class GitArchiveSnapshot
     /**
      * List requested paths that exist at a git ref.
      *
-     * @param list<string> $paths
+     * @param string       $projectRoot Working tree the git ls-tree runs in.
+     * @param string       $ref         Git ref whose tree is queried for the requested paths.
+     * @param list<string> $paths       Path filters to test; normalised to root-relative before the query.
      * @return list<string>
      */
     private function existingPathsInRef(string $projectRoot, string $ref, array $paths): array
     {
         $candidatePaths = $this->normaliseArchivePaths($projectRoot, $paths);
         if ($candidatePaths === []) {
+            // Nothing survived normalisation, so skip the ls-tree call and report no matching paths.
             return [];
         }
 
@@ -147,13 +153,15 @@ final readonly class GitArchiveSnapshot
         $paths = array_values(array_unique($paths));
         sort($paths, SORT_STRING);
 
+        // Empty means no requested path exists at the ref; the caller reads that as "archive nothing", not an error.
         return $paths;
     }
 
     /**
      * Normalise archive paths for the branch-review workflow.
      *
-     * @param list<string> $paths
+     * @param string       $projectRoot Root that absolute inputs are made relative to; paths outside it are dropped.
+     * @param list<string> $paths       Caller path filters, absolute or relative, possibly with `./` prefixes.
      * @return list<string>
      */
     private function normaliseArchivePaths(string $projectRoot, array $paths): array
@@ -189,12 +197,14 @@ final readonly class GitArchiveSnapshot
         $paths = array_values($normalised);
         sort($paths, SORT_STRING);
 
+        // Paths outside the project root are dropped, not rejected, so empty can mean every input was out-of-tree.
         return $paths;
     }
 
     /**
      * Validate a Git ref before passing it to archive commands.
      *
+     * @param string $ref Untrusted caller-supplied ref name to allowlist before it reaches the command line.
      * @return string Safe Git ref name.
      */
     private function validatedRef(string $ref): string
@@ -204,6 +214,8 @@ final readonly class GitArchiveSnapshot
             throw new DiffException(sprintf('Git archive base ref "%s" is not a safe git ref name.', $ref));
         }
 
+        // Having passed the ref-character allowlist, the value cannot carry shell metacharacters or a
+        // leading dash, so callers may splice it into the git command line unquoted without injection risk.
         return $ref;
     }
 }

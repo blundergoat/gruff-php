@@ -226,24 +226,29 @@ final readonly class SuffixHungarianRule implements RuleInterface
     }
 
     /**
-     * @param array<string, string> $suffixes
+     * @param string                $name      Identifier (without leading `$`) whose trailing token is examined.
+     * @param array<string, string> $suffixes  Map of lower-case suffix token to configured display suffix.
+     * @param IdentifierTokenizer   $tokenizer Splits the name into tokens so the final word can be matched.
      * @return string|null Lower-case suffix token matched at the end of the name.
      */
     private function suffixToken(string $name, array $suffixes, IdentifierTokenizer $tokenizer): ?string
     {
         $tokens = $tokenizer->tokenize($name);
         if (count($tokens) < 2 || $this->isConversionIdiom($tokens)) {
+            // Single-token names and `as`/`to` conversions carry no type suffix worth flagging.
             return null;
         }
 
         $suffixToken = $tokens[array_key_last($tokens)];
 
+        // Match only when the final token is one of the configured suffixes; otherwise no suffix applies.
         return isset($suffixes[$suffixToken]) ? $suffixToken : null;
     }
 
     /**
      * Read the nearest local `@var` type attached to a variable assignment.
      *
+     * @param Variable $variable Local variable node; the walk climbs its `parent` chain looking for a `@var` doc.
      * @return string|null PHPDoc type text when present.
      */
     private function localVarDocType(Variable $variable): ?string
@@ -254,36 +259,45 @@ final readonly class SuffixHungarianRule implements RuleInterface
             $docComment = $parent->getDocComment();
             // Read an adjacent @var type assertion before using it to infer suffix intent.
             if ($docComment !== null && preg_match('/@var\s+([^\s]+)/', $docComment->getText(), $matches) === 1) {
+                // Nearest enclosing `@var` wins; its raw type text is what the suffix check compares against.
                 return $matches[1];
             }
 
             if ($parent instanceof Expression || $parent instanceof ClassMethod || $parent instanceof Function_) {
+                // Stop at the statement or function boundary so the search stays within the variable's own scope.
                 return null;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
+        // Reached the top of the chain with no annotation, so the variable has no local doc type.
         return null;
     }
 
     /**
+     * @param Node|null $type   Declared type node to test, or null when the declaration omits a type.
+     * @param string    $suffix Lower-case suffix token the name carries (e.g. `string`, `array`).
      * @return bool True when the declared type exists and does not support the suffix.
      */
     private function doesTypeContradictSuffix(?Node $type, string $suffix): bool
     {
         if ($type === null) {
+            // No declared type means nothing can contradict the suffix; the suffix stands as evidence.
             return false;
         }
 
         $typeName = $this->singleTypeName($type);
 
+        // Contradiction needs a resolvable single type whose name does not match the suffix.
         return $typeName !== null && !$this->matchesTypeNameSuffix($typeName, $suffix);
     }
 
     /**
      * Check whether a single-arm PHPDoc type supports the configured suffix.
      *
+     * @param string $type   Raw PHPDoc type text from a `@var` tag, possibly nullable or a union.
+     * @param string $suffix Lower-case suffix token to confirm against the type's sole non-null arm.
      * @return bool True when the PHPDoc type matches the suffix.
      */
     private function matchesDocTypeSuffix(string $type, string $suffix): bool
@@ -295,15 +309,21 @@ final readonly class SuffixHungarianRule implements RuleInterface
         ));
 
         if (count($arms) !== 1) {
+            // Multi-arm unions are ambiguous about the suffix, so they neither confirm nor allow it here.
             return false;
         }
 
+        // A single non-null arm is decisive: the suffix holds only if that one type matches it.
         return $this->matchesTypeNameSuffix($arms[0], $suffix);
     }
 
     /**
      * Check whether a native or short type name supports the configured suffix.
      *
+     * @param string $typeName Declared or PHPDoc type name; namespace, generics, and `[]` are stripped first.
+     * @param string $suffix   Lower-case suffix token the identifier carries, naming the native type it claims to
+     *                         be; the `match ($suffix)` expression is the authoritative set of recognised tokens and
+     *                         the type names each one admits. An unrecognised token can never match (`default` arm).
      * @return bool True when the type name matches the suffix.
      */
     private function matchesTypeNameSuffix(string $typeName, string $suffix): bool
@@ -313,6 +333,7 @@ final readonly class SuffixHungarianRule implements RuleInterface
         $parts      = explode('\\', $normalised);
         $shortName  = $parts[array_key_last($parts)] ?? $normalised;
 
+        // Each suffix admits the native type names that genuinely denote it; anything else is no match.
         return match ($suffix) {
             'string' => $shortName === 'string',
             'array', 'list', 'map', 'set', 'hash' => in_array($shortName, ['array', 'iterable', 'list', 'non-empty-list'], true),
@@ -327,15 +348,18 @@ final readonly class SuffixHungarianRule implements RuleInterface
     /**
      * Resolve nullable or simple single-arm types to one type name.
      *
+     * @param Node $type Type-hint node from a declaration: nullable, plain, or union form.
      * @return string|null Type name when the declaration has exactly one non-null arm.
      */
     private function singleTypeName(Node $type): ?string
     {
         if ($type instanceof NullableType) {
+            // `?T` is one non-null arm; unwrap the nullable and resolve the inner type.
             return $this->singleTypeName($type->type);
         }
 
         if ($type instanceof Identifier || $type instanceof Name) {
+            // A plain hint already names exactly one type, so return it verbatim.
             return $type->toString();
         }
 
@@ -345,17 +369,19 @@ final readonly class SuffixHungarianRule implements RuleInterface
                 static fn (Node $node): bool => !($node instanceof Identifier && $node->toLowerString() === 'null'),
             ));
 
+            // Resolvable only when the union collapses to a single non-null arm; mixed unions stay ambiguous.
             return count($nonNull) === 1 ? $this->singleTypeName($nonNull[0]) : null;
         }
 
+        // Intersection and other unsupported shapes cannot be reduced to one name.
         return null;
     }
 
     /**
      * Normalize configured suffixes to case-insensitive lookup keys.
      *
-     * @param list<string> $suffixes
-     * @return array<string, string>
+     * @param list<string> $suffixes Configured display suffixes as authored in `.gruff-php.yaml`, any casing.
+     * @return array<string, string> Lower-case token keyed to the original display suffix; blanks dropped.
      */
     private function normalisedSuffixes(array $suffixes): array
     {
@@ -368,35 +394,41 @@ final readonly class SuffixHungarianRule implements RuleInterface
             }
         }
 
+        // Lower-case keys let suffix lookups ignore the casing authors used in config.
         return $normalised;
     }
 
     /**
-     * @param list<string> $tokens
+     * @param list<string> $tokens Lower-case name tokens in source order; the last is the candidate suffix.
      * @return bool True when the suffix is part of an explicit conversion idiom.
      */
     private function isConversionIdiom(array $tokens): bool
     {
         if (count($tokens) < 3) {
+            // An idiom needs a verb plus subject plus suffix; fewer tokens cannot form `...AsString`.
             return false;
         }
 
         $previousToken = $tokens[array_key_last($tokens) - 1];
 
+        // `as`/`to` immediately before the suffix marks a deliberate cast like `$nameAsString`, so exempt it.
         return in_array($previousToken, ['as', 'to'], true);
     }
 
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
+     * @param FunctionLikeScope $scope Scope being reported; its node and kind name the owning callable.
      * @return string Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            // Named methods and functions carry a real qualified symbol, so reuse the shared resolver.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Anonymous closures and arrows have no name, so label them by kind and start line for traceability.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 }

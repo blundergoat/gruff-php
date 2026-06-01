@@ -41,6 +41,7 @@ final readonly class TestQualityScope
      */
     public function lineCount(): int
     {
+        // Unknown end line counts as a single line; otherwise the span is inclusive of both endpoints, never below 1.
         return $this->endLine === null ? 1 : max(1, $this->endLine - $this->line + 1);
     }
 }

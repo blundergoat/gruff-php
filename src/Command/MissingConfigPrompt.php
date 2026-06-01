@@ -52,20 +52,25 @@ final readonly class MissingConfigPrompt
         bool $shouldSkipConfig,
     ): ?int {
         if ($shouldSkipConfig || $explicitConfigPath !== null) {
+            // Caller already chose a config path (or opted out), so offering init would override their intent.
             return null;
         }
         if (!$input->isInteractive()) {
+            // No TTY to read a y/N answer from, so never block a piped or CI run on a prompt.
             return null;
         }
         if (ConfigLoader::hasProjectConfig($projectRoot)) {
+            // A project config already exists; init has nothing to scaffold here.
             return null;
         }
         if (!$symfonyApplication instanceof SymfonyApplication) {
+            // Without the application we cannot locate and dispatch the init command, so stay silent.
             return null;
         }
 
         $questionHelper = $symfonyApplication->getHelperSet()->get('question');
         if (!$questionHelper instanceof QuestionHelper) {
+            // No question helper registered means we cannot ask, so skip rather than guess consent.
             return null;
         }
 
@@ -77,6 +82,7 @@ final readonly class MissingConfigPrompt
             new ConfirmationQuestion(self::PROMPT_TEXT, false),
         );
         if (!$accepted) {
+            // User declined the offer, so let the original command continue without scaffolding config.
             return null;
         }
 
@@ -89,6 +95,7 @@ final readonly class MissingConfigPrompt
             $promptOutput,
         );
 
+        // Surface a failed init as the caller's exit code; on success return null so the caller proceeds.
         return $exitCode === Command::SUCCESS ? null : $exitCode;
     }
 
@@ -105,9 +112,11 @@ final readonly class MissingConfigPrompt
     private static function promptOutput(OutputInterface $output): OutputInterface
     {
         if ($output instanceof ConsoleOutputInterface) {
+            // Prefer STDERR so prompt and init chatter never corrupt machine-readable STDOUT payloads.
             return $output->getErrorOutput();
         }
 
+        // No separate error stream available, so fall back to the caller's single output stream.
         return $output;
     }
 }

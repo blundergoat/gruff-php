@@ -36,6 +36,7 @@ final readonly class MissingParamTagRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory, high-confidence metadata for the documentation pillar.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing @param tag',
@@ -104,6 +105,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
         }
 
+        // One finding per declared parameter absent from the contract-bearing docblock.
         return $findings;
     }
 
@@ -147,6 +149,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
         }
 
+        // Variable names of every well-formed @param entry, in docblock order.
         return $paramNames;
     }
 
@@ -181,6 +184,7 @@ final readonly class MissingParamTagRule implements RuleInterface
             }
 
             if ($depth === 0 && $character === '@') {
+                // Reached the next tag before a variable; this @param has no input name.
                 return null;
             }
 
@@ -188,12 +192,14 @@ final readonly class MissingParamTagRule implements RuleInterface
             if ($depth === 0 && $character === '$' && preg_match('/\$(\w+)/A', $stripped, $matches, 0, $position) === 1) {
                 $position += strlen($matches[0]);
 
+                // The documented parameter name, captured without its leading `$`.
                 return $matches[1];
             }
 
             $position++;
         }
 
+        // Input exhausted at depth zero without a variable; the @param tag is malformed.
         return null;
     }
 
@@ -202,6 +208,8 @@ final readonly class MissingParamTagRule implements RuleInterface
      * depth-aware parser. Newlines are preserved so multi-line bracketed shapes keep their line breaks
      * for caller inspection; only the per-line `*` decoration is stripped.
      *
+     * @param string $docText Raw docblock text including its `/**`, ` * `, and `*\/` framing.
+     *
      * @return string Docblock text without framing characters.
      */
     private static function stripDocFraming(string $docText): string
@@ -209,11 +217,14 @@ final readonly class MissingParamTagRule implements RuleInterface
         $stripped = preg_replace('/^\s*\/\*\*+/', '', $docText) ?? '';
         $stripped = preg_replace('/\*\/\s*$/', '', $stripped) ?? '';
 
+        // Inner body with per-line `*` decoration removed but line breaks intact.
         return preg_replace('/^\s*\*\s?/m', '', $stripped) ?? '';
     }
 
     /**
      * Check whether a docblock carries enough contract text to require @param tags.
+     *
+     * @param string $docText Raw docblock text scanned for prose or contract-bearing tags.
      *
      * @return bool True when parameter tags should be enforced.
      */
@@ -225,6 +236,7 @@ final readonly class MissingParamTagRule implements RuleInterface
                 continue;
             }
 
+            // A non-empty, non-tag line is prose: the docblock states a contract.
             return true;
         }
 

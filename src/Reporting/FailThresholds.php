@@ -66,6 +66,7 @@ final readonly class FailThresholds
             ],
         };
 
+        // The legacy flag has no total cap; a zero per-severity cap reproduces "fail on any finding at or above X".
         return new self(null, $severityCounts);
     }
 
@@ -78,6 +79,7 @@ final readonly class FailThresholds
      */
     public static function fromConfig(array $failureConditions): self
     {
+        // Top-level entry point: only here is a nested newFindings sub-gate allowed (true), never deeper.
         return self::parseConditions($failureConditions, 'failureConditions', true);
     }
 
@@ -94,6 +96,7 @@ final readonly class FailThresholds
     {
         self::assertKnownKeys($conditions, $keyPath, $allowsNewFindings);
 
+        // Assemble the gate from its three independently-parsed parts after the keys are validated.
         return new self(
             self::parseTotal($conditions, $keyPath),
             self::parseSeverityThresholds($conditions, $keyPath),
@@ -131,6 +134,7 @@ final readonly class FailThresholds
     private static function parseTotal(array $conditions, string $keyPath): ?int
     {
         if (!array_key_exists('total', $conditions)) {
+            // Omitting total means "no overall cap"; null is the explicit no-limit value the constructor expects.
             return null;
         }
 
@@ -139,6 +143,7 @@ final readonly class FailThresholds
             throw new ConfigException(sprintf('Config key "%s.total" must be a non-negative integer.', $keyPath));
         }
 
+        // Validated non-negative cap on the total finding count.
         return $totalValue;
     }
 
@@ -153,6 +158,7 @@ final readonly class FailThresholds
     private static function parseSeverityThresholds(array $conditions, string $keyPath): array
     {
         if (!array_key_exists('severityThresholds', $conditions)) {
+            // No per-severity block; an empty map means no severity is individually capped.
             return [];
         }
 
@@ -173,6 +179,7 @@ final readonly class FailThresholds
             $severityCounts[$severityKey] = $cap;
         }
 
+        // Validated caps keyed by canonical severity value, ready for the constructor's non-negativity recheck.
         return $severityCounts;
     }
 
@@ -188,6 +195,7 @@ final readonly class FailThresholds
     private static function parseNewFindingsGate(array $conditions, string $keyPath, bool $allowsNewFindings): ?self
     {
         if (!$allowsNewFindings || !array_key_exists('newFindings', $conditions)) {
+            // No sub-gate when nesting is disallowed at this level or the block simply omits newFindings.
             return null;
         }
 
@@ -196,6 +204,7 @@ final readonly class FailThresholds
             throw new ConfigException(sprintf('Config key "%s.newFindings" must be an object.', $keyPath));
         }
 
+        // Recurse with allowsNewFindings=false so a newFindings block cannot itself nest another one.
         return self::parseConditions($newFindings, $keyPath . '.newFindings', false);
     }
 
@@ -223,15 +232,18 @@ final readonly class FailThresholds
         foreach (self::SEVERITY_ORDER as $severity) {
             $cap = $this->severityCounts[$severity] ?? null;
             if ($cap !== null && $counts[$severity] > $cap) {
+                // Most-severe-first iteration means the first breach reported is the worst one.
                 return new ThresholdTrip($severity, $counts[$severity], $cap);
             }
         }
 
         $totalCount = count($findings);
         if ($this->total !== null && $totalCount > $this->total) {
+            // No single severity breached, but the aggregate count did; report the total trip.
             return new ThresholdTrip(ThresholdTrip::KIND_TOTAL, $totalCount, $this->total);
         }
 
+        // No cap exceeded: the run passes the gate.
         return null;
     }
 
@@ -243,6 +255,7 @@ final readonly class FailThresholds
      */
     public function withNewFindingsGate(?FailThresholds $newFindingsGate): self
     {
+        // Readonly value object, so swapping the sub-gate means returning a fresh copy of the caps.
         return new self($this->total, $this->severityCounts, $newFindingsGate);
     }
 
@@ -261,10 +274,12 @@ final readonly class FailThresholds
         if ($this->newFindingsGate instanceof FailThresholds) {
             $newTrip = $this->newFindingsGate->tripsOn($newFindings);
             if ($newTrip instanceof ThresholdTrip) {
+                // A new-findings breach wins: tag it NEW so the report points at the freshly introduced findings.
                 return $newTrip->withScope(ThresholdTrip::SCOPE_NEW);
             }
         }
 
+        // No new-findings sub-gate or it passed; fall through to the overall gate across every finding.
         return $this->tripsOn($allFindings);
     }
 }

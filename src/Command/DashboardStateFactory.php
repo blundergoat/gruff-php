@@ -31,6 +31,7 @@ final class DashboardStateFactory
             : '';
         $pathState = implode(' ', array_map($this->pathToken(...), $paths === [] ? ['.'] : $paths));
 
+        // Initial control values for an unsubmitted form: CLI options win, with safe fallbacks for the rest.
         return [
             'project' => $projectRoot,
             'paths' => $pathState,
@@ -54,9 +55,11 @@ final class DashboardStateFactory
     private function pathToken(string $path): string
     {
         if ($path !== '' && strpbrk($path, " \t\r\n\"\\") === false) {
+            // No whitespace, quote, or backslash: the tokenizer reads it verbatim, so emit it bare.
             return $path;
         }
 
+        // Path carries characters the parser would split on; wrap in quotes and escape \ and " for round-trip safety.
         return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $path) . '"';
     }
 
@@ -73,6 +76,7 @@ final class DashboardStateFactory
             ?? $this->optionalStringOption($input, 'project')
             ?? $launchRoot;
 
+        // Resolve and validate the chosen path; null here means the option pointed at a non-directory.
         return $this->resolveProjectRoot($project, $launchRoot);
     }
 
@@ -90,6 +94,7 @@ final class DashboardStateFactory
         $scanScope       = $query['scanScope'] ?? $defaults['scanScope'];
         $isSubmittedForm = $query !== [];
 
+        // Submitted form values override defaults; checkboxes route through checkboxState so an absent box reads as off.
         return [
             'project' => $query['project'] ?? $defaults['project'],
             'paths' => $query['paths'] ?? $defaults['paths'],
@@ -107,20 +112,25 @@ final class DashboardStateFactory
     /**
      * Resolve a submitted dashboard checkbox value.
      *
-     * @param array<string, string> $query
-     * @param array<string, string> $defaults
+     * @param string                $key             Checkbox state key (such as noBaseline) to resolve.
+     * @param array<string, string> $query           Raw request query; an unchecked HTML checkbox is absent, not "0".
+     * @param array<string, string> $defaults        Initial state used only before the first submission.
+     * @param bool                  $isSubmittedForm True once any query value was posted, so a missing box means off.
      * @return string "1" when checked, otherwise "0".
      */
     private function checkboxState(string $key, array $query, array $defaults, bool $isSubmittedForm): string
     {
         if (array_key_exists($key, $query)) {
+            // The form sent this key explicitly; normalise anything other than "1" to off.
             return $query[$key] === '1' ? '1' : '0';
         }
 
         if ($isSubmittedForm) {
+            // Form was submitted but this checkbox is absent, which HTML represents as unchecked.
             return '0';
         }
 
+        // No submission yet, so fall back to the initial default for this control.
         return $defaults[$key] === '1' ? '1' : '0';
     }
 
@@ -136,6 +146,7 @@ final class DashboardStateFactory
         $path     = PathHelper::resolveAgainst($baseRoot, $project);
         $realPath = realpath($path);
 
+        // Canonical path only when it exists and is a directory; null signals an invalid or missing project root.
         return is_string($realPath) && is_dir($realPath) ? $realPath : null;
     }
 
@@ -153,9 +164,11 @@ final class DashboardStateFactory
     private function resolveDashboardFailOn(InputInterface $input, string $projectRoot): string
     {
         if ($input->hasParameterOption('--fail-on', true)) {
+            // Explicit --fail-on wins (ADR-015); a bare flag with no value degrades to the "none" default.
             return $this->optionalStringOption($input, 'fail-on') ?? 'none';
         }
 
+        // No flag: fall to config.minimumSeverity.dashboard, then the binary default of "none".
         return $this->loadConfigFailThreshold($input, $projectRoot) ?? 'none';
     }
 
@@ -177,6 +190,7 @@ final class DashboardStateFactory
     private function loadConfigFailThreshold(InputInterface $input, string $projectRoot): ?string
     {
         if ((bool) $input->getOption('no-config')) {
+            // --no-config opts out of config entirely, so there is no threshold to seed; let the caller default it.
             return null;
         }
 
@@ -184,9 +198,11 @@ final class DashboardStateFactory
             $config = (new ConfigLoader($projectRoot, ConfigLoader::packageRoot()))
                 ->load($this->optionalStringOption($input, 'config'), RuleRegistry::defaults());
         } catch (ConfigException) {
+            // Swallow config errors: the request handler re-loads config and reports them; this lookup just seeds the form.
             return null;
         }
 
+        // The configured dashboard threshold, or null when the key is unset, so the caller can apply its default.
         return $config->failThresholdFor('dashboard')?->value;
     }
 
@@ -200,11 +216,13 @@ final class DashboardStateFactory
     public function optionalStringOption(InputInterface $input, string $name): ?string
     {
         if (!$input->hasOption($name)) {
+            // Option is not defined on this command at all, so treat it as unset rather than letting Symfony throw.
             return null;
         }
 
         $optionValue = $input->getOption($name);
 
+        // Non-empty string only; null collapses both "absent" and "" so callers can use ?? for a single fallback.
         return is_string($optionValue) && $optionValue !== '' ? $optionValue : null;
     }
 }

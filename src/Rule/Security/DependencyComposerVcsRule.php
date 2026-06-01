@@ -38,6 +38,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence by default: a VCS repository is a supply-chain smell to review, not proof of harm.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Composer VCS repository',
@@ -59,11 +60,13 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
+            // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
         if ($manifest === null || !isset($manifest['repositories']) || !is_array($manifest['repositories'])) {
+            // Unparseable manifest or no repositories block means there is nothing of this shape to flag.
             return [];
         }
 
@@ -95,6 +98,7 @@ final class DependencyComposerVcsRule implements SourceTextRuleInterface
             );
         }
 
+        // One finding per VCS repository; empty when every declared repository resolves through Packagist.
         return $findings;
     }
 }

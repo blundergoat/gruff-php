@@ -31,6 +31,7 @@ final readonly class TrivialAssertionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning by default: an assertion that passes by construction gives false confidence, so flag it loudly.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Trivial assertion',
@@ -74,6 +75,7 @@ final readonly class TrivialAssertionRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per assertion that passes by construction across every test scope in the unit.
         return $findings;
     }
 }

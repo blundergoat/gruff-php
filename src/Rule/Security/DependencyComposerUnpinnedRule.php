@@ -38,6 +38,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: an unbounded constraint is a reproducibility smell to review, not a proven risk.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unpinned Composer dependency constraint',
@@ -59,11 +60,13 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
+            // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
         if ($manifest === null) {
+            // Unparseable manifest means there are no declared constraints to inspect.
             return [];
         }
 
@@ -96,6 +99,7 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
             }
         }
 
+        // One finding per unpinned constraint; empty when every require entry is bounded.
         return $findings;
     }
 
@@ -110,19 +114,23 @@ final class DependencyComposerUnpinnedRule implements SourceTextRuleInterface
         $normalized = strtolower(trim($constraint));
 
         if ($normalized === '*' || $normalized === '') {
+            // A wildcard or empty constraint accepts any published version, so the install is non-reproducible.
             return true;
         }
 
         if (str_starts_with($normalized, 'dev-')) {
+            // A dev- branch tracks a moving HEAD, not a release, so resolved code can change silently.
             return true;
         }
 
         // An open lower bound with no upper bound (">=1.0" / ">1.0") is non-reproducible;
         // a bounded range ("<2.0" present) or caret/tilde operator is considered pinned.
         if ((str_contains($normalized, '>=') || str_contains($normalized, '>')) && !str_contains($normalized, '<')) {
+            // Future major releases satisfy this constraint, so an upgrade can pull breaking or unvetted code.
             return true;
         }
 
+        // Everything else carries an upper bound (caret, tilde, or explicit range), so it is treated as pinned.
         return false;
     }
 }

@@ -62,6 +62,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning severity at high confidence: each missing strict attribute is a concrete, unambiguous gap.
         return new RuleDefinition(
             id:              self::ID,
             name:            'PHPUnit strict flags missing',
@@ -83,26 +84,32 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     {
         $root = $ruleContext->projectRoot;
         if (isset($this->emittedRoots[$root])) {
+            // One config maps to many test files; emit per project root once so the finding is not duplicated.
             return [];
         }
 
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
+            // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
             return [];
         }
 
         $config = $this->discovery->discover($root);
         if ($config === null) {
+            // No discoverable phpunit.xml means there are no strict attributes to fault; treat as not applicable.
             return [];
         }
 
         $missing = $this->missingFlags($config);
         if ($missing === []) {
             $this->emittedRoots[$root] = true;
+
+            // Every strict flag is set, so this root is fully configured; later test files need no re-check.
             return [];
         }
 
         $this->emittedRoots[$root] = true;
 
+        // At least one strict flag is absent, so risky/noisy tests could pass unnoticed; report the gap once.
         return [
             new Finding(
                 ruleId:  self::ID,
@@ -127,6 +134,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
     /**
      * List PHPUnit strictness flags missing from configuration.
      *
+     * @param PhpUnitConfig $config Discovered config whose <phpunit> root attributes are checked for each flag.
      * @return list<string>
      */
     private function missingFlags(PhpUnitConfig $config): array
@@ -141,6 +149,7 @@ final class PhpUnitStrictFlagsMissingRule implements RuleInterface
             }
         }
 
+        // Names of flags that are unset, blank, or "false"; an empty list means strictness is fully configured.
         return $missing;
     }
 }

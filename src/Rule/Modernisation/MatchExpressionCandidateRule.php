@@ -33,6 +33,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: match changes comparison and exhaustiveness, so it suggests, never gates.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Match expression candidate',
@@ -54,6 +55,7 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
+            // The match expression needs PHP 8.0, so stay silent on targets that cannot use it.
             return [];
         }
 
@@ -81,11 +83,14 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per switch whose direct-return branches could collapse into a match.
         return $findings;
     }
 
     /**
      * Check whether every switch case consists of exactly one return statement.
+     *
+     * @param Stmt\Switch_ $switch Switch under inspection; only an all-direct-return body maps cleanly onto a match.
      *
      * @return bool True when all cases return directly.
      */
@@ -93,10 +98,12 @@ final readonly class MatchExpressionCandidateRule implements RuleInterface
     {
         foreach ($switch->cases as $case) {
             if (count($case->stmts) !== 1 || !$case->stmts[0] instanceof Stmt\Return_) {
+                // Any case with fall-through or extra statements would not survive the rewrite, so reject.
                 return false;
             }
         }
 
+        // Every case is a single return, so the switch is a clean match candidate.
         return true;
     }
 }

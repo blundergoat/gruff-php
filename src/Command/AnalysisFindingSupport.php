@@ -25,14 +25,17 @@ final readonly class AnalysisFindingSupport
     {
         $allowedPreviews = $config->allowedSecretPreviews();
         if ($allowedPreviews === []) {
+            // Nothing allowlisted, so no secret-preview suppression applies and findings pass through unchanged.
             return $findings;
         }
 
+        // Hand back the findings minus any sensitive-data hit whose preview the operator has explicitly allowlisted.
         return array_values(array_filter(
             $findings,
             static function (Finding $finding) use ($allowedPreviews): bool {
                 $preview = $finding->metadata['preview'] ?? null;
 
+                // Keep the finding unless it is a sensitive-data hit whose string preview is on the allowlist.
                 return $finding->pillar !== Pillar::SensitiveData
                     || !is_string($preview)
                     || !in_array($preview, $allowedPreviews, true);
@@ -50,11 +53,13 @@ final readonly class AnalysisFindingSupport
     public function filterFindingsToChangedFiles(array $findings, array $changedFiles): array
     {
         if ($changedFiles === []) {
+            // An empty changed set means nothing changed, so no finding qualifies; this is an intentional drop-all.
             return [];
         }
 
         $changed = array_fill_keys($changedFiles, true);
 
+        // Hand back only the findings whose file is in the changed set, keyed by path for O(1) membership.
         return array_values(array_filter(
             $findings,
             static fn (Finding $finding): bool => isset($changed[$finding->filePath]),
@@ -71,11 +76,13 @@ final readonly class AnalysisFindingSupport
     public function normalizeFindingPaths(array $findings, ?string $pathsRelativeTo): array
     {
         if ($pathsRelativeTo === null) {
+            // No base requested, so the contract is to leave finding paths exactly as the rules emitted them.
             return $findings;
         }
 
         $realRoot = realpath($pathsRelativeTo);
         if ($realRoot === false) {
+            // The base directory does not resolve on disk, so rebasing is impossible; leave paths untouched.
             return $findings;
         }
 
@@ -108,6 +115,7 @@ final readonly class AnalysisFindingSupport
             );
         }
 
+        // Hand back every finding with absolute paths under the root rebased to relative; others kept verbatim.
         return $normalized;
     }
 
@@ -151,6 +159,7 @@ final readonly class AnalysisFindingSupport
         $paths = array_values($normalised);
         sort($paths, SORT_STRING);
 
+        // Hand back the de-duplicated, project-relative paths in a stable sort so set matching is deterministic.
         return $paths;
     }
 
@@ -167,14 +176,18 @@ final readonly class AnalysisFindingSupport
 
         foreach ($requestedPaths as $requestedPath) {
             if ($requestedPath === '.') {
+                // '.' means the whole project was requested, so every changed file is in scope.
                 return true;
             }
 
             if ($changedFile === $requestedPath || str_starts_with($changedFile, $requestedPath . '/')) {
+                // A requested path scopes itself and everything under it as a directory; the trailing '/' is the
+                // boundary that stops a request for 'src/Foo' matching the sibling file 'src/FooBar.php'.
                 return true;
             }
         }
 
+        // No requested path contained this file, so it falls outside the analysis scope.
         return false;
     }
 
@@ -197,6 +210,7 @@ final readonly class AnalysisFindingSupport
 
         sort($existing, SORT_STRING);
 
+        // Hand back the on-disk subset, sorted and de-duplicated, so source discovery sees stable distinct paths.
         return array_values(array_unique($existing));
     }
 
@@ -219,6 +233,7 @@ final readonly class AnalysisFindingSupport
             }
         }
 
+        // Hand back only the requested paths present in the snapshot; an empty result signals none survived there.
         return $existing === [] ? [] : $existing;
     }
 }

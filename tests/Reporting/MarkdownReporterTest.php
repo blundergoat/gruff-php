@@ -244,7 +244,7 @@ final class MarkdownReporterTest extends TestCase
     private function report(array $findings, ?ScoreReport $score = null): AnalysisReport
     {
         $score ??= (new ScoreCalculator())->calculate($findings, null, DiffResult::inactive());
-
+        // Hand back a markdown-format report fixture wired with the given findings and resolved score.
         return new AnalysisReport(
             toolVersion:     '0.1.0-test',
             requestedPaths:  ['src'],

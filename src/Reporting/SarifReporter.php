@@ -75,8 +75,10 @@ final readonly class SarifReporter
         ];
 
         try {
+            // Trailing newline keeps the document POSIX-line-terminated when redirected to a .sarif file.
             return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
         } catch (JsonException $exception) {
+            // Encoding failure still emits parseable JSON so a SARIF consumer reports an error instead of choking.
             return sprintf('{"error":"Unable to encode SARIF: %s"}%s', addslashes($exception->getMessage()), PHP_EOL);
         }
     }
@@ -120,6 +122,7 @@ final readonly class SarifReporter
             $properties['options'] = $definition->defaultOptions;
         }
 
+        // Help and full description reuse the one-line rule description; gruff has no separate long-form help text.
         return [
             'id' => $definition->id,
             'name' => $definition->name,
@@ -139,6 +142,9 @@ final readonly class SarifReporter
     /**
      * Build one SARIF result payload for a finding.
      *
+     * @param Finding $finding   Finding to serialize into a single SARIF result entry.
+     * @param int     $ruleIndex Zero-based offset of this finding's rule in the driver `rules` array, so the
+     *                           result can reference its rule by index rather than repeating the descriptor.
      * @return array<string, mixed>
      */
     private function result(Finding $finding, int $ruleIndex): array
@@ -186,6 +192,7 @@ final readonly class SarifReporter
             $properties['metadata'] = $finding->metadata;
         }
 
+        // partialFingerprints carries the gruff fingerprint so SARIF tooling can track a finding across line drift.
         return [
             'ruleId' => $finding->ruleId,
             'ruleIndex' => $ruleIndex,
@@ -206,10 +213,12 @@ final readonly class SarifReporter
     /**
      * Map gruff-php severities onto SARIF result levels.
      *
+     * @param Severity $severity Gruff severity to translate; advisory collapses to SARIF `note`, which has no peer.
      * @return string SARIF level name.
      */
     private function level(Severity $severity): string
     {
+        // SARIF defines no "advisory" level, so gruff's advisory maps onto its closest peer, `note`.
         return match ($severity) {
             Severity::Error => 'error',
             Severity::Warning => 'warning',

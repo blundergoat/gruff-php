@@ -89,6 +89,7 @@ final readonly class ScoreCalculator
 
         $scope = $diffResult instanceof DiffResult && $diffResult->active ? 'diff' : 'full-project';
 
+        // Composite is the mean of applicable pillars only; an all-inapplicable run scored 100 above keeps a clean grade.
         return new ScoreReport(
             composite:              Grade::fromScore($averageScore),
             pillars:                $pillars,
@@ -112,25 +113,30 @@ final readonly class ScoreCalculator
     private function scoredFindings(array $findings, ?AnalysisConfig $analysisConfig): array
     {
         if (!$analysisConfig instanceof AnalysisConfig) {
+            // No config means no per-rule exclusions to honour, so every finding stays in scoring.
             return $findings;
         }
 
         $rules = $analysisConfig->rules();
 
+        // Keep only findings whose rule is not opted out of scoring; reindex so the result stays a list.
         return array_values(array_filter(
             $findings,
             static function (Finding $finding) use ($rules): bool {
                 $settings = $rules[$finding->ruleId] ?? null;
                 if ($settings !== null) {
+                    // Configured rule decides: drop the finding from scoring when it is marked excludeFromScore.
                     return !$settings->isExcludedFromScore();
                 }
 
+                // A rule with no config entry is scored by default.
                 return true;
             },
         ));
     }
 
     /**
+     * @param MutationAnalysisResult|null $mutationAnalysisResult Present means the summary names the MSI-based mutation pillar; null means it states mutation was skipped.
      * @return string Human-readable score calculation summary.
      */
     private function scoreExplanation(?MutationAnalysisResult $mutationAnalysisResult): string
@@ -138,9 +144,11 @@ final readonly class ScoreCalculator
         $base = 'Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores.';
 
         if ($mutationAnalysisResult instanceof MutationAnalysisResult) {
+            // With mutation data present, spell out that the mutation pillar comes straight from the Infection MSI.
             return $base . ' Mutation uses the supplied Infection MSI as the mutation pillar score.';
         }
 
+        // No mutation data: say the pillar was dropped so a reader does not expect a mutation score in the report.
         return $base . ' Mutation is omitted when no Infection report is supplied.';
     }
 
@@ -221,6 +229,7 @@ final readonly class ScoreCalculator
             );
         }
 
+        // One score per resolved pillar, in pillar-name order; inapplicable pillars are still present but ungraded.
         return $scores;
     }
 
@@ -274,11 +283,13 @@ final readonly class ScoreCalculator
         }
 
         usort($scores, static function (FileScore $leftFileScore, FileScore $rightFileScore): int {
+            // Worst grade first; ties broken by more findings, then path so the order is deterministic across runs.
             return $leftFileScore->grade->score <=> $rightFileScore->grade->score
                 ?: $rightFileScore->findings <=> $leftFileScore->findings
                 ?: strcmp($leftFileScore->filePath, $rightFileScore->filePath);
         });
 
+        // Return only the worst `$limit` offenders, since reports show a capped top-N list.
         return array_slice($scores, 0, $limit);
     }
 
@@ -321,12 +332,14 @@ final readonly class ScoreCalculator
             }
         }
 
+        // Fixed five-bucket histogram; every bucket key is present even when its count is zero.
         return $buckets;
     }
 
     /**
      * Convert one finding severity and confidence into a score penalty.
      *
+     * @param Finding $finding Finding whose severity and confidence set the base weight, before any cluster sharing.
      * @return float Weighted penalty contribution for the finding.
      */
     private function penaltyFor(Finding $finding): float
@@ -343,6 +356,7 @@ final readonly class ScoreCalculator
             Confidence::High => 1.0,
         };
 
+        // Base penalty multiplies severity by confidence, so a low-confidence advisory costs far less than a sure error.
         return $severityWeight * $confidenceWeight;
     }
 
@@ -397,6 +411,7 @@ final readonly class ScoreCalculator
             }
         }
 
+        // Per-finding weight after cluster sharing; same key reused by both the pillar and file penalty sums.
         return $penalties;
     }
 
@@ -414,6 +429,7 @@ final readonly class ScoreCalculator
             $total += $penalties[spl_object_id($finding)] ?? $this->penaltyFor($finding);
         }
 
+        // Sum of the precomputed weights; a finding missing from the map falls back to its own base penalty.
         return $total;
     }
 
@@ -431,11 +447,14 @@ final readonly class ScoreCalculator
             $counts[$finding->severity->value]++;
         }
 
+        // All three severity keys are always present, so callers can read any bucket without an existence check.
         return $counts;
     }
 
     /**
      * @param list<Finding> $findings
+     * @param string        $ruleId   Only findings from this rule are considered; others are skipped before reading metadata.
+     * @param string        $key      Metadata entry to maximise; non-integer or absent values are ignored.
      * @return int|null Maximum integer metadata value for the selected rule and key.
      */
     private function maxMetadataInt(array $findings, string $ruleId, string $key): ?int
@@ -455,6 +474,7 @@ final readonly class ScoreCalculator
             $maximumValue = $maximumValue === null ? $metricValue : max($maximumValue, $metricValue);
         }
 
+        // Null, not zero, when no matching finding carried the metric, so callers can tell absent from a real 0.
         return $maximumValue;
     }
 
@@ -479,6 +499,7 @@ final readonly class ScoreCalculator
             $maximumLines = $maximumLines === null ? $lineCount : max($maximumLines, $lineCount);
         }
 
+        // Null when no size finding reported a line count, so a file with no size issue shows no line metric.
         return $maximumLines;
     }
 }

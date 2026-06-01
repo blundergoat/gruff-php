@@ -32,6 +32,7 @@ final readonly class NoAssertionsRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Error severity: a test that asserts nothing proves nothing, so it should fail the gate by default.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test without assertions',
@@ -74,40 +75,50 @@ final readonly class NoAssertionsRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per assertion-free test scope; empty when every test proved something.
         return $findings;
     }
 
     /**
      * Detect assertions, mock verifications, or explicit PHPUnit expectation markers.
      *
+     * @param TestQualityScope $scope Test scope whose body is searched for any observable expectation.
+     *
      * @return bool True when the test has an observable expectation.
      */
     private function hasObservableExpectation(TestQualityScope $scope): bool
     {
         if (TestQualityNodeHelper::assertionCalls($scope) !== []) {
+            // A direct assertion call is the clearest proof of intent, so the test is already covered.
             return true;
         }
 
         if ($scope->node instanceof ClassMethod && $this->hasExpectedExceptionAnnotation($scope->node)) {
+            // A legacy @expectedException docblock asserts a throw, so count it as an observable expectation.
             return true;
         }
 
         foreach (TestQualityNodeHelper::calls($scope) as $call) {
             if (TestQualityNodeHelper::isMockVerificationCall($call)) {
+                // A mock verification (such as a Mockery expectation) is checked at teardown, so it counts.
                 return true;
             }
 
             $name = TestQualityNodeHelper::callName($call);
             if (in_array($name, ['addtoassertioncount', 'marktestincomplete', 'marktestskipped'], true)) {
+                // These PHPUnit calls register an explicit expectation or deliberate skip, not an empty test.
                 return true;
             }
         }
 
+        // No assertion, expectation annotation, mock verification, or marker found, so the test verifies nothing.
         return false;
     }
 
     /**
      * Detect legacy `@expectedException` annotations.
+     *
+     * @param ClassMethod $classMethod Test method whose docblock is checked for the legacy annotation.
      *
      * @return bool True when the method docblock declares an expected exception.
      */
@@ -115,6 +126,7 @@ final readonly class NoAssertionsRule implements RuleInterface
     {
         $docText = strtolower($classMethod->getDocComment()?->getText() ?? '');
 
+        // Lower-cased match so the legacy annotation is recognised regardless of how the author cased it.
         return str_contains($docText, '@expectedexception');
     }
 }

@@ -85,6 +85,7 @@ final class NodeIndex
         /** @var list<T> $nodes Cached entries are keyed by the exact requested class-string. */
         $nodes = $byClass[$class] ?? [];
 
+        // Empty list (not null) when the unit holds no node of that class, so callers can foreach unconditionally.
         return $nodes;
     }
 
@@ -100,6 +101,7 @@ final class NodeIndex
         $byClass = self::index($analysisUnit);
 
         if (count($classes) === 1) {
+            // Single class needs no dedup, so hand back its cached preorder list directly.
             return $byClass[$classes[0]] ?? [];
         }
 
@@ -113,6 +115,7 @@ final class NodeIndex
             }
         }
 
+        // Reindex to a 0-based list; the object-id keys only existed to drop nodes matching more than one class.
         return array_values($combined);
     }
 
@@ -125,9 +128,11 @@ final class NodeIndex
     public static function bodyDescendants(Node $node): array
     {
         if (!$node instanceof ClassMethod && !$node instanceof Function_ && !$node instanceof Closure) {
+            // A node with no body has no descendants to walk, so treat it as empty rather than rejecting the caller.
             return [];
         }
 
+        // Only function-like nodes reach here, so the body cache can safely assume a statement list exists.
         return self::bodyIndex($node);
     }
 
@@ -145,6 +150,7 @@ final class NodeIndex
     public static function descendantsOfAny(Node $node, array $classes): array
     {
         if ($classes === [] || self::bodyDescendants($node) === []) {
+            // No filter classes or no body means nothing can match, so skip the scan entirely.
             return [];
         }
 
@@ -158,6 +164,7 @@ final class NodeIndex
             }
         }
 
+        // Each match appears once in body preorder; the inner break stops a node counting per class it satisfies.
         return $matches;
     }
 
@@ -172,6 +179,7 @@ final class NodeIndex
         self::$logicalLineCountCache ??= new WeakMap();
         $cached = self::$logicalLineCountCache[$node] ?? null;
         if (is_int($cached)) {
+            // is_int guards the WeakMap miss; a hit means this body was already counted, so reuse it.
             return $cached;
         }
 
@@ -191,12 +199,14 @@ final class NodeIndex
 
         self::$logicalLineCountCache[$node] = $count;
 
+        // Distinct start lines, so multiple statements sharing one physical line count once toward body size.
         return $count;
     }
 
     /**
      * Index parsed nodes by concrete PhpParser class.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose full AST is walked once; the result is memoised against it.
      * @return array<class-string<Node>, list<Node>>
      */
     private static function index(AnalysisUnit $analysisUnit): array
@@ -204,6 +214,7 @@ final class NodeIndex
         self::$cache ??= new WeakMap();
         $cached = self::$cache[$analysisUnit] ?? null;
         if ($cached !== null) {
+            // A populated entry means this unit was already walked, so reuse it instead of re-traversing the AST.
             return $cached;
         }
 
@@ -256,6 +267,7 @@ final class NodeIndex
                     $this->nodesByClass[$key][] = $node;
                 }
 
+                // Null tells PhpParser to leave the node untouched and keep descending; we only observe, never rewrite.
                 return null;
             }
 
@@ -267,6 +279,7 @@ final class NodeIndex
              */
             public function nodesByClass(): array
             {
+                // Hand back the index the walk accumulated, keyed by concrete, ancestor, and interface class-strings.
                 return $this->nodesByClass;
             }
         };
@@ -277,12 +290,16 @@ final class NodeIndex
 
         self::$cache[$analysisUnit] = $visitor->nodesByClass();
 
+        // Return via the accessor rather than re-reading self::$cache: WeakMap offset access is statically
+        // nullable, whereas nodesByClass() is typed non-null, so this hands the freshly built index straight
+        // back without reintroducing a null branch the caller would have to guard.
         return $visitor->nodesByClass();
     }
 
     /**
      * Index nodes that appear inside function-like bodies.
      *
+     * @param Node $node Function-like node confirmed to carry a body; its statements are walked once and memoised.
      * @return list<Node>
      */
     private static function bodyIndex(Node $node): array
@@ -290,6 +307,7 @@ final class NodeIndex
         self::$bodyCache ??= new WeakMap();
         $cached = self::$bodyCache[$node] ?? null;
         if ($cached !== null) {
+            // A populated entry means this body was already walked, so reuse it instead of re-walking the statements.
             return $cached;
         }
 
@@ -307,6 +325,7 @@ final class NodeIndex
             {
                 $this->nodes[] = $node;
 
+                // Null tells PhpParser to keep descending; every visited descendant is appended, none rewritten.
                 return null;
             }
 
@@ -317,6 +336,7 @@ final class NodeIndex
              */
             public function nodes(): array
             {
+                // Hand back the body descendants in the source order the preorder walk visited them.
                 return $this->nodes;
             }
         };
@@ -332,6 +352,9 @@ final class NodeIndex
 
         self::$bodyCache[$node] = $visitor->nodes();
 
+        // Return via the accessor rather than re-reading self::$bodyCache: WeakMap offset access is statically
+        // nullable, whereas nodes() is typed non-null, so this hands the freshly built descendant list straight
+        // back without reintroducing a null branch the caller would have to guard.
         return $visitor->nodes();
     }
 }

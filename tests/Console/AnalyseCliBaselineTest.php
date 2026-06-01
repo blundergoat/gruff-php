@@ -513,6 +513,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
     /**
      * Run the analyse CLI inside a project directory and return the finished process.
      *
+     * @param string       $project Working directory the binary runs in, so relative paths resolve against it.
      * @param list<string> $args CLI arguments passed after the binary.
      * @return Process Completed analyse process.
      */
@@ -522,6 +523,7 @@ final class AnalyseCliBaselineTest extends CliTestCase
         $process->run();
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
+        // Hand back the finished process so callers can read its exit code and decoded stdout.
         return $process;
     }
 }

@@ -31,6 +31,7 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence by default: a path repo is a smell to review, not proof of a vulnerability.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Composer path repository',
@@ -52,11 +53,13 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
+            // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
         if ($manifest === null || !isset($manifest['repositories']) || !is_array($manifest['repositories'])) {
+            // Unparseable manifest or no repositories block means there is nothing of this shape to flag.
             return [];
         }
 
@@ -88,6 +91,7 @@ final class DependencyComposerPathRule implements SourceTextRuleInterface
             );
         }
 
+        // One finding per path repository; empty when every repository declared some other type.
         return $findings;
     }
 }

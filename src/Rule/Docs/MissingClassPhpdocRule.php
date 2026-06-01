@@ -38,6 +38,7 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory and high-confidence: a missing class docblock is unambiguous but not build-breaking.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Missing class PHPDoc',
@@ -95,16 +96,20 @@ final readonly class MissingClassPhpdocRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per undocumented class-like declaration; empty when all are documented.
         return $findings;
     }
 
     /**
      * Return the declaration kind for a class-like node.
      *
+     * @param Node $node Class-like node already confirmed to be a class, interface, trait, or enum.
+     *
      * @return string One of class, interface, trait, or enum.
      */
     private function classKind(Node $node): string
     {
+        // Caller has narrowed the node to one of the four kinds, so class is a safe default arm.
         return match (true) {
             $node instanceof Interface_ => 'interface',
             $node instanceof Trait_ => 'trait',

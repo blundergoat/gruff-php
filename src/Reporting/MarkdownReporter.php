@@ -28,6 +28,7 @@ final readonly class MarkdownReporter
         $this->appendPillarSection($lines, $report);
         $this->appendFindingsSection($lines, $report);
 
+        // Sections are accumulated line-by-line, then joined with a single trailing newline for clean file output.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
@@ -129,11 +130,13 @@ final readonly class MarkdownReporter
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
     {
         if ($report->review === null) {
+            // No branch review means no rule deltas to surface; leave the lines untouched.
             return;
         }
 
         $rows = $report->review->perRuleDelta();
         if ($rows === []) {
+            // No rule moved between base and head, so emit no improved/regressed block at all.
             return;
         }
 
@@ -177,6 +180,7 @@ final readonly class MarkdownReporter
     private function appendMutationSummary(array &$lines, AnalysisReport $report): void
     {
         if ($report->mutation === null) {
+            // Mutation testing did not run; skip the block rather than print zeroed-out statistics.
             return;
         }
 
@@ -249,6 +253,7 @@ final readonly class MarkdownReporter
 
         if ($rows === []) {
             $lines[] = '| _(none)_ |  |  |  |  |  |  |';
+            // Header is already emitted, so a placeholder row keeps the table well-formed when no pillars apply.
             return;
         }
 
@@ -278,6 +283,7 @@ final readonly class MarkdownReporter
     private function pillarSummaryRows(AnalysisReport $report): array
     {
         if ($report->score === null) {
+            // No score computed (e.g. empty scope), so there are no pillar rows to show.
             return [];
         }
 
@@ -291,9 +297,11 @@ final readonly class MarkdownReporter
         }
 
         usort($rows, static function (PillarScore $left, PillarScore $right): int {
+            // Findings DESC is the primary key; pillar name ASC breaks ties so ordering is deterministic.
             return $right->findings <=> $left->findings ?: strcmp($left->pillar, $right->pillar);
         });
 
+        // Hand back the applicable pillars in the canonical table order built above.
         return $rows;
     }
 
@@ -320,6 +328,7 @@ final readonly class MarkdownReporter
     /**
      * Render one finding as a Markdown list item.
      *
+     * @param Finding $finding Finding to format; a null line omits the line suffix and a null symbol omits its token.
      * @return string Markdown finding line.
      */
     private function findingLine(Finding $finding): string
@@ -327,6 +336,7 @@ final readonly class MarkdownReporter
         $location = $finding->line === null ? $finding->filePath : $finding->filePath . ':' . $finding->line;
         $symbol   = $finding->symbol === null ? '' : sprintf(' `%s`', $finding->symbol);
 
+        // Single bullet packing severity, rule id, location, optional symbol, and message into one list item.
         return sprintf(
             '- **%s** `%s` %s%s - %s',
             $finding->severity->value,
@@ -340,8 +350,10 @@ final readonly class MarkdownReporter
     /**
      * Append finding groups details to report output.
      *
-     * @param list<string>  $lines
-     * @param list<Finding> $findings
+     * @param list<string>  $lines     Markdown lines being built; mutated in place with the rendered group.
+     * @param string        $title     Section heading text, emitted only when $hasHeading is true.
+     * @param list<Finding> $findings  Findings to group by severity then file path; an empty list renders "None.".
+     * @param bool          $hasHeading Whether to print the section heading; false for the inline current-findings.
      *
      * @return void
      */
@@ -355,6 +367,7 @@ final readonly class MarkdownReporter
         if ($findings === []) {
             $lines[] = 'None.';
             $lines[] = '';
+            // Empty group still prints a "None." marker so an absent section is explicit rather than missing.
             return;
         }
 
@@ -396,6 +409,7 @@ final readonly class MarkdownReporter
     private function mutationStatusSummary(array $counts): string
     {
         if ($counts === []) {
+            // No mutants ran, so report the literal word rather than an empty status string.
             return 'none';
         }
 
@@ -404,6 +418,7 @@ final readonly class MarkdownReporter
             $parts[] = sprintf('%s=%d', $status, $count);
         }
 
+        // Comma-joined `status=count` pairs in the map's own order, mirroring the upstream Infection report.
         return implode(', ', $parts);
     }
 
@@ -422,6 +437,7 @@ final readonly class MarkdownReporter
             }
         }
 
+        // Null signals the caller to omit the context-only line entirely when none of these statuses occurred.
         return $parts === [] ? null : implode(', ', $parts);
     }
 

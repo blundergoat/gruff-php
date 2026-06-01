@@ -40,12 +40,14 @@ final readonly class AnalyseCommandSetupBuilder
         $projectRoot = getcwd();
 
         if ($projectRoot === false) {
+            // Without a working directory there is no project to resolve config/paths against; fail hard.
             return AnalyseCommandSetupResult::plainError(
                 '<error>Unable to determine current working directory.</error>',
                 Command::FAILURE,
             );
         }
 
+        // Project root is known, so defer all option validation and config loading to the worker.
         return $this->buildSetup($input, $output, $symfonyApplication, $projectRoot);
     }
 
@@ -66,6 +68,7 @@ final readonly class AnalyseCommandSetupBuilder
     ): AnalyseCommandSetupResult {
         $options = AnalyseCommandOptions::fromInput($input);
         if ($options->usageError() === '--no-config cannot be combined with --config.') {
+            // These two flags are contradictory; report before a format is parsed, so the message stays plain text.
             return AnalyseCommandSetupResult::plainError(
                 '<error>--no-config cannot be combined with --config.</error>',
                 Command::INVALID,
@@ -74,11 +77,13 @@ final readonly class AnalyseCommandSetupBuilder
 
         $formatResult = $this->format($input->getOption('format'));
         if (!$formatResult instanceof OutputFormat) {
+            // An unparseable format means we cannot render a structured report, so the error stays plain text.
             return AnalyseCommandSetupResult::plainError($formatResult, Command::INVALID);
         }
 
         $failThreshold = $this->failThreshold($input->getOption('fail-on'));
         if (!$failThreshold instanceof FailThreshold) {
+            // Non-enum result is the rejected raw value; echo it back through a structured usage report.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     $options,
@@ -92,6 +97,7 @@ final readonly class AnalyseCommandSetupBuilder
 
         $mutationBudget = $this->mutationBudget($input->getOption('mutation-budget'));
         if ($mutationBudget === false) {
+            // false is the parser's "given but malformed" signal (null would mean omitted); reject it as a usage error.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     $options,
@@ -106,6 +112,7 @@ final readonly class AnalyseCommandSetupBuilder
         $options    = $options->withMutationBudget($mutationBudget);
         $usageError = $options->usageError();
         if ($usageError !== null) {
+            // Any remaining cross-option conflict surfaces here, after the budget is folded into the options.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport($options, $formatResult, $failThreshold->value, $usageError),
                 $formatResult,
@@ -121,6 +128,7 @@ final readonly class AnalyseCommandSetupBuilder
             shouldSkipConfig:   $options->noConfig,
         );
         if ($promptExitCode !== null) {
+            // A non-null code means the init prompt already handled this run (declined or dispatched); stop here.
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
         }
 
@@ -135,12 +143,14 @@ final readonly class AnalyseCommandSetupBuilder
             configLoader:  $configLoader,
         );
         if ($configResult instanceof AnalysisReport) {
+            // A report rather than a config means loading raised a ConfigException already rendered as the error.
             return AnalyseCommandSetupResult::reportError($configResult, $formatResult);
         }
         $failThreshold        = $this->resolveFailThresholdWithConfig($input, $configResult, $failThreshold);
         $failThresholds       = $this->resolveFailThresholds($input, $configResult, $failThreshold);
         $referenceError       = $this->newFindingsReferenceError($options, $failThresholds);
         if ($referenceError !== null) {
+            // A new-findings gate without a baseline or diff reference cannot decide what "new" means; refuse to run.
             return AnalyseCommandSetupResult::reportError(
                 $this->usageReport(
                     options: $options,
@@ -157,6 +167,7 @@ final readonly class AnalyseCommandSetupBuilder
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
 
+        // Every gate passed; hand back the assembled setup the analyse command will execute against.
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
             projectRoot:    $projectRoot,
             options:        $options,
@@ -172,6 +183,7 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Parse the requested output format.
      *
+     * @param mixed $optionValue Raw --format console option; a non-string (option absent) defaults to text.
      * @return OutputFormat|string Parsed format, or a formatted usage error string.
      */
     private function format(mixed $optionValue): OutputFormat|string
@@ -179,6 +191,7 @@ final readonly class AnalyseCommandSetupBuilder
         $rawValue = is_string($optionValue) ? $optionValue : OutputFormat::Text->value;
         $format   = OutputFormat::fromInput($rawValue);
 
+        // Null coalesce turns an unrecognised format into the tagged usage-error string the caller checks for.
         return $format ?? sprintf(
             '<error>USAGE-ERROR Unsupported output format "%s". Use text, json, html, markdown, github, hotspot, or sarif.</error>',
             $rawValue,
@@ -199,9 +212,11 @@ final readonly class AnalyseCommandSetupBuilder
         FailThreshold $explicitOrDefault,
     ): FailThreshold {
         if ($input->hasParameterOption('--fail-on', true)) {
+            // An explicit CLI --fail-on outranks config under ADR-015, so use the parsed value as-is.
             return $explicitOrDefault;
         }
 
+        // No explicit flag: a per-command config threshold wins, falling back to the binary default.
         return $config->failThresholdFor('analyse') ?? $explicitOrDefault;
     }
 
@@ -239,6 +254,7 @@ final readonly class AnalyseCommandSetupBuilder
             ? FailThresholds::fromFailOn(FailThreshold::Error)
             : $configFailureConditions?->newFindingsGate;
 
+        // Combine the resolved total gate with the independent new-findings sub-gate into the final exit-code policy.
         return $totalGate->withNewFindingsGate($newFindingsGate);
     }
 
@@ -253,37 +269,44 @@ final readonly class AnalyseCommandSetupBuilder
     private function newFindingsReferenceError(AnalyseCommandOptions $options, FailThresholds $failThresholds): ?string
     {
         if ($failThresholds->newFindingsGate === null) {
+            // No new-findings gate is in play, so there is nothing to anchor and no error to report.
             return null;
         }
 
         $baselineWillApply = $options->baseline->baselinePath !== null && $options->baseline->generateBaselinePath === null;
         if ($baselineWillApply || $options->diffVs !== null) {
+            // A consuming baseline (not a generate run) or a --diff-vs ref supplies the reference; the gate is valid.
             return null;
         }
 
+        // Gate configured but no reference exists: return the remediation text naming the flags that fix it.
         return 'The new-findings gate needs a reference point. Configure --baseline or --diff-vs <ref> before enabling --fail-on-new or failureConditions.newFindings.';
     }
 
     /**
      * Parse the requested failure threshold.
      *
+     * @param mixed $optionValue Raw --fail-on console option; a non-string (option absent) defaults to advisory.
      * @return FailThreshold|string Parsed threshold, or the unsupported raw value.
      */
     private function failThreshold(mixed $optionValue): FailThreshold|string
     {
         $rawValue = is_string($optionValue) ? $optionValue : FailThreshold::Advisory->value;
 
+        // Return the raw string on failure so the caller can name the rejected value in its error message.
         return FailThreshold::fromInput($rawValue) ?? $rawValue;
     }
 
     /**
      * Parse the optional mutation finding budget.
      *
+     * @param mixed $optionValue Raw --mutation-budget console option; null means the flag was not supplied.
      * @return int|false|null Non-negative budget, false for invalid input, or null when omitted.
      */
     private function mutationBudget(mixed $optionValue): int|false|null
     {
         if ($optionValue === null) {
+            // null propagates the "flag omitted" state, kept distinct from false so callers do not treat it as invalid.
             return null;
         }
 
@@ -294,6 +317,11 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Load analysis configuration or convert configuration failures to a report.
      *
+     * @param AnalyseCommandOptions $options       Validated options; its noConfig/configPath select the load path.
+     * @param RuleRegistry          $registry      Default rule set used to seed config when loading is disabled.
+     * @param OutputFormat          $format        Output format stamped onto the error report when loading fails.
+     * @param FailThreshold         $failThreshold Threshold echoed into the error report so its failOn stays accurate.
+     * @param ConfigLoader          $configLoader  Loader that reads and validates the on-disk config file.
      * @return AnalysisConfig|AnalysisReport Loaded config or a formatted config error report.
      */
     private function config(
@@ -304,10 +332,12 @@ final readonly class AnalyseCommandSetupBuilder
         ConfigLoader $configLoader,
     ): AnalysisConfig|AnalysisReport {
         try {
+            // --no-config builds config from the registry alone; otherwise read and validate the on-disk file.
             return $options->noConfig
                 ? AnalysisConfig::fromRegistry($registry)
                 : $configLoader->load($options->configPath, $registry);
         } catch (ConfigException $exception) {
+            // Convert a load/validation failure into a structured error report rather than letting it propagate.
             return $this->usageReport(
                 options: $options,
                 format:  $format,
@@ -321,20 +351,29 @@ final readonly class AnalyseCommandSetupBuilder
     /**
      * Resolve the config path that should be reported for this run.
      *
+     * @param AnalyseCommandOptions $options      Validated options; noConfig and an explicit configPath drive the result.
+     * @param ConfigLoader          $configLoader Loader used to auto-discover the path when none was given explicitly.
      * @return string|null Resolved path, explicit path, or null when config loading is disabled.
      */
     private function effectiveConfigPath(AnalyseCommandOptions $options, ConfigLoader $configLoader): ?string
     {
         if ($options->noConfig) {
+            // --no-config means no file was consulted, so report no path rather than a misleading discovered one.
             return null;
         }
 
+        // Prefer the user's explicit --config; otherwise report whatever path discovery would have loaded.
         return $options->configPath ?? $configLoader->resolveConfigPath(null);
     }
 
     /**
      * Build a zero-finding report for CLI usage and configuration errors.
      *
+     * @param AnalyseCommandOptions $options Validated options supplying the requested paths and config path for context.
+     * @param OutputFormat          $format  Format the caller will render this error report in.
+     * @param string                $failOn  Fail-on value to record on the report so its threshold field stays accurate.
+     * @param string                $message Human-readable remediation text shown to the user as the diagnostic.
+     * @param string                $type    Diagnostic category, either 'usage-error' (default) or 'config-error'.
      * @return AnalysisReport Report carrying the diagnostic and invalid exit code.
      */
     private function usageReport(
@@ -344,6 +383,7 @@ final readonly class AnalyseCommandSetupBuilder
         string $message,
         string $type = 'usage-error',
     ): AnalysisReport {
+        // No analysis ran, so emit a report with zero files/findings carrying only the diagnostic and INVALID code.
         return new AnalysisReport(
             toolVersion:     Application::VERSION,
             requestedPaths:  $options->paths,

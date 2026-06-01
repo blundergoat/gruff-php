@@ -877,6 +877,7 @@ PATCH);
     /**
      * Load an expected CLI golden output fixture.
      *
+     * @param string $fileName Basename under tests/Fixtures/Cli/Golden whose contents are the expected output.
      * @return string Fixture contents.
      */
     private function goldenOutput(string $fileName): string
@@ -884,6 +885,7 @@ PATCH);
         $contents = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Cli/Golden/' . $fileName);
         self::assertIsString($contents);
 
+        // Hand back the fixture text verbatim to compare the CLI's actual output against.
         return $contents;
     }
 
@@ -901,6 +903,7 @@ PATCH);
             }
         }
 
+        // Hand back just the string symbol of each finding; entries without one are silently skipped.
         return $symbols;
     }
 
@@ -909,6 +912,7 @@ PATCH);
      */
     private function changedRegionSource(): string
     {
+        // Hand back source with one edited and one untouched method, so diff-mode tests can target a changed region.
         return <<<'PHP'
 <?php
 final class Example

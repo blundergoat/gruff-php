@@ -12,6 +12,7 @@ final readonly class UnifiedDiffParser
     /**
      * Parse unified diff text.
      *
+     * @param string $diff Raw `git diff` output; only added-line hunks contribute to the returned ranges.
      * @return array{files: list<string>, lines: array<string, list<ChangedLineRange>>}
      */
     public function parse(string $diff): array
@@ -64,6 +65,7 @@ final readonly class UnifiedDiffParser
         sort($changedFiles, SORT_STRING);
         ksort($changedLines, SORT_STRING);
 
+        // Files and per-file ranges are pre-sorted so downstream diff filtering is deterministic.
         return [
             'files' => $changedFiles,
             'lines' => $changedLines,
@@ -81,6 +83,7 @@ final readonly class UnifiedDiffParser
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
     {
         if ($filePath === null || in_array($filePath, $changedFiles, true)) {
+            // Skip null paths and files already tracked so each path keeps a single range bucket.
             return;
         }
 
@@ -91,6 +94,7 @@ final readonly class UnifiedDiffParser
     /**
      * Parse the destination path from a unified diff header.
      *
+     * @param string $line A `+++ ` header line; its `b/` prefix is stripped to a project-relative path.
      * @return string|null Current-file path, or null for deleted files.
      */
     private function parseNewFilePath(string $line): ?string
@@ -98,19 +102,23 @@ final readonly class UnifiedDiffParser
         $rawPath = $this->normaliseHeaderPath(substr($line, 4));
 
         if ($rawPath === '/dev/null') {
+            // /dev/null on the destination side marks a deletion: there is no current file.
             return null;
         }
 
         if (str_starts_with($rawPath, 'b/')) {
+            // Drop git's `b/` destination prefix to recover the project-relative path.
             return substr($rawPath, 2);
         }
 
+        // No `b/` prefix (e.g. already-normalised input): use the path unchanged.
         return $rawPath;
     }
 
     /**
      * Parse the source path from a unified diff header.
      *
+     * @param string $line A `--- ` header line; its `a/` prefix is stripped to a project-relative path.
      * @return string|null Previous-file path, or null for new files.
      */
     private function parseOldFilePath(string $line): ?string
@@ -118,13 +126,16 @@ final readonly class UnifiedDiffParser
         $rawPath = $this->normaliseHeaderPath(substr($line, 4));
 
         if ($rawPath === '/dev/null') {
+            // /dev/null on the source side marks an addition: there is no previous file.
             return null;
         }
 
         if (str_starts_with($rawPath, 'a/')) {
+            // Drop git's `a/` source prefix to recover the project-relative path.
             return substr($rawPath, 2);
         }
 
+        // No `a/` prefix (e.g. already-normalised input): use the path unchanged.
         return $rawPath;
     }
 
@@ -134,6 +145,7 @@ final readonly class UnifiedDiffParser
      * Handles git's quoted form (core.quotePath / non-ASCII filenames) and strips
      * trailing tab-separated metadata that some patch formats append.
      *
+     * @param string $rawPath Path slice from a diff header, still possibly C-quoted or tab-suffixed.
      * @return string Cleaned header path.
      */
     private function normaliseHeaderPath(string $rawPath): string
@@ -145,9 +157,11 @@ final readonly class UnifiedDiffParser
         }
 
         if (strlen($rawPath) >= 2 && $rawPath[0] === '"' && $rawPath[strlen($rawPath) - 1] === '"') {
+            // Quoted header: strip the surrounding quotes and decode git's C-style escapes.
             return stripcslashes(substr($rawPath, 1, -1));
         }
 
+        // Unquoted ASCII path needs no decoding once any trailing metadata is gone.
         return $rawPath;
     }
 }

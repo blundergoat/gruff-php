@@ -39,6 +39,7 @@ final readonly class AnalyseCommandSetupResult
      */
     public static function ready(AnalyseCommandSetup $setup): self
     {
+        // Success variant: only the setup payload is populated and the exit code is zero.
         return new self($setup, null, null, null, Command::SUCCESS);
     }
 
@@ -51,6 +52,7 @@ final readonly class AnalyseCommandSetupResult
      */
     public static function plainError(string $message, int $exitCode): self
     {
+        // Error variant carrying only an unformatted console message; the caller prints it and exits non-zero.
         return new self(null, null, null, $message, $exitCode);
     }
 
@@ -62,6 +64,7 @@ final readonly class AnalyseCommandSetupResult
      */
     public static function exitCode(int $exitCode): self
     {
+        // Early-exit variant with no payload: another component already wrote output, so only the code is honoured.
         return new self(null, null, null, null, $exitCode);
     }
 
@@ -74,6 +77,7 @@ final readonly class AnalyseCommandSetupResult
      */
     public static function reportError(AnalysisReport $report, OutputFormat $format): self
     {
+        // Error variant whose failure is rendered through the report formatter; exit code is the invalid-usage code.
         return new self(null, $report, $format, null, Command::INVALID);
     }
 }

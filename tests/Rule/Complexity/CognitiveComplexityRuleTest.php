@@ -44,6 +44,7 @@ final class CognitiveComplexityRuleTest extends TestCase
      */
     public static function methodCcProvider(): array
     {
+        // Each row pairs a fixture method with its expected cognitive score; the oracle the counter is checked against.
         return [
             'flat method' => ['flat', 0],
             'single if' => ['oneIf', 1],
@@ -181,8 +182,10 @@ final class CognitiveComplexityRuleTest extends TestCase
     /**
      * Analyse complexity fixtures and return findings for assertions.
      *
-     * @param array<string, int> $thresholds
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string             $fixture    - fixture filename under Fixtures/Complexity to parse and run.
+     * @param array<string, int> $thresholds - warning/error cutoffs keyed by level; sets where the rule starts
+     *   emitting, so a test can force or suppress findings on the same fixture.
+     * @return list<\GruffPhp\Finding\Finding> - findings the rule emits under those thresholds, to assert on.
      */
     private function analyse(string $fixture, array $thresholds): array
     {
@@ -193,6 +196,7 @@ final class CognitiveComplexityRuleTest extends TestCase
             new RuleSettings(true, $thresholds),
         );
 
+        // Run the single rule under the test-supplied thresholds so each case controls its own finding boundary.
         return $this->rule->analyse($unit, new RuleContext(__DIR__ . '/../../..', $config));
     }
 
@@ -206,6 +210,7 @@ final class CognitiveComplexityRuleTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Complexity/' . $filename;
 
+        // Parsed unit carries the display path the rule reports findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Complexity/' . $filename));
     }
 }

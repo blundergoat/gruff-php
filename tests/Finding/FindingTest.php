@@ -142,6 +142,9 @@ final class FindingTest extends TestCase
     /**
      * Build a Finding fixture for stable-identity tests.
      *
+     * @param int         $line   Source line the fixture finding points at; varied across cases to probe identity.
+     * @param string|null $symbol Enclosing symbol, or null when the finding is file-level rather than scoped.
+     * @param string      $ruleId Rule the finding was raised under; defaulted so cases vary only line and symbol.
      * @return Finding
      */
     private function finding(
@@ -149,6 +152,7 @@ final class FindingTest extends TestCase
         ?string $symbol,
         string $ruleId = 'size.file-length',
     ): Finding {
+        // Hand back the fully built fixture finding so a test can compare its stable identity.
         return new Finding(
             ruleId:           $ruleId,
             message:          'File is too long.',

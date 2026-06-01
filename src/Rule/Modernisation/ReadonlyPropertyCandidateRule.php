@@ -35,6 +35,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Hand back this rule's fixed identity and defaults for the registry and reports.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Readonly property candidate',
@@ -56,6 +57,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.1)) {
+            // The readonly modifier landed in PHP 8.1; below that target the candidate cannot be acted on.
             return [];
         }
 
@@ -104,13 +106,15 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             }
         }
 
+        // Hand back every readonly-candidate finding gathered across the unit's eligible final classes.
         return $findings;
     }
 
     /**
      * Collect constructor assignments that affect the modernisation rule.
      *
-     * @return array<string, true>
+     * @param Stmt\Class_ $class Final class under inspection; only its `__construct` body is scanned.
+     * @return array<string, true> Names of properties assigned via `$this->prop = ...` inside the constructor.
      */
     private function constructorAssignments(Stmt\Class_ $class): array
     {
@@ -124,6 +128,7 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
         }
 
         if (!$constructor instanceof Stmt\ClassMethod) {
+            // No constructor means no constructor-only assignment, so no property qualifies as a candidate here.
             return [];
         }
 
@@ -135,13 +140,16 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             }
         }
 
+        // The set of `$this` properties the constructor assigns, keyed by name for O(1) candidate lookups.
         return $assignments;
     }
 
     /**
      * Collect late assignments that affect the modernisation rule.
      *
-     * @return array<string, true>
+     * @param Stmt\Class_ $class Final class under inspection; every method except `__construct` is scanned.
+     * @return array<string, true> Names of properties mutated or unset outside the constructor, which disqualify
+     *   them from being readonly candidates.
      */
     private function lateAssignments(Stmt\Class_ $class): array
     {
@@ -164,13 +172,17 @@ final readonly class ReadonlyPropertyCandidateRule implements RuleInterface
             }
         }
 
+        // The set of properties written after construction; any name here vetoes a readonly suggestion.
         return $assignments;
     }
 
     /**
      * Walk through any chain of array-index fetches and record the underlying `$this` property mutation.
      *
-     * @param array<string, true> &$assignments
+     * @param Expr $expr Assignment or unset target; array-index writes like `$this->items[] = x` resolve to the
+     *   base property so element mutation still counts as mutating the property.
+     * @param array<string, true> &$assignments Accumulator mutated in place; the resolved property name is added
+     *   when the target is a `$this` property, and left untouched otherwise.
      */
     private function recordPropertyMutation(Expr $expr, array &$assignments): void
     {

@@ -39,6 +39,7 @@ final readonly class GitDiffProvider
             $this->appendUntrackedFiles($projectRoot, $parsed['files'], $parsed['lines']);
         }
 
+        // Local modes carry no base ref; non-local modes record the ref under base for reporting.
         return new DiffResult(
             active:       true,
             mode:         $isLocalMode ? $mode : 'base-ref',
@@ -84,6 +85,7 @@ final readonly class GitDiffProvider
     /**
      * Ensure diff mode only runs inside a git working tree.
      *
+     * @param string $projectRoot Directory the git probe runs in; must be the working tree to inspect.
      * @return void
      */
     private function ensureGitWorkTree(string $projectRoot): void
@@ -99,10 +101,12 @@ final readonly class GitDiffProvider
     /**
      * Build the git diff command used to calculate changed lines.
      *
+     * @param string $mode One of staged|unstaged|working-tree, or a base ref name validated as the diff target.
      * @return list<string>
      */
     private function diffCommand(string $mode): array
     {
+        // --unified=0 yields exact changed-line ranges; --find-renames keeps moved files in scope.
         return match ($mode) {
             'staged' => ['git', 'diff', '--cached', '--unified=0', '--no-ext-diff', '--find-renames', '--'],
             'unstaged' => ['git', 'diff', '--unified=0', '--no-ext-diff', '--find-renames', '--'],
@@ -114,6 +118,7 @@ final readonly class GitDiffProvider
     /**
      * Reject unsafe refs before passing them to git.
      *
+     * @param string $ref Caller-supplied base ref; rejected unless it is a safe git ref with no leading dash.
      * @return string The validated git ref name.
      */
     private function validatedRef(string $ref): string
@@ -123,6 +128,7 @@ final readonly class GitDiffProvider
             throw new DiffException(sprintf('Diff base ref "%s" is not a safe git ref name.', $ref));
         }
 
+        // Hand back the same ref once it has cleared the safe-character guard.
         return $ref;
     }
 
@@ -137,6 +143,7 @@ final readonly class GitDiffProvider
     private function appendChangedFile(?string $filePath, array &$changedFiles, array &$changedLines): void
     {
         if ($filePath === null || in_array($filePath, $changedFiles, true)) {
+            // Skip null paths and files already tracked so each path keeps a single range bucket.
             return;
         }
 

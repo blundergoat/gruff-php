@@ -34,6 +34,8 @@ final readonly class DiffResult
      */
     public static function inactive(): self
     {
+        // Sentinel for "no diff requested": active=false is what downstream filters check to keep
+        // every finding, so the empty changed-file/line sets here must never be read as "nothing changed".
         return new self(false, 'full-project', null, [], [], 'Diff mode is disabled.');
     }
 
@@ -45,6 +47,8 @@ final readonly class DiffResult
      */
     public function rangesFor(string $filePath): array
     {
+        // An unmapped path is an expected miss, not an error: a file with no entry simply has no
+        // changed lines, so empty here lets callers treat the whole file as in-scope rather than skipped.
         return $this->changedLines[$filePath] ?? [];
     }
 
@@ -72,6 +76,8 @@ final readonly class DiffResult
             ];
         }
 
+        // The wire shape intentionally diverges from the in-memory one: `changedFiles` is emitted as a
+        // count while the per-file paths and ranges move under `files`, so consumers read a summary plus detail.
         return [
             'active' => $this->active,
             'mode' => $this->mode,

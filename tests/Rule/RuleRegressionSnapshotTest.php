@@ -120,6 +120,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         self::assertSame(count($files), count($units));
 
+        // Bundle the parsed units, raw findings, and canonical JSON so callers can assert on any of the three.
         return [$units, $findings, $json];
     }
 
@@ -165,6 +166,7 @@ final class RuleRegressionSnapshotTest extends TestCase
             )[1],
         );
 
+        // Hand back the extra findings the baseline scan cannot reach, merged into one calibration list.
         return $findings;
     }
 
@@ -181,6 +183,7 @@ final class RuleRegressionSnapshotTest extends TestCase
             self::assertTrue(mkdir($root . '/src', 0777, true));
             file_put_contents($root . '/src/Example.php', "<?php\n\nfinal class Example {}\n");
 
+            // A src tree with no README is what trips docs.missing-readme; return only its findings.
             return $this->analysePaths(['src/Example.php'], projectRoot: $root)[1];
         } finally {
             $this->removeDir($root);
@@ -200,6 +203,7 @@ final class RuleRegressionSnapshotTest extends TestCase
             'tests/Fixtures/TestQuality/non-candidates.php',
         ));
 
+        // Run against the lax phpunit-config fixture root so the phpunit.* config rules fire for the snapshot.
         return $registry->analyse(
             [$unit],
             new RuleContext(
@@ -223,6 +227,7 @@ final class RuleRegressionSnapshotTest extends TestCase
         )));
         sort($ruleIds, SORT_STRING);
 
+        // Hand back the de-duplicated rule ids in stable string order so the snapshot is deterministic.
         return $ruleIds;
     }
 
@@ -241,12 +246,14 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         usort($payload, static fn (array $left, array $right): int => $left <=> $right);
 
+        // Hand back the rows sorted into a canonical order so reordered findings still hash identically.
         return $payload;
     }
 
     /**
      * Build a stable finding payload row for snapshot hashing.
      *
+     * @param Finding $finding single finding to flatten; its metadata is recursively key-sorted for stability
      * @return FindingArray Canonical finding payload.
      */
     private static function canonicalFindingArray(Finding $finding): array
@@ -259,6 +266,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         ksort($findingPayload, SORT_STRING);
 
+        // Hand back the row with top-level keys sorted so two equal findings serialise byte-for-byte alike.
         return $findingPayload;
     }
 
@@ -278,6 +286,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         ksort($metadata, SORT_STRING);
 
+        // Hand back the metadata with both nested maps and the top level key-sorted for a stable snapshot.
         return $metadata;
     }
 
@@ -292,6 +301,7 @@ final class RuleRegressionSnapshotTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the freshly created, uniquely named temp directory path for the caller to populate.
         return $path;
     }
 
@@ -304,6 +314,7 @@ final class RuleRegressionSnapshotTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the path was never created; treat removal as a no-op.
             return;
         }
 

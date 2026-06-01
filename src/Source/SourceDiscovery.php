@@ -123,16 +123,16 @@ final readonly class SourceDiscovery
         $absolutePath = $this->absolutePath($path);
 
         if (!file_exists($absolutePath)) {
-            // A non-existent input is reported as missing rather than silently skipped.
             $missingPaths[] = $path;
+            // A non-existent input is reported as missing rather than silently dropped from discovery.
             return;
         }
 
         $displayPath = $this->displayPath($absolutePath);
         $decision    = $this->ignoreResolver->decide($displayPath, $absolutePath, $configuredIgnorePatterns, $shouldIncludeIgnored);
         if ($decision->ignored) {
-            // An ignored input contributes an ignore record but never a discovered file.
             $ignoredDetails[] = IgnoredPath::from($displayPath, $decision);
+            // An ignored input contributes an ignore record but never a discovered file.
             return;
         }
 

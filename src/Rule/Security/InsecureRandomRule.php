@@ -38,6 +38,7 @@ final class InsecureRandomRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the flagged function names are unambiguous, so the gate can trust this warning.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Insecure random source',
@@ -82,6 +83,7 @@ final class InsecureRandomRule implements RuleInterface
             );
         }
 
+        // One finding per non-cryptographic random call in this unit; empty when the file uses none.
         return $findings;
     }
 }

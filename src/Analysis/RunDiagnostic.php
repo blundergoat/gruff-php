@@ -34,6 +34,7 @@ final readonly class RunDiagnostic
      */
     public function toArray(): array
     {
+        // Report-facing JSON keys ("file" for the file path) rather than the internal property names.
         return [
             'type' => $this->type,
             'message' => $this->message,

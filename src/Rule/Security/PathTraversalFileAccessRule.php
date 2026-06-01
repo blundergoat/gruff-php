@@ -53,6 +53,7 @@ final class PathTraversalFileAccessRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence by default: request data reaching a path argument is a likely traversal sink, not certain.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Path traversal file access',
@@ -103,16 +104,21 @@ final class PathTraversalFileAccessRule implements RuleInterface
             }
         }
 
+        // One finding per filesystem sink fed request-controlled data; empty when no tainted path reaches a sink.
         return $findings;
     }
 
     /**
      * Build the path traversal finding.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit supplying the display path recorded on the finding.
+     * @param Node         $node         Call or `new` node whose start line localises the finding for the reviewer.
+     * @param string       $sink         Sink label (function name, or `filesystem-object`) recorded on the finding.
      * @return Finding Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node, string $sink): Finding
     {
+        // Report against the sink call's own line so the reviewer lands on the tainted filesystem access.
         return new Finding(
             ruleId:      self::ID,
             message:     sprintf('Filesystem access with request-controlled path detected: %s.', $sink),

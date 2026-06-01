@@ -69,6 +69,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Default threshold of 20 is the CCN above which a function-like is flagged; .gruff-php.yaml can override it.
         return new RuleDefinition(
             id:                self::ID,
             name:              'Cyclomatic complexity',
@@ -138,6 +139,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per function-like that breached its threshold; empty when all stay under.
         return $findings;
     }
 
@@ -156,6 +158,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
         if (isset($cyclomaticCache[$node])) {
             $cached = $cyclomaticCache[$node];
             if (is_int($cached)) {
+                // Reuse the memoised score so a node walked by several complexity rules is only counted once.
                 return $cached;
             }
         }
@@ -178,16 +181,19 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
 
         $cyclomaticCache[$node] = $ccn;
 
+        // One baseline path plus every decision point reached; match arms add one per extra condition.
         return $ccn;
     }
 
     /**
      * Check whether a node contributes one cyclomatic complexity point.
      *
+     * @param Node $child Body descendant being classified as a decision point or not.
      * @return bool True when the node is counted as a decision point.
      */
     private static function isDecisionNode(Node $child): bool
     {
+        // Branch statements and short-circuit operators each fork control flow; a `default` case (cond null) does not.
         return self::isInstanceOfAny($child, self::BRANCH_STATEMENT_TYPES)
             || self::isInstanceOfAny($child, self::BRANCH_EXPRESSION_TYPES)
             || ($child instanceof Stmt\Case_ && $child->cond !== null);
@@ -196,6 +202,7 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     /**
      * Check whether a node is an instance of any configured class.
      *
+     * @param Node                      $node    Node whose runtime class is tested against the candidates.
      * @param list<class-string<Node>> $classes Candidate node classes.
      *
      * @return bool True when the node matches one candidate class.
@@ -204,10 +211,12 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
     {
         foreach ($classes as $class) {
             if ($node instanceof $class) {
+                // First matching class is enough; the caller only needs membership, not which class matched.
                 return true;
             }
         }
 
+        // Node is none of the candidate classes.
         return false;
     }
 
@@ -227,11 +236,13 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
                 ? ($parent->name?->toString() ?? 'class@anonymous')
                 : null;
 
+            // Qualify as Class::method() when an owning class is known; fall back to bare method() otherwise.
             return $className !== null
                 ? sprintf('%s::%s()', $className, $node->name->toString())
                 : $node->name->toString() . '()';
         }
 
+        // A free function has no owning class, so its symbol is just the function name.
         return $node->name->toString() . '()';
     }
 
@@ -252,20 +263,24 @@ final readonly class CyclomaticComplexityRule implements RuleInterface
      */
     public static function hasExecutableBody(ClassMethod|Function_ $node): bool
     {
+        // A null statement list marks a bodyless declaration (abstract/interface), which has no control flow to score.
         return $node->stmts !== null;
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+     * @param int|float $number Configured threshold to render; whole floats are shown without a trailing decimal.
      * @return string Human-readable threshold value.
      */
     private static function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
+            // A real fractional threshold keeps its decimals so the message stays faithful.
             return (string) $number;
         }
 
+        // Integers and whole-valued floats render without a trailing `.0` for a cleaner message.
         return (string) (int) $number;
     }
 }

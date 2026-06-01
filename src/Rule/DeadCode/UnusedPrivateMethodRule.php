@@ -49,6 +49,8 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High-confidence warning: a private method no in-scope call shape reaches is dead and safe to delete,
+        // yet stale dead code rarely breaks a build, so it warns rather than errors.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused private method',
@@ -96,6 +98,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             );
         }
 
+        // Hand back every unused-private-method finding gathered across the class-likes in this unit.
         return $findings;
     }
 
@@ -120,12 +123,14 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
+        // Hand back the non-magic private declarations keyed by name, the candidates that must be referenced.
         return $privateMethods;
     }
 
     /**
      * Collect private method calls made inside a class-like node.
      *
+     * @param NodeFinder          $nodeFinder Reused tree walker that enumerates every node under the class-like body.
      * @param Class_|Trait_|Enum_ $classLike
      * @return array<string, true>
      */
@@ -142,11 +147,14 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             }
         }
 
+        // Hand back the set of method names referenced anywhere in scope; absence here means unused.
         return $calledNames;
     }
 
     /**
      * Extract a private method name from `$this` or self/static calls.
+     *
+     * @param Node $node Arbitrary node from the class-like body; only `$this`/self/static method calls yield a name.
      *
      * @return string|null Called method name, or null for unsupported calls.
      */
@@ -157,6 +165,7 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             && $node->var->name === 'this'
             && $node->name instanceof Node\Identifier
         ) {
+            // A literal `$this->name()` call counts as a use of that private method.
             return $node->name->toString();
         }
 
@@ -165,35 +174,45 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             && in_array($node->class->toString(), ['self', 'static'], true)
             && $node->name instanceof Node\Identifier
         ) {
+            // A `self::name()` or `static::name()` call counts as a use of that private method.
             return $node->name->toString();
         }
 
+        // No literal in-scope call shape matched, so this node names no private method.
         return null;
     }
 
     /**
      * Extract a method name from callable-array syntax.
      *
+     * @param Node $node Arbitrary node from the class-like body; only a `[$this, 'method']` array yields a name.
+     *
      * @return string|null Callable method name, or null when the node is not supported.
      */
     private function callableArrayName(Node $node): ?string
     {
         if (!$node instanceof Expr\Array_) {
+            // Only array literals can spell the `[$this, 'method']` callable shape; nothing else qualifies.
             return null;
         }
 
         foreach ($node->items as $arrayItem) {
             if ($this->isCallableReference($arrayItem->value)) {
+                // First `[$this, 'method']` element wins; report the method it references as a use.
                 return $this->extractCallableName($arrayItem->value);
             }
         }
 
+        // The array held no `$this` callable pair, so it references no private method.
         return null;
     }
 
     /**
      * Build findings for unused methods in the dead-code rule.
      *
+     * @param AnalysisUnit                    $analysisUnit   Supplies the display path stamped on each finding; the
+     *                                                         line span comes from each method node, not this unit.
+     * @param RuleDefinition                  $definition     Supplies the rule id, severity, pillar, and tier copied into every finding.
      * @param Class_|Trait_|Enum_             $classLike
      * @param array<string, Stmt\ClassMethod> $privateMethods
      * @param array<string, true>             $calledNames
@@ -230,23 +249,28 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per private method whose name was never seen among the called names.
         return $findings;
     }
 
     /**
      * Check whether an expression is a `$this` callable-array reference.
      *
+     * @param Expr $expr Candidate array-item value to test for the `[$this, 'method']` callable pair.
+     *
      * @return bool True when the expression is a supported callable reference.
      */
     private function isCallableReference(Expr $expr): bool
     {
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
+            // Only a two-element array can be the `[$this, 'method']` pair; anything else is not a reference.
             return false;
         }
 
         $first  = $expr->items[0]->value;
         $second = $expr->items[1]->value;
 
+        // True only when the pair is literally `$this` followed by a string method name.
         return ($first instanceof Expr\Variable && $first->name === 'this')
             && $second instanceof Node\Scalar\String_;
     }
@@ -254,16 +278,20 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     /**
      * Extract the method name from a supported callable-array expression.
      *
+     * @param Expr $expr Callable-array value already vetted by isCallableReference for the `[$this, 'method']` shape.
+     *
      * @return string|null Callable method name, or null when not available.
      */
     private function extractCallableName(Expr $expr): ?string
     {
         if (!$expr instanceof Expr\Array_ || count($expr->items) !== 2) {
+            // Guard against callers that skipped the shape check; only a two-element array carries a name.
             return null;
         }
 
         $second = $expr->items[1]->value;
 
+        // The method name lives in the second slot as a string literal; absent that, there is no name.
         return $second instanceof Node\Scalar\String_ ? $second->value : null;
     }
 
@@ -277,9 +305,11 @@ final readonly class UnusedPrivateMethodRule implements RuleInterface
     private function resolveClassName(Node $node): string
     {
         if ($node instanceof Class_) {
+            // Anonymous classes have no name node, so fall back to a stable placeholder for the symbol string.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
+        // Traits and enums are always named; the line-tagged fallback only guards against malformed input.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 }

@@ -34,6 +34,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory at medium confidence: narrowing mixed is a contract improvement to weigh, not a build-breaker.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Mixed type overuse',
@@ -55,6 +56,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ModernisationNodeHelper::supportsPhp($ruleContext, 8.0)) {
+            // The explicit mixed type arrived in PHP 8.0, so stay silent on targets that predate it.
             return [];
         }
 
@@ -92,11 +94,15 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per public function-like that leans on mixed at a parameter or return.
         return $findings;
     }
 
     /**
      * List source locations where broad mixed types appear.
+     *
+     * @param Stmt\ClassMethod|Stmt\Function_ $functionLike Function-like whose parameter and return types are scanned
+     *                                                      for mixed; the labels feed the finding message verbatim.
      *
      * @return list<string>
      */
@@ -117,6 +123,7 @@ final readonly class MixedTypeOveruseRule implements RuleInterface
             $locations[] = 'return type';
         }
 
+        // Hand back the human-readable spots ($param names and 'return type') so the message can list them.
         return $locations;
     }
 }

@@ -57,7 +57,7 @@ final class PhpFileParserTest extends TestCase
         $fixture = realpath(__DIR__ . '/../Fixtures/Source/' . $path);
 
         self::assertIsString($fixture);
-
+        // Hand back the resolved absolute fixture path; realpath has already confirmed the file exists.
         return $fixture;
     }
 }

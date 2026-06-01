@@ -315,32 +315,35 @@ final readonly class RuleConfigApplier
      */
     private function optionValue(string $ruleId, string $optionName, mixed $optionValue, mixed $defaultValue): int|float|bool|string|array
     {
+        // The default's runtime type is the contract: each branch picks the validator whose accepted type
+        // matches it, so an override can only widen/narrow within that one default-declared shape.
         if (is_int($defaultValue)) {
-            // Default is an int, so the override must validate as an int.
+            // An int default forbids the float-tolerant numeric path; an override of 1.0 is a config error.
             return $this->integerOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_float($defaultValue)) {
-            // Default is a float, so accept any numeric override.
+            // A float default tolerates an int override (3 for 3.0); both coerce to the same option type.
             return $this->numericOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_bool($defaultValue)) {
-            // Default is a bool, so the override must validate as a bool.
+            // Bool is checked before the array branches so true/false never reach list/map shape validation.
             return $this->isBooleanOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (is_string($defaultValue)) {
-            // Default is a string, so the override must validate as a string.
+            // String defaults exclude numeric coercion: "8" must stay a string, not become the int 8.
             return $this->stringOptionValue($ruleId, $optionName, $optionValue);
         }
 
         if (array_is_list($defaultValue)) {
-            // Default is a list, so validate the override as a list and check its item type.
+            // List must precede the map fall-through: an empty default array also satisfies array_is_list,
+            // so map is only safely distinguishable as the residual once list is ruled out here.
             return $this->listOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
         }
 
-        // Only an associative map remains; validate keys and per-value types against the default map.
+        // Sole remaining shape is an associative map; its keys and per-value types are checked downstream.
         return $this->mapOptionValue($ruleId, $optionName, $optionValue, $defaultValue);
     }
 
@@ -358,7 +361,7 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be an integer.', $ruleId, $optionName));
         }
 
-        // Narrowed to int by the guard above.
+        // Returned verbatim, not cast: the rule receives the exact int the user configured.
         return $optionValue;
     }
 
@@ -376,7 +379,7 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be numeric.', $ruleId, $optionName));
         }
 
-        // Narrowed to int|float by the guard above.
+        // An int stays an int and a float stays a float: no widening to float, so the rule sees the user's type.
         return $optionValue;
     }
 
@@ -394,7 +397,7 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be boolean.', $ruleId, $optionName));
         }
 
-        // Narrowed to bool by the guard above.
+        // No truthiness coercion: only a real bool reaches here, so "0"/"false"/1 are rejected, not mapped.
         return $optionValue;
     }
 
@@ -412,7 +415,7 @@ final readonly class RuleConfigApplier
             throw new ConfigException(sprintf('Option "rules.%s.options.%s" must be a string.', $ruleId, $optionName));
         }
 
-        // Narrowed to string by the guard above.
+        // Returned untrimmed and uncast: surrounding whitespace and numeric-looking text survive to the rule.
         return $optionValue;
     }
 

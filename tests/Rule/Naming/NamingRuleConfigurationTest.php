@@ -252,6 +252,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Just the abbreviation findings that survived the supplied allowlist.
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === AbbreviationAllowlistRule::ID,
@@ -275,6 +276,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Just the hungarian-notation findings produced under the supplied type prefixes.
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === HungarianNotationRule::ID,
@@ -298,6 +300,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Just the boolean-prefix findings produced under the supplied options.
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === BooleanPrefixRule::ID,
@@ -327,6 +330,8 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         );
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Keeps only NegativeBooleanRule findings; this config disables BooleanPrefixRule so the two
+        // rules cannot both flag the same negated boolean name and inflate the result.
         return array_values(array_filter(
             $findings,
             static fn ($finding): bool => $finding->ruleId === NegativeBooleanRule::ID,
@@ -356,6 +361,7 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
             $rules[$name][] = $finding->ruleId;
         }
 
+        // Map of identifier name to the rule ids that flagged it, for asserting which names overlap.
         return $rules;
     }
 }

@@ -35,6 +35,7 @@ final readonly class EmptyMethodRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence because an empty body is unambiguous; advisory keeps the finding opt-in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Empty method',
@@ -90,26 +91,31 @@ final readonly class EmptyMethodRule implements RuleInterface
             );
         }
 
+        // One finding per non-abstract function-like with a present-but-empty body, minus promoted constructors.
         return $findings;
     }
 
     /**
      * Allow empty constructors that only define promoted properties.
      *
+     * @param ClassMethod $classMethod Method to test; only `__construct` with promoted params earns the exemption.
      * @return bool True when the constructor exists solely for property promotion.
      */
     private function isPromotedConstructor(ClassMethod $classMethod): bool
     {
         if ($classMethod->name->toString() !== '__construct') {
+            // Non-constructors gain nothing from an empty body, so they stay reportable.
             return false;
         }
 
         foreach ($classMethod->params as $param) {
             if ($param->isPromoted()) {
+                // A promoted param means the empty body is doing real work (assigning the property); exempt it.
                 return true;
             }
         }
 
+        // A parameterless or non-promoting empty constructor carries no behaviour, so it remains a finding.
         return false;
     }
 }

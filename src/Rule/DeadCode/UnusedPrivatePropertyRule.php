@@ -40,6 +40,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High-confidence warning: an unread/unwritten private member is dead and safe to remove.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused private property',
@@ -87,6 +88,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             );
         }
 
+        // Hand back the dead-property findings gathered across every class-like in the unit.
         return $findings;
     }
 
@@ -134,14 +136,16 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             }
         }
 
+        // Plain declarations plus promoted constructor params, keyed by name; later keys win on collision.
         return $privateProps;
     }
 
     /**
      * Track reads and writes for collected private properties.
      *
-     * @param Class_|Trait_|Enum_                                         $classLike
-     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps
+     * @param NodeFinder                                                  $nodeFinder   Walks the body for accesses.
+     * @param Class_|Trait_|Enum_                                         $classLike    Owner of the accesses.
+     * @param array<string, array{line: int, writtenByDeclaration: bool}> $privateProps Names to track; rest ignored.
      * @return array{reads: array<string, true>, writes: array<string, true>}
      */
     private function propertyUsage(NodeFinder $nodeFinder, Class_|Trait_|Enum_ $classLike, array $privateProps): array
@@ -161,14 +165,17 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $this->recordPropertyUsage($node, $name, $reads, $writes);
         }
 
+        // Two name-keyed sets the caller intersects: a property absent from both is unused.
         return ['reads' => $reads, 'writes' => $writes];
     }
 
     /**
      * Record read/write usage for a private property access node.
      *
-     * @param array<string, true> $reads
-     * @param array<string, true> $writes
+     * @param Node                $node   Access node already matched to $name; its parent decides read vs write.
+     * @param string              $name   Property whose usage flag to set.
+     * @param array<string, true> $reads  Accumulator, keyed by name; receives true when this access reads.
+     * @param array<string, true> $writes Accumulator, keyed by name; receives true when this access assigns.
      *
      * @return void
      */
@@ -179,6 +186,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
         if ($parent instanceof Expr\Assign && $parent->var === $node) {
             $writes[$name] = true;
 
+            // A plain assignment target is written only; stop before it also counts as a read.
             return;
         }
 
@@ -186,6 +194,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             $writes[$name] = true;
             $reads[$name]  = true;
 
+            // Compound assignment ($x += ...) both reads and writes; done once both are recorded.
             return;
         }
 
@@ -195,9 +204,11 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     /**
      * Build findings for properties in the dead-code rule.
      *
-     * @param Class_|Trait_|Enum_                                            $classLike
-     * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps
-     * @param array{reads: array<string, true>, writes: array<string, true>} $usage
+     * @param AnalysisUnit                                                   $analysisUnit Path stamped on findings.
+     * @param RuleDefinition                                                 $definition   Source of id and severity.
+     * @param Class_|Trait_|Enum_                                            $classLike    Owner; name prefixes ids.
+     * @param array<string, array{line: int, writtenByDeclaration: bool}>    $privateProps Defaulted means written.
+     * @param array{reads: array<string, true>, writes: array<string, true>} $usage        Reads/writes per name.
      * @return list<Finding>
      */
     private function findingsForProperties(
@@ -234,24 +245,34 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             );
         }
 
+        // One finding per property that failed the read-and-written test; empty when all are live.
         return $findings;
     }
 
     /**
      * Build the finding message for a private property usage state.
      *
+     * @param string $symbol    Fully qualified property symbol to name in the message.
+     * @param bool   $isRead    Whether any read of the property was seen.
+     * @param bool   $isWritten Whether the property is ever written: true if an assignment was seen OR the
+     *                          declaration carries a default, so true with zero observed writes means default-only.
+     *
      * @return string Human-readable finding message.
      */
     private function propertyMessage(string $symbol, bool $isRead, bool $isWritten): string
     {
         if (!$isRead && !$isWritten) {
+            // Neither read nor written: the strongest claim, so report it first.
             return sprintf('Private property %s is never used.', $symbol);
         }
 
         if (!$isRead) {
+            // Written somewhere but never consumed; the value computed into it is dead.
             return sprintf('Private property %s is written but never read.', $symbol);
         }
 
+        // Remaining case ($isRead, !$isWritten): read somewhere, yet has no declaration default and is
+        // never assigned, so every read observes the implicit null/uninitialised value, not a stored one.
         return sprintf('Private property %s is read but never explicitly written.', $symbol);
     }
 
@@ -265,14 +286,19 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
     private function resolveClassName(Node $node): string
     {
         if ($node instanceof Class_) {
+            // Anonymous classes carry no name node, so stand in with a stable placeholder.
             return $node->name?->toString() ?? 'class@anonymous';
         }
 
+        // Traits and enums are always named; the line-tagged fallback only guards a malformed tree.
         return $node->name?->toString() ?? sprintf('unknown@%d', $node->getStartLine());
     }
 
     /**
      * Extract the private property name from `$this` or own-class static access.
+     *
+     * @param Node        $node         Candidate access node; only $this-> and own-class static fetches qualify.
+     * @param string|null $ownClassName Enclosing class name, or null inside a trait/anonymous scope.
      *
      * @return string|null Property name, or null when the node is not supported.
      */
@@ -283,6 +309,7 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             && $node->var->name === 'this'
             && $node->name instanceof Node\Identifier
         ) {
+            // Plain $this->name access; the literal property name is what usage tracking keys on.
             return $node->name->toString();
         }
 
@@ -290,29 +317,37 @@ final readonly class UnusedPrivatePropertyRule implements RuleInterface
             && $node->name instanceof Node\VarLikeIdentifier
             && $this->refersToOwnClass($node->class, $ownClassName)
         ) {
+            // self::/static::/OwnClass:: access to the same property; treat it like a $this read or write.
             return $node->name->toString();
         }
 
+        // Not a self-referential property access, so it tells us nothing about this class's members.
         return null;
     }
 
     /**
      * Check whether a static access target refers to the current class-like scope.
      *
+     * @param Node        $class        Class reference from a static fetch; non-Name targets never match.
+     * @param string|null $ownClassName Enclosing class name to compare against, or null when there is none.
+     *
      * @return bool True when the target is self/static or the own class name.
      */
     private function refersToOwnClass(Node $class, ?string $ownClassName): bool
     {
         if (!$class instanceof Node\Name) {
+            // Dynamic targets (variables, expressions) can't be resolved statically, so treat as foreign.
             return false;
         }
 
         $reference = strtolower($class->toString());
 
         if ($reference === 'self' || $reference === 'static') {
+            // self:: and static:: always point at the enclosing class, regardless of its name.
             return true;
         }
 
+        // Otherwise match the unqualified class name; null scope (trait/anonymous) can never match.
         return $ownClassName !== null && strtolower($class->getLast()) === strtolower($ownClassName);
     }
 }

@@ -117,7 +117,9 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Assert how many findings one rule emitted.
      *
-     * @param list<Finding> $findings
+     * @param string        $ruleId        Rule whose findings are isolated before counting.
+     * @param int           $expectedCount Findings the rule must report for this fixture.
+     * @param list<Finding> $findings      Full analysis output to filter by rule id.
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
@@ -132,6 +134,8 @@ final class TestQualityCalibrationRulesTest extends TestCase
     /**
      * Analyse test-quality fixtures and return findings for assertions.
      *
+     * @param string          $path   Project-relative fixture path to parse and scan.
+     * @param ?AnalysisConfig $config Override config; null applies the registry defaults.
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
@@ -139,6 +143,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
         $registry = RuleRegistry::defaults();
         $unit     = $this->unitForPath($path);
 
+        // Run the full default rule set; callers filter to the rule they assert on.
         return $registry->analyse(
             [$unit],
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -155,6 +160,7 @@ final class TestQualityCalibrationRulesTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
+        // Display path stays repo-relative so findings report the fixture, not the absolute path.
         return (new PhpFileParser())->parse($sourceFile);
     }
 }

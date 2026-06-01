@@ -63,12 +63,14 @@ final readonly class InfectionReportParser
             }
         }
 
+        // Assemble the report only after every section validated; partial reports are never returned.
         return new InfectionReport($this->displayPath($resolvedPath), $stats, $mutants);
     }
 
     /**
      * Resolve and validate a report path.
      *
+     * @param string $path Caller-supplied report path, absolute or relative to the project root.
      * @return string Absolute report path when realpath is available.
      */
     private function resolvePath(string $path): string
@@ -81,6 +83,7 @@ final readonly class InfectionReportParser
 
         $realPath = realpath($candidate);
 
+        // Keep the unresolved candidate when realpath fails (e.g. broken symlink) instead of aborting.
         return $realPath === false ? $candidate : $realPath;
     }
 
@@ -88,6 +91,7 @@ final readonly class InfectionReportParser
      * Parse stats for the mutation report parser.
      *
      * @param JsonObject $decoded
+     * @param string     $path Original report path, used only to label validation failures.
      * @return array<string, int|float>
      */
     private function parseStats(array $decoded, string $path): array
@@ -112,12 +116,17 @@ final readonly class InfectionReportParser
             }
         }
 
+        // Hand back the numeric stats only once all four required MSI keys are confirmed present.
         return $stats;
     }
 
     /**
      * Parse one mutant row from an Infection status section.
      *
+     * @param mixed  $mutantRecord Raw decoded row; must be a JSON object or validation rejects it.
+     * @param string $status       Normalised mutant status already mapped from the section name.
+     * @param string $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string $path         Original report path, used only to label validation failures.
      * @return InfectionMutant Parsed mutant record.
      */
     private function parseMutant(mixed $mutantRecord, string $status, string $location, string $path): InfectionMutant
@@ -127,6 +136,7 @@ final readonly class InfectionReportParser
         $diff          = $mutantRecord['diff'] ?? null;
         $processOutput = $mutantRecord['processOutput'] ?? null;
 
+        // Empty diff/processOutput strings collapse to null so callers can treat absent and blank alike.
         return new InfectionMutant(
             status:        $status,
             filePath:      $this->displayPath($this->requireMutatorString($mutator, 'originalFilePath', $location, $path)),
@@ -140,18 +150,23 @@ final readonly class InfectionReportParser
     /**
      * Extract and validate the mutator object from one mutant row.
      *
-     * @param JsonObject $mutantRecord
+     * @param JsonObject $mutantRecord Already-validated mutant object to pull the "mutator" entry from.
+     * @param string     $location     Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path         Original report path, used only to label validation failures.
      * @return JsonObject
      */
     private function requireMutatorObject(array $mutantRecord, string $location, string $path): array
     {
         $mutator = $mutantRecord['mutator'] ?? null;
+        // A missing or non-object mutator key is a malformed report, so reuse the object guard to reject it.
         return $this->requireJsonObject($mutator, sprintf('Infection report "%s" mutant %s must contain a mutator object.', $path, $location));
     }
 
     /**
      * Validate that a decoded Infection value is an object-like array.
      *
+     * @param mixed  $decodedValue Decoded value expected to be a string-keyed array, not a list or scalar.
+     * @param string $message      Exception message thrown verbatim when the value is not an object.
      * @return JsonObject
      */
     private function requireJsonObject(mixed $decodedValue, string $message): array
@@ -169,31 +184,37 @@ final readonly class InfectionReportParser
             $result[$key] = $this->jsonValue($item);
         }
 
+        // Return a freshly built map so only string-keyed, shape-validated entries reach the caller.
         return $result;
     }
 
     /**
      * Normalise one decoded Infection JSON value.
      *
+     * @param mixed $decodedValue One decoded value, routed to array narrowing or scalar validation by type.
      * @return JsonValue
      */
     private function jsonValue(mixed $decodedValue): array|bool|float|int|string|null
     {
         if (is_array($decodedValue)) {
+            // Arrays recurse through the depth-bounded narrowing chain.
             return $this->jsonArray($decodedValue);
         }
 
+        // Everything else must validate as a leaf scalar before it is accepted.
         return $this->jsonScalar($decodedValue);
     }
 
     /**
      * Validate scalar Infection JSON values after decoding.
      *
+     * @param mixed $decodedValue Value that must already be a bool, int, float, string, or null; else throws.
      * @return JsonScalar
      */
     private function jsonScalar(mixed $decodedValue): bool|float|int|string|null
     {
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
+            // Pass the value straight through once it is proven to be a permitted JSON scalar.
             return $decodedValue;
         }
 
@@ -214,6 +235,7 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth2($item) : $this->jsonScalar($item);
         }
 
+        // Top-level array narrowed to the supported four-deep JSON shape; deeper nesting is rejected later.
         return $result;
     }
 
@@ -231,6 +253,7 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth3($item) : $this->jsonScalar($item);
         }
 
+        // Second level narrowed; its return type permits one fewer nesting layer than the top-level shape.
         return $result;
     }
 
@@ -248,6 +271,7 @@ final readonly class InfectionReportParser
             $result[$key] = is_array($item) ? $this->jsonArrayDepth4($item) : $this->jsonScalar($item);
         }
 
+        // Third level narrowed; the next recursion is the last that may still hold a nested array.
         return $result;
     }
 
@@ -269,11 +293,15 @@ final readonly class InfectionReportParser
             $result[$key] = $this->jsonScalar($item);
         }
 
+        // Deepest supported level: every entry is now a scalar, since any array here already threw.
         return $result;
     }
 
     /**
-     * @param JsonObject $mutator
+     * @param JsonObject $mutator  Validated mutator object whose string field is being extracted.
+     * @param string     $field    Mutator key to read, e.g. "mutatorName" or "originalFilePath".
+     * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path     Original report path, used only to label validation failures.
      *
      * @return string Required mutator field value.
      */
@@ -284,11 +312,14 @@ final readonly class InfectionReportParser
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s is missing mutator.%s.', $path, $location, $field));
         }
 
+        // Reached only past the guard, so the value is a guaranteed non-empty string for the mutant record.
         return $fieldValue;
     }
 
     /**
-     * @param JsonObject $mutator
+     * @param JsonObject $mutator  Validated mutator object that may carry an "originalStartLine" entry.
+     * @param string     $location Section-and-index label (e.g. "escaped[3]") used in error messages.
+     * @param string     $path     Original report path, used only to label validation failures.
      *
      * @return int|null Original start line, or null when absent.
      */
@@ -299,6 +330,7 @@ final readonly class InfectionReportParser
             throw new MutationReportException(sprintf('Infection report "%s" mutant %s has a non-integer mutator.originalStartLine.', $path, $location));
         }
 
+        // Null is a valid result here: it means the report omitted the start line, not that parsing failed.
         return $line;
     }
 
@@ -309,6 +341,7 @@ final readonly class InfectionReportParser
      */
     private function statusSections(): array
     {
+        // Keys are Infection's JSON section names; values are the human-facing statuses gruff reports.
         return [
             'escaped' => 'escaped',
             'timeouted' => 'timed out',
@@ -324,10 +357,12 @@ final readonly class InfectionReportParser
     /**
      * Convert an absolute report path to a project-relative display path when possible.
      *
+     * @param string $path Absolute or canonical filesystem path to render for display.
      * @return string Display path for report metadata.
      */
     private function displayPath(string $path): string
     {
+        // Prefer a project-relative path for readable output; fall back to canonical when outside the root.
         return PathHelper::relativeToRoot($path, $this->projectRoot) ?? PathHelper::canonical($path);
     }
 }

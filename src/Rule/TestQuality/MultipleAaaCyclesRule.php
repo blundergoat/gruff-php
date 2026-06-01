@@ -34,6 +34,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Low confidence: cycle counting is heuristic, so default to advisory and only flag at three or more.
         return new RuleDefinition(
             id:                 self::ID,
             name:               'Multiple arrange-act-assert cycles',
@@ -60,6 +61,7 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
         $settings = $ruleContext->settingsFor($this->definition());
 
         if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+            // This path is exempted (e.g. an end-to-end suite that legitimately chains scenarios); skip it.
             return [];
         }
 
@@ -92,11 +94,14 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per test method whose cycle count reached the configured threshold.
         return $findings;
     }
 
     /**
      * Count apparent act-then-assert cycles across top-level test statements.
+     *
+     * @param TestQualityScope $scope Test method whose top-level statements are scanned for act/assert runs.
      *
      * @return int Number of detected cycles.
      */
@@ -144,13 +149,15 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             $sawNonAssertionCall = $hasNonAssertionCall;
         }
 
+        // Total runs where an act was followed by its own assertions; the caller compares this to the threshold.
         return $cycles;
     }
 
     /**
      * Check whether a project-configured path exemption applies.
      *
-     * @param list<string> $patterns Glob patterns for accepted broad test shapes.
+     * @param string       $displayPath Display path of the unit under test, matched after slash normalisation.
+     * @param list<string> $patterns    Glob patterns for accepted broad test shapes.
      * @return bool True when the display path matches an ignored pattern.
      */
     private function isPathIgnored(string $displayPath, array $patterns): bool
@@ -159,15 +166,19 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
 
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                // Path matched an exemption glob, so the whole file is treated as an accepted broad shape.
                 return true;
             }
         }
 
+        // No exemption glob matched, so this path is subject to the cycle check.
         return false;
     }
 
     /**
      * Detect whether a call is used only to compute an assertion argument.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call Inner call whose ancestor chain is walked.
      *
      * @return bool True when the call is nested inside an assertion call.
      */
@@ -179,12 +190,14 @@ final readonly class MultipleAaaCyclesRule implements RuleInterface
             if (($parent instanceof Expr\FuncCall || $parent instanceof Expr\MethodCall || $parent instanceof Expr\StaticCall)
                 && TestQualityNodeHelper::isAssertionCall($parent)
             ) {
+                // An assertion ancestor means this call only builds an assertion argument, not a separate act.
                 return true;
             }
 
             $parent = $parent->getAttribute('parent');
         }
 
+        // Reached the top of the tree without an assertion ancestor, so this call is a standalone act.
         return false;
     }
 }

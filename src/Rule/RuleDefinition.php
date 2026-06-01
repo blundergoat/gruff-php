@@ -96,6 +96,7 @@ final readonly class RuleDefinition
      */
     public function description(): string
     {
+        // An empty description means none was configured, so the name doubles as the display text.
         return $this->description !== '' ? $this->description : $this->name;
     }
 }

@@ -129,18 +129,22 @@ final class FunctionLikeScopeWalkerTest extends TestCase
     /**
      * Build function-like scopes for a test fixture.
      *
+     * @param string $source Inline PHP source defining the functions and closures to walk.
      * @return list<FunctionLikeScope>
      */
     private function scopesFor(string $source): array
     {
         $unit = $this->parseSource($source);
 
+        // FunctionLikeScopeWalker yields in depth-first declaration order; callers index $scopes
+        // by fixed position, so that order is the contract this helper hands back unchanged.
         return (new FunctionLikeScopeWalker())->scopes($unit->statements);
     }
 
     /**
      * Parse inline PHP source through the production parser.
      *
+     * @param string $source Inline PHP written to a throwaway temp file before parsing.
      * @return AnalysisUnit Parsed source fixture.
      */
     private function parseSource(string $source): AnalysisUnit
@@ -159,6 +163,7 @@ final class FunctionLikeScopeWalkerTest extends TestCase
 
         self::assertSame([], $unit->diagnostics);
 
+        // Hand back the unit only once it parsed cleanly, so scope tests start from valid input.
         return $unit;
     }
 }

@@ -191,7 +191,9 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Assert the expected modernisation finding count for a rule.
      *
-     * @param list<Finding> $findings
+     * @param string $ruleId Rule id whose findings are counted.
+     * @param int $expectedCount Number of findings the fixture should trip for that rule.
+     * @param list<Finding> $findings Full finding set to filter down to the rule.
      * @return void
      */
     private static function assertRuleCount(string $ruleId, int $expectedCount, array $findings): void
@@ -206,17 +208,21 @@ final class ModernisationRulesTest extends TestCase
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
+     * @param string $path Project-relative fixture path to scan.
+     * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
      * @return list<Finding>
      */
     private function analysePath(string $path, ?AnalysisConfig $config = null): array
     {
+        // Single-path convenience over analysePaths(); the multi-path form holds the real work.
         return $this->analysePaths([$path], $config);
     }
 
     /**
      * Analyse modernisation fixtures and return findings for assertions.
      *
-     * @param list<string> $paths
+     * @param list<string> $paths Project-relative fixture paths to scan together.
+     * @param AnalysisConfig|null $config Override config; null falls back to the default registry config.
      * @return list<Finding>
      */
     private function analysePaths(array $paths, ?AnalysisConfig $config = null): array
@@ -224,6 +230,7 @@ final class ModernisationRulesTest extends TestCase
         $units    = array_map(fn (string $path): AnalysisUnit => $this->unitForPath($path), $paths);
         $registry = RuleRegistry::defaults();
 
+        // Findings across every supplied fixture, run under the override config or the registry default.
         return $registry->analyse(
             $units,
             new RuleContext(self::PROJECT_ROOT, $config ?? AnalysisConfig::fromRegistry($registry)),
@@ -240,6 +247,7 @@ final class ModernisationRulesTest extends TestCase
     {
         $sourceFile = new SourceFile(self::PROJECT_ROOT . '/' . $path, $path);
 
+        // Display path mirrors the project-relative input so findings reference the real fixture.
         return (new PhpFileParser())->parse($sourceFile);
     }
 
@@ -251,6 +259,7 @@ final class ModernisationRulesTest extends TestCase
      */
     private function config(string $path): AnalysisConfig
     {
+        // Load the fixture's own config so a test can exercise project-level rule overrides.
         return (new ConfigLoader(self::PROJECT_ROOT))->load($path, RuleRegistry::defaults());
     }
 }

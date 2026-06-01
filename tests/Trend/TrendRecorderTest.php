@@ -195,6 +195,7 @@ final class TrendRecorderTest extends TestCase
      */
     private function score(float $score): ScoreReport
     {
+        // Hand back a minimal full-project ScoreReport fixture graded from the given score.
         return new ScoreReport(
             composite:              Grade::fromScore($score),
             pillars:                [],
@@ -216,6 +217,7 @@ final class TrendRecorderTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Hand back the unique temp directory just created for the caller to populate.
         return $path;
     }
 
@@ -228,6 +230,7 @@ final class TrendRecorderTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to clean up when the path is absent, so stop the recursion here.
             return;
         }
 

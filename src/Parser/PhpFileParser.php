@@ -44,6 +44,8 @@ final readonly class PhpFileParser
         $source = file_get_contents($file->absolutePath);
 
         if ($source === false) {
+            // Unreadable file is surfaced as a diagnostic, not an exception, so one bad file
+            // does not abort the whole run; downstream rules see an empty unit carrying the error.
             return new AnalysisUnit(
                 $file,
                 '',
@@ -54,6 +56,7 @@ final readonly class PhpFileParser
         }
 
         if (!$file->isPhp()) {
+            // Non-PHP sources keep their text for raw-content rules but skip AST/token work.
             return new AnalysisUnit($file, $source, [], [], []);
         }
 
@@ -76,8 +79,11 @@ final readonly class PhpFileParser
                 }
             }
 
+            // Fully parsed unit: name-resolved, parent-linked statements plus only the comment tokens rules read.
             return new AnalysisUnit($file, $source, $traversed, $commentTokens, []);
         } catch (Error $error) {
+            // A syntax error is expected input here (we analyse broken code too): record it as a
+            // diagnostic at its source line and keep the tokens so comment-based rules still run.
             return new AnalysisUnit(
                 $file,
                 $source,
@@ -86,6 +92,8 @@ final readonly class PhpFileParser
                 [new ParseDiagnostic($error->getRawMessage(), max(1, $error->getStartLine()))],
             );
         } catch (Throwable $throwable) {
+            // Last-resort guard against parser internals failing unexpectedly: degrade to an empty
+            // unit pinned to line 1 rather than letting one file crash the whole analysis pass.
             return new AnalysisUnit(
                 $file,
                 $source,

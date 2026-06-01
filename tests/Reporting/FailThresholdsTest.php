@@ -254,6 +254,7 @@ final class FailThresholdsTest extends TestCase
      */
     private function finding(Severity $severity): Finding
     {
+        // Hand back a finding fixed at the requested severity so a test can drive one threshold band.
         return new Finding(
             ruleId:     'rule.example',
             message:    'Example finding.',

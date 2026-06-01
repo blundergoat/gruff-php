@@ -34,6 +34,7 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Hand back the static metadata the registry uses to list and configure this rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unsafe archive extraction',
@@ -79,10 +80,16 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per extractTo() call whose destination or entry list came from request data.
         return $findings;
     }
 
     /**
+     * Check whether an extractTo() call draws its destination or entry list from request input.
+     *
+     * @param Expr\MethodCall|Expr\StaticCall $call extractTo() call whose first two arguments (destination, entries)
+     *                                              are taint-checked against request data.
+     *
      * @return bool True when destination or selected entries come from request data.
      */
     private function hasRequestControlledExtractionArgument(Expr\MethodCall|Expr\StaticCall $call): bool
@@ -90,20 +97,26 @@ final class UnsafeArchiveExtractionRule implements RuleInterface
         foreach ([0, 1] as $argumentIndex) {
             $argument = SecurityNodeHelper::argumentValue($call->args, $argumentIndex);
             if ($argument !== null && SecurityNodeHelper::containsUserInput($argument)) {
+                // A request-tainted destination or entry list is enough to flag the extraction.
                 return true;
             }
         }
 
+        // Neither modelled argument carried request taint, so the extraction target is trusted.
         return false;
     }
 
     /**
      * Build the unsafe archive extraction finding.
      *
+     * @param AnalysisUnit $analysisUnit Unit being scanned; supplies the display path recorded on the finding.
+     * @param Node         $node         extractTo() call flagged as unsafe; its start line locates the finding.
+     *
      * @return Finding Security finding.
      */
     private function finding(AnalysisUnit $analysisUnit, Node $node): Finding
     {
+        // Request-controlled extraction enables path traversal, so flag it as a warning with remediation guidance.
         return new Finding(
             ruleId:      self::ID,
             message:     'Archive extraction with request-controlled destination or entries detected.',

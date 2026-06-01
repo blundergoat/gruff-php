@@ -33,6 +33,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory: linear tests are a strong default, but matrix-style suites legitimately branch, so teams opt in.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Conditional test logic',
@@ -58,6 +59,7 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
         $settings   = $ruleContext->settingsFor($definition);
 
         if ($this->isPathIgnored($analysisUnit->file->displayPath, $settings->stringListOption('ignoredPathPatterns'))) {
+            // Project opted this path out of the rule, so emit nothing rather than reporting expected branching.
             return [];
         }
 
@@ -80,13 +82,15 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
             }
         }
 
+        // One finding per conditional accumulated across every test scope in the unit.
         return $findings;
     }
 
     /**
      * Check whether a project-configured path exemption applies.
      *
-     * @param list<string> $patterns Glob patterns for accepted test shapes.
+     * @param string       $displayPath Repository-relative path of the analysed file, used as the fnmatch subject.
+     * @param list<string> $patterns    Glob patterns the caller configured to exempt known matrix-style test paths.
      * @return bool True when the display path matches an ignored pattern.
      */
     private function isPathIgnored(string $displayPath, array $patterns): bool
@@ -95,10 +99,12 @@ final readonly class ConditionalTestLogicRule implements RuleInterface
 
         foreach ($patterns as $pattern) {
             if (fnmatch($pattern, $normalizedPath, FNM_NOESCAPE)) {
+                // Path matched an exemption glob, so the caller treats this file as intentionally branchy.
                 return true;
             }
         }
 
+        // No exemption glob matched, so conditionals in this file remain reportable.
         return false;
     }
 }

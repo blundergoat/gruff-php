@@ -31,6 +31,7 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning at high confidence: a missing skip reason is unambiguous, and a silent skip erodes the suite.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Skipped test without reason',
@@ -79,6 +80,7 @@ final readonly class SkippedWithoutReasonRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per markTestSkipped() call left without an explanatory reason string.
         return $findings;
     }
 }

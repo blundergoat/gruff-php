@@ -279,7 +279,7 @@ final class InfectionReportParserTest extends TestCase
             'coveredCodeMsi' => 0.0,
             'mutationCodeCoverage' => 0.0,
         ];
-
+        // Each case pairs a deliberately malformed report with the substring its rejection message must contain.
         return [
             'missing stats' => [
                 ['escaped' => []],
@@ -427,13 +427,18 @@ final class InfectionReportParserTest extends TestCase
         if (!mkdir($path, 0777, true) && !is_dir($path)) {
             self::fail(sprintf('Unable to create temp directory: %s', $path));
         }
-
+        // Hand back the freshly created temp directory; the caller owns removing it after the test.
         return $path;
     }
 
     /**
      * Build one infection mutant payload for parser tests.
      *
+     * @param string   $filePath      Source path the mutant claims to touch, mirrored into mutator.originalFilePath.
+     * @param string   $mutatorName   Infection mutator label, e.g. "Plus"; drives how the parser classifies the mutant.
+     * @param int|null $line          One-based source line; null omits originalStartLine to hit the optional branch.
+     * @param string   $diff          Unified diff body the report would carry; blank when a test does not assert on it.
+     * @param string   $processOutput Captured runner stdout for the mutant; blank when irrelevant to the case.
      * @return array{mutator: array{mutatorName: string, originalFilePath: string, originalStartLine?: int}, diff: string, processOutput: string}
      */
     private function mutant(string $filePath, string $mutatorName, ?int $line, string $diff = '', string $processOutput = ''): array
@@ -446,7 +451,7 @@ final class InfectionReportParserTest extends TestCase
         if ($line !== null) {
             $mutator['originalStartLine'] = $line;
         }
-
+        // Hand back the assembled mutant entry in the exact shape Infection writes into its escaped/killed lists.
         return [
             'mutator' => $mutator,
             'diff' => $diff,
@@ -457,6 +462,7 @@ final class InfectionReportParserTest extends TestCase
     /**
      * Write an Infection report fixture to a temporary file.
      *
+     * @param string             $path   Destination file the JSON-encoded fixture is written to; caller cleans it up.
      * @param InvalidReportShape $report
      * @return void
      */
@@ -474,6 +480,7 @@ final class InfectionReportParserTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to tear down when the directory was never created, so treat removal as already done.
             return;
         }
 

@@ -46,6 +46,7 @@ final class RuntimeTimingObserver implements RuleRunnerObserver
 
         usort($rows, static fn (array $left, array $right): int => $right['totalNs'] <=> $left['totalNs']);
 
+        // Hand back the per-rule rows, slowest first, so callers can surface the costliest rules without re-sorting.
         return $rows;
     }
 }

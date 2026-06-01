@@ -30,6 +30,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: the AKIA/ASIA prefix plus a fixed 16-char body is a near-unique AWS shape, rarely noise.
         return new RuleDefinition(
             id:              self::ID,
             name:            'AWS access key',
@@ -51,6 +52,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, 'AKIA') && !str_contains($analysisUnit->source, 'ASIA')) {
+            // Neither AWS key-id prefix is present, so the regex cannot match; skip it to keep the rule near-free.
             return [];
         }
 
@@ -80,6 +82,7 @@ final readonly class AwsAccessKeyRule implements SourceTextRuleInterface
             );
         }
 
+        // Empty when every AKIA/ASIA match sat in a comment or looked like a dummy value; treated as a clean file.
         return $findings;
     }
 }

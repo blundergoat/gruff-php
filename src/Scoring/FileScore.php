@@ -40,6 +40,13 @@ final readonly class FileScore
     }
 
     /**
+     * Flatten this score into the JSON-report row shape consumed by reporters and the dashboard.
+     *
+     * Keys are the wire contract: renaming one breaks every JSON/SARIF/HTML consumer, so treat the
+     * shape as stable. The nested grade is expanded into separate `score`/`grade` keys and `penalty`
+     * is rounded to 2 decimals so downstream diffs stay stable; nullable metric keys stay null when
+     * the metric was not measured for this file.
+     *
      * @return array{
      *     file: string,
      *     score: float,
@@ -53,10 +60,11 @@ final readonly class FileScore
      *     maxCognitive: int|null,
      *     maxLines: int|null,
      *     mutationScore: float|null
-     * }
+     * } the report row; null metric values mean "not measured", not zero
      */
     public function toArray(): array
     {
+        // Penalty rounded here (not at the call site) so every serialised row reports the same precision.
         return [
             'file' => $this->filePath,
             'score' => $this->grade->score,

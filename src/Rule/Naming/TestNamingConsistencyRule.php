@@ -34,6 +34,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Confidence High but Advisory severity: mixed casing is unambiguous, yet teams pick the style to enforce.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Test method naming consistency',
@@ -115,6 +116,7 @@ final readonly class TestNamingConsistencyRule implements RuleInterface
             }
         }
 
+        // Hand back one finding per class that mixed both casings; consistent classes contribute nothing.
         return $findings;
     }
 }

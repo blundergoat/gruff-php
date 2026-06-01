@@ -196,7 +196,10 @@ final class DeadCodeRulesTest extends TestCase
     /**
      * Analyse dead-code fixtures and return findings for assertions.
      *
-     * @return list<\GruffPhp\Finding\Finding>
+     * @param string $fixture - fixture filename under Fixtures/DeadCode to parse and run the full registry against.
+     * @param string $ruleId  - rule id to isolate; the full pass runs but only this rule's findings come back, so a
+     *   fixture exercising several dead-code shapes can be asserted one rule at a time.
+     * @return list<\GruffPhp\Finding\Finding> - findings from $ruleId alone, re-indexed for positional assertions.
      */
     private function analyseRule(string $fixture, string $ruleId): array
     {
@@ -205,6 +208,7 @@ final class DeadCodeRulesTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Keep only the requested rule so one fixture can be asserted against each dead-code rule independently.
         return array_values(array_filter($findings, static fn ($finding) => $finding->ruleId === $ruleId));
     }
 
@@ -218,6 +222,7 @@ final class DeadCodeRulesTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/DeadCode/' . $filename;
 
+        // Parsed unit carries the display path the rules report findings against, so keep it relative to the repo root.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/DeadCode/' . $filename));
     }
 }

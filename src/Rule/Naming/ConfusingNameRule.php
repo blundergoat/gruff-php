@@ -41,6 +41,7 @@ final readonly class ConfusingNameRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Advisory with medium confidence: the standalone-name heuristic flags suspects, not certainties.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Confusing standalone class name',
@@ -92,6 +93,7 @@ final readonly class ConfusingNameRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per confusingly-named class; empty when the unit holds no flagged names.
         return $findings;
     }
 }

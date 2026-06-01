@@ -307,7 +307,8 @@ final class ScoreCalculatorTest extends TestCase
     /**
      * Build an AnalysisConfig with one rule marked excludeFromScore.
      *
-     * @param string $ruleId Rule identifier to mark excluded.
+     * @param RuleRegistry $registry Source of rule defaults the config is seeded from.
+     * @param string       $ruleId   Rule identifier to mark excluded.
      * @return AnalysisConfig
      */
     private function configWithExcludedRule(RuleRegistry $registry, string $ruleId): AnalysisConfig
@@ -315,6 +316,7 @@ final class ScoreCalculatorTest extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $settings = $config->ruleSettings($ruleId);
 
+        // Clone the config with this rule flagged so its findings drop out of the composite score.
         return $config->withRuleSettings($ruleId, new \GruffPhp\Config\RuleSettings(
             enabled:           $settings->enabled,
             thresholds:        $settings->thresholds,
@@ -337,6 +339,7 @@ final class ScoreCalculatorTest extends TestCase
             $map[$pillar->pillar] = $pillar;
         }
 
+        // Pillar scores keyed by name so a test can assert one pillar without index juggling.
         return $map;
     }
 
@@ -348,6 +351,7 @@ final class ScoreCalculatorTest extends TestCase
      * @param Severity                                                                               $severity
      * @param string                                                                                 $filePath Finding file path.
      * @param int                                                                                    $line     Finding line number.
+     * @param int|null $endLine End line of the finding span; null means the finding spans a single line.
      * @param string|null                                                                            $symbol
      * @param array<string, bool|float|int|string|null|array<array-key, bool|float|int|string|null>> $metadata
      * @return Finding
@@ -362,6 +366,7 @@ final class ScoreCalculatorTest extends TestCase
         ?string $symbol = null,
         array $metadata = [],
     ): Finding {
+        // Assemble a fully populated Finding fixture so scoring tests vary only the fields they pass.
         return new Finding(
             ruleId:     $ruleId,
             message:    'Example finding.',

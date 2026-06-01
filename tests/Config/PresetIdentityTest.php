@@ -60,6 +60,7 @@ final class PresetIdentityTest extends TestCase
         }
         ksort($rules);
 
+        // Hand back a key-sorted, fully resolved view so two configs compare equal regardless of rule ordering.
         return [
             'rules' => $rules,
             'minimumPhpVersion' => $config->minimumPhpVersion(),

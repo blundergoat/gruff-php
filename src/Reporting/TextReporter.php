@@ -75,6 +75,7 @@ final readonly class TextReporter
 
         $this->appendOutputVolumeHint($lines, $counts['total']);
 
+        // Join the accumulated lines with a trailing newline so the block reads cleanly when piped to a terminal.
         return implode(PHP_EOL, $lines) . PHP_EOL;
     }
 
@@ -84,12 +85,14 @@ final readonly class TextReporter
      * hint short-circuits the "open a Python summariser to triage" workaround
      * that consumers were writing externally. See M08.
      *
-     * @param list<string> $lines
+     * @param list<string> $lines        Output buffer appended in place; the hint is added only past the floor.
+     * @param int          $findingCount Total finding count this report rendered; gates whether the hint appears.
      * @return void
      */
     private function appendOutputVolumeHint(array &$lines, int $findingCount): void
     {
         if ($findingCount < self::OUTPUT_VOLUME_HINT_THRESHOLD) {
+            // Small reports stay browsable flat, so the summary hint would be noise below the floor.
             return;
         }
 
@@ -107,17 +110,20 @@ final readonly class TextReporter
      * attention to which rules actually shifted since the base. Block is silent when no
      * branch-review is in scope. See M06 / ADR-016.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines  Output buffer appended in place; left untouched when no review is attached.
+     * @param AnalysisReport $report Report whose attached branch-review supplies the per-rule deltas, if any.
      * @return void
      */
     private function appendRuleDeltas(array &$lines, AnalysisReport $report): void
     {
         if ($report->review === null) {
+            // No branch review means no base to diff against, so the rule-delta block is omitted entirely.
             return;
         }
 
         $rows = $report->review->perRuleDelta();
         if ($rows === []) {
+            // Base and current findings matched rule-for-rule, so there is nothing to surface as a delta.
             return;
         }
 
@@ -129,6 +135,7 @@ final readonly class TextReporter
         );
 
         if ($improved === [] && $regressed === []) {
+            // Every delta netted to zero after filtering, so neither the improved nor regressed list would print.
             return;
         }
 
@@ -161,12 +168,14 @@ final readonly class TextReporter
     /**
      * Append review details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines  Output buffer appended in place; left untouched when no review is attached.
+     * @param AnalysisReport $report Report whose attached branch-review supplies the base ref and finding sets.
      * @return void
      */
     private function appendReview(array &$lines, AnalysisReport $report): void
     {
         if ($report->review === null) {
+            // No branch review was requested, so the entire Branch review section is skipped.
             return;
         }
 
@@ -186,6 +195,7 @@ final readonly class TextReporter
         }
 
         if ($report->review->introduced === []) {
+            // The summary line already reported zero introduced findings, so the detailed list adds nothing.
             return;
         }
 
@@ -204,12 +214,14 @@ final readonly class TextReporter
     /**
      * Append score details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines  Output buffer appended in place; left untouched when the report has no score.
+     * @param AnalysisReport $report Report supplying the composite score, per-pillar grades, and diff context.
      * @return void
      */
     private function appendScore(array &$lines, AnalysisReport $report): void
     {
         if ($report->score === null) {
+            // Scoring is skipped for diff-only or filtered runs, so there is no Score section to render.
             return;
         }
 
@@ -253,12 +265,14 @@ final readonly class TextReporter
     /**
      * Append baseline details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>   $lines  Output buffer appended in place; left untouched when no baseline was applied.
+     * @param AnalysisReport $report Report supplying baseline movement counts and the stale-entry resolution flag.
      * @return void
      */
     private function appendBaseline(array &$lines, AnalysisReport $report): void
     {
         if ($report->baseline === null) {
+            // No baseline was generated or applied this run, so the Baseline section is omitted.
             return;
         }
 
@@ -286,6 +300,7 @@ final readonly class TextReporter
                 $report->baseline->path,
             );
 
+            // A just-generated baseline cannot have stale entries yet, so skip the staleness tips below.
             return;
         }
 
@@ -313,12 +328,15 @@ final readonly class TextReporter
     /**
      * Append mutation details to report output.
      *
-     * @param list<string> $lines
+     * @param list<string>                $lines    Output buffer appended in place.
+     * @param MutationAnalysisResult|null $mutation Mutation-testing result, or null when no mutation run is in scope
+     *                                              (null produces no Mutation section at all).
      * @return void
      */
     private function appendMutation(array &$lines, ?MutationAnalysisResult $mutation): void
     {
         if (!$mutation instanceof MutationAnalysisResult) {
+            // Mutation testing did not run, so the Mutation section is left out of the report.
             return;
         }
 
@@ -366,6 +384,7 @@ final readonly class TextReporter
 
         $fileSummaries = $mutation->report->fileSummaries();
         if ($fileSummaries === []) {
+            // The aggregate stats above already stand alone when no per-file breakdown is available.
             return;
         }
 
@@ -390,6 +409,7 @@ final readonly class TextReporter
     private function mutationStatusSummary(array $counts): string
     {
         if ($counts === []) {
+            // No statuses to summarise; "none" reads better in the report than an empty string.
             return 'none';
         }
 
@@ -398,6 +418,7 @@ final readonly class TextReporter
             $parts[] = sprintf('%s=%d', $status, $count);
         }
 
+        // Comma-joined status=count pairs render the full mutant status breakdown on one line.
         return implode(', ', $parts);
     }
 
@@ -416,19 +437,22 @@ final readonly class TextReporter
             }
         }
 
+        // Null tells the caller to drop the context-status line entirely rather than print an empty one.
         return $parts === [] ? null : implode(', ', $parts);
     }
 
     /**
      * Append path section details to report output.
      *
-     * @param list<string> $lines
-     * @param list<string> $paths
+     * @param list<string> $lines Output buffer appended in place; left untouched when $paths is empty.
+     * @param string       $title Section heading printed once above the paths (for example "Ignored paths").
+     * @param list<string> $paths Paths to list under the heading; an empty list suppresses the whole section.
      * @return void
      */
     private function appendPathSection(array &$lines, string $title, array $paths): void
     {
         if ($paths === []) {
+            // With no paths to list, the heading would be a dangling label, so emit nothing.
             return;
         }
 
@@ -450,6 +474,7 @@ final readonly class TextReporter
     private function appendDiagnostics(array &$lines, array $diagnostics): void
     {
         if ($diagnostics === []) {
+            // A clean run has no diagnostics, so the Diagnostics heading is suppressed.
             return;
         }
 
@@ -488,6 +513,7 @@ final readonly class TextReporter
 
         if ($findings === []) {
             $lines[] = '  None';
+            // "None" is the whole section when the run is clean, so stop before the per-finding loop.
             return;
         }
 

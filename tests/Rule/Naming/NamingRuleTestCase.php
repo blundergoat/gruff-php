@@ -32,6 +32,8 @@ abstract class NamingRuleTestCase extends TestCase
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
+     * @param string $fixture Fixture filename under tests/Fixtures/Naming.
+     * @param string $ruleId Rule id to keep; findings from every other rule are discarded.
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseRule(string $fixture, string $ruleId): array
@@ -41,12 +43,16 @@ abstract class NamingRuleTestCase extends TestCase
         $config   = AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+        // Keep only the rule under test so an assertion sees its findings in isolation.
         return array_values(array_filter($findings, static fn ($finding): bool => $finding->ruleId === $ruleId));
     }
 
     /**
      * Analyse naming fixtures and return findings for assertions.
      *
+     * @param string $source Inline PHP written to a throwaway temp file before parsing.
+     * @param string $ruleId Rule id to keep; findings from every other rule are discarded.
+     * @param string $displayPath Path the rule sees, letting a test exercise path-sensitive naming checks.
      * @return list<\GruffPhp\Finding\Finding>
      */
     protected function analyseSourceRule(string $source, string $ruleId, string $displayPath = 'tests/Fixtures/Naming/inline.php'): array
@@ -62,6 +68,7 @@ abstract class NamingRuleTestCase extends TestCase
             $config   = AnalysisConfig::fromRegistry($registry);
             $findings = $registry->analyse([$unit], new RuleContext(__DIR__ . '/../../..', $config));
 
+            // Keep only the rule under test so an assertion sees its findings in isolation.
             return array_values(array_filter($findings, static fn ($finding): bool => $finding->ruleId === $ruleId));
         } finally {
             if (is_file($path)) {
@@ -80,6 +87,7 @@ abstract class NamingRuleTestCase extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/Naming/' . $filename;
 
+        // Display path stays repo-relative so finding output matches a real checkout.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/Naming/' . $filename));
     }
 }

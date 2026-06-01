@@ -54,6 +54,7 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('Unable to write history file: %s', $resolvedPath));
         }
 
+        // Report the just-written snapshot plus its delta against the prior run for callers to display.
         return new TrendReport(
             path:          PathHelper::relativeToRoot($resolvedPath, $projectRoot) ?? PathHelper::canonical($resolvedPath),
             currentScore:  $score->composite->score,
@@ -64,14 +65,16 @@ final readonly class TrendRecorder
     }
 
     /**
-     * Read entries for the component.
+     * Read and validate the bounded history file into typed snapshot rows.
      *
-     * @return list<TrendEntry>
+     * @param string $path Resolved history file path; an absent or empty file is treated as no history.
+     * @return list<TrendEntry> Snapshot rows in file order; empty when the file is absent or blank.
      */
     private function readEntries(string $path): array
     {
         $contents = $this->readHistoryFile($path);
         if ($contents === null) {
+            // No file or a blank file means there is simply no prior history yet.
             return [];
         }
 
@@ -80,6 +83,7 @@ final readonly class TrendRecorder
             throw new RuntimeException(sprintf('History file must contain a JSON array: %s', $path));
         }
 
+        // Each decoded row is re-validated so a tampered history file fails loudly rather than silently.
         return array_map(
             fn (mixed $trendEntry): array => $this->normaliseEntry($trendEntry, $path),
             $decoded,
@@ -87,11 +91,15 @@ final readonly class TrendRecorder
     }
 
     /**
-     * @return string|null History file contents, or null when absent/empty.
+     * Read raw history file bytes, distinguishing "no history" from an unreadable file.
+     *
+     * @param string      $path Resolved history file path to read.
+     * @return string|null Raw file contents, or null when the file is missing or whitespace-only.
      */
     private function readHistoryFile(string $path): ?string
     {
         if (!is_file($path)) {
+            // A missing file is the first-run case, not an error: caller starts a fresh history.
             return null;
         }
 
@@ -101,16 +109,20 @@ final readonly class TrendRecorder
         }
 
         if (trim($contents) === '') {
+            // A blank file is treated like no history so a truncated write cannot crash the next run.
             return null;
         }
 
+        // Defer JSON parsing to the caller; this method only owns presence and readability.
         return $contents;
     }
 
     /**
      * Validate one decoded history row and preserve its scalar values.
      *
-     * @return TrendEntry
+     * @param mixed  $trendEntry Decoded JSON row; must be a string-keyed map, else the file is rejected.
+     * @param string $path       History file path, used only to make validation errors point at the file.
+     * @return TrendEntry The row with every value confirmed scalar, ready to fold back into history.
      */
     private function normaliseEntry(mixed $trendEntry, string $path): array
     {
@@ -127,15 +139,21 @@ final readonly class TrendRecorder
             $normalisedEntry[$key] = $this->normaliseEntryValue($trendValue, $path);
         }
 
+        // Hand back the rebuilt row so an invalid value anywhere aborts before it re-enters history.
         return $normalisedEntry;
     }
 
     /**
-     * @return bool|float|int|string|null Scalar trend entry value.
+     * Assert a single history value is scalar, rejecting nested arrays/objects.
+     *
+     * @param mixed  $trendValue Decoded value to vet; non-scalar shapes are not valid trend data.
+     * @param string $path       History file path, surfaced in the error when a value is rejected.
+     * @return bool|float|int|string|null The same value once confirmed scalar.
      */
     private function normaliseEntryValue(mixed $trendValue, string $path): bool|float|int|string|null
     {
         if (is_bool($trendValue) || is_float($trendValue) || is_int($trendValue) || is_string($trendValue) || $trendValue === null) {
+            // Pass scalars through untouched; only their type is contractually guaranteed.
             return $trendValue;
         }
 
@@ -151,6 +169,7 @@ final readonly class TrendRecorder
     {
         $score = $trendEntry['score'] ?? null;
 
+        // A missing or non-numeric score yields null so the delta is reported as unknown, not zero.
         return is_int($score) || is_float($score) ? (float) $score : null;
     }
 

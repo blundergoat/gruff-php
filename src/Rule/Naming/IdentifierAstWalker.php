@@ -30,10 +30,12 @@ final readonly class IdentifierAstWalker
             $this->collectMatchingNodes($node, $predicate, $matches);
         }
 
+        // Hand back every descendant that satisfied the predicate, gathered across all roots.
         return $matches;
     }
 
     /**
+     * @param Node                 $node      Current node to test; recursion stops at function-like boundaries.
      * @param callable(Node): bool $predicate Predicate that selects matching descendants.
      * @param list<Node>           $matches   Output list of matching descendant nodes.
      * @return void
@@ -41,6 +43,7 @@ final readonly class IdentifierAstWalker
     private function collectMatchingNodes(Node $node, callable $predicate, array &$matches): void
     {
         if ($node instanceof ClassMethod || $node instanceof Function_ || $node instanceof Closure || $node instanceof ArrowFunction) {
+            // Stop at a function-like boundary so inner-callable declarations stay out of the parent scope.
             return;
         }
 
@@ -56,6 +59,7 @@ final readonly class IdentifierAstWalker
     /**
      * List direct child nodes that can be recursively traversed.
      *
+     * @param Node $node Parent node whose declared sub-node slots are flattened into traversable children.
      * @return list<Node>
      */
     private function childNodes(Node $node): array
@@ -66,12 +70,14 @@ final readonly class IdentifierAstWalker
             $this->collectChildNodes($node->{$name}, $children);
         }
 
+        // Hand back the flattened direct children pulled from every sub-node slot of this node.
         return $children;
     }
 
     /**
      * Append traversable child nodes to the current collection.
      *
+     * @param mixed      $subNode  One sub-node slot value: a Node, an array of them, or a scalar/null that is skipped.
      * @param list<Node> $children
      * @return void
      */
@@ -79,10 +85,12 @@ final readonly class IdentifierAstWalker
     {
         if ($subNode instanceof Node) {
             $children[] = $subNode;
+            // A bare Node is itself a child; record it and do not recurse into a non-array.
             return;
         }
 
         if (!is_array($subNode)) {
+            // Scalars, strings, and null are leaf slot values with no traversable children, so skip them.
             return;
         }
 

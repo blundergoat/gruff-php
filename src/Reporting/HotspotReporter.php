@@ -32,6 +32,7 @@ final readonly class HotspotReporter
             ),
         ];
 
+        // Pretty-printed with a trailing newline so the hotspot map stays diffable and shell-redirection clean.
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
     }
 }

@@ -330,6 +330,7 @@ final class TestQualityNodeHelperTest extends TestCase
     {
         $path = __DIR__ . '/../../Fixtures/TestQuality/test-quality-node-helper.php';
 
+        // Hand back the shared helper fixture parsed once, so each assertion inspects the same scopes and calls.
         return $this->parser->parse(new SourceFile($path, 'tests/Fixtures/TestQuality/test-quality-node-helper.php'));
     }
 
@@ -341,6 +342,7 @@ final class TestQualityNodeHelperTest extends TestCase
      */
     private function unitWithDisplayPath(string $displayPath): AnalysisUnit
     {
+        // Hand back a body-less unit so a test can exercise display-path handling without parsing real source.
         return new AnalysisUnit(new SourceFile(__FILE__, $displayPath), '', [], [], []);
     }
 
@@ -357,6 +359,7 @@ final class TestQualityNodeHelperTest extends TestCase
             $scopes[$scope->name] = $scope;
         }
 
+        // Hand back the fixture scopes keyed by name so tests can look one up without scanning the list.
         return $scopes;
     }
 
@@ -370,6 +373,7 @@ final class TestQualityNodeHelperTest extends TestCase
     {
         self::assertInstanceOf(Stmt\ClassMethod::class, $scope->node);
 
+        // The assertion above has already narrowed the node to a class method; hand that back to the caller.
         return $scope->node;
     }
 
@@ -384,6 +388,7 @@ final class TestQualityNodeHelperTest extends TestCase
     {
         foreach ($calls as $call) {
             if (TestQualityNodeHelper::callName($call) === $name) {
+                // Stop at the first call whose normalised name matches; later duplicates are irrelevant here.
                 return $call;
             }
         }

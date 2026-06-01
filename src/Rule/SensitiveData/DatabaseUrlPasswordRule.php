@@ -30,6 +30,9 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence is justified because a literal `:password@` inside a recognised DB scheme is an
+        // unambiguous credential, not a heuristic guess; the dummy-value and comment filters below cut the
+        // residual false positives, so callers can gate on these findings without manual triage.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Database URL password',
@@ -53,6 +56,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
         // Fast bail: a credential-bearing DB URL needs scheme://...:...@...
         // Skip the alternation when no supported scheme prefix appears.
         if (preg_match('#(?:mysql|mariadb|mongodb|pgsql|postgres|postgresql|redis)://#i', $analysisUnit->source) !== 1) {
+            // No supported DB scheme in the source means there can be no inline credential to report.
             return [];
         }
 
@@ -93,6 +97,7 @@ final readonly class DatabaseUrlPasswordRule implements SourceTextRuleInterface
             );
         }
 
+        // Hand back one finding per credential-bearing URL that survived the comment and dummy-value filters.
         return $findings;
     }
 }

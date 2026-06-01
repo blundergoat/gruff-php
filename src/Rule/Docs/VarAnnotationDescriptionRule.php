@@ -41,6 +41,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning at high confidence: a bare local @var is an unambiguous documentation gap, so it should be loud.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Var annotation description',
@@ -64,6 +65,7 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
     {
         // Fast bail: nothing to find when the file has no @var tag.
         if (!str_contains($analysisUnit->source, '@var')) {
+            // No @var anywhere means no annotation to judge, so report nothing.
             return [];
         }
 
@@ -115,16 +117,21 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
             }
         }
 
+        // Hand back every bare-@var finding gathered while walking the docblocks.
         return $findings;
     }
 
     /**
      * Distinguish declaration docblocks from local variable assertion docblocks.
      *
+     * @param Node $node AST node carrying the @var docblock; a declaration node means the tag documents that
+     *                   declaration rather than a local assertion, so it is exempt from this rule.
+     *
      * @return bool True when the docblock belongs to a declaration node.
      */
     private function isDeclarationNode(Node $node): bool
     {
+        // A @var on any of these declaration shapes documents the declaration, not a local assertion to flag.
         return $node instanceof Property
             || $node instanceof ClassMethod
             || $node instanceof Function_
@@ -136,6 +143,8 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
 
     /**
      * Find local @var annotations that name a type without explaining intent.
+     *
+     * @param string $docText Raw docblock text, including the comment markers, that trim() strips line by line.
      *
      * @return list<string>
      */
@@ -169,9 +178,11 @@ final readonly class VarAnnotationDescriptionRule implements RuleInterface
         }
 
         if ($descriptiveLines !== []) {
+            // Any prose line already explains the docblock, so suppress every bare-@var finding for it.
             return [];
         }
 
+        // Only tag-only docblocks reach here, so surface the variables whose @var carried no reason.
         return $bareVariables;
     }
 }

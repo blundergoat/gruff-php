@@ -80,6 +80,7 @@ final class DashboardScanCommandBuilderTest extends TestCase
      */
     private function state(): array
     {
+        // Canonical valid scan state the builder turns into a command line.
         return [
             'project' => __DIR__,
             'paths' => '.',

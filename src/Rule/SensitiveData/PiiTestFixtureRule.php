@@ -30,6 +30,8 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     private function patterns(): array
     {
+        // One detector name plus its regex per PII family; the name only gates the email-only
+        // attribution check, the finding message, and the detector field, not the value allow-list.
         return [
             ['name' => 'email', 'pattern' => '/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i'],
             ['name' => 'phone', 'pattern' => '/\b(?:\+?1[-.\s]?)?\(?[2-9]\d{2}\)?[-.\s]\d{3}[-.\s]\d{4}\b/'],
@@ -44,6 +46,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning, medium confidence: realistic-looking fixtures are likely synthetic but worth a reviewer's eye.
         return new RuleDefinition(
             id:              self::ID,
             name:            'PII in test fixture',
@@ -65,6 +68,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!SecretScannerHelper::isTestPath($analysisUnit->file->displayPath)) {
+            // This rule only governs fixtures, so production paths produce nothing.
             return [];
         }
 
@@ -102,11 +106,14 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
             }
         }
 
+        // One finding per fixture match that is neither a synthetic example nor an attribution email.
         return $findings;
     }
 
     /**
      * Allow clearly synthetic example values.
+     *
+     * @param string $candidateFixture Matched fixture text, lower-cased here before substring checks.
      *
      * @return bool True when the matched value is an accepted example fixture.
      */
@@ -114,6 +121,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     {
         $normalized = strtolower($candidateFixture);
 
+        // True for reserved example/test domains and the 555-010x phone block, all guaranteed non-real.
         return str_contains($normalized, '@example.')
             || str_contains($normalized, '@example-')
             || str_contains($normalized, '@test.')
@@ -125,6 +133,9 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
     /**
      * Ignore email addresses that appear in attribution or copyright lines.
      *
+     * @param string $source Full unit source, used to recover the physical line around the match.
+     * @param int    $offset Byte offset of the email match within the source.
+     *
      * @return bool True when the email appears in attribution context.
      */
     private function isAttributionEmail(string $source, int $offset): bool
@@ -135,6 +146,7 @@ final readonly class PiiTestFixtureRule implements SourceTextRuleInterface
         $lineEnd   = $lineEnd === false ? strlen($source) : $lineEnd;
         $line      = strtolower(substr($source, $lineStart, $lineEnd - $lineStart));
 
+        // True for author/copyright lines, where a maintainer email is metadata rather than fixture PII.
         return str_contains($line, '@author')
             || str_contains($line, 'copyright')
             || str_contains($line, '@copyright');

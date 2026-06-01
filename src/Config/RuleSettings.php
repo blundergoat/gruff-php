@@ -33,6 +33,7 @@ final readonly class RuleSettings
      */
     public function isExcludedFromScore(): bool
     {
+        // Report-only rules surface findings but stay out of the composite score (ADR-016).
         return $this->excludeFromScore;
     }
 
@@ -51,6 +52,7 @@ final readonly class RuleSettings
             throw new LogicException(sprintf('Missing numeric threshold "%s".', $name));
         }
 
+        // The configured limit for this rule (e.g. the warning or error budget a metric is compared against).
         return $thresholdValue;
     }
 
@@ -63,6 +65,7 @@ final readonly class RuleSettings
     public function highValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
+            // Single-threshold override: breach only once the value strictly exceeds it.
             return $measuredValue > $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -70,12 +73,14 @@ final readonly class RuleSettings
 
         $warningThreshold = $this->numericThreshold('warning');
         if ($measuredValue <= $warningThreshold) {
+            // Metric is within budget; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
         $severity       = $measuredValue > $errorThreshold ? Severity::Error : Severity::Warning;
 
+        // Report at the highest band the value crossed so the finding names the breached limit.
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
             $severity,
@@ -91,6 +96,7 @@ final readonly class RuleSettings
     public function lowValueThresholdMatch(int|float $measuredValue): ?ThresholdMatch
     {
         if ($this->severityThreshold instanceof SeverityThreshold) {
+            // Single-threshold override: breach only once the value falls strictly below it.
             return $measuredValue < $this->severityThreshold->threshold
                 ? new ThresholdMatch($this->severityThreshold->threshold, $this->severityThreshold->severity)
                 : null;
@@ -98,12 +104,14 @@ final readonly class RuleSettings
 
         $warningThreshold = $this->numericThreshold('warning');
         if ($measuredValue >= $warningThreshold) {
+            // Metric meets the required floor; null is the rule's "passes, nothing to report" signal to callers.
             return null;
         }
 
         $errorThreshold = $this->numericThreshold('error');
         $severity       = $measuredValue < $errorThreshold ? Severity::Error : Severity::Warning;
 
+        // Report at the lowest band the value undershot so the finding names the breached floor.
         return new ThresholdMatch(
             $severity === Severity::Error ? $errorThreshold : $warningThreshold,
             $severity,
@@ -123,6 +131,7 @@ final readonly class RuleSettings
             throw new LogicException(sprintf('Missing option "%s".', $name));
         }
 
+        // The rule's configured option value in its raw union type; callers narrow it (see stringListOption).
         return $this->options[$name];
     }
 
@@ -151,6 +160,7 @@ final readonly class RuleSettings
             $stringOptions[] = $optionItem;
         }
 
+        // The option's configured string values; an unset option yields the empty list, not an error.
         return $stringOptions;
     }
 }

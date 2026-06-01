@@ -294,6 +294,7 @@ final class MissingConfigPromptTest extends TestCase
      */
     private function fakeConsoleOutput(BufferedOutput $bufferedOutput): BufferedOutput&ConsoleOutputInterface
     {
+        // Hand back an anonymous console double whose error stream is the supplied buffer, main stream its own.
         return new class ($bufferedOutput) extends BufferedOutput implements ConsoleOutputInterface
         {
             /**
@@ -313,6 +314,7 @@ final class MissingConfigPromptTest extends TestCase
              */
             public function getErrorOutput(): OutputInterface
             {
+                // Expose the injected buffer so assertions can read whatever was routed to STDERR.
                 return $this->bufferedOutput;
             }
 
@@ -383,6 +385,7 @@ final class MissingConfigPromptTest extends TestCase
         $stringInput->setStream($stream);
         $stringInput->setInteractive(true);
 
+        // Hand back an interactive input whose stream feeds the prepared answers to the QuestionHelper.
         return $stringInput;
     }
 
@@ -396,6 +399,7 @@ final class MissingConfigPromptTest extends TestCase
         $path = sys_get_temp_dir() . '/gruff-prompt-' . bin2hex(random_bytes(6));
         self::assertTrue(mkdir($path));
 
+        // Hand back the new directory path for the caller to populate and later tear down.
         return $path;
     }
 
@@ -408,6 +412,7 @@ final class MissingConfigPromptTest extends TestCase
     private function removeTempDirectory(string $path): void
     {
         if (!is_dir($path)) {
+            // Already gone (or never created), so there is nothing to recurse into.
             return;
         }
 

@@ -45,6 +45,7 @@ final class DashboardRequestHandlerTest extends TestCase
      */
     public static function rejectedHostRequestProvider(): array
     {
+        // Each row pairs a raw request with the status line its bad/absent Host must trigger.
         return [
             'missing host' => ["GET / HTTP/1.1\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
             'mismatched host' => ["GET /scan HTTP/1.1\r\nHost: evil.example\r\n\r\n", 'HTTP/1.1 421 Misdirected Request'],
@@ -111,7 +112,8 @@ final class DashboardRequestHandlerTest extends TestCase
     /**
      * Return the dashboard response for a raw HTTP request.
      *
-     * @param string $request Raw HTTP request.
+     * @param string $request          Raw HTTP request.
+     * @param bool   $shouldCloseWrite When true, half-close the write side to exercise truncated-request handling.
      * @return string
      */
     private function responseFor(string $request, bool $shouldCloseWrite = false): string
@@ -132,6 +134,7 @@ final class DashboardRequestHandlerTest extends TestCase
 
         self::assertIsString($response);
 
+        // Give back exactly what the handler wrote to the socket for the test to assert on.
         return $response;
     }
 
@@ -145,6 +148,7 @@ final class DashboardRequestHandlerTest extends TestCase
         $dashboardStateFactory = new DashboardStateFactory();
         $dashboardPageRenderer = new DashboardPageRenderer();
 
+        // Handler wired to a loopback context and a fake binary so tests never spawn the real scanner.
         return new DashboardRequestHandler(
             new DashboardRequestContext(
                 $this->input(),
@@ -167,6 +171,7 @@ final class DashboardRequestHandlerTest extends TestCase
      */
     private function input(): ArrayInput
     {
+        // Empty input carrying just the option definitions the handler reads.
         return new ArrayInput([], new InputDefinition([
             new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
             new InputOption('fail-on', null, InputOption::VALUE_REQUIRED, '', 'none'),
@@ -189,6 +194,7 @@ final class DashboardRequestHandlerTest extends TestCase
         $path = sys_get_temp_dir() . '/gruff-dashboard-test-' . bin2hex(random_bytes(6)) . '.php';
         file_put_contents($path, "<?php echo '<!doctype html><html><body>scan</body></html>'; \n");
 
+        // Path to a stub script that prints fixed HTML, standing in for the real gruff binary.
         return $path;
     }
 }

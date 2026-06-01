@@ -25,6 +25,7 @@ final class ModernisationNodeHelper
      */
     public static function supportsPhp(RuleContext $ruleContext, float $version): bool
     {
+        // True only when the project's configured floor already reaches the feature's required version.
         return $ruleContext->config->minimumPhpVersion() >= $version;
     }
 
@@ -37,9 +38,11 @@ final class ModernisationNodeHelper
     public static function typeName(null|Identifier|Name|Node\ComplexType $type): ?string
     {
         if ($type instanceof Identifier || $type instanceof Name) {
+            // Lower-case so callers can compare against literal type names without minding source casing.
             return strtolower($type->toString());
         }
 
+        // Union, intersection, nullable, and absent types carry no single name to normalise.
         return null;
     }
 
@@ -53,13 +56,16 @@ final class ModernisationNodeHelper
     public static function isThisPropertyFetch(Expr $expr, ?string $propertyName = null): bool
     {
         if (!$expr instanceof Expr\PropertyFetch || !$expr->var instanceof Expr\Variable) {
+            // Anything that is not a property fetch on a plain variable cannot be a `$this->prop` access.
             return false;
         }
 
         if ($expr->var->name !== 'this' || !$expr->name instanceof Identifier) {
+            // Reject fetches off other variables, or dynamic `$this->$name`, since the name is not statically known.
             return false;
         }
 
+        // With no name requested, any `$this` property matches; otherwise the fetched name must equal it.
         return $propertyName === null || $expr->name->toString() === $propertyName;
     }
 
@@ -72,9 +78,11 @@ final class ModernisationNodeHelper
     public static function propertyFetchName(Expr $expr): ?string
     {
         if (!$expr instanceof Expr\PropertyFetch || !$expr->name instanceof Identifier) {
+            // Dynamic property names (`$obj->$name`) and non-fetch expressions have no static name to report.
             return null;
         }
 
+        // Return the bare property identifier so callers can key assignment maps on it.
         return $expr->name->toString();
     }
 
@@ -86,6 +94,7 @@ final class ModernisationNodeHelper
      */
     public static function className(Stmt\Class_ $class): ?string
     {
+        // Anonymous classes have no name node, so the null-safe call yields null for them.
         return $class->name?->toString();
     }
 
@@ -99,15 +108,18 @@ final class ModernisationNodeHelper
     {
         $name = self::className($class);
         if ($name === null) {
+            // An anonymous class carries no naming convention to classify, so treat it as non-DTO.
             return false;
         }
 
         foreach (['Data', 'Dto', 'DTO', 'Payload', 'ValueObject'] as $suffix) {
             if (str_ends_with($name, $suffix)) {
+                // A recognised value-object suffix is the signal that exempts the class from mutable-state rules.
                 return true;
             }
         }
 
+        // No conventional suffix matched, so the class is not treated as a value object.
         return false;
     }
 
@@ -121,6 +133,7 @@ final class ModernisationNodeHelper
     {
         $parent = $node->getAttribute('parent');
 
+        // Null means the parent visitor never ran or this is a root node, not that a parent was checked and absent.
         return $parent instanceof Node ? $parent : null;
     }
 }

@@ -195,6 +195,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
      */
     private function runGruff(array $args): Process
     {
+        // Hand back an unstarted process so the caller controls when and how it runs.
         return new Process(
             array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args),
             $this->project,
@@ -204,6 +205,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
     /**
      * Decode a check-ignore JSON array response into a list of result rows.
      *
+     * @param Process $process Completed check-ignore process whose stdout holds the JSON array.
      * @return list<array{path: string, ignored: bool, source: string|null, pattern: string|null}>
      * @throws JsonException
      */
@@ -213,6 +215,7 @@ final class IgnoreAuthoritativeCliTest extends CliTestCase
         self::assertIsArray($decoded);
 
         /** @var list<array{path: string, ignored: bool, source: string|null, pattern: string|null}> $decoded The check-ignore JSON output is always a list of path-decision rows. */
+        // Hand back the decoded path-decision rows for the test's per-row assertions.
         return $decoded;
     }
 

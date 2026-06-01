@@ -399,6 +399,7 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
      */
     public static function invalidInlineConfigProvider(): array
     {
+        // Each case pairs a malformed inline config payload with the validation message the loader must raise.
         return [
             'severity threshold without severity' => [
                 '{"rules":{"size.file-length":{"threshold":70}}}',

@@ -60,6 +60,7 @@ final readonly class BaselineReport
      */
     public function toArray(): array
     {
+        // Report shape: "staleEntries" is a count, the full entries live under "stale", counts group under "buckets".
         return [
             'path' => $this->path,
             'generated' => $this->generated,

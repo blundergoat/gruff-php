@@ -30,6 +30,7 @@ final readonly class IgnoredPath
      */
     public static function from(string $path, IgnoreDecision $decision): self
     {
+        // A decision with no recorded source is treated as a config exclusion, the default ignore origin.
         return new self($path, $decision->source ?? PathIgnoreResolver::SOURCE_CONFIG, $decision->pattern);
     }
 
@@ -40,6 +41,7 @@ final readonly class IgnoredPath
      */
     public function toArray(): array
     {
+        // Flatten to the report row shape; pattern stays null when the exclusion had no concrete match string.
         return [
             'path' => $this->path,
             'source' => $this->source,

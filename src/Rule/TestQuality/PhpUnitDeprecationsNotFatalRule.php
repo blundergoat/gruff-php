@@ -50,6 +50,7 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning severity at high confidence: a missing failOnDeprecation is an unambiguous, fixable config gap.
         return new RuleDefinition(
             id:              self::ID,
             name:            'PHPUnit deprecations not fatal',
@@ -71,15 +72,18 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
     {
         $root = $ruleContext->projectRoot;
         if (isset($this->emittedRoots[$root])) {
+            // One config maps to many test files; emit per project root once so the finding is not duplicated.
             return [];
         }
 
         if (!TestQualityNodeHelper::looksLikePhpUnitTestFile($analysisUnit)) {
+            // Wait for an actual PHPUnit test file before judging the config, so non-test projects stay silent.
             return [];
         }
 
         $config = $this->discovery->discover($root);
         if ($config === null) {
+            // No discoverable phpunit.xml means there is no failOnDeprecation setting to fault; not applicable.
             return [];
         }
 
@@ -89,9 +93,11 @@ final class PhpUnitDeprecationsNotFatalRule implements RuleInterface
         $attributeValue = $attributes !== null ? $attributes->failOnDeprecation : null;
 
         if ($attributeValue !== null && strtolower($attributeValue->__toString()) !== 'false' && $attributeValue->__toString() !== '') {
+            // A present, non-empty, non-"false" value means deprecations already fail the run; nothing to report.
             return [];
         }
 
+        // failOnDeprecation is absent or explicitly disabled, so deprecations would accrue silently; report it.
         return [
             new Finding(
                 ruleId:  self::ID,

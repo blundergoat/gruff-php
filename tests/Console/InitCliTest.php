@@ -383,6 +383,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Write an existing config with local path-ignore policy.
      *
+     * @param string $configPath Destination the pre-existing config is written to before init runs.
      * @return void
      */
     private function writeConfigWithCustomPathIgnores(string $configPath): void
@@ -402,6 +403,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Decode generated YAML config for assertions.
      *
+     * @param string $configPath Path of the config init generated, read back for assertions.
      * @return array<string, mixed>
      */
     private function decodedConfig(string $configPath): array
@@ -413,6 +415,7 @@ final class InitCliTest extends CliTestCase
 
         $decoded = Yaml::parse($contents);
 
+        // Hand back the parsed config narrowed to string keys for structural assertions.
         return $this->stringKeyedArray($decoded);
     }
 
@@ -465,6 +468,7 @@ final class InitCliTest extends CliTestCase
     /**
      * Assert a decoded YAML value is an array keyed by strings.
      *
+     * @param mixed $decodedValue Raw YAML decode result asserted to be a string-keyed array.
      * @return array<string, mixed>
      */
     private function stringKeyedArray(mixed $decodedValue): array
@@ -477,6 +481,7 @@ final class InitCliTest extends CliTestCase
             $result[$key] = $entry;
         }
 
+        // Hand back the value re-typed as a string-keyed array once every key is verified.
         return $result;
     }
 
@@ -491,6 +496,7 @@ final class InitCliTest extends CliTestCase
         $contents = file_get_contents($configPath);
         self::assertIsString($contents);
 
+        // Hand back the generated config text for the caller's content assertions.
         return $contents;
     }
 }

@@ -30,6 +30,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      */
     private function patterns(): array
     {
+        // Each pattern anchors on a provider's published key prefix and minimum length, keeping false positives low.
         return [
             ['name' => 'stripe', 'pattern' => '/\bsk_live_[A-Za-z0-9]{16,}\b/'],
             ['name' => 'github', 'pattern' => '/\bghp_[A-Za-z0-9]{36}\b/'],
@@ -53,6 +54,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // High confidence: provider prefixes are distinctive enough that a non-dummy match is very likely a real key.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Common API key pattern',
@@ -79,6 +81,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
         // of these distinctive prefixes. Skipping the per-pattern regex when
         // none are present makes this rule near-free for the common case.
         if (preg_match('/sk_live_|ghp_|github_pat_|gh[ours]_|sk-proj-|sk-ant-|xox[baprs]-|hooks\.slack\.com\/services|npm_|AIza|[?&]sv=|glpat-/i', $analysisUnit->source) !== 1) {
+            // No supported prefix in the source means no provider pattern can match, so skip the per-pattern scan.
             return [];
         }
 
@@ -111,6 +114,7 @@ final readonly class ApiKeyPatternRule implements SourceTextRuleInterface
             }
         }
 
+        // Empty when every match sat in a comment or looked like a dummy value; the caller treats that as a clean file.
         return $findings;
     }
 }

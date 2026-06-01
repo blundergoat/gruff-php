@@ -38,6 +38,7 @@ final readonly class UnusedParameterRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Static metadata is the same on every call; the registry reads it to list and configure the rule.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Unused parameter',
@@ -65,12 +66,14 @@ final readonly class UnusedParameterRule implements RuleInterface
             array_push($findings, ...$this->findingsForNode($analysisUnit, $definition, $nodeFinder, $node));
         }
 
+        // Hand back every unused-parameter finding gathered across this unit's callables.
         return $findings;
     }
 
     /**
      * List functions and methods whose parameters can be checked for use.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose AST is searched for parameter-bearing callables.
      * @return list<ClassMethod|Function_>
      */
     private function analysableNodes(AnalysisUnit $analysisUnit): array
@@ -92,66 +95,79 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
+        // Only callables with both a body and parameters survive; the rest can hold no unused parameter.
         return $nodes;
     }
 
     /**
      * Detect whether the method's parameters can be analysed for unused-ness (skips abstract, magic, and contract overrides).
      *
+     * @param ClassMethod $classMethod Method declaration under inspection; its visibility and parent drive the decision.
      * @return bool True when the method body is in scope and not bound to an external interface contract.
      */
     private function isAnalysableMethod(ClassMethod $classMethod): bool
     {
         if ($classMethod->isAbstract() || $this->isMagicContractMethod($classMethod)) {
+            // Abstract and magic methods have no body to analyse and a signature we cannot change.
             return false;
         }
 
         if ($classMethod->isPrivate()) {
+            // A private method has no external caller, so an unused parameter is always the author's to remove.
             return true;
         }
 
+        // Otherwise it is analysable only when no inherited contract forces the parameter to stay.
         return !$this->hasExternalMethodContract($classMethod);
     }
 
     /**
      * Detect whether the method is a magic / contract method (`__toString`, `__get`, etc.) where parameter shape is fixed.
      *
+     * @param ClassMethod $classMethod Method whose name is matched against the PHP magic-method naming convention.
      * @return bool True when the name begins with `__` and is not `__construct`.
      */
     private function isMagicContractMethod(ClassMethod $classMethod): bool
     {
         $name = strtolower($classMethod->name->toString());
 
+        // The `__` prefix marks an engine-defined method; `__construct` is exempt because callers own its parameters.
         return str_starts_with($name, '__') && $name !== '__construct';
     }
 
     /**
      * Detect whether the method overrides or implements an external contract whose signature is mandatory.
      *
+     * @param ClassMethod $classMethod Method whose attributes, docblock, and enclosing type are checked for an inherited contract.
      * @return bool True when an Override attribute, inheritDoc marker, or `extends` / `implements` ancestor exists.
      */
     private function hasExternalMethodContract(ClassMethod $classMethod): bool
     {
         if ($this->hasOverrideAttribute($classMethod) || $this->hasInheritDoc($classMethod)) {
+            // An explicit Override or inheritDoc marker declares the signature is inherited and fixed.
             return true;
         }
 
         $parent = $classMethod->getAttribute('parent');
 
         if ($parent instanceof Node\Stmt\Class_) {
+            // A class that extends or implements may be honouring a parent signature we must not flag against.
             return $parent->extends !== null || $parent->implements !== [];
         }
 
         if ($parent instanceof Node\Stmt\Enum_) {
+            // Enums cannot extend, so only an implemented interface can impose a fixed signature.
             return $parent->implements !== [];
         }
 
+        // No marker and no extends/implements ancestor means the signature is entirely the author's own.
         return false;
     }
 
     /**
      * Detect whether the method carries a `#[\Override]` attribute.
      *
+     * @param ClassMethod $classMethod Method whose attribute groups are scanned for the `Override` marker.
      * @return bool
      */
     private function hasOverrideAttribute(ClassMethod $classMethod): bool
@@ -159,23 +175,27 @@ final readonly class UnusedParameterRule implements RuleInterface
         foreach ($classMethod->attrGroups as $attributeGroup) {
             foreach ($attributeGroup->attrs as $attribute) {
                 if (strtolower($attribute->name->getLast()) === 'override') {
+                    // Short-circuit on the first `Override` attribute; one is enough to bind the signature.
                     return true;
                 }
             }
         }
 
+        // No attribute group carried `Override`, so nothing here ties the method to a parent signature.
         return false;
     }
 
     /**
      * Detect whether the method's docblock contains `@inheritdoc` or `{@inheritdoc}`.
      *
+     * @param ClassMethod $classMethod Method whose attached docblock text is searched; absent docblock counts as no marker.
      * @return bool
      */
     private function hasInheritDoc(ClassMethod $classMethod): bool
     {
         $docComment = $classMethod->getDocComment();
 
+        // A method with no docblock cannot inherit one, so treat the missing-docblock case as no marker.
         return $docComment !== null
             // Match both block `@inheritdoc` and inline `{@inheritdoc}` inheritance markers.
             && preg_match('/\\{?@inheritdoc\\b\\}?/i', $docComment->getText()) === 1;
@@ -184,7 +204,10 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Build unused-parameter findings for one function or method.
      *
-     * @param ClassMethod|Function_ $node
+     * @param AnalysisUnit          $analysisUnit Parsed unit supplying file path and source for finding locations.
+     * @param RuleDefinition        $definition   Resolved rule metadata stamped onto each emitted finding.
+     * @param NodeFinder            $nodeFinder   Shared finder reused across nodes to collect variable references.
+     * @param ClassMethod|Function_ $node         Callable whose declared parameters are diffed against its body usage.
      * @return list<Finding>
      */
     private function findingsForNode(
@@ -208,6 +231,7 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
+        // Return one finding per declared parameter absent from the set of names read in the body.
         return $findings;
     }
 
@@ -231,19 +255,22 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
+        // Map only plain parameters by name; promoted-property params are skipped since they outlive the body.
         return $paramNames;
     }
 
     /**
      * Collect variable names referenced inside a function or method body.
      *
-     * @param ClassMethod|Function_ $node
+     * @param ClassMethod|Function_ $node       Callable whose statement list is walked for variable reads.
+     * @param NodeFinder            $nodeFinder Finder used to traverse the body; `unset()` targets are excluded as non-uses.
      * @return array<string, true>
      */
     private function usedVariableNames(ClassMethod|Function_ $node, NodeFinder $nodeFinder): array
     {
         $usedNames = [];
         $usedVars  = $nodeFinder->find($node->stmts ?? [], static function (Node $child): bool {
+            // Keep only named variable nodes that are genuine reads, so `unset()` does not count as use.
             return $child instanceof Variable
                 && is_string($child->name)
                 && self::isVariableUse($child);
@@ -256,18 +283,21 @@ final readonly class UnusedParameterRule implements RuleInterface
             }
         }
 
+        // Return the set of variable names read in the body, keyed for O(1) membership tests by the caller.
         return $usedNames;
     }
 
     /**
      * Detect whether the variable reference counts as a use; `unset($x)` is a placeholder, not a use.
      *
+     * @param Variable $variable Variable node found in the body; its parent decides whether it reads or merely clears the slot.
      * @return bool
      */
     private static function isVariableUse(Variable $variable): bool
     {
         $parent = $variable->getAttribute('parent');
 
+        // Treat as a use unless this exact node is an operand of `unset()`, which clears rather than reads it.
         return !$parent instanceof Node\Stmt\Unset_
             || !in_array($variable, $parent->vars, true);
     }
@@ -275,6 +305,11 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Build the Finding for one unused parameter.
      *
+     * @param AnalysisUnit          $analysisUnit Parsed unit supplying the display path reported in the finding.
+     * @param RuleDefinition        $definition   Resolved rule metadata copied into the finding's id, severity, and pillar.
+     * @param ClassMethod|Function_ $node         Enclosing callable, resolved to a human-readable symbol for the message.
+     * @param string                $name         Parameter name without the leading `$`, used in the message and metadata.
+     * @param Node\Param            $param        Parameter node giving the source position the finding points at.
      * @return Finding
      */
     private function findingForParameter(
@@ -286,6 +321,7 @@ final readonly class UnusedParameterRule implements RuleInterface
     ): Finding {
         $symbol = CyclomaticComplexityRule::resolveSymbol($node);
 
+        // Point the finding at the parameter's own position so the author can jump straight to the offending token.
         return new Finding(
             ruleId:      $definition->id,
             message:     sprintf('Parameter $%s in %s is never used.', $name, $symbol),
@@ -305,6 +341,8 @@ final readonly class UnusedParameterRule implements RuleInterface
     /**
      * Compute the 1-based column of the parameter's start position within its line, or null when unknown.
      *
+     * @param AnalysisUnit $analysisUnit Parsed unit whose raw source is sliced to locate the line start.
+     * @param Node\Param   $param        Parameter node; a negative recorded start offset yields null instead of a column.
      * @return int|null
      */
     private function startColumn(AnalysisUnit $analysisUnit, Node\Param $param): ?int
@@ -312,12 +350,14 @@ final readonly class UnusedParameterRule implements RuleInterface
         $startFilePosition = $param->getStartFilePos();
 
         if ($startFilePosition < 0) {
+            // The parser records -1 when position tracking is off; report an unknown column rather than guess.
             return null;
         }
 
         $sourceBeforeParameter = substr($analysisUnit->source, 0, $startFilePosition);
         $lineStartPosition     = strrpos($sourceBeforeParameter, "\n");
 
+        // Offset from the preceding newline gives a 1-based column; a first-line param has no newline, so treat it as -1.
         return $startFilePosition - ($lineStartPosition === false ? -1 : $lineStartPosition);
     }
 }

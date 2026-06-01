@@ -30,6 +30,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Warning, high confidence: a PEM private-key header is an unambiguous signal, rarely a false positive.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Private key material',
@@ -51,6 +52,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!str_contains($analysisUnit->source, '-----BEGIN ')) {
+            // Without a PEM armor prefix the key regex cannot match, so skip the scan entirely.
             return [];
         }
 
@@ -71,6 +73,7 @@ final readonly class PrivateKeyRule implements SourceTextRuleInterface
             );
         }
 
+        // One finding per private-key header; the key body itself is never read or stored.
         return $findings;
     }
 }

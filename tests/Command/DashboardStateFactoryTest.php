@@ -220,6 +220,7 @@ final class DashboardStateFactoryTest extends TestCase
      */
     public static function provideDashboardPrecedenceCases(): array
     {
+        // Each case pairs the CLI parameters with the fail-on threshold precedence is expected to resolve to.
         return [
             'config wins over binary default when no CLI flag' => [[], 'error'],
             'CLI flag overrides config' => [['--fail-on' => 'warning'], 'warning'],
@@ -294,6 +295,7 @@ final class DashboardStateFactoryTest extends TestCase
      */
     private function input(array $parameters = []): ArrayInput
     {
+        // Hand back an input whose option set mirrors the analyse command, so default resolution behaves as in production.
         return new ArrayInput($parameters, new InputDefinition([
             new InputArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
             new InputOption('project', null, InputOption::VALUE_REQUIRED),
@@ -321,6 +323,7 @@ final class DashboardStateFactoryTest extends TestCase
             "schemaVersion: gruff-php.config.v0.1\nminimumSeverity:\n    dashboard: " . $threshold . "\n",
         );
 
+        // Hand back the root so callers can chdir into the project whose config now carries the threshold.
         return $project;
     }
 
@@ -335,6 +338,7 @@ final class DashboardStateFactoryTest extends TestCase
         self::assertTrue(mkdir($project));
         $this->tempDirs[] = $project;
 
+        // Hand back the freshly created directory; it is already registered for teardown cleanup.
         return $project;
     }
 
@@ -367,6 +371,7 @@ final class DashboardStateFactoryTest extends TestCase
     private function removeTempDirectory(string $path): void
     {
         if (!is_dir($path)) {
+            // Already gone (or never created), so there is nothing to recurse into.
             return;
         }
 

@@ -178,6 +178,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
 
             self::assertIsInt($implementorCount);
 
+            // Yield the per-finding count so the outer unique() collapses it; the test asserts one value holds.
             return $implementorCount;
         }, $findings)));
         $externalUsageCounts = array_values(array_unique(array_map(static function (Finding $finding): int {
@@ -185,6 +186,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
 
             self::assertIsInt($externalUsageCount);
 
+            // Yield the per-finding count so the outer unique() collapses it; the test asserts one value holds.
             return $externalUsageCount;
         }, $findings)));
         $missingImplementorFqns = array_values(array_filter($findings, static fn ($finding): bool => ($finding->metadata['implementorFqn'] ?? null) === null));
@@ -247,7 +249,9 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
     /**
      * Analyse design-rule fixtures and return findings for assertions.
      *
-     * @return list<Finding>
+     * @param AnalysisConfig|null $config - optional config override; null means stock rule defaults, so only the
+     *   exclusion-path test passes a custom one and every other test exercises the shipped behaviour.
+     * @return list<Finding> - findings from the single-implementor rule alone, re-indexed for assertions.
      */
     private function analyseFixtures(?AnalysisConfig $config = null): array
     {
@@ -260,6 +264,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             new RuleContext(self::PROJECT_ROOT, $config),
         );
 
+        // Drop other rules' findings so assertions read the single-implementor output without filtering noise per test.
         return array_values(array_filter(
             $allFindings,
             static fn (Finding $finding): bool => $finding->ruleId === SingleImplementorInterfaceRule::ID,
@@ -290,6 +295,7 @@ final class SingleImplementorInterfaceRuleTest extends TestCase
             $units[]  = $phpFileParser->parse(new SourceFile($absolute, self::FIXTURE_DIR . '/' . $relative));
         }
 
+        // All fixtures parse as one batch because the rule resolves implementors across units, not file by file.
         return $units;
     }
 }

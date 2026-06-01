@@ -123,12 +123,14 @@ final class ResultCacheCliTest extends CliTestCase
         );
         $process->run();
 
+        // Hand back the already-run scan process so the caller can assert on its cache behaviour.
         return $process;
     }
 
     /**
      * Decode the findings array from an analyse JSON report.
      *
+     * @param Process $process Completed analyse process whose stdout holds the JSON report.
      * @return list<mixed> Findings list.
      */
     private function decodeFindings(Process $process): array
@@ -137,6 +139,7 @@ final class ResultCacheCliTest extends CliTestCase
         $findings = is_array($decoded) ? ($decoded['findings'] ?? []) : [];
         self::assertIsArray($findings);
 
+        // Re-index to a 0-based list so positional assertions stay stable regardless of source keys.
         return array_values($findings);
     }
 
@@ -147,6 +150,7 @@ final class ResultCacheCliTest extends CliTestCase
      */
     private function dangerSource(): string
     {
+        // Hand back fixture source that deliberately trips exactly one security finding.
         return "<?php\n\nnamespace Demo;\n\n/**\n * Danger fixture with a security finding.\n */\nclass Danger\n{\n    /**\n     * Run dynamic code.\n     *\n     * @param string \$code Code to evaluate.\n     * @return mixed Evaluation result.\n     */\n    public function run(string \$code): mixed\n    {\n        return eval(\$code);\n    }\n}\n";
     }
 
@@ -162,6 +166,7 @@ final class ResultCacheCliTest extends CliTestCase
             ? "\n    /**\n     * Run dynamic code.\n     *\n     * @param string \$code Code to evaluate.\n     * @return mixed Evaluation result.\n     */\n    public function run(string \$code): mixed\n    {\n        return eval(\$code);\n    }\n"
             : '';
 
+        // Hand back fixture source that is clean unless the caller opted to inject the finding.
         return "<?php\n\nnamespace Demo;\n\n/**\n * Clean fixture.\n */\nclass Clean\n{\n    /**\n     * Add one to the amount.\n     *\n     * @param int \$amount Amount to increment.\n     * @return int Incremented amount.\n     */\n    public function add(int \$amount): int\n    {\n        return \$amount + 1;\n    }\n{$method}}\n";
     }
 

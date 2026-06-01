@@ -160,6 +160,7 @@ final class FailureConditionsCliTest extends CliTestCase
      */
     private function runGruff(array $args): Process
     {
+        // Hand back an unstarted process so the caller can set timeouts before running it.
         return new Process(
             array_merge([PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php'], $args),
             $this->project,

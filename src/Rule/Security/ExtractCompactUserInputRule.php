@@ -33,6 +33,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence: a request-fed extract/compact is a likely variable-injection sink, not certain.
         return new RuleDefinition(
             id:              self::ID,
             name:            'extract or compact on request data',
@@ -82,6 +83,7 @@ final class ExtractCompactUserInputRule implements RuleInterface
             );
         }
 
+        // One finding per extract/compact call reached by request data; empty when no such call is tainted.
         return $findings;
     }
 }

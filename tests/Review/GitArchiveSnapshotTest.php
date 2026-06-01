@@ -131,6 +131,7 @@ final class GitArchiveSnapshotTest extends TestCase
      */
     public static function unsafeRefProvider(): array
     {
+        // Each row is a ref git must reject before archiving: option flags, or names argv could pass as options.
         return [
             'no-renames option' => ['--no-renames'],
             'upload-pack option' => ['--upload-pack=anything'],
@@ -183,12 +184,15 @@ final class GitArchiveSnapshotTest extends TestCase
         $this->runGit($repo, ...['add', 'src/Target.php', 'src/Unrelated.php', 'big/Unrelated.txt']);
         $this->runGit($repo, 'commit', '-m', 'base');
 
+        // Hand back the committed repo root; the caller snapshots from it and owns teardown via removeDir().
         return $repo;
     }
 
     /**
      * List files below a temporary test directory.
      *
+     * @param string $path - directory root to walk; paths are returned relative to it, so callers
+     *   compare against expected layout without leaking the random temp prefix.
      * @return list<string>
      */
     private function filesBelow(string $path): array
@@ -208,6 +212,7 @@ final class GitArchiveSnapshotTest extends TestCase
 
         sort($files, SORT_STRING);
 
+        // Sorted before returning so assertions compare on content, not on filesystem iteration order.
         return $files;
     }
 
@@ -222,6 +227,7 @@ final class GitArchiveSnapshotTest extends TestCase
         self::assertIsArray($paths);
         sort($paths, SORT_STRING);
 
+        // Sorted so the before/after diff that detects leaked snapshot dirs is stable across runs.
         return $paths;
     }
 
@@ -267,6 +273,7 @@ final class GitArchiveSnapshotTest extends TestCase
 
         self::assertTrue(mkdir($path));
 
+        // Directory now exists on disk; the caller owns it and must tear it down via removeDir().
         return $path;
     }
 
@@ -279,6 +286,7 @@ final class GitArchiveSnapshotTest extends TestCase
     private function removeDir(string $path): void
     {
         if (!is_dir($path)) {
+            // Nothing to remove (path absent or never created); stay a no-op so finally-block cleanup is idempotent.
             return;
         }
 

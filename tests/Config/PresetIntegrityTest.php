@@ -67,6 +67,7 @@ final class PresetIntegrityTest extends TestCase
             $cases[$preset] = [$preset];
         }
 
+        // Hand back one case per bundled preset so the integrity test runs against every shipped profile.
         return $cases;
     }
 
@@ -78,6 +79,7 @@ final class PresetIntegrityTest extends TestCase
      */
     private static function presetPath(string $preset): string
     {
+        // Resolve the preset against the package's shipped profiles directory, mirroring how ConfigLoader finds it.
         return ConfigLoader::packageRoot() . '/resources/profiles/' . $preset . '.yaml';
     }
 }

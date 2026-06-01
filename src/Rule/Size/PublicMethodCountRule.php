@@ -36,6 +36,7 @@ final readonly class PublicMethodCountRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Carries the 25-method error threshold the analyse pass reads back via settingsFor().
         return new RuleDefinition(
             id:                self::ID,
             name:              'Public method count',
@@ -110,20 +111,24 @@ final readonly class PublicMethodCountRule implements RuleInterface
             );
         }
 
+        // Hand back one finding per class or enum whose public API breached the threshold; empty when all fit.
         return $findings;
     }
 
     /**
      * Format threshold numbers without unnecessary decimal places.
      *
+     * @param int|float $number Threshold value to render; whole values are shown without a trailing decimal.
      * @return string Human-readable threshold value.
      */
     private function formatNumber(int|float $number): string
     {
         if (is_float($number) && floor($number) !== $number) {
+            // Keep the decimal only for a genuinely fractional threshold, such as 2.5.
             return (string) $number;
         }
 
+        // Whole numbers print without a trailing ".0" so messages read cleanly.
         return (string) (int) $number;
     }
 }

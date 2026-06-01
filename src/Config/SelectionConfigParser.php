@@ -37,6 +37,7 @@ final readonly class SelectionConfigParser
         $selection = $this->requireObject($decodedValue);
         $this->assertKnownKeys($selection);
 
+        // Hand back one RuleSelection carrying every validated include and exclude filter for the run.
         return new RuleSelection(
             tiers:          $this->tiers($selection),
             pillars:        $this->pillars($selection, 'pillars'),
@@ -70,6 +71,7 @@ final readonly class SelectionConfigParser
     private function tiers(array $selection): array
     {
         if (!array_key_exists('tiers', $selection)) {
+            // Empty list is the "no tier filter requested" sentinel: every tier stays eligible (default-include).
             return [];
         }
 
@@ -81,6 +83,7 @@ final readonly class SelectionConfigParser
             }
         }
 
+        // The configured tier names to include; each is a real RuleTier, so the run can filter on them.
         return $tiers;
     }
 
@@ -88,11 +91,13 @@ final readonly class SelectionConfigParser
      * Read included pillar names from the selection config.
      *
      * @param ConfigObject $selection
+     * @param string       $key       Which selection sub-list to read, 'pillars' (include) or 'excludePillars'.
      * @return list<string>
      */
     private function pillars(array $selection, string $key): array
     {
         if (!array_key_exists($key, $selection)) {
+            // Absent include/exclude key means no pillar constraint for this side of the selection.
             return [];
         }
 
@@ -104,6 +109,7 @@ final readonly class SelectionConfigParser
             }
         }
 
+        // The configured pillar names for this include/exclude side; each is a real Pillar the run can filter on.
         return $pillars;
     }
 
@@ -111,11 +117,14 @@ final readonly class SelectionConfigParser
      * Read included rule identifiers from the selection config.
      *
      * @param ConfigObject $selection
+     * @param string       $key       Which selection sub-list to read, 'rules' (include) or 'excludeRules'.
+     * @param RuleRegistry $registry  Source of truth for valid rule ids; unknown ids are rejected.
      * @return list<string>
      */
     private function ruleIds(array $selection, string $key, RuleRegistry $registry): array
     {
         if (!array_key_exists($key, $selection)) {
+            // Absent include/exclude key means no rule-id constraint for this side of the selection.
             return [];
         }
 
@@ -127,6 +136,7 @@ final readonly class SelectionConfigParser
             }
         }
 
+        // The configured rule ids for this include/exclude side; each names a rule the registry recognises.
         return $ruleIds;
     }
 
@@ -152,31 +162,37 @@ final readonly class SelectionConfigParser
             $normalizedSelection[$key] = $this->configValue($decodedItem);
         }
 
+        // The selection as a string-keyed object: the shape the per-key tier/pillar/rule readers expect.
         return $normalizedSelection;
     }
 
     /**
      * Normalise one decoded selection value into the supported value set.
      *
+     * @param mixed $decodedValue One raw YAML/JSON-decoded value, scalar or nested array, to validate.
      * @return ConfigValue
      */
     private function configValue(mixed $decodedValue): array|bool|float|int|object|string|null
     {
         if (is_array($decodedValue)) {
+            // Arrays recurse so nested structures get depth-limited validation, not scalar treatment.
             return $this->configArray($decodedValue);
         }
 
+        // Anything non-array is a leaf; defer to the scalar gate for the type check.
         return $this->configScalar($decodedValue);
     }
 
     /**
      * Validate scalar selection config values after YAML decoding.
      *
+     * @param mixed $decodedValue One decoded leaf value; anything not YAML/JSON-compatible is rejected.
      * @return ConfigScalar
      */
     private function configScalar(mixed $decodedValue): bool|float|int|object|string|null
     {
         if (is_bool($decodedValue) || is_float($decodedValue) || is_int($decodedValue) || is_object($decodedValue) || is_string($decodedValue) || $decodedValue === null) {
+            // An accepted config leaf: returned verbatim, as scalars carry no shape that needs normalising.
             return $decodedValue;
         }
 
@@ -197,6 +213,7 @@ final readonly class SelectionConfigParser
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth2($decodedItem) : $this->configScalar($decodedItem);
         }
 
+        // The validated first-level config subtree: scalars plus nested arrays constrained to the supported depth.
         return $normalizedSelectionValues;
     }
 
@@ -214,6 +231,7 @@ final readonly class SelectionConfigParser
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth3($decodedItem) : $this->configScalar($decodedItem);
         }
 
+        // The validated second-level config subtree: scalars plus nested arrays constrained to the supported depth.
         return $normalizedSelectionValues;
     }
 
@@ -231,6 +249,7 @@ final readonly class SelectionConfigParser
             $normalizedSelectionValues[$key] = is_array($decodedItem) ? $this->configArrayDepth4($decodedItem) : $this->configScalar($decodedItem);
         }
 
+        // The validated third-level config subtree: scalars plus nested arrays constrained to the supported depth.
         return $normalizedSelectionValues;
     }
 
@@ -252,6 +271,7 @@ final readonly class SelectionConfigParser
             $normalizedSelectionValues[$key] = $this->configScalar($decodedItem);
         }
 
+        // The deepest config level: scalar leaves only, since selection config is capped at four nesting levels.
         return $normalizedSelectionValues;
     }
 }

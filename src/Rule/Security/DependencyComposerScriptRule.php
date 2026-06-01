@@ -54,6 +54,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Medium confidence by default: fragment matching catches shell/remote calls but cannot prove intent or harm.
         return new RuleDefinition(
             id:              self::ID,
             name:            'Composer install-time shell script',
@@ -75,11 +76,13 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
     public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
     {
         if (!ComposerManifest::isManifest($analysisUnit->file->displayPath)) {
+            // This rule only applies to composer.json; every other file yields no findings.
             return [];
         }
 
         $manifest = ComposerManifest::decode($analysisUnit->source);
         if ($manifest === null || !isset($manifest['scripts']) || !is_array($manifest['scripts'])) {
+            // Unparseable manifest or no scripts block means there are no lifecycle commands to inspect.
             return [];
         }
 
@@ -105,6 +108,7 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
             );
         }
 
+        // One finding per scripts event with a risky command; empty when every event is a plain PHP callable or alias.
         return $findings;
     }
 
@@ -126,11 +130,13 @@ final class DependencyComposerScriptRule implements SourceTextRuleInterface
             $normalized = strtolower($command);
             foreach (self::RISKY_FRAGMENTS as $fragment) {
                 if (str_contains($normalized, $fragment)) {
+                    // First risky fragment is enough to flag the event; no need to inspect the remaining commands.
                     return true;
                 }
             }
         }
 
+        // No command contained a shell/remote fragment, so the event is treated as a safe PHP callable or alias.
         return false;
     }
 }

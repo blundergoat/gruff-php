@@ -33,6 +33,7 @@ final readonly class TodoDensityRule implements RuleInterface
      */
     public function definition(): RuleDefinition
     {
+        // Default threshold of 10 markers per file: a handful of TODOs is normal, a pile of them signals neglect.
         return new RuleDefinition(
             id:                self::ID,
             name:              'TODO/FIXME density',
@@ -56,6 +57,7 @@ final readonly class TodoDensityRule implements RuleInterface
     {
         // Fast bail: most files have zero deferred-work markers; skip the per-token scan for them.
         if (preg_match('/\b(?:TODO|FIXME|HACK|XXX)\b/i', $analysisUnit->source) !== 1) {
+            // No marker anywhere in the raw source means nothing to count; the density rule cannot fire.
             return [];
         }
 
@@ -82,9 +84,11 @@ final readonly class TodoDensityRule implements RuleInterface
         $thresholdMatch = $settings->highValueThresholdMatch($count);
 
         if ($thresholdMatch === null) {
+            // Marker count stayed at or below the configured threshold, so this file is within tolerance.
             return [];
         }
 
+        // Count crossed the threshold; report a single file-level finding anchored at the first marker seen.
         return [
             new Finding(
                 ruleId:      $definition->id,
@@ -104,10 +108,12 @@ final readonly class TodoDensityRule implements RuleInterface
     /**
      * Check whether a token is a normal comment or docblock.
      *
+     * @param Token $token Lexer token from the parsed unit; only comment-bearing kinds can hold a marker.
      * @return bool True when the token can contain TODO markers.
      */
     private function isCommentToken(Token $token): bool
     {
+        // Only // # and /* */ comments and /** */ docblocks carry marker text; code and whitespace cannot.
         return $token->id === T_COMMENT || $token->id === T_DOC_COMMENT;
     }
 }

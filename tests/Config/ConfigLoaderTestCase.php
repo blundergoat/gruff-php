@@ -44,6 +44,7 @@ abstract class ConfigLoaderTestCase extends TestCase
 
         self::assertNotFalse(file_put_contents($path, $contents));
 
+        // Hand back the on-disk path so the test can point a ConfigLoader at this fixture.
         return $path;
     }
 
@@ -56,6 +57,7 @@ abstract class ConfigLoaderTestCase extends TestCase
     private function ensureSchemaVersion(string $contents): string
     {
         if (str_contains($contents, 'schemaVersion')) {
+            // Test already declares a schemaVersion (often a wrong one on purpose); leave it untouched.
             return $contents;
         }
 
@@ -65,10 +67,12 @@ abstract class ConfigLoaderTestCase extends TestCase
         if ($trimmed !== '' && $trimmed[0] === '{') {
             $decoded = json_decode($contents, true);
             if (is_array($decoded)) {
+                // Inline JSON config: splice schemaVersion in as the first key, keeping the original payload.
                 return (string) json_encode(['schemaVersion' => $version] + $decoded, JSON_THROW_ON_ERROR);
             }
         }
 
+        // YAML (or non-JSON) contents: prepend the schemaVersion line above the test's original body.
         return sprintf("schemaVersion: %s\n%s", $version, $contents);
     }
 }

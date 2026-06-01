@@ -71,6 +71,7 @@ final class TextReporterTest extends TestCase
             );
         }
 
+        // One file/parse pair keeps the fixture minimal; only the findings count drives the footer-hint assertion.
         return new AnalysisReport(
             toolVersion:     '0.2.0',
             requestedPaths:  ['src'],

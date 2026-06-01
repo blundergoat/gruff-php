@@ -46,12 +46,14 @@ final readonly class BaselineStore
     {
         $decoded = $this->readBaselineObject($path);
 
+        // Validated envelope turned into the in-memory baseline: the source path plus one entry per persisted finding.
         return new BaselineData($path, $this->entriesFromFindings($decoded['findings']));
     }
 
     /**
      * Decode the baseline JSON root and validate its schema envelope.
      *
+     * @param string $path Baseline path to decode; a missing file or bad schema throws BaselineException.
      * @return BaselineFileData
      */
     private function readBaselineObject(string $path): array
@@ -80,6 +82,7 @@ final readonly class BaselineStore
             throw new BaselineException(sprintf('Baseline schemaVersion must be "%s".', self::SCHEMA_VERSION));
         }
 
+        // Normalised envelope with the schema pinned and the findings key validated into a list of scalar-keyed rows.
         return [
             'schemaVersion' => self::SCHEMA_VERSION,
             'findings' => $this->readFindingsList($decoded['findings'] ?? null),
@@ -89,6 +92,7 @@ final readonly class BaselineStore
     /**
      * Read findings list for the baseline workflow.
      *
+     * @param mixed $findings Raw decoded JSON findings key; anything but a list of scalar-keyed objects throws.
      * @return list<BaselineFindingRow>
      */
     private function readFindingsList(mixed $findings): array
@@ -120,6 +124,7 @@ final readonly class BaselineStore
             $rows[] = $baselineFinding;
         }
 
+        // Every finding row, each proven to be a string-keyed map of scalar-or-null values ready for entry hydration.
         return $rows;
     }
 
@@ -136,6 +141,7 @@ final readonly class BaselineStore
             $entries[] = BaselineEntry::fromArray($finding, $index);
         }
 
+        // One BaselineEntry per row, in file order; the index is carried so malformed rows can name their position.
         return $entries;
     }
 
@@ -177,12 +183,16 @@ final readonly class BaselineStore
 
         $this->writeAtomically($absolutePath, $json . PHP_EOL, $path);
 
+        // The baseline as persisted: returned so callers can report what was written without re-reading the file.
         return $baselineData;
     }
 
     /**
      * Write a baseline payload via temporary file and atomic rename.
      *
+     * @param string $absolutePath Final on-disk destination the temporary file is renamed onto.
+     * @param string $payload      Exact bytes to persist, written in full before the rename; partial writes raise.
+     * @param string $displayPath  Project-relative path used only in error messages, never for filesystem access.
      * @return void
      */
     private function writeAtomically(string $absolutePath, string $payload, string $displayPath): void
@@ -231,6 +241,9 @@ final readonly class BaselineStore
     /**
      * Move the temporary baseline into place, handling existing Windows targets.
      *
+     * @param string $tempPath     Source temporary file; removed before throwing if the move cannot complete.
+     * @param string $absolutePath Final destination; on Windows an existing target is unlinked before the rename.
+     * @param string $displayPath  Project-relative path used only in error messages, never for filesystem access.
      * @return void
      */
     private function replaceBaselineFile(string $tempPath, string $absolutePath, string $displayPath): void
@@ -249,11 +262,14 @@ final readonly class BaselineStore
     /**
      * Remove a temporary baseline file after a failed write.
      *
+     * @param string $tempPath    Temporary file to delete; treated as already gone when it is not a file.
+     * @param string $displayPath Project-relative path used only in the error message if the unlink itself fails.
      * @return void
      */
     private function removeTemporaryFile(string $tempPath, string $displayPath): void
     {
         if (!is_file($tempPath)) {
+            // Nothing to clean up: the temporary file was never created or was already moved into place.
             return;
         }
 
@@ -265,10 +281,12 @@ final readonly class BaselineStore
     /**
      * Resolve a path relative to the project root when needed.
      *
+     * @param string $path Baseline path returned unchanged when already absolute, else joined to the project root.
      * @return string Absolute path.
      */
     private function absolutePath(string $path): string
     {
+        // Already-absolute paths pass through; relative ones are anchored to the store's project root.
         return PathHelper::resolveAgainst($this->projectRoot, $path);
     }
 }

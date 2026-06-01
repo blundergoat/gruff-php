@@ -750,11 +750,14 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the catch-introduced exception names so they are excluded from generic judging.
         return $variables;
     }
 
     /**
-     * @param list<string> $genericTokens Lowercase loop variable names treated as generic.
+     * @param FunctionLikeScope $scope             Scope to scan for long-bodied foreach loops.
+     * @param list<string>      $genericTokens     Lowercase loop variable names treated as generic.
+     * @param int               $loopBodyThreshold Statement count at or above which a foreach body is "long" enough to demand a meaningful name.
      * @return array<string, Variable> Loop variables that should be reported.
      */
     private function reportableLoopVariableNames(
@@ -785,19 +788,29 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the first occurrence of each generic-named variable in a long foreach body.
         return $variables;
     }
 
-    /** @return bool True for the conventional key/value map iteration idiom. */
+    /**
+     * @param Foreach_ $foreach Loop to test against the canonical `$key => $value` map-iteration idiom.
+     *
+     * @return bool True for the conventional key/value map iteration idiom.
+     */
     private function isCanonicalMapLoop(Foreach_ $foreach): bool
     {
+        // True only for the exact `$key => $value` shape, the one idiom where those generic names read as intentional.
         return $foreach->keyVar instanceof Variable
             && $foreach->valueVar instanceof Variable
             && $foreach->keyVar->name === 'key'
             && $foreach->valueVar->name === 'value';
     }
 
-    /** @return array<string, int> Local variable read counts keyed by variable name. */
+    /**
+     * @param FunctionLikeScope $scope Scope whose variable occurrences are tallied.
+     *
+     * @return array<string, int> Local variable read counts keyed by variable name.
+     */
     private function localVariableReferenceCounts(FunctionLikeScope $scope): array
     {
         $counts = [];
@@ -808,6 +821,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back the per-name occurrence tally that gates the minScopeReferences floor.
         return $counts;
     }
 
@@ -829,6 +843,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
     }
 
     /**
+     * @param FunctionLikeScope    $scope     Scope whose pre-walked body descendants are filtered (loop/catch vars stay in scope).
      * @param callable(Node): bool $predicate Predicate that selects matching descendants.
      * @return list<Node> Descendant nodes in the current function-like scope.
      */
@@ -842,30 +857,38 @@ final readonly class IdentifierQualityRule implements RuleInterface
             }
         }
 
+        // Hand back every body descendant the predicate accepted, in source order.
         return $matches;
     }
 
     /**
      * Resolve the human-readable symbol for a function-like scope.
      *
+     * @param FunctionLikeScope $scope Scope whose enclosing callable label is wanted for finding grouping.
+     *
      * @return string Named callable symbol or synthetic closure/arrow label.
      */
     private function symbol(FunctionLikeScope $scope): string
     {
         if ($scope->node instanceof ClassMethod || $scope->node instanceof Function_) {
+            // Named callables get their real qualified symbol so findings group under the method or function.
             return CyclomaticComplexityRule::resolveSymbol($scope->node);
         }
 
+        // Closures and arrow functions have no name, so synthesise a stable kind@line label instead.
         return sprintf('%s@%d', $scope->kind, $scope->node->getStartLine());
     }
 
     /**
      * Return the declaration kind for a class-like node.
      *
+     * @param Class_|Interface_|Trait_|Enum_ $node Class-like node whose declaration keyword is wanted for the message.
+     *
      * @return string One of class, interface, trait, or enum.
      */
     private function classLikeKind(Class_|Interface_|Trait_|Enum_ $node): string
     {
+        // Map the concrete node subtype to its declaration keyword, defaulting to "class" for plain Class_ nodes.
         return match (true) {
             $node instanceof Interface_ => 'interface',
             $node instanceof Trait_ => 'trait',
@@ -877,11 +900,12 @@ final readonly class IdentifierQualityRule implements RuleInterface
     /**
      * Normalize string lists for case-insensitive comparisons.
      *
-     * @param list<string> $values
-     * @return list<string>
+     * @param list<string> $values Raw configured names; case and duplicates are insignificant to the caller.
+     * @return list<string> The same names lowercased and de-duplicated, re-indexed from zero.
      */
     private function lowercaseList(array $values): array
     {
+        // Lowercase then drop duplicates so later in_array comparisons are case-insensitive and cheap.
         return array_values(array_unique(array_map(
             static fn (string $name): string => strtolower($name),
             $values,

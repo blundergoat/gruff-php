@@ -42,9 +42,13 @@ final readonly class AnalysisSourceSet
     public function parsedFileCount(): int
     {
         if ($this->explicitParsedFileCount !== null) {
+            // Streaming flows release each unit's AST before constructing the set, so the
+            // live units are no longer countable; trust the count captured at parse time.
             return $this->explicitParsedFileCount;
         }
 
+        // No pre-computed count, so the units are still in memory: derive it by excluding
+        // units that failed to parse, matching how non-streaming callers measure coverage.
         return count(array_filter(
             $this->analysisUnits,
             static fn (AnalysisUnit $analysisUnit): bool => !$analysisUnit->hasParseErrors(),

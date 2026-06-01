@@ -19,6 +19,7 @@ final readonly class JsonReporter
      */
     public function render(AnalysisReport $report): string
     {
+        // Pretty-printed so the file is diffable; a trailing newline keeps shell redirection POSIX-clean.
         return json_encode(
             $report->toArray(),
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,

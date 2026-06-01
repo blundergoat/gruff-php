@@ -40,6 +40,7 @@ final readonly class DashboardServer
         if ($server === false) {
             $output->writeln(sprintf('<error>Unable to start dashboard on %s:%d: %s (%d)</error>', $host, $port, $errorMessage, $errorCode));
 
+            // Socket bind failed (port in use or denied); abort before the accept loop so the command exits non-zero.
             return Command::FAILURE;
         }
 
@@ -66,16 +67,21 @@ final readonly class DashboardServer
 
         fclose($server);
 
+        // Reached only when the listening socket is closed (Ctrl+C / external close); a clean shutdown, not an error.
         return Command::SUCCESS;
     }
 
     /**
      * Build the initial dashboard URL shown in console output.
      *
+     * @param string                  $host                    Bound host the browser should connect back to.
+     * @param int                     $port                    Bound TCP port to embed in the URL.
+     * @param DashboardRequestContext $dashboardRequestContext Request context whose input/projectRoot seed the default query string.
      * @return string Dashboard URL with default query state.
      */
     private function url(string $host, int $port, DashboardRequestContext $dashboardRequestContext): string
     {
+        // Pre-populate the URL with the default form state so the first page load reflects the launch options.
         return sprintf(
             'http://%s:%d/?%s',
             $this->urlHost($host),
@@ -87,20 +93,24 @@ final readonly class DashboardServer
     /**
      * Format a host for use in a browser URL.
      *
+     * @param string $host Bound host or address; an unbracketed IPv6 literal here gets wrapped.
      * @return string Host, bracketed when it is an IPv6 literal.
      */
     private function urlHost(string $host): string
     {
         if (str_contains($host, ':') && !str_starts_with($host, '[')) {
+            // Bare IPv6 literal: bracket it so the colons are not mistaken for the URL port separator.
             return '[' . $host . ']';
         }
 
+        // Hostname or IPv4 address needs no bracketing; return it untouched.
         return $host;
     }
 
     /**
      * Build the per-request dashboard handler.
      *
+     * @param DashboardRequestContext $dashboardRequestContext Request context threaded into the handler and its scan runner.
      * @return DashboardRequestHandler HTTP request handler.
      */
     private function handler(DashboardRequestContext $dashboardRequestContext): DashboardRequestHandler
@@ -108,19 +118,27 @@ final readonly class DashboardServer
         $dashboardPageRenderer = new DashboardPageRenderer();
         $dashboardScanRunner   = new DashboardScanRunner($this->gruffBinary, $this->stateFactory, $dashboardPageRenderer);
 
+        // Handler wired with its own renderer, scan runner, and responder so each connection reuses one collaborator set.
         return new DashboardRequestHandler($dashboardRequestContext, $this->stateFactory, $dashboardScanRunner, new DashboardHttpResponder());
     }
 
     /**
+     * Open the listening socket with PHP warnings suppressed so the caller handles bind failures.
+     *
+     * @param string      $host         Host or address to bind; IPv6 literals are bracketed before use.
+     * @param int         $port         TCP port to bind.
+     * @param int|null    $errorCode    Receives the socket errno on failure; caller passes an unset variable to be filled.
+     * @param string|null $errorMessage Receives the human-readable bind error on failure; pairs with $errorCode.
      * @param-out int|null $errorCode
      * @param-out string|null $errorMessage
-     * @return resource|false
+     * @return resource|false Listening stream on success, or false when the bind fails (details land in the out params).
      */
     private function createServer(string $host, int $port, ?int &$errorCode, ?string &$errorMessage)
     {
         set_error_handler(static fn (): bool => true);
 
         try {
+            // Return the listening socket (or false) while the suppressing handler is active so bind warnings stay quiet.
             return stream_socket_server(sprintf('tcp://%s:%d', $this->urlHost($host), $port), $errorCode, $errorMessage);
         } finally {
             restore_error_handler();
@@ -138,6 +156,7 @@ final readonly class DashboardServer
         set_error_handler(static fn (): bool => true);
 
         try {
+            // Accept with a 1s timeout so the loop wakes periodically; false on timeout/error lets the caller retry.
             return stream_socket_accept($server, 1);
         } finally {
             restore_error_handler();
