@@ -3,7 +3,7 @@
 **Status:** Implemented
 **Date:** 2026-05-30
 **Author(s):** gruff maintainers
-**Updated:** 2026-05-30 — amends ADR-010 (severity calibration); extends ADR-017 (mission corollary)
+**Updated:** 2026-06-03 — amends ADR-010 (severity calibration); extends ADR-017 (mission corollary); records advisory static-analysis-redundant candidates
 
 ## Context
 
@@ -48,6 +48,15 @@ over-fire: `mock-only-test`, `mock-without-expectation`, `trivial-assertion`,
 `trivial-snapshot`, and the style/design smells (`eager-test`, `mystery-guest`,
 `excessive-mocking`, `setup-bloat`, `magic-number-assertion`, naming/readability). Forcing
 those would manufacture ceremony — the opposite of the mission.
+
+Add `test-quality.static-analysis-redundant-test` as an **advisory** candidate rule, not a
+hard gate. It flags direct static-shape assertions such as
+`assertTrue(class_exists(Foo::class))` or `assertTrue(method_exists(Foo::class, 'bar'))`
+only when the declaration is visible in the same parsed file. These findings must use
+candidate language and recommend behavioral evidence, because public compatibility tests
+and runtime contract probes can be legitimate even when they mention source shape. Promotion
+to `error` would require the same false-positive-clean evidence standard used for
+`test-quality.tautological-type-assertion`.
 
 Severity is metadata, not schema: `gruff.analysis.v2` / `gruff.baseline.v1` are unchanged.
 The two stability snapshots (rule-definition digest, fixture-finding digest) are refreshed

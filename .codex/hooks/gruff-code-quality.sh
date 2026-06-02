@@ -10,7 +10,7 @@
 #   same file.
 #
 # Supported analyzers:
-#   - gruff-ts for .ts / .tsx / .js / .jsx
+#   - gruff-ts for .ts / .tsx / .mts / .cts / .js / .jsx / .mjs / .cjs
 #   - gruff-php for .php
 #   - gruff-go for .go
 #   - gruff-rs for .rs
@@ -20,8 +20,8 @@
 #   Payload is read from stdin as agent PostToolUse JSON. The hook prefers
 #   an edited file path from the payload, then falls back to git-changed
 #   supported files for runtimes that only expose the completed file tool
-#   event. It also needs a matching `.gruff-*.yaml` config at the repo root,
-#   a matching gruff binary, and `jq` for JSON filtering. Missing
+#   event. It also needs a matching `.gruff-*.yaml` or `.gruff-*.yml` config at
+#   the repo root, a matching gruff binary, and `jq` for JSON filtering. Missing
 #   prerequisites fail soft: the edit is not blocked and whole-file gruff
 #   output is not printed as a fallback.
 #
@@ -30,12 +30,26 @@
 #   Otherwise parse `git diff --unified=0 -- <file>` for tracked files.
 #   New/untracked files are treated as fully changed. If no range can be
 #   derived, the hook exits quietly apart from a short stderr diagnostic.
+#   Analyzers with native changed-region support own the filtering: gruff-py is
+#   invoked with `--changed-ranges`, `--changed-scope symbol`, and `--no-baseline`
+#   so symbol-aware scope is used and adoption baselines do not hide agent
+#   feedback. All other analyzers use the portable primary-line fallback above.
+#   Either way the surfaced findings are severity-sorted, floored, and capped
+#   identically.
 #
 # Output:
-#   Prints `[severity] path:line rule - message` for findings whose
-#   primary reported line intersects the changed ranges, then one compact
-#   suppressed-count line for same-file findings outside those ranges.
-#   The playbook footer is printed only when at least one changed-line
+#   Prints a scope/tally header
+#   `gruff-code-quality: <binary> <path> changed-lines=<ranges>; <n> on changed
+#   lines: <e> error, <w> warning, <a> advisory`, then one canonical finding line
+#   per surfaced finding `- [severity] file:line ruleId - message` (matching
+#   CONTRACT.md's normative per-finding line so hook and native CLI output read
+#   identically). Findings on changed lines are sorted error -> warning ->
+#   advisory so the highest-value land first; they are floored at
+#   GRUFF_CODE_QUALITY_MIN_SEVERITY (default advisory) and capped at
+#   GRUFF_CODE_QUALITY_MAX_FINDINGS (default 20) with a "(<m> more on changed
+#   lines)" note when the cap hides some. A trailing line reports findings dropped
+#   below the floor and the count of same-file findings outside the changed
+#   ranges. The playbook footer is printed only when at least one changed-line
 #   finding is shown. If the analyzer reports the edited file as ignored by
 #   its `paths.ignore` config, the hook instead prints a single
 #   `skipped <path> - out of scope` line and surfaces no findings, so the
@@ -46,7 +60,15 @@ set -euo pipefail
 
 FOOTER="For triage: consult .goat-flow/skill-playbooks/gruff-code-quality.md"
 SUPPORTED_TOOLS=" edit write multiedit write_to_file replace_file_content multi_replace_file_content "
-SKIP_DIR_PATTERN='(^|/)(node_modules|vendor|\.goat-flow|dist|build|coverage|\.git)(/|$)'
+SKIP_DIR_PATTERN='(^|/)(node_modules|vendor|\.goat-flow|dist|build|coverage|\.git|target|\.venv|\.mypy_cache|\.pytest_cache|\.ruff_cache)(/|$)'
+GRUFF_CODE_QUALITY_TIMEOUT_SECONDS="${GRUFF_CODE_QUALITY_TIMEOUT_SECONDS:-30}"
+# Max changed-line findings listed per file before the rest are summarised as
+# "(<m> more on changed lines)". Keeps a large edit from flooding the agent.
+GRUFF_CODE_QUALITY_MAX_FINDINGS="${GRUFF_CODE_QUALITY_MAX_FINDINGS:-20}"
+# Lowest severity surfaced on changed lines (advisory|warning|error). Findings
+# below it are counted, not listed - a project that only wants the agent pushed on
+# warning+ sets this to `warning`. Default `advisory` keeps every finding visible.
+GRUFF_CODE_QUALITY_MIN_SEVERITY="${GRUFF_CODE_QUALITY_MIN_SEVERITY:-advisory}"
 
 # Payload extraction stays jq-first for correctness but keeps small regex
 # fallbacks so unsupported tools and paths can still be skipped when jq is
@@ -79,34 +101,52 @@ json_tool_name() {
   '
 }
 
-json_file_path() {
+json_file_paths() {
   local input="$1"
   json_field "$input" '
-    def path_from(value):
+    def string_path_fields(value):
+      if (value | type) == "object" then
+        [
+          value.file_path?,
+          value.filePath?,
+          value.path?,
+          value.AbsolutePath?,
+          value.absolutePath?,
+          value.TargetFile?,
+          value.targetFile?,
+          value.FilePath?,
+          value.SearchPath?,
+          value.searchPath?
+        ]
+      else
+        []
+      end;
+    def paths_from(value):
       if value == null then
         empty
+      elif (value | type) == "array" then
+        value[] | paths_from(.)
       elif (value | type) == "object" then
-        (value.file_path // value.path // value.AbsolutePath // value.TargetFile // value.FilePath // value.SearchPath // empty)
+        (string_path_fields(value)[]?),
+        (value.files? | paths_from(.)),
+        (value.paths? | paths_from(.)),
+        (value.edits? | paths_from(.)),
+        (value.changes? | paths_from(.)),
+        (value.operations? | paths_from(.))
       elif (value | type) == "string" then
-        ((value | fromjson? // {})
-        | if type == "object" then
-            (.file_path // .path // .AbsolutePath // .TargetFile // .FilePath // .SearchPath // empty)
-          else
-            empty
-          end)
+        (try (value | fromjson | paths_from(.)) catch value)
       else
         empty
       end;
 
     [
-      .tool_input.file_path,
-      .tool_input.path,
-      path_from(.toolCall.args),
-      path_from(.toolArgs),
-      path_from(.tool_args),
-      .file_path,
-      .path
-    ] | map(select(type == "string" and length > 0)) | first
+      paths_from(.tool_input),
+      paths_from(.toolCall.args),
+      paths_from(.toolArgs),
+      paths_from(.tool_args),
+      paths_from(.result),
+      paths_from(.)
+    ] | map(select(type == "string" and length > 0)) | unique | .[]
   '
 }
 
@@ -121,12 +161,12 @@ fallback_tool_name() {
   fi
 }
 
-fallback_file_path() {
+fallback_file_paths() {
   local input="$1"
   if [[ "$input" =~ \"file_path\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
+    printf '%s\n' "${BASH_REMATCH[1]}"
   elif [[ "$input" =~ \"path\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-    printf '%s' "${BASH_REMATCH[1]}"
+    printf '%s\n' "${BASH_REMATCH[1]}"
   fi
 }
 
@@ -164,7 +204,7 @@ absolute_path() {
 variant_for_path() {
   local file_path="$1"
   case "${file_path##*.}" in
-    ts|tsx|js|jsx) printf 'gruff-ts' ;;
+    ts|tsx|mts|cts|js|jsx|mjs|cjs) printf 'gruff-ts' ;;
     php) printf 'gruff-php' ;;
     go) printf 'gruff-go' ;;
     rs) printf 'gruff-rs' ;;
@@ -187,6 +227,7 @@ git_changed_supported_paths() {
   local rel_path
   {
     git -C "$root" diff --name-only --diff-filter=ACMR -- 2>/dev/null || true
+    git -C "$root" diff --cached --name-only --diff-filter=ACMR -- 2>/dev/null || true
     git -C "$root" ls-files --others --exclude-standard -- 2>/dev/null || true
   } | while IFS= read -r rel_path; do
     if supported_candidate_path "$rel_path"; then
@@ -198,11 +239,11 @@ git_changed_supported_paths() {
 file_paths_for_payload() {
   local payload="$1"
   local root="$2"
-  local file_path
-  file_path="$(json_file_path "$payload")"
-  [[ -n "$file_path" ]] || file_path="$(fallback_file_path "$payload")"
-  if [[ -n "$file_path" ]]; then
-    printf '%s\n' "$file_path"
+  local paths
+  paths="$(json_file_paths "$payload" || true)"
+  [[ -n "$paths" ]] || paths="$(fallback_file_paths "$payload")"
+  if [[ -n "$paths" ]]; then
+    printf '%s\n' "$paths" | awk 'length($0) && !seen[$0]++'
     return
   fi
   git_changed_supported_paths "$root"
@@ -335,9 +376,87 @@ changed_ranges() {
   git_diff_ranges "$root" "$rel_path" "$abs_path"
 }
 
+self_test() {
+  local payload paths ranges variant report_output report_json first_line
+  if ! command -v jq >/dev/null 2>&1; then
+    printf 'gruff-code-quality self-test: jq unavailable\n' >&2
+    return 1
+  fi
+
+  payload='{"tool_name":"MultiEdit","tool_input":{"edits":[{"file_path":"src/a.mts"},{"path":"src/b.php"}],"changed_ranges":[{"startLine":2,"endLine":4}]}}'
+  paths="$(json_file_paths "$payload")"
+  [[ "$paths" == *"src/a.mts"* && "$paths" == *"src/b.php"* ]] || {
+    printf 'gruff-code-quality self-test: path extraction failed: %s\n' "$paths" >&2
+    return 1
+  }
+  ranges="$(payload_ranges "$payload")"
+  [[ "$ranges" == "2-4" ]] || {
+    printf 'gruff-code-quality self-test: range extraction failed: %s\n' "$ranges" >&2
+    return 1
+  }
+  variant="$(variant_for_path "src/a.mts")"
+  [[ "$variant" == "gruff-ts" ]] || {
+    printf 'gruff-code-quality self-test: variant mapping failed: %s\n' "$variant" >&2
+    return 1
+  }
+
+  [[ "$(min_severity_rank warning)" == "2" && "$(min_severity_rank error)" == "3" && "$(min_severity_rank bogus)" == "1" ]] || {
+    printf 'gruff-code-quality self-test: min_severity_rank mapping failed\n' >&2
+    return 1
+  }
+
+  report_output='{"findings":[{"severity":"advisory","line":2,"file":"x.ts","ruleId":"a.one","message":"m1"},{"severity":"error","line":3,"file":"x.ts","ruleId":"z.two","message":"m2"},{"severity":"warning","line":4,"file":"x.ts","ruleId":"m.three","message":"m3"}]}'
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "2-4" 1 2)"
+  first_line="$(printf '%s' "$report_json" | jq -r '.lines[0]')"
+  [[ "$first_line" == "- [error] x.ts:3 z.two - m2" ]] || {
+    printf 'gruff-code-quality self-test: severity sort failed: %s\n' "$first_line" >&2
+    return 1
+  }
+  [[ "$(printf '%s' "$report_json" | jq -r '.total')" == "3" && "$(printf '%s' "$report_json" | jq -r '.more')" == "1" ]] || {
+    printf 'gruff-code-quality self-test: volume cap failed\n' >&2
+    return 1
+  }
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "2-4" 2 20 0)"
+  [[ "$(printf '%s' "$report_json" | jq -r '.surfaced')" == "2" && "$(printf '%s' "$report_json" | jq -r '.floored')" == "1" ]] || {
+    printf 'gruff-code-quality self-test: severity floor failed\n' >&2
+    return 1
+  }
+
+  # Native mode (analyzer owns scoping) surfaces a finding outside the literal
+  # changed range; the portable fallback filters that same finding out.
+  report_output='{"findings":[{"severity":"warning","line":99,"file":"x.ts","ruleId":"r.one","message":"m"}]}'
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "2-4" 1 20 1)"
+  [[ "$(printf '%s' "$report_json" | jq -r '.total')" == "1" ]] || {
+    printf 'gruff-code-quality self-test: native scope bypass failed\n' >&2
+    return 1
+  }
+  report_json="$(changed_findings_report "$report_output" "x.ts" "/tmp/x.ts" "2-4" 1 20 0)"
+  [[ "$(printf '%s' "$report_json" | jq -r '.total')" == "0" ]] || {
+    printf 'gruff-code-quality self-test: fallback range filter failed\n' >&2
+    return 1
+  }
+
+  printf 'gruff-code-quality self-test: ok\n'
+}
+
+# An analyzer "owns" changed-region filtering when it can scope the scan itself.
+# Only gruff-py advertises the symbol-aware trio (`--changed-ranges`,
+# `--changed-scope`, `--no-baseline`); when present the hook delegates scoping to
+# it instead of filtering by primary line. Any other binary uses the fallback.
+supports_native_changed_regions() {
+  local binary="$1"
+  local help="$2"
+  [[ "$binary" == "gruff-py" ]] || return 1
+  [[ "$help" == *"--changed-ranges"* ]] || return 1
+  [[ "$help" == *"--changed-scope"* ]] || return 1
+  [[ "$help" == *"--no-baseline"* ]] || return 1
+}
+
 # Analyzer invocation adapts to the two flag families currently used by the
 # gruff CLIs: long GNU-style flags (`--format json`) and Go-style single-dash
-# flags (`-format json`). Findings never cause a non-zero hook exit.
+# flags (`-format json`). When the binary owns changed-region scoping the hook
+# passes `--no-baseline --changed-ranges <ranges> --changed-scope symbol`.
+# Findings never cause a non-zero hook exit.
 analyse_help() {
   local binary_path="$1"
   "$binary_path" analyse --help 2>&1 || true
@@ -352,12 +471,17 @@ run_gruff_json() {
   local binary_path="$1"
   local help="$2"
   local file_path="$3"
-  local args
+  local binary="$4"
+  local ranges="$5"
+  local args timeout_seconds
   args=(analyse)
   if [[ "$help" == *"--format"* ]]; then
     args+=(--format json)
     if [[ "$help" == *"--fail-on"* ]]; then
       args+=(--fail-on none)
+    fi
+    if supports_native_changed_regions "$binary" "$help"; then
+      args+=(--no-baseline --changed-ranges "$ranges" --changed-scope symbol)
     fi
   elif [[ "$help" == *"-format"* ]]; then
     args+=(-format json)
@@ -365,8 +489,13 @@ run_gruff_json() {
     return 64
   fi
 
+  timeout_seconds="$GRUFF_CODE_QUALITY_TIMEOUT_SECONDS"
+  if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" -lt 1 ]]; then
+    timeout_seconds=30
+  fi
+
   if command -v timeout >/dev/null 2>&1; then
-    timeout 30 "$binary_path" "${args[@]}" "$file_path" 2>&1
+    timeout "$timeout_seconds" "$binary_path" "${args[@]}" "$file_path" 2>&1
     return $?
   fi
   "$binary_path" "${args[@]}" "$file_path" 2>&1
@@ -377,15 +506,36 @@ valid_gruff_json() {
   printf '%s' "$output" | jq -e 'type == "object" and (.findings | type == "array")' >/dev/null 2>&1
 }
 
-# Report filtering accepts the JSON shapes emitted across gruff-ts, gruff-go,
-# gruff-php, gruff-py, and gruff-rs: path may be `filePath`, `file`, or
-# `path`; line may be `line`, `location.line`, or `location.startLine`.
-filter_findings() {
+# Map a min-severity name to its rank (advisory=1, warning=2, error=3). Any
+# unrecognised value (or empty) floors at advisory, the default - the hook never
+# hides findings because of a typo in GRUFF_CODE_QUALITY_MIN_SEVERITY.
+min_severity_rank() {
+  case "${1,,}" in
+    warning) printf '2' ;;
+    error) printf '3' ;;
+    *) printf '1' ;;
+  esac
+}
+
+# Build a single JSON control object describing the changed-line findings:
+#   { total, e, w, a, surfaced, floored, more, lines }
+# `total`/`e`/`w`/`a` count every finding whose primary line intersects the
+# changed ranges, by severity. `lines` holds the canonical
+# `- [severity] file:line ruleId - message` rows for the findings that survive the
+# severity floor (rank >= $floor_rank), sorted error -> warning -> advisory then
+# file/line/ruleId, capped at $max; `more` is how many surfaced findings the cap
+# hid and `floored` how many were dropped below the floor. Accepts the JSON shapes
+# emitted across all five ports: path may be `filePath`, `file`, or `path`; line
+# may be `line`, `location.line`, or `location.startLine`.
+changed_findings_report() {
   local output="$1"
   local rel_path="$2"
   local abs_path="$3"
   local ranges="$4"
-  printf '%s' "$output" | jq -r --arg rel "$rel_path" --arg abs "$abs_path" --arg ranges "$ranges" '
+  local floor_rank="$5"
+  local max="$6"
+  local native="${7:-0}"
+  printf '%s' "$output" | jq -c --arg rel "$rel_path" --arg abs "$abs_path" --arg ranges "$ranges" --argjson floor_rank "$floor_rank" --argjson max "$max" --argjson native "$native" '
     def normalize_path:
       tostring | gsub("\\\\"; "/") | sub("^\\./"; "");
     def finding_path:
@@ -414,12 +564,29 @@ filter_findings() {
     def in_changed_ranges($line):
       parsed_ranges as $parsed
       | any($parsed[]; $line >= .start and $line <= .end);
+    def sev_rank($s):
+      if $s == "error" then 3 elif $s == "warning" then 2 elif $s == "advisory" then 1 else 0 end;
 
-    (.findings // [])
-    | map(. as $finding | ($finding | line_or_null) as $line | select(($finding | same_file) and $line != null and in_changed_ranges($line)))
-    | .[]
-    | line_or_null as $line
-    | "[\(.severity // "unknown")] \(finding_path):\($line) \(.ruleId // "unknown-rule") - \(.message // "")"
+    [ (.findings // [])[]
+      | . as $finding
+      | ($finding | line_or_null) as $line
+      | select(($finding | same_file) and $line != null and ($native == 1 or in_changed_ranges($line)))
+      | { sev: (.severity // "unknown"),
+          rank: sev_rank(.severity // ""),
+          line: $line,
+          file: ($finding | finding_path),
+          ruleId: (.ruleId // "unknown-rule"),
+          message: (.message // "") } ] as $all
+    | ($all | sort_by([ (3 - .rank), .file, .line, .ruleId ])) as $sorted
+    | [ $sorted[] | select(.rank >= $floor_rank) ] as $surfaced
+    | { total: ($all | length),
+        e: ([ $all[] | select(.sev == "error") ] | length),
+        w: ([ $all[] | select(.sev == "warning") ] | length),
+        a: ([ $all[] | select(.sev == "advisory") ] | length),
+        surfaced: ($surfaced | length),
+        floored: (($all | length) - ($surfaced | length)),
+        more: (if ($surfaced | length) > $max then ($surfaced | length) - $max else 0 end),
+        lines: [ limit($max; $surfaced[]) | "- [\(.sev)] \(.file):\(.line) \(.ruleId) - \(.message)" ] }
   ' 2>/dev/null || true
 }
 
@@ -469,6 +636,16 @@ suppressed_count() {
   ' 2>/dev/null || printf '0'
 }
 
+# When the analyzer owns changed-region scoping, it reports how many findings it
+# suppressed as out-of-scope in its own output; read that count rather than
+# re-deriving it. Falls back to 0 when the field is absent.
+native_suppressed_count() {
+  local output="$1"
+  printf '%s' "$output" | jq -r '
+    (.suppressedCount? // .diff.suppressedCount? // 0)
+  ' 2>/dev/null || printf '0'
+}
+
 # When the analyzer reports the edited file as ignored by its config
 # (`paths.ignore`), return a short human descriptor (for example
 # "ignored by gruff config (matched *.css)") so the hook can tell the agent the
@@ -496,9 +673,9 @@ ignored_descriptor() {
         or $n == ("./" + ($rel | normalize_path))
         or ($n | endswith("/" + ($rel | normalize_path))));
 
-    ((.paths.ignoredPaths? // .ignoredPaths? // .paths.skipped? // []))
+    ((.paths.ignoredPaths? // []) + (.ignoredPaths? // []) + (.paths.skipped? // []))
     | map(select(is_match(entry_path)))
-    | first
+    | ((map(select(entry_detail | length > 0)) | first) // first)
     | if . == null then empty
       else (entry_detail) as $d
         | if ($d | length) > 0 then "ignored by gruff config (matched \($d))"
@@ -507,12 +684,26 @@ ignored_descriptor() {
   ' 2>/dev/null || true
 }
 
+print_scope_header() {
+  local binary="$1"
+  local rel_path="$2"
+  local ranges="$3"
+  local total="$4"
+  local err="$5"
+  local warn="$6"
+  local adv="$7"
+  printf 'gruff-code-quality: %s %s changed-lines=%s; %s on changed lines: %s error, %s warning, %s advisory\n' \
+    "$binary" "$rel_path" "$ranges" "$total" "$err" "$warn" "$adv"
+}
+
 process_file() {
   local payload="$1"
   local root="$2"
   local file_path="$3"
   local rel_path abs_path binary binary_path config_file
-  local ranges help output status changed_output suppressed ignored_desc
+  local ranges help output status suppressed ignored_desc uses_native_regions
+  local max_findings floor_rank report_json scope_fields
+  local total err warn adv surfaced floored more
 
   [[ -n "$file_path" ]] || return 0
   [[ "$file_path" =~ $SKIP_DIR_PATTERN ]] && return 0
@@ -526,6 +717,9 @@ process_file() {
   binary="$(variant_for_path "$rel_path" || true)"
   [[ -n "$binary" ]] || return 0
   config_file="$root/.${binary}.yaml"
+  if [[ ! -f "$config_file" ]]; then
+    config_file="$root/.${binary}.yml"
+  fi
   [[ -f "$config_file" ]] || return 0
 
   binary_path="$(discover_binary "$root" "$binary")"
@@ -547,14 +741,18 @@ process_file() {
     printf 'gruff-code-quality: %s does not expose JSON output; changed-line filtering skipped\n' "$binary" >&2
     return 0
   fi
+  uses_native_regions=0
+  if supports_native_changed_regions "$binary" "$help"; then
+    uses_native_regions=1
+  fi
 
   set +e
-  output="$(run_gruff_json "$binary_path" "$help" "$rel_path")"
+  output="$(run_gruff_json "$binary_path" "$help" "$rel_path" "$binary" "$ranges")"
   status=$?
   set -e
 
-  if [[ "$status" -eq 124 ]]; then
-    printf 'gruff-code-quality: %s crashed or timed out\n' "$binary" >&2
+  if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+    printf 'gruff-code-quality: %s exceeded %ss or was killed; changed-line filtering skipped\n' "$binary" "$GRUFF_CODE_QUALITY_TIMEOUT_SECONDS" >&2
     return 0
   fi
   if [[ -z "$output" ]]; then
@@ -573,7 +771,7 @@ process_file() {
       printf '%s\n' "$output" | awk 'NR <= 12 { print "  " $0 }'
       return 0
     fi
-    printf 'gruff-code-quality: %s produced non-JSON output; changed-line filtering skipped\n' "$binary" >&2
+    printf 'gruff-code-quality: %s exited %s with non-JSON output; changed-line filtering skipped\n' "$binary" "$status" >&2
     return 0
   fi
 
@@ -584,22 +782,50 @@ process_file() {
   # bypass `paths.ignore` for explicitly-passed files.
   ignored_desc="$(ignored_descriptor "$output" "$rel_path" "$abs_path")"
   if [[ -n "$ignored_desc" ]]; then
-    printf 'gruff-code-quality: skipped %s - %s; out of scope, do not modify to satisfy gruff.\n' "$rel_path" "$ignored_desc"
+    printf 'gruff-code-quality: skipped %s %s - %s; out of scope, do not modify to satisfy gruff.\n' "$binary" "$rel_path" "$ignored_desc"
     return 0
   fi
 
   # MVP range model: enforce findings whose primary line intersects edited lines.
   # Wider function-block expansion is deferred unless an analyzer reports new
-  # method findings only on unchanged declaration lines.
-  changed_output="$(filter_findings "$output" "$rel_path" "$abs_path" "$ranges")"
-  suppressed="$(suppressed_count "$output" "$rel_path" "$abs_path" "$ranges")"
-  if [[ -n "$changed_output" ]]; then
-    printf '%s\n' "$changed_output"
+  # method findings only on unchanged declaration lines. Surfaced findings are
+  # severity-sorted (error first), floored at GRUFF_CODE_QUALITY_MIN_SEVERITY, and
+  # capped at GRUFF_CODE_QUALITY_MAX_FINDINGS.
+  max_findings="$GRUFF_CODE_QUALITY_MAX_FINDINGS"
+  [[ "$max_findings" =~ ^[0-9]+$ && "$max_findings" -ge 1 ]] || max_findings=20
+  floor_rank="$(min_severity_rank "$GRUFF_CODE_QUALITY_MIN_SEVERITY")"
+
+  report_json="$(changed_findings_report "$output" "$rel_path" "$abs_path" "$ranges" "$floor_rank" "$max_findings" "$uses_native_regions")"
+  [[ -n "$report_json" ]] || report_json='{"total":0,"e":0,"w":0,"a":0,"surfaced":0,"floored":0,"more":0,"lines":[]}'
+  if [[ "$uses_native_regions" -eq 1 ]]; then
+    suppressed="$(native_suppressed_count "$output")"
+  else
+    suppressed="$(suppressed_count "$output" "$rel_path" "$abs_path" "$ranges")"
+  fi
+
+  scope_fields="$(printf '%s' "$report_json" | jq -r '[.total,.e,.w,.a,.surfaced,.floored,.more] | @tsv' 2>/dev/null || true)"
+  IFS=$'\t' read -r total err warn adv surfaced floored more <<< "$scope_fields"
+  [[ "$total" =~ ^[0-9]+$ ]] || total=0
+  [[ "$surfaced" =~ ^[0-9]+$ ]] || surfaced=0
+  [[ "$floored" =~ ^[0-9]+$ ]] || floored=0
+  [[ "$more" =~ ^[0-9]+$ ]] || more=0
+
+  if [[ "$total" -gt 0 || ( "$suppressed" =~ ^[0-9]+$ && "$suppressed" -gt 0 ) ]]; then
+    print_scope_header "$binary" "$rel_path" "$ranges" "$total" "$err" "$warn" "$adv"
+  fi
+  if [[ "$surfaced" -gt 0 ]]; then
+    printf '%s' "$report_json" | jq -r '.lines[]' 2>/dev/null || true
+  fi
+  if [[ "$more" -gt 0 ]]; then
+    printf 'gruff-code-quality: (%s more on changed lines; raise GRUFF_CODE_QUALITY_MAX_FINDINGS to list them)\n' "$more"
+  fi
+  if [[ "$floored" -gt 0 ]]; then
+    printf 'gruff-code-quality: %s finding(s) below GRUFF_CODE_QUALITY_MIN_SEVERITY=%s not listed\n' "$floored" "${GRUFF_CODE_QUALITY_MIN_SEVERITY:-advisory}"
   fi
   if [[ "$suppressed" =~ ^[0-9]+$ && "$suppressed" -gt 0 ]]; then
     printf 'gruff-code-quality: suppressed %s pre-existing finding(s) outside changed lines\n' "$suppressed"
   fi
-  if [[ -n "$changed_output" ]]; then
+  if [[ "$surfaced" -gt 0 ]]; then
     printf '%s\n' "$FOOTER"
   fi
   return 0
@@ -608,6 +834,11 @@ process_file() {
 main() {
   local payload tool_name root file_path
   local -a file_paths
+  if [[ "${1:-}" == "--self-test=smoke" ]]; then
+    self_test
+    exit $?
+  fi
+
   payload="$(read_stdin)"
   tool_name="$(json_tool_name "$payload")"
   [[ -n "$tool_name" ]] || tool_name="$(fallback_tool_name "$payload")"

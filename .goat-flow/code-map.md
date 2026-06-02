@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-06-01. Captures the v0.3.0 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-06-03. Captures the v0.3.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -246,6 +246,7 @@ src/
 |   |   |-- SetupBloatRule.php                = `test-quality.setup-bloat`
 |   |   |-- SkippedWithoutReasonRule.php      = `test-quality.skipped-without-reason`
 |   |   |-- SleepInTestRule.php               = `test-quality.sleep-in-test` (covers `sleep`/`usleep` family + `time`/`microtime` + `new DateTime('now')`/`DateTimeImmutable()`)
+|   |   |-- StaticAnalysisRedundantTestRule.php = `test-quality.static-analysis-redundant-test` (advisory candidate for tests that assert same-file static declarations such as class_exists/method_exists/property_exists)
 |   |   |-- SutNotCalledRule.php              = `test-quality.sut-not-called` (skips subprocess-execution tests; matches verb-without-trailing-`s` candidates so `testLoadsX` matches `load()`)
 |   |   |-- TautologicalTypeAssertionRule.php = `test-quality.tautological-type-assertion` (only when local static evidence proves the asserted type)
 |   |   |-- TestdoxReadabilityRule.php        = `test-quality.testdox-readability` (`minWords` threshold)

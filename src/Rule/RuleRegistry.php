@@ -122,6 +122,7 @@ use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
@@ -297,6 +298,7 @@ final class RuleRegistry
                             new SetupBloatRule(),
                             new SkippedWithoutReasonRule(),
                             new SleepInTestRule(),
+                            new StaticAnalysisRedundantTestRule(),
                             new SutNotCalledRule(),
                             new TautologicalTypeAssertionRule(),
                             new TestLongerThanSutRule(),

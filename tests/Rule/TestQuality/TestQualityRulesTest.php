@@ -7,7 +7,9 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Config\RuleSettings;
+use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
@@ -33,6 +35,7 @@ use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
@@ -277,6 +280,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 0, $findings);
         self::assertRuleCount(UnusedMockRule::ID, 0, $findings);
         self::assertRuleCount(ExceptionTypeOnlyRule::ID, 0, $findings);
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $findings);
         self::assertRuleCount(TautologicalTypeAssertionRule::ID, 0, $findings);
         self::assertRuleCount(GlobalStateMutationRule::ID, 0, $findings);
         self::assertRuleCount(MockWithoutExpectationRule::ID, 0, $findings);
@@ -370,6 +374,70 @@ final class TestQualityRulesTest extends TestCase
         $findings = $this->analysePath('tests/Fixtures/TestQuality/tautological-type-assertion.php');
 
         self::assertRuleCount(TautologicalTypeAssertionRule::ID, 2, $findings);
+    }
+
+    /**
+     * Verify static-analysis-redundant candidates carry evidence and leave behavior clean.
+     *
+     * @return void
+     */
+    public function testStaticAnalysisRedundantCandidatesDetectedWithEvidence(): void
+    {
+        $findings = array_values(array_filter(
+                                     $this->analysePath('tests/Fixtures/TestQuality/static-analysis-redundant-test.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === StaticAnalysisRedundantTestRule::ID,
+                                 ));
+
+        self::assertCount(6, $findings);
+        self::assertSame(
+            [
+                'class_exists',
+                'enum_exists',
+                'interface_exists',
+                'method_exists',
+                'property_exists',
+                'trait_exists',
+            ],
+            $this->stringMetadataValues($findings, 'variant'),
+        );
+        self::assertSame(
+            [
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeContract',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService::$label',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService::label()',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeStatus',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeTrait',
+            ],
+            $this->stringMetadataValues($findings, 'evidenceSymbol'),
+        );
+
+        foreach ($findings as $finding) {
+            self::assertSame(Severity::Advisory, $finding->severity);
+            self::assertSame(Confidence::High, $finding->confidence);
+            self::assertStringContainsString('static-analysis-redundant candidate', $finding->message);
+            self::assertSame('high', $finding->metadata['candidateConfidence'] ?? null);
+        }
+    }
+
+    /**
+     * Verify static-analysis-redundant candidates do not duplicate neighbouring rule ownership.
+     *
+     * @return void
+     */
+    public function testStaticAnalysisRedundantCandidatesRespectNeighbouringRules(): void
+    {
+        $tautologicalFindings = $this->analysePath('tests/Fixtures/TestQuality/tautological-type-assertion.php');
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $tautologicalFindings);
+        self::assertRuleCount(TautologicalTypeAssertionRule::ID, 2, $tautologicalFindings);
+
+        $exceptionFindings = $this->analysePath('tests/Fixtures/TestQuality/exception-type-only.php');
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $exceptionFindings);
+        self::assertRuleCount(ExceptionTypeOnlyRule::ID, 1, $exceptionFindings);
+
+        $mechanicsFindings = $this->analysePath('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php');
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $mechanicsFindings);
+        self::assertRuleCount(PrivateReflectionRule::ID, 3, $mechanicsFindings);
     }
 
     /**
@@ -544,6 +612,26 @@ final class TestQualityRulesTest extends TestCase
             array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
+    }
+
+    /**
+     * Return sorted string metadata values for stable assertions.
+     *
+     * @param list<Finding> $findings - Findings whose metadata should be inspected.
+     * @param string        $key - Metadata key to read.
+     *
+     * @return list<string> - String values sorted ascending.
+     */
+    private function stringMetadataValues(array $findings, string $key): array
+    {
+        $values = array_values(array_filter(
+                                   array_map(static fn(Finding $finding): mixed => $finding->metadata[$key] ?? null, $findings),
+                                   'is_string',
+                               ));
+
+        sort($values, SORT_STRING);
+
+        return $values;
     }
 
     /**

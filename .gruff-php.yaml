@@ -490,6 +490,8 @@ rules:
         enabled: true
     test-quality.sleep-in-test:
         enabled: true
+    test-quality.static-analysis-redundant-test:
+        enabled: true
     test-quality.sut-not-called:
         enabled: true
     test-quality.tautological-type-assertion:
