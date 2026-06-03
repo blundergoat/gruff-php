@@ -66,6 +66,31 @@ final readonly class AnalysisFindingSupport
     }
 
     /**
+     * Keep project-rule findings inside the files requested by this invocation.
+     *
+     * @param list<Finding> $findings - Findings to filter.
+     * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context.
+     * @param list<string>  $filePaths - Project-relative display paths in the requested source set.
+     *
+     * @return list<Finding> - Findings with out-of-scope project-rule rows removed.
+     */
+    public function filterProjectRuleFindingsToFiles(array $findings, array $projectRuleIds, array $filePaths): array
+    {
+        if ($projectRuleIds === [] || $filePaths === []) {
+            return $findings;
+        }
+
+        $projectRules = array_fill_keys($projectRuleIds, true);
+        $files        = array_fill_keys($filePaths, true);
+
+        return array_values(array_filter(
+            $findings,
+            static fn(Finding $finding): bool => !isset($projectRules[$finding->ruleId])
+                || isset($files[$finding->filePath]),
+        ));
+    }
+
+    /**
      * Rewrite absolute finding paths to be relative to the requested base directory.
      *
      * @param list<Finding> $findings - Findings whose paths may need normalising.

@@ -35,6 +35,16 @@ use Symfony\Component\Yaml\Yaml;
 final class DeadCodeProjectIndex
 {
     /**
+     * Pattern for PHP class FQNs: namespace segments separated by backslashes.
+     */
+    private const PHP_CLASS_FQN_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/';
+
+    /**
+     * Pattern for a concrete PHP method identifier after a controller callable delimiter.
+     */
+    private const PHP_METHOD_NAME_PATTERN = '/^[A-Za-z_][A-Za-z0-9_]*$/';
+
+    /**
      * @var array<string, DeadCodeSymbolDeclaration>
      */
     private array $classLikeDeclarations = [];
@@ -289,18 +299,18 @@ final class DeadCodeProjectIndex
     /**
      * Walk parsed YAML and record values attached to `_controller` keys.
      *
-     * @param mixed $value - Parsed YAML value.
+     * @param mixed $yamlNode - Parsed YAML value or nested mapping.
      * @param bool  $isTestFile - Whether the containing unit is a test file.
      *
      * @return void
      */
-    private function recordSymfonyYamlControllerReferencesFromValue(mixed $value, bool $isTestFile): void
+    private function recordSymfonyYamlControllerReferencesFromValue(mixed $yamlNode, bool $isTestFile): void
     {
-        if (!is_array($value)) {
+        if (!is_array($yamlNode)) {
             return;
         }
 
-        foreach ($value as $key => $childValue) {
+        foreach ($yamlNode as $key => $childValue) {
             if ($key === '_controller' && is_string($childValue)) {
                 $this->recordSymfonyControllerReferenceValue($childValue, $isTestFile);
             }
@@ -359,7 +369,13 @@ final class DeadCodeProjectIndex
             return null;
         }
 
-        if (!$this->isPhpFqn($classPart) || !$this->isPhpMethodName($methodPart)) {
+        // Require a PHP class FQN: identifier segments separated by namespace separators.
+        if (preg_match(self::PHP_CLASS_FQN_PATTERN, $classPart) !== 1) {
+            return null;
+        }
+
+        // Require a concrete method identifier after the Symfony controller delimiter.
+        if (preg_match(self::PHP_METHOD_NAME_PATTERN, $methodPart) !== 1) {
             return null;
         }
 
@@ -378,30 +394,6 @@ final class DeadCodeProjectIndex
         $extension = strtolower(pathinfo($analysisUnit->file->displayPath, PATHINFO_EXTENSION));
 
         return $extension === 'yaml' || $extension === 'yml';
-    }
-
-    /**
-     * Decide whether a string has PHP FQN segment syntax.
-     *
-     * @param string $fqn - Candidate class FQN without a leading slash.
-     *
-     * @return bool - true when every namespace segment is a PHP identifier
-     */
-    private function isPhpFqn(string $fqn): bool
-    {
-        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/', $fqn) === 1;
-    }
-
-    /**
-     * Decide whether a callable suffix has PHP method-name syntax.
-     *
-     * @param string $methodName - Candidate method name after `::`.
-     *
-     * @return bool - true when the method segment is a PHP identifier
-     */
-    private function isPhpMethodName(string $methodName): bool
-    {
-        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $methodName) === 1;
     }
 
     /**

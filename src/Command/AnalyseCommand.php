@@ -197,6 +197,7 @@ final class AnalyseCommand extends Command
             $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changedScope);
             $findings         = $diffFilterResult->findings;
             $suppressedCount  = $diffFilterResult->suppressedCount;
+            $diff             = $diff->withSuppressedCount($suppressedCount);
         }
 
         $findings       = $findingSupport->filterAllowedSecretPreviews($findings, $config);

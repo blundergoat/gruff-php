@@ -410,6 +410,26 @@ final class RuleRegistry
     }
 
     /**
+     * Return enabled rule ids whose findings come from project-wide analysis.
+     *
+     * @param AnalysisConfig $config - Config used to filter registered rules.
+     *
+     * @return list<string> - Enabled ProjectRuleInterface ids in registry order.
+     */
+    public function enabledProjectRuleIds(AnalysisConfig $config): array
+    {
+        $ruleIds = [];
+
+        foreach ($this->enabledRules($config) as $rule) {
+            if ($rule instanceof ProjectRuleInterface) {
+                $ruleIds[] = $rule->definition()->id;
+            }
+        }
+
+        return $ruleIds;
+    }
+
+    /**
      * Determine whether the enabled rule set is fully streaming-capable.
      *
      * A rule set is streaming-capable when every enabled project rule

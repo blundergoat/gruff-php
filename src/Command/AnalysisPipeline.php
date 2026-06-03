@@ -18,6 +18,7 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Rule\RuleRunnerObserver;
 use Closure;
+use GruffPhp\Source\SourceFile;
 use GruffPhp\Source\SourceDiscoveryResult;
 
 /**
@@ -133,9 +134,13 @@ final class AnalysisPipeline
         ?DiffResult           $reviewDiff,
         RuleContext           $ruleContext,
     ): bool {
+        $hasNarrowProjectRuleContext = $options->paths !== []
+            && $this->registry->hasEnabledProjectRules($ruleContext->config);
+
         // Stream only when no review/diff retains the base snapshot and every enabled rule tolerates per-unit release.
         return ($reviewDiff === null || !$reviewDiff->active)
                && !$options->hasChangedRegionMode()
+               && !$hasNarrowProjectRuleContext
                && $options->diffVs === null
                && $this->registry->supportsStreaming($ruleContext);
     }
@@ -302,6 +307,11 @@ final class AnalysisPipeline
                                              $ruleRunnerObserver,
             shouldReleaseUnitsAfterAnalysis: true,
         );
+        $findings     = (new AnalysisFindingSupport())->filterProjectRuleFindingsToFiles(
+            $findings,
+            $this->registry->enabledProjectRuleIds($config),
+            $this->sourceFilePaths($sources),
+        );
         $analyseNs    = hrtime(true) - $analyseStart;
 
         // Surface the resolved project-context units too so review flows can diff them against the base snapshot.
@@ -312,5 +322,20 @@ final class AnalysisPipeline
             'analyseNs'           => $analyseNs,
             'projectContextUnits' => $projectContextUnits,
         ];
+    }
+
+    /**
+     * Return display paths from the source set requested by this invocation.
+     *
+     * @param AnalysisSourceSet $sources - Loaded sources for the requested analysis paths.
+     *
+     * @return list<string> - Project-relative source file paths in discovery order.
+     */
+    private function sourceFilePaths(AnalysisSourceSet $sources): array
+    {
+        return array_map(
+            static fn(SourceFile $sourceFile): string => $sourceFile->displayPath,
+            $sources->discovery->files,
+        );
     }
 }

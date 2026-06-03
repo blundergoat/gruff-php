@@ -16,6 +16,7 @@ final readonly class DiffResult
      * @param array<string, list<ChangedLineRange>> $changedLines - Changed line ranges keyed by display path.
      * @param list<string>                          $changedFiles - Display paths marked as changed.
      * @param string                                $message - Human-readable diff status message.
+     * @param int|null                              $suppressedCount - Findings removed by changed-region filtering, when known.
      */
     public function __construct(
         public bool    $active,
@@ -24,6 +25,7 @@ final readonly class DiffResult
         public array   $changedLines,
         public array   $changedFiles,
         public string  $message,
+        public ?int    $suppressedCount = null,
     ) {
     }
 
@@ -38,6 +40,26 @@ final readonly class DiffResult
         // Sentinel for "no diff requested": active=false is what downstream filters check to keep
         // every finding, so the empty changed-file/line sets here must never be read as "nothing changed".
         return new self(false, 'full-project', null, [], [], 'Diff mode is disabled.');
+    }
+
+    /**
+     * Return a copy carrying the changed-region suppression count.
+     *
+     * @param int $suppressedCount - Findings excluded by changed-region filtering.
+     *
+     * @return self - Diff metadata with the count attached for report serialization.
+     */
+    public function withSuppressedCount(int $suppressedCount): self
+    {
+        return new self(
+            active:          $this->active,
+            mode:            $this->mode,
+            base:            $this->base,
+            changedLines:    $this->changedLines,
+            changedFiles:    $this->changedFiles,
+            message:         $this->message,
+            suppressedCount: $suppressedCount,
+        );
     }
 
     /**
@@ -62,6 +84,7 @@ final readonly class DiffResult
      *     base: string|null,
      *     changedFiles: int,
      *     message: string,
+     *     suppressedCount?: int,
      *     files: list<array{file: string, ranges: list<array{start: int, end: int}>}>
      * } - JSON-serialisable summary of the diff: changedFiles is a count (not the paths), with per-file paths and ranges nested under files
      */
@@ -81,7 +104,7 @@ final readonly class DiffResult
 
         // The wire shape intentionally diverges from the in-memory one: `changedFiles` is emitted as a
         // count while the per-file paths and ranges move under `files`, so consumers read a summary plus detail.
-        return [
+        $payload = [
             'active'       => $this->active,
             'mode'         => $this->mode,
             'base'         => $this->base,
@@ -89,5 +112,11 @@ final readonly class DiffResult
             'message'      => $this->message,
             'files'        => $files,
         ];
+
+        if ($this->suppressedCount !== null) {
+            $payload['suppressedCount'] = $this->suppressedCount;
+        }
+
+        return $payload;
     }
 }

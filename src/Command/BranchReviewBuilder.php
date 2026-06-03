@@ -18,6 +18,7 @@ use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\ScoreCalculator;
+use GruffPhp\Source\SourceFile;
 use RuntimeException;
 
 /**
@@ -90,6 +91,11 @@ final readonly class BranchReviewBuilder
                     ? $this->baseProjectContextUnits($baseRoot, $options, $config)
                     : $baseSources->analysisUnits;
                 $baseFindings = $baseRegistry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
+                $baseFindings = (new AnalysisFindingSupport())->filterProjectRuleFindingsToFiles(
+                    $baseFindings,
+                    $baseRegistry->enabledProjectRuleIds($config),
+                    $this->sourceFilePaths($baseSources),
+                );
                 $baseFindings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($baseFindings, $config);
             }
 
@@ -189,12 +195,12 @@ final readonly class BranchReviewBuilder
     ): array {
         $support = new AnalysisFindingSupport();
 
-        if (!$options->isChangedOnly) {
-            return $support->normaliseRequestedPaths($projectRoot, $options->paths);
-        }
-
         if ($shouldLoadProjectContext) {
             return [];
+        }
+
+        if (!$options->isChangedOnly) {
+            return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
         if ($reviewDiff->changedFiles === []) {
@@ -285,8 +291,27 @@ final readonly class BranchReviewBuilder
             return true;
         }
 
+        if ($options->paths !== []) {
+            return true;
+        }
+
         return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== [];
+    }
+
+    /**
+     * Return display paths from a source set.
+     *
+     * @param AnalysisSourceSet $sources - Source set loaded for requested analysis paths.
+     *
+     * @return list<string> - Project-relative display paths in discovery order.
+     */
+    private function sourceFilePaths(AnalysisSourceSet $sources): array
+    {
+        return array_map(
+            static fn(SourceFile $sourceFile): string => $sourceFile->displayPath,
+            $sources->discovery->files,
+        );
     }
 }
