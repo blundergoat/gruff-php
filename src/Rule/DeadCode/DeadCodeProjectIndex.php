@@ -26,6 +26,8 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\UnionType;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Builds project-owned declaration/reference summaries for dead-code rules.
@@ -176,6 +178,10 @@ final class DeadCodeProjectIndex
      */
     private function recordDeclarations(AnalysisUnit $analysisUnit): void
     {
+        if (!$analysisUnit->file->isPhp()) {
+            return;
+        }
+
         $scope = $this->scope();
         $skipEntrypointDeclarations = $scope->isEntrypointPath($analysisUnit->file->displayPath);
         $classLikeTypes = [Class_::class, Interface_::class, Trait_::class, Enum_::class];
@@ -245,11 +251,157 @@ final class DeadCodeProjectIndex
     {
         $isTestFile = $this->scope()->isTestPath($analysisUnit->file->displayPath);
 
+        if (!$analysisUnit->file->isPhp()) {
+            $this->recordSymfonyYamlControllerReferences($analysisUnit, $isTestFile);
+            return;
+        }
+
         $this->recordExpressionClassReferences($analysisUnit, $isTestFile);
         $this->recordStructuralClassReferences($analysisUnit, $isTestFile);
         $this->recordTypeReferencesInUnit($analysisUnit, $isTestFile);
         $this->recordFunctionCallReferences($analysisUnit, $isTestFile);
         $this->recordConstantFetchReferences($analysisUnit, $isTestFile);
+    }
+
+    /**
+     * Record Symfony YAML route controller callables as class references.
+     *
+     * @param AnalysisUnit $analysisUnit - YAML/YML text unit to inspect.
+     * @param bool         $isTestFile - Whether the containing unit is a test file.
+     *
+     * @return void
+     */
+    private function recordSymfonyYamlControllerReferences(AnalysisUnit $analysisUnit, bool $isTestFile): void
+    {
+        if (!$this->isYamlUnit($analysisUnit) || trim($analysisUnit->source) === '') {
+            return;
+        }
+
+        try {
+            $decoded = Yaml::parse($analysisUnit->source);
+        } catch (ParseException) {
+            return;
+        }
+
+        $this->recordSymfonyYamlControllerReferencesFromValue($decoded, $isTestFile);
+    }
+
+    /**
+     * Walk parsed YAML and record values attached to `_controller` keys.
+     *
+     * @param mixed $value - Parsed YAML value.
+     * @param bool  $isTestFile - Whether the containing unit is a test file.
+     *
+     * @return void
+     */
+    private function recordSymfonyYamlControllerReferencesFromValue(mixed $value, bool $isTestFile): void
+    {
+        if (!is_array($value)) {
+            return;
+        }
+
+        foreach ($value as $key => $childValue) {
+            if ($key === '_controller' && is_string($childValue)) {
+                $this->recordSymfonyControllerReferenceValue($childValue, $isTestFile);
+            }
+
+            if (is_array($childValue)) {
+                $this->recordSymfonyYamlControllerReferencesFromValue($childValue, $isTestFile);
+            }
+        }
+    }
+
+    /**
+     * Record the class part from an internal `FQCN::method` controller callable.
+     *
+     * @param string $controllerValue - Raw `_controller` scalar from YAML.
+     * @param bool   $isTestFile - Whether the containing unit is a test file.
+     *
+     * @return void
+     */
+    private function recordSymfonyControllerReferenceValue(string $controllerValue, bool $isTestFile): void
+    {
+        $fqn = $this->classFqnFromControllerCallable($controllerValue);
+        if ($fqn === null || !$this->scope()->isInternalFqn($fqn)) {
+            return;
+        }
+
+        $this->classReferences[$fqn][] = new DeadCodeSymbolReference(
+            fqn:          $fqn,
+            originSymbol: null,
+            isTestFile:   $isTestFile,
+        );
+    }
+
+    /**
+     * Extract a PHP class FQN from a Symfony controller callable string.
+     *
+     * @param string $controllerValue - Candidate `_controller` value.
+     *
+     * @return string|null - Class FQN without leading slash, or null for non-FQCN controller shapes
+     */
+    private function classFqnFromControllerCallable(string $controllerValue): ?string
+    {
+        $candidate = trim($controllerValue, " \t\n\r\0\x0B'\"");
+        if (!str_contains($candidate, '::')) {
+            return null;
+        }
+
+        $parts = explode('::', $candidate, 2);
+        if (count($parts) !== 2) {
+            return null;
+        }
+
+        $classPart  = ltrim(trim($parts[0], " \t\n\r\0\x0B'\""), '\\');
+        $methodPart = trim($parts[1], " \t\n\r\0\x0B'\"");
+
+        if ($classPart === '' || $methodPart === '') {
+            return null;
+        }
+
+        if (!$this->isPhpFqn($classPart) || !$this->isPhpMethodName($methodPart)) {
+            return null;
+        }
+
+        return $classPart;
+    }
+
+    /**
+     * Decide whether the unit is a YAML route/config source.
+     *
+     * @param AnalysisUnit $analysisUnit - Text unit to classify.
+     *
+     * @return bool - true for .yaml and .yml display paths
+     */
+    private function isYamlUnit(AnalysisUnit $analysisUnit): bool
+    {
+        $extension = strtolower(pathinfo($analysisUnit->file->displayPath, PATHINFO_EXTENSION));
+
+        return $extension === 'yaml' || $extension === 'yml';
+    }
+
+    /**
+     * Decide whether a string has PHP FQN segment syntax.
+     *
+     * @param string $fqn - Candidate class FQN without a leading slash.
+     *
+     * @return bool - true when every namespace segment is a PHP identifier
+     */
+    private function isPhpFqn(string $fqn): bool
+    {
+        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/', $fqn) === 1;
+    }
+
+    /**
+     * Decide whether a callable suffix has PHP method-name syntax.
+     *
+     * @param string $methodName - Candidate method name after `::`.
+     *
+     * @return bool - true when the method segment is a PHP identifier
+     */
+    private function isPhpMethodName(string $methodName): bool
+    {
+        return preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $methodName) === 1;
     }
 
     /**

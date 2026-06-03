@@ -1,0 +1,3 @@
+inline_controller:
+  path: /inline
+  defaults: { _controller: App\Controller\InlineController::index }

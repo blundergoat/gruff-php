@@ -1,0 +1,4 @@
+block_controller:
+  path: /block
+  defaults:
+    _controller: App\Controller\BlockController::index

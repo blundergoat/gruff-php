@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace GruffPhp\Rule\DeadCode;
 
+use GruffPhp\Rule\ProjectSourceTextRuleAccumulator;
+
 /**
  * Reports project-owned class-like declarations with no supported references.
  */
-final class UnusedInternalClassRule extends AbstractUnusedInternalSymbolRule
+final class UnusedInternalClassRule extends AbstractUnusedInternalSymbolRule implements ProjectSourceTextRuleAccumulator
 {
     /**
      * Stable rule identifier for unused internal class-like findings.

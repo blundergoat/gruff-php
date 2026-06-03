@@ -529,12 +529,16 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
-        if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
+        if ($analysisUnit->hasParseErrors()) {
             return;
         }
 
+        $isPhp = $analysisUnit->file->isPhp();
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
+                continue;
+            }
+            if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
 

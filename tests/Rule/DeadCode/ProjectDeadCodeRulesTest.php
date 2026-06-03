@@ -28,17 +28,22 @@ final class ProjectDeadCodeRulesTest extends TestCase
     private const FIXTURE_ROOT = __DIR__ . '/../../Fixtures/DeadCode/project-wide';
 
     /**
-     * Fixture PHP files analysed as one project.
+     * Fixture files analysed as one project.
      *
      * @var list<string>
      */
     private const FIXTURE_FILES = [
         'src/Symbols.php',
+        'src/Controller/RouteControllers.php',
         'src/references.php',
         'tests/TestReferences.php',
         'entrypoints/Entrypoints.php',
         'src/FrameworkCommand.php',
         'src/External/Vendored.php',
+        'config/routes/inline.yaml',
+        'config/routes/block.yml',
+        'config/routes/quoted.yaml',
+        'config/routes/non-fqcn.yaml',
     ];
 
     /**
@@ -70,6 +75,24 @@ final class ProjectDeadCodeRulesTest extends TestCase
         self::assertNotContains('App\\TestOnlyClass', $symbols);
         self::assertNotContains('App\\FrameworkCommand', $symbols);
         self::assertNotContains('App\\Tests\\FixtureTestCase', $symbols);
+    }
+
+    /**
+     * Verify Symfony YAML `_controller` FQCN callables keep route controllers live.
+     *
+     * @return void
+     */
+    public function testSymfonyYamlControllerReferencesKeepInternalClassesLive(): void
+    {
+        $symbols = $this->symbolsForRule(UnusedInternalClassRule::ID);
+
+        self::assertNotContains('App\\Controller\\InlineController', $symbols);
+        self::assertNotContains('App\\Controller\\BlockController', $symbols);
+        self::assertNotContains('App\\Controller\\SingleQuotedController', $symbols);
+        self::assertNotContains('App\\Controller\\DoubleQuotedController', $symbols);
+        self::assertContains('App\\Controller\\UnreferencedController', $symbols);
+        self::assertContains('App\\Controller\\ServiceIdStyleController', $symbols);
+        self::assertContains('App\\Controller\\OtherKeyController', $symbols);
     }
 
     /**
@@ -281,7 +304,9 @@ final class ProjectDeadCodeRulesTest extends TestCase
      */
     private function parseProjectFile(string $projectRoot, string $displayPath): AnalysisUnit
     {
-        return (new PhpFileParser())->parse(new SourceFile($projectRoot . '/' . $displayPath, $displayPath));
+        $type = str_ends_with($displayPath, '.php') ? SourceFile::TYPE_PHP : SourceFile::TYPE_TEXT;
+
+        return (new PhpFileParser())->parse(new SourceFile($projectRoot . '/' . $displayPath, $displayPath, $type));
     }
 
     /**

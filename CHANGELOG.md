@@ -5,6 +5,14 @@ Notable user-facing changes to `gruff-php` are listed here.
 This project is still pre-1.0, so minor releases may break behaviour. Breaking
 changes are marked and include the action to take.
 
+## 0.3.1 - 2026-06-04
+
+0.3.1 adds one conservative test-quality rule, fixes a Symfony YAML route false positive in project-wide dead-code analysis, and moves the headline numbers to the top of text reports. No breaking changes; JSON schemas, config format, and baselines are unchanged.
+
+- **New rule `test-quality.static-analysis-redundant-test`** - Advisory rule that flags unit tests whose main assertion only restates a statically visible declaration: `class_exists`, `interface_exists`, `trait_exists`, `enum_exists`, `method_exists`, or `property_exists` on a type declared in the same file. Each finding names the static fact the assertion restates and recommends asserting behaviour instead of deleting the test; it does not duplicate the existing `test-quality.tautological-type-assertion` hard gate. On by default at advisory, so upgrading projects may see new advisory findings - they are candidates, not gate failures.
+- **Symfony YAML route controllers count as live references** - `dead-code.unused-internal-class` now recognises internal `FQCN::method` values under Symfony YAML `_controller` keys, including block, inline, and quoted route defaults. Service-id and legacy non-FQCN controller strings are ignored, so projects with YAML routes no longer need to add those controllers to `entrypointSymbols` just to avoid this false positive.
+- **Text reports lead with score and findings** - `analyse` and `summary` text output now show `Composite:` and `Findings: N total · N error · N warning · N advisory` at the top, and the header names the subcommand (for example `gruff-php ... analyse`). JSON output is unchanged.
+
 ## 0.3.0 - 2026-05-31
 
 0.3.0 focuses on agent-friendly CI: scan only changed code, respect ignored paths everywhere, and fail on newly introduced debt instead of old baseline debt. It also removes noisy complexity/design checks and tightens the rules that support human review of AI-written code.
