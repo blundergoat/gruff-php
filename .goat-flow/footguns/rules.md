@@ -1,6 +1,6 @@
 ---
 category: rules
-last_reviewed: 2026-06-01
+last_reviewed: 2026-06-04
 ---
 
 # Rule Footguns
@@ -117,6 +117,26 @@ description after the closing `}` of an `@return` or `@phpstan-return` array sha
 as malformed type syntax, not prose. When composing long PHPStan type aliases, avoid splitting the
 alias name from its type body across physical lines; `tests/Mutation/InfectionReportParserTest.php`
 (search: `InvalidReportNestedA`) uses smaller intermediate aliases instead.
+
+## Footgun: Member-existence rules must honour PHP's split case rules — methods case-insensitive, properties case-sensitive
+
+**Status:** active | **Created:** 2026-06-04 | **Evidence:** OBSERVED
+
+PHP resolves method names case-insensitively but property names case-sensitively: `method_exists($c, 'RENDER')` is true for a declared `render()`, yet `property_exists($c, 'LABEL')` is false for a declared `$label`. A rule that indexes or looks up member names with a single `strtolower()` for both buckets mis-handles properties. `src/Rule/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `memberCandidate`) originally lowercased both the declaration key and the asserted member, so `assertTrue(property_exists(Foo::class, 'LABEL'))` against a `$label` property — a test that actually fails at runtime — was reported as a static-analysis-redundant candidate, steering users to delete a test that was catching a real case typo.
+
+**Evidence:** PR #8 review (Codex P2, "Preserve property-name case in redundant-test matching"). Reproduction: a fixture with `public string $label` plus `assertTrue(property_exists(Widget::class, 'LABEL'))` was flagged pre-fix and is not flagged post-fix, while `method_exists(Widget::class, 'RENDER')` stays flagged. The fix indexes properties by their declared name (search: `PHP property names are case-sensitive, so index by the declared name as-is`) and keeps methods lowercased (search: `PHP resolves method names case-insensitively`); `memberCandidate` chooses the lookup key by member kind.
+
+**Prevention:** Any rule that matches class members by name must split case handling by kind. Case-insensitive: methods, functions, class/interface/trait/enum names (lowercase both sides). Case-sensitive: properties, class constants, enum cases, variables (compare verbatim). When a member-matching rule lands, add a wrong-case fixture for every case-sensitive member kind it inspects and assert it is NOT matched, so a future single-`strtolower()` shortcut fails the test.
+
+## Footgun: `NodeIndex` enumerates declarations nested in functions and conditionals, not just top-level ones
+
+**Status:** active | **Created:** 2026-06-04 | **Evidence:** OBSERVED
+
+`NodeIndex::nodesOfAny`/`nodesOf` return matches from a full preorder walk of the whole unit — `src/Rule/NodeIndex.php` (search: `traverse($analysisUnit->statements)`) visits every descendant, so a query for `Stmt\Class_`/`Interface_`/`Trait_`/`Enum_` also returns class-likes declared inside functions, methods, `if` blocks, and other conditionals. PHP does not register those symbols until the enclosing path runs (`class_exists(Foo::class, false)` is false before a nested `class Foo {}` executes), so a rule that treats every indexed declaration as "statically guaranteed to exist" over-claims. `src/Rule/TestQuality/StaticAnalysisRedundantTestRule.php` (search: `topLevelClassLikes`) hit this: a `class` declared inside `if (!class_exists(...)) { ... }` (a common polyfill shape) was treated as proven, so an `assertTrue(class_exists(...))` that genuinely tests the runtime branch was flagged as redundant.
+
+**Evidence:** PR #8 review (Codex P2, "Skip non-top-level declarations for redundant checks"). Reproduction: a conditionally-declared `Conditional` class plus `assertTrue(class_exists(Conditional::class))` was flagged pre-fix and is not flagged post-fix. The fix walks `$analysisUnit->statements` and only collects class-likes at file scope or directly inside a `Stmt\Namespace_` body (search: `topLevelClassLikes`), instead of using the full-AST `NodeIndex` enumeration.
+
+**Prevention:** When a rule needs declarations that PHP registers unconditionally (top-level symbols, "this type definitely exists"), do not enumerate them via `NodeIndex` — it has no scope filter. Collect them from `$analysisUnit->statements` plus each `Stmt\Namespace_::$stmts` directly, which excludes function/method/conditional bodies. `NodeIndex` stays correct for "find every node of this shape anywhere" queries (most rules); the trap is specifically assuming its results are top-level.
 
 ## Resolved Entries
 

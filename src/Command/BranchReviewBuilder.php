@@ -18,7 +18,6 @@ use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleRegistry;
 use GruffPhp\Scoring\ScoreCalculator;
-use GruffPhp\Source\SourceFile;
 use RuntimeException;
 
 /**
@@ -94,7 +93,7 @@ final readonly class BranchReviewBuilder
                 $baseFindings = (new AnalysisFindingSupport())->filterProjectRuleFindingsToFiles(
                     $baseFindings,
                     $baseRegistry->enabledProjectRuleIds($config),
-                    $this->sourceFilePaths($baseSources),
+                    $baseSources->displayPaths(),
                 );
                 $baseFindings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($baseFindings, $config);
             }
@@ -298,20 +297,5 @@ final readonly class BranchReviewBuilder
         return $options->isChangedOnly
             && $reviewDiff instanceof DiffResult
             && $reviewDiff->changedFiles !== [];
-    }
-
-    /**
-     * Return display paths from a source set.
-     *
-     * @param AnalysisSourceSet $sources - Source set loaded for requested analysis paths.
-     *
-     * @return list<string> - Project-relative display paths in discovery order.
-     */
-    private function sourceFilePaths(AnalysisSourceSet $sources): array
-    {
-        return array_map(
-            static fn(SourceFile $sourceFile): string => $sourceFile->displayPath,
-            $sources->discovery->files,
-        );
     }
 }

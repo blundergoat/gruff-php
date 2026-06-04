@@ -358,7 +358,14 @@ git_diff_ranges() {
     [[ -f "$abs_path" ]] && all_file_range "$abs_path"
     return
   fi
-  diff_output="$(git -C "$root" diff --unified=0 -- "$rel_path" 2>/dev/null || true)"
+  # Diff against HEAD so staged-only edits are scoped too: discovery already includes
+  # `--cached` paths, so a file whose only changes are staged would otherwise yield no
+  # ranges and be skipped. Fall back to the index diff on an unborn branch with no HEAD.
+  if git -C "$root" rev-parse --verify --quiet HEAD >/dev/null 2>&1; then
+    diff_output="$(git -C "$root" diff HEAD --unified=0 -- "$rel_path" 2>/dev/null || true)"
+  else
+    diff_output="$(git -C "$root" diff --cached --unified=0 -- "$rel_path" 2>/dev/null || true)"
+  fi
   parse_diff_ranges "$diff_output"
 }
 
@@ -367,11 +374,17 @@ changed_ranges() {
   local root="$2"
   local rel_path="$3"
   local abs_path="$4"
+  local file_count="${5:-1}"
   local ranges
-  ranges="$(payload_ranges "$payload")"
-  if [[ -n "$ranges" ]]; then
-    printf '%s' "$ranges"
-    return
+  # A payload's changed_ranges is a single flat list with no per-file attribution, so trust it only
+  # for a single-file edit. With several edited files, sharing one range set would mis-scope findings
+  # for every file but the one the ranges came from, so derive each file's ranges from git instead.
+  if [[ "$file_count" -le 1 ]]; then
+    ranges="$(payload_ranges "$payload")"
+    if [[ -n "$ranges" ]]; then
+      printf '%s' "$ranges"
+      return
+    fi
   fi
   git_diff_ranges "$root" "$rel_path" "$abs_path"
 }
@@ -397,6 +410,25 @@ self_test() {
   variant="$(variant_for_path "src/a.mts")"
   [[ "$variant" == "gruff-ts" ]] || {
     printf 'gruff-code-quality self-test: variant mapping failed: %s\n' "$variant" >&2
+    return 1
+  }
+
+  # A single edited file trusts the payload's changed_ranges; several edited files must not share
+  # one range set, so changed_ranges falls back to per-file git ranges (empty under a bogus root).
+  [[ "$(changed_ranges "$payload" "/nonexistent" "src/a.mts" "/nonexistent/src/a.mts" 1)" == "2-4" ]] || {
+    printf 'gruff-code-quality self-test: single-file payload range failed\n' >&2
+    return 1
+  }
+  [[ -z "$(changed_ranges "$payload" "/nonexistent" "src/a.mts" "/nonexistent/src/a.mts" 2)" ]] || {
+    printf 'gruff-code-quality self-test: multi-file payload range sharing not suppressed\n' >&2
+    return 1
+  }
+
+  # An invalid or sub-1 timeout floors at 30 so the value used and the value reported agree.
+  [[ "$(GRUFF_CODE_QUALITY_TIMEOUT_SECONDS=bogus normalized_timeout_seconds)" == "30" \
+     && "$(GRUFF_CODE_QUALITY_TIMEOUT_SECONDS=0 normalized_timeout_seconds)" == "30" \
+     && "$(GRUFF_CODE_QUALITY_TIMEOUT_SECONDS=45 normalized_timeout_seconds)" == "45" ]] || {
+    printf 'gruff-code-quality self-test: timeout normalization failed\n' >&2
     return 1
   }
 
@@ -467,6 +499,17 @@ supports_json_format() {
   [[ "$help" == *"--format"* || "$help" == *"-format"* ]]
 }
 
+# Resolve the analyzer timeout, flooring any non-numeric or sub-1 value at the
+# 30-second default. Centralised so the value passed to `timeout` and the value
+# named in the timeout/kill diagnostic are always the same number.
+normalized_timeout_seconds() {
+  local timeout_seconds="${GRUFF_CODE_QUALITY_TIMEOUT_SECONDS:-}"
+  if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" -lt 1 ]]; then
+    timeout_seconds=30
+  fi
+  printf '%s' "$timeout_seconds"
+}
+
 run_gruff_json() {
   local binary_path="$1"
   local help="$2"
@@ -489,10 +532,7 @@ run_gruff_json() {
     return 64
   fi
 
-  timeout_seconds="$GRUFF_CODE_QUALITY_TIMEOUT_SECONDS"
-  if ! [[ "$timeout_seconds" =~ ^[0-9]+$ ]] || [[ "$timeout_seconds" -lt 1 ]]; then
-    timeout_seconds=30
-  fi
+  timeout_seconds="$(normalized_timeout_seconds)"
 
   if command -v timeout >/dev/null 2>&1; then
     timeout "$timeout_seconds" "$binary_path" "${args[@]}" "$file_path" 2>&1
@@ -692,7 +732,7 @@ print_scope_header() {
   local err="$5"
   local warn="$6"
   local adv="$7"
-  printf 'gruff-code-quality: %s %s changed-lines=%s; %s on changed lines: %s error, %s warning, %s advisory\n' \
+  printf 'gruff-code-quality: %s %s changed-lines=%s; %s in changed scope: %s error, %s warning, %s advisory\n' \
     "$binary" "$rel_path" "$ranges" "$total" "$err" "$warn" "$adv"
 }
 
@@ -700,6 +740,7 @@ process_file() {
   local payload="$1"
   local root="$2"
   local file_path="$3"
+  local file_count="${4:-1}"
   local rel_path abs_path binary binary_path config_file
   local ranges help output status suppressed ignored_desc uses_native_regions
   local max_findings floor_rank report_json scope_fields
@@ -730,7 +771,7 @@ process_file() {
     return 0
   fi
 
-  ranges="$(changed_ranges "$payload" "$root" "$rel_path" "$abs_path")"
+  ranges="$(changed_ranges "$payload" "$root" "$rel_path" "$abs_path" "$file_count")"
   if [[ -z "$ranges" ]]; then
     printf 'gruff-code-quality: no changed lines detected for %s; skipping gruff output\n' "$rel_path" >&2
     return 0
@@ -752,7 +793,7 @@ process_file() {
   set -e
 
   if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
-    printf 'gruff-code-quality: %s exceeded %ss or was killed; changed-line filtering skipped\n' "$binary" "$GRUFF_CODE_QUALITY_TIMEOUT_SECONDS" >&2
+    printf 'gruff-code-quality: %s exceeded %ss or was killed; changed-line filtering skipped\n' "$binary" "$(normalized_timeout_seconds)" >&2
     return 0
   fi
   if [[ -z "$output" ]]; then
@@ -817,13 +858,13 @@ process_file() {
     printf '%s' "$report_json" | jq -r '.lines[]' 2>/dev/null || true
   fi
   if [[ "$more" -gt 0 ]]; then
-    printf 'gruff-code-quality: (%s more on changed lines; raise GRUFF_CODE_QUALITY_MAX_FINDINGS to list them)\n' "$more"
+    printf 'gruff-code-quality: (%s more in changed scope; raise GRUFF_CODE_QUALITY_MAX_FINDINGS to list them)\n' "$more"
   fi
   if [[ "$floored" -gt 0 ]]; then
     printf 'gruff-code-quality: %s finding(s) below GRUFF_CODE_QUALITY_MIN_SEVERITY=%s not listed\n' "$floored" "${GRUFF_CODE_QUALITY_MIN_SEVERITY:-advisory}"
   fi
   if [[ "$suppressed" =~ ^[0-9]+$ && "$suppressed" -gt 0 ]]; then
-    printf 'gruff-code-quality: suppressed %s pre-existing finding(s) outside changed lines\n' "$suppressed"
+    printf 'gruff-code-quality: suppressed %s pre-existing finding(s) outside changed scope\n' "$suppressed"
   fi
   if [[ "$surfaced" -gt 0 ]]; then
     printf '%s\n' "$FOOTER"
@@ -849,7 +890,7 @@ main() {
   [[ "${#file_paths[@]}" -gt 0 ]] || exit 0
 
   for file_path in "${file_paths[@]}"; do
-    process_file "$payload" "$root" "$file_path"
+    process_file "$payload" "$root" "$file_path" "${#file_paths[@]}"
   done
   exit 0
 }

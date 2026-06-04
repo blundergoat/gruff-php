@@ -70,18 +70,28 @@ final readonly class AnalysisFindingSupport
      *
      * @param list<Finding> $findings - Findings to filter.
      * @param list<string>  $projectRuleIds - Rule ids whose output came from project-wide context.
-     * @param list<string>  $filePaths - Project-relative display paths in the requested source set.
+     * @param list<string>  $filePaths - Project-relative display paths in the requested source set; an empty set drops every project-rule finding.
      *
      * @return list<Finding> - Findings with out-of-scope project-rule rows removed.
      */
     public function filterProjectRuleFindingsToFiles(array $findings, array $projectRuleIds, array $filePaths): array
     {
-        if ($projectRuleIds === [] || $filePaths === []) {
+        if ($projectRuleIds === []) {
             return $findings;
         }
 
         $projectRules = array_fill_keys($projectRuleIds, true);
-        $files        = array_fill_keys($filePaths, true);
+
+        if ($filePaths === []) {
+            // The invocation requested files but discovered none, so nothing is in scope. Drop every
+            // project-rule finding rather than leaking the whole-project context this run never loaded.
+            return array_values(array_filter(
+                $findings,
+                static fn(Finding $finding): bool => !isset($projectRules[$finding->ruleId]),
+            ));
+        }
+
+        $files = array_fill_keys($filePaths, true);
 
         return array_values(array_filter(
             $findings,

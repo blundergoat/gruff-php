@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-05-31
+last_reviewed: 2026-06-04
 ---
 
 # CLI Command Footguns
@@ -24,6 +24,16 @@ The default-applied `gruff-baseline.json` matches accepted-debt findings to live
 **Evidence:** `src/Baseline/BaselineFilter.php` (search: `$entriesByFingerprint[$fingerprint]`) is fingerprint-only; `src/Finding/Finding.php` (search: `function fingerprint`) shows `line` is part of the hash. The analyse output's "Movement: N new" line and "Stale entries" tip surface the resurfaced findings.
 
 **Prevention:** When refactoring a file that carries baseline-suppressed findings, first run `grep <ClassName> gruff-baseline.json` to learn which findings it has accepted, then either (a) add the new code *below* every suppressed finding and keep any edit above them net-zero in line count — the trick used to keep `stripTopLevelNullUnion` from shifting `PhpDocMixedOveruseRule`'s baselined methods — or (b) fix the resurfaced finding for real, or (c) regenerate with `gruff-php analyse --generate-baseline gruff-baseline.json` after reviewing the movement diff.
+
+## Footgun: Finding-scope filters must treat an empty target set as drop-all, not pass-through
+
+**Status:** active | **Created:** 2026-06-04 | **Evidence:** OBSERVED
+
+`src/Command/AnalysisFindingSupport.php` holds sibling finding filters with deliberately different — and easy-to-confuse — empty-set semantics. `filterFindingsToChangedFiles` (search: `intentional drop-all`) returns `[]` on an empty changed set because "nothing changed" means nothing qualifies. `filterProjectRuleFindingsToFiles` (search: `filterProjectRuleFindingsToFiles`) originally short-circuited `if ($projectRuleIds === [] || $filePaths === []) return $findings;`, returning ALL findings when the requested path set discovered zero files. Because the legacy pipeline runs project rules over the whole-tree context regardless of the narrow request (`src/Rule/RuleRegistry.php`, search: `$projectUnits ?? $units`), a scoped run whose path matched no source files (e.g. `analyse some/dir-with-no-php --diff-vs main` with a project rule like `dead-code.unused-internal-class`) leaked whole-repo project findings into a run the user scoped to nothing.
+
+**Evidence:** PR #8 review (CodeRabbit, "Don't treat an empty discovered-file set as unscoped"). Both callers pass `AnalysisSourceSet::displayPaths()` (search: `displayPaths`), which is empty exactly when the requested paths discovered no files. The fix drops project-rule findings on an empty set (search: `nothing is in scope`) while still returning unchanged when there are simply no project rules to scope. `tests/Command/AnalysisFindingSupportTest.php` (search: `WhenNoFilesDiscovered`) locks the behaviour.
+
+**Prevention:** For any filter whose job is "keep findings inside scope set S", an empty S means "nothing is in scope" → drop the in-scope-only findings, not "no filter" → keep everything. Only return the input unchanged when the FILTER itself is inactive (no rule ids, no allowlist) — a different condition from an empty scope set. When adding a finding filter, write the empty-scope-set case as an explicit test before the happy path; the `=== [] return $findings` shortcut reads as a harmless guard but silently inverts the filter.
 
 ## Resolved Entries
 

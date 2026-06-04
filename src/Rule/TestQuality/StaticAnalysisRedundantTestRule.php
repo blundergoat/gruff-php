@@ -10,7 +10,6 @@ use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Rule\NodeIndex;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -122,11 +121,8 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
     {
         $declarations = [];
 
-        foreach (NodeIndex::nodesOfAny(
-            $analysisUnit,
-            [Stmt\Class_::class, Stmt\Interface_::class, Stmt\Trait_::class, Stmt\Enum_::class],
-        ) as $node) {
-            if (!$node instanceof Stmt\ClassLike || $node->name === null) {
+        foreach ($this->topLevelClassLikes($analysisUnit) as $node) {
+            if ($node->name === null) {
                 continue;
             }
 
@@ -144,6 +140,7 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
 
             foreach ($node->stmts as $statement) {
                 if ($statement instanceof Stmt\ClassMethod) {
+                    // PHP resolves method names case-insensitively, so index by the lowercase name.
                     $methodName = $statement->name->toString();
                     $record['methods'][strtolower($methodName)] = $methodName;
                     continue;
@@ -151,8 +148,9 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
 
                 if ($statement instanceof Stmt\Property) {
                     foreach ($statement->props as $property) {
+                        // PHP property names are case-sensitive, so index by the declared name as-is.
                         $propertyName = $property->name->toString();
-                        $record['properties'][strtolower($propertyName)] = $propertyName;
+                        $record['properties'][$propertyName] = $propertyName;
                     }
                 }
             }
@@ -163,6 +161,38 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
         }
 
         return $declarations;
+    }
+
+    /**
+     * Collect class-like declarations PHP registers unconditionally: those at the file top level or
+     * directly inside a namespace block. Declarations nested in functions, methods, or conditional
+     * blocks are only registered once that code path runs, so a static existence assertion against
+     * them is not provably redundant and must be excluded from the index.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose top-level declarations should be collected.
+     *
+     * @return list<Stmt\ClassLike> - Class-like declarations at file or namespace scope, in source order.
+     */
+    private function topLevelClassLikes(AnalysisUnit $analysisUnit): array
+    {
+        $classLikes = [];
+
+        foreach ($analysisUnit->statements as $statement) {
+            if ($statement instanceof Stmt\Namespace_) {
+                foreach ($statement->stmts as $namespaceStatement) {
+                    if ($namespaceStatement instanceof Stmt\ClassLike) {
+                        $classLikes[] = $namespaceStatement;
+                    }
+                }
+                continue;
+            }
+
+            if ($statement instanceof Stmt\ClassLike) {
+                $classLikes[] = $statement;
+            }
+        }
+
+        return $classLikes;
     }
 
     /**
@@ -233,7 +263,10 @@ final readonly class StaticAnalysisRedundantTestRule implements RuleInterface
             return null;
         }
 
-        $declaredName = $declaration[$memberBucket][strtolower($member)] ?? null;
+        // Methods resolve case-insensitively in PHP; properties do not. Look each up the way the
+        // language resolves it so a wrong-case property_exists() is not mistaken for a proven member.
+        $memberKey    = $memberKind === 'property' ? $member : strtolower($member);
+        $declaredName = $declaration[$memberBucket][$memberKey] ?? null;
         if (!is_string($declaredName)) {
             return null;
         }

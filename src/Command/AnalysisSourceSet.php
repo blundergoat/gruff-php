@@ -7,6 +7,7 @@ namespace GruffPhp\Command;
 use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Source\SourceDiscoveryResult;
+use GruffPhp\Source\SourceFile;
 
 /**
  * Carries parsed analysis units, diagnostics, and discovery metadata.
@@ -32,6 +33,19 @@ final readonly class AnalysisSourceSet
         ?int $parsedFileCount = null,
     ) {
         $this->explicitParsedFileCount = $parsedFileCount;
+    }
+
+    /**
+     * List the project-relative display paths of the discovered source files.
+     *
+     * @return list<string> - Project-relative source file paths in discovery order.
+     */
+    public function displayPaths(): array
+    {
+        return array_map(
+            static fn (SourceFile $sourceFile): string => $sourceFile->displayPath,
+            $this->discovery->files,
+        );
     }
 
     /**
