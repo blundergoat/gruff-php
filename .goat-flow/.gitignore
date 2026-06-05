@@ -51,6 +51,12 @@ logs/events/*.jsonl
 !logs/critiques/
 logs/critiques/*.md
 !logs/critiques/README.md
+# Keep the review-artifact path and README committed, but ignore run artifacts.
+!logs/review/
+logs/review/*.txt
+logs/review/*.json
+logs/review/*.md
+!logs/review/README.md
 # Keep the security-log path and README, but ignore captured reports.
 !logs/security/
 logs/security/*.md

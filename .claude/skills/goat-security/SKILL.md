@@ -1,7 +1,7 @@
 ---
 name: goat-security
 description: "Use when assessing security implications of code changes, architecture decisions, or new features."
-goat-flow-skill-version: "1.9.0"
+goat-flow-skill-version: "1.9.1"
 ---
 # /goat-security
 
@@ -40,7 +40,7 @@ Use when assessing security posture before release, after auth/input/storage cha
 2. Scan by severity using the repo's real threat surface: secrets/command execution first, then authz and data exposure, then filesystem/config/agent surfaces, then dependency supply chain.
 3. Re-check framework or platform mitigations before keeping a finding.
 4. For diff mode, report changed file count, risky buckets touched, and whether each issue is on an added line, modified context, or clearly pre-existing context.
-5. Present `CONFIRMED` findings first, then `PROBABLE` only if the user asked for them. Note what was not checked.
+5. Present `CONFIRMED` findings first. If `PROBABLE`/`THEORETICAL` leads are withheld, include count, compact titles, and exact evidence needed. Note what was not checked.
 
 ## Full Assessment Path
 
@@ -176,7 +176,7 @@ For compliance checks, present gaps as: non-compliant, partially compliant, or n
 - MUST classify every finding as CONFIRMED, PROBABLE, or THEORETICAL
 - MUST show data flow path for CONFIRMED findings
 - MUST include diff metadata for diff/PR reviews
-- MUST default to confirmed-only report unless user requests full
+- MUST default to confirmed-only report unless user requests full; still summarize withheld lead counts and needed evidence
 
 ## Output Format
 

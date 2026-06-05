@@ -1,7 +1,7 @@
 ---
 name: goat-qa
 description: "Use when evaluating test coverage gaps, planning test strategy, or assessing testing risk for code changes."
-goat-flow-skill-version: "1.9.0"
+goat-flow-skill-version: "1.9.1"
 ---
 # /goat-qa
 
@@ -112,7 +112,7 @@ Map each stated expectation to the code path that implements it. Gaps between in
 
 **Cross-agent verification:** suggest a different agent/model for blind-spot checks.
 
-**BLOCKING GATE:** Present gap analysis plus Verification Integrity and stop. Ask: "Continue to Phase 3, or adjust the analysis first?" Reserve diagrams for Phase 3. After the plan, suggest `/goat-plan` for milestone tasks.
+**BLOCKING GATE:** Present gap analysis plus Verification Integrity and stop. Ask: "Continue to Phase 3, or adjust the analysis first?" For explicit "what should I test" or "test plan" intent, continue through Phase 3 in the same response. Reserve diagrams for Phase 3. After the plan, suggest `/goat-plan` for milestone tasks.
 
 ## Phase 3 - Targeted Testing Plan
 

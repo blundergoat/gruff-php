@@ -11,22 +11,22 @@
 #   behaviour when .goat-flow/hook-lib is missing from a hook's directory.
 #
 #   Each deny hook re-execs into this script when invoked with
-#   `--self-test[=mode]`, so `deny-dangerous.sh --self-test` is equivalent to
-#   `deny-dangerous-self-test.sh --self-test --hook shell`.
+#   `--self-test[=mode]`, so `deny-dangerous.sh --self-test` runs the full
+#   regression corpus unless `--self-test=smoke` is requested explicitly.
 #
 # Usage:
 #   bash deny-dangerous-self-test.sh [--self-test[=smoke|full]] [--hook <name>]
 #
 #   Examples:
-#     bash deny-dangerous-self-test.sh                          # smoke
+#     bash deny-dangerous-self-test.sh                          # full
 #     bash deny-dangerous-self-test.sh --self-test=full         # full
 #     GOAT_DENY_DANGEROUS_HOOK=.claude/hooks/deny-dangerous.sh bash deny-dangerous-self-test.sh
 #
 # Modes:
 #   smoke   Fast coverage of the canonical block/allow cases per hook,
-#           plus the missing-hook-lib fail-closed checks. Default.
+#           plus the missing-hook-lib fail-closed checks.
 #   full    Smoke plus comprehensive per-hook block/allow coverage and
-#           Copilot/Antigravity JSON payload checks.
+#           Copilot/Antigravity JSON payload checks. Default.
 #
 # Exit:
 #   0 when every executed assertion passes; prints a PASS summary line.
@@ -36,12 +36,12 @@
 
 set -euo pipefail
 
-SELF_TEST_MODE="smoke"
+SELF_TEST_MODE="full"
 HOOK_FILTER=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --self-test) SELF_TEST_MODE="smoke" ;;
+    --self-test) SELF_TEST_MODE="full" ;;
     --self-test=*) SELF_TEST_MODE="${1#--self-test=}" ;;
     --hook)
       shift
@@ -115,6 +115,35 @@ expect_block() {
   fi
 }
 
+# Assert representative stderr copy names the policy scope and the denied reason.
+expect_block_message() {
+  local hook="$1"
+  local command="$2"
+  local label="$3"
+  local expected_scope="$4"
+  local expected_reason="$5"
+  selected_hook "$hook" || {
+    record_skip
+    return
+  }
+  executed=$((executed + 1))
+  local output status
+  set +e
+  output="$(bash "$(hook_path "$hook")" --check="$command" 2>&1)"
+  status=$?
+  set -e
+  if [[ "$status" -ne 2 ]]; then
+    record_fail "$hook should block $label for copy check (exit=$status)"
+    return
+  fi
+  if [[ "$output" != *"BLOCKED: Policy $expected_scope:"* || "$output" != *"$expected_reason"* ]]; then
+    record_fail "$hook should identify policy and reason for $label"
+  fi
+  if [[ "$output" == *"Guard "* ]]; then
+    record_fail "$hook block copy should not use legacy Guard wording for $label"
+  fi
+}
+
 expect_allow() {
   local hook="$1"
   local command="$2"
@@ -147,6 +176,55 @@ expect_copilot_block() {
   if [[ "$output" != *'"permissionDecision":"deny"'* ]]; then
     record_fail "$hook Copilot payload should return deny JSON for $label"
   fi
+  if [[ "$output" != *"Policy "* || "$output" == *"Guard "* ]]; then
+    record_fail "$hook Copilot payload should identify policy without legacy Guard wording for $label"
+  fi
+}
+
+expect_copilot_payload_block() {
+  local hook="$1"
+  local payload="$2"
+  local label="$3"
+  local expected_reason="${4:-Policy }"
+  selected_hook "$hook" || {
+    record_skip
+    return
+  }
+  executed=$((executed + 1))
+  local output
+  if ! output="$(printf '%s' "$payload" | bash "$(hook_path "$hook")" 2>&1)"; then
+    record_fail "$hook Copilot payload should exit 0 for $label"
+    return
+  fi
+  if [[ "$output" != *'"permissionDecision":"deny"'* ]]; then
+    record_fail "$hook Copilot payload should return deny JSON for $label"
+  fi
+  if [[ "$output" != *"$expected_reason"* || "$output" == *"Guard "* ]]; then
+    record_fail "$hook Copilot payload should identify expected policy reason for $label"
+  fi
+}
+
+expect_copilot_payload_allow() {
+  local hook="$1"
+  local payload="$2"
+  local label="$3"
+  selected_hook "$hook" || {
+    record_skip
+    return
+  }
+  executed=$((executed + 1))
+  local output status
+  set +e
+  output="$(printf '%s' "$payload" | bash "$(hook_path "$hook")" 2>&1)"
+  status=$?
+  set -e
+  if [[ "$status" -ne 0 ]]; then
+    record_fail "$hook Copilot payload should exit 0 for $label (exit=$status)"
+    return
+  fi
+  if [[ -n "$output" ]]; then
+    record_fail "$hook Copilot payload should allow silently for $label"
+  fi
 }
 
 expect_antigravity_block() {
@@ -167,6 +245,9 @@ expect_antigravity_block() {
   if [[ "$output" != *'"decision":"deny"'* ]]; then
     record_fail "$hook Antigravity payload should return deny JSON for $label"
   fi
+  if [[ "$output" != *"Policy "* || "$output" == *"Guard "* ]]; then
+    record_fail "$hook Antigravity payload should identify policy without legacy Guard wording for $label"
+  fi
 }
 
 expect_antigravity_secret_file_block() {
@@ -183,6 +264,46 @@ expect_antigravity_secret_file_block() {
   fi
   if [[ "$output" != *'"decision":"deny"'* ]]; then
     record_fail "paths Antigravity file payload should return deny JSON for .env read"
+  fi
+  if [[ "$output" != *"Policy "* || "$output" == *"Guard "* ]]; then
+    record_fail "paths Antigravity file payload should identify policy without legacy Guard wording"
+  fi
+}
+
+expect_no_jq_copilot_block() {
+  local hook="$1"
+  local payload="$2"
+  local label="$3"
+  local expected_reason="${4:-}"
+  selected_hook "$hook" || {
+    record_skip
+    return
+  }
+  executed=$((executed + 1))
+  local tmp bin output status tool
+  tmp="$(mktemp -d)"
+  bin="$tmp/bin"
+  mkdir -p "$bin"
+  for tool in bash git dirname sed awk cat; do
+    ln -s "$(command -v "$tool")" "$bin/$tool"
+  done
+  set +e
+  output="$(printf '%s' "$payload" | PATH="$bin" bash "$(hook_path "$hook")" 2>&1)"
+  status=$?
+  set -e
+  rm -rf "$tmp"
+  if [[ "$status" -ne 0 ]]; then
+    record_fail "$hook no-jq Copilot payload should exit 0 for $label (exit=$status)"
+    return
+  fi
+  if [[ "$output" != *'"permissionDecision":"deny"'* ]]; then
+    record_fail "$hook no-jq Copilot payload should return deny JSON for $label"
+  fi
+  if [[ "$output" != *"Policy "* || "$output" == *"Guard "* ]]; then
+    record_fail "$hook no-jq Copilot payload should identify policy without legacy Guard wording for $label"
+  fi
+  if [[ -n "$expected_reason" && "$output" != *"$expected_reason"* ]]; then
+    record_fail "$hook no-jq Copilot payload should cite '$expected_reason' for $label (got: $output)"
   fi
 }
 
@@ -209,8 +330,11 @@ expect_missing_common_fails_closed() {
   if [[ "$status" -ne 2 ]]; then
     record_fail "$hook missing hook-lib should fail closed (exit=$status)"
   fi
-  if [[ "$output" != *"cannot start"* || "$output" != *"hook-lib"* ]]; then
+  if [[ "$output" != *"Policy hook unavailable"* || "$output" != *"hook-lib"* ]]; then
     record_fail "$hook missing hook-lib should explain the missing store"
+  fi
+  if [[ "$output" == *"Guard "* ]]; then
+    record_fail "$hook missing hook-lib copy should not use legacy Guard wording"
   fi
 }
 
@@ -245,8 +369,11 @@ expect_missing_common_fails_closed_json() {
   if [[ "$status" -ne 0 ]]; then
     record_fail "$hook missing hook-lib should exit 0 in $mode JSON mode (exit=$status)"
   fi
-  if [[ "$output" != *"$expected"* || "$output" != *"hook-lib"* ]]; then
+  if [[ "$output" != *"$expected"* || "$output" != *"Policy hook unavailable"* || "$output" != *"hook-lib"* ]]; then
     record_fail "$hook missing hook-lib should return fail-closed $mode JSON"
+  fi
+  if [[ "$output" == *"Guard "* ]]; then
+    record_fail "$hook missing hook-lib $mode copy should not use legacy Guard wording"
   fi
 }
 
@@ -266,6 +393,9 @@ run_smoke() {
   expect_block shell "rm -rf /" "rm -rf"
   expect_block paths "cat .env" ".env read"
   expect_block writes "git push origin main" "git push"
+  expect_block_message shell "rm -rf /" "rm -rf copy" "destructive" "rm -r without safe scoping"
+  expect_block_message paths "cat .env" ".env read copy" "secret" "Secret-file access"
+  expect_block_message writes "git push origin main" "git push copy" "repository" "git push is not allowed"
   expect_block writes "git -C /tmp push origin main" "git -C push"
   expect_block paths "cat .envrc" ".envrc read"
   expect_allow shell "echo safe" "safe echo"
@@ -273,6 +403,7 @@ run_smoke() {
   expect_allow shell 'rg "&& rm -rf /" src/' "quoted destructive search literal"
   expect_allow paths "cat .env.example" ".env.example read"
   expect_allow writes "git status" "git status"
+  expect_copilot_payload_allow paths '{"toolName":"view","toolArgs":"{\"path\":\"README.md\"}"}' "stringified non-bash file read"
   run_common_dependency_checks
 }
 
@@ -288,9 +419,19 @@ run_full() {
   expect_block shell "rm -r -f /" "rm separated recursive force"
   expect_block shell "rm -r src" "rm recursive source tree"
   expect_block shell "rm --recursive src" "rm long recursive source tree"
+  expect_block shell "find / -name node -exec rm -rf {} +" "find exec recursive rm"
+  expect_block shell 'find . -name "*.log" -delete' "find delete"
+  expect_block shell 'find . -exec rm -rf {} \;' "find exec recursive rm semicolon"
+  expect_block shell "xargs rm -rf < list.txt" "xargs recursive rm"
+  expect_allow shell 'find . -name "*.log" -print' "find print read-only"
   expect_block shell "true && rm -rf /" "chained rm"
   expect_block shell 'bash -c "echo ok; rm -rf /"' "bash -c chained rm"
+  expect_block shell 'bash -c "echo safe" | python3 -c "x"' "bash -c pipe to interpreter"
   expect_block shell 'echo Z2l0IHB1c2g= | base64 -d | sh' "base64 pipe shell"
+  expect_block shell "dd if=/tmp/image of=/dev/sda" "dd write device"
+  expect_allow shell "dd if=/tmp/image of=/tmp/disk.img" "dd write ordinary file"
+  expect_block shell "mkfs.ext4 /dev/sda1" "mkfs filesystem format"
+  expect_block shell "cat /dev/null > important.txt" "cat null truncation"
   expect_block shell "powershell -c remove-item -recurse -force ." "powershell remove-item"
   expect_block shell "pwsh --command remove-item -recurse -force ." "powershell double-dash command remove-item"
   expect_block shell "powershell --encodedcommand SQBlAHgAaQB0AA==" "powershell double-dash encodedcommand"
@@ -347,12 +488,21 @@ run_full() {
   expect_block writes "git clean -fd" "git clean force"
   expect_block writes "git send-pack origin main" "git send-pack"
   expect_block writes "git -c alias.p='push origin main' p" "git alias push"
-  expect_block writes "gh issue comment 1 --body hi" "gh issue comment"
-  expect_block writes "gh --repo owner/repo issue comment 64620 --body hi" "gh global repo issue comment"
-  expect_block writes "gh issue --repo owner/repo comment 64620 --body hi" "gh topic repo issue comment"
+  expect_allow writes "gh issue comment 1 --body hi" "gh issue comment allowed (ADR-028 carve-out)"
+  expect_allow writes "gh --repo owner/repo issue comment 64620 --body hi" "gh global repo issue comment allowed"
+  expect_allow writes "gh issue --repo owner/repo comment 64620 --body hi" "gh topic repo issue comment allowed"
+  expect_allow writes "gh issue comment 64620 --repo owner/repo --body-file /tmp/issue_64620_comment.md" "gh issue comment body-file allowed"
+  expect_allow writes "gh --repo owner/repo issue comment 64620 --body-file /tmp/issue_64620_comment.md" "gh global repo issue comment body-file allowed"
+  expect_allow writes "gh pr comment 123 --body lgtm" "gh pr comment allowed (ADR-028 carve-out)"
+  expect_allow writes "gh --repo owner/repo pr comment 123 --body lgtm" "gh global repo pr comment allowed"
+  expect_allow writes "gh pr comment 123 --body-file /tmp/pr_123_comment.md" "gh pr comment body-file allowed"
+  expect_allow writes "gh --repo owner/repo pr comment 123 --body-file /tmp/pr_123_comment.md" "gh global repo pr comment body-file allowed"
+  expect_allow writes "printf '%s\n' body | xargs -I{} gh issue comment 64620 --body {}" "xargs gh issue comment allowed"
   expect_block writes "gh pr -R owner/repo review 123 --approve" "gh pr review"
   expect_block writes "gh workflow run deploy.yml" "gh workflow run"
-  expect_block writes "printf '%s\n' body | xargs -I{} gh issue comment 64620 --body {}" "xargs gh issue comment"
+  expect_block writes "gh issue create --title x --body y" "gh issue create still blocked"
+  expect_block writes "gh pr create --title x --body y" "gh pr create still blocked"
+  expect_block writes "gh api repos/owner/repo/issues/1/comments -X POST -f body=hi" "gh api POST to comments endpoint still blocked"
   expect_allow writes "gh issue view 1" "gh issue view"
   expect_allow writes "gh api repos/owner/repo/issues --method GET -f state=open" "gh api get with fields"
   expect_allow writes "git --git-dir /tmp/repo status" "git --git-dir status"
@@ -363,6 +513,11 @@ run_full() {
   expect_copilot_block shell "rm -rf /" "rm -rf"
   expect_copilot_block paths "cat .env" ".env read"
   expect_copilot_block writes "git push" "git push"
+  expect_copilot_payload_allow paths '{"toolName":"edit","toolArgs":"{\"file_path\":\"README.md\"}"}' "stringified non-bash file edit"
+  expect_copilot_payload_block paths '{"toolName":"view","toolArgs":"{\"path\":\".env\"}"}' "stringified non-bash secret file read" "Secret-file access"
+  expect_no_jq_copilot_block shell '{"toolName":"bash","toolArgs":"{\"command\":\"echo \\\"safe\\\"; rm -rf /\"}"}' "escaped quote command"
+  expect_no_jq_copilot_block shell '{"toolName":"bash","command":"echo \u0020"}' "top-level unsupported unicode escape" "unsupported JSON escapes"
+  expect_no_jq_copilot_block shell '{"toolName":"bash","toolArgs":"{\"command\":\"echo \\u0020\"}"}' "unsupported unicode escape" "unsupported JSON escapes"
 
   expect_antigravity_block shell "rm -rf /" "rm -rf"
   expect_antigravity_block paths "cat .env" ".env read"

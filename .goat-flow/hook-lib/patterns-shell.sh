@@ -45,6 +45,90 @@ rm_is_safely_scoped() {
   return 0
 }
 
+strip_xargs_payload_command() {
+  local c="$1"
+  local -a xargs_words=()
+  split_shell_words_into xargs_words "$c"
+  [[ "${#xargs_words[@]}" -eq 0 ]] && return 1
+
+  local command_word="${xargs_words[0]##*/}"
+  [[ "$command_word" == "xargs" ]] || return 1
+
+  local i=1
+  local word=""
+  while [[ "$i" -lt "${#xargs_words[@]}" ]]; do
+    word="${xargs_words[$i]}"
+    case "$word" in
+      --)
+        i=$((i + 1))
+        break
+        ;;
+      -0|--null|-r|--no-run-if-empty|-t|--verbose|-p|--interactive)
+        i=$((i + 1))
+        continue
+        ;;
+      -I|-i|-L|-l|-n|-P|-s|-E|-e|-d|--replace|--max-lines|--max-args|--max-procs|--max-chars|--eof|--delimiter)
+        i=$((i + 2))
+        continue
+        ;;
+      -I?*|-i?*|-L?*|-l?*|-n?*|-P?*|-s?*|-E?*|-e?*|-d?*|--replace=*|--max-lines=*|--max-args=*|--max-procs=*|--max-chars=*|--eof=*|--delimiter=*)
+        i=$((i + 1))
+        continue
+        ;;
+      -*)
+        i=$((i + 1))
+        continue
+        ;;
+    esac
+    break
+  done
+
+  [[ "$i" -lt "${#xargs_words[@]}" ]] || return 1
+
+  local rest=""
+  while [[ "$i" -lt "${#xargs_words[@]}" ]]; do
+    rest+="${xargs_words[$i]} "
+    i=$((i + 1))
+  done
+  printf '%s' "${rest% }"
+}
+
+find_has_destructive_action() {
+  local c
+  c=$(normalize_command_candidate "$1")
+  c="${c#"${c%%[![:space:]]*}"}"
+  [[ "$(first_word_base "$c")" == "find" ]] || return 1
+
+  local -a words=()
+  split_shell_words_into words "$c"
+  local i=1
+  local word=""
+  local exec_cmd=""
+  while [[ "$i" -lt "${#words[@]}" ]]; do
+    word="${words[$i]}"
+    if [[ "$word" == "-delete" ]]; then
+      return 0
+    fi
+    if [[ "$word" == "-exec" || "$word" == "-execdir" ]]; then
+      i=$((i + 1))
+      exec_cmd=""
+      while [[ "$i" -lt "${#words[@]}" ]]; do
+        word="${words[$i]}"
+        [[ "$word" == ";" || "$word" == "+" ]] && break
+        exec_cmd+="$word "
+        i=$((i + 1))
+      done
+      exec_cmd="${exec_cmd% }"
+      if rm_has_recursive "$exec_cmd"; then
+        return 0
+      fi
+      continue
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
 is_shell_command() {
   local c
   c=$(normalize_command_candidate "$1")
@@ -168,8 +252,34 @@ check_destructive_segment() {
     fi
   fi
 
+  local xargs_payload=""
+  if xargs_payload="$(strip_xargs_payload_command "$CMD_NORMALIZED")" && rm_has_recursive "$xargs_payload"; then
+    block "xargs feeding rm -r hides recursive deletion targets. Review the input list and run manually." || return $?
+  fi
+
+  if find_has_destructive_action "$CMD_NORMALIZED"; then
+    block "find deletion action (-delete / -exec rm -r) can remove many files. Review matches and run manually." || return $?
+  fi
+
   if [[ "$CMD_NORMALIZED" =~ (^|[[:space:]])chmod([[:space:]]|$) ]] &&      [[ "$CMD_NORMALIZED" =~ chmod[[:space:]]+([^;&|]*[[:space:]])?0?777([[:space:]]|$) ]]; then
     block "chmod 777 sets world-writable permissions. Use a more restrictive mode." || return $?
+  fi
+
+  local mkfs_re='(^|[[:space:]])mkfs(\.[^[:space:]]*)?([[:space:]]|$)'
+  if [[ "$CMD_NORMALIZED" =~ $mkfs_re ]]; then
+    block "mkfs formats filesystems and can destroy data. Run manually with explicit confirmation." || return $?
+  fi
+
+  local dd_re='(^|[[:space:]])dd([[:space:]]|$)'
+  local dd_device_re='(^|[[:space:]])of=/dev/([^[:space:]]+)'
+  if [[ "$CMD_NORMALIZED" =~ $dd_re && "$CMD_NORMALIZED" =~ $dd_device_re ]]; then
+    local dd_target="${BASH_REMATCH[2]}"
+    case "$dd_target" in
+      null|stdout|stderr|fd/*) ;;
+      *)
+        block "dd writing to a device path can overwrite disks. Write to an ordinary file or run manually." || return $?
+        ;;
+    esac
   fi
 
   local pipe_to_shell_re='(curl|wget)[^|]*\|[[:space:]]*(ba)?sh'
@@ -197,6 +307,10 @@ check_destructive_segment() {
   local null_redirect_re='^[[:space:]]*(:|true)[[:space:]]+>{1,2}\|?[[:space:]]*[^[:space:]<>]'
   if [[ "$CMD_NORMALIZED" =~ $null_redirect_re ]]; then
     block "Null-command (: / true) followed by redirect truncates the target. Use a safer approach." || return $?
+  fi
+  local cat_null_redirect_re='(^|[[:space:]])cat[[:space:]]+/dev/null[[:space:]]*>{1,2}\|?[[:space:]]*[^[:space:]<>]'
+  if [[ "$CMD_NORMALIZED" =~ $cat_null_redirect_re ]]; then
+    block "cat /dev/null redirected to a file truncates the target. Use a safer approach." || return $?
   fi
   local empty_printf_single_re="printf[[:space:]]+''[[:space:]]*>\\|?[[:space:]]+[^[:space:]]"
   local empty_printf_double_re='printf[[:space:]]+""[[:space:]]*>\|?[[:space:]]+[^[:space:]]'
@@ -272,4 +386,3 @@ check_destructive_segment() {
     block "Cloud or infrastructure destructive command. Ask the user to run it manually." || return $?
   fi
 }
-

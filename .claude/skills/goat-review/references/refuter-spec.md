@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.9.0"
+goat-flow-reference-version: "1.9.1"
 ---
 # Cross-Model Refuter Specification
 
@@ -49,7 +49,7 @@ Output as structured JSON matching the schema below.
 }
 ```
 
-Output to: `.goat-flow/scratchpad/goat-review-refuter.<random>.json`
+Output to: `.goat-flow/logs/review/goat-review-refuter.<random>.json`
 
 ## Synthesis Rules
 

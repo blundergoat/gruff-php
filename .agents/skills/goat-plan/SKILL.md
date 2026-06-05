@@ -1,7 +1,7 @@
 ---
 name: goat-plan
 description: "Use when starting a non-trivial implementation that needs structured task breakdown with progress tracking."
-goat-flow-skill-version: "1.9.0"
+goat-flow-skill-version: "1.9.1"
 ---
 # /goat-plan
 
@@ -128,10 +128,10 @@ User explicitly asked to edit an existing plan file. Path-only references do not
 
 Analysis signals triggered this mode.
 
-- Run Phase 1 in full. Present milestones inline. Do NOT write files or modify `.goat-flow/tasks/`.
-- Skip Phase 3. Include summary format from Output Format.
+- Run Phase 1. Present milestones. Do NOT write files or modify `.goat-flow/tasks/`.
+- Skip Phase 3. Include summary format.
 
-**Transition out:** On "write these to files" / "let's go ahead", switch to Mode 4 using approved Phase 1 output. Do NOT re-run breakdown.
+**Transition out:** On "write these to files" / "let's go ahead", switch to Mode 4 using approved Phase 1 output. If prior-turn/session, re-read instructions, `.active`, named sources. Do NOT re-run breakdown.
 
 **CHECKPOINT:** "Milestones for [feature] (no files written). Say 'write to files' to persist, or adjust first."
 
