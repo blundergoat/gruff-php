@@ -592,7 +592,7 @@ final class AnalyseCommand extends Command
             return $analysisPaths === [] ? null : $analysisPaths;
         }
 
-        if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
+        if (!$options->isChangedOnly || $options->paths !== []) {
             return $options->paths;
         }
 
