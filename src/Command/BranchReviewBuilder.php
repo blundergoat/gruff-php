@@ -55,7 +55,13 @@ final readonly class BranchReviewBuilder
 
         $gitArchiveSnapshot       = new GitArchiveSnapshot();
         $baseRoot                 = null;
-        $shouldLoadProjectContext = $this->shouldLoadProjectContext($projectRoot, $options, $registry, $config, $reviewDiff);
+        $shouldLoadProjectContext = $this->shouldLoadProjectContext(
+            projectRoot: $projectRoot,
+            options:     $options,
+            registry:    $registry,
+            config:      $config,
+            reviewDiff:  $reviewDiff,
+        );
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
@@ -162,7 +168,13 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         AnalysisSourceSet $analysisSourceSet,
     ): array {
-        if (!$this->shouldLoadProjectContext($projectRoot, $options, $registry, $config, $reviewDiff)) {
+        if (!$this->shouldLoadProjectContext(
+            projectRoot: $projectRoot,
+            options:     $options,
+            registry:    $registry,
+            config:      $config,
+            reviewDiff:  $reviewDiff,
+        )) {
             return $analysisSourceSet->analysisUnits;
         }
 

@@ -1,6 +1,6 @@
 ---
 category: setup
-last_reviewed: 2026-05-24
+last_reviewed: 2026-06-07
 ---
 
 # Setup Footguns
@@ -26,6 +26,16 @@ last_reviewed: 2026-05-24
 **Prevention:** When a package constraint includes a newer framework major than the local lockfile currently installs, verify the public CLI against that major before release. For Symfony Console support, prefer APIs present across every advertised major (`addCommands` across 6.4/7.x/8.x here) and avoid deprecated 7.x APIs when `^8.0` is allowed. A consumer-install test should either run in the CI PHP version that can resolve the newest major or include an explicit platform/dependency smoke so the highest supported major is actually exercised.
 
 ## Resolved Entries
+
+## Footgun: classmap-authoritative hid newly added src/ classes in dev
+
+**Status:** resolved | **Created:** 2026-06-07 | **Resolved:** 2026-06-07 | **Evidence:** ACTUAL_MEASURED
+
+`composer.json` (search: `"optimize-autoloader"`) previously also set `config.classmap-authoritative: true`, which disables the PSR-4 filesystem fallback in the generated autoloader. A newly created `src/` class (e.g. a new Rule) was then invisible to `bin/gruff-php` and `RuleRegistry::defaults()` (search: `RuleRegistry`) until `composer dump-autoload` regenerated the classmap — symptom: `Class "...Rule" not found`, or a new rule silently missing from `list-rules`. The flag only ever affected this repo's own dev install (a consumer's root config governs their autoloader optimisation), so it bought nothing here.
+
+**Resolution:** Removed `classmap-authoritative` from `composer.json` (kept `optimize-autoloader: true`). Verified the regenerated autoloader reports `isClassMapAuthoritative()` false and that a class created after a dump — absent from `vendor/composer/autoload_classmap.php` — still resolves via `class_exists()`.
+
+**Prevention:** Do not re-add `classmap-authoritative: true` to `composer.json`; it reinstates the invisible-new-class trap. `optimize-autoloader: true` is safe — it builds the fast classmap without disabling the PSR-4 fallback.
 
 ## Footgun: PHP-named scaffold has no PHP app surface yet
 

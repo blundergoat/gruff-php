@@ -1,6 +1,6 @@
 # Code Map - gruff-php
 
-Last reviewed 2026-06-03. Captures the v0.3.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
+Last reviewed 2026-06-07. Captures the v0.3.1 surface as wired in `composer.json`, `bin/gruff-php`, `src/`, and `tests/`. Treat directory listings as authoritative for scope, but always re-grep before claiming behaviour.
 
 ## Top-level layout
 
@@ -13,11 +13,12 @@ Last reviewed 2026-06-03. Captures the v0.3.1 surface as wired in `composer.json
 |-- composer.json             = Composer metadata, runtime deps, bin, autoload, `check`/`phpstan`/`security:scan`/`test` scripts
 |-- composer.lock             = resolved Composer dependency versions
 |-- phpstan.neon.dist         = PHPStan 2 level 10 config for `src/` and `tests/`
-|-- phpunit.xml.dist          = PHPUnit 11 test suite config
+|-- phpunit.xml.dist          = PHPUnit 12 test suite config
 |-- package.json              = harness-only Node manifest (no app code consumes it)
-|-- pnpm-lock.yaml            = pnpm lockfile for harness Node tooling
+|-- package-lock.json         = npm lockfile for harness Node tooling
 |-- node_modules/             = harness Node tooling install (gitignored)
 |-- vendor/                   = Composer install (gitignored)
+|-- .gruff-cache/             = incremental result cache (ADR-020); gitignored + discovery-ignored
 |-- bin/                      = PHP CLI entrypoint
 |-- scripts/                  = local maintenance scripts
 |-- src/                      = gruff-php application source (PSR-4 root `GruffPhp\`)
@@ -55,12 +56,37 @@ src/
 |   |-- BaselineFilter.php                    = suppresses findings matching baseline fingerprint + rule + file
 |   |-- BaselineReport.php                    = baseline metadata exposed in analysis reports
 |   `-- BaselineStore.php                     = reads/writes `gruff.baseline.v1` JSON files
+|-- Cache/
+|   |-- AnalysisFingerprint.php               = content-addressed per-file cache key: folds gruff version, PHP version floor, allowlists, and the enabled-rule set with resolved settings into `sha256(runDigest + displayPath + sha256(fileBytes))` (ADR-020)
+|   `-- ResultCache.php                       = on-disk `.gruff-cache/` store; fail-open and byte-identical to a cold run, oldest-first eviction; engaged only when no project rule is enabled and `--no-cache` is unset
 |-- Command/
 |   |-- AnalyseCommand.php                    = `analyse` command; loads config, applies optional execution profiles (`--profile=security` selects security + sensitive-data rules), derives changed-only branch-review paths when needed, discovers paths, parses files, runs rules/mutation/composites, filters diffs/baselines, compares branch review, applies display filters, scores, renders, and resolves exit code
-|   |-- DashboardCommand.php                  = `dashboard` command; local HTTP controls for refreshable scans and alternate project roots
+|   |-- AnalyseCommandOptions.php             = validated CLI options value object for an analyse run (includes `--no-cache`)
+|   |-- AnalyseCommandSetup.php               = resolved dependencies and options needed to execute analysis
+|   |-- AnalyseCommandSetupBuilder.php        = builds validated analyse command setup from console input
+|   |-- AnalyseCommandSetupResult.php         = discriminated result: ready analysis setup or an early command error
+|   |-- AnalysisFindingSupport.php            = stateless path/finding-normalisation helpers shared by the analyse command and branch-review builder
+|   |-- AnalysisPipeline.php                  = streaming and batch parse→analyse pipelines that release one file at a time to bound peak memory
+|   |-- AnalysisSourceLoader.php              = discovers and parses analysis source files for CLI execution
+|   |-- AnalysisSourceSet.php                 = parsed analysis units, diagnostics, and discovery metadata
+|   |-- BranchReviewBuilder.php               = builds the `--diff-vs` branch-review comparison and resolves project-context units for `AnalyseCommand`
+|   |-- CheckIgnoreCommand.php                = `check-ignore` command; reports whether (and via which pattern) gruff would ignore each path, without analysis (ADR-019)
+|   |-- DashboardCommand.php                  = `dashboard` command; serves the local browser dashboard for interactive analysis
+|   |-- DashboardHttpResponder.php            = writes dashboard HTTP responses to an accepted socket client
+|   |-- DashboardHttpResponse.php             = status/headers/body value for dashboard HTTP replies
+|   |-- DashboardPageRenderer.php             = renders dashboard HTML and embeds scan metadata
+|   |-- DashboardRequestContext.php           = immutable dashboard server paths and command helpers for a request
+|   |-- DashboardRequestHandler.php           = parses and routes one dashboard HTTP request
+|   |-- DashboardScanCommandBuilder.php       = builds command arguments for dashboard-triggered scans
+|   |-- DashboardScanRunner.php               = runs dashboard scans and converts scan output into HTML
+|   |-- DashboardServer.php                   = serves the dashboard HTTP loop for local browser usage
+|   |-- DashboardStateFactory.php             = builds dashboard query state from console input and request parameters
 |   |-- InitCommand.php                       = `init` command; writes `.gruff-php.yaml` from registry defaults and preserves existing `paths.ignore` values on forced regeneration
-|   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON
+|   |-- ListRulesCommand.php                  = `list-rules` command; emits registry rule metadata as a table or JSON, with an optional per-rule `<ruleId>` detail view
+|   |-- MissingConfigPrompt.php               = offers to run `gruff-php init` when no project config is present
 |   |-- ReportCommand.php                     = `report` command; renders static HTML/JSON reports by delegating to `analyse`
+|   |-- Runtime/
+|   |   `-- RuntimeTimingObserver.php         = collects per-rule wall-clock totals reported by `RuleRegistry::analyse()`
 |   |-- SummaryCommand.php                    = `summary` command; runs the analyser once and renders compact text/JSON aggregate output
 |   `-- SummaryReportData.php                 = aggregate payload for summary command rendering
 |-- Config/
@@ -70,7 +96,7 @@ src/
 |   |-- RuleSelection.php                     = include/exclude semantics for tiers, pillars, and explicit rule ids
 |   `-- RuleSettings.php                      = per-rule `enabled` flag and threshold map; `numericThreshold()` accessor
 |-- Console/
-|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.1.2`; registers `analyse`, `summary`, `dashboard`, `init`, `list-rules`, and `report`
+|   `-- Application.php                       = Symfony Console application named `gruff-php`, version constant `0.3.1`; registers `analyse`, `check-ignore`, `dashboard`, `init`, `list-rules`, `report`, and `summary`
 |-- Diff/
 |   |-- ChangedLineRange.php                  = inclusive changed-line range value object
 |   |-- DiffException.php                     = diff-mode failure exception
@@ -282,6 +308,7 @@ src/
 |   |-- ScoreCalculator.php                   = composite, pillar, file, complexity-distribution, mutation scoring, and profile-scoped composite scoring for `--profile=security`
 |   `-- ScoreReport.php                       = serialisable score payload for reports
 |-- Source/
+|   |-- PathIgnoreResolver.php                = shared ignore engine: configured `paths.ignore` globs plus generated-lockfile name skips (`bun.lockb`, `composer.lock`, `npm-shrinkwrap.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`)
 |   |-- SourceDiscovery.php                   = Git-visible or fallback recursive discovery; PHP plus text/config extensions (conf/config/env/ini/json/md/neon/sh/toml/xml/yaml/yml + `.env*`, `.editorconfig`, `.gitattributes`, `.gitignore`); deterministic ksort + path canonicalisation; configured ignores and generated lockfile skips
 |   |-- SourceDiscoveryResult.php             = files, missingPaths, ignoredPaths; `hasInputErrors()` on missing paths
 |   `-- SourceFile.php                        = absolutePath, displayPath, type (`php` or `text`); `isPhp()` predicate
@@ -440,6 +467,6 @@ tests/
 
 - `vendor/` and `node_modules/` are generated and gitignored.
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
-- `composer.json`'s `check` script lists every committed PHP file for `php -l` linting; new files must be added there or the script fails.
+- `composer.json`'s `check` script lints every committed PHP source/test file with `php -l` via `find src tests -name '*.php'` (excluding the intentional `tests/Fixtures/Source/syntax-error` fixtures), so new files are linted automatically rather than from a hand-maintained list.
 - Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality, Design. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.
