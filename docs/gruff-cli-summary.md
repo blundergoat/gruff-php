@@ -29,27 +29,27 @@ php bin/gruff-php summary [paths...] [options]
 
 ## Example - text format
 
-The example output below was captured from a development checkout. A tagged
-release prints `0.1.1` instead of a `-dev` suffix.
+The example output below is captured from the current checkout.
 
 ```bash
 php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.1.1 - summary
+gruff-php 0.3.1 summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
 Files     2 discovered, 2 parsed, 6 ignored, 0 missing, 0 parse errors
 
-Composite A (95.50 / 100)
+Composite: A (95.10 / 100)
+Findings: 7 total · 0 error · 2 warning · 5 advisory
 Scope     full-project
 Score note Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
 
 Pillars
+  documentation   B  86.00 findings=4     advisory=4     warning=0     error=0
   naming          D  65.00 findings=3     advisory=1     warning=2     error=0
-  documentation   A  90.00 findings=3     advisory=3     warning=0     error=0
   size            A 100.00 findings=0     advisory=0     warning=0     error=0
   ...
 
@@ -60,9 +60,10 @@ Top 3 rules by finding count
 
 Top 2 file offenders
   D   67.50  tests/Fixtures/Source/mixed/nested/beta.php  findings=4    a=3 w=1 e=0
-  C   76.25  tests/Fixtures/Source/mixed/alpha.php        findings=2    a=1 w=1 e=0
+  C   71.25  tests/Fixtures/Source/mixed/alpha.php        findings=3    a=2 w=1 e=0
 
-Totals    6 findings (advisory=4, warning=2, error=0)
+Baseline  After review, `gruff-php analyse --generate-baseline` records current findings as known debt.
+          Use `gruff-php analyse --no-baseline` to audit without a baseline.
 ```
 
 Pillars are ordered by finding count (loudest first). Pillars with zero findings still appear so it's obvious which are clean.
@@ -70,35 +71,35 @@ Pillars are ordered by finding count (loudest first). Pillars with zero findings
 ## Example - JSON format
 
 ```bash
-php bin/gruff-php summary src --format=json --top=5
+php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json --top=5
 ```
 
 ```json
 {
   "schemaVersion": "gruff.summary.v2",
-  "tool": { "name": "gruff-php", "version": "0.1.1" },
+  "tool": { "name": "gruff-php", "version": "0.3.1" },
   "scope": {
-    "paths": ["src"],
-    "configPath": "/home/devgoat/projects/gruff-workspace/gruff-php/.gruff-php.yaml",
-    "filesDiscovered": 237,
-    "filesParsed": 237,
-    "ignoredPaths": 0,
+    "paths": ["tests/Fixtures/Source/mixed"],
+    "configPath": null,
+    "filesDiscovered": 2,
+    "filesParsed": 2,
+    "ignoredPaths": 6,
     "missingPaths": 0,
     "parseErrors": 0,
     "scope": "full-project"
   },
-  "composite": { "score": 89.7, "grade": "B" },
-  "findings": { "advisory": 217, "warning": 0, "error": 0, "total": 217 },
+  "composite": { "score": 95.1, "grade": "A" },
+  "findings": { "advisory": 5, "warning": 2, "error": 0, "total": 7 },
   "pillars": [
-    { "pillar": "documentation", "grade": "B", "score": 78.55, "findings": 216, "advisory": 216, "warning": 0, "error": 0, "penalty": 21.45, "applicable": true },
+    { "pillar": "size", "grade": "A", "score": 100, "findings": 0, "advisory": 0, "warning": 0, "error": 0, "penalty": 0, "applicable": true },
     ...
   ],
   "topRules": [
-    { "ruleId": "docs.bare-phpdoc-tags", "count": 203, "advisory": 203, "warning": 0, "error": 0, "pillar": "documentation" },
+    { "ruleId": "naming.class-file-mismatch", "count": 2, "advisory": 0, "warning": 2, "error": 0, "pillar": "naming" },
     ...
   ],
   "topOffenders": [
-    { "file": "src/Rule/Naming/IdentifierQualityRule.php", "score": 55, "grade": "F", "findings": 12, "advisory": 12, "warning": 0, "error": 0, "penalty": 45, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
+    { "file": "tests/Fixtures/Source/mixed/nested/beta.php", "score": 67.5, "grade": "D", "findings": 4, "advisory": 3, "warning": 1, "error": 0, "penalty": 32.5, "maxCyclomatic": null, "maxCognitive": null, "maxLines": null, "mutationScore": null },
     ...
   ]
 }

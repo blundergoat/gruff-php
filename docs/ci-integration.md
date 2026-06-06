@@ -52,7 +52,7 @@ unaffected. See
 [`docs/configuration.md`](configuration.md#minimum-severity) for the full
 rejection contract.
 
-The `analyse` binary default is `advisory` in 0.1.5+. CI jobs that relied
+The `analyse` binary default is `advisory` in 0.2.0+. CI jobs that relied
 on the previous `error` floor must either pass `--fail-on error` or set
 `minimumSeverity.analyse: error` in the project config.
 

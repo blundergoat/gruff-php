@@ -17,8 +17,10 @@ with built-in defaults.
 Supported top-level sections are:
 
 - `schemaVersion`
+- `extends`
 - `minimumPhpVersion`
 - `minimumSeverity`
+- `failureConditions`
 - `paths`
 - `allowlists`
 - `selection`
@@ -39,6 +41,21 @@ Configs missing this key fail to load with a hint pointing at
 `gruff-php init --force`. See
 [`ADR-015`](../.goat-flow/decisions/ADR-015-per-command-minimum-severity.md)
 for the rationale.
+
+## Extends
+
+`extends` can load a bundled preset or another YAML file before applying the
+current file's overrides:
+
+```yaml
+schemaVersion: gruff-php.config.v0.1
+extends: gruff.recommended
+```
+
+Bundled presets are `gruff.recommended`, `gruff.starter`, and `gruff.strict`.
+Relative paths resolve from the file that declares `extends`. Inheritance chains
+resolve ancestor-first; cycles, chains deeper than five hops, and unknown preset
+names fail fast.
 
 ## Minimum Severity
 
@@ -66,10 +83,36 @@ Precedence when resolving the effective threshold:
 3. Binary default — `advisory` for `analyse`, `none` for `report` and
    `dashboard`
 
-`analyse`'s binary default lowered from `error` to `advisory` in 0.1.5 so
+`analyse`'s binary default lowered from `error` to `advisory` in 0.2.0 so
 that every finding visible in the report can fail CI by default. Pass
 `--fail-on error` or set `minimumSeverity.analyse: error` to restore the
 older behaviour.
+
+## Failure Conditions
+
+`failureConditions` sets count-based gates for `analyse`. Use it when the policy
+is "allow N findings, fail above N" rather than a simple severity floor:
+
+```yaml
+failureConditions:
+  total: 200
+  severityThresholds:
+    error: 0
+    warning: 5
+    advisory: 50
+```
+
+Any configured cap that is exceeded fails the run. An explicit CLI `--fail-on`
+flag overrides `failureConditions`. To gate only change-introduced findings,
+configure `newFindings` and provide a reference point with `--baseline` or
+`--diff-vs`:
+
+```yaml
+failureConditions:
+  newFindings:
+    severityThresholds:
+      error: 0
+```
 
 ## Paths
 
@@ -121,7 +164,7 @@ Selection narrows the active rule set:
 ```yaml
 selection:
   pillars: [security, complexity]
-  excludeRules: [security.eval-call]
+  excludeRules: [security.weak-crypto]
 ```
 
 ## Rules
@@ -159,6 +202,6 @@ for the rationale and the failure-mode comparison.
 
 ## Compatibility
 
-The shared cross-language config expectations are documented in
-[`../../CONTRACT.md`](../../CONTRACT.md). PHP intentionally keeps YAML-only
-config loading and the legacy `.gruff.yaml` fallback.
+The shared cross-language expectations are summarized in
+[Naming Conventions](naming-conventions.md#shared-contract). PHP intentionally
+keeps YAML-only config loading and the legacy `.gruff.yaml` fallback.

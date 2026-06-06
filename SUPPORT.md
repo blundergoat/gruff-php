@@ -1,7 +1,7 @@
 # Support
 
-Support for the `0.1.x` release line is best effort and focused on local CLI,
-CI, reporting, and rule-calibration workflows.
+Support for the current `0.3.x` release line is best effort and focused on local
+CLI, CI, reporting, and rule-calibration workflows.
 
 ## Getting Help
 
@@ -41,7 +41,7 @@ Review generated JSON before attaching it to public issues.
 
 ## Supported Use Cases
 
-Best-effort support for v0.1:
+Best-effort support for the current `0.3.x` release line:
 
 - Local CLI scans.
 - CI scans.
@@ -52,7 +52,7 @@ Best-effort support for v0.1:
 - Baselines.
 - Infection report ingestion.
 
-Not supported as production services in v0.1:
+Not supported as production services:
 
 - Exposing the dashboard on an untrusted network.
 - Treating findings as legal, compliance, or security certification.

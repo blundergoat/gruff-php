@@ -54,7 +54,7 @@ The key lives under `rules.<rule-id>.excludeFromScore` alongside the existing `e
 - A CLI `--exclude-score-rule` flag.
 - Differentiated penalty weights ("count this rule at 25%").
 - Auto-surfacing all `excludeFromScore: true` rules in a dedicated "informational" section of reports. The per-finding rule id is already visible; a dedicated section is polish that needs concrete evidence.
-- Class-level inline suppression (the healthkit `BookingSession` problem). `excludeFromScore` is the wrong tool for that need — the user wants the warning visible AND acknowledged at the call site, not silenced from the score. A class-level attribute / annotation is a separate design with its own ADR.
+- Class-level inline suppression (a real-world `BookingSession` problem). `excludeFromScore` is the wrong tool for that need — the user wants the warning visible AND acknowledged at the call site, not silenced from the score. A class-level attribute / annotation is a separate design with its own ADR.
 
 ## References
 
