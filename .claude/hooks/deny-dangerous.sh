@@ -77,10 +77,14 @@ read_payload() {
   cat || true
 }
 
+jq_available() {
+  [[ "${GOAT_DENY_FORCE_NO_JQ:-}" != "1" ]] && command -v jq >/dev/null 2>&1
+}
+
 json_value() {
   local payload="$1"
   local expr="$2"
-  if command -v jq >/dev/null 2>&1; then
+  if jq_available; then
     printf '%s' "$payload" | jq -r "$expr // empty" 2>/dev/null || true
   fi
 }
@@ -202,7 +206,7 @@ extract_tool_name() {
   local unsafe=0
   local tool_pattern='"(toolName|tool_name|name)"[[:space:]]*:[[:space:]]*"([^"]+)"'
   tool="$(json_value "$payload" '.toolName // .tool_name // .toolCall.name')"
-  if [[ -z "$tool" ]] && ! command -v jq >/dev/null 2>&1; then
+  if [[ -z "$tool" ]] && ! jq_available; then
     fallback_status=0
     tool="$(json_fallback_nested_string_value "$payload" 'toolName|tool_name|name')" || fallback_status=$?
     if [[ "$fallback_status" -ne 0 ]]; then
@@ -230,7 +234,7 @@ extract_command_text() {
     printf '%s' "$CHECK_COMMAND"
     return
   fi
-  if command -v jq >/dev/null 2>&1; then
+  if jq_available; then
     command="$(json_value "$payload" '
       def extract_command(value):
         if value == null then empty
@@ -323,32 +327,95 @@ tool_is_secret_file_operation() {
   esac
 }
 
-heredoc_opener_executes_shell() {
-  local opener="$1"
-  local before_heredoc="${opener%%<<*}"
-  local normalized
-  local first_word
-  local pipe_shell_re
-
-  normalized=$(normalize_command_candidate "$before_heredoc")
-  first_word=$(first_word_base "$normalized")
-  case "$first_word" in
-    bash|sh|dash|zsh|ksh|fish|pwsh|powershell|cmd)
+goat_first_word_is_inert() {
+  # A command that treats the heredoc body as data, or runs it as its OWN
+  # (non-shell) language - never as shell commands. Keep this list conservative:
+  # anything NOT listed (a shell, xargs/parallel, source/., read/mapfile, a control
+  # keyword, ssh, or any unknown command) makes the masker leave the body
+  # inspectable. NB the interpreters/clients here still execute the body AS THEIR
+  # OWN LANGUAGE (python `os.system`, sed `e`, awk `system()`, sql `\!`/`.shell`) -
+  # a deliberately accepted scope limit: deny-dangerous guards SHELL, not
+  # interpreter languages, the same reason `python - <<X` is not inspected.
+  case "$1" in
+    cat|tac|tee|head|tail|sort|uniq|wc|nl|rev|cut|tr|fold|fmt|column|paste|join|comm|expand|unexpand|strings|iconv|\
+    base64|base32|xxd|hexdump|od|md5sum|sha1sum|sha256sum|sha512sum|cksum|\
+    grep|egrep|fgrep|rg|ag|sed|gsed|awk|gawk|mawk|nawk|jq|yq|xq|mlr|\
+    python|python2|python3|php|node|nodejs|deno|ruby|perl|lua|\
+    psql|mysql|mariadb|sqlite3|mongosh|mongo|redis-cli|cqlsh|duckdb|\
+    echo|printf|true|false|:|mail|mailx|sendmail|less|more)
       return 0 ;;
   esac
+  return 1
+}
 
-  pipe_shell_re='[|][[:space:]]*(env[[:space:]]+)?([^[:space:]/]+/)*(bash|sh|dash|zsh|ksh|fish|pwsh|powershell|cmd)([[:space:]]|$)'
-  [[ "$opener" =~ $pipe_shell_re ]]
+heredoc_command_list_is_inert() {
+  local scan segment first inner match ps_re
+  local -a segs=()
+
+  # Strip quoted spans first (so a shell NAME used as data is not read as a
+  # command, and a quoted delimiter/pipe does not split).
+  # shellcheck disable=SC2001  # regex strip of quoted spans, not a glob
+  scan=$(printf '%s' "$1" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")
+
+  # Process substitutions route the body to/from their inner command: `cat >
+  # >(bash)`, `tee >(bash)` feed the heredoc body straight into that command's
+  # stdin. The `;&|` split below never looks inside `>(...)`/`<(...)`, so classify
+  # the whole inner command list here; `>(printf ''; bash)` is not inert even
+  # though its first command is. Replace each checked substitution with a token so
+  # the loop terminates and the leftover never confuses the segment split.
+  ps_re='[<>]\(([^()]*)\)'
+  while [[ "$scan" =~ $ps_re ]]; do
+    match="${BASH_REMATCH[0]}"
+    inner="${BASH_REMATCH[1]}"
+    heredoc_command_list_is_inert "$inner" || return 1
+    scan="${scan/"$match"/ __goat_ps__ }"
+  done
+
+  # Break the pipeline on every command separator ; & | and inspect each leading
+  # command word.
+  scan="${scan//$'\n'/;}"
+  IFS=';&|' read -ra segs <<< "$scan"
+  (( ${#segs[@]} > 0 )) || return 1
+  # An opener with many pipeline commands is not a simple inert-consumer pipeline;
+  # refuse to mask (inspect instead). This also bounds the per-segment subshell
+  # forks so a crafted `cat <<X; cat; cat; ...` opener cannot fork-DoS the masker.
+  (( ${#segs[@]} > 64 )) && return 1
+  for segment in "${segs[@]}"; do
+    segment="${segment#"${segment%%[![:space:]]*}"}"
+    [[ -z "$segment" ]] && continue
+    first=$(first_word_base "$(normalize_command_candidate "$segment")")
+    goat_first_word_is_inert "$first" || return 1
+  done
+  return 0
+}
+
+heredoc_body_is_inert() {
+  # SAFE BY DEFAULT. Mask a quoted heredoc body (hide it from chain-counting and
+  # content checks) ONLY when EVERY command in the opener's pipeline - including
+  # every command in any process-substitution target - is a known NON-shell
+  # consumer. Anything else - a shell, an `xargs`/`parallel` dispatcher,
+  # `source`/`.`, a `read`/`mapfile` variable handoff, a control keyword
+  # (while/for/if/do/then/done), `ssh`, a `>(bash)` process substitution, or any
+  # unrecognised command - means we do NOT mask, so the body stays inspectable and
+  # an executed `rm -rf /` is caught however it is reached. The opener arrives
+  # continuation-joined; its own redirects/args are still policy-checked
+  # separately, so masking the body never hides a dangerous opener. Trade-off
+  # (chosen deliberately): a >50-line heredoc to an unrecognised or
+  # compound-wrapped consumer may trip the chain cap - a safe false positive
+  # ("review and run manually"), never a bypass.
+  heredoc_command_list_is_inert "$1"
 }
 
 mask_safe_quoted_heredoc_bodies() {
   local input="$1"
   local output=""
   local line=""
+  local logical=""
   local delimiter=""
   local in_body=0
   local mask_body=0
   local strip_tabs=0
+  local body_masked=0
   local stripped_line=""
   local single_quoted_re="(<<-?)[[:space:]]*'([^']+)'"
   local double_quoted_re='(<<-?)[[:space:]]*"([^"]+)"'
@@ -366,26 +433,48 @@ mask_safe_quoted_heredoc_bodies() {
         in_body=0
         mask_body=0
         strip_tabs=0
+        body_masked=0
         delimiter=""
       elif (( mask_body )); then
-        output+="__goat_quoted_heredoc_body__"$'\n'
+        # Collapse the whole inert body to ONE placeholder: a quoted-interpreter
+        # heredoc (e.g. python - <<'PY' ... PY) is a single command argument, not
+        # one chain link per line. Emitting one token per line let a body over 50
+        # lines trip the 50-chained-segment cap - a false positive on ordinary
+        # inline smoke scripts. Shell-fed heredocs keep mask_body=0 and fall to
+        # the else branch below, so they stay emitted line by line, inspectable
+        # and still counted.
+        if (( ! body_masked )); then
+          output+="__goat_quoted_heredoc_body__"$'\n'
+          body_masked=1
+        fi
       else
         output+="$line"$'\n'
       fi
       continue
     fi
 
-    output+="$line"$'\n'
-    if [[ "$line" =~ $single_quoted_re ]] || [[ "$line" =~ $double_quoted_re ]]; then
+    # Join bash line-continuations into one logical opener so a heredoc whose
+    # pipeline/dispatcher is split across `\`<newline> (e.g. `cat <<'X' \`<nl>`|
+    # bash`) is classified as a whole. A trailing `\` inside a heredoc body is
+    # literal and is handled by the in_body branch above, never here.
+    logical="$line"
+    while [[ "$logical" =~ (^|[^\\])(\\\\)*\\$ ]]; do
+      IFS= read -r line || break
+      logical="${logical%\\}$line"
+    done
+
+    output+="$logical"$'\n'
+    if [[ "$logical" =~ $single_quoted_re ]] || [[ "$logical" =~ $double_quoted_re ]]; then
       strip_tabs=0
       [[ "${BASH_REMATCH[1]}" == "<<-" ]] && strip_tabs=1
       delimiter="${BASH_REMATCH[2]}"
-      if heredoc_opener_executes_shell "$line"; then
-        mask_body=0
-      else
+      if heredoc_body_is_inert "$logical"; then
         mask_body=1
+      else
+        mask_body=0
       fi
       in_body=1
+      body_masked=0
     fi
   done <<< "$input"
 
@@ -424,6 +513,13 @@ check_command_substitutions() {
     fi
     scan_remaining="${scan_remaining/$match/__goat_proc_subst__}"
   done
+
+  # Arithmetic expansion $(( ... )) is not command substitution. Any dangerous
+  # nested $(...) inside it was already stripped and policy-checked by the loop
+  # above, so a remaining "$((" opener is pure arithmetic; mask it so the
+  # residual catch-all below does not misfire on benign arithmetic.
+  local arith_open="\$(("
+  scan_remaining="${scan_remaining//"$arith_open"/__goat_arith__}"
 
   if [[ "$scan_remaining" =~ \$\( ]]; then
     block "Complex command substitution. Write the expanded command directly." || return $?
@@ -988,6 +1084,7 @@ split_command_segments_into() {
   local in_single=0
   local in_double=0
   local escaped=0
+  local subst_depth=0
   local i=0
 
   for ((i = 0; i < ${#input}; i++)); do
@@ -1027,6 +1124,28 @@ split_command_segments_into() {
 
     if [[ "$in_single" -eq 0 && "$in_double" -eq 0 ]]; then
       next="${input:i+1:1}"
+      # Command/process substitution openers ( $(  <(  >( ) start a no-split
+      # region: control operators inside them are not top-level chain
+      # separators. check_command_substitutions recurses into the interior, so
+      # those operators are still policy-checked at the correct level. Plain
+      # (...) subshells are deliberately NOT tracked here - they are not
+      # recursed into elsewhere, so they must stay splittable to avoid a
+      # (cmd && rm -rf /) bypass.
+      if [[ "$next" == '(' && ( "$char" == '$' || "$char" == '<' || "$char" == '>' ) ]]; then
+        current+="$char$next"
+        subst_depth=$((subst_depth + 1))
+        i=$((i + 1))
+        continue
+      fi
+      if [[ "$subst_depth" -gt 0 ]]; then
+        if [[ "$char" == '(' ]]; then
+          subst_depth=$((subst_depth + 1))
+        elif [[ "$char" == ')' ]]; then
+          subst_depth=$((subst_depth - 1))
+        fi
+        current+="$char"
+        continue
+      fi
       if [[ "$char$next" == "&&" || "$char$next" == "||" ]]; then
         __goat_split_out__+=("$current")
         current=""
@@ -1223,12 +1342,38 @@ check_command_segments() {
 
   split_command_segments_into nested_segments "$input"
 
+  # Substitution interiors stay intact through split_command_segments_into and
+  # are recursed into here, so enforce the chain-count cap at nested depths too
+  # (depth 0 is already capped in main).
+  if (( depth > 0 && ${#nested_segments[@]} > 50 )); then
+    block "Command has more than 50 chained segments; review and run manually if intended." || return $?
+  fi
+
   for nested_segment in "${nested_segments[@]}"; do
     nested_segment="${nested_segment#"${nested_segment%%[![:space:]]*}"}"
     nested_segment="${nested_segment%"${nested_segment##*[![:space:]]}"}"
     [[ -z "$nested_segment" ]] && continue
     check_segment "$nested_segment" "$depth" || return $?
   done
+}
+
+count_substitution_openers() {
+  local input="$1"
+  local count=0
+  local i ch next next2
+  for ((i = 0; i < ${#input}; i += 1)); do
+    ch="${input:i:1}"
+    next="${input:i+1:1}"
+    next2="${input:i+2:1}"
+    if [[ "$ch$next" == "\$(" ]]; then
+      if [[ "$next2" != '(' ]]; then
+        count=$((count + 1))
+      fi
+    elif [[ "$ch$next" == '<(' || "$ch$next" == '>(' ]]; then
+      count=$((count + 1))
+    fi
+  done
+  printf '%s\n' "$count"
 }
 
 main() {
@@ -1322,6 +1467,17 @@ main() {
     block "Command has more than 50 chained segments; review and run manually if intended."
   fi
   unset _goat_chain_segments
+
+  # Cap total command/process substitution openers before the recursive
+  # check_command_segments walk. Each `$(`/`<(`/`>(` triggers its own recursive
+  # re-scan, so a command packed with hundreds (e.g. `cat <(:) <(:) ... <(:)`) is a
+  # policy-parser DoS (~10s at 300). This flat O(len) count bounds the work;
+  # real commands use a handful, so pathological input blocks ("run it manually").
+  local _goat_subst_n=0
+  _goat_subst_n="$(count_substitution_openers "$command_policy")"
+  if (( _goat_subst_n > 32 )); then
+    block "Command has too many command substitutions; review and run manually if intended."
+  fi
 
   check_command_segments "$command_policy" 0
   allow

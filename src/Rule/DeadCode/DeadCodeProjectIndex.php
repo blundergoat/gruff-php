@@ -297,7 +297,7 @@ final class DeadCodeProjectIndex
     }
 
     /**
-     * Walk parsed YAML and record values attached to `_controller` keys.
+     * Walk parsed YAML and record values attached to `_controller` or `controller` keys.
      *
      * @param mixed $yamlNode - Parsed YAML value or nested mapping.
      * @param bool  $isTestFile - Whether the containing unit is a test file.
@@ -311,7 +311,10 @@ final class DeadCodeProjectIndex
         }
 
         foreach ($yamlNode as $key => $childValue) {
-            if ($key === '_controller' && is_string($childValue)) {
+            // Symfony accepts both `defaults._controller` and the 4.1+ top-level `controller:` shortcut
+            // for a route's callable; recognise both so a controller wired only via the shortcut is not
+            // mis-reported as dead code.
+            if (($key === '_controller' || $key === 'controller') && is_string($childValue)) {
                 $this->recordSymfonyControllerReferenceValue($childValue, $isTestFile);
             }
 

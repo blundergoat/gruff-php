@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.9.1"
+goat-flow-reference-version: "1.9.2"
 ---
 # Observability
 
@@ -17,6 +17,10 @@ This is a discipline reference, not a runnable tool. Load it when:
 - A dashboard query, alert rule, or trace lookup keeps returning unusable signal.
 
 No CLI check applies; correctness is verified at review time using the **Verification Gate** below, not by running a command.
+
+## Intent
+
+A coding agent adds instrumentation so a future operator can answer a concrete operational question without reopening the code: what happened, where, who or what was affected, and what action is expected. If a log, metric, or span event has no named consumer - dashboard, alert, runbook, incident query, or debugging workflow - do not add it.
 
 ## Boundary
 
@@ -64,6 +68,8 @@ logger.error("Payment processing failed", {
 ```
 
 The message stays constant across thousands of failures; the attributes vary. A single log query can now group every payment failure and break it down by gateway, currency, or error class.
+
+Identifier fields such as `user_id`, `account_id`, and `order_id` mean opaque internal IDs. Do not use emails, names, external account numbers, or other personal identifiers as stand-ins for IDs unless the service's logging policy explicitly allows that storage path.
 
 ### Trace correlation
 
@@ -229,8 +235,8 @@ Redact at the boundary where the value is first introduced. Trusting every downs
 
 Before claiming new instrumentation is done, demonstrate it does what the reader expects.
 
-1. **Logs:** find the new log in the backend by message and one expected attribute. Confirm `trace_id` is present, or note explicitly that the call site has no active span and why.
-2. **Metrics:** confirm the metric appears with the expected label set and unit. Increment it in a test run and watch the value move. For histograms, verify bucket boundaries cover the expected range.
+1. **Logs:** find the new log in the backend by message and one expected attribute. If no backend is available, use a local OTel collector, test exporter, or captured structured-log output and label the proof as local-only. Confirm `trace_id` is present, or note explicitly that the call site has no active span and why.
+2. **Metrics:** confirm the metric appears with the expected label set and unit in the backend or a local test exporter. Increment it in a test run and watch the value move. For histograms, verify bucket boundaries cover the expected range.
 3. **Cardinality:** for each new label, list the possible values. If the list is open-ended, the design is wrong - fix before merging.
 4. **Consumer named:** state the dashboard panel, alert rule, or runbook step this signal exists to serve. If you cannot name one, reconsider whether it should exist.
 5. **Sensitive-data grep:** before merging, grep the diff for any field name in the sensitive-data table. Catching this in review beats catching it in a compliance audit.
@@ -239,7 +245,7 @@ Verification is the difference between "I added a log" and "I added a useful log
 
 ## Related References
 
-- `.goat-flow/skill-reference/skill-preamble.md` - Proof Gate and OBSERVED / INFERRED tagging discipline applied when this playbook directs you to verify instrumentation.
-- `.goat-flow/skill-reference/skill-conventions.md` - footgun and lesson entry shapes for recording recurring instrumentation traps with file evidence.
+- `skill-preamble.md` - Proof Gate and OBSERVED / INFERRED tagging discipline applied when this playbook directs you to verify instrumentation.
+- `skill-conventions.md` - footgun and lesson entry shapes for recording recurring instrumentation traps with file evidence.
 - OTel Semantic Conventions (upstream spec) - authoritative names for `http.*`, `db.*`, `messaging.*`, `exception.*`, `service.*` attributes.
 - OTel data model documentation - severity numbers, instrument kinds, log record shape, span event shape.

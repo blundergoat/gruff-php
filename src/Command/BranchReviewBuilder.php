@@ -55,7 +55,7 @@ final readonly class BranchReviewBuilder
 
         $gitArchiveSnapshot       = new GitArchiveSnapshot();
         $baseRoot                 = null;
-        $shouldLoadProjectContext = $this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff);
+        $shouldLoadProjectContext = $this->shouldLoadProjectContext($projectRoot, $options, $registry, $config, $reviewDiff);
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
@@ -162,7 +162,7 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         AnalysisSourceSet $analysisSourceSet,
     ): array {
-        if (!$this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff)) {
+        if (!$this->shouldLoadProjectContext($projectRoot, $options, $registry, $config, $reviewDiff)) {
             return $analysisSourceSet->analysisUnits;
         }
 
@@ -269,6 +269,7 @@ final readonly class BranchReviewBuilder
     /**
      * Report whether narrowed analysis still has to load whole-tree context for project-level rules.
      *
+     * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options carrying changed-only and changed-region flags.
      * @param RuleRegistry          $registry - Rule registry consulted for any enabled project-wide rule.
      * @param AnalysisConfig        $config - Effective rule and path config for resolving enabled rules.
@@ -277,6 +278,7 @@ final readonly class BranchReviewBuilder
      * @return bool - True when a narrowed run still needs complete context for project-level rules.
      */
     private function shouldLoadProjectContext(
+        string $projectRoot,
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
         AnalysisConfig $config,
@@ -290,7 +292,11 @@ final readonly class BranchReviewBuilder
             return true;
         }
 
-        if ($options->paths !== []) {
+        // A whole-project request ('.', './', or the root path) covers the same tree a bare invocation
+        // does, so it must not trigger the separate full-tree context load that genuinely narrower paths
+        // need; otherwise `analyse . --diff-vs=<ref>` reparses the whole tree twice for the same scope.
+        $requestedPaths = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        if ($requestedPaths !== [] && $requestedPaths !== ['.']) {
             return true;
         }
 

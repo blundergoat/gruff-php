@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.9.1"
+goat-flow-reference-version: "1.9.2"
 ---
 # Browser Evidence Reference
 
@@ -16,6 +16,12 @@ command -v browser-use || command -v browser-use-python
 ```
 
 If found, run `browser-use doctor` (or `browser-use-python -c "import browser_use; print('ok')"` for the venv wrapper). If missing, offer to install: "browser-use is not installed. Want me to install it (`pip install browser-use`)? Or I can work from manual evidence (screenshots, DevTools output) instead." Never install it without approval. If the user declines or installation fails, use the manual fallback section below.
+
+## Intent
+
+A coding agent uses browser evidence to turn a browser-visible claim into observed facts before editing or declaring a fix done. The useful proof is compact: URL, rendered state, screenshot or DOM/text capture, interaction sequence, and the before/after symptom.
+
+Use `browser-use` for one-off observations and simple interactions. For repeatable multi-page capture, stop and load `page-capture.md`; for CI-grade regression coverage, write Playwright tests.
 
 ## Observation Workflow
 
@@ -99,6 +105,16 @@ The browser persists between commands via a background daemon. Close it when don
 - Summarize sensitive network data by method, route shape, status, and sanitized field names only.
 - Screenshot files may contain sensitive rendered content. Save to temporary paths unless the user asked for an artifact.
 
+## Verification Gate
+
+Before using browser evidence as proof:
+
+1. **State was captured at the right time.** Run `browser-use state` after opening the page and again after navigation or major UI changes before relying on element indices.
+2. **Visual claims have a capture.** Pair any rendered-layout, screenshot, or "the UI now shows X" claim with `browser-use screenshot` or scoped DOM/text output.
+3. **Interactions are reproducible.** Record the click/input/key sequence in enough detail that another agent can replay it.
+4. **Fix verification replays the original symptom.** A browser-visible bug is not fixed until the original URL and interaction sequence no longer reproduce it.
+5. **Sensitive data is handled.** Screenshots and copied DOM/network output omit credentials, tokens, cookies, and personal data unless the user explicitly asked for that artifact and it is safe to share.
+
 ## Fallback When browser-use Is Unavailable
 
 When `browser-use` cannot be installed or run, capture equivalent evidence manually:
@@ -114,6 +130,7 @@ Ask the user to provide this evidence. Manual evidence follows the same classifi
 ## Troubleshooting
 
 - **Browser will not start:** `browser-use close` then retry with `browser-use --headed open <url>`
+- **Browser starts then times out in a root/container environment:** run `browser-use close --all`, then retry the same smoke with `IN_DOCKER=true browser-use open <url>` before declaring the wrapper unusable
 - **Local HTML shows an empty DOM:** serve the directory over localhost and open the HTTP URL instead of `file://`
 - **Element not found after state:** `browser-use scroll down` then `browser-use state`
 - **Stale indices after navigation:** re-run `browser-use state`

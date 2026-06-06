@@ -1,22 +1,11 @@
 ---
-goat-flow-reference-version: "1.9.1"
+goat-flow-reference-version: "1.9.2"
 ---
 # Page Capture Reference
 
 Use this when a task requires visiting a list of pages in a real browser, capturing a screenshot of each, and emitting a markdown record per page. Typical triggers: documenting new pages after a feature ships, capturing a UI baseline before a release, recording before/after evidence across multiple pages, or producing an audit-style page snapshot.
 
 Page Capture is the durable batch workflow: scripted, repeatable, evidence-grade. `browser-use` is the right tool for one-off mid-task observation. Playwright (any integration path) plus this reference is the right tool for batch capture across multiple pages with load verification, especially when authentication or framework-specific patterns matter.
-
-## Boundary
-
-| Job | Tool | Reference |
-|---|---|---|
-| Single observation, mid-skill, agent decides what to look at | `browser-use` CLI | `browser-use.md` |
-| Visit N known pages, screenshot each, emit structured MD | Playwright (any integration) | this file |
-| Test-suite-driven evidence (assertion -> screenshot -> record on fail) | Playwright Test + custom reporter | not in goat-flow; see Playwright reporter docs |
-| Crawl/discover pages an agent hasn't seen | `browser-use` with agent loop | `browser-use.md` |
-
-If the task fits row 1 or row 4, stop and load `browser-use.md` instead. If the task fits row 3, document it as a project-level test-runner concern, not a goat-flow workflow.
 
 ## Availability Check
 
@@ -47,7 +36,7 @@ browser-use-python -c "from playwright.sync_api import sync_playwright; print('o
 python -m playwright --version
 ```
 
-If a Python venv exposes Playwright through a `browser-use-python` wrapper (some environments place one on `PATH`, e.g. at `~/.local/bin/browser-use-python`), check it before declaring Playwright unavailable. Otherwise install Python Playwright the standard way — `pip install playwright && python -m playwright install chromium`.
+If a Python venv exposes Playwright through a `browser-use-python` wrapper (some environments place one on `PATH`, e.g. at `~/.local/bin/browser-use-python`), check it before declaring Playwright unavailable. If no Python Playwright path is available, offer to install it with `pip install playwright && python -m playwright install chromium`; never install it without approval.
 
 The agent writes a Python capture script using `playwright.sync_api`, executes it, and reads the output. See "Writing a capture script" below.
 
@@ -66,6 +55,21 @@ Use `browser-use open`, `browser-use screenshot`, `browser-use state`. This path
 See "Fallback When No Playwright Path Is Available" at the bottom.
 
 **If all automated tiers fail,** state which checks were run and their output. Do not silently fall back to a less capable tool.
+
+## Intent
+
+A coding agent uses page capture to create durable, repeatable browser evidence across known pages. The output is not a screenshot gallery; it is an evidence bundle with one markdown record per page, a screenshot path that resolves on disk, load verification, console-error accounting, and an index that makes partial failures visible.
+
+## Boundary
+
+| Job | Tool | Reference |
+|---|---|---|
+| Single observation, mid-skill, agent decides what to look at | `browser-use` CLI | `browser-use.md` |
+| Visit N known pages, screenshot each, emit structured MD | Playwright (any integration) | this file |
+| Test-suite-driven evidence (assertion -> screenshot -> record on fail) | Playwright Test + custom reporter | not in goat-flow; see Playwright reporter docs |
+| Crawl/discover pages an agent hasn't seen | `browser-use` with agent loop | `browser-use.md` |
+
+If the task fits row 1 or row 4, stop and load `browser-use.md` instead. If the task fits row 3, document it as a project-level test-runner concern, not a goat-flow workflow.
 
 ## Writing a Capture Script (Tier 2/3)
 
@@ -187,9 +191,9 @@ After all pages processed, write `<output_dir>/index.md`:
 <list each failure with URL and reason, or "None">
 ```
 
-### Step 4 - Verification Gate
+## Verification Gate
 
-Before claiming the run complete, verify:
+After the per-page loop and index step, verify before claiming the run complete:
 
 - Every URL in the input list has a corresponding MD file or a recorded failure
 - Every screenshot path in every MD file resolves to a real file on disk

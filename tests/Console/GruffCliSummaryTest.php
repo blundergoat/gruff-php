@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Console\Application;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +38,7 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $output = $process->getOutput();
 
-        self::assertStringContainsString('gruff-php 0.3.1 summary', $output);
+        self::assertStringContainsString('gruff-php ' . Application::VERSION . ' summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
         self::assertMatchesRegularExpression('/^Composite: [A-F] \(\d+\.\d{2} \/ 100\)$/m', $output);
         self::assertMatchesRegularExpression(
@@ -108,7 +109,7 @@ final class GruffCliSummaryTest extends TestCase
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);
-        self::assertSame('0.3.1', $tool['version'] ?? null);
+        self::assertSame(Application::VERSION, $tool['version'] ?? null);
 
         $scope = $decoded['scope'] ?? null;
         self::assertIsArray($scope);

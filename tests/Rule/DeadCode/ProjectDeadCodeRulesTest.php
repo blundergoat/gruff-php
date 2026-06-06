@@ -96,6 +96,51 @@ final class ProjectDeadCodeRulesTest extends TestCase
     }
 
     /**
+     * Verify the Symfony `controller:` route shortcut keeps a referenced controller live.
+     *
+     * @return void
+     */
+    public function testSymfonyYamlControllerShortcutKeyKeepsControllerLive(): void
+    {
+        $projectRoot = $this->tempDir();
+
+        try {
+            self::assertTrue(mkdir($projectRoot . '/src/Controller', 0777, true));
+            self::assertTrue(mkdir($projectRoot . '/config', 0777, true));
+            file_put_contents(
+                $projectRoot . '/src/Controller/ShortcutController.php',
+                "<?php\n\nnamespace App\\Controller;\n\nfinal class ShortcutController\n{\n}\n",
+            );
+            file_put_contents(
+                $projectRoot . '/src/Controller/UnwiredController.php',
+                "<?php\n\nnamespace App\\Controller;\n\nfinal class UnwiredController\n{\n}\n",
+            );
+            file_put_contents(
+                $projectRoot . '/config/routes.yaml',
+                "homepage:\n  path: /\n  controller: App\\Controller\\ShortcutController::index\n",
+            );
+
+            $units   = [
+                $this->parseProjectFile($projectRoot, 'src/Controller/ShortcutController.php'),
+                $this->parseProjectFile($projectRoot, 'src/Controller/UnwiredController.php'),
+                $this->parseProjectFile($projectRoot, 'config/routes.yaml'),
+            ];
+            $config  = $this->configWithOptions(
+                UnusedInternalClassRule::ID,
+                ['internalNamespacePrefixes' => ['App\\']],
+            );
+            $symbols = $this->symbolsForRuleWithUnits(UnusedInternalClassRule::ID, $units, $projectRoot, $config);
+
+            // The `controller:` shortcut references ShortcutController, so it is a live route entrypoint;
+            // UnwiredController has no reference and stays flagged, proving the assertion is meaningful.
+            self::assertNotContains('App\\Controller\\ShortcutController', $symbols);
+            self::assertContains('App\\Controller\\UnwiredController', $symbols);
+        } finally {
+            $this->removeDir($projectRoot);
+        }
+    }
+
+    /**
      * Verify unused internal functions are reported while direct and test references count.
      *
      * @return void

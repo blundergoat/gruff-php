@@ -107,6 +107,17 @@ is_env_example_touch() {
   return 1
 }
 
+# True only when a redirect actually writes to .env.example. A bare fd dup
+# (2>&1), a stderr discard (2>/dev/null), or a redirect to some other file is
+# still a read of .env.example, so those must not be treated as writes.
+is_env_example_redirect_write() {
+  local c
+  c=$(strip_shell_quotes_for_path_scan "$1")
+  # The redirect target may carry a path prefix (./ , sub/dir/ , ~/x/ , /abs/),
+  # so allow an optional leading path before the .env.example basename.
+  [[ "$c" =~ (\>|\>\>|\>\|)[[:space:]]*[\'\"]?([^[:space:]>|\'\"]*/)?\.env\.example([[:space:]]|$|[\'\"]) ]]
+}
+
 is_git_ls_files() {
   __goat_git_strip_globals "$1" || return 1
   [[ "$__goat_git_rest" =~ ^ls-files([[:space:]]|$) ]]
@@ -300,7 +311,7 @@ check_secret_segment() {
           env_example_read_only=1
         fi ;;
     esac
-    if [[ "$HAS_REDIRECT" -eq 1 ]]; then
+    if [[ "$HAS_REDIRECT" -eq 1 ]] && is_env_example_redirect_write "$cmd"; then
       env_example_read_only=0
     fi
     if [[ "$HAS_PIPE" -eq 1 ]]; then
