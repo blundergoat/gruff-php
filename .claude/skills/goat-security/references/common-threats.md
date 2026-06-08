@@ -1,5 +1,5 @@
 ---
-goat-flow-reference-version: "1.9.2"
+goat-flow-reference-version: "1.10.1"
 ---
 # goat-security reference: common threats
 

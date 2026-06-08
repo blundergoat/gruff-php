@@ -1,4 +1,4 @@
-# AGENTS.md - project v1.5.1 / goat-flow 1.9.0 (2026-06-01)
+# AGENTS.md - project v1.5.1 / goat-flow 1.10.1 (2026-06-09)
 gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern AI-generated code so a human can verify, trust, and sign off on it (legible, secure, genuinely tested). Current invariant: keep app claims and commands grounded in real source/config files.
 
 ## Truth Order
@@ -7,7 +7,7 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 2. This instruction file
 3. `.goat-flow/architecture.md`
 4. `.goat-flow/code-map.md`
-5. Skills and `.goat-flow/skill-playbooks/` on demand
+5. Skills and `.goat-flow/skill-docs/playbooks/` on demand
 
 ## Autonomy Tiers
 
@@ -28,9 +28,9 @@ gruff-php is an opinionated PHP code-quality analyzer; its mission is to govern 
 
 ## Key Resources
 
-- Learning loop: `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/`
-- Skill reference: `.goat-flow/skill-reference/`
-- Tool playbooks: `.goat-flow/skill-playbooks/README.md`, `.goat-flow/skill-playbooks/browser-use.md`, `.goat-flow/skill-playbooks/page-capture.md`
+- Learning loop: `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/`
+- Skill reference: `.goat-flow/skill-docs/`
+- Tool playbooks: `.goat-flow/skill-docs/playbooks/README.md`, `.goat-flow/skill-docs/playbooks/browser-use.md`, `.goat-flow/skill-docs/playbooks/page-capture.md`
 - Orientation: `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md`
 
 ## Commit Messages
@@ -57,7 +57,7 @@ node node_modules/@blundergoat/goat-flow/dist/cli/cli.js audit . --agent codex -
 When a goat-* skill is active, its Step 0 replaces READ and selects the skill mode/depth. Resume at ACT after Step 0 output.
 
 ### READ
-Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/footguns/`, `.goat-flow/lessons/`, and `.goat-flow/patterns/`; include decisions for architecture, policy, or setup work.
+Read relevant files before changes. For URL, local HTML, localhost, screenshot, rendered UI, or browser-visible behavior, check browser evidence first with `command -v browser-use || command -v browser-use-python`. Before declaring any tool or capability unavailable, read the matching playbook in `.goat-flow/skill-docs/playbooks/` (e.g. `browser-use.md`, `page-capture.md`) and run that doc's "Availability Check" section verbatim - project-local CLI tools at `~/.local/bin/` are valid; do not conflate "no harness/MCP tool" with "no tool". Use grep-first retrieval across `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, and `.goat-flow/learning-loop/patterns/`; include decisions for architecture, policy, or setup work.
 
 ### SCOPE
 Declare files allowed to change, non-goals, and max blast radius before writes. Treat framework setup as limited to goat-flow artifacts and agent-owned config unless the user widens scope.
@@ -75,7 +75,7 @@ Run relevant checks before claiming success. If no app commands exist, say that 
 4. **Hedged claims.** Do not use "should work", "probably fine", "looks good" as verification. These are guesses, not evidence.
 5. **Rule paraphrase.** Do not weaken a rule by restating it with different words. Spirit over letter — paraphrases count as the same constraint.
 
-Rationalisations to reject: see the Excuse / Reality table in `.goat-flow/skill-reference/skill-preamble.md`. If you catch yourself thinking the Excuse, run the proof or mark the claim **UNVERIFIED**.
+Rationalisations to reject: see the Excuse / Reality table in `.goat-flow/skill-docs/skill-preamble.md`. If you catch yourself thinking the Excuse, run the proof or mark the claim **UNVERIFIED**.
 
 ## Definition of Done
 
@@ -87,7 +87,7 @@ Rationalisations to reject: see the Excuse / Reality table in `.goat-flow/skill-
 
 ## Artifact Routing
 
-Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lessons/<category>.md`; decisions in `.goat-flow/decisions/ADR-NNN.md`; patterns in `.goat-flow/patterns/<category>.md`. Read the target directory README before adding artifacts.
+Footguns go in `.goat-flow/learning-loop/footguns/<category>.md`; lessons in `.goat-flow/learning-loop/lessons/<category>.md`; decisions in `.goat-flow/learning-loop/decisions/ADR-NNN.md`; patterns in `.goat-flow/learning-loop/patterns/<category>.md`. Read the target directory README before adding artifacts.
 
 ## Router Table
 
@@ -95,13 +95,13 @@ Footguns go in `.goat-flow/footguns/<category>.md`; lessons in `.goat-flow/lesso
 |----------|------|
 | Codex instruction file | `AGENTS.md` |
 | Claude peer instruction file | `CLAUDE.md` |
-| Learning loop | `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, `.goat-flow/decisions/` |
-| Skill reference (meta) | `.goat-flow/skill-reference/` |
-| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-playbooks/` - read BEFORE declaring a tool unavailable |
+| Learning loop | `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, `.goat-flow/learning-loop/decisions/` |
+| Skill reference (meta) | `.goat-flow/skill-docs/` |
+| Tool playbooks (CLI/MCP availability checks: browser-use, page-capture, skill-quality-testing) | `.goat-flow/skill-docs/playbooks/` - read BEFORE declaring a tool unavailable |
 | Orientation | `.goat-flow/architecture.md`, `.goat-flow/code-map.md`, `.goat-flow/glossary.md` |
 | Codex skills/config | `.agents/skills/`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/hooks/` |
 | Claude skills/config | `.claude/skills/`, `.claude/settings.json`, `.claude/hooks/` |
-| Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/tasks/`, `.goat-flow/scratchpad/` |
+| Local workspace notes | `.goat-flow/logs/sessions/`, `.goat-flow/plans/`, `.goat-flow/scratchpad/` |
 | Commit guidance | `docs/coding-standards/git-commit.md` |
 | Project entry docs | `README.md` |
-| Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |
+| Mission / philosophy | `docs/mission.md` (rationale); `.goat-flow/learning-loop/decisions/ADR-017-mission-govern-ai-generated-code.md` (decision) |
