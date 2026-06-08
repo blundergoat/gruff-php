@@ -11,9 +11,24 @@ use GruffPhp\Finding\Finding;
  */
 final readonly class HookFindingScope
 {
+    /**
+     * Finding attributable to a single edited line.
+     */
     public const LINE    = 'line';
+
+    /**
+     * Finding attributable to one symbol such as a method, function, or class span.
+     */
     public const SYMBOL  = 'symbol';
+
+    /**
+     * Finding that describes the whole source file rather than one location.
+     */
     public const FILE    = 'file';
+
+    /**
+     * Finding with no single file location, reported across the project.
+     */
     public const PROJECT = 'project';
 
     /**

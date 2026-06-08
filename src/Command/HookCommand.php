@@ -38,6 +38,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 final class HookCommand extends Command
 {
+    /**
+     * Contract version advertised in every hook payload and capability probe.
+     */
     private const CONTRACT_VERSION = 'gruff.hook.v1';
 
     /**
@@ -52,13 +55,13 @@ final class HookCommand extends Command
             ->setDescription('Run gruff-php using the cross-analyzer agent-hook contract.')
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or directories to analyse.')
             ->addOption('file', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'File to analyse. Can be repeated.')
-            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format. Hook mode supports json.', 'json')
+            ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Output format. Hook mode supports json.', default: 'json')
             ->addOption('capabilities', null, InputOption::VALUE_NONE, 'Print hook capabilities and exit.')
             ->addOption('config', null, InputOption::VALUE_REQUIRED, 'Path to a gruff YAML config file (.yaml or .yml).')
             ->addOption('no-config', null, InputOption::VALUE_NONE, 'Skip auto-applying the default .gruff-php.yaml file for this run.')
             ->addOption('include-ignored', null, InputOption::VALUE_NONE, 'Scan ignored files by using filesystem traversal instead of Git/default ignores.')
             ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Explicit changed line ranges, e.g. 3-3,8-10.')
-            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope. Hook mode supports symbol.', 'symbol')
+            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope. Hook mode supports symbol.', default: 'symbol')
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Use a git diff mode/base ref for changed regions and new-only filtering.')
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Use a git base ref for changed regions and new-only filtering.')
             ->addOption('baseline', null, InputOption::VALUE_REQUIRED, 'Path to a prior gruff.hook.v1 JSON report for new-only filtering.')
@@ -141,8 +144,8 @@ final class HookCommand extends Command
                     findings:        $filterResult->findings,
                     suppressedCount: $filterResult->suppressedCount,
                     ignoredPathRows: $analysis['sources']->discovery->ignoredPathDetails,
-                    configSchemaOk:  true,
-                    configError:     null,
+                    isConfigSchemaOk: true,
+                    configError:      null,
                 ),
             );
 
@@ -209,10 +212,34 @@ final class HookCommand extends Command
         $includeRules = $this->stringListOption($input, 'include-rule');
         $excludeRules = $this->stringListOption($input, 'exclude-rule');
         if ($includeRules !== [] || $excludeRules !== []) {
-            $config = $config->withRuleSelection(new RuleSelection(rules: $includeRules, excludeRules: $excludeRules));
+            $config = $config->withRuleSelection($this->refinedSelection($config->ruleSelection(), $includeRules, $excludeRules));
         }
 
         return $config;
+    }
+
+    /**
+     * Layer hook --include-rule/--exclude-rule onto the project's existing rule selection.
+     *
+     * Replacing the selection outright drops a configured selection.rules narrowing: an empty include
+     * list means "all rules", so a bare --exclude-rule would widen a focused config to the whole rule
+     * set. Preserve the configured tiers/pillars/includes and only add the hook's filters on top.
+     *
+     * @param RuleSelection $existing     - Selection already resolved from the project config.
+     * @param list<string>  $includeRules - Hook --include-rule ids; when non-empty they focus the run.
+     * @param list<string>  $excludeRules - Hook --exclude-rule ids dropped on top of the existing selection.
+     *
+     * @return RuleSelection - Selection that keeps the configured scope while applying the hook filters.
+     */
+    private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
+    {
+        return new RuleSelection(
+            tiers:          $existing->tiers,
+            pillars:        $existing->pillars,
+            rules:          $includeRules !== [] ? $includeRules : $existing->rules,
+            excludePillars: $existing->excludePillars,
+            excludeRules:   array_values(array_unique([...$existing->excludeRules, ...$excludeRules])),
+        );
     }
 
     /**
@@ -439,7 +466,13 @@ final class HookCommand extends Command
             throw new RuntimeException(sprintf('Unable to read hook baseline: %s', $baselinePath));
         }
 
-        $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        try {
+            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            // A malformed --baseline file is an operational error; surface it in-band rather than crashing the contract.
+            throw new RuntimeException(sprintf('Hook baseline is not valid JSON: %s', $baselinePath), 0, $exception);
+        }
+
         if (!is_array($decoded)) {
             throw new RuntimeException(sprintf('Hook baseline is not a JSON object: %s', $baselinePath));
         }
@@ -543,7 +576,7 @@ final class HookCommand extends Command
      * @param list<Finding>     $findings        - Findings to render.
      * @param int               $suppressedCount - Hook suppression count.
      * @param list<IgnoredPath> $ignoredPathRows - Ignored path records.
-     * @param bool              $configSchemaOk  - Whether config loaded cleanly.
+     * @param bool              $isConfigSchemaOk - Whether config loaded cleanly.
      * @param string|null       $configError     - Config or operational error message.
      *
      * @return array<string, mixed> - Hook report.
@@ -552,7 +585,7 @@ final class HookCommand extends Command
         array $findings,
         int $suppressedCount,
         array $ignoredPathRows,
-        bool $configSchemaOk,
+        bool $isConfigSchemaOk,
         ?string $configError,
     ): array {
         $presenter = new HookFindingPresenter();
@@ -578,7 +611,7 @@ final class HookCommand extends Command
                 ),
             ],
             'config' => [
-                'schemaOk' => $configSchemaOk,
+                'schemaOk' => $isConfigSchemaOk,
                 'error' => $configError,
             ],
         ];
@@ -587,12 +620,12 @@ final class HookCommand extends Command
     /**
      * Build an empty hook report, usually for an operational/config error before analysis.
      *
-     * @param bool        $configSchemaOk - Config status.
+     * @param bool        $isConfigSchemaOk - Config status.
      * @param string|null $configError    - Error message.
      *
      * @return array<string, mixed> - Empty hook report.
      */
-    private function emptyReport(bool $configSchemaOk, ?string $configError): array
+    private function emptyReport(bool $isConfigSchemaOk, ?string $configError): array
     {
         return [
             'contractVersion' => self::CONTRACT_VERSION,
@@ -608,7 +641,7 @@ final class HookCommand extends Command
                 'paths' => [],
             ],
             'config' => [
-                'schemaOk' => $configSchemaOk,
+                'schemaOk' => $isConfigSchemaOk,
                 'error' => $configError,
             ],
         ];
@@ -645,6 +678,7 @@ final class HookCommand extends Command
                 continue;
             }
 
+            // Accept a single 1-based line ("8") or an inclusive range ("3-8"); group 2 holds the optional end bound.
             if (!preg_match('/^(\d+)(?:-(\d+))?$/', $part, $matches)) {
                 throw new DiffException(sprintf('Invalid --changed-ranges value "%s". Use ranges like "3-3,8-10".', $ranges));
             }
@@ -675,7 +709,7 @@ final class HookCommand extends Command
      */
     private function paths(InputInterface $input): array
     {
-        /** @var list<string> $paths */
+        /** @var list<string> $paths The paths argument is declared variadic, so the console returns a list of strings. */
         $paths = $input->getArgument('paths');
         foreach ($this->stringListOption($input, 'file') as $filePath) {
             $paths[] = $filePath;
@@ -697,9 +731,9 @@ final class HookCommand extends Command
             return null;
         }
 
-        $value = $input->getOption('diff');
+        $diffOption = $input->getOption('diff');
 
-        return is_string($value) && $value !== '' ? $value : 'working-tree';
+        return is_string($diffOption) && $diffOption !== '' ? $diffOption : 'working-tree';
     }
 
     /**
@@ -712,9 +746,9 @@ final class HookCommand extends Command
      */
     private function stringOption(InputInterface $input, string $name): ?string
     {
-        $value = $input->getOption($name);
+        $rawOption = $input->getOption($name);
 
-        return is_string($value) && $value !== '' ? $value : null;
+        return is_string($rawOption) && $rawOption !== '' ? $rawOption : null;
     }
 
     /**

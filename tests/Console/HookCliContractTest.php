@@ -80,7 +80,8 @@ final class HookCliContractTest extends CliTestCase
             ]);
             $changedFindings = $this->findingRows($changedReport);
             self::assertNull($this->firstFindingByRule($changedFindings, 'size.file-length'));
-            self::assertSame(2, $this->suppressedCount($changedReport));
+            $expectedSuppressedCount = 2;
+            self::assertSame($expectedSuppressedCount, $this->suppressedCount($changedReport));
             self::assertSame(['Example::empty()'], $this->symbols($changedFindings));
 
             [, $anchorReport] = $this->runHook($tempDir, [
@@ -138,7 +139,8 @@ final class HookCliContractTest extends CliTestCase
 
             $metadata = $fileLength['metadata'] ?? null;
             self::assertIsArray($metadata);
-            self::assertSame(12, $metadata['measured'] ?? null);
+            $expectedMeasuredLines = 12;
+            self::assertSame($expectedMeasuredLines, $metadata['measured'] ?? null);
             self::assertSame(5, $metadata['threshold'] ?? null);
             self::assertSame('lines', $metadata['unit'] ?? null);
             self::assertSame('above', $metadata['direction'] ?? null);
@@ -441,6 +443,82 @@ YAML);
     }
 
     /**
+     * Verify a malformed --baseline file returns the in-band hook error instead of crashing the contract.
+     *
+     * Regression: json_decode(JSON_THROW_ON_ERROR) on the baseline raised an uncaught JsonException that
+     * escaped the DiffException|RuntimeException handler, breaking the JSON contract on a common operational error.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testHookReturnsInBandErrorForMalformedBaseline(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/gruff-test.yaml', $this->focusedConfig(5, false));
+            file_put_contents($tempDir . '/Example.php', $this->oversizedSource(9));
+            file_put_contents($tempDir . '/baseline.json', '{ not valid json');
+
+            [$process, $report] = $this->runHook($tempDir, [
+                'hook',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--baseline',
+                'baseline.json',
+                '--format',
+                'json',
+            ]);
+
+            self::assertSame(2, $process->getExitCode());
+            self::assertSame('gruff.hook.v1', $report['contractVersion'] ?? null);
+            $config = $report['config'] ?? null;
+            self::assertIsArray($config);
+            self::assertIsString($config['error'] ?? null);
+            self::assertStringContainsString('baseline', $config['error']);
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify --exclude-rule drops only the named rule and preserves the configured selection.
+     *
+     * Regression: an empty include list means "all rules", so replacing the config selection with a
+     * bare --exclude-rule widened a focused config to the whole rule set instead of removing one rule.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testHookExcludeRulePreservesConfiguredSelection(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/gruff-test.yaml', $this->focusedConfig(5));
+            file_put_contents($tempDir . '/Example.php', $this->fileAndSymbolSource());
+
+            [, $report] = $this->runHook($tempDir, [
+                'hook',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--exclude-rule',
+                'size.file-length',
+                '--format',
+                'json',
+            ]);
+
+            $ruleIds = $this->ruleIds($this->findingRows($report));
+            self::assertNotContains('size.file-length', $ruleIds);
+            self::assertSame(['waste.empty-method'], array_values(array_unique($ruleIds)));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * Run the gruff CLI hook command.
      *
      * @param string       $cwd  - Working directory.
@@ -461,13 +539,13 @@ YAML);
      * Return a focused config for hook tests.
      *
      * @param int  $fileLengthThreshold - Size threshold.
-     * @param bool $includeWaste        - Whether to include the empty-method rule.
+     * @param bool $shouldIncludeWaste  - Whether to include the empty-method rule.
      *
      * @return string - YAML config.
      */
-    private function focusedConfig(int $fileLengthThreshold, bool $includeWaste = true): string
+    private function focusedConfig(int $fileLengthThreshold, bool $shouldIncludeWaste = true): string
     {
-        $rules = $includeWaste
+        $rules = $shouldIncludeWaste
             ? "        - size.file-length\n        - waste.empty-method\n"
             : "        - size.file-length\n";
 
@@ -636,7 +714,7 @@ PHP;
         $findings = $report['findings'] ?? null;
         self::assertIsArray($findings);
 
-        /** @var list<array<string, mixed>> $findings */
+        /** @var list<array<string, mixed>> $findings Decoded JSON finding rows, asserted as an array above. */
         return $findings;
     }
 

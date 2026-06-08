@@ -64,7 +64,7 @@ final readonly class HookFindingIdentity
      * @param Finding $finding - Native finding.
      * @param string  $scope   - Hook scope for the finding.
      *
-     * @return array<string, mixed>|string|null - qualitative identity detail.
+     * @return array<string, bool|float|int|string|null>|string|null - qualitative identity detail.
      */
     private static function qualifier(Finding $finding, string $scope): array|string|null
     {

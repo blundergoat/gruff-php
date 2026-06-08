@@ -24,19 +24,19 @@ final readonly class HookFindingPresenter
     {
         $scope   = HookFindingScope::classify($finding);
         $payload = [
-            'ruleId' => $finding->ruleId,
-            'pillar' => $finding->pillar->value,
-            'severity' => $finding->severity->value,
-            'scope' => $scope,
-            'file' => $finding->filePath,
-            'line' => $finding->line,
-            'endLine' => $finding->endLine,
-            'symbol' => $finding->symbol,
-            'message' => $finding->message,
-            'remediation' => $finding->remediation ?? $this->fallbackRemediation($finding),
-            'metadata' => $this->metadata($finding),
+            'ruleId'         => $finding->ruleId,
+            'pillar'         => $finding->pillar->value,
+            'severity'       => $finding->severity->value,
+            'scope'          => $scope,
+            'file'           => $finding->filePath,
+            'line'           => $finding->line,
+            'endLine'        => $finding->endLine,
+            'symbol'         => $finding->symbol,
+            'message'        => $finding->message,
+            'remediation'    => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
+            'metadata'       => $this->metadata($finding),
             'stableIdentity' => HookFindingIdentity::forFinding($finding, $scope),
-            'fingerprint' => $finding->fingerprint(),
+            'fingerprint'    => $finding->fingerprint(),
         ];
 
         if ($payload['metadata'] === []) {
@@ -67,8 +67,8 @@ final readonly class HookFindingPresenter
 
                 return self::severityRank($rightSeverity) <=> self::severityRank($leftSeverity)
                     ?: strcmp($leftFile, $rightFile)
-                    ?: $leftLine <=> $rightLine
-                    ?: strcmp(is_string($left['ruleId'] ?? null) ? $left['ruleId'] : '', is_string($right['ruleId'] ?? null) ? $right['ruleId'] : '');
+                        ?: $leftLine <=> $rightLine
+                            ?: strcmp(is_string($left['ruleId'] ?? null) ? $left['ruleId'] : '', is_string($right['ruleId'] ?? null) ? $right['ruleId'] : '');
             },
         );
 
@@ -92,9 +92,9 @@ final readonly class HookFindingPresenter
 
         $measured   = $this->measuredValue($finding);
         $normalized = [
-            'measured' => $measured,
+            'measured'  => $measured,
             'threshold' => $metadata['threshold'],
-            'unit' => $this->unit($finding),
+            'unit'      => $this->unit($finding),
             'direction' => $this->direction($finding),
         ];
 
@@ -187,18 +187,6 @@ final readonly class HookFindingPresenter
     private function direction(Finding $finding): string
     {
         return $finding->ruleId === 'complexity.maintainability-index' ? 'below' : 'above';
-    }
-
-    /**
-     * Fallback remediation for older findings that lack a native remediation string.
-     *
-     * @param Finding $finding - Native finding.
-     *
-     * @return string - Non-empty remediation text.
-     */
-    private function fallbackRemediation(Finding $finding): string
-    {
-        return sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId);
     }
 
     /**

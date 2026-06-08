@@ -55,7 +55,7 @@ final readonly class HookFindingFilter
                 continue;
             }
 
-            if ($this->intersectsChangedRegion($finding, $changedRegion)) {
+            if ($this->touchesChangedRegion($finding, $changedRegion)) {
                 $kept[] = $finding;
                 continue;
             }
@@ -74,7 +74,7 @@ final readonly class HookFindingFilter
      *
      * @return bool - True when the finding is attributable to the changed region.
      */
-    private function intersectsChangedRegion(Finding $finding, DiffResult $changedRegion): bool
+    private function touchesChangedRegion(Finding $finding, DiffResult $changedRegion): bool
     {
         if (!in_array($finding->filePath, $changedRegion->changedFiles, true)) {
             return false;

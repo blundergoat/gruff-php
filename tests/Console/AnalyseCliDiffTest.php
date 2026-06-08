@@ -281,27 +281,14 @@ PATCH
         try {
             $this->writeSizeAggregateFixture($tempDir);
 
-            $report = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '30-30',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $report = $this->runChangedScopeAnalyse($tempDir, '30-30', 'symbol');
 
-            $ruleIds = $this->ruleIdsFromJsonFindings($this->findingRows($report));
+            $ruleIds            = $this->ruleIdsFromJsonFindings($this->findingRows($report));
+            $expectedSuppressed = 5;
 
             self::assertSame(['size.method-length', 'size.parameter-count'], $ruleIds);
-            self::assertSame(5, $this->suppressedCount($report));
-            self::assertSame(5, $this->diffSuppressedCount($report));
+            self::assertSame($expectedSuppressed, $this->suppressedCount($report));
+            self::assertSame($expectedSuppressed, $this->diffSuppressedCount($report));
         } finally {
             $this->removeDir($tempDir);
         }
@@ -313,45 +300,17 @@ PATCH
      * @return void
      * @throws JsonException
      */
-    public function testAnalyseCommandChangedRangesSymbolScopeKeepsAggregateFindingWhenAnchorChanges(): void
+    public function testAnalyseCommandChangedRangesSymbolScopeKeepsAggregateFindingOnAnchorEdit(): void
     {
         $tempDir = $this->tempDir();
 
         try {
             $this->writeSizeAggregateFixture($tempDir);
 
-            $fileAnchorReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '1-1',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $fileAnchorReport = $this->runChangedScopeAnalyse($tempDir, '1-1', 'symbol');
             self::assertSame(['size.file-length'], $this->ruleIdsFromJsonFindings($this->findingRows($fileAnchorReport)));
 
-            $classAnchorReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '7-7',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $classAnchorReport = $this->runChangedScopeAnalyse($tempDir, '7-7', 'symbol');
             self::assertSame(
                 [
                     'size.average-method-length',
@@ -379,21 +338,7 @@ PATCH
         try {
             $this->writeSizeAggregateFixture($tempDir);
 
-            $report = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '30-30',
-                '--changed-scope',
-                'file',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $report = $this->runChangedScopeAnalyse($tempDir, '30-30', 'file');
 
             self::assertSame(
                 [
@@ -458,58 +403,16 @@ PATCH
         try {
             $this->writeTodoDensityFixture($tempDir);
 
-            $outOfAnchorReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '12-12',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $outOfAnchorReport = $this->runChangedScopeAnalyse($tempDir, '12-12', 'symbol');
             self::assertSame([], $this->findingRows($outOfAnchorReport));
             self::assertSame(1, $this->suppressedCount($outOfAnchorReport));
             self::assertSame(1, $this->diffSuppressedCount($outOfAnchorReport));
 
-            $anchorReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '9-9',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $anchorReport = $this->runChangedScopeAnalyse($tempDir, '9-9', 'symbol');
             self::assertSame(['docs.todo-density'], $this->ruleIdsFromJsonFindings($this->findingRows($anchorReport)));
             self::assertSame(0, $this->suppressedCount($anchorReport));
 
-            $fileScopeReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'Example.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '12-12',
-                '--changed-scope',
-                'file',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
+            $fileScopeReport = $this->runChangedScopeAnalyse($tempDir, '12-12', 'file');
             self::assertSame(['docs.todo-density'], $this->ruleIdsFromJsonFindings($this->findingRows($fileScopeReport)));
             self::assertSame(0, $this->suppressedCount($fileScopeReport));
         } finally {
@@ -635,6 +538,35 @@ PATCH
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
 
         return $this->decodeJsonOutput($process);
+    }
+
+    /**
+     * Run a changed-region analyse over the fixture's Example.php and decode the report.
+     *
+     * @param string $workingDirectory - Project root to run the command in.
+     * @param string $ranges           - Value passed to --changed-ranges.
+     * @param string $scope            - Value passed to --changed-scope.
+     *
+     * @return array<string, mixed> - Decoded JSON report.
+     * @throws JsonException
+     */
+    private function runChangedScopeAnalyse(string $workingDirectory, string $ranges, string $scope): array
+    {
+        return $this->runJsonAnalyse($workingDirectory, [
+            'analyse',
+            'Example.php',
+            '--config',
+            'gruff-test.yaml',
+            '--no-baseline',
+            '--changed-ranges',
+            $ranges,
+            '--changed-scope',
+            $scope,
+            '--format',
+            'json',
+            '--fail-on',
+            'none',
+        ]);
     }
 
     /**
