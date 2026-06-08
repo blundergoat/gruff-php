@@ -2,8 +2,7 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
-
-## 0.3.1 - 2026-06-08
+## 0.3.1 - 2026-06-09
 
 0.3.1 adds the `gruff.hook.v1` agent-hook contract (`gruff-php hook --format json`) for editor and coding-agent integrations, plus one conservative test-quality rule, fixes Symfony YAML route and changed-region accounting edges in project-wide dead-code analysis, and moves the headline numbers to the top of text reports. No breaking changes; JSON schemas, config format, and baselines are unchanged.
 
