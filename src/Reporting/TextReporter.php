@@ -32,18 +32,28 @@ final readonly class TextReporter
     public function render(AnalysisReport $report): string
     {
         $counts = $report->findingCounts();
-        $lines  = [
-            sprintf('%s %s', AnalysisReport::TOOL_NAME, $report->toolVersion),
-            sprintf('Format: %s', $report->format),
-            sprintf('Fail threshold: %s', $report->failOn),
-            '',
-            'Files',
-            sprintf('  Discovered: %d', $report->filesDiscovered),
-            sprintf('  Parsed: %d', $report->filesParsed),
-            sprintf('  Ignored: %d', count($report->ignoredPaths)),
-            sprintf('  Missing: %d', count($report->missingPaths)),
-            sprintf('  Parse errors: %d', $report->parseErrorCount()),
-        ];
+        $lines  = [sprintf('%s %s analyse', AnalysisReport::TOOL_NAME, $report->toolVersion)];
+
+        if ($report->score !== null) {
+            $lines[] = sprintf('Composite: %s (%.2f / 100)', $report->score->composite->letter, $report->score->composite->score);
+        }
+
+        $lines[] = sprintf(
+            'Findings: %d total · %d error · %d warning · %d advisory',
+            $counts['total'],
+            $counts['error'],
+            $counts['warning'],
+            $counts['advisory'],
+        );
+        $lines[] = sprintf('Format: %s', $report->format);
+        $lines[] = sprintf('Fail threshold: %s', $report->failOn);
+        $lines[] = '';
+        $lines[] = 'Files';
+        $lines[] = sprintf('  Discovered: %d', $report->filesDiscovered);
+        $lines[] = sprintf('  Parsed: %d', $report->filesParsed);
+        $lines[] = sprintf('  Ignored: %d', count($report->ignoredPaths));
+        $lines[] = sprintf('  Missing: %d', count($report->missingPaths));
+        $lines[] = sprintf('  Parse errors: %d', $report->parseErrorCount());
 
         $this->appendPathSection($lines, 'Ignored paths', $report->ignoredPaths);
         $this->appendPathSection($lines, 'Missing paths', $report->missingPaths);
@@ -57,13 +67,6 @@ final readonly class TextReporter
 
         $lines[] = '';
         $lines[] = 'Summary';
-        $lines[] = sprintf(
-            '  Findings: %d (advisory: %d, warning: %d, error: %d)',
-            $counts['total'],
-            $counts['advisory'],
-            $counts['warning'],
-            $counts['error'],
-        );
         $lines[] = sprintf('  Exit code: %d', $report->exitCode);
 
         if ($report->failureReason !== null) {
@@ -224,11 +227,6 @@ final readonly class TextReporter
 
         $lines[] = '';
         $lines[] = 'Score';
-        $lines[] = sprintf(
-            '  Composite: %s (%.2f/100)',
-            $report->score->composite->letter,
-            $report->score->composite->score,
-        );
         $lines[] = sprintf('  Scope: %s', $report->score->scope);
         $lines[] = sprintf('  Score drivers: %s', $report->score->explanation);
 

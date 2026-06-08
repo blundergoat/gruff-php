@@ -122,6 +122,7 @@ use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
@@ -297,6 +298,7 @@ final class RuleRegistry
                             new SetupBloatRule(),
                             new SkippedWithoutReasonRule(),
                             new SleepInTestRule(),
+                            new StaticAnalysisRedundantTestRule(),
                             new SutNotCalledRule(),
                             new TautologicalTypeAssertionRule(),
                             new TestLongerThanSutRule(),
@@ -405,6 +407,26 @@ final class RuleRegistry
         }
 
         return false;
+    }
+
+    /**
+     * Return enabled rule ids whose findings come from project-wide analysis.
+     *
+     * @param AnalysisConfig $config - Config used to filter registered rules.
+     *
+     * @return list<string> - Enabled ProjectRuleInterface ids in registry order.
+     */
+    public function enabledProjectRuleIds(AnalysisConfig $config): array
+    {
+        $ruleIds = [];
+
+        foreach ($this->enabledRules($config) as $rule) {
+            if ($rule instanceof ProjectRuleInterface) {
+                $ruleIds[] = $rule->definition()->id;
+            }
+        }
+
+        return $ruleIds;
     }
 
     /**
@@ -527,12 +549,16 @@ final class RuleRegistry
         RuleContext         $ruleContext,
         ?RuleRunnerObserver $ruleRunnerObserver,
     ): void {
-        if ($analysisUnit->hasParseErrors() || !$analysisUnit->file->isPhp()) {
+        if ($analysisUnit->hasParseErrors()) {
             return;
         }
 
+        $isPhp = $analysisUnit->file->isPhp();
         foreach ($this->enabledRules($ruleContext->config) as $rule) {
             if (!$rule instanceof ProjectRuleAccumulator) {
+                continue;
+            }
+            if (!$isPhp && !$rule instanceof ProjectSourceTextRuleAccumulator) {
                 continue;
             }
 

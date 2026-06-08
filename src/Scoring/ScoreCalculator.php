@@ -197,7 +197,7 @@ final readonly class ScoreCalculator
                 continue;
             }
 
-            if ($pillarName === Pillar::Mutation->value && $mutationAnalysisResult instanceof MutationAnalysisResult) {
+            if ($pillarName === Pillar::Mutation->value) {
                 $mutationFindings = array_values(array_filter(
                                                      $findings,
                                                      static fn(Finding $finding): bool => $finding->pillar === Pillar::Mutation,

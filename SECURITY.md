@@ -8,8 +8,8 @@ Treat analyzer output as sensitive when scanning private code.
 
 | Version | Supported |
 | --- | --- |
-| `0.1.x` | Supported. |
-| `<0.1.0` | Development snapshots only. |
+| Current `0.3.x` release line | Supported. |
+| Older development snapshots | Best effort only. |
 
 ## Reporting A Vulnerability
 

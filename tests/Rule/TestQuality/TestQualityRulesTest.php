@@ -7,7 +7,9 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
 use GruffPhp\Config\RuleSettings;
+use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
+use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
 use GruffPhp\Rule\RuleContext;
@@ -33,6 +35,7 @@ use GruffPhp\Rule\TestQuality\RepeatedStructureMissingDataProviderRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TautologicalTypeAssertionRule;
 use GruffPhp\Rule\TestQuality\TestdoxReadabilityRule;
@@ -43,6 +46,7 @@ use GruffPhp\Rule\TestQuality\TrivialAssertionRule;
 use GruffPhp\Rule\TestQuality\TrivialSnapshotRule;
 use GruffPhp\Rule\TestQuality\UnusedMockRule;
 use GruffPhp\Source\SourceFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -277,6 +281,7 @@ final class TestQualityRulesTest extends TestCase
         self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 0, $findings);
         self::assertRuleCount(UnusedMockRule::ID, 0, $findings);
         self::assertRuleCount(ExceptionTypeOnlyRule::ID, 0, $findings);
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $findings);
         self::assertRuleCount(TautologicalTypeAssertionRule::ID, 0, $findings);
         self::assertRuleCount(GlobalStateMutationRule::ID, 0, $findings);
         self::assertRuleCount(MockWithoutExpectationRule::ID, 0, $findings);
@@ -289,75 +294,37 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify extends production class detected and allows test case descendants.
+     * Verify each single-rule fixture emits exactly the expected finding count.
+     *
+     * @param string $fixture - Fixture path under tests/Fixtures/TestQuality to analyse.
+     * @param string $ruleId - Rule identifier whose findings are counted.
+     * @param int    $expectedCount - Exact number of findings the rule must emit on the fixture.
      *
      * @return void
      */
-    public function testExtendsProductionClassDetectedAndAllowsTestCaseDescendants(): void
+    #[DataProvider('singleRuleFixtureProvider')]
+    public function testSingleRuleFixtureEmitsExpectedCount(string $fixture, string $ruleId, int $expectedCount): void
     {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/extends-production.php');
-
-        self::assertRuleCount(ExtendsProductionClassRule::ID, 1, $findings);
+        self::assertRuleCount($ruleId, $expectedCount, $this->analysePath($fixture));
     }
 
     /**
-     * Verify test method too long detected and ignores whitespace lines.
+     * Provide single-rule fixtures paired with the exact finding count each rule must emit. Each exact count also
+     * pins the negative half of the fixture (the allowed shapes that must stay unflagged).
      *
-     * @return void
+     * @return array<string, array{0: string, 1: string, 2: int}> - Rows of fixture path, rule id, and expected finding count.
      */
-    public function testTestMethodTooLongDetectedAndIgnoresWhitespaceLines(): void
+    public static function singleRuleFixtureProvider(): array
     {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/test-method-too-long.php');
-
-        self::assertRuleCount(TestMethodTooLongRule::ID, 1, $findings);
-    }
-
-    /**
-     * Verify empty data provider detected and yielding provider is allowed.
-     *
-     * @return void
-     */
-    public function testEmptyDataProviderDetectedAndYieldingProviderIsAllowed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/empty-data-provider.php');
-
-        self::assertRuleCount(EmptyDataProviderRule::ID, 2, $findings);
-    }
-
-    /**
-     * Verify loop assertion without message detected and assertion with message allowed.
-     *
-     * @return void
-     */
-    public function testLoopAssertionWithoutMessageDetectedAndAssertionWithMessageAllowed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/loop-assertion-without-message.php');
-
-        self::assertRuleCount(LoopAssertionWithoutMessageRule::ID, 3, $findings);
-    }
-
-    /**
-     * Verify unused mock detected and used mocks allowed.
-     *
-     * @return void
-     */
-    public function testUnusedMockDetectedAndUsedMocksAllowed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/unused-mock.php');
-
-        self::assertRuleCount(UnusedMockRule::ID, 2, $findings);
-    }
-
-    /**
-     * Verify exception type only detected and paired assertions allowed.
-     *
-     * @return void
-     */
-    public function testExceptionTypeOnlyDetectedAndPairedAssertionsAllowed(): void
-    {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/exception-type-only.php');
-
-        self::assertRuleCount(ExceptionTypeOnlyRule::ID, 1, $findings);
+        return [
+            'extends-production flags its production-class parent' => ['tests/Fixtures/TestQuality/extends-production.php', ExtendsProductionClassRule::ID, 1],
+            'test-method-too-long flags one oversized method' => ['tests/Fixtures/TestQuality/test-method-too-long.php', TestMethodTooLongRule::ID, 1],
+            'empty-data-provider flags two empty providers' => ['tests/Fixtures/TestQuality/empty-data-provider.php', EmptyDataProviderRule::ID, 2],
+            'loop-assertion-without-message flags three messageless loop assertions' => ['tests/Fixtures/TestQuality/loop-assertion-without-message.php', LoopAssertionWithoutMessageRule::ID, 3],
+            'unused-mock flags two unused mocks' => ['tests/Fixtures/TestQuality/unused-mock.php', UnusedMockRule::ID, 2],
+            'exception-type-only flags one type-only expectation' => ['tests/Fixtures/TestQuality/exception-type-only.php', ExceptionTypeOnlyRule::ID, 1],
+            'global-state-mutation flags three leaks in the leaky class' => ['tests/Fixtures/TestQuality/global-state-mutation.php', GlobalStateMutationRule::ID, 3],
+        ];
     }
 
     /**
@@ -373,16 +340,59 @@ final class TestQualityRulesTest extends TestCase
     }
 
     /**
-     * Verify global state mutation detected and cleaned up class allowed.
+     * Verify static-analysis-redundant candidates carry evidence and leave behavior clean.
      *
      * @return void
      */
-    public function testGlobalStateMutationDetectedAndCleanedUpClassAllowed(): void
+    public function testStaticAnalysisRedundantCandidatesDetectedWithEvidence(): void
     {
-        $findings = $this->analysePath('tests/Fixtures/TestQuality/global-state-mutation.php');
+        $findings = array_values(array_filter(
+                                     $this->analysePath('tests/Fixtures/TestQuality/static-analysis-redundant-test.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === StaticAnalysisRedundantTestRule::ID,
+                                 ));
 
-        // 3 mutations in the leaky class (superglobal write + putenv + ini_set), 0 in classes with local or inherited cleanup, 0 in the read-only class.
-        self::assertRuleCount(GlobalStateMutationRule::ID, 3, $findings);
+        self::assertCount(6, $findings);
+        self::assertSame(
+            [
+                'class_exists',
+                'enum_exists',
+                'interface_exists',
+                'method_exists',
+                'property_exists',
+                'trait_exists',
+            ],
+            $this->stringMetadataValues($findings, 'variant'),
+        );
+        self::assertSame(
+            [
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeContract',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService::$label',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeService::label()',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeStatus',
+                'Fixtures\TestQuality\StaticAnalysisRedundantTest\ShapeTrait',
+            ],
+            $this->stringMetadataValues($findings, 'evidenceSymbol'),
+        );
+
+        foreach ($findings as $index => $finding) {
+            self::assertSame(Severity::Advisory, $finding->severity, "finding {$index}");
+            self::assertSame(Confidence::High, $finding->confidence, "finding {$index}");
+            self::assertStringContainsString('static-analysis-redundant candidate', $finding->message, "finding {$index}");
+            self::assertSame('high', $finding->metadata['candidateConfidence'] ?? null, "finding {$index}");
+        }
+    }
+
+    /**
+     * Verify static-analysis-redundant candidates do not duplicate neighbouring rule ownership.
+     *
+     * @return void
+     */
+    public function testStaticAnalysisRedundantCandidatesRespectNeighbouringRules(): void
+    {
+        $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/tautological-type-assertion.php', TautologicalTypeAssertionRule::ID, 2);
+        $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/exception-type-only.php', ExceptionTypeOnlyRule::ID, 1);
+        $this->assertSmellOwnedSolelyByNeighbour('tests/Fixtures/TestQuality/phpunit-mechanics-smells.php', PrivateReflectionRule::ID, 3);
     }
 
     /**
@@ -544,6 +554,43 @@ final class TestQualityRulesTest extends TestCase
             array_values(array_filter($findings, static fn(Finding $finding): bool => $finding->ruleId === $ruleId)),
             sprintf('Expected %d findings for %s.', $expectedCount, $ruleId),
         );
+    }
+
+    /**
+     * Assert the static-analysis-redundant rule stays silent while a neighbouring rule solely owns the fixture's smell.
+     *
+     * @param string $fixture - Fixture path whose neighbouring-rule ownership is verified.
+     * @param string $ownerRuleId - Rule identifier expected to solely own the fixture's smell.
+     * @param int    $ownerCount - Exact number of findings the owning rule must emit.
+     *
+     * @return void
+     */
+    private function assertSmellOwnedSolelyByNeighbour(string $fixture, string $ownerRuleId, int $ownerCount): void
+    {
+        $findings = $this->analysePath($fixture);
+
+        self::assertRuleCount(StaticAnalysisRedundantTestRule::ID, 0, $findings);
+        self::assertRuleCount($ownerRuleId, $ownerCount, $findings);
+    }
+
+    /**
+     * Return sorted string metadata values for stable assertions.
+     *
+     * @param list<Finding> $findings - Findings whose metadata should be inspected.
+     * @param string        $key - Metadata key to read.
+     *
+     * @return list<string> - String values sorted ascending.
+     */
+    private function stringMetadataValues(array $findings, string $key): array
+    {
+        $values = array_values(array_filter(
+                                   array_map(static fn(Finding $finding): mixed => $finding->metadata[$key] ?? null, $findings),
+                                   'is_string',
+                               ));
+
+        sort($values, SORT_STRING);
+
+        return $values;
     }
 
     /**

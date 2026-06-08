@@ -20,6 +20,6 @@ Use these docs with the top-level README for the stable user-facing surface.
 
 ## Shared Contract
 
-Cross-language naming and CLI expectations live in
-[`../../CONTRACT.md`](../../CONTRACT.md). PHP keeps documented extensions for
-mutation and Infection workflows.
+Cross-language naming and CLI expectations are summarized in
+[Naming Conventions](naming-conventions.md#shared-contract). PHP keeps
+documented extensions for mutation and Infection workflows.

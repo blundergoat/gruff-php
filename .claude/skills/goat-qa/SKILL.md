@@ -1,14 +1,14 @@
 ---
 name: goat-qa
 description: "Use when evaluating test coverage gaps, planning test strategy, or assessing testing risk for code changes."
-goat-flow-skill-version: "1.9.0"
+goat-flow-skill-version: "1.10.1"
 ---
 # /goat-qa
 
 ## Shared Conventions
 
-Read `.goat-flow/skill-reference/skill-preamble.md` before starting.
-On full-depth, also read `.goat-flow/skill-reference/skill-conventions.md`.
+Read `.goat-flow/skill-docs/skill-preamble.md` before starting.
+On full-depth, also read `.goat-flow/skill-docs/skill-conventions.md`.
 
 ## When to Use
 
@@ -55,7 +55,7 @@ If mode and scope are clear, state "Running [mode] on [scope]." and proceed. Ask
 
 **Gather:** changed scope, existing test plan (if any), audience. Check the instruction file's Essential Commands section or `package.json` scripts for test/lint commands.
 
-**Footgun check:** Use the preamble's grep-first learning-loop retrieval on `.goat-flow/footguns/`, `.goat-flow/lessons/`, `.goat-flow/patterns/`, and `.goat-flow/decisions/` for the target area. Surface matches or an explicit retrieval miss; do not broad-load any bucket.
+**Footgun check:** Use the preamble's grep-first learning-loop retrieval on `.goat-flow/learning-loop/footguns/`, `.goat-flow/learning-loop/lessons/`, `.goat-flow/learning-loop/patterns/`, and `.goat-flow/learning-loop/decisions/` for the target area. Surface matches or an explicit retrieval miss; do not broad-load any bucket.
 
 **PR / issue link (strongly encouraged):** ask for PR/issue before Phase 1. Acceptance criteria are the benchmark. If `gh` is available, use `gh pr view` + `gh pr diff`; otherwise note `no-intent-spec`, which degrades `safe to skip` confidence.
 
@@ -112,7 +112,7 @@ Map each stated expectation to the code path that implements it. Gaps between in
 
 **Cross-agent verification:** suggest a different agent/model for blind-spot checks.
 
-**BLOCKING GATE:** Present gap analysis plus Verification Integrity and stop. Ask: "Continue to Phase 3, or adjust the analysis first?" Reserve diagrams for Phase 3. After the plan, suggest `/goat-plan` for milestone tasks.
+**BLOCKING GATE:** Present gap analysis plus Verification Integrity and stop. Ask: "Continue to Phase 3, or adjust the analysis first?" For explicit "what should I test" or "test plan" intent, continue through Phase 3 in the same response. Reserve diagrams for Phase 3. After the plan, suggest `/goat-plan` for milestone tasks.
 
 ## Phase 3 - Targeted Testing Plan
 

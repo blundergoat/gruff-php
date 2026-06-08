@@ -35,6 +35,22 @@ Each finding carries two identifier fields:
 For baseline matching, use `fingerprint`. For line-shift-resilient diff
 tooling, use `stableIdentity`.
 
+Changed-region reports (`--diff`, `--since`, or `--changed-ranges`) include a
+top-level `suppressedCount`, mirrored as `diff.suppressedCount`, when diff
+filtering is active. It counts findings anchored in the changed/requested files
+that were produced by the analysis run and then removed because they were
+outside the selected hunk or symbol. Project-wide rules still use whole-project
+context before filtering, but project-rule findings anchored outside the
+changed/requested files are outside the invocation scope and are not included in
+the suppression total.
+
+`--changed-scope=symbol` keeps ordinary symbol-local findings when the changed
+hunk touches their enclosing declaration, but file and class aggregate findings
+such as `size.file-length`, `size.class-length`, and `docs.todo-density` are kept
+only when the hunk touches their reported anchor. Use `--changed-scope=file` for
+changed-file review workflows that intentionally want file-level aggregates and
+class aggregate findings whose reported span overlaps the changed hunk.
+
 ## HTML
 
 Use `html` for archived human review or dashboard scan output:

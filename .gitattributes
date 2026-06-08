@@ -33,16 +33,49 @@
 tests/Fixtures/sse-simple-text-crlf.txt -text
 
 # Exclude from distribution archives (composer install / packagist)
+/.agents/               export-ignore
+/.claude/               export-ignore
+/.codex/                export-ignore
 /.github/               export-ignore
+/.goat-flow/            export-ignore
 /docs/                  export-ignore
 /tests/                 export-ignore
 /scripts/               export-ignore
+AGENTS.md               export-ignore
 CLAUDE.md               export-ignore
 CONTRIBUTING.md         export-ignore
-CHANGELOG.md            export-ignore
+.gruff-php.yaml         export-ignore
 .editorconfig           export-ignore
-.php-cs-fixer.php       export-ignore
+.gitattributes          export-ignore
+.gitignore              export-ignore
+.php-cs-fixer.dist.php  export-ignore
+composer.lock           export-ignore
 infection.json5         export-ignore
+package.json            export-ignore
+package-lock.json       export-ignore
 phpmd.xml               export-ignore
 phpstan.neon            export-ignore
+phpstan.neon.dist       export-ignore
 phpunit.xml             export-ignore
+phpunit.xml.dist        export-ignore
+
+# Local generated artifacts, for composer archive from a development checkout
+/.gruff-cache/          export-ignore
+/.idea/                 export-ignore
+/.vscode/               export-ignore
+/.php-cs-fixer.cache    export-ignore
+/.phpunit.cache/        export-ignore
+/.phpunit.result.cache  export-ignore
+/baselines/             export-ignore
+/build/                 export-ignore
+/coverage/              export-ignore
+/dist/                  export-ignore
+/history.json           export-ignore
+/infection-html-report/ export-ignore
+/infection-report.json  export-ignore
+/node_modules/          export-ignore
+/output/                export-ignore
+/phpstan-cache/         export-ignore
+/psalm-cache/           export-ignore
+/rector-cache/          export-ignore
+/vendor/                export-ignore

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Console;
 
+use GruffPhp\Console\Application;
 use JsonException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -37,13 +38,16 @@ final class GruffCliSummaryTest extends TestCase
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
         $output = $process->getOutput();
 
-        self::assertStringContainsString('gruff-php 0.3.0 - summary', $output);
+        self::assertStringContainsString('gruff-php ' . Application::VERSION . ' summary', $output);
         self::assertStringContainsString('Paths     tests/Fixtures/Source/mixed', $output);
-        self::assertStringContainsString('Composite', $output);
+        self::assertMatchesRegularExpression('/^Composite: [A-F] \(\d+\.\d{2} \/ 100\)$/m', $output);
+        self::assertMatchesRegularExpression(
+            '/^Findings: \d+ total · \d+ error · \d+ warning · \d+ advisory$/m',
+            $output,
+        );
         self::assertStringContainsString('Score note Per-pillar scores start at 100', $output);
         self::assertStringContainsString('Pillars', $output);
         self::assertStringContainsString('Top', $output);
-        self::assertStringContainsString('Totals', $output);
         self::assertStringContainsString('gruff-php analyse --generate-baseline', $output);
         self::assertStringContainsString('known debt', $output);
     }
@@ -66,11 +70,13 @@ final class GruffCliSummaryTest extends TestCase
 
         self::assertSame(0, $process->getExitCode());
 
-        // The text reporter shows per-finding `[warning] rule.id` lines under "Findings".
-        // The summary digest must aggregate; it must not include those lines.
-        self::assertStringNotContainsString('[warning]', $process->getOutput());
-        self::assertStringNotContainsString('[advisory]', $process->getOutput());
-        self::assertStringNotContainsString('Findings', $process->getOutput());
+        // The analyse text reporter shows per-finding `[warning] rule.id` lines under a bare
+        // "Findings" heading. The summary digest must aggregate; it must not include those lines.
+        // The canonical `Findings:` tally line (with colon) is expected and asserted elsewhere.
+        $output = $process->getOutput();
+        self::assertStringNotContainsString('[warning]', $output);
+        self::assertStringNotContainsString('[advisory]', $output);
+        self::assertDoesNotMatchRegularExpression('/^Findings$/m', $output);
     }
 
     /**
@@ -103,7 +109,7 @@ final class GruffCliSummaryTest extends TestCase
         $tool = $decoded['tool'] ?? null;
         self::assertIsArray($tool);
         self::assertSame('gruff-php', $tool['name'] ?? null);
-        self::assertSame('0.3.0', $tool['version'] ?? null);
+        self::assertSame(Application::VERSION, $tool['version'] ?? null);
 
         $scope = $decoded['scope'] ?? null;
         self::assertIsArray($scope);

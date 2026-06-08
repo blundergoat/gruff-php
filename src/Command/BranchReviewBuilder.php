@@ -55,7 +55,13 @@ final readonly class BranchReviewBuilder
 
         $gitArchiveSnapshot       = new GitArchiveSnapshot();
         $baseRoot                 = null;
-        $shouldLoadProjectContext = $this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff);
+        $shouldLoadProjectContext = $this->shouldLoadProjectContext(
+            projectRoot: $projectRoot,
+            options:     $options,
+            registry:    $registry,
+            config:      $config,
+            reviewDiff:  $reviewDiff,
+        );
         $baseSnapshotPaths        = $this->baseSnapshotPaths($projectRoot, $options, $reviewDiff, $shouldLoadProjectContext);
         $baseAnalysisPaths        = $this->baseAnalysisPaths($projectRoot, $options, $reviewDiff);
 
@@ -90,6 +96,11 @@ final readonly class BranchReviewBuilder
                     ? $this->baseProjectContextUnits($baseRoot, $options, $config)
                     : $baseSources->analysisUnits;
                 $baseFindings = $baseRegistry->analyse($baseSources->analysisUnits, new RuleContext($baseRoot, $config), $baseProjectContextUnits);
+                $baseFindings = (new AnalysisFindingSupport())->filterProjectRuleFindingsToFiles(
+                    $baseFindings,
+                    $baseRegistry->enabledProjectRuleIds($config),
+                    $baseSources->displayPaths(),
+                );
                 $baseFindings = (new AnalysisFindingSupport())->filterAllowedSecretPreviews($baseFindings, $config);
             }
 
@@ -157,7 +168,13 @@ final readonly class BranchReviewBuilder
         ?DiffResult $reviewDiff,
         AnalysisSourceSet $analysisSourceSet,
     ): array {
-        if (!$this->shouldLoadProjectContext($options, $registry, $config, $reviewDiff)) {
+        if (!$this->shouldLoadProjectContext(
+            projectRoot: $projectRoot,
+            options:     $options,
+            registry:    $registry,
+            config:      $config,
+            reviewDiff:  $reviewDiff,
+        )) {
             return $analysisSourceSet->analysisUnits;
         }
 
@@ -189,12 +206,12 @@ final readonly class BranchReviewBuilder
     ): array {
         $support = new AnalysisFindingSupport();
 
-        if (!$options->isChangedOnly) {
-            return $support->normaliseRequestedPaths($projectRoot, $options->paths);
-        }
-
         if ($shouldLoadProjectContext) {
             return [];
+        }
+
+        if (!$options->isChangedOnly) {
+            return $support->normaliseRequestedPaths($projectRoot, $options->paths);
         }
 
         if ($reviewDiff->changedFiles === []) {
@@ -264,6 +281,7 @@ final readonly class BranchReviewBuilder
     /**
      * Report whether narrowed analysis still has to load whole-tree context for project-level rules.
      *
+     * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options - Effective CLI options carrying changed-only and changed-region flags.
      * @param RuleRegistry          $registry - Rule registry consulted for any enabled project-wide rule.
      * @param AnalysisConfig        $config - Effective rule and path config for resolving enabled rules.
@@ -272,6 +290,7 @@ final readonly class BranchReviewBuilder
      * @return bool - True when a narrowed run still needs complete context for project-level rules.
      */
     private function shouldLoadProjectContext(
+        string $projectRoot,
         AnalyseCommandOptions $options,
         RuleRegistry $registry,
         AnalysisConfig $config,
@@ -282,6 +301,14 @@ final readonly class BranchReviewBuilder
         }
 
         if ($options->hasChangedRegionMode()) {
+            return true;
+        }
+
+        // A whole-project request ('.', './', or the root path) covers the same tree a bare invocation
+        // does, so it must not trigger the separate full-tree context load that genuinely narrower paths
+        // need; otherwise `analyse . --diff-vs=<ref>` reparses the whole tree twice for the same scope.
+        $requestedPaths = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        if ($requestedPaths !== [] && $requestedPaths !== ['.']) {
             return true;
         }
 

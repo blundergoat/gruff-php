@@ -96,6 +96,7 @@ use GruffPhp\Rule\TestQuality\PrivateReflectionRule;
 use GruffPhp\Rule\TestQuality\SetupBloatRule;
 use GruffPhp\Rule\TestQuality\SkippedWithoutReasonRule;
 use GruffPhp\Rule\TestQuality\SleepInTestRule;
+use GruffPhp\Rule\TestQuality\StaticAnalysisRedundantTestRule;
 use GruffPhp\Rule\TestQuality\SutNotCalledRule;
 use GruffPhp\Rule\TestQuality\TestLongerThanSutRule;
 use GruffPhp\Rule\TestQuality\TestNamingConsistencyRule;
@@ -171,6 +172,7 @@ final class RuleRegistryTest extends TestCase
             MockOnlyTestRule::ID, MysteryGuestRule::ID, NoAssertionsRule::ID,
             PrivateReflectionRule::ID, SetupBloatRule::ID,
             SkippedWithoutReasonRule::ID, SleepInTestRule::ID,
+            StaticAnalysisRedundantTestRule::ID,
             SutNotCalledRule::ID, TestLongerThanSutRule::ID,
             TestNamingConsistencyRule::ID, TrivialAssertionRule::ID,
             TrivialSnapshotRule::ID, AverageMethodLengthRule::ID,
@@ -326,9 +328,9 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(132, $definitions);
+        self::assertCount(133, $definitions);
         self::assertSame(
-            '5766c459c7516111c2b7' . 'b2d95ed45390cff1f3ffeec82d90de8327bdedb4a8ba',
+            'e6458d471a959cc841760b' . '96bc46aa52d7cf8c8c90839971d7e16934275af700',
             hash('sha256', $json),
         );
     }

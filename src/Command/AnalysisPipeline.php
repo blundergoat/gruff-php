@@ -92,7 +92,7 @@ final class AnalysisPipeline
             ];
         }
 
-        if ($this->canStream($options, $reviewDiff, $ruleContext)) {
+        if ($this->canStream($projectRoot, $options, $reviewDiff, $ruleContext)) {
             // Streaming is safe here, so take the low-peak-memory path that releases each unit after analysis.
             return $this->runStreaming(
                 projectRoot:        $projectRoot,
@@ -121,6 +121,7 @@ final class AnalysisPipeline
     /**
      * Decide whether streaming parse → analyse → release is safe for this run.
      *
+     * @param string                $projectRoot - Project root requested paths resolve against.
      * @param AnalyseCommandOptions $options - CLI options; changed-region and diff modes force the legacy path.
      * @param DiffResult|null       $reviewDiff - Review diff metadata; an active review keeps the base snapshot.
      * @param RuleContext           $ruleContext - Context whose enabled rules must all tolerate per-unit release.
@@ -129,13 +130,22 @@ final class AnalysisPipeline
      *              mode forces the legacy load-all path
      */
     private function canStream(
+        string                $projectRoot,
         AnalyseCommandOptions $options,
         ?DiffResult           $reviewDiff,
         RuleContext           $ruleContext,
     ): bool {
+        // An explicit project-root request ('.', './', or the root path itself) still covers the whole
+        // tree, so it can stream like a bare invocation; only a genuinely narrower path needs the legacy
+        // load-all flow that pulls whole-tree project context separately from the requested files.
+        $requestedPaths              = (new AnalysisFindingSupport())->normaliseRequestedPaths($projectRoot, $options->paths);
+        $hasNarrowProjectRuleContext = $requestedPaths !== [] && $requestedPaths !== ['.']
+            && $this->registry->hasEnabledProjectRules($ruleContext->config);
+
         // Stream only when no review/diff retains the base snapshot and every enabled rule tolerates per-unit release.
         return ($reviewDiff === null || !$reviewDiff->active)
                && !$options->hasChangedRegionMode()
+               && !$hasNarrowProjectRuleContext
                && $options->diffVs === null
                && $this->registry->supportsStreaming($ruleContext);
     }
@@ -301,6 +311,11 @@ final class AnalysisPipeline
                                              $projectContextUnits,
                                              $ruleRunnerObserver,
             shouldReleaseUnitsAfterAnalysis: true,
+        );
+        $findings     = (new AnalysisFindingSupport())->filterProjectRuleFindingsToFiles(
+            $findings,
+            $this->registry->enabledProjectRuleIds($config),
+            $sources->displayPaths(),
         );
         $analyseNs    = hrtime(true) - $analyseStart;
 

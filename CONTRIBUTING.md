@@ -4,7 +4,7 @@ Thanks for taking the time to improve `gruff-php`.
 
 Keep contributions focused, grounded in the current CLI surface, and covered by
 tests. Public rule ids, schemas, and command flags should be treated as
-compatibility-sensitive once `0.1.0` is tagged.
+compatibility-sensitive throughout the pre-1.0 line.
 
 ## Requirements
 
@@ -35,8 +35,9 @@ composer format:check
 php bin/gruff-php analyse --fail-on none
 ```
 
-`composer check` runs Composer validation, shell syntax checks, PHP syntax
-checks, and PHPStan. It does not run PHPUnit; run `composer test` separately.
+`composer check` runs Composer validation, dependency audit, the security scan,
+shell syntax checks, PHP syntax checks, and PHPStan. It does not run PHPUnit;
+run `composer test` separately.
 
 ## Coding Standards
 

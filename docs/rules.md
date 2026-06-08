@@ -12,7 +12,7 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 132
+Total rules: 133
 
 ## Summary By Pillar
 
@@ -28,7 +28,7 @@ Total rules: 132
 | `security` | 25 |
 | `sensitive-data` | 11 |
 | `size` | 7 |
-| `test-quality` | 33 |
+| `test-quality` | 34 |
 
 ## Rule Catalogue
 
@@ -65,7 +65,7 @@ Total rules: 132
 | --- | --- | --- | --- | --- |
 | `design.single-implementor-interface` | Single-implementor interface | `advisory` | `medium` | yes |
 
-### `documentation` (14)
+### `documentation` (15)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -204,7 +204,7 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `size.property-count` | Property count | `error` | `high` | yes |
 | `size.public-method-count` | Public method count | `error` | `high` | yes |
 
-### `test-quality` (33)
+### `test-quality` (34)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
@@ -224,7 +224,7 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `test-quality.multiple-aaa-cycles` | Multiple arrange-act-assert cycles | `advisory` | `low` | yes |
 | `test-quality.mystery-guest` | Mystery guest | `advisory` | `medium` | yes |
 | `test-quality.naming-consistency` | Test naming consistency | `advisory` | `high` | yes |
-| `test-quality.no-assertions` | Test without assertions | `warning` | `medium` | yes |
+| `test-quality.no-assertions` | Test without assertions | `error` | `medium` | yes |
 | `test-quality.phpunit-coverage-source-missing` | PHPUnit coverage source missing | `advisory` | `medium` | yes |
 | `test-quality.phpunit-deprecations-not-fatal` | PHPUnit deprecations not fatal | `warning` | `high` | yes |
 | `test-quality.phpunit-strict-flags-missing` | PHPUnit strict flags missing | `warning` | `high` | yes |
@@ -233,8 +233,9 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `test-quality.setup-bloat` | Setup bloat | `advisory` | `medium` | yes |
 | `test-quality.skipped-without-reason` | Skipped test without reason | `warning` | `high` | yes |
 | `test-quality.sleep-in-test` | Sleep or wall-clock read in test | `warning` | `high` | yes |
-| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `advisory` | `low` | yes |
-| `test-quality.tautological-type-assertion` | Tautological type assertion | `warning` | `high` | yes |
+| `test-quality.static-analysis-redundant-test` | Static-analysis-redundant test candidate | `advisory` | `high` | yes |
+| `test-quality.sut-not-called` | Test name mentions SUT that is not called | `error` | `low` | yes |
+| `test-quality.tautological-type-assertion` | Tautological type assertion | `error` | `high` | yes |
 | `test-quality.test-longer-than-sut` | Test longer than apparent SUT | `advisory` | `low` | yes |
 | `test-quality.test-method-too-long` | Test method too long | `advisory` | `high` | yes |
 | `test-quality.testdox-readability` | Testdox readability | `advisory` | `low` | yes |

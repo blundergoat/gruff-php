@@ -452,7 +452,7 @@ final class SummaryCommand extends Command
     private function renderText(SummaryReportData $summaryReportData): string
     {
         $lines   = [];
-        $lines[] = sprintf('%s %s - summary', Application::NAME, Application::VERSION);
+        $lines[] = sprintf('%s %s summary', Application::NAME, Application::VERSION);
         $lines[] = '';
         $lines[] = sprintf('Paths     %s', $summaryReportData->paths === [] ? '(none)' : implode(', ', $summaryReportData->paths));
         $lines[] = sprintf('Config    %s', $summaryReportData->configPath ?? '(none)');
@@ -465,7 +465,14 @@ final class SummaryCommand extends Command
             $summaryReportData->parseErrors
         );
         $lines[] = '';
-        $lines[] = sprintf('Composite %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
+        $lines[] = sprintf('Composite: %s (%.2f / 100)', $summaryReportData->score->composite->letter, $summaryReportData->score->composite->score);
+        $lines[] = sprintf(
+            'Findings: %d total · %d error · %d warning · %d advisory',
+            $summaryReportData->totals['total'],
+            $summaryReportData->totals['error'],
+            $summaryReportData->totals['warning'],
+            $summaryReportData->totals['advisory'],
+        );
         $lines[] = sprintf('Scope     %s', $summaryReportData->score->scope);
         $lines[] = sprintf('Score note %s', $summaryReportData->score->explanation);
         $lines[] = '';
@@ -526,15 +533,6 @@ final class SummaryCommand extends Command
                 );
             }
         }
-
-        $lines[] = '';
-        $lines[] = sprintf(
-            'Totals    %d findings (advisory=%d, warning=%d, error=%d)',
-            $summaryReportData->totals['total'],
-            $summaryReportData->totals['advisory'],
-            $summaryReportData->totals['warning'],
-            $summaryReportData->totals['error'],
-        );
 
         if ($summaryReportData->totals['total'] > 0) {
             $lines[] = '';

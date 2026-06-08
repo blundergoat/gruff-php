@@ -7,6 +7,7 @@ namespace GruffPhp\Console;
 use GruffPhp\Command\AnalyseCommand;
 use GruffPhp\Command\CheckIgnoreCommand;
 use GruffPhp\Command\DashboardCommand;
+use GruffPhp\Command\HookCommand;
 use GruffPhp\Command\InitCommand;
 use GruffPhp\Command\ListRulesCommand;
 use GruffPhp\Command\ReportCommand;
@@ -26,7 +27,7 @@ final class Application extends SymfonyApplication
     /**
      * Version displayed by the CLI.
      */
-    public const VERSION = '0.3.0';
+    public const VERSION = '0.3.1';
 
     /**
      * Register the gruff-php CLI command surface with Symfony Console.
@@ -39,6 +40,7 @@ final class Application extends SymfonyApplication
             new AnalyseCommand(),
             new CheckIgnoreCommand(),
             new DashboardCommand(),
+            new HookCommand(),
             new InitCommand(),
             new ListRulesCommand(),
             new ReportCommand(),

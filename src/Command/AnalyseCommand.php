@@ -84,7 +84,7 @@ final class AnalyseCommand extends Command
             ->addOption('diff', null, InputOption::VALUE_OPTIONAL, 'Filter findings to changed regions. Bare uses working tree vs HEAD; use working-tree, staged, unstaged, a base ref, or "-" for unified diff on stdin.', default: null)
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Filter findings to files and regions changed since this Git base ref.')
             ->addOption('changed-ranges', null, InputOption::VALUE_REQUIRED, 'Filter findings to explicit line ranges, for example "3-3,8-10".')
-            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope: symbol or hunk.', default: DiffFindingFilter::SCOPE_SYMBOL)
+            ->addOption('changed-scope', null, InputOption::VALUE_REQUIRED, 'Changed-region scope: symbol, hunk, or file. Use file to keep file-level aggregates and class aggregate span hits in changed-file review workflows.', default: DiffFindingFilter::SCOPE_SYMBOL)
             ->addOption('diff-vs', null, InputOption::VALUE_REQUIRED, 'Compare current findings against a base Git ref and report introduced/removed/unchanged findings.')
             ->addOption('changed-only', null, InputOption::VALUE_NONE, 'With --diff-vs, compare only files changed from the base ref.')
             ->addOption('paths-relative-to', null, InputOption::VALUE_REQUIRED, 'Normalize absolute finding paths relative to this directory for reports.')
@@ -197,6 +197,7 @@ final class AnalyseCommand extends Command
             $diffFilterResult = (new DiffFindingFilter())->apply($findings, $diff, $sources->analysisUnits, $options->changedScope);
             $findings         = $diffFilterResult->findings;
             $suppressedCount  = $diffFilterResult->suppressedCount;
+            $diff             = $diff->withSuppressedCount($suppressedCount);
         }
 
         $findings       = $findingSupport->filterAllowedSecretPreviews($findings, $config);
@@ -591,7 +592,7 @@ final class AnalyseCommand extends Command
             return $analysisPaths === [] ? null : $analysisPaths;
         }
 
-        if (!$options->isChangedOnly || $options->paths !== [] || !$reviewDiff instanceof DiffResult) {
+        if (!$options->isChangedOnly || $options->paths !== []) {
             return $options->paths;
         }
 
