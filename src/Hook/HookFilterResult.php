@@ -12,12 +12,14 @@ use GruffPhp\Finding\Finding;
 final readonly class HookFilterResult
 {
     /**
-     * @param list<Finding> $findings        - Findings kept for hook output.
-     * @param int           $suppressedCount - Findings removed by hook filtering.
+     * @param list<Finding>      $findings        - Findings kept for hook output.
+     * @param int                $suppressedCount - Findings removed by hook filtering.
+     * @param array<int, string> $identities      - Disambiguated hook identity keyed by spl_object_id($finding), spanning the full input set.
      */
     public function __construct(
         public array $findings,
         public int $suppressedCount,
+        public array $identities = [],
     ) {
     }
 }

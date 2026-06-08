@@ -59,6 +59,46 @@ final readonly class HookFindingIdentity
     }
 
     /**
+     * Build disambiguated hook identities for a set of findings analysed together.
+     *
+     * forFinding() omits line/endLine/column so an identity survives line shifts, but that also makes
+     * repeated same-rule findings with no symbol and no distinguishing metadata (e.g. two
+     * security.error-suppression hits in one file) collapse to one identity - hiding a newly added
+     * duplicate in --baseline/--diff new-only mode. Append an occurrence ordinal within each colliding
+     * group, ordered by line then column, so duplicates stay distinct while a uniform line shift keeps
+     * the ordinals (and identities) stable. Reordering one duplicate above another only swaps ordinals,
+     * which surfaces a pre-existing finding rather than hiding a new one - the safe direction.
+     *
+     * @param list<Finding> $findings - Findings identified together (current run or base snapshot).
+     *
+     * @return array<int, string> - Disambiguated identity keyed by spl_object_id($finding).
+     * @throws JsonException When identity encoding fails.
+     */
+    public static function forFindings(array $findings): array
+    {
+        /** @var array<string, list<int>> $groups Finding indices grouped by value-independent base identity. */
+        $groups = [];
+        foreach ($findings as $index => $finding) {
+            $groups[self::forFinding($finding, HookFindingScope::classify($finding))][] = $index;
+        }
+
+        $identities = [];
+        foreach ($groups as $baseIdentity => $indices) {
+            usort(
+                $indices,
+                static fn(int $left, int $right): int => [$findings[$left]->line ?? PHP_INT_MAX, $findings[$left]->column ?? PHP_INT_MAX, $left]
+                    <=> [$findings[$right]->line ?? PHP_INT_MAX, $findings[$right]->column ?? PHP_INT_MAX, $right],
+            );
+
+            foreach ($indices as $ordinal => $index) {
+                $identities[spl_object_id($findings[$index])] = $baseIdentity . ':' . $ordinal;
+            }
+        }
+
+        return $identities;
+    }
+
+    /**
      * Return a value-independent qualifier that distinguishes repeated same-rule findings where possible.
      *
      * @param Finding $finding - Native finding.

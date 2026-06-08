@@ -19,6 +19,7 @@ use GruffPhp\Finding\Finding;
 use GruffPhp\Hook\HookFindingFilter;
 use GruffPhp\Hook\HookFindingIdentity;
 use GruffPhp\Hook\HookFindingPresenter;
+use GruffPhp\Hook\HookFindingScope;
 use GruffPhp\Mutation\MutationAnalysisOptions;
 use GruffPhp\Review\GitArchiveSnapshot;
 use GruffPhp\Rule\RuleContext;
@@ -144,6 +145,7 @@ final class HookCommand extends Command
                     findings:        $filterResult->findings,
                     suppressedCount: $filterResult->suppressedCount,
                     ignoredPathRows: $analysis['sources']->discovery->ignoredPathDetails,
+                    identities:       $filterResult->identities,
                     isConfigSchemaOk: true,
                     configError:      null,
                 ),
@@ -219,24 +221,30 @@ final class HookCommand extends Command
     }
 
     /**
-     * Layer hook --include-rule/--exclude-rule onto the project's existing rule selection.
+     * Resolve the rule selection for hook --include-rule/--exclude-rule against the project config.
      *
-     * Replacing the selection outright drops a configured selection.rules narrowing: an empty include
-     * list means "all rules", so a bare --exclude-rule would widen a focused config to the whole rule
-     * set. Preserve the configured tiers/pillars/includes and only add the hook's filters on top.
+     * --include-rule means "run only these ids" (per the option help), so it must narrow to exactly
+     * those rules: RuleSelection::allows() ORs tier/pillar/rule includes, so inheriting the config's
+     * tiers/pillars would widen the focused run. A bare --exclude-rule instead keeps the configured
+     * selection and only drops the named rules, so a configured selection.rules narrowing is not
+     * widened to the whole rule set (an empty include list means "all rules").
      *
      * @param RuleSelection $existing     - Selection already resolved from the project config.
      * @param list<string>  $includeRules - Hook --include-rule ids; when non-empty they focus the run.
      * @param list<string>  $excludeRules - Hook --exclude-rule ids dropped on top of the existing selection.
      *
-     * @return RuleSelection - Selection that keeps the configured scope while applying the hook filters.
+     * @return RuleSelection - Focused selection for --include-rule, or the configured selection plus excludes.
      */
     private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
     {
+        if ($includeRules !== []) {
+            return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
+        }
+
         return new RuleSelection(
             tiers:          $existing->tiers,
             pillars:        $existing->pillars,
-            rules:          $includeRules !== [] ? $includeRules : $existing->rules,
+            rules:          $existing->rules,
             excludePillars: $existing->excludePillars,
             excludeRules:   array_values(array_unique([...$existing->excludeRules, ...$excludeRules])),
         );
@@ -535,9 +543,8 @@ final class HookCommand extends Command
             );
 
             $identities = [];
-            foreach ($analysis['findings'] as $finding) {
-                $scope                                                         = \GruffPhp\Hook\HookFindingScope::classify($finding);
-                $identities[HookFindingIdentity::forFinding($finding, $scope)] = true;
+            foreach (HookFindingIdentity::forFindings($analysis['findings']) as $identity) {
+                $identities[$identity] = true;
             }
 
             return $identities;
@@ -575,9 +582,10 @@ final class HookCommand extends Command
      *
      * @param list<Finding>     $findings        - Findings to render.
      * @param int               $suppressedCount - Hook suppression count.
-     * @param list<IgnoredPath> $ignoredPathRows - Ignored path records.
-     * @param bool              $isConfigSchemaOk - Whether config loaded cleanly.
-     * @param string|null       $configError     - Config or operational error message.
+     * @param list<IgnoredPath>  $ignoredPathRows - Ignored path records.
+     * @param array<int, string> $identities      - Disambiguated hook identity keyed by spl_object_id($finding).
+     * @param bool               $isConfigSchemaOk - Whether config loaded cleanly.
+     * @param string|null        $configError     - Config or operational error message.
      *
      * @return array<string, mixed> - Hook report.
      */
@@ -585,13 +593,16 @@ final class HookCommand extends Command
         array $findings,
         int $suppressedCount,
         array $ignoredPathRows,
+        array $identities,
         bool $isConfigSchemaOk,
         ?string $configError,
     ): array {
         $presenter = new HookFindingPresenter();
         $rows      = [];
         foreach ($findings as $finding) {
-            $rows[] = $presenter->toArray($finding);
+            $stableIdentity = $identities[spl_object_id($finding)]
+                ?? HookFindingIdentity::forFinding($finding, HookFindingScope::classify($finding));
+            $rows[]         = $presenter->toArray($finding, $stableIdentity);
         }
 
         return [

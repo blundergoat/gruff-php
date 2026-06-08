@@ -15,12 +15,13 @@ final readonly class HookFindingPresenter
     /**
      * Convert a finding to the hook-contract payload.
      *
-     * @param Finding $finding - Native finding.
+     * @param Finding $finding        - Native finding.
+     * @param string  $stableIdentity - Disambiguated hook identity for this finding, resolved across the full result set.
      *
      * @return array<string, mixed> - JSON-ready hook finding.
-     * @throws JsonException When the stable identity cannot be encoded.
+     * @throws JsonException When the fingerprint cannot be encoded.
      */
-    public function toArray(Finding $finding): array
+    public function toArray(Finding $finding, string $stableIdentity): array
     {
         $scope   = HookFindingScope::classify($finding);
         $payload = [
@@ -35,7 +36,7 @@ final readonly class HookFindingPresenter
             'message'        => $finding->message,
             'remediation'    => $finding->remediation ?? sprintf('Address the %s finding or configure the rule if this is intentional.', $finding->ruleId),
             'metadata'       => $this->metadata($finding),
-            'stableIdentity' => HookFindingIdentity::forFinding($finding, $scope),
+            'stableIdentity' => $stableIdentity,
             'fingerprint'    => $finding->fingerprint(),
         ];
 

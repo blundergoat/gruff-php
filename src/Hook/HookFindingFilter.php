@@ -20,7 +20,7 @@ final readonly class HookFindingFilter
      * @param array<string, true> $baseStableIdentities - Stable identities present in the baseline/base ref.
      * @param bool                $hasNewOnlySource     - Whether --baseline or a comparable --diff base was supplied.
      *
-     * @return HookFilterResult - kept findings and suppression count.
+     * @return HookFilterResult - kept findings, suppression count, and disambiguated identities for the input set.
      */
     public function apply(
         array $findings,
@@ -28,12 +28,13 @@ final readonly class HookFindingFilter
         array $baseStableIdentities,
         bool $hasNewOnlySource,
     ): HookFilterResult {
+        $identities      = HookFindingIdentity::forFindings($findings);
         $kept            = [];
         $suppressedCount = 0;
 
         foreach ($findings as $finding) {
             $scope = HookFindingScope::classify($finding);
-            $isNew = !isset($baseStableIdentities[HookFindingIdentity::forFinding($finding, $scope)]);
+            $isNew = !isset($baseStableIdentities[$identities[spl_object_id($finding)] ?? HookFindingIdentity::forFinding($finding, $scope)]);
 
             if ($hasNewOnlySource && !$isNew) {
                 $suppressedCount++;
@@ -63,7 +64,7 @@ final readonly class HookFindingFilter
             $suppressedCount++;
         }
 
-        return new HookFilterResult($kept, $suppressedCount);
+        return new HookFilterResult($kept, $suppressedCount, $identities);
     }
 
     /**
