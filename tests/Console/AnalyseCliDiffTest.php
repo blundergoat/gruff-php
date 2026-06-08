@@ -269,6 +269,255 @@ PATCH
     }
 
     /**
+     * Verify symbol scope treats file and class aggregate findings as anchor-local, while method findings still follow their changed symbol.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandChangedRangesSymbolScopeSuppressesAggregateFindingsAwayFromAnchors(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->writeSizeAggregateFixture($tempDir);
+
+            $report = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '30-30',
+                '--changed-scope',
+                'symbol',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+
+            $ruleIds = $this->ruleIdsFromJsonFindings($this->findingRows($report));
+
+            self::assertSame(['size.method-length', 'size.parameter-count'], $ruleIds);
+            self::assertSame(5, $this->suppressedCount($report));
+            self::assertSame(5, $this->diffSuppressedCount($report));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify aggregate findings survive symbol scope when the edit touches their representative anchor.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandChangedRangesSymbolScopeKeepsAggregateFindingWhenAnchorChanges(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->writeSizeAggregateFixture($tempDir);
+
+            $fileAnchorReport = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '1-1',
+                '--changed-scope',
+                'symbol',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+            self::assertSame(['size.file-length'], $this->ruleIdsFromJsonFindings($this->findingRows($fileAnchorReport)));
+
+            $classAnchorReport = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '7-7',
+                '--changed-scope',
+                'symbol',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+            self::assertSame(
+                [
+                    'size.average-method-length',
+                    'size.class-length',
+                    'size.property-count',
+                    'size.public-method-count',
+                ],
+                $this->ruleIdsFromJsonFindings($this->findingRows($classAnchorReport)),
+            );
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify file scope preserves the previous changed-file aggregate span signal for CI review workflows.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandChangedRangesFileScopeKeepsAggregateSpanFindings(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->writeSizeAggregateFixture($tempDir);
+
+            $report = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '30-30',
+                '--changed-scope',
+                'file',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+
+            self::assertSame(
+                [
+                    'size.file-length',
+                    'size.average-method-length',
+                    'size.class-length',
+                    'size.property-count',
+                    'size.public-method-count',
+                    'size.method-length',
+                    'size.parameter-count',
+                ],
+                $this->ruleIdsFromJsonFindings($this->findingRows($report)),
+            );
+            self::assertSame(0, $this->suppressedCount($report));
+            self::assertSame(0, $this->diffSuppressedCount($report));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify full scans still report whole-file findings when changed-region filtering is inactive.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandFullScanStillReportsFileLengthFinding(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->writeFileLengthFixture($tempDir);
+
+            $report = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+
+            self::assertSame(['size.file-length'], $this->ruleIdsFromJsonFindings($this->findingRows($report)));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
+     * Verify file-aggregate TODO density uses its first-marker anchor rather than the enclosing class span.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testAnalyseCommandChangedRangesSymbolScopeUsesTodoDensityAnchor(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            $this->writeTodoDensityFixture($tempDir);
+
+            $outOfAnchorReport = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '12-12',
+                '--changed-scope',
+                'symbol',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+            self::assertSame([], $this->findingRows($outOfAnchorReport));
+            self::assertSame(1, $this->suppressedCount($outOfAnchorReport));
+            self::assertSame(1, $this->diffSuppressedCount($outOfAnchorReport));
+
+            $anchorReport = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '9-9',
+                '--changed-scope',
+                'symbol',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+            self::assertSame(['docs.todo-density'], $this->ruleIdsFromJsonFindings($this->findingRows($anchorReport)));
+            self::assertSame(0, $this->suppressedCount($anchorReport));
+
+            $fileScopeReport = $this->runJsonAnalyse($tempDir, [
+                'analyse',
+                'Example.php',
+                '--config',
+                'gruff-test.yaml',
+                '--no-baseline',
+                '--changed-ranges',
+                '12-12',
+                '--changed-scope',
+                'file',
+                '--format',
+                'json',
+                '--fail-on',
+                'none',
+            ]);
+            self::assertSame(['docs.todo-density'], $this->ruleIdsFromJsonFindings($this->findingRows($fileScopeReport)));
+            self::assertSame(0, $this->suppressedCount($fileScopeReport));
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * Extract symbol strings from JSON finding rows.
      *
      * @param list<array<string, mixed>> $findings - Finding rows decoded from the CLI JSON report.
@@ -286,6 +535,26 @@ PATCH
         }
 
         return $symbols;
+    }
+
+    /**
+     * Extract rule ids from JSON finding rows.
+     *
+     * @param list<array<string, mixed>> $findings - Finding rows decoded from the CLI JSON report.
+     *
+     * @return list<string> - rule ids in finding order
+     */
+    private function ruleIdsFromJsonFindings(array $findings): array
+    {
+        $ruleIds = [];
+
+        foreach ($findings as $finding) {
+            if (is_string($finding['ruleId'] ?? null)) {
+                $ruleIds[] = $finding['ruleId'];
+            }
+        }
+
+        return $ruleIds;
     }
 
     /**
@@ -406,6 +675,101 @@ PATCH
         file_put_contents($projectRoot . '/src/OtherUnused.php', "<?php\n\nnamespace App;\n\nfinal class OtherUnused\n{\n}\n");
         file_put_contents($projectRoot . '/src/Used.php', "<?php\n\nnamespace App;\n\nfinal class Used\n{\n}\n");
         file_put_contents($projectRoot . '/src/references.php', "<?php\n\nnamespace App;\n\nnew Used();\n");
+    }
+
+    /**
+     * Create a size-rule fixture with only aggregate and method-size rules enabled.
+     *
+     * @param string $projectRoot - Temporary project root to populate.
+     *
+     * @return void
+     */
+    private function writeSizeAggregateFixture(string $projectRoot): void
+    {
+        $source = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Size/cumulative-violations.php');
+        self::assertIsString($source);
+
+        file_put_contents($projectRoot . '/Example.php', $source);
+        file_put_contents($projectRoot . '/gruff-test.yaml', <<<'YAML'
+schemaVersion: gruff-php.config.v0.1
+selection:
+    rules:
+        - size.file-length
+        - size.average-method-length
+        - size.class-length
+        - size.property-count
+        - size.public-method-count
+        - size.method-length
+        - size.parameter-count
+rules:
+    size.file-length:
+        threshold: 5
+        severity: warning
+    size.method-length:
+        threshold: 3
+        severity: warning
+    size.class-length:
+        threshold: 5
+        severity: warning
+    size.parameter-count:
+        threshold: 2
+        severity: warning
+    size.public-method-count:
+        threshold: 3
+        severity: warning
+    size.property-count:
+        threshold: 3
+        severity: warning
+    size.average-method-length:
+        threshold: 2
+        severity: warning
+YAML);
+    }
+
+    /**
+     * Create a file-length-only fixture for full-scan assertions.
+     *
+     * @param string $projectRoot - Temporary project root to populate.
+     *
+     * @return void
+     */
+    private function writeFileLengthFixture(string $projectRoot): void
+    {
+        $source = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Size/cumulative-violations.php');
+        self::assertIsString($source);
+
+        file_put_contents($projectRoot . '/Example.php', $source);
+        file_put_contents($projectRoot . '/gruff-test.yaml', <<<'YAML'
+schemaVersion: gruff-php.config.v0.1
+selection:
+    rules:
+        - size.file-length
+rules:
+    size.file-length:
+        threshold: 5
+        severity: warning
+YAML);
+    }
+
+    /**
+     * Create a TODO-density-only fixture for aggregate anchor assertions.
+     *
+     * @param string $projectRoot - Temporary project root to populate.
+     *
+     * @return void
+     */
+    private function writeTodoDensityFixture(string $projectRoot): void
+    {
+        $source = file_get_contents(self::PROJECT_ROOT . '/tests/Fixtures/Docs/todo-density.php');
+        self::assertIsString($source);
+
+        file_put_contents($projectRoot . '/Example.php', $source);
+        file_put_contents($projectRoot . '/gruff-test.yaml', <<<'YAML'
+schemaVersion: gruff-php.config.v0.1
+selection:
+    rules:
+        - docs.todo-density
+YAML);
     }
 
     /**

@@ -5,6 +5,12 @@ Notable user-facing changes to `gruff-php` are listed here.
 This project is still pre-1.0, so minor releases may break behaviour. Breaking
 changes are marked and include the action to take.
 
+## Unreleased
+
+- **Agent-hook contract output** - Added `gruff-php hook --format json` with the `gruff.hook.v1` contract for editor and coding-agent integrations. The new hook surface advertises itself through `hook --capabilities --format json`, emits normalized finding fields (`scope`, non-null `remediation`, threshold `metadata.measured/threshold/unit/direction`, and hook-stable `stableIdentity`), reports ignored paths under `ignored.paths`, surfaces config-schema failures in-band, and exits zero when analysis runs with findings. Hook `--baseline`, `--diff`, and `--since` use value-independent identities so pre-existing findings stay suppressed across line shifts and measured-value changes, while newly introduced findings still surface.
+- **Hook-only changed-region fairness** - `hook --changed-ranges ... --changed-scope=symbol` now returns changed line/symbol findings but omits file/project-scope findings, including anchor-line residuals, unless they are new versus a supplied hook baseline or diff base. This keeps coding-agent feedback focused on attributable edits without changing existing `analyse`, `summary`, or CI JSON output.
+- **Fairer changed-region symbol scope for aggregate findings** - `--changed-scope=symbol` now drops file/class aggregate findings such as `size.file-length`, `size.class-length`, and `docs.todo-density` when the changed hunk does not touch their reported anchor, while ordinary method/symbol findings still follow their enclosing changed declaration. Full scans still report the aggregate findings. Use the new `--changed-scope=file` mode when changed-file review workflows should keep file-level aggregates and class aggregate span hits.
+
 ## 0.3.1 - 2026-06-04
 
 0.3.1 adds one conservative test-quality rule, fixes Symfony YAML route and changed-region accounting edges in project-wide dead-code analysis, and moves the headline numbers to the top of text reports. No breaking changes; JSON schemas, config format, and baselines are unchanged.

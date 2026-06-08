@@ -224,7 +224,7 @@ vendor/bin/gruff-php analyse --format json --since HEAD src/Example.php --fail-o
 git diff | vendor/bin/gruff-php analyse --format json --diff - --fail-on none
 ```
 
-Bare `--diff` compares the working tree to `HEAD`. `--changed-scope=symbol` is the default and keeps findings whose own location or enclosing declaration overlaps a changed hunk; use `--changed-scope=hunk` for strict line-span filtering. JSON output includes top-level `suppressedCount` when changed-region mode is active.
+Bare `--diff` compares the working tree to `HEAD`. `--changed-scope=symbol` is the default and keeps ordinary findings whose own location or enclosing declaration overlaps a changed hunk; file/class aggregate findings are kept only when the hunk touches their reported anchor. Use `--changed-scope=hunk` for strict line-span filtering, or `--changed-scope=file` when a changed-file review should keep file-level aggregates and class aggregate findings whose reported span overlaps the hunk. JSON output includes top-level `suppressedCount` when changed-region mode is active.
 
 Branch review compares against a base ref:
 

@@ -26,6 +26,31 @@ final readonly class DiffFindingFilter
     public const SCOPE_HUNK   = 'hunk';
 
     /**
+     * Include file-level aggregates from changed files and declaration aggregates whose span overlaps a changed diff hunk.
+     */
+    public const SCOPE_FILE   = 'file';
+
+    /**
+     * Rule ids whose diagnostic scope is the whole source file.
+     */
+    private const FILE_AGGREGATE_RULE_IDS = [
+        'docs.todo-density' => true,
+        'size.file-length'  => true,
+    ];
+
+    /**
+     * Rule ids whose diagnostic location is an aggregate anchor, not a reviewable symbol span.
+     */
+    private const ANCHOR_ONLY_AGGREGATE_RULE_IDS = [
+        'docs.todo-density'           => true,
+        'size.average-method-length'  => true,
+        'size.class-length'           => true,
+        'size.file-length'            => true,
+        'size.property-count'         => true,
+        'size.public-method-count'    => true,
+    ];
+
+    /**
      * @param list<Finding> $findings - Findings to filter against the diff scope.
      * @param DiffResult    $diff - Diff result used to retain changed-file findings.
      *
@@ -44,7 +69,8 @@ final readonly class DiffFindingFilter
      * @param list<Finding>      $findings - Findings to filter against the diff scope.
      * @param DiffResult         $diff - Diff result used to retain changed-file findings.
      * @param list<AnalysisUnit> $analysisUnits - Parsed units used to recover enclosing declarations.
-     * @param string             $scope - SCOPE_SYMBOL widens a hit to its enclosing declaration; SCOPE_HUNK keeps only hunk hits.
+     * @param string             $scope - SCOPE_SYMBOL widens ordinary hits to their enclosing declaration; SCOPE_HUNK keeps only hunk hits;
+     *                                    SCOPE_FILE keeps file aggregates and aggregate span hits for changed-file review workflows.
      *
      * @return DiffFilterResult - kept findings in input order paired with the count dropped as out of diff scope
      */
@@ -63,7 +89,7 @@ final readonly class DiffFindingFilter
         $suppressedCount   = 0;
 
         foreach ($findings as $finding) {
-            if ($this->isFindingInScope($finding, $diff, $declarationRanges)) {
+            if ($this->isFindingInScope($finding, $diff, $declarationRanges, $scope)) {
                 $kept[] = $finding;
                 continue;
             }
@@ -78,10 +104,11 @@ final readonly class DiffFindingFilter
      * @param Finding                               $finding - Single finding whose location is tested for diff membership.
      * @param DiffResult                            $diff - Source of changed files and changed-line ranges to test against.
      * @param array<string, list<ChangedLineRange>> $declarationRanges - Per-file declaration spans for symbol widening.
+     * @param string                                $scope - Changed-region scope requested by the caller.
      *
      * @return bool - true when the finding belongs to a changed file, hunk, or enclosing changed declaration
      */
-    private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges): bool
+    private function isFindingInScope(Finding $finding, DiffResult $diff, array $declarationRanges, string $scope): bool
     {
         if (!in_array($finding->filePath, $diff->changedFiles, true)) {
             // The diff never touched this file, so nothing in it can be attributable to the change.
@@ -101,6 +128,17 @@ final readonly class DiffFindingFilter
             return true;
         }
 
+        if ($scope === self::SCOPE_FILE && $this->isFileAggregateFinding($finding)) {
+            // File scope intentionally preserves file-level aggregate findings for changed-file review workflows.
+            return true;
+        }
+
+        if ($scope !== self::SCOPE_FILE && $this->isAnchorOnlyAggregateFinding($finding)) {
+            // Aggregate rules report a representative anchor. Under changed-region symbol/hunk review,
+            // keep them only when the edit touches that anchor instead of widening to the whole file/class span.
+            return $this->hasRangeOverlap($changedRanges, $line, $line);
+        }
+
         $endLine = $finding->endLine ?? $line;
         if ($this->hasRangeOverlap($changedRanges, $line, $endLine)) {
             // The finding's own span lands on edited lines, so it is a direct consequence of the diff.
@@ -116,6 +154,26 @@ final readonly class DiffFindingFilter
         // Last chance under symbol scope: the finding sits in a method/closure whose body was edited,
         // so editing any part of that symbol pulls the whole symbol's findings back into review.
         return $this->hasRangeOverlap($changedRanges, $enclosingRange->startLine, $enclosingRange->endLine);
+    }
+
+    /**
+     * @param Finding $finding - Finding to classify before symbol/file span widening.
+     *
+     * @return bool - true when the rule reports a file or class aggregate anchored at a representative line
+     */
+    private function isAnchorOnlyAggregateFinding(Finding $finding): bool
+    {
+        return isset(self::ANCHOR_ONLY_AGGREGATE_RULE_IDS[$finding->ruleId]);
+    }
+
+    /**
+     * @param Finding $finding - Finding to classify for changed-file aggregate review.
+     *
+     * @return bool - true when the rule reports one aggregate finding for the whole file
+     */
+    private function isFileAggregateFinding(Finding $finding): bool
+    {
+        return isset(self::FILE_AGGREGATE_RULE_IDS[$finding->ruleId]);
     }
 
     /**

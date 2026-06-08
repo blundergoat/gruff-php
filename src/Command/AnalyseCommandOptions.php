@@ -39,7 +39,7 @@ final readonly class AnalyseCommandOptions
      * @param string|null                $diffMode - Requested diff mode, when diff analysis is enabled.
      * @param string|null                $since - Git base ref used for changed-region analysis.
      * @param string|null                $changedRanges - Explicit changed ranges used for changed-region analysis.
-     * @param string                     $changedScope - Changed-region scope: symbol or hunk.
+     * @param string                     $changedScope - Changed-region scope: symbol, hunk, or file.
      * @param string|null                $diffVs - Comparison ref used for diff and changed-only analysis.
      * @param bool                       $isChangedOnly - Whether analysis should be restricted to changed files.
      * @param string|null                $historyFile - Trend history file path, when configured.
@@ -565,9 +565,9 @@ final readonly class AnalyseCommandOptions
             return '--diff, --since, --changed-ranges, and --diff-vs are mutually exclusive.';
         }
 
-        if (!in_array($this->changedScope, ['symbol', 'hunk'], true)) {
+        if (!in_array($this->changedScope, ['symbol', 'hunk', 'file'], true)) {
             // Scope drives how ranges map to findings; an unknown value would silently mis-scope, so reject it.
-            return '--changed-scope must be one of: symbol, hunk.';
+            return '--changed-scope must be one of: symbol, hunk, file.';
         }
 
         if ($this->changedRanges !== null && $this->paths === []) {

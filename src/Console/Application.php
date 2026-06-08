@@ -7,6 +7,7 @@ namespace GruffPhp\Console;
 use GruffPhp\Command\AnalyseCommand;
 use GruffPhp\Command\CheckIgnoreCommand;
 use GruffPhp\Command\DashboardCommand;
+use GruffPhp\Command\HookCommand;
 use GruffPhp\Command\InitCommand;
 use GruffPhp\Command\ListRulesCommand;
 use GruffPhp\Command\ReportCommand;
@@ -39,6 +40,7 @@ final class Application extends SymfonyApplication
             new AnalyseCommand(),
             new CheckIgnoreCommand(),
             new DashboardCommand(),
+            new HookCommand(),
             new InitCommand(),
             new ListRulesCommand(),
             new ReportCommand(),
