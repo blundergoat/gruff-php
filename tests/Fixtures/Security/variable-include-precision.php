@@ -40,6 +40,11 @@ function fixedShapeIncludePaths(): void
     $fixedDir = __DIR__ . '/inc/';
     require $fixedDir . 'z.php';
 
+    $guardedAutoload = __DIR__ . '/vendor/autoload.php';
+    if (file_exists($guardedAutoload) && is_readable($guardedAutoload)) {
+        require_once $guardedAutoload;
+    }
+
     $laterCall = __DIR__ . '/later.php';
     require $laterCall;
     poisonIncludePath($laterCall);

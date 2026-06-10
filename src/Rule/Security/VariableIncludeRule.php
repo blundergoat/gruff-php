@@ -37,6 +37,20 @@ final class VariableIncludeRule implements RuleInterface
     private const FIXED_CONSTANT_NAME_PATTERN = '/^[A-Z][A-Z0-9_]*$/';
 
     /**
+     * Global path-inspection functions that cannot mutate an include-path local passed by value.
+     *
+     * @var array<string, true>
+     */
+    private const NON_MUTATING_PATH_FUNCTIONS = [
+        'file_exists' => true,
+        'is_dir'      => true,
+        'is_file'     => true,
+        'is_readable' => true,
+        'is_writable' => true,
+        'realpath'    => true,
+    ];
+
+    /**
      * Describe the variable include security rule.
      *
      * @return RuleDefinition - Rule metadata and defaults.
@@ -413,10 +427,10 @@ final class VariableIncludeRule implements RuleInterface
             return true;
         }
 
-        if (($candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall)
-            && $this->doesPassNameAsDirectArgument($candidate, $name)
-        ) {
-            return true;
+        if ($candidate instanceof Expr\FuncCall || $candidate instanceof Expr\MethodCall || $candidate instanceof Expr\StaticCall) {
+            if ($this->doesPassNameAsDirectMutableArgument($candidate, $name)) {
+                return true;
+            }
         }
 
         if ($candidate instanceof Stmt\Foreach_ && ($this->doesBindName($candidate->valueVar, $name) || ($candidate->keyVar instanceof Expr && $this->doesBindName($candidate->keyVar, $name)))) {
@@ -440,14 +454,14 @@ final class VariableIncludeRule implements RuleInterface
     }
 
     /**
-     * Detect calls that hand the include-path local to unknown code before the include.
+     * Detect calls that hand the include-path local to code that may mutate it before the include.
      *
      * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node whose arguments are inspected.
      * @param string                                        $name - Variable name without the leading `$`.
      *
      * @return bool - True when the variable is passed as a direct argument and could be mutated by reference.
      */
-    private function doesPassNameAsDirectArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
+    private function doesPassNameAsDirectMutableArgument(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call, string $name): bool
     {
         foreach ($call->args as $argument) {
             if (!$argument instanceof Node\Arg) {
@@ -455,11 +469,30 @@ final class VariableIncludeRule implements RuleInterface
             }
 
             if ($argument->value instanceof Expr\Variable && $argument->value->name === $name) {
-                return true;
+                return $argument->byRef || !$this->isKnownNonMutatingPathFunction($call);
             }
         }
 
         return false;
+    }
+
+    /**
+     * Check whether a direct argument is being read by a known path guard instead of handed to unknown code.
+     *
+     * @param Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call - Call node carrying the argument.
+     *
+     * @return bool - True for global built-ins that inspect path strings without mutating their arguments.
+     */
+    private function isKnownNonMutatingPathFunction(Expr\FuncCall|Expr\MethodCall|Expr\StaticCall $call): bool
+    {
+        if (!$call instanceof Expr\FuncCall) {
+            // Method/static calls can be userland code with by-reference parameters, so remain unprovable.
+            return false;
+        }
+
+        $functionName = SecurityNodeHelper::globalFunctionName($call);
+
+        return $functionName !== null && isset(self::NON_MUTATING_PATH_FUNCTIONS[$functionName]);
     }
 
     /**
