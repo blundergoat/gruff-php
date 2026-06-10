@@ -103,14 +103,14 @@ final class ResultCacheCliTest extends CliTestCase
     }
 
     /**
-     * Verify runs with project rules active bypass the per-file cache.
+     * Verify a default no-config run writes the per-file cache now that no registered rule needs project context.
      *
      * @return void
      */
-    public function testProjectRuleRunDoesNotWriteCache(): void
+    public function testDefaultRunWritesCacheWithNoProjectRulesRegistered(): void
     {
-        // No --profile: the default rule set includes project rules, so the cache
-        // must stay disabled (skipping a unit would corrupt project-rule output).
+        // No --profile: since the project rules were retired the default rule set has no
+        // ProjectRuleInterface implementor, so the cache guard passes and entries are written.
         $process = new Process(
             [PHP_BINARY, self::PROJECT_ROOT . '/bin/gruff-php', 'analyse', 'src', '--no-config', '--fail-on', 'none', '--format', 'json'],
             $this->project,
@@ -118,7 +118,7 @@ final class ResultCacheCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertDirectoryDoesNotExist($this->project . '/.gruff-cache');
+        self::assertDirectoryExists($this->project . '/.gruff-cache');
     }
 
     /**

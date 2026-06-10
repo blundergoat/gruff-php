@@ -194,8 +194,13 @@ final class AnalysisPipeline
         // The per-file result cache is only byte-identical-correct when no rule
         // needs cross-file state: project rules (accumulators included) observe
         // every unit during analysis, so reusing a cached file's findings without
-        // re-running them would corrupt the project-rule output.
-        $cacheable   = !$options->noCache && !$this->registry->hasEnabledProjectRules($config);
+        // re-running them would corrupt the project-rule output. A run whose
+        // discovered working set exceeds the cache's entry cap is also ineligible:
+        // its entries would be evicted before any warm run could reuse them, so
+        // over-cap repos silently run uncached instead of thrashing the store.
+        $cacheable   = !$options->noCache
+            && !$this->registry->hasEnabledProjectRules($config)
+            && ResultCache::canHoldRun(count($discoveryResult->files));
         $cache       = $cacheable ? ResultCache::forProject($projectRoot) : null;
         $fingerprint = $cacheable ? AnalysisFingerprint::forRun($this->registry, $config, Application::VERSION) : null;
 
@@ -241,6 +246,9 @@ final class AnalysisPipeline
             $unit->release();
             unset($unit);
         }
+
+        // Trim the store to its cap exactly once per run; evicting per put globbed the cache directory on every write.
+        $cache?->finalizeRun();
 
         array_push($findings, ...$this->registry->endStreaming($ruleContext, $ruleRunnerObserver));
         $findings  = $this->registry->finalizeFindings($findings);

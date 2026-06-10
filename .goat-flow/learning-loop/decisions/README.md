@@ -61,6 +61,8 @@ Everything else in this directory is a stats failure. If a note cannot earn an A
 - `ADR-022-test-quality-gate-parity.md`
 - `ADR-023-retire-design-god-rubric.md`
 - `ADR-024-cluster-correlated-complexity-penalties.md`
+- `ADR-025-return-comment-to-described-return-tag.md`
+- `ADR-026-retire-project-rules.md`
 
 ## Required Structure
 

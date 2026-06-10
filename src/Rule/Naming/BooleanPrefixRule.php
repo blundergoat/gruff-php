@@ -393,8 +393,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
 
             $nextChar = $name[strlen($prefix)];
-            if ($nextChar >= 'A' && $nextChar <= 'Z') {
-                // Uppercase next char marks a camelCase boundary (`isReady`), so the prefix is a real word.
+            if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
+                // An uppercase char marks a camelCase boundary (`isReady`) and an underscore a snake_case
+                // boundary (`is_ready`), so either way the prefix is a real word; a lowercase char (`isolate`) is not.
                 return true;
             }
         }
@@ -417,8 +418,9 @@ final readonly class BooleanPrefixRule implements RuleInterface
             }
 
             $nextChar = $name[strlen($prefix)];
-            if ($nextChar >= 'A' && $nextChar <= 'Z') {
-                // Negative prefix at a camelCase boundary (`noCache`); NegativeBooleanRule owns these instead.
+            if (($nextChar >= 'A' && $nextChar <= 'Z') || $nextChar === '_') {
+                // Negative prefix at a camelCase (`noCache`) or snake_case (`no_cache`) boundary;
+                // NegativeBooleanRule owns these instead.
                 return true;
             }
         }

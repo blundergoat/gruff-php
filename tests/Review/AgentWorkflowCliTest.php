@@ -46,12 +46,12 @@ final class AgentWorkflowCliTest extends TestCase
     }
 
     /**
-     * Verify display filters are report metadata and do not enable rules.
+     * Verify --include-rule narrows execution and scoring to the named rule while --min-severity stays a display-only filter in run metadata.
      *
      * @return void
      * @throws JsonException
      */
-    public function testDisplayFiltersAreReportMetadataAndDoNotEnableRules(): void
+    public function testIncludeRuleNarrowsExecutionWhileMinSeverityRemainsDisplayOnly(): void
     {
         $process = new Process([
                                    PHP_BINARY,
@@ -80,7 +80,7 @@ final class AgentWorkflowCliTest extends TestCase
         self::assertTrue($filters['active'] ?? null);
         self::assertSame('warning', $this->stringValue($filters, 'minSeverity'));
         self::assertSame(['naming.identifier-quality'], $this->listValue($filters, 'includeRules'));
-        self::assertSame('F', $this->stringValue($composite, 'grade'));
+        self::assertSame('A', $this->stringValue($composite, 'grade'));
     }
 
     /**
@@ -378,66 +378,6 @@ final class AgentWorkflowCliTest extends TestCase
 
             self::assertSame(1, $this->intValue($counts, 'introduced'));
             self::assertContains('Example::newRisk()', $this->symbolsFromFindings($review['introduced'] ?? null));
-        } finally {
-            $this->removeDir($repo);
-        }
-    }
-
-    /**
-     * Verify changed-only review gives project rules full context before changed-file filtering.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testBranchReviewChangedOnlyUsesFullProjectContextForProjectRules(): void
-    {
-        $this->skipWhenGitIsUnavailable();
-        $repo = $this->tempDir();
-
-        try {
-            self::assertTrue(mkdir($repo . '/src/Contracts', 0777, true));
-            self::assertTrue(mkdir($repo . '/src/Infrastructure', 0777, true));
-            $this->runGit($repo, 'init');
-            $this->runGit($repo, 'config', 'user.email', 'test@example.com');
-            $this->runGit($repo, 'config', 'user.name', 'Gruff Test');
-            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', AgentWorkflowFixtureSources::bookingGatewayInterfaceSource());
-            file_put_contents($repo . '/src/Infrastructure/BookingOtpGateway.php', AgentWorkflowFixtureSources::bookingOtpGatewaySource());
-            $this->runGit($repo, 'add', 'src/Contracts/BookingGatewayInterface.php', 'src/Infrastructure/BookingOtpGateway.php');
-            $this->runGit($repo, 'commit', '-m', 'base');
-
-            file_put_contents($repo . '/src/Contracts/BookingGatewayInterface.php', AgentWorkflowFixtureSources::changedBookingGatewayInterfaceSource());
-
-            $process = new Process([
-                                       PHP_BINARY,
-                                       self::PROJECT_ROOT . '/bin/gruff-php',
-                                       'analyse',
-                                       '--format=json',
-                                       '--fail-on=none',
-                                       '--no-config',
-                                       '--no-baseline',
-                                       '--diff-vs=HEAD',
-                                       '--changed-only',
-                                       '--include-rule=design.single-implementor-interface',
-                                   ], $repo);
-            $process->run();
-
-            self::assertSame(0, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
-            $report = $this->decodeJson($process);
-            self::assertSame([], $this->diagnosticTypes($report));
-
-            $summary = $this->arrayValue($report, 'summary');
-            self::assertSame(1, $this->intValue($summary, 'filesDiscovered'));
-
-            $review = $this->arrayValue($report, 'review');
-            $counts = $this->arrayValue($review, 'counts');
-
-            self::assertSame(0, $this->intValue($counts, 'introduced'));
-            self::assertSame(0, $this->intValue($counts, 'removed'));
-            self::assertSame(1, $this->intValue($counts, 'unchanged'));
-            self::assertContains(
-                'App\\Contracts\\BookingGatewayInterface',
-                $this->symbolsFromFindings($review['unchanged'] ?? null),
-            );
         } finally {
             $this->removeDir($repo);
         }

@@ -32,7 +32,7 @@ final class AnalyseCliTest extends CliTestCase
         $process->run();
 
         self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('gruff-php 0.3.1', $process->getOutput());
+        self::assertStringContainsString('gruff-php 0.4.0', $process->getOutput());
         self::assertStringContainsString('Discovered: 2', $process->getOutput());
         self::assertStringContainsString('Ignored: 6', $process->getOutput());
         self::assertStringContainsString('tests/Fixtures/Source/mixed/vendor/ignored.php', $process->getOutput());
@@ -256,24 +256,40 @@ final class AnalyseCliTest extends CliTestCase
     }
 
     /**
-     * Verify analyse command fails invalid config.
+     * Verify --exclude-rule is execution-level: the excluded rule's findings neither display nor trip the fail gate.
      *
      * @return void
+     * @throws JsonException
      */
-    public function testAnalyseCommandFailsInvalidConfig(): void
+    public function testAnalyseCommandExcludeRuleSkipsExecutionAndExitCode(): void
     {
-        $process = new Process([
-                                   PHP_BINARY,
-                                   __DIR__ . '/../../bin/gruff-php',
-                                   'analyse',
-                                   '--config',
-                                   'tests/Fixtures/Config/unknown-rule.yaml',
-                                   'tests/Fixtures/Source/mixed/alpha.php',
-                               ], __DIR__ . '/../..');
-        $process->run();
+        $baseArguments = [
+            PHP_BINARY,
+            __DIR__ . '/../../bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Source/Code',
+            '--no-config',
+            '--no-baseline',
+            '--format',
+            'json',
+            '--fail-on',
+            'advisory',
+        ];
 
-        self::assertSame(2, $process->getExitCode());
-        self::assertStringContainsString('[CONFIG-ERROR] Unknown rule id "size.nope".', $process->getOutput());
+        $controlProcess = new Process($baseArguments, __DIR__ . '/../..');
+        $controlProcess->run();
+        self::assertSame(1, $controlProcess->getExitCode(), 'the fixture must trip the advisory gate for the exclusion proof to mean anything');
+
+        $excludedProcess = new Process([...$baseArguments, '--exclude-rule', 'docs.missing-public-phpdoc'], __DIR__ . '/../..');
+        $excludedProcess->run();
+        self::assertSame(0, $excludedProcess->getExitCode(), $excludedProcess->getErrorOutput());
+
+        $report  = $this->decodeJsonOutput($excludedProcess);
+        $summary = $report['summary'] ?? null;
+        self::assertIsArray($summary);
+        $findingCounts = $summary['findings'] ?? null;
+        self::assertIsArray($findingCounts);
+        self::assertSame(0, $findingCounts['total'] ?? null);
     }
 
     /**

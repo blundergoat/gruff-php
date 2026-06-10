@@ -2,6 +2,21 @@
 
 Notable user-facing changes to `gruff-php` are listed here.
 
+## 0.4.0 - 2026-06-11
+
+0.4.0 retires the project rules whose whole-project analysis made per-edit feedback slow and whose verified false-positive rates made their findings untrustworthy on framework code. With no project rules left, the per-file result cache introduced in 0.3.0 now engages on every default run, and single-file scans no longer pay whole-project cost. Eight per-unit rules also gained precision fixes for mechanical misfires.
+
+- **BEHAVIOUR CHANGE: `analyse --include-rule`/`--exclude-rule` now select rule execution** - Excluded rules no longer run or count toward `--fail-on`, `failureConditions`, scoring, or baselines; `--include-rule` runs only the named rules; unknown rule ids are now usage errors.
+- **BREAKING: Removed `dead-code.unused-internal-class`, `dead-code.unused-internal-constant`, and `dead-code.unused-internal-function`** - False-positive rates up to 95% on framework code, and each forced a 13-31s whole-project reparse per single-file scan.
+- **BREAKING: Removed `design.single-implementor-interface`** - 45-100% false-positive rates: extension-point interfaces read as single-implementor.
+- **Configs naming removed rules keep working** - Unknown rule ids under `rules:` warn on stderr and are ignored; `selection:` entries still reject them.
+- **Per-file result cache now engages by default** - Warm whole-repo scans on the framework test corpus dropped from 33-82s to 1.8-5.0s with byte-identical findings; the entry cap rose from 4096 to 32768.
+- **Single-file `analyse`/`hook` is no longer O(project)** - One-file scans dropped from 13-31s to under 0.1s on real framework repos.
+- **Naming, test-quality, and superglobal rules misfire less** - `test-quality.extends-production-class` recognises snake_case test bases, `naming.boolean-prefix` accepts `is_valid`-style names, `naming.identifier-quality`'s loop escape hatch reaches closure params, and `modernisation.forbidden-global-access` no longer flags superglobal writes.
+- **Security rules exempt provably safe code** - `security.variable-include` accepts provably fixed include paths (new `treatGlobalConstantsAsFixed`/`dynamicPathConstants` options); `security.sql-concatenation` understands `$wpdb->prepare()`, safe identifier interpolation, and non-SQL `query()`.
+- **Sensitive-data rules skip identifiers and synthetic fixtures** - `sensitive-data.high-entropy-string` exempts identifier/key/alphabet literals (real secrets and tokens keep flagging); `sensitive-data.pii-test-fixture` accepts reserved-TLD emails and marked synthetic addresses.
+- **Config-less runs no longer hang or write config on piped stdin** - The init offer now appears only for terminal users with human-oriented output, so piped stdin cannot block a run or silently create `.gruff-php.yaml`.
+
 ## 0.3.1 - 2026-06-09
 
 0.3.1 adds the `gruff.hook.v1` agent-hook contract (`gruff-php hook --format json`) for editor and coding-agent integrations, plus one conservative test-quality rule, fixes Symfony YAML route and changed-region accounting edges in project-wide dead-code analysis, and moves the headline numbers to the top of text reports. No breaking changes; JSON schemas, config format, and baselines are unchanged.

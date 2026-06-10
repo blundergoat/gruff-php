@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
@@ -27,13 +28,14 @@ final readonly class MissingConfigPrompt
     /**
      * Decide whether to offer the init prompt and run it when accepted.
      *
-     * Skips silently when stdin is non-interactive, when the caller passed
-     * --no-config or --config, or when a project config already exists. The
-     * prompt and any dispatched init output are routed to the error stream so
-     * machine-readable stdout payloads (JSON, SARIF, HTML) stay parseable. The
-     * dispatched init command is scoped to {@see $projectRoot} so callers that
-     * address a non-CWD root (notably `dashboard --project ...`) write the new
-     * config in the right directory.
+     * Skips silently when stdin is non-interactive, when the active output
+     * format is machine-readable, when the caller passed --no-config or
+     * --config, or when a project config already exists. The prompt and any
+     * dispatched init output are routed to the error stream so machine-readable
+     * stdout payloads (JSON, SARIF, HTML) stay parseable. The dispatched init
+     * command is scoped to {@see $projectRoot} so callers that address a
+     * non-CWD root (notably `dashboard --project ...`) write the new config in
+     * the right directory.
      *
      * @param InputInterface          $input - Console input for the calling command.
      * @param OutputInterface         $output - Console output for the calling command.
@@ -41,6 +43,8 @@ final readonly class MissingConfigPrompt
      * @param string                  $projectRoot - Project root used to look for an existing config.
      * @param string|null             $explicitConfigPath - Explicit --config path, when supplied.
      * @param bool                    $shouldSkipConfig - Whether the caller passed --no-config.
+     * @param bool                    $isMachineReadableFormat - Whether the caller renders a machine-parsed payload, which suppresses the prompt.
+     * @param (callable(): bool)|null $stdinTtyProbe - Test seam overriding the real-STDIN TTY probe; null probes STDIN itself.
      *
      * @return int|null - Exit code when init was run and failed; null when the caller may continue.
      */
@@ -51,13 +55,25 @@ final readonly class MissingConfigPrompt
         string $projectRoot,
         ?string $explicitConfigPath,
         bool $shouldSkipConfig,
+        bool $isMachineReadableFormat = false,
+        ?callable $stdinTtyProbe = null,
     ): ?int {
         if ($shouldSkipConfig || $explicitConfigPath !== null) {
             // Caller already chose a config path (or opted out), so offering init would override their intent.
             return null;
         }
+        if ($isMachineReadableFormat) {
+            // The run feeds a parser or artifact store, so never mix an interactive offer into it.
+            return null;
+        }
         if (!$input->isInteractive()) {
-            // No TTY to read a y/N answer from, so never block a piped or CI run on a prompt.
+            // The caller opted out of interaction (-n/--quiet), so never block a piped or CI run on a prompt.
+            return null;
+        }
+        if (!self::hasAnswerableInput($input, $stdinTtyProbe)) {
+            // Symfony's interactive flag stays true for piped stdin without -n; with no TTY and no explicit
+            // stream nobody can answer, so skip instead of blocking in the question helper (or consuming
+            // piped data such as a file list starting with "y" as consent).
             return null;
         }
         if (ConfigLoader::hasProjectConfig($projectRoot)) {
@@ -98,6 +114,57 @@ final readonly class MissingConfigPrompt
 
         // Surface a failed init as the caller's exit code; on success return null so the caller proceeds.
         return $exitCode === Command::SUCCESS ? null : $exitCode;
+    }
+
+    /**
+     * Decide whether a y/N answer can actually be read for this input.
+     *
+     * An explicitly set stream (tests, embedders) counts as answerable —
+     * mirroring QuestionHelper's own stream resolution. Only when no stream
+     * was set is the process's real STDIN probed for a terminal. Accepted
+     * edge: genuinely interactive users without a TTY stdin (ssh -T, MSYS
+     * mintty) lose the init offer; the machine-readable-format skip is the
+     * primary guard precisely because this probe cannot see them.
+     *
+     * @param InputInterface          $input - Console input for the calling command.
+     * @param (callable(): bool)|null $stdinTtyProbe - Test seam overriding the real-STDIN TTY probe; null probes STDIN itself.
+     *
+     * @return bool - True when the prompt has an input source that can answer it.
+     */
+    private static function hasAnswerableInput(InputInterface $input, ?callable $stdinTtyProbe): bool
+    {
+        if ($input instanceof StreamableInputInterface && $input->getStream() !== null) {
+            // An explicitly set stream is an intentional answer source (QuestionHelper reads it), so honour it.
+            return true;
+        }
+
+        if ($stdinTtyProbe !== null) {
+            // A test supplied its own probe, so consult it instead of the process's real STDIN.
+            return $stdinTtyProbe();
+        }
+
+        return self::isStdinTty();
+    }
+
+    /**
+     * Probe whether the process's real STDIN is attached to a terminal.
+     *
+     * @return bool - True when STDIN exists and is a TTY.
+     */
+    private static function isStdinTty(): bool
+    {
+        if (!defined('STDIN')) {
+            // Non-CLI SAPIs expose no STDIN constant; treat that as non-interactive rather than guessing.
+            return false;
+        }
+
+        $stdin = constant('STDIN');
+        if (!is_resource($stdin)) {
+            // A closed or detached descriptor cannot answer a prompt, and probing it would raise a warning.
+            return false;
+        }
+
+        return stream_isatty($stdin);
     }
 
     /**

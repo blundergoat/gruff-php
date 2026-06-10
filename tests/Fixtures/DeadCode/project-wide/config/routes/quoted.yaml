@@ -1,9 +1,0 @@
-single_quoted_controller:
-  path: /single-quoted
-  defaults:
-    _controller: 'App\Controller\SingleQuotedController::index'
-
-double_quoted_controller:
-  path: /double-quoted
-  defaults:
-    _controller: "App\\Controller\\DoubleQuotedController::index"

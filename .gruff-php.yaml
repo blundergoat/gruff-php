@@ -86,78 +86,6 @@ rules:
         enabled: true
         threshold: 4
         severity: error
-    # Project-owned class, interface, trait, or enum with no supported static references.
-    dead-code.unused-internal-class:
-        enabled: true
-        options:
-            internalNamespacePrefixes: []
-            entrypointSymbols: []
-            entrypointPathPrefixes: []
-            additionalExcludedPaths: []
-            externalNamespacePrefixes:
-                - Psr\
-                - Symfony\
-                - Doctrine\
-                - Twig\
-                - League\
-                - PhpParser\
-                - PHPUnit\
-            frameworkAttributePrefixes:
-                - Symfony\
-                - Doctrine\
-                - Attribute\AsCommand
-                - Attribute\AsController
-                - Attribute\AutoconfigureTag
-                - Attribute\AsEventSubscriber
-            treatTestsAsReferences: true
-    # Project-owned standalone constant with no supported direct constant-fetch references.
-    dead-code.unused-internal-constant:
-        enabled: true
-        options:
-            internalNamespacePrefixes: []
-            entrypointSymbols: []
-            entrypointPathPrefixes: []
-            additionalExcludedPaths: []
-            externalNamespacePrefixes:
-                - Psr\
-                - Symfony\
-                - Doctrine\
-                - Twig\
-                - League\
-                - PhpParser\
-                - PHPUnit\
-            frameworkAttributePrefixes:
-                - Symfony\
-                - Doctrine\
-                - Attribute\AsCommand
-                - Attribute\AsController
-                - Attribute\AutoconfigureTag
-                - Attribute\AsEventSubscriber
-            treatTestsAsReferences: true
-    # Project-owned standalone function with no supported direct function-call references.
-    dead-code.unused-internal-function:
-        enabled: true
-        options:
-            internalNamespacePrefixes: []
-            entrypointSymbols: []
-            entrypointPathPrefixes: []
-            additionalExcludedPaths: []
-            externalNamespacePrefixes:
-                - Psr\
-                - Symfony\
-                - Doctrine\
-                - Twig\
-                - League\
-                - PhpParser\
-                - PHPUnit\
-            frameworkAttributePrefixes:
-                - Symfony\
-                - Doctrine\
-                - Attribute\AsCommand
-                - Attribute\AsController
-                - Attribute\AutoconfigureTag
-                - Attribute\AsEventSubscriber
-            treatTestsAsReferences: true
     # Unused private constant
     dead-code.unused-private-constant:
         enabled: true
@@ -167,35 +95,6 @@ rules:
     # Unused private property
     dead-code.unused-private-property:
         enabled: true
-    # Single-implementor interface
-    design.single-implementor-interface:
-        enabled: true
-        options:
-            externalNamespacePrefixes:
-                - Psr\
-                - Symfony\
-                - Doctrine\
-                - Twig\
-                - League\
-                - PhpParser\
-                - PHPUnit\
-                - Stringable
-                - Throwable
-                - Countable
-                - IteratorAggregate
-                - Iterator
-                - JsonSerializable
-                - ArrayAccess
-                - Traversable
-            frameworkAttributePrefixes:
-                - Symfony\
-                - Doctrine\
-                - Attribute\AsCommand
-                - Attribute\AsController
-                - Attribute\AutoconfigureTag
-                - Attribute\AsEventSubscriber
-            treatMockUsageAsImplementor: false
-            additionalExcludedPaths: []
     # Bare PHPDoc tags
     docs.bare-phpdoc-tags:
         enabled: true
@@ -654,7 +553,6 @@ rules:
                 - 'tests/Console/AnalyseCliTest.php'
                 - 'tests/Reporting/SarifReporterTest.php'
                 - 'tests/Rule/Complexity/*RuleTest.php'
-                - 'tests/Rule/Design/SingleImplementorInterfaceRuleTest.php'
                 - 'tests/Rule/Modernisation/PhpDocMixedOveruseRuleTest.php'
                 - 'tests/Rule/SensitiveData/SensitiveDataRulesTest.php'
                 - 'tests/Rule/TestQuality/TestQualityNodeHelperTest.php'

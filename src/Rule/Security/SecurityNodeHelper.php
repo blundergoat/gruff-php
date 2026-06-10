@@ -305,7 +305,7 @@ final class SecurityNodeHelper
      *
      * @return FunctionLike|null - nearest enclosing function/method/closure, or null when the node lives at file scope
      */
-    private static function enclosingFunctionLike(Node $node): ?FunctionLike
+    public static function enclosingFunctionLike(Node $node): ?FunctionLike
     {
         $current = $node;
         while ($current instanceof Node) {

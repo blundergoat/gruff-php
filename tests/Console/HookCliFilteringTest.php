@@ -58,6 +58,47 @@ YAML);
     }
 
     /**
+     * Verify unknown hook rule filters return an in-band error instead of running zero rules.
+     *
+     * @return void
+     * @throws JsonException
+     */
+    public function testHookRejectsUnknownExecutionRuleFilters(): void
+    {
+        $tempDir = $this->tempDir();
+
+        try {
+            file_put_contents($tempDir . '/Example.php', $this->fileAndSymbolSource());
+
+            foreach (['--include-rule', '--exclude-rule'] as $option) {
+                [$process, $report] = $this->runHook($tempDir, [
+                    'hook',
+                    'Example.php',
+                    '--no-config',
+                    $option,
+                    'docs.missing-public-phpdox',
+                    '--format',
+                    'json',
+                ]);
+
+                self::assertSame(2, $process->getExitCode(), $process->getOutput() . $process->getErrorOutput());
+
+                $config = $report['config'] ?? null;
+                self::assertIsArray($config, sprintf('Expected config payload for %s.', $option));
+                self::assertFalse($config['schemaOk'] ?? true, sprintf('Expected schema failure for %s.', $option));
+                self::assertSame(
+                    sprintf('Unknown rule id "docs.missing-public-phpdox" for %s.', $option),
+                    $config['error'] ?? null,
+                    sprintf('Expected unknown-rule message for %s.', $option),
+                );
+                self::assertSame([], $this->findingRows($report), sprintf('Expected no findings for %s.', $option));
+            }
+        } finally {
+            $this->removeDir($tempDir);
+        }
+    }
+
+    /**
      * Verify repeated same-rule line findings get distinct identities so a new duplicate still surfaces.
      *
      * Regression: line-scoped identities omit the line, so two symbol-less same-message findings (e.g.

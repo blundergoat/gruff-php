@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\TestQuality;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Parser\AnalysisUnit;
 use GruffPhp\Parser\PhpFileParser;
@@ -172,6 +173,29 @@ final class TestQualityConfigurationRulesTest extends TestCase
 
         self::assertRuleCount(NoAssertionsRule::ID, 0, $findings);
         self::assertRuleCount(TrivialAssertionRule::ID, 1, $findings);
+    }
+
+    /**
+     * Verify additionalTestBaseClasses accepts an exact base name that matches neither *TestCase shape.
+     *
+     * @return void
+     */
+    public function testExtendsProductionClassHonoursAdditionalTestBaseClasses(): void
+    {
+        $registry = RuleRegistry::defaults();
+        $settings = AnalysisConfig::fromRegistry($registry)->ruleSettings(ExtendsProductionClassRule::ID);
+        $config   = AnalysisConfig::fromRegistry($registry)->withRuleSettings(
+            ExtendsProductionClassRule::ID,
+            new RuleSettings(true, $settings->thresholds, array_merge($settings->options, ['additionalTestBaseClasses' => ['IntegrationTestBase']])),
+        );
+
+        $findings = array_values(array_filter(
+                                     $this->analysePaths(['tests/Fixtures/TestQuality/extends-production.php'], $config),
+                                     static fn(Finding $finding): bool => $finding->ruleId === ExtendsProductionClassRule::ID,
+                                 ));
+
+        self::assertCount(1, $findings);
+        self::assertSame('OrderServiceTest', $findings[0]->symbol);
     }
 
     /**

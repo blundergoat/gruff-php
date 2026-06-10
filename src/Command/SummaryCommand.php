@@ -85,12 +85,13 @@ final class SummaryCommand extends Command
         }
 
         $promptExitCode = MissingConfigPrompt::maybeOffer(
-            input:              $input,
-            output:             $output,
-            symfonyApplication: $this->getApplication(),
-            projectRoot:        $projectRoot,
-            explicitConfigPath: $configPath,
-            shouldSkipConfig:   $noConfig,
+            input:                   $input,
+            output:                  $output,
+            symfonyApplication:      $this->getApplication(),
+            projectRoot:             $projectRoot,
+            explicitConfigPath:      $configPath,
+            shouldSkipConfig:        $noConfig,
+            isMachineReadableFormat: $format === 'json',
         );
         if ($promptExitCode !== null) {
             return $promptExitCode;

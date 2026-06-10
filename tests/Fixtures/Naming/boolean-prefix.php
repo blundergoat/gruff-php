@@ -21,5 +21,11 @@ class BooleanPrefixFixture
     public function check(): bool { return false; }
     public function didRun(): bool { return true; }
 
+    public function has_note_been_actioned(): bool { return true; }
+    public function is_valid_state(): bool { return true; }
+
+    public function hasty(): bool { return true; }
+    public function isolate(): bool { return false; }
+
     public function getName(): string { return ''; }
 }

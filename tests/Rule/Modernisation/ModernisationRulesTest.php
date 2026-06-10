@@ -132,6 +132,25 @@ final class ModernisationRulesTest extends TestCase
     }
 
     /**
+     * Verify forbidden global access skips superglobal writes and unsets while reads keep flagging.
+     *
+     * @return void
+     */
+    public function testForbiddenGlobalAccessSkipsWritePositionsAndKeepsReads(): void
+    {
+        $findings = array_values(array_filter(
+                                     $this->analysePath('tests/Fixtures/Modernisation/forbidden-global-write-positions.php'),
+                                     static fn(Finding $finding): bool => $finding->ruleId === ForbiddenGlobalAccessRule::ID,
+                                 ));
+
+        // Plain read, compound assignment, and the read inside a write target's dimension expression.
+        self::assertSame(
+            ['_GET', '_GET', '_POST'],
+            array_map(static fn(Finding $finding): mixed => $finding->metadata['global'] ?? null, $findings),
+        );
+    }
+
+    /**
      * Verify modernisation rules keep their documented false-positive fixtures quiet.
      *
      * @param string $fixture - Fixture file under tests/Fixtures/Modernisation.

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Rule;
 
+use Closure;
 use GruffPhp\Config\AnalysisConfig;
+use GruffPhp\Config\RuleSelection;
 use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Finding;
@@ -19,9 +21,6 @@ use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rule\Complexity\NestingDepthRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalFunctionRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
 use GruffPhp\Rule\Modernisation\ConstructorPromotionCandidateRule;
@@ -37,6 +36,8 @@ use GruffPhp\Rule\Naming\AbbreviationAllowlistRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\Naming\NegativeBooleanRule;
 use GruffPhp\Rule\Naming\SuffixHungarianRule;
+use GruffPhp\Rule\ProjectRuleAccumulator;
+use GruffPhp\Rule\ProjectRuleInterface;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
@@ -131,9 +132,6 @@ final class RuleRegistryTest extends TestCase
             CognitiveComplexityRule::ID, CyclomaticComplexityRule::ID,
             HalsteadVolumeRule::ID, MaintainabilityIndexRule::ID,
             NestingDepthRule::ID,
-            UnusedInternalClassRule::ID,
-            UnusedInternalConstantRule::ID,
-            UnusedInternalFunctionRule::ID,
             UnusedPrivateConstantRule::ID,
             UnusedPrivateMethodRule::ID, UnusedPrivatePropertyRule::ID,
             CommentedOutCodeRule::ID, EmptyClassRule::ID,
@@ -261,6 +259,35 @@ final class RuleRegistryTest extends TestCase
     }
 
     /**
+     * Verify the project-rule accumulator seam observes full project context while per-unit analysis stays scoped.
+     *
+     * @return void
+     */
+    public function testProjectRuleAccumulatorSeamObservesFullProjectContext(): void
+    {
+        $ruleRegistry = new RuleRegistry([$this->accumulatingProjectRule()]);
+        $config       = AnalysisConfig::fromRegistry($ruleRegistry);
+        $alphaUnit    = $this->parseFixture('tests/Fixtures/Source/mixed/alpha.php');
+        $betaUnit     = $this->parseFixture('tests/Fixtures/Source/mixed/nested/beta.php');
+
+        self::assertTrue($ruleRegistry->hasEnabledProjectRules($config));
+        self::assertSame(['test.accumulating-project-rule'], $ruleRegistry->enabledProjectRuleIds($config));
+
+        $findings = $ruleRegistry->analyse(
+            [$alphaUnit],
+            new RuleContext(__DIR__ . '/../..', $config),
+            [$alphaUnit, $betaUnit],
+        );
+
+        self::assertCount(1, $findings);
+        self::assertSame('test.accumulating-project-rule', $findings[0]->ruleId);
+        self::assertSame(
+            'Accumulated: tests/Fixtures/Source/mixed/alpha.php, tests/Fixtures/Source/mixed/nested/beta.php.',
+            $findings[0]->message,
+        );
+    }
+
+    /**
      * Verify rejects duplicate rule ids.
      *
      * @return void
@@ -328,11 +355,59 @@ final class RuleRegistryTest extends TestCase
         usort($definitions, static fn(array $left, array $right): int => $left['id'] <=> $right['id']);
         $json = json_encode($definitions, JSON_THROW_ON_ERROR);
 
-        self::assertCount(133, $definitions);
+        self::assertCount(129, $definitions);
         self::assertSame(
-            'e6458d471a959cc841760b' . '96bc46aa52d7cf8c8c90839971d7e16934275af700',
+            'e048ea1bc51d59121b5616' . '37911744dfe0f264a0f916a7e0e34ca301ff52614e',
             hash('sha256', $json),
         );
+    }
+
+    /**
+     * Verify repeated enabledRules() calls with the same config reuse the memoised set without re-reading definitions.
+     *
+     * @return void
+     */
+    public function testEnabledRulesAreMemoisedPerConfigObject(): void
+    {
+        $definitionCalls = 0;
+        $countingRule    = $this->definitionCountingRule(static function () use (&$definitionCalls): void {
+            $definitionCalls++;
+        });
+        $registry        = new RuleRegistry([$countingRule]);
+        $config          = AnalysisConfig::fromRegistry($registry);
+        $callsBefore     = $definitionCalls;
+
+        $firstResolution  = $registry->enabledRules($config);
+        $secondResolution = $registry->enabledRules($config);
+
+        self::assertSame([$countingRule], $firstResolution);
+        self::assertSame($firstResolution, $secondResolution);
+        self::assertSame(
+            $callsBefore,
+            $definitionCalls,
+            'enabledRules() must not re-invoke definition(); the registry snapshots definitions at construction',
+        );
+    }
+
+    /**
+     * Verify the memoisation is keyed by config identity, so distinct configs resolve distinct rule sets.
+     *
+     * @return void
+     */
+    public function testDifferentConfigObjectsResolveDifferentEnabledRuleSets(): void
+    {
+        $registry       = RuleRegistry::defaults();
+        $fullConfig     = AnalysisConfig::fromRegistry($registry);
+        $narrowedConfig = $fullConfig->withRuleSelection(new RuleSelection(excludeRules: [FileLengthRule::ID]));
+
+        $fullRules     = $registry->enabledRules($fullConfig);
+        $narrowedRules = $registry->enabledRules($narrowedConfig);
+        $fullRuleIds   = array_map(static fn($rule): string => $rule->definition()->id, $fullRules);
+        $narrowedIds   = array_map(static fn($rule): string => $rule->definition()->id, $narrowedRules);
+
+        self::assertContains(FileLengthRule::ID, $fullRuleIds);
+        self::assertNotContains(FileLengthRule::ID, $narrowedIds);
+        self::assertSame($fullRules, $registry->enabledRules($fullConfig), 'the narrowed config must not poison the full config cache entry');
     }
 
     /**
@@ -347,6 +422,59 @@ final class RuleRegistryTest extends TestCase
         $absolutePath = __DIR__ . '/../..' . '/' . $displayPath;
 
         return (new PhpFileParser())->parse(new SourceFile($absolutePath, $displayPath));
+    }
+
+    /**
+     * Build a fixture rule that reports every definition() invocation through the given callback.
+     *
+     * @param Closure $onDefinitionCall - Invoked once per definition() call, before the definition is built.
+     *
+     * @return RuleInterface - an anonymous findings-free rule whose definition() calls are observable
+     */
+    private function definitionCountingRule(Closure $onDefinitionCall): RuleInterface
+    {
+        return new readonly class ($onDefinitionCall) implements RuleInterface {
+            /**
+             * Build the counting fixture rule.
+             *
+             * @param Closure $onDefinitionCall - Invoked once per definition() call.
+             */
+            public function __construct(private Closure $onDefinitionCall)
+            {
+            }
+
+            /**
+             * Return metadata for the fixture rule, reporting the invocation first.
+             *
+             * @return RuleDefinition - the counting fixture's deterministic identity and reporting metadata
+             */
+            public function definition(): RuleDefinition
+            {
+                ($this->onDefinitionCall)();
+
+                return new RuleDefinition(
+                    id:              'test.definition-counting',
+                    name:            'Definition counting fixture',
+                    pillar:          Pillar::Maintainability,
+                    tier:            RuleTier::V01,
+                    defaultSeverity: Severity::Advisory,
+                    confidence:      Confidence::Low,
+                );
+            }
+
+            /**
+             * Return findings produced by the fixture rule.
+             *
+             * @param AnalysisUnit $analysisUnit - Analysis unit.
+             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             *
+             * @return list<\GruffPhp\Finding\Finding> - always empty; this fixture only observes definition() calls
+             */
+            public function analyse(AnalysisUnit $analysisUnit, RuleContext $ruleContext): array
+            {
+                return [];
+            }
+        };
     }
 
     /**
@@ -407,6 +535,101 @@ final class RuleRegistryTest extends TestCase
                         confidence: Confidence::Low,
                     ),
                 ];
+            }
+        };
+    }
+
+    /**
+     * Build a streaming project-rule fixture that records every accumulated unit path.
+     *
+     * @return ProjectRuleInterface - an anonymous accumulator emitting one finding that lists the unit paths it observed
+     */
+    private function accumulatingProjectRule(): ProjectRuleInterface
+    {
+        return new class () implements ProjectRuleInterface, ProjectRuleAccumulator {
+            /**
+             * Display paths of every unit fed to accumulate(), in arrival order.
+             *
+             * @var list<string>
+             */
+            private array $observedPaths = [];
+
+            /**
+             * Return metadata for the fixture rule.
+             *
+             * @return RuleDefinition - the accumulator fixture's deterministic identity and reporting metadata
+             */
+            public function definition(): RuleDefinition
+            {
+                return new RuleDefinition(
+                    id:              'test.accumulating-project-rule',
+                    name:            'Accumulating project rule fixture',
+                    pillar:          Pillar::Maintainability,
+                    tier:            RuleTier::V01,
+                    defaultSeverity: Severity::Advisory,
+                    confidence:      Confidence::Low,
+                );
+            }
+
+            /**
+             * Reset the accumulated unit paths for a fresh project pass.
+             *
+             * @param RuleContext $ruleContext - Rule context for the fixture.
+             *
+             * @return void
+             */
+            public function startProject(RuleContext $ruleContext): void
+            {
+                $this->observedPaths = [];
+            }
+
+            /**
+             * Record one analysed unit's display path.
+             *
+             * @param AnalysisUnit $analysisUnit - Parsed unit to accumulate.
+             * @param RuleContext  $ruleContext - Rule context for the fixture.
+             *
+             * @return void
+             */
+            public function accumulate(AnalysisUnit $analysisUnit, RuleContext $ruleContext): void
+            {
+                $this->observedPaths[] = $analysisUnit->file->displayPath;
+            }
+
+            /**
+             * Emit one finding listing every accumulated unit path.
+             *
+             * @param RuleContext $ruleContext - Rule context for the fixture.
+             *
+             * @return list<Finding> - a single finding naming the observed paths, proving full project context reached the seam
+             */
+            public function finishProject(RuleContext $ruleContext): array
+            {
+                return [
+                    new Finding(
+                        ruleId:     'test.accumulating-project-rule',
+                        message:    sprintf('Accumulated: %s.', implode(', ', $this->observedPaths)),
+                        filePath:   $this->observedPaths[0] ?? 'unknown',
+                        line:       1,
+                        severity:   Severity::Advisory,
+                        pillar:     Pillar::Maintainability,
+                        tier:       RuleTier::V01,
+                        confidence: Confidence::Low,
+                    ),
+                ];
+            }
+
+            /**
+             * Run the legacy whole-project pass for the fixture.
+             *
+             * @param list<AnalysisUnit> $units - Parsed units available to the project-level rule.
+             * @param RuleContext        $ruleContext - Rule context for the fixture.
+             *
+             * @return list<Finding> - always empty; the registry routes this accumulator through the streaming seam instead
+             */
+            public function analyseProject(array $units, RuleContext $ruleContext): array
+            {
+                return [];
             }
         };
     }

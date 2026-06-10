@@ -60,12 +60,14 @@ final class AnalyseCliRuntimeTest extends CliTestCase
      */
     public function testPrintRuntimeDetailedAddsPerRuleTotals(): void
     {
+        // --no-cache forces every rule to execute; a warm result cache would skip rule invocations entirely.
         $process = new Process([
             PHP_BINARY,
             self::PROJECT_ROOT . '/bin/gruff-php',
             'analyse',
             'tests/Fixtures/Source/mixed',
             '--no-config',
+            '--no-cache',
             '--print-runtime',
             '--runtime-mode=detailed',
             '--fail-on',
@@ -100,6 +102,82 @@ final class AnalyseCliRuntimeTest extends CliTestCase
     }
 
     /**
+     * Verify --exclude-rule removes the rule from execution: it must not appear in the detailed per-rule totals.
+     *
+     * @return void
+     */
+    public function testExcludeRuleRemovesRuleFromExecution(): void
+    {
+        $controlPayload  = $this->detailedRuntimePayload([]);
+        $excludedPayload = $this->detailedRuntimePayload(['--exclude-rule', 'docs.missing-class-phpdoc']);
+
+        $controlRuleIds  = array_column($controlPayload['rules'], 'ruleId');
+        $excludedRuleIds = array_column($excludedPayload['rules'], 'ruleId');
+
+        self::assertContains('docs.missing-class-phpdoc', $controlRuleIds, 'control run must execute the rule for the exclusion proof to mean anything');
+        self::assertNotContains('docs.missing-class-phpdoc', $excludedRuleIds, '--exclude-rule must remove the rule from execution, not merely hide its findings');
+        self::assertSame(
+            $controlPayload['rulesExecuted'] - 1,
+            $excludedPayload['rulesExecuted'],
+            'the enabled-rule count must drop by exactly the one excluded rule',
+        );
+    }
+
+    /**
+     * Verify the timed phases account for at least half of measured wall time.
+     *
+     * Locks the regression class where an untimed seam (historically the
+     * project-rule context pass) ran outside every phase: phase coverage then
+     * dropped to 20-33% of wall while --print-runtime claimed the run was
+     * accounted for. With every pass timed, coverage on a src-sized corpus
+     * measures ~0.99; the only untimed remainder is constant per-process setup
+     * (config load, registry construction), which stays under a millisecond-scale
+     * budget. The 0.5 floor is deliberately conservative: CI jitter cannot
+     * plausibly halve the ratio on a multi-second run, but any reintroduced
+     * whole-corpus untimed seam would.
+     *
+     * @return void
+     */
+    public function testRuntimePhasesCoverMostOfWallTime(): void
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            'src',
+            '--no-config',
+            '--no-baseline',
+            '--no-cache',
+            '--print-runtime',
+            '--fail-on',
+            'none',
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $payload = $this->decodeRuntimePayload($process->getErrorOutput());
+        self::assertIsInt($payload['wallMs']);
+        self::assertGreaterThan(0, $payload['wallMs']);
+        self::assertIsArray($payload['phases']);
+
+        $phaseTotalNs = 0;
+        foreach ($payload['phases'] as $phaseKey => $phaseNs) {
+            self::assertIsInt($phaseNs, "phase {$phaseKey} must be an integer nanosecond count");
+            $phaseTotalNs += $phaseNs;
+        }
+
+        $wallNs   = $payload['wallMs'] * 1_000_000;
+        $coverage = $phaseTotalNs / $wallNs;
+
+        self::assertGreaterThan(
+            0.5,
+            $coverage,
+            sprintf('timed phases cover only %.2f of wall time; an untimed seam has reappeared (phases %dns, wall %dns)', $coverage, $phaseTotalNs, $wallNs),
+        );
+    }
+
+    /**
      * Verify the analyse command default behaviour is unchanged when --print-runtime is omitted.
      *
      * @return void
@@ -119,6 +197,41 @@ final class AnalyseCliRuntimeTest extends CliTestCase
 
         self::assertSame(0, $process->getExitCode());
         self::assertSame('', $process->getErrorOutput(), 'no stderr output expected without --print-runtime');
+    }
+
+    /**
+     * Run a detailed-runtime analyse over the mixed fixture with extra arguments and decode the payload.
+     *
+     * @param list<string> $extraArguments - Additional analyse CLI arguments appended to the base invocation.
+     *
+     * @return array{rulesExecuted: int, rules: list<array{ruleId: string, totalNs: int, invocations: int}>} - Decoded detailed runtime payload.
+     */
+    private function detailedRuntimePayload(array $extraArguments): array
+    {
+        $process = new Process([
+            PHP_BINARY,
+            self::PROJECT_ROOT . '/bin/gruff-php',
+            'analyse',
+            'tests/Fixtures/Source/mixed',
+            '--no-config',
+            '--no-baseline',
+            '--no-cache',
+            '--print-runtime',
+            '--runtime-mode=detailed',
+            '--fail-on',
+            'none',
+            ...$extraArguments,
+        ], self::PROJECT_ROOT);
+        $process->run();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+
+        $payload = $this->decodeRuntimePayload($process->getErrorOutput());
+        self::assertIsInt($payload['rulesExecuted']);
+        self::assertIsArray($payload['rules']);
+
+        /** @var array{rulesExecuted: int, rules: list<array{ruleId: string, totalNs: int, invocations: int}>} $payload validated above */
+        return $payload;
     }
 
     /**

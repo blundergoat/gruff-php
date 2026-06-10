@@ -1,6 +1,6 @@
 {
     "name": "blundergoat/gruff-php",
-    "description": "Opinionated PHP code-quality analyzer with 133 rules, SARIF output, baselines, and a local dashboard.",
+    "description": "Opinionated PHP code-quality analyzer with SARIF output, baselines, and a local dashboard.",
     "type": "library",
     "keywords": [
         "php",

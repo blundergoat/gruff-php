@@ -1,6 +1,6 @@
 ---
 category: commands
-last_reviewed: 2026-06-04
+last_reviewed: 2026-06-10
 ---
 
 # CLI Command Footguns
@@ -36,6 +36,30 @@ The default-applied `gruff-baseline.json` matches accepted-debt findings to live
 **Prevention:** For any filter whose job is "keep findings inside scope set S", an empty S means "nothing is in scope" → drop the in-scope-only findings, not "no filter" → keep everything. Only return the input unchanged when the FILTER itself is inactive (no rule ids, no allowlist) — a different condition from an empty scope set. When adding a finding filter, write the empty-scope-set case as an explicit test before the happy path; the `=== [] return $findings` shortcut reads as a harmless guard but silently inverts the filter.
 
 ## Resolved Entries
+
+## Footgun: A narrow-path `analyse`/`hook` re-parsed the whole project when built-in project rules were enabled
+
+**Status:** resolved | **Created:** 2026-06-10 | **Resolved:** 2026-06-10 | **Evidence:** ACTUAL_MEASURED
+
+Before v0.4.0, the default `.gruff-php.yaml` enabled four built-in `ProjectRuleInterface` rules (`dead-code.unused-internal-class`, `dead-code.unused-internal-constant`, `dead-code.unused-internal-function`, `design.single-implementor-interface`). Narrow `analyse` and `hook` runs therefore paid whole-project context cost even when the requested path was one file, and the result cache stayed unavailable because project rules require cross-file context.
+
+**Evidence:** ACTUAL_MEASURED 2026-06-10, synthetic git project, PHP 8.3.30 (NTS), WSL2, gruff-php 0.3.1. `analyse OneSmallFile.php` (one 19-line class): 0.33s user @500 files -> 1.20s user @2000 files. `hook --changed-ranges 1-60 OneSmallFile.php` @2000 files: 1.20s user, identical to `analyse`. Disabling only the four project rules: 1.20s -> 0.04s user with the same 10 findings. `--print-runtime --runtime-mode detailed` reported `filesParsed: 1` while the legacy project-context path had parsed the larger tree.
+
+**Resolution:** ADR-026 retired those four built-in project rules, and the default `.gruff-php.yaml` no longer enables them. The `ProjectRuleInterface` seam remains available for future cross-file rules, but the built-in default path no longer triggers this cost.
+
+**Prevention:** Treat any future `ProjectRuleInterface` as a whole-project-cost feature for narrow runs. Before adding one, measure narrow-path latency, decide whether the rule belongs in default config, and prefer one shared cross-file index over one-index-per-rule.
+
+## Footgun: Config-less `analyse` blocked or wrote config on non-TTY stdin without `-n`
+
+**Status:** resolved | **Created:** 2026-06-10 | **Resolved:** 2026-06-10 | **Evidence:** ACTUAL_MEASURED
+
+Before v0.4.0, `src/Command/MissingConfigPrompt.php` (search: `!$input->isInteractive()`) relied on Symfony's interactive flag for the init y/N prompt. In this Symfony/PHP setup, that flag could stay true for a non-TTY pipe/socket stdin even when `stream_isatty(STDIN)` was false, so config-less `analyse` could block waiting for prompt input or accept a piped leading `y` and write `.gruff-php.yaml`.
+
+**Evidence:** ACTUAL_MEASURED 2026-06-10, PHP 8.3.30. In a config-less git repo, `sleep 20 | timeout 8 php bin/gruff-php analyse --format json X.php` exited 124 on the prompt; adding `-n` completed. `printf 'y\n' | php bin/gruff-php analyse --format json X.php` accepted the prompt and wrote `.gruff-php.yaml`.
+
+**Resolution:** `src/Command/MissingConfigPrompt.php` (search: `shouldSkipForInput`) now skips the prompt for machine-readable formats and for the real STDIN non-TTY case when Symfony has no explicit test stream. `src/Command/ReportCommand.php` (search: `'--no-interaction'`) also forwards non-interaction to its child analyse process.
+
+**Prevention:** Do not rely on `InputInterface::isInteractive()` alone for prompt safety. Any command that can emit machine-readable output or run under hooks/jobs must either pass `-n`/`--no-interaction`, provide an explicit stream test seam, or check real TTY state before prompting.
 
 ## Footgun: Dispatching a sub-command loses the caller's project-root context
 

@@ -195,80 +195,6 @@ PATCH
     }
 
     /**
-     * Verify project-wide rule findings in the changed file surface or count, while other project findings stay out of the file-scoped total.
-     *
-     * @return void
-     * @throws JsonException
-     */
-    public function testAnalyseCommandChangedRangesReconcilesProjectWideFindings(): void
-    {
-        $tempDir = $this->tempDir();
-
-        try {
-            $this->writeProjectWideChangedRegionFixture($tempDir);
-
-            $fullReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'src/ChangedUnused.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
-            $fullFindings = $this->findingRows($fullReport);
-            self::assertSame(['App\\ChangedUnused'], $this->symbolsFromJsonFindings($fullFindings));
-
-            $inRangeReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'src/ChangedUnused.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '5-5',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
-            self::assertSame(['App\\ChangedUnused'], $this->symbolsFromJsonFindings($this->findingRows($inRangeReport)));
-            self::assertSame(0, $this->suppressedCount($inRangeReport));
-            self::assertSame(0, $this->diffSuppressedCount($inRangeReport));
-
-            $outOfRangeReport = $this->runJsonAnalyse($tempDir, [
-                'analyse',
-                'src/ChangedUnused.php',
-                '--config',
-                'gruff-test.yaml',
-                '--no-baseline',
-                '--changed-ranges',
-                '2-2',
-                '--changed-scope',
-                'symbol',
-                '--format',
-                'json',
-                '--fail-on',
-                'none',
-            ]);
-            $outOfRangeFindings = $this->findingRows($outOfRangeReport);
-            self::assertSame([], $outOfRangeFindings);
-            self::assertSame(1, $this->suppressedCount($outOfRangeReport));
-            self::assertSame(1, $this->diffSuppressedCount($outOfRangeReport));
-            self::assertSame(
-                count($fullFindings),
-                count($outOfRangeFindings) + $this->suppressedCount($outOfRangeReport),
-            );
-        } finally {
-            $this->removeDir($tempDir);
-        }
-    }
-
-    /**
      * Verify symbol scope treats file and class aggregate findings as anchor-local, while method findings still follow their changed symbol.
      *
      * @return void
@@ -592,24 +518,6 @@ PATCH
     }
 
     /**
-     * Create a tiny project whose project-wide dead-code findings include one changed-file and one other-file symbol.
-     *
-     * @param string $projectRoot - Temporary project root to populate.
-     *
-     * @return void
-     */
-    private function writeProjectWideChangedRegionFixture(string $projectRoot): void
-    {
-        self::assertTrue(mkdir($projectRoot . '/src', 0777, true));
-        file_put_contents($projectRoot . '/composer.json', "{\"autoload\":{\"psr-4\":{\"App\\\\\":\"src/\"}}}\n");
-        file_put_contents($projectRoot . '/gruff-test.yaml', $this->ruleSelectionConfig(['dead-code.unused-internal-class']));
-        file_put_contents($projectRoot . '/src/ChangedUnused.php', $this->changedUnusedProjectSource());
-        file_put_contents($projectRoot . '/src/OtherUnused.php', "<?php\n\nnamespace App;\n\nfinal class OtherUnused\n{\n}\n");
-        file_put_contents($projectRoot . '/src/Used.php', "<?php\n\nnamespace App;\n\nfinal class Used\n{\n}\n");
-        file_put_contents($projectRoot . '/src/references.php', "<?php\n\nnamespace App;\n\nnew Used();\n");
-    }
-
-    /**
      * Create a size-rule fixture with only aggregate and method-size rules enabled.
      *
      * @param string $projectRoot - Temporary project root to populate.
@@ -750,21 +658,4 @@ final class Example
 PHP;
     }
 
-    /**
-     * Build the changed project-wide dead-code fixture file.
-     *
-     * @return string - Source with an unused class-like declaration anchored on line 5.
-     */
-    private function changedUnusedProjectSource(): string
-    {
-        return <<<'PHP'
-<?php
-
-namespace App;
-
-final class ChangedUnused
-{
-}
-PHP;
-    }
 }

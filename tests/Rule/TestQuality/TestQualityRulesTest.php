@@ -317,7 +317,7 @@ final class TestQualityRulesTest extends TestCase
     public static function singleRuleFixtureProvider(): array
     {
         return [
-            'extends-production flags its production-class parent' => ['tests/Fixtures/TestQuality/extends-production.php', ExtendsProductionClassRule::ID, 1],
+            'extends-production flags production-class and unconfigured base parents' => ['tests/Fixtures/TestQuality/extends-production.php', ExtendsProductionClassRule::ID, 2],
             'test-method-too-long flags one oversized method' => ['tests/Fixtures/TestQuality/test-method-too-long.php', TestMethodTooLongRule::ID, 1],
             'empty-data-provider flags two empty providers' => ['tests/Fixtures/TestQuality/empty-data-provider.php', EmptyDataProviderRule::ID, 2],
             'loop-assertion-without-message flags three messageless loop assertions' => ['tests/Fixtures/TestQuality/loop-assertion-without-message.php', LoopAssertionWithoutMessageRule::ID, 3],

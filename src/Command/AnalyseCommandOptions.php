@@ -51,8 +51,8 @@ final readonly class AnalyseCommandOptions
      * @param string|null                $minSeverity - Minimum severity filter requested for output.
      * @param list<string>               $includePillars - Pillars explicitly included in report output.
      * @param list<string>               $excludePillars - Pillars explicitly excluded from report output.
-     * @param list<string>               $includeRules - Rule IDs explicitly included in report output.
-     * @param list<string>               $excludeRules - Rule IDs explicitly excluded from report output.
+     * @param list<string>               $includeRules - Rule IDs the run executes exclusively; applied at execution level like the hook command.
+     * @param list<string>               $excludeRules - Rule IDs excluded from execution; the rules do not run at all.
      * @param string|null                $optionError - First usage error discovered while parsing options.
      */
     public function __construct(
@@ -291,6 +291,9 @@ final readonly class AnalyseCommandOptions
 
     /**
      * Build the FindingDisplayFilter from the parsed display options (min-severity, include/exclude pillars and rules).
+     *
+     * The rule lists are already enforced at execution level via the run's RuleSelection;
+     * they ride along here so report metadata (run.filters) names every active filter.
      *
      * @return FindingDisplayFilter - the enum-typed filter the reporter applies to decide which findings to display.
      */
