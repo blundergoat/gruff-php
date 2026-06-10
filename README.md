@@ -22,7 +22,7 @@ Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on
 
 | Field | Value |
 | --- | --- |
-| Current source | `0.3.1` |
+| Current source | `0.4.0` |
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |

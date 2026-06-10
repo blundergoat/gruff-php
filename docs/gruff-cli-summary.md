@@ -36,7 +36,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --top=3
 ```
 
 ```
-gruff-php 0.3.1 summary
+gruff-php 0.4.0 summary
 
 Paths     tests/Fixtures/Source/mixed
 Config    (none)
@@ -45,7 +45,7 @@ Files     2 discovered, 2 parsed, 6 ignored, 0 missing, 0 parse errors
 Composite: A (95.10 / 100)
 Findings: 7 total · 0 error · 2 warning · 5 advisory
 Scope     full-project
-Score note Per-pillar scores start at 100 and subtract weighted finding penalties; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
+Score note Per-pillar scores start at 100 and subtract weighted finding penalties; correlated size and complexity findings on one symbol share a single penalty; the composite is the average of applicable pillar scores. Mutation is omitted when no Infection report is supplied.
 
 Pillars
   documentation   B  86.00 findings=4     advisory=4     warning=0     error=0
@@ -77,7 +77,7 @@ php bin/gruff-php summary tests/Fixtures/Source/mixed --no-config --format=json 
 ```json
 {
   "schemaVersion": "gruff.summary.v2",
-  "tool": { "name": "gruff-php", "version": "0.3.1" },
+  "tool": { "name": "gruff-php", "version": "0.4.0" },
   "scope": {
     "paths": ["tests/Fixtures/Source/mixed"],
     "configPath": null,
