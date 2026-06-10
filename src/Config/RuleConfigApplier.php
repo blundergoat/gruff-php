@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GruffPhp\Config;
 
+use Closure;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Rule\RuleRegistry;
 
@@ -18,12 +19,21 @@ use GruffPhp\Rule\RuleRegistry;
 final readonly class RuleConfigApplier
 {
     /**
+     * Create an applier with an optional warning receiver.
+     *
+     * @param (Closure(string): void)|null $warningSink - Receiver for one-line config warnings; null writes them to STDERR.
+     */
+    public function __construct(private ?Closure $warningSink = null)
+    {
+    }
+
+    /**
      * @param AnalysisConfig $config - Config to update.
      * @param RuleRegistry   $registry - Rule registry used to validate rule ids.
      * @param ConfigObject   $rootConfig - Parsed root config object.
      *
-     * @return AnalysisConfig - the input config with every rule's overrides folded in, or unchanged with no "rules" block
-     * @throws ConfigException When rule config references unknown ids or invalid values.
+     * @return AnalysisConfig - the input config with every known rule's overrides folded in; unknown rule ids are warned about and skipped
+     * @throws ConfigException When rule config carries invalid keys or values.
      */
     public function apply(AnalysisConfig $config, RuleRegistry $registry, array $rootConfig): AnalysisConfig
     {
@@ -35,7 +45,9 @@ final readonly class RuleConfigApplier
 
         foreach ($rulesConfig as $ruleId => $ruleConfigValue) {
             if (!$registry->has($ruleId)) {
-                throw new ConfigException(sprintf('Unknown rule id "%s".', $ruleId));
+                // Warn-and-ignore keeps configs that still carry blocks for retired rules working after an upgrade.
+                $this->warnUnknownRuleId($ruleId);
+                continue;
             }
 
             $config = $this->applyRuleConfig(
@@ -47,6 +59,35 @@ final readonly class RuleConfigApplier
         }
 
         return $config;
+    }
+
+    /**
+     * Emit a one-line warning for a config block naming an unknown rule id.
+     *
+     * Unknown ids under `rules:` are skipped rather than rejected so configs
+     * that still name retired rules (for example older init-generated files)
+     * keep working; `selection:` entries stay strict because they change which
+     * rules run.
+     *
+     * @param string $ruleId - Unknown rule id named by the config block.
+     *
+     * @return void
+     */
+    private function warnUnknownRuleId(string $ruleId): void
+    {
+        $line = sprintf(
+            'gruff-php: ignoring unknown rule id "%s" in config (retired or mistyped); remove the "rules.%s" block to silence this warning.',
+            $ruleId,
+            $ruleId,
+        );
+
+        if ($this->warningSink !== null) {
+            ($this->warningSink)($line);
+
+            return;
+        }
+
+        fwrite(STDERR, $line . PHP_EOL);
     }
 
     /**

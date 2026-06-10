@@ -9,6 +9,7 @@ use GruffPhp\Analysis\RunDiagnostic;
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\RuleSelection;
 use GruffPhp\Console\Application;
 use GruffPhp\Reporting\FailThreshold;
 use GruffPhp\Reporting\FailThresholds;
@@ -115,12 +116,13 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $promptExitCode = MissingConfigPrompt::maybeOffer(
-            input:              $input,
-            output:             $output,
-            symfonyApplication: $symfonyApplication,
-            projectRoot:        $projectRoot,
-            explicitConfigPath: $options->configPath,
-            shouldSkipConfig:   $options->noConfig,
+            input:                   $input,
+            output:                  $output,
+            symfonyApplication:      $symfonyApplication,
+            projectRoot:             $projectRoot,
+            explicitConfigPath:      $options->configPath,
+            shouldSkipConfig:        $options->noConfig,
+            isMachineReadableFormat: $formatResult->isMachineReadable(),
         );
         if ($promptExitCode !== null) {
             return AnalyseCommandSetupResult::exitCode($promptExitCode);
@@ -158,6 +160,23 @@ final readonly class AnalyseCommandSetupBuilder
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
         }
+        $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
+        if ($ruleFilterError !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport(
+                    options: $options,
+                    format:  $formatResult,
+                    failOn:  $failThreshold->value,
+                    message: $ruleFilterError,
+                ),
+                $formatResult,
+            );
+        }
+        if ($options->includeRules !== [] || $options->excludeRules !== []) {
+            $configResult = $configResult->withRuleSelection(
+                $this->refinedSelection($configResult->ruleSelection(), $options->includeRules, $options->excludeRules),
+            );
+        }
 
         return AnalyseCommandSetupResult::ready(new AnalyseCommandSetup(
             projectRoot:    $projectRoot,
@@ -169,6 +188,58 @@ final readonly class AnalyseCommandSetupBuilder
             configPath:     $this->effectiveConfigPath($options, $configLoader),
             registry:       $registry,
         ));
+    }
+
+    /**
+     * Resolve the execution-level rule selection for analyse --include-rule/--exclude-rule.
+     *
+     * Mirrors the hook command's selection refinement: --include-rule means "run
+     * only these ids", so it must narrow to exactly those rules because
+     * RuleSelection::allows() ORs tier/pillar/rule includes and inheriting the
+     * config's tiers/pillars would widen the focused run. A bare --exclude-rule
+     * keeps the configured selection and only drops the named rules, so a
+     * configured selection.rules narrowing is not widened to the whole rule set.
+     *
+     * @param RuleSelection $existing - Selection already resolved from config and profile.
+     * @param list<string>  $includeRules - CLI --include-rule ids; when non-empty they focus the run.
+     * @param list<string>  $excludeRules - CLI --exclude-rule ids dropped on top of the existing selection.
+     *
+     * @return RuleSelection - Focused selection for --include-rule, or the existing selection plus excludes.
+     */
+    private function refinedSelection(RuleSelection $existing, array $includeRules, array $excludeRules): RuleSelection
+    {
+        if ($includeRules !== []) {
+            return new RuleSelection(rules: $includeRules, excludeRules: $excludeRules);
+        }
+
+        return new RuleSelection(
+            tiers:          $existing->tiers,
+            pillars:        $existing->pillars,
+            rules:          $existing->rules,
+            excludePillars: $existing->excludePillars,
+            excludeRules:   array_values(array_unique([...$existing->excludeRules, ...$excludeRules])),
+        );
+    }
+
+    /**
+     * Validate execution-level rule filters before they can narrow the run to zero rules.
+     *
+     * @param RuleRegistry $registry - Registry whose ids define valid CLI rule filters.
+     * @param list<string> $includeRules - Rule ids from --include-rule.
+     * @param list<string> $excludeRules - Rule ids from --exclude-rule.
+     *
+     * @return string|null - Usage error for the first unknown id, or null when every id is registered.
+     */
+    private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
+    {
+        foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
+            $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            if ($unknownRuleIds !== []) {
+                return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
+            }
+        }
+
+        return null;
     }
 
     /**

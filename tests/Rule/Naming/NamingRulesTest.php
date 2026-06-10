@@ -129,6 +129,9 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertContains('BooleanPrefixFixture::enabled()', $symbols);
         self::assertContains('BooleanPrefixFixture::check()', $symbols);
         self::assertContains('BooleanPrefixFixture::didRun()', $symbols);
+        // A prefix followed by a lowercase letter is no word boundary, so these still flag.
+        self::assertContains('BooleanPrefixFixture::hasty()', $symbols);
+        self::assertContains('BooleanPrefixFixture::isolate()', $symbols);
     }
 
     /**
@@ -149,6 +152,9 @@ final class NamingRulesTest extends NamingRuleTestCase
         self::assertNotContains('BooleanPrefixFixture::looksLikeTestFile()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::matchesPattern()', $symbols);
         self::assertNotContains('BooleanPrefixFixture::supportsFeature()', $symbols);
+        // An underscore after the prefix is a snake_case word boundary, so these read as predicates.
+        self::assertNotContains('BooleanPrefixFixture::has_note_been_actioned()', $symbols);
+        self::assertNotContains('BooleanPrefixFixture::is_valid_state()', $symbols);
     }
 
     /**

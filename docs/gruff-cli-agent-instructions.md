@@ -144,7 +144,7 @@ Branch review:
 - Use `--changed-only` to compare only files changed from the base ref.
 - With no explicit paths, derives changed files from Git internally.
 - Requires Git, but does not mutate the working tree.
-- Project-level rules need full context. A zero count for `design.single-implementor-interface` or future `ProjectRuleInterface` rules under `--changed-only` is not proof of cleanliness; run a full-project scan and intersect relevant findings with changed files when those rules matter.
+- Project-level rules need full context. No bundled rule currently implements `ProjectRuleInterface` (the project rules were retired), but if a future project rule lands, a zero count for it under `--changed-only` is not proof of cleanliness; run a full-project scan and intersect relevant findings with changed files when those rules matter.
 
 When in doubt, run both:
 
@@ -292,13 +292,18 @@ Use SARIF for GitHub Code Scanning ingestion:
 php bin/gruff-php analyse src --format sarif --fail-on none > /tmp/gruff.sarif
 ```
 
-## Display Filters
+## Display Filters and Rule Selection
 
-Display filters run after analysis and before rendering. They change report contents, not rule execution, scoring, or baseline generation semantics.
+Display filters (`--min-severity`, `--include-pillar`, `--exclude-pillar`) run after analysis and before rendering. They change report contents, not rule execution, scoring, or baseline generation semantics.
 
 ```bash
 php bin/gruff-php analyse src --format markdown --fail-on none --min-severity warning
 php bin/gruff-php analyse src --format json --fail-on none --include-pillar security,sensitive-data
+```
+
+The rule-id flags (`--include-rule`, `--exclude-rule`) select rule execution, matching `hook --include-rule`/`--exclude-rule`: an excluded rule does not run at all, so its findings neither display nor count toward the exit code, scoring, or a generated baseline, and `--include-rule` runs only the named rules.
+
+```bash
 php bin/gruff-php analyse src --format json --fail-on none --exclude-rule docs.missing-public-phpdoc
 php bin/gruff-php analyse src --format json --fail-on none --include-rule complexity.cyclomatic
 ```

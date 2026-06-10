@@ -24,6 +24,29 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
     public const ID = 'sensitive-data.high-entropy-string';
 
     /**
+     * Minimum separator-delimited segments before a literal can read as an identifier or slug.
+     */
+    private const IDENTIFIER_MIN_SEGMENTS = 2;
+
+    /**
+     * Minimum length for a pure-alphabetic segment to count as a dictionary-like word.
+     */
+    private const WORD_SEGMENT_MIN_LENGTH = 3;
+
+    /**
+     * Any single non-word segment at or above this length reads as the random tail of a prefixed
+     * credential (`config_prod_<random>`, `sk_live_`-style keys), so the identifier exemption is refused
+     * outright regardless of how the character census lands.
+     */
+    private const RANDOM_SEGMENT_REFUSAL_LENGTH = 16;
+
+    /**
+     * Strict-majority ratio for the character-weighted word census: alpha-word characters must exceed
+     * this fraction of all alphanumeric characters across the segments for the exemption to hold.
+     */
+    private const WORD_CHARACTER_MAJORITY_RATIO = 0.5;
+
+    /**
      * Describe the high entropy string rule.
      *
      * @return RuleDefinition - Rule metadata and thresholds.
@@ -42,6 +65,16 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
             defaultThresholds: [
                 'minLength' => 32,
                 'entropy' => 4.2,
+            ],
+            falsePositiveShapes: [
+                [
+                    'shape'      => 'Identifier and slug literals: PHPCS sniff ids (PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound), '
+                        . 'class names (WPCOM_REST_API_V2_Endpoint_External_Media), and package slugs (Automattic/i18n-check-webpack-plugin).',
+                    'mitigation' => 'Exempt automatically: a literal with no +/= that splits on [/._-] into two or more alphanumeric segments '
+                        . 'reads as an identifier only when alphabetic words of three or more characters supply strictly more than half of all '
+                        . 'alphanumeric characters and no single non-word segment reaches 16 characters. Prefixed keys (config_prod_<random>), '
+                        . 'slugs with hex tails, and dot-joined JWT/JWE tokens keep flagging because their random runs dominate the character census.',
+                ],
             ],
         );
     }
@@ -78,6 +111,7 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 $this->shouldSkipKnownSecretPattern($candidateSecret)
                 || $this->isPathLikeLiteral($candidateSecret)
                 || $this->isGruffConfigPathLiteral($candidateSecret)
+                || $this->isIdentifierOrSlugLiteral($candidateSecret)
                 || SecretScannerHelper::isLikelyDummyValue($candidateSecret)
             ) {
                 continue;
@@ -102,7 +136,8 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
                 confidence:   Confidence::Medium,
                 detector:     'high-entropy-string',
                 preview:      $preview,
-                remediation:  'Confirm this is not a credential; move real secrets out of source.',
+                remediation:  'Confirm this is not a credential; move real secrets out of source. '
+                    . 'Word-shaped identifiers and slugs are exempt automatically.',
             );
         }
 
@@ -235,6 +270,87 @@ final readonly class HighEntropyStringRule implements SourceTextRuleInterface
 
         // Match known config roots followed by dotted path segments; values, URLs, and credentials do not use this shape.
         return preg_match('/^(?:rules|paths|allowlists|selection)\.[A-Za-z0-9_.-]+$/', $candidateSecret) === 1;
+    }
+
+    /**
+     * Detect identifier- and slug-shaped literals (sniff ids, class names, package slugs) that read as
+     * high entropy but decompose into dictionary-like word segments no encoded credential exhibits.
+     *
+     * @param string $candidateSecret - Literal under test; dotted/underscored identifiers and separator-joined slugs
+     *                                trip the entropy gate without holding secret material.
+     *
+     * @return bool - True when the literal is an identifier or slug rather than secret material.
+     */
+    private function isIdentifierOrSlugLiteral(string $candidateSecret): bool
+    {
+        if (str_contains($candidateSecret, '+') || str_contains($candidateSecret, '=')) {
+            // Padding and token separators appear in encoded credentials but never in identifiers or slugs.
+            return false;
+        }
+
+        // Match the dotted-identifier shape PHPCS sniff ids use: letter-led segments joined by two or more dots.
+        $hasDottedIdentifierShape = preg_match('/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*){2,}$/', $candidateSecret) === 1;
+        // Match the underscore-identifier shape class names such as WPCOM_REST_API_V2_Endpoint_External_Media use.
+        $hasUnderscoreIdentifierShape = preg_match('/^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+$/', $candidateSecret) === 1;
+        // Match the slug shape package paths such as Automattic/i18n-check-webpack-plugin use: alphanumeric segments joined by [/._-].
+        $hasSlugShape = preg_match('#^[A-Za-z0-9]+(?:[/._-][A-Za-z0-9]+)+$#', $candidateSecret) === 1;
+        if (!$hasDottedIdentifierShape && !$hasUnderscoreIdentifierShape && !$hasSlugShape) {
+            // Anything outside the three identifier/slug shapes stays eligible for entropy scanning.
+            return false;
+        }
+
+        // The shape alone is not load-bearing: dot-joined JWT/JWE tokens and base64url material with an
+        // underscore satisfy the regexes too, so every shape must also pass the word-segment decomposition.
+        return $this->hasMostlyAlphaWordSegments($candidateSecret);
+    }
+
+    /**
+     * Require the word-segment decomposition that separates identifiers from encoded credentials: split on
+     * `[/._-]`, every segment alphanumeric, no non-word segment long enough to be a random credential tail,
+     * and a character-weighted strict majority of alpha-word characters. A segment-count census would let two
+     * short dictionary words outvote one long random run (`config_prod_<32-char tail>`), so the census weighs
+     * characters, not segments, and a single long non-word segment refuses the exemption outright.
+     *
+     * @param string $candidateSecret - Literal already matching an identifier/slug shape.
+     *
+     * @return bool - True when alpha-word characters dominate and no segment reads as a random credential tail.
+     */
+    private function hasMostlyAlphaWordSegments(string $candidateSecret): bool
+    {
+        // Split the literal into its separator-delimited segments for the word-shape census.
+        $segments = preg_split('#[/._-]+#', $candidateSecret, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($segments) || count($segments) < self::IDENTIFIER_MIN_SEGMENTS) {
+            // A regex engine error or an unbroken token (no separators) is not an identifier compound; fail
+            // closed so single-run secrets such as 64-char hex digests stay eligible for entropy scanning.
+            return false;
+        }
+
+        $wordCharacterCount  = 0;
+        $totalCharacterCount = 0;
+        foreach ($segments as $segment) {
+            if (!ctype_alnum($segment)) {
+                // A non-alphanumeric segment means the literal is not a clean identifier compound.
+                return false;
+            }
+
+            $segmentLength = strlen($segment);
+            $isWordSegment = $segmentLength >= self::WORD_SEGMENT_MIN_LENGTH && ctype_alpha($segment);
+            if (!$isWordSegment && $segmentLength >= self::RANDOM_SEGMENT_REFUSAL_LENGTH) {
+                // One long non-word run is exactly the random tail of a prefixed key (`secret-key-<hex>`,
+                // `myapp/prod-keys/<hex>`); no amount of word prefix can make that an identifier.
+                return false;
+            }
+
+            $totalCharacterCount += $segmentLength;
+            if ($isWordSegment) {
+                $wordCharacterCount += $segmentLength;
+            }
+        }
+
+        // The census is character-weighted: alpha-word characters must strictly outnumber the non-word rest,
+        // so WPCOM_REST_API_V2_Endpoint_External_Media (33 of 35 chars in words) passes while
+        // config_prod_<32-char tail> (10 of 42) fails even though its word segments outnumber the tail.
+        return $wordCharacterCount > $totalCharacterCount * self::WORD_CHARACTER_MAJORITY_RATIO;
     }
 
     /**

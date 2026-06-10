@@ -103,6 +103,98 @@ final class MissingConfigPromptTest extends TestCase
     }
 
     /**
+     * Verify a non-TTY real stdin skips the prompt even when the interactive flag is on.
+     *
+     * Symfony leaves Input::$interactive true for piped callers that omit -n,
+     * so when no explicit stream was set the guard must probe the real STDIN
+     * instead of blocking forever in the question helper.
+     *
+     * @return void
+     */
+    public function testNonTtyRealStdinWithoutExplicitStreamSkipsPromptSilently(): void
+    {
+        $this->withTemporaryProject(function (string $project): void {
+            $stringInput = new StringInput('');
+            $stringInput->setInteractive(true);
+            $bufferedOutput = new BufferedOutput();
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
+                stdinTtyProbe:      static fn (): bool => false,
+            );
+
+            self::assertNull($result);
+            self::assertSame('', $bufferedOutput->fetch());
+            self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        });
+    }
+
+    /**
+     * Verify an explicitly set stream counts as interactive even when STDIN is not a TTY.
+     *
+     * Embedders and tests answer the prompt through setStream(), so the real
+     * STDIN probe must only apply when no stream was set.
+     *
+     * @return void
+     */
+    public function testExplicitStreamStillPromptsWhenStdinProbeReportsNoTty(): void
+    {
+        $this->withTemporaryProject(function (string $project): void {
+            $stringInput    = $this->interactiveInput("n\n");
+            $bufferedOutput = new BufferedOutput();
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:              $stringInput,
+                output:             $bufferedOutput,
+                symfonyApplication: new Application(),
+                projectRoot:        $project,
+                explicitConfigPath: null,
+                shouldSkipConfig:   false,
+                stdinTtyProbe:      static fn (): bool => false,
+            );
+
+            self::assertNull($result);
+            self::assertStringContainsString(MissingConfigPrompt::PROMPT_TEXT, $bufferedOutput->fetch());
+            self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        });
+    }
+
+    /**
+     * Verify a machine-readable output format skips the prompt despite an interactive stream.
+     *
+     * Machine consumers parse the payload, so the init offer must never run
+     * even when an answerable input stream exists.
+     *
+     * @return void
+     */
+    public function testMachineReadableFormatSkipsPromptDespiteInteractiveStream(): void
+    {
+        $this->withTemporaryProject(function (string $project): void {
+            $stringInput    = $this->interactiveInput("y\n");
+            $bufferedOutput = new BufferedOutput();
+
+            $result = MissingConfigPrompt::maybeOffer(
+                input:                   $stringInput,
+                output:                  $bufferedOutput,
+                symfonyApplication:      new Application(),
+                projectRoot:             $project,
+                explicitConfigPath:      null,
+                shouldSkipConfig:        false,
+                isMachineReadableFormat: true,
+            );
+
+            self::assertNull($result);
+            self::assertSame('', $bufferedOutput->fetch());
+            self::assertFileDoesNotExist($project . '/' . ConfigLoader::DEFAULT_CONFIG_FILE);
+        });
+    }
+
+    /**
      * Verify --no-config callers skip the prompt silently.
      *
      * @return void

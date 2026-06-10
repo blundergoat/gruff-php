@@ -6,6 +6,7 @@ namespace GruffPhp\Tests\Rule\Security;
 
 use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\RuleSettings;
 use GruffPhp\Finding\Finding;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
@@ -36,6 +37,7 @@ use PhpParser\Node\Stmt;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\ParserFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -186,6 +188,83 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * Verify attack-shaped include paths all keep flagging in the precision fixture.
+     *
+     * @return void
+     */
+    public function testVariableIncludePrecisionFixtureFlagsEveryAttackShape(): void
+    {
+        $findings = $this->findingsForRule($this->parseFixture('variable-include-precision.php'), VariableIncludeRule::ID);
+
+        self::assertSame([9, 10, 13, 17, 19, 20, 32], self::findingLines($findings));
+    }
+
+    /**
+     * Verify attack-shaped SQL constructions all keep flagging in the precision fixture.
+     *
+     * @return void
+     */
+    public function testSqlConcatenationPrecisionFixtureFlagsEveryAttackShape(): void
+    {
+        $findings = $this->findingsForRule($this->parseFixture('sql-concatenation-precision.php'), SqlConcatenationRule::ID);
+
+        self::assertSame([7, 8, 9, 10, 25], self::findingLines($findings));
+    }
+
+    /**
+     * Provide stricter option overrides and the lines each one re-flags in the precision fixtures.
+     *
+     * @return array<string, array{string, string, array<string, bool|list<string>>, list<int>}> - keyed by case label;
+     *                       each value lists rule id, fixture, option override, and the expected flagged lines
+     */
+    public static function strictOptionOverrideProvider(): array
+    {
+        return [
+            'constant exemption disabled re-flags constant includes' => [
+                VariableIncludeRule::ID,
+                'variable-include-precision.php',
+                ['treatGlobalConstantsAsFixed' => false, 'dynamicPathConstants' => []],
+                [9, 10, 13, 17, 19, 20, 32, 37, 38],
+            ],
+            'dynamicPathConstants re-flags only the listed constant' => [
+                VariableIncludeRule::ID,
+                'variable-include-precision.php',
+                ['treatGlobalConstantsAsFixed' => true, 'dynamicPathConstants' => ['ABSPATH']],
+                [9, 10, 13, 17, 19, 20, 32, 37],
+            ],
+            'empty safe receivers re-flag identifier interpolation but keep the keyword gate' => [
+                SqlConcatenationRule::ID,
+                'sql-concatenation-precision.php',
+                ['safeInterpolationReceivers' => []],
+                [7, 8, 9, 10, 17, 18, 25],
+            ],
+        ];
+    }
+
+    /**
+     * Verify the strict-project option overrides re-flag exactly the relaxed shapes they target.
+     *
+     * @param string                           $ruleId - rule whose options are overridden
+     * @param string                           $fixture - precision fixture to analyse
+     * @param array<string, bool|list<string>> $options - full option map for the override
+     * @param list<int>                        $expectedLines - lines the rule must flag under the override
+     *
+     * @return void
+     */
+    #[DataProvider('strictOptionOverrideProvider')]
+    public function testStrictOptionOverridesReflagRelaxedShapes(string $ruleId, string $fixture, array $options, array $expectedLines): void
+    {
+        $config = AnalysisConfig::fromRegistry(RuleRegistry::defaults())->withRuleSettings(
+            $ruleId,
+            new RuleSettings(true, [], $options),
+        );
+
+        $findings = $this->findingsForRule($this->parseFixture($fixture), $ruleId, $config);
+
+        self::assertSame($expectedLines, self::findingLines($findings));
+    }
+
+    /**
      * Verify expanded security sink patterns detected.
      *
      * @return void
@@ -331,17 +410,33 @@ final class SecurityRulesTest extends TestCase
     }
 
     /**
+     * List the line numbers a rule flagged, in ascending source order.
+     *
+     * @param list<Finding> $findings - Findings whose start lines are collected.
+     *
+     * @return list<int> - sorted start lines of the findings; empty when the rule stayed quiet
+     */
+    private static function findingLines(array $findings): array
+    {
+        $lines = array_map(static fn(Finding $finding): int => (int) $finding->line, $findings);
+        sort($lines);
+
+        return $lines;
+    }
+
+    /**
      * Run one security rule against a fixture and return its findings.
      *
-     * @param AnalysisUnit $analysisUnit - already-parsed fixture to run the full default registry over
-     * @param string       $ruleId - rule id to retain; findings from every other rule are discarded
+     * @param AnalysisUnit        $analysisUnit - already-parsed fixture to run the full default registry over
+     * @param string              $ruleId - rule id to retain; findings from every other rule are discarded
+     * @param AnalysisConfig|null $config - config override for option-behaviour cases, or null for registry defaults
      *
      * @return list<Finding> - only the findings whose ruleId matches $ruleId, re-indexed from zero; empty when that rule never fired
      */
-    private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId): array
+    private function findingsForRule(AnalysisUnit $analysisUnit, string $ruleId, ?AnalysisConfig $config = null): array
     {
         $registry = RuleRegistry::defaults();
-        $config   = AnalysisConfig::fromRegistry($registry);
+        $config ??= AnalysisConfig::fromRegistry($registry);
         $findings = $registry->analyse([$analysisUnit], new RuleContext(__DIR__ . '/../../..', $config));
 
         // Narrow the full run down to the single rule under test so assertions are not polluted by neighbours.

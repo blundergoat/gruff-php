@@ -45,6 +45,20 @@ enum OutputFormat: string
     case Sarif = 'sarif';
 
     /**
+     * Report whether this format feeds a parser or artifact store rather than a human terminal.
+     *
+     * Machine-readable output suppresses interactive chatter such as the
+     * missing-config init offer so the payload stays parseable.
+     *
+     * @return bool - True for every format except the human-oriented text report.
+     */
+    public function isMachineReadable(): bool
+    {
+        // Only the plain text report targets a human at a terminal; json/sarif/github/hotspot/markdown/html feed tooling.
+        return $this !== self::Text;
+    }
+
+    /**
      * Convert a CLI format string into the matching output format.
      *
      * @param string $rawInput - CLI format value to parse.

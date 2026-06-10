@@ -135,6 +135,24 @@ PHP, IdentifierQualityRule::ID);
     }
 
     /**
+     * Verify the sole parameter of short iteration callbacks gets the loop escape hatch while long or non-iteration callbacks still flag.
+     *
+     * @return void
+     */
+    public function testIdentifierQualityAppliesLoopThresholdToIterationCallbackParameters(): void
+    {
+        $findings = $this->analyseRule('identifier-quality-callback-params.php', IdentifierQualityRule::ID);
+        $names    = array_map(static fn ($finding): mixed => $finding->metadata['identifierName'] ?? null, $findings);
+
+        // Short array_filter/array_map callbacks: the sole $item parameter is a loop variable below the threshold.
+        self::assertNotContains('item', $names);
+        // A callback body at the threshold still demands a meaningful name.
+        self::assertContains('entry', $names);
+        // A generic parameter on a non-iteration callback is not exempt.
+        self::assertContains('data', $names);
+    }
+
+    /**
      * Verify identifier quality honours local-variable reference thresholds.
      *
      * @return void

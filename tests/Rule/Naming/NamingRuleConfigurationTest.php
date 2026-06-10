@@ -103,7 +103,12 @@ final class NamingRuleConfigurationTest extends NamingRuleTestCase
         self::assertContains('changedOnly', $names);
         self::assertContains('infectionRun', $names);
         self::assertContains('infectionRunCtor', $names);
+        // A prefix that does not lead the name is no predicate, with or without a trailing word.
+        self::assertContains('force', $names);
+        self::assertContains('forceShould', $names);
         self::assertNotContains('isPest', $names);
+        // snake_case prefixes read as predicates: the underscore is a word boundary.
+        self::assertNotContains('is_valid', $names);
         self::assertNotContains('active', $names);
         self::assertNotContains('emitted', $names);
         self::assertNotContains('valid', $names);

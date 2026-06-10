@@ -213,6 +213,10 @@ final class HookCommand extends Command
 
         $includeRules = $this->stringListOption($input, 'include-rule');
         $excludeRules = $this->stringListOption($input, 'exclude-rule');
+        $ruleFilterError = $this->ruleFilterError($registry, $includeRules, $excludeRules);
+        if ($ruleFilterError !== null) {
+            throw new ConfigException($ruleFilterError);
+        }
         if ($includeRules !== [] || $excludeRules !== []) {
             $config = $config->withRuleSelection($this->refinedSelection($config->ruleSelection(), $includeRules, $excludeRules));
         }
@@ -248,6 +252,27 @@ final class HookCommand extends Command
             excludePillars: $existing->excludePillars,
             excludeRules:   array_values(array_unique([...$existing->excludeRules, ...$excludeRules])),
         );
+    }
+
+    /**
+     * Validate hook rule filters before they can focus execution to zero rules.
+     *
+     * @param RuleRegistry $registry - Registry whose ids define valid hook rule filters.
+     * @param list<string> $includeRules - Rule ids from --include-rule.
+     * @param list<string> $excludeRules - Rule ids from --exclude-rule.
+     *
+     * @return string|null - Config-contract error for the first unknown id, or null when every id is registered.
+     */
+    private function ruleFilterError(RuleRegistry $registry, array $includeRules, array $excludeRules): ?string
+    {
+        foreach (['--include-rule' => $includeRules, '--exclude-rule' => $excludeRules] as $option => $ruleIds) {
+            $unknownRuleIds = $registry->unknownRuleIds($ruleIds);
+            if ($unknownRuleIds !== []) {
+                return sprintf('Unknown rule id "%s" for %s.', $unknownRuleIds[0], $option);
+            }
+        }
+
+        return null;
     }
 
     /**

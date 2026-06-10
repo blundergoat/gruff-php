@@ -156,20 +156,9 @@ src/
 |   |   |-- MaintainabilityIndexRule.php      = `complexity.maintainability-index` (Maintainability pillar)
 |   |   `-- NestingDepthRule.php              = `complexity.nesting-depth`
 |   |-- DeadCode/
-|   |   |-- AbstractUnusedInternalSymbolRule.php = shared `ProjectRuleAccumulator` base for internal class/function/constant dead-code rules
-|   |   |-- DeadCodeNameResolver.php       = declaration/reference FQN resolver for project-wide dead-code summaries
-|   |   |-- DeadCodeProjectIndex.php        = project-wide declaration/reference summary index derived from Composer/configured internal namespace ownership
-|   |   |-- DeadCodeProjectScope.php        = per-run ownership, entrypoint, exclusion, framework-attribute, and test-reference policy for project-wide dead-code checks
-|   |   |-- DeadCodeSymbolDeclaration.php   = typed declaration summary used by the project-wide dead-code index
-|   |   |-- DeadCodeSymbolReference.php     = typed reference summary used by the project-wide dead-code index
-|   |   |-- UnusedInternalClassRule.php     = `dead-code.unused-internal-class`
-|   |   |-- UnusedInternalConstantRule.php  = `dead-code.unused-internal-constant`
-|   |   |-- UnusedInternalFunctionRule.php  = `dead-code.unused-internal-function`
 |   |   |-- UnusedPrivateConstantRule.php   = `dead-code.unused-private-constant`
 |   |   |-- UnusedPrivateMethodRule.php       = `dead-code.unused-private-method`
 |   |   `-- UnusedPrivatePropertyRule.php     = `dead-code.unused-private-property`
-|   |-- Design/
-|   |   `-- SingleImplementorInterfaceRule.php = `design.single-implementor-interface` (ProjectRuleInterface; flags internal interfaces with exactly one implementor and no external type-hint usage; configurable external prefixes, framework attributes, mock-as-implementor toggle, and additional excluded paths)
 |   |-- Docs/
 |   |   |-- MissingClassPhpdocRule.php        = `docs.missing-class-phpdoc` (flags class/interface/trait/enum declarations without a docblock; skips anonymous classes)
 |   |   |-- MissingConstantPhpdocRule.php     = `docs.missing-constant-phpdoc` (flags class constants without a docblock; enum cases exempt when the enclosing enum is documented)
@@ -346,8 +335,7 @@ tests/
 |-- Reporting/
 |   `-- HtmlReporterTest.php                  = HTML report section rendering and malicious string escaping
 |-- Review/
-|   |-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
-|   `-- AgentWorkflowDeadCodeCliTest.php      = branch-review changed-only coverage for project-wide dead-code rules
+|   `-- AgentWorkflowCliTest.php              = list-rules, display filters, SARIF, and branch-review CLI coverage
 |-- Source/
 |   `-- SourceDiscoveryTest.php               = discovery, default/configured ignore semantics, missing-path reporting
 |-- Rule/
@@ -358,8 +346,7 @@ tests/
 |   |   |-- CyclomaticComplexityRuleTest.php
 |   |   `-- NestingDepthRuleTest.php
 |   |-- DeadCode/
-|   |   |-- DeadCodeRulesTest.php
-|   |   `-- ProjectDeadCodeRulesTest.php
+|   |   `-- DeadCodeRulesTest.php
 |   |-- Docs/
 |   |   `-- DocsRulesTest.php
 |   |-- Naming/
@@ -468,5 +455,5 @@ tests/
 - `vendor/` and `node_modules/` are generated and gitignored.
 - CI lives in `.github/workflows/ci.yml`: `verify` runs Composer checks and preflight on PHP 8.3/8.4, `security` gates on `composer security:scan` with read-only permissions, and `security-sarif` uploads gruff SARIF on non-PR events with `security-events: write`.
 - `composer.json`'s `check` script lints every committed PHP source/test file with `php -l` via `find src tests -name '*.php'` (excluding the intentional `tests/Fixtures/Source/syntax-error` fixtures), so new files are linted automatically rather than from a hand-maintained list.
-- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality, Design. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture) are reserved for later tiers.
+- Pillars currently emitted by registered static rules: Size, Complexity, Maintainability, DeadCode, Naming, Documentation, Modernisation, Security, SensitiveData, TestQuality. Optional Infection ingestion emits Mutation findings. Other `Pillar::*` cases (Coupling, Architecture, Design) are reserved; Design emptied when the project rules were retired (ADR-026).
 - Static baselines are explicit `gruff.baseline.v1` JSON files. They suppress exact fingerprint/rule/file matches only; inline suppression comments are intentionally absent in v0.1.

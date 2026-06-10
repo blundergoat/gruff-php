@@ -90,8 +90,8 @@ final class ReportCommand extends Command
             ->addOption('min-severity', null, InputOption::VALUE_REQUIRED, 'Display only findings at or above advisory, warning, or error.')
             ->addOption('include-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated pillars or repeated values.')
             ->addOption('exclude-pillar', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated pillars or repeated values.')
-            ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Display only these comma-separated rule IDs or repeated values.')
-            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Hide these comma-separated rule IDs or repeated values.')
+            ->addOption('include-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Run only these comma-separated rule IDs or repeated values.')
+            ->addOption('exclude-rule', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Skip running these comma-separated rule IDs or repeated values.')
             ->addOption('history-file', null, InputOption::VALUE_REQUIRED, 'Append score trend history to this JSON file.')
             ->addOption(
                 'baseline',
@@ -131,13 +131,17 @@ final class ReportCommand extends Command
             }
         }
 
+        // Only `report --format json` counts as machine-readable here: the default html output is a
+        // file artifact whose stdout stays prompt-safe (the offer rides stderr), so genuinely
+        // interactive html users keep the init offer while json consumers never see it.
         $promptExitCode = MissingConfigPrompt::maybeOffer(
-            input:              $input,
-            output:             $output,
-            symfonyApplication: $this->getApplication(),
-            projectRoot:        $projectRoot,
-            explicitConfigPath: $this->optionalStringOption($input, 'config'),
-            shouldSkipConfig:   (bool)$input->getOption('no-config'),
+            input:                   $input,
+            output:                  $output,
+            symfonyApplication:      $this->getApplication(),
+            projectRoot:             $projectRoot,
+            explicitConfigPath:      $this->optionalStringOption($input, 'config'),
+            shouldSkipConfig:        (bool)$input->getOption('no-config'),
+            isMachineReadableFormat: ($this->optionalStringOption($input, 'format') ?? 'html') === 'json',
         );
         if ($promptExitCode !== null) {
             return $promptExitCode;
@@ -183,7 +187,9 @@ final class ReportCommand extends Command
      */
     private function analyseCommand(InputInterface $input): array
     {
-        $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', '--format'];
+        // The child analyse runs behind pipes where nobody can answer a prompt, so always pass
+        // --no-interaction; the report command itself already handled the missing-config offer.
+        $command   = [PHP_BINARY, $this->gruffBinary(), 'analyse', '--no-interaction', '--format'];
         $command[] = $this->optionalStringOption($input, 'format') ?? 'html';
         $command[] = '--fail-on';
         $command[] = $this->resolveFailOn($input);

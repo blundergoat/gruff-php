@@ -12,15 +12,14 @@ to three near-match suggestions and exits with code 2.
 This rule catalogue is generated from `php bin/gruff-php list-rules --format json`.
 Use that command for the full machine-readable metadata, including thresholds and options.
 
-Total rules: 133
+Total rules: 129
 
 ## Summary By Pillar
 
 | Pillar | Rules |
 | --- | ---: |
 | `complexity` | 4 |
-| `dead-code` | 13 |
-| `design` | 1 |
+| `dead-code` | 10 |
 | `documentation` | 15 |
 | `maintainability` | 2 |
 | `modernisation` | 10 |
@@ -41,13 +40,10 @@ Total rules: 133
 | `complexity.halstead-volume` | Halstead volume | `advisory` | `medium` | yes |
 | `complexity.nesting-depth` | Maximum nesting depth | `error` | `high` | yes |
 
-### `dead-code` (13)
+### `dead-code` (10)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
 | --- | --- | --- | --- | --- |
-| `dead-code.unused-internal-class` | Unused internal class-like | `advisory` | `medium` | yes |
-| `dead-code.unused-internal-constant` | Unused internal constant | `advisory` | `medium` | yes |
-| `dead-code.unused-internal-function` | Unused internal function | `advisory` | `medium` | yes |
 | `dead-code.unused-private-constant` | Unused private constant | `warning` | `high` | yes |
 | `dead-code.unused-private-method` | Unused private method | `warning` | `high` | yes |
 | `dead-code.unused-private-property` | Unused private property | `warning` | `high` | yes |
@@ -58,12 +54,6 @@ Total rules: 133
 | `waste.unreachable-code` | Unreachable code | `warning` | `high` | yes |
 | `waste.unused-import` | Unused import | `warning` | `high` | yes |
 | `waste.unused-parameter` | Unused parameter | `warning` | `high` | yes |
-
-### `design` (1)
-
-| Rule ID | Name | Severity | Confidence | Enabled By Default |
-| --- | --- | --- | --- | --- |
-| `design.single-implementor-interface` | Single-implementor interface | `advisory` | `medium` | yes |
 
 ### `documentation` (15)
 
@@ -130,6 +120,13 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `modernisation.public-property` | Public mutable property | `warning` | `high` | yes |
 | `modernisation.readonly-property-candidate` | Readonly property candidate | `advisory` | `medium` | yes |
 
+`modernisation.forbidden-global-access` flags superglobal reads only.
+Write positions — plain assignments into `$_GET`/`$_POST`/`$_SESSION`
+(including nested dimension writes) and `unset()` arguments — are
+request-simulation or cleanup, not boundary leaks, so they stay quiet.
+Compound assignments (`.=`, `+=`) read the current value before writing
+and still fire, as do reads inside a write target's dimension expression.
+
 ### `naming` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -145,6 +142,22 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `naming.short-variable` | Short variable name | `advisory` | `high` | yes |
 | `naming.suffix-hungarian` | Suffix Hungarian notation | `advisory` | `medium` | yes |
 | `naming.test-naming-consistency` | Test method naming consistency | `advisory` | `high` | yes |
+
+`naming.boolean-prefix` recognises both camelCase and snake_case word
+boundaries after an allowed prefix: `isReady()` and `is_ready()` both
+read as predicates. A prefix followed by a lowercase letter (`hasty`,
+`isolate`) is not a word, and a prefix that does not lead the name
+(`$force`, `$forceShould`) still fires.
+
+`naming.identifier-quality` applies its `loopBodyThreshold` escape hatch
+to inline iteration callbacks as well as foreach loops: the sole
+parameter of a closure or arrow function passed directly to an
+array-iteration callable (`array_filter`, `array_map`, `array_walk`,
+`usort`, `uasort`, `array_reduce`, `array_any`, `array_all`,
+`array_find`) is treated as a loop variable, so a generic name like
+`$item` stays quiet while the callback body is below the threshold.
+Longer callback bodies and generic parameters on non-iteration closures
+still fire.
 
 ### `security` (25)
 
@@ -176,6 +189,30 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `security.variable-include` | Variable include or require path | `warning` | `medium` | yes |
 | `security.weak-crypto` | Weak cryptography primitives | `warning` | `high` | yes |
 
+`security.variable-include` treats two provable shapes as fixed paths in
+addition to literals and `__DIR__`/`__FILE__`: ALL-CAPS global constants
+(the `define('ABSPATH', ...)` bootstrap convention; class constants and
+non-ALL-CAPS names such as `conf` stay dynamic) and locals whose every
+same-scope plain assignment is itself a fixed expression, with at least
+one before the include. Any tainted or second non-fixed assignment,
+parameter binding, compound/by-ref write, foreach binding, `global`/
+`static` declaration, or destructuring keeps the include flagged.
+Constant resolution is name-based only (no cross-file `define()`
+lookup); set `options.treatGlobalConstantsAsFixed: false` to disable the
+constant exemption, or list specific names in
+`options.dynamicPathConstants` to re-flag them.
+
+`security.sql-concatenation` no longer flags identifier-only
+interpolation through property fetches on receivers named in
+`options.safeInterpolationReceivers` (default `['wpdb']`, so
+`{$wpdb->prefix}`-style table prefixes pass). When the first argument's
+root expression is a `prepare()` call the template argument is inspected
+instead - interpolating a local into the template still flags, so
+`prepare()` is never skipped wholesale. Finally, a word-bounded SQL
+keyword (SELECT/INSERT/UPDATE/DELETE/ALTER/DROP/CREATE/SHOW/FROM/WHERE)
+must appear in the literal fragments, which keeps non-SQL `query()`
+receivers such as `DOMXPath` quiet without receiver type resolution.
+
 ### `sensitive-data` (11)
 
 | Rule ID | Name | Severity | Confidence | Enabled By Default |
@@ -191,6 +228,31 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `sensitive-data.pii-test-fixture` | PII in test fixture | `warning` | `medium` | yes |
 | `sensitive-data.private-key` | Private key material | `warning` | `high` | yes |
 | `sensitive-data.url-credentials` | URL embedded credentials | `warning` | `high` | yes |
+
+`sensitive-data.high-entropy-string` no longer flags identifier- and
+slug-shaped literals: a literal that contains no `+`/`=` and splits on
+`[/._-]` into two or more alphanumeric segments reads as an identifier
+(PHPCS sniff ids such as
+`PHPCompatibility.FunctionUse.NewFunctions.ldap_exop_syncFound`, class
+names such as `WPCOM_REST_API_V2_Endpoint_External_Media`, package
+slugs such as `Automattic/i18n-check-webpack-plugin`), not secret
+material — but only when alphabetic words of three or more characters
+supply strictly more than half of all alphanumeric characters, and no
+single non-word segment reaches 16 characters. The census is
+character-weighted, so a couple of short dictionary words cannot
+outvote a long random run: prefixed keys (`config_prod_<random>`),
+slugs with hex tails (`myapp/prod-keys/<hex>`), word-prefixed digests
+(`secret-key-<64-char hex>`), base64/hex tokens, npm `sha512-...`
+integrity hashes, and dot-joined JWT/JWE tokens all keep flagging.
+
+`sensitive-data.pii-test-fixture` now accepts two fixture shapes its
+remediation already recommends: emails whose domain ends in a reserved
+special-use TLD (`.local`, `.test`, `.invalid`, `.localhost`,
+`.example`, matched at a label boundary), and addresses whose matched
+tokens or surrounding line carry a synthetic marker word (`test`,
+`fake`, `sample`, `demo`, `anytown`, matched as whole words). Realistic
+emails, addresses without a marker, and phone numbers outside the
+555-010x reserved block still flag.
 
 ### `size` (7)
 
@@ -242,3 +304,12 @@ bag), `Collection<mixed>` (single-leaf generic).
 | `test-quality.trivial-assertion` | Trivial assertion | `warning` | `high` | yes |
 | `test-quality.trivial-snapshot` | Trivial snapshot | `advisory` | `medium` | yes |
 | `test-quality.unused-mock` | Unused mock variable | `advisory` | `high` | yes |
+
+`test-quality.extends-production-class` recognises a `*TestCase` parent
+after ignoring underscores, so snake_case bases such as
+`WC_Unit_Test_Case` or `Email_Editor_Integration_Test_Case` count as
+test bases. Project bases that match neither shape (e.g.
+`IntegrationTestBase`) can be declared via
+`rules.test-quality.extends-production-class.options.additionalTestBaseClasses`
+(exact names, compared case-insensitively against the parent's short and
+fully qualified name).

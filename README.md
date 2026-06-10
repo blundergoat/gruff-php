@@ -26,7 +26,7 @@ Wired into a coding agent's loop — as a pre-commit hook, a CI gate (`--fail-on
 | Runtime | PHP `^8.3` |
 | Package | `blundergoat/gruff-php` |
 | Binary | `bin/gruff-php` from checkout; `vendor/bin/gruff-php` after install |
-| Rule catalogue | 133 rules across 11 pillars |
+| Rule catalogue | 129 rules across 10 pillars |
 | Primary config | `.gruff-php.yaml`; legacy `.gruff.yaml` is accepted when the primary file is absent |
 | Analysis schema | `gruff.analysis.v2` |
 | Baseline schema | `gruff.baseline.v1` |
@@ -188,21 +188,20 @@ Use `vendor/bin/gruff-php list-rules --format json` to inspect supported thresho
 
 ## Rules And Pillars
 
-The v0.1 catalogue contains 133 registry rules:
+The v0.1 catalogue contains 129 registry rules:
 
 | Pillar | Rules |
 | --- | ---: |
 | `size` | 7 |
 | `complexity` | 4 |
 | `maintainability` | 2 |
-| `dead-code` | 13 |
+| `dead-code` | 10 |
 | `naming` | 11 |
 | `documentation` | 15 |
 | `modernisation` | 10 |
 | `security` | 25 |
 | `sensitive-data` | 11 |
 | `test-quality` | 34 |
-| `design` | 1 |
 
 Some dead-code pillar rules keep a `waste.*` rule-id prefix for historical continuity. Filter by the `pillar` field from `list-rules --format json` when the pillar matters more than the rule-id prefix.
 
@@ -232,7 +231,7 @@ Branch review compares against a base ref:
 vendor/bin/gruff-php analyse --diff-vs=origin/main --changed-only --fail-on none
 ```
 
-Display filters such as `--min-severity`, `--include-pillar`, and `--exclude-rule` reduce rendered output without changing which rules execute.
+Display filters such as `--min-severity`, `--include-pillar`, and `--exclude-pillar` reduce rendered output without changing which rules execute. The rule-id flags `--include-rule` and `--exclude-rule` instead select rule execution, matching the hook command: an excluded rule does not run, and the exit code reflects the narrowed run.
 
 ## Mutation Analysis
 

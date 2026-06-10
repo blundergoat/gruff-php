@@ -37,7 +37,7 @@ php bin/gruff-php analyse \
 
 `--diff-vs=<base-ref> --changed-only` is the key combination. Replace `<base-ref>` with the branch or ref you review against. With no explicit paths, gruff derives changed files from Git internally and scopes both current-tree analysis and base snapshot comparison to those changed files. Agents should not wrap this in a separate `git diff | mapfile` command unless they intentionally need a custom path list.
 
-Project-level rules need full project context. A zero count for `design.single-implementor-interface` or any future `ProjectRuleInterface` rule under `--changed-only` is not proof that the branch is clean for that rule. When those rules matter, run a full-project scan and intersect relevant findings with changed files or review relevance after the fact.
+Project-level rules need full project context. No bundled rule currently implements `ProjectRuleInterface` (the project rules were retired), but a zero count for any future `ProjectRuleInterface` rule under `--changed-only` is not proof that the branch is clean for that rule. When those rules matter, run a full-project scan and intersect relevant findings with changed files or review relevance after the fact.
 
 ## Optional Explicit Paths
 

@@ -13,12 +13,8 @@ use GruffPhp\Rule\Complexity\HalsteadVolumeRule;
 use GruffPhp\Rule\Complexity\MaintainabilityIndexRule;
 use GruffPhp\Rule\Complexity\NestingDepthRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalConstantRule;
-use GruffPhp\Rule\DeadCode\UnusedInternalFunctionRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivateMethodRule;
 use GruffPhp\Rule\DeadCode\UnusedPrivatePropertyRule;
-use GruffPhp\Rule\Design\SingleImplementorInterfaceRule;
 use GruffPhp\Rule\Docs\MissingClassPhpdocRule;
 use GruffPhp\Rule\Docs\MissingConstantPhpdocRule;
 use GruffPhp\Rule\Docs\MissingFilePhpdocRule;
@@ -141,6 +137,7 @@ use GruffPhp\Rule\Waste\UnreachableCodeRule;
 use GruffPhp\Rule\Waste\UnusedImportRule;
 use GruffPhp\Rule\Waste\UnusedParameterRule;
 use InvalidArgumentException;
+use WeakMap;
 
 /**
  * Stores available rules and dispatches enabled rule analysis.
@@ -168,26 +165,54 @@ final class RuleRegistry
     private readonly array $rules;
 
     /**
+     * Rule definitions captured once at construction, keyed by rule id in registry order.
+     *
+     * Calling definition() rebuilds a RuleDefinition (with its preg-validating
+     * constructor) on every invocation, so the enabled-rule filter reads from
+     * this snapshot instead of re-asking each rule per call.
+     *
+     * @var array<string, RuleDefinition>
+     */
+    private readonly array $definitions;
+
+    /**
+     * Enabled-rule lists memoised per AnalysisConfig instance.
+     *
+     * AnalysisConfig is immutable (every with*() returns a new instance), so
+     * object identity is a sound cache key and WeakMap keeps entries from
+     * outliving their config.
+     *
+     * @var WeakMap<AnalysisConfig, list<RuleInterface|ProjectRuleInterface>>
+     */
+    private readonly WeakMap $enabledRulesByConfig;
+
+    /**
      * @param list<RuleInterface|ProjectRuleInterface> $rules - Rule instances to index by id.
      *
      * @throws InvalidArgumentException When two rules declare the same id.
      */
     public function __construct(array $rules)
     {
-        $indexedRules = [];
+        $indexedRules       = [];
+        $indexedDefinitions = [];
 
         foreach ($rules as $rule) {
-            $id = $rule->definition()->id;
+            $definition = $rule->definition();
+            $id         = $definition->id;
 
             if (isset($indexedRules[$id])) {
                 throw new InvalidArgumentException(sprintf('Duplicate rule id "%s".', $id));
             }
 
-            $indexedRules[$id] = $rule;
+            $indexedRules[$id]       = $rule;
+            $indexedDefinitions[$id] = $definition;
         }
 
         ksort($indexedRules, SORT_STRING);
-        $this->rules = $indexedRules;
+        ksort($indexedDefinitions, SORT_STRING);
+        $this->rules                = $indexedRules;
+        $this->definitions          = $indexedDefinitions;
+        $this->enabledRulesByConfig = new WeakMap();
     }
 
     /**
@@ -203,9 +228,6 @@ final class RuleRegistry
                             new HalsteadVolumeRule(),
                             new MaintainabilityIndexRule(),
                             new NestingDepthRule(),
-                            new UnusedInternalClassRule(),
-                            new UnusedInternalConstantRule(),
-                            new UnusedInternalFunctionRule(),
                             new UnusedPrivateConstantRule(),
                             new UnusedPrivateMethodRule(),
                             new UnusedPrivatePropertyRule(),
@@ -330,7 +352,6 @@ final class RuleRegistry
                             new ParameterCountRule(),
                             new PropertyCountRule(),
                             new PublicMethodCountRule(),
-                            new SingleImplementorInterfaceRule(),
                         ]);
     }
 
@@ -357,6 +378,27 @@ final class RuleRegistry
     }
 
     /**
+     * Return the requested rule ids that are not registered.
+     *
+     * @param list<string> $ruleIds - Rule identifiers to validate.
+     *
+     * @return list<string> - Unknown ids in first-seen order, de-duplicated.
+     */
+    public function unknownRuleIds(array $ruleIds): array
+    {
+        $unknown = [];
+        foreach ($ruleIds as $ruleId) {
+            if (isset($unknown[$ruleId]) || $this->has($ruleId)) {
+                continue;
+            }
+
+            $unknown[$ruleId] = true;
+        }
+
+        return array_keys($unknown);
+    }
+
+    /**
      * Return a registered rule by id.
      *
      * @param string $ruleId - Rule identifier to look up.
@@ -380,15 +422,29 @@ final class RuleRegistry
      */
     public function enabledRules(AnalysisConfig $config): array
     {
-        return array_values(array_filter(
-                                $this->rules,
-                                static function (RuleInterface|ProjectRuleInterface $rule) use ($config): bool {
-                                    $definition = $rule->definition();
+        return $this->enabledRulesByConfig[$config] ??= $this->filterEnabledRules($config);
+    }
 
-                                    return $config->ruleSettings($definition->id)->enabled
-                                           && $config->ruleSelection()->allows($definition);
-                                },
-                            ));
+    /**
+     * Filter the registered rules down to the set the config enables.
+     *
+     * @param AnalysisConfig $config - Config used to filter registered rules.
+     *
+     * @return list<RuleInterface|ProjectRuleInterface> - rules passing both per-rule toggle and selection filter, id-sorted; empty when config
+     *                                                  disables all
+     */
+    private function filterEnabledRules(AnalysisConfig $config): array
+    {
+        $selection    = $config->ruleSelection();
+        $enabledRules = [];
+
+        foreach ($this->definitions as $ruleId => $definition) {
+            if ($config->ruleSettings($ruleId)->enabled && $selection->allows($definition)) {
+                $enabledRules[] = $this->rules[$ruleId];
+            }
+        }
+
+        return $enabledRules;
     }
 
     /**

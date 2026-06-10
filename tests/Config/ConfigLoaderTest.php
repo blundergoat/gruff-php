@@ -622,22 +622,6 @@ final class ConfigLoaderTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify rejects unknown rule ids.
-     *
-     * @return void
-     */
-    public function testRejectsUnknownRuleIds(): void
-    {
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('Unknown rule id "size.nope".');
-
-        (new ConfigLoader(__DIR__ . '/../..'))->load(
-            'tests/Fixtures/Config/unknown-rule.yaml',
-            RuleRegistry::defaults(),
-        );
-    }
-
-    /**
      * Verify loads path ignores allowlists and rule selection.
      *
      * @return void

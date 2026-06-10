@@ -17,7 +17,12 @@ use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Closure;
+use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
@@ -87,6 +92,21 @@ final readonly class IdentifierQualityRule implements RuleInterface
     ];
 
     /**
+     * Array-iteration callables whose direct closure callbacks act like loop bodies.
+     */
+    private const ITERATION_CALLABLES = [
+        'array_filter',
+        'array_map',
+        'array_walk',
+        'usort',
+        'uasort',
+        'array_reduce',
+        'array_any',
+        'array_all',
+        'array_find',
+    ];
+
+    /**
      * Framework and lifecycle hooks exempt from generic method-name checks.
      */
     private const LIFECYCLE_METHODS = [
@@ -128,12 +148,12 @@ final readonly class IdentifierQualityRule implements RuleInterface
                 'genericTokens' => 'Tokens treated as generic when used as the whole identifier (data, entry, info, item).',
                 'ignoredNames' => 'Names exempt from all checks (loop counters, exception variables, $_).',
                 'minScopeReferences' => 'Minimum local-variable references before reporting generic names.',
-                'loopBodyThreshold' => 'Foreach body statement count above which generic loop names report.',
+                'loopBodyThreshold' => 'Body statement count at which generic names report for foreach loops and sole parameters of inline array-iteration callbacks.',
             ],
             falsePositiveShapes: [
                 [
-                    'shape' => 'Short loop bodies that use a conventional generic name ($entry, $item, $row) when iterating a payload.',
-                    'mitigation' => 'Keep the loop body at or below loopBodyThreshold (default 4) statements, or add the name to options.ignoredNames.',
+                    'shape' => 'Short iteration bodies that use a conventional generic name ($entry, $item, $row) - foreach loops, or single-parameter closures passed directly to array-iteration callables such as array_filter.',
+                    'mitigation' => 'Keep the body below loopBodyThreshold (default 4) statements, or add the name to options.ignoredNames.',
                 ],
                 [
                     'shape' => 'Single-parameter helpers whose role is intentionally generic (mixed → string converters, JSON-boundary helpers).',
@@ -275,7 +295,8 @@ final readonly class IdentifierQualityRule implements RuleInterface
         int $minScopeReferences,
         int $loopBodyThreshold,
     ): array {
-        $findings = [];
+        $findings             = [];
+        $iterationCallbackIds = $this->iterationCallbackIds($findingContext->analysisUnit);
 
         foreach ((new FunctionLikeScopeWalker())->scopes($findingContext->analysisUnit->statements) as $scope) {
             $function         = $scope->node;
@@ -286,7 +307,7 @@ final readonly class IdentifierQualityRule implements RuleInterface
             array_push(
                 $findings,
                 ...$functionFindings,
-                ...$this->parameterFindings($findingContext, $scope),
+                ...$this->parameterFindings($findingContext, $scope, $loopBodyThreshold, $iterationCallbackIds),
                 ...$this->localVariableFindings($findingContext, $scope, $minScopeReferences, $loopBodyThreshold),
             );
         }
@@ -324,14 +345,21 @@ final readonly class IdentifierQualityRule implements RuleInterface
      *
      * @param IdentifierFindingContext $findingContext - Resolved vocabulary and unit shared across the per-parameter checks.
      * @param FunctionLikeScope        $scope - Single function-like scope whose declared parameters are judged.
+     * @param int                      $loopBodyThreshold - Body size at which generic iteration-callback parameters become reportable.
+     * @param array<int, true>         $iterationCallbackIds - spl_object_id set of closures passed directly to array-iteration callables.
      *
      * @return list<Finding> - Findings for parameters and promoted properties.
      */
-    private function parameterFindings(IdentifierFindingContext $findingContext, FunctionLikeScope $scope): array
-    {
+    private function parameterFindings(
+        IdentifierFindingContext $findingContext,
+        FunctionLikeScope $scope,
+        int $loopBodyThreshold,
+        array $iterationCallbackIds,
+    ): array {
         $findings              = [];
         $symbol                = $this->symbol($scope);
-        $skipGenericComplaints = $this->isGenericByPurposeHelper($scope);
+        $skipGenericComplaints = $this->isGenericByPurposeHelper($scope)
+            || $this->isShortIterationCallback($scope, $loopBodyThreshold, $iterationCallbackIds);
 
         foreach ($scope->node->params as $param) {
             if (!$param->var instanceof Variable || !is_string($param->var->name)) {
@@ -394,6 +422,56 @@ final readonly class IdentifierQualityRule implements RuleInterface
         $typeName = ModernisationNodeHelper::typeName($type);
 
         return $typeName === 'mixed' || $typeName === 'scalar';
+    }
+
+    /**
+     * Index closures and arrow functions passed directly as arguments to array-iteration callables.
+     *
+     * @param AnalysisUnit $analysisUnit - Parsed unit whose function calls are scanned for inline callbacks.
+     *
+     * @return array<int, true> - spl_object_id set of function-like nodes used as iteration callbacks.
+     */
+    private function iterationCallbackIds(AnalysisUnit $analysisUnit): array
+    {
+        $callbackIds = [];
+
+        foreach (NodeIndex::nodesOf($analysisUnit, FuncCall::class) as $call) {
+            if (!$call->name instanceof Name || !in_array(strtolower($call->name->toString()), self::ITERATION_CALLABLES, true)) {
+                continue;
+            }
+
+            foreach ($call->args as $arg) {
+                if ($arg instanceof Arg && ($arg->value instanceof Closure || $arg->value instanceof ArrowFunction)) {
+                    $callbackIds[spl_object_id($arg->value)] = true;
+                }
+            }
+        }
+
+        return $callbackIds;
+    }
+
+    /**
+     * Detect the sole-parameter, short-bodied iteration callback shape. The lone parameter of a closure
+     * passed directly to an array-iteration callable plays the same role as a foreach value variable,
+     * so the loopBodyThreshold escape hatch documented for loops applies to its generic name too.
+     *
+     * @param FunctionLikeScope $scope - Scope whose node may be an inline iteration callback.
+     * @param int               $loopBodyThreshold - Body statement count at which generic names become reportable.
+     * @param array<int, true>  $iterationCallbackIds - spl_object_id set of iteration-callback nodes.
+     *
+     * @return bool - True when the callback has exactly one parameter and its body stays below the loop threshold.
+     */
+    private function isShortIterationCallback(FunctionLikeScope $scope, int $loopBodyThreshold, array $iterationCallbackIds): bool
+    {
+        $node = $scope->node;
+        if (!isset($iterationCallbackIds[spl_object_id($node)]) || count($node->params) !== 1) {
+            return false;
+        }
+
+        // An arrow function body is one expression; closures count their statement list like a foreach body.
+        $statementCount = $node instanceof ArrowFunction ? 1 : count($node->stmts ?? []);
+
+        return $statementCount < $loopBodyThreshold;
     }
 
     /**

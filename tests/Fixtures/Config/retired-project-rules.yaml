@@ -1,0 +1,99 @@
+schemaVersion: gruff-php.config.v0.1
+rules:
+    dead-code.unused-internal-class:
+        enabled: true
+        options:
+            internalNamespacePrefixes: []
+            entrypointSymbols: []
+            entrypointPathPrefixes: []
+            additionalExcludedPaths: []
+            externalNamespacePrefixes:
+                - Psr\
+                - Symfony\
+                - Doctrine\
+                - Twig\
+                - League\
+                - PhpParser\
+                - PHPUnit\
+            frameworkAttributePrefixes:
+                - Symfony\
+                - Doctrine\
+                - Attribute\AsCommand
+                - Attribute\AsController
+                - Attribute\AutoconfigureTag
+                - Attribute\AsEventSubscriber
+            treatTestsAsReferences: true
+    dead-code.unused-internal-constant:
+        enabled: true
+        options:
+            internalNamespacePrefixes: []
+            entrypointSymbols: []
+            entrypointPathPrefixes: []
+            additionalExcludedPaths: []
+            externalNamespacePrefixes:
+                - Psr\
+                - Symfony\
+                - Doctrine\
+                - Twig\
+                - League\
+                - PhpParser\
+                - PHPUnit\
+            frameworkAttributePrefixes:
+                - Symfony\
+                - Doctrine\
+                - Attribute\AsCommand
+                - Attribute\AsController
+                - Attribute\AutoconfigureTag
+                - Attribute\AsEventSubscriber
+            treatTestsAsReferences: true
+    dead-code.unused-internal-function:
+        enabled: true
+        options:
+            internalNamespacePrefixes: []
+            entrypointSymbols: []
+            entrypointPathPrefixes: []
+            additionalExcludedPaths: []
+            externalNamespacePrefixes:
+                - Psr\
+                - Symfony\
+                - Doctrine\
+                - Twig\
+                - League\
+                - PhpParser\
+                - PHPUnit\
+            frameworkAttributePrefixes:
+                - Symfony\
+                - Doctrine\
+                - Attribute\AsCommand
+                - Attribute\AsController
+                - Attribute\AutoconfigureTag
+                - Attribute\AsEventSubscriber
+            treatTestsAsReferences: true
+    design.single-implementor-interface:
+        enabled: true
+        options:
+            externalNamespacePrefixes:
+                - Psr\
+                - Symfony\
+                - Doctrine\
+                - Twig\
+                - League\
+                - PhpParser\
+                - PHPUnit\
+                - Stringable
+                - Throwable
+                - Countable
+                - IteratorAggregate
+                - Iterator
+                - JsonSerializable
+                - ArrayAccess
+                - Traversable
+            frameworkAttributePrefixes:
+                - Symfony\
+                - Doctrine\
+                - Attribute\AsCommand
+                - Attribute\AsController
+                - Attribute\AutoconfigureTag
+                - Attribute\AsEventSubscriber
+            treatMockUsageAsImplementor: false
+            additionalExcludedPaths: []

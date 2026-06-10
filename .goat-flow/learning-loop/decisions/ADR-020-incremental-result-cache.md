@@ -59,3 +59,27 @@ profile, or a fast per-file hook config) are fully cacheable.
   per-unit rule, and the equivalence test is the standing proof.
 - Correctness is preserved unconditionally — the guard plus the fail-open contract
   mean the cache can only ever make a correct run faster, never change its result.
+
+## Addendum (2026-06-10): project-rule count correction
+
+The Context section's claim "Only 3 rules are project rules" was wrong when written — there were
+four `ProjectRuleInterface` implementors (`dead-code.unused-internal-class`,
+`dead-code.unused-internal-constant`, `dead-code.unused-internal-function`, and
+`design.single-implementor-interface`). All four were retired in
+[ADR-026](ADR-026-retire-project-rules.md), so the count is now 0: the guard's
+`!hasEnabledProjectRules` check passes on every default run, the cache engages by default, and the
+guard's project-rule branch is inert until a new project rule lands. The guard itself stays — it is
+the correctness contract any future project rule must re-enter through.
+
+**(2026-06-10) Scale fix to point 4's bound.** Final 0.4.0 validation on a 10,384-file repo exposed
+two scale defects in the "capped with oldest-first eviction" mechanics: `put()` globbed the whole
+cache directory on every write, and the 4096-entry cap sat below the repo's file count, so entries
+were evicted before any warm run could reuse them — the cold whole-repo scan went from 92s
+(pre-cache-default) to a 900s timeout, and the "warm" run thrashed identically. The bound stays but
+its mechanics changed: eviction now runs exactly once per run via an explicit end-of-run
+`ResultCache::finalizeRun()` call in the streaming pipeline; a run whose discovered file count
+exceeds the cap silently skips the cache (a working set that cannot fit is pure overhead either
+way); and the cap was raised to 32768 — measured at ~39MB per 4096 entries, so a ~320MB
+steady-state worst case. The cap is sized against the DISCOVERED file count (PHP plus text
+units), not the count of files with findings: shopware discovers 17,543 units, so the first
+16384 cap silently routed it into the over-cap skip and the motivating repo never warmed.

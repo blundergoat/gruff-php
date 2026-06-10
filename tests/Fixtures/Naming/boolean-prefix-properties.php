@@ -14,6 +14,9 @@ final class BooleanPrefixPropertiesFixture
     public ?bool $valid       = null;
     public bool|null $silent  = null;
     public bool|string $flag  = false;
+    public bool $is_valid     = false;
+    public bool $force        = false;
+    public bool $forceShould  = false;
 
     public function __construct(private bool $interactive, private bool $infectionRunCtor)
     {

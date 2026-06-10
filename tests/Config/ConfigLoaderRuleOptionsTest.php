@@ -7,19 +7,23 @@ declare(strict_types=1);
 
 namespace GruffPhp\Tests\Config;
 
+use GruffPhp\Config\AnalysisConfig;
 use GruffPhp\Config\ConfigException;
 use GruffPhp\Config\ConfigLoader;
+use GruffPhp\Config\RuleConfigApplier;
 use GruffPhp\Finding\Confidence;
 use GruffPhp\Finding\Pillar;
 use GruffPhp\Finding\RuleTier;
 use GruffPhp\Finding\Severity;
 use GruffPhp\Parser\AnalysisUnit;
-use GruffPhp\Rule\DeadCode\UnusedInternalClassRule;
 use GruffPhp\Rule\Naming\IdentifierQualityRule;
 use GruffPhp\Rule\RuleContext;
 use GruffPhp\Rule\RuleDefinition;
 use GruffPhp\Rule\RuleInterface;
 use GruffPhp\Rule\RuleRegistry;
+use GruffPhp\Rule\Security\SqlConcatenationRule;
+use GruffPhp\Rule\Security\VariableIncludeRule;
+use GruffPhp\Rule\TestQuality\ExtendsProductionClassRule;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -84,27 +88,89 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Verify loads project-wide dead-code rule options.
+     * Verify unknown rule ids in a rules block warn through the sink and are skipped while known blocks still apply.
      *
      * @return void
      */
-    public function testLoadsProjectWideDeadCodeOptions(): void
+    public function testWarnsAndIgnoresUnknownRuleIdBlocks(): void
+    {
+        $ruleRegistry = new RuleRegistry([new FixtureDefaultDisabledRule()]);
+        $warnings     = [];
+        $applier      = new RuleConfigApplier(static function (string $line) use (&$warnings): void {
+            $warnings[] = $line;
+        });
+
+        $config = $applier->apply(
+            AnalysisConfig::fromRegistry($ruleRegistry),
+            $ruleRegistry,
+            [
+                'rules' => [
+                    'dead-code.retired-rule'         => ['enabled' => true],
+                    FixtureDefaultDisabledRule::ID   => ['enabled' => true],
+                ],
+            ],
+        );
+
+        self::assertSame(
+            ['gruff-php: ignoring unknown rule id "dead-code.retired-rule" in config (retired or mistyped); remove the "rules.dead-code.retired-rule" block to silence this warning.'],
+            $warnings,
+        );
+        self::assertTrue($config->ruleSettings(FixtureDefaultDisabledRule::ID)->enabled);
+    }
+
+    /**
+     * Verify loads the extends-production-class additional test base classes option.
+     *
+     * @return void
+     */
+    public function testLoadsAdditionalTestBaseClassesOption(): void
     {
         $path = $this->writeTempConfig(sprintf(
-                                           '{"rules":{"%s":{"options":{"internalNamespacePrefixes":["App\\\\"],"entrypointSymbols":["App\\\\Console"],"entrypointPathPrefixes":["bin/"],"additionalExcludedPaths":["vendor-copy/"],"externalNamespacePrefixes":["Psr\\\\"],"frameworkAttributePrefixes":["Symfony\\\\"],"treatTestsAsReferences":false}}}}',
-                                           UnusedInternalClassRule::ID,
+                                           '{"rules":{"%s":{"options":{"additionalTestBaseClasses":["IntegrationTestBase"]}}}}',
+                                           ExtendsProductionClassRule::ID,
                                        ));
 
         $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-        $settings = $config->ruleSettings(UnusedInternalClassRule::ID);
+        $settings = $config->ruleSettings(ExtendsProductionClassRule::ID);
 
-        self::assertSame(['App\\'], $settings->stringListOption('internalNamespacePrefixes'));
-        self::assertSame(['App\\Console'], $settings->stringListOption('entrypointSymbols'));
-        self::assertSame(['bin/'], $settings->stringListOption('entrypointPathPrefixes'));
-        self::assertSame(['vendor-copy/'], $settings->stringListOption('additionalExcludedPaths'));
-        self::assertSame(['Psr\\'], $settings->stringListOption('externalNamespacePrefixes'));
-        self::assertSame(['Symfony\\'], $settings->stringListOption('frameworkAttributePrefixes'));
-        self::assertFalse($settings->option('treatTestsAsReferences'));
+        self::assertSame(['IntegrationTestBase'], $settings->stringListOption('additionalTestBaseClasses'));
+    }
+
+    /**
+     * Verify loads the variable-include constant-path options.
+     *
+     * @return void
+     */
+    public function testLoadsVariableIncludeConstantPathOptions(): void
+    {
+        $path = $this->writeTempConfig(sprintf(
+                                           '{"rules":{"%s":{"options":{"treatGlobalConstantsAsFixed":false,"dynamicPathConstants":["ABSPATH"]}}}}',
+                                           VariableIncludeRule::ID,
+                                       ));
+
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(VariableIncludeRule::ID);
+
+        self::assertFalse($settings->option('treatGlobalConstantsAsFixed'));
+        self::assertSame(['ABSPATH'], $settings->stringListOption('dynamicPathConstants'));
+    }
+
+    /**
+     * Verify loads the sql-concatenation safe-interpolation-receivers option.
+     *
+     * @return void
+     */
+    public function testLoadsSqlConcatenationSafeInterpolationReceiversOption(): void
+    {
+        $path = $this->writeTempConfig(sprintf(
+                                           '{"rules":{"%s":{"options":{"safeInterpolationReceivers":["wpdb","db"]}}}}',
+                                           SqlConcatenationRule::ID,
+                                       ));
+
+        $config   = (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
+        $settings = $config->ruleSettings(SqlConcatenationRule::ID);
+
+        self::assertSame(['wpdb', 'db'], $settings->stringListOption('safeInterpolationReceivers'));
     }
 
     /**
@@ -185,29 +251,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
     }
 
     /**
-     * Provide invalid project-wide dead-code option type cases.
-     *
-     * @return array<string, array{string, string}> - config payload and expected validation message
-     */
-    public static function invalidProjectWideDeadCodeOptionProvider(): array
-    {
-        return [
-            'entrypoint symbols list shape'       => [
-                '{"rules":{"%s":{"options":{"entrypointSymbols":"App\\\\Console"}}}}',
-                'Option "rules.%s.options.entrypointSymbols" must be a list.',
-            ],
-            'internal namespace string item'      => [
-                '{"rules":{"%s":{"options":{"internalNamespacePrefixes":[123]}}}}',
-                'Option "rules.%s.options.internalNamespacePrefixes.0" must be a string.',
-            ],
-            'treat tests as references boolean'   => [
-                '{"rules":{"%s":{"options":{"treatTestsAsReferences":"false"}}}}',
-                'Option "rules.%s.options.treatTestsAsReferences" must be boolean.',
-            ],
-        ];
-    }
-
-    /**
      * Verify rejects invalid rule option type variants.
      *
      * @param string $configTemplate - Config JSON template.
@@ -227,24 +270,6 @@ final class ConfigLoaderRuleOptionsTest extends ConfigLoaderTestCase
         (new ConfigLoader(dirname($path)))->load(basename($path), $ruleRegistry);
     }
 
-    /**
-     * Verify rejects invalid project-wide dead-code option variants.
-     *
-     * @param string $configTemplate - Config JSON template.
-     * @param string $messageTemplate - Expected exception message template.
-     *
-     * @return void
-     */
-    #[DataProvider('invalidProjectWideDeadCodeOptionProvider')]
-    public function testRejectsInvalidProjectWideDeadCodeOptionVariants(string $configTemplate, string $messageTemplate): void
-    {
-        $path = $this->writeTempConfig(sprintf($configTemplate, UnusedInternalClassRule::ID));
-
-        $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage(sprintf($messageTemplate, UnusedInternalClassRule::ID));
-
-        (new ConfigLoader(dirname($path)))->load(basename($path), RuleRegistry::defaults());
-    }
 }
 
 /**
