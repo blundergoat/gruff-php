@@ -115,6 +115,15 @@ final readonly class AnalyseCommandSetupBuilder
             );
         }
 
+        $registry        = RuleRegistry::defaults();
+        $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
+        if ($ruleFilterError !== null) {
+            return AnalyseCommandSetupResult::reportError(
+                $this->usageReport($options, $formatResult, $failThreshold->value, $ruleFilterError),
+                $formatResult,
+            );
+        }
+
         $promptExitCode = MissingConfigPrompt::maybeOffer(
             input:                   $input,
             output:                  $output,
@@ -129,7 +138,6 @@ final readonly class AnalyseCommandSetupBuilder
         }
 
         $options      = $options->withDefaultBaseline($projectRoot);
-        $registry     = RuleRegistry::defaults();
         $configLoader = new ConfigLoader($projectRoot, ConfigLoader::packageRoot());
         $configResult = $this->config(
             options:       $options,
@@ -159,18 +167,6 @@ final readonly class AnalyseCommandSetupBuilder
         $profileRuleSelection = $options->profileRuleSelection();
         if ($profileRuleSelection !== null) {
             $configResult = $configResult->withRuleSelection($profileRuleSelection);
-        }
-        $ruleFilterError = $this->ruleFilterError($registry, $options->includeRules, $options->excludeRules);
-        if ($ruleFilterError !== null) {
-            return AnalyseCommandSetupResult::reportError(
-                $this->usageReport(
-                    options: $options,
-                    format:  $formatResult,
-                    failOn:  $failThreshold->value,
-                    message: $ruleFilterError,
-                ),
-                $formatResult,
-            );
         }
         if ($options->includeRules !== [] || $options->excludeRules !== []) {
             $configResult = $configResult->withRuleSelection(
